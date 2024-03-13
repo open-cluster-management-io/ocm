@@ -36,6 +36,15 @@ func NewSourceOptions(mqttOptions *MQTTOptions, clientID, sourceID string) *opti
 }
 
 func (o *mqttSourceOptions) WithContext(ctx context.Context, evtCtx cloudevents.EventContext) (context.Context, error) {
+	topic, err := getSourcePubTopic(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if topic != nil {
+		return cloudeventscontext.WithTopic(ctx, string(*topic)), nil
+	}
+
 	eventType, err := types.ParseCloudEventsType(evtCtx.GetType())
 	if err != nil {
 		return nil, fmt.Errorf("unsupported event type %s, %v", eventType, err)

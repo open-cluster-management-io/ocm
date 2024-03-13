@@ -20,6 +20,14 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
+type TopicKey string
+type PubTopic string
+
+const (
+	MQTT_SOURCE_PUB_TOPIC_KEY TopicKey = "mqtt_source_pub_topic"
+	MQTT_AGENT_PUB_TOPIC_KEY  TopicKey = "mqtt_agent_pub_topic"
+)
+
 // MQTTOptions holds the options that are used to build MQTT client.
 type MQTTOptions struct {
 	Topics         types.Topics
@@ -271,4 +279,48 @@ func replaceLast(str, old, new string) string {
 		return str
 	}
 	return str[:last] + new + str[last+len(old):]
+}
+
+func getSourcePubTopic(ctx context.Context) (*PubTopic, error) {
+	ctxTopic := ctx.Value(MQTT_SOURCE_PUB_TOPIC_KEY)
+	if ctxTopic == nil {
+		return nil, nil
+	}
+
+	topic, ok := ctxTopic.(PubTopic)
+	if !ok {
+		return nil, fmt.Errorf("source pub topic should be a string")
+	}
+
+	if regexp.MustCompile(types.SourceEventsTopicPattern).MatchString(string(topic)) {
+		return &topic, nil
+	}
+
+	if regexp.MustCompile(types.SourceBroadcastTopicPattern).MatchString(string(topic)) {
+		return &topic, nil
+	}
+
+	return nil, fmt.Errorf("invalid source pub topic")
+}
+
+func getAgentPubTopic(ctx context.Context) (*PubTopic, error) {
+	ctxTopic := ctx.Value(MQTT_AGENT_PUB_TOPIC_KEY)
+	if ctxTopic == nil {
+		return nil, nil
+	}
+
+	topic, ok := ctxTopic.(PubTopic)
+	if !ok {
+		return nil, fmt.Errorf("agent pub topic should be a string")
+	}
+
+	if regexp.MustCompile(types.AgentEventsTopicPattern).MatchString(string(topic)) {
+		return &topic, nil
+	}
+
+	if regexp.MustCompile(types.AgentBroadcastTopicPattern).MatchString(string(topic)) {
+		return &topic, nil
+	}
+
+	return nil, fmt.Errorf("invalid agent pub topic")
 }
