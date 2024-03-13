@@ -9,7 +9,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/rs/zerolog"
+	"log/slog"
 )
 
 // Config contains configuration values for a listener.
@@ -22,24 +22,24 @@ type Config struct {
 // EstablishFn is a callback function for establishing new clients.
 type EstablishFn func(id string, c net.Conn) error
 
-// CloseFunc is a callback function for closing all listener clients.
+// CloseFn is a callback function for closing all listener clients.
 type CloseFn func(id string)
 
 // Listener is an interface for network listeners. A network listener listens
 // for incoming client connections and adds them to the server.
 type Listener interface {
-	Init(*zerolog.Logger) error // open the network address
-	Serve(EstablishFn)          // starting actively listening for new connections
-	ID() string                 // return the id of the listener
-	Address() string            // the address of the listener
-	Protocol() string           // the protocol in use by the listener
-	Close(CloseFn)              // stop and close the listener
+	Init(*slog.Logger) error // open the network address
+	Serve(EstablishFn)       // starting actively listening for new connections
+	ID() string              // return the id of the listener
+	Address() string         // the address of the listener
+	Protocol() string        // the protocol in use by the listener
+	Close(CloseFn)           // stop and close the listener
 }
 
 // Listeners contains the network listeners for the broker.
 type Listeners struct {
-	wg       sync.WaitGroup      // a waitgroup that waits for all listeners to finish.
-	internal map[string]Listener // a map of active listeners.
+	ClientsWg sync.WaitGroup      // a waitgroup that waits for all clients in all listeners to finish.
+	internal  map[string]Listener // a map of active listeners.
 	sync.RWMutex
 }
 
@@ -86,8 +86,6 @@ func (l *Listeners) Serve(id string, establisher EstablishFn) {
 	listener := l.internal[id]
 
 	go func(e EstablishFn) {
-		defer l.wg.Done()
-		l.wg.Add(1)
 		listener.Serve(e)
 	}(establisher)
 }
@@ -131,5 +129,5 @@ func (l *Listeners) CloseAll(closer CloseFn) {
 	for _, id := range ids {
 		l.Close(id, closer)
 	}
-	l.wg.Wait()
+	l.ClientsWg.Wait()
 }

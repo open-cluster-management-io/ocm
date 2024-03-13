@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"google.golang.org/grpc"
@@ -18,20 +17,6 @@ import (
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protocol"
-)
-
-const (
-	// SpecTopic is a pubsub topic for resource spec.
-	SpecTopic = "sources/+/clusters/+/spec"
-
-	// StatusTopic is a pubsub topic for resource status.
-	StatusTopic = "sources/+/clusters/+/status"
-
-	// SpecResyncTopic is a pubsub topic for resource spec resync.
-	SpecResyncTopic = "sources/clusters/+/specresync"
-
-	// StatusResyncTopic is a pubsub topic for resource status resync.
-	StatusResyncTopic = "sources/+/clusters/statusresync"
 )
 
 // GRPCOptions holds the options that are used to build gRPC client.
@@ -167,21 +152,4 @@ func (o *GRPCOptions) GetCloudEventsClient(ctx context.Context, errorHandler fun
 	}
 
 	return cloudevents.NewClient(p)
-}
-
-// Replace the nth occurrence of old in str by new.
-func replaceNth(str, old, new string, n int) string {
-	i := 0
-	for m := 1; m <= n; m++ {
-		x := strings.Index(str[i:], old)
-		if x < 0 {
-			break
-		}
-		i += x
-		if m == n {
-			return str[:i] + new + str[i+len(old):]
-		}
-		i += len(old)
-	}
-	return str
 }
