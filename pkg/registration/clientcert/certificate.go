@@ -2,9 +2,11 @@ package clientcert
 
 import (
 	"context"
+	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -92,15 +94,35 @@ func IsCertificateValid(logger klog.Logger, certData []byte, subject *pkix.Name)
 	}
 
 	// check subject of certificates
+	// if the subject is specified, make sure at least one cert in the certificate chain matches the subject
 	for _, cert := range certs {
-		if cert.Subject.CommonName != subject.CommonName {
-			continue
+		if certMatchSubject(cert, subject) {
+			return true, nil
 		}
-		return true, nil
 	}
 
-	logger.V(4).Info("Certificate is not issued for subject", "commonName", subject.CommonName)
+	logger.V(4).Info("Certificate is not issued for subject", "commonName", subject.CommonName, "organization",
+		subject.Organization, "organizationalUnit", subject.OrganizationalUnit)
 	return false, nil
+}
+
+func certMatchSubject(cert *x509.Certificate, subject *pkix.Name) bool {
+	// check commonName
+	if cert.Subject.CommonName != subject.CommonName {
+		return false
+	}
+
+	// check groups(origanization)
+	if !reflect.DeepEqual(cert.Subject.Organization, subject.Organization) {
+		return false
+	}
+
+	// check originzation unit
+	if !reflect.DeepEqual(cert.Subject.OrganizationalUnit, subject.OrganizationalUnit) {
+		return false
+	}
+
+	return true
 }
 
 // getCertValidityPeriod returns the validity period of the client certificate in the secret

@@ -44,20 +44,24 @@ var _ = ginkgo.Describe("Cluster Auto Approval", func() {
 		defer cancel()
 
 		// after bootstrap the spokecluster should be accepted and its csr should be auto approved
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			cluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
-				return false
+				return err
 			}
 
-			return cluster.Spec.HubAcceptsClient
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			if !cluster.Spec.HubAcceptsClient {
+				return fmt.Errorf("cluster should be accepted")
+			}
+
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		var approvedCSR *certificates.CertificateSigningRequest
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			approvedCSR, err = util.FindAutoApprovedSpokeCSR(kubeClient, managedClusterName)
-			return err == nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return err
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		// simulate hub cluster to fill a certificate
 		now := time.Now()
