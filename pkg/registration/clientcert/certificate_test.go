@@ -201,6 +201,20 @@ func TestIsCertificateValid(t *testing.T) {
 			},
 			isValid: true,
 		},
+		{
+			name: "valid cert different order",
+			testCert: testinghelpers.NewTestCertWithSubject(pkix.Name{
+				CommonName:         "test",
+				Organization:       []string{"org", "org2"},
+				OrganizationalUnit: []string{"ou", "ou2"},
+			}, 60*time.Second),
+			subject: &pkix.Name{
+				CommonName:         "test",
+				Organization:       []string{"org2", "org"},
+				OrganizationalUnit: []string{"ou2", "ou"},
+			},
+			isValid: true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

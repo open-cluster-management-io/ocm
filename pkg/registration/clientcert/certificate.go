@@ -6,7 +6,6 @@ import (
 	"crypto/x509/pkix"
 	"errors"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -14,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	certificatesinformers "k8s.io/client-go/informers/certificates"
 	certificatesv1informers "k8s.io/client-go/informers/certificates/v1"
 	"k8s.io/client-go/kubernetes"
@@ -112,17 +112,13 @@ func certMatchSubject(cert *x509.Certificate, subject *pkix.Name) bool {
 		return false
 	}
 
-	// check groups(origanization)
-	if !reflect.DeepEqual(cert.Subject.Organization, subject.Organization) {
+	// check groups (organization)
+	if !sets.New(cert.Subject.Organization...).Equal(sets.New(subject.Organization...)) {
 		return false
 	}
 
-	// check originzation unit
-	if !reflect.DeepEqual(cert.Subject.OrganizationalUnit, subject.OrganizationalUnit) {
-		return false
-	}
-
-	return true
+	// check organizational units
+	return sets.New(cert.Subject.OrganizationalUnit...).Equal(sets.New(subject.OrganizationalUnit...))
 }
 
 // getCertValidityPeriod returns the validity period of the client certificate in the secret
