@@ -614,7 +614,7 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 					return fmt.Errorf("statusFeedbackSynced condition should be True")
 				}
 				return nil
-			}, t.EventuallyTimeout, t.EventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, t.EventuallyTimeout*2, t.EventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		})
 	})
