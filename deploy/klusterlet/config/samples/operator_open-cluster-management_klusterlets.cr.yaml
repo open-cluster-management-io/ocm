@@ -4,7 +4,7 @@ metadata:
   name: klusterlet
 spec:
   deployOption:
-    mode: Default
+    mode: Singleton
   registrationImagePullSpec: quay.io/open-cluster-management/registration
   workImagePullSpec: quay.io/open-cluster-management/work
   imagePullSpec: quay.io/open-cluster-management/registration-operator

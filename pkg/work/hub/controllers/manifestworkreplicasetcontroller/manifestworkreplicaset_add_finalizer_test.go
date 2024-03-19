@@ -61,7 +61,7 @@ func TestAddFinalizerTwiceReconcile(t *testing.T) {
 		workClient: fakeClient,
 	}
 
-	mwrSetTest, _, err := addFinalizerController.reconcile(context.TODO(), mwrSetTest)
+	_, _, err := addFinalizerController.reconcile(context.TODO(), mwrSetTest)
 	if err != nil {
 		t.Fatal(err)
 	}

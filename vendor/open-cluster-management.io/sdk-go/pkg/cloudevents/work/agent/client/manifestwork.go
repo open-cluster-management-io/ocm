@@ -7,7 +7,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/klog/v2"
@@ -17,16 +16,9 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/codec"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/common"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/utils"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/watcher"
-)
-
-const ManifestsDeleted = "Deleted"
-
-const (
-	UpdateRequestAction = "update_request"
-	DeleteRequestAction = "delete_request"
 )
 
 // ManifestWorkAgentClient implements the ManifestWorkInterface. It sends the manifestworks status back to source by
@@ -36,8 +28,6 @@ type ManifestWorkAgentClient struct {
 	watcher           *watcher.ManifestWorkWatcher
 	lister            workv1lister.ManifestWorkNamespaceLister
 }
-
-var manifestWorkGR = schema.GroupResource{Group: workv1.GroupName, Resource: "manifestworks"}
 
 var _ workv1client.ManifestWorkInterface = &ManifestWorkAgentClient{}
 
@@ -53,23 +43,23 @@ func (c *ManifestWorkAgentClient) SetLister(lister workv1lister.ManifestWorkName
 }
 
 func (c *ManifestWorkAgentClient) Create(ctx context.Context, manifestWork *workv1.ManifestWork, opts metav1.CreateOptions) (*workv1.ManifestWork, error) {
-	return nil, errors.NewMethodNotSupported(manifestWorkGR, "create")
+	return nil, errors.NewMethodNotSupported(common.ManifestWorkGR, "create")
 }
 
 func (c *ManifestWorkAgentClient) Update(ctx context.Context, manifestWork *workv1.ManifestWork, opts metav1.UpdateOptions) (*workv1.ManifestWork, error) {
-	return nil, errors.NewMethodNotSupported(manifestWorkGR, "update")
+	return nil, errors.NewMethodNotSupported(common.ManifestWorkGR, "update")
 }
 
 func (c *ManifestWorkAgentClient) UpdateStatus(ctx context.Context, manifestWork *workv1.ManifestWork, opts metav1.UpdateOptions) (*workv1.ManifestWork, error) {
-	return nil, errors.NewMethodNotSupported(manifestWorkGR, "updatestatus")
+	return nil, errors.NewMethodNotSupported(common.ManifestWorkGR, "updatestatus")
 }
 
 func (c *ManifestWorkAgentClient) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	return errors.NewMethodNotSupported(manifestWorkGR, "delete")
+	return errors.NewMethodNotSupported(common.ManifestWorkGR, "delete")
 }
 
 func (c *ManifestWorkAgentClient) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	return errors.NewMethodNotSupported(manifestWorkGR, "deletecollection")
+	return errors.NewMethodNotSupported(common.ManifestWorkGR, "deletecollection")
 }
 
 func (c *ManifestWorkAgentClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*workv1.ManifestWork, error) {
@@ -88,7 +78,6 @@ func (c *ManifestWorkAgentClient) List(ctx context.Context, opts metav1.ListOpti
 }
 
 func (c *ManifestWorkAgentClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	// TODO (skeeey) consider resync the manifestworks when the ManifestWorkInformer reconnected
 	return c.watcher, nil
 }
 
@@ -105,7 +94,7 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 		return nil, err
 	}
 
-	eventDataType, err := types.ParseCloudEventsDataType(patchedWork.Annotations[codec.CloudEventsDataTypeAnnotationKey])
+	eventDataType, err := types.ParseCloudEventsDataType(patchedWork.Annotations[common.CloudEventsDataTypeAnnotationKey])
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +112,7 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 	}
 
 	if statusUpdated {
-		eventType.Action = UpdateRequestAction
+		eventType.Action = common.UpdateRequestAction
 		if err := c.cloudEventsClient.Publish(ctx, eventType, newWork); err != nil {
 			return nil, err
 		}
@@ -137,13 +126,13 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 	// it back to source
 	if !newWork.DeletionTimestamp.IsZero() && len(newWork.Finalizers) == 0 {
 		meta.SetStatusCondition(&newWork.Status.Conditions, metav1.Condition{
-			Type:    ManifestsDeleted,
+			Type:    common.ManifestsDeleted,
 			Status:  metav1.ConditionTrue,
 			Reason:  "ManifestsDeleted",
 			Message: fmt.Sprintf("The manifests are deleted from the cluster %s", newWork.Namespace),
 		})
 
-		eventType.Action = DeleteRequestAction
+		eventType.Action = common.DeleteRequestAction
 		if err := c.cloudEventsClient.Publish(ctx, eventType, newWork); err != nil {
 			return nil, err
 		}

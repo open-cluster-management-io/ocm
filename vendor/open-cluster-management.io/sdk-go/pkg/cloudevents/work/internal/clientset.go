@@ -7,6 +7,7 @@ import (
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	workv1alpha1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1alpha1"
+	sourceclient "open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/client"
 )
 
 // WorkClientSetWrapper wraps a work client that has a manifestwork client to a work clientset interface, this wrapper
@@ -37,7 +38,10 @@ type WorkV1ClientWrapper struct {
 var _ workv1client.WorkV1Interface = &WorkV1ClientWrapper{}
 
 func (c *WorkV1ClientWrapper) ManifestWorks(namespace string) workv1client.ManifestWorkInterface {
-	// TODO if the ManifestWorkClient is ManifestWorkSourceClient, we need set namespace here
+	if sourceManifestWorkClient, ok := c.ManifestWorkClient.(*sourceclient.ManifestWorkSourceClient); ok {
+		sourceManifestWorkClient.SetNamespace(namespace)
+		return sourceManifestWorkClient
+	}
 	return c.ManifestWorkClient
 }
 

@@ -2,6 +2,7 @@ package clientcert
 
 import (
 	"context"
+	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	certificatesinformers "k8s.io/client-go/informers/certificates"
 	certificatesv1informers "k8s.io/client-go/informers/certificates/v1"
 	"k8s.io/client-go/kubernetes"
@@ -92,15 +94,31 @@ func IsCertificateValid(logger klog.Logger, certData []byte, subject *pkix.Name)
 	}
 
 	// check subject of certificates
+	// if the subject is specified, make sure at least one cert in the certificate chain matches the subject
 	for _, cert := range certs {
-		if cert.Subject.CommonName != subject.CommonName {
-			continue
+		if certMatchSubject(cert, subject) {
+			return true, nil
 		}
-		return true, nil
 	}
 
-	logger.V(4).Info("Certificate is not issued for subject", "commonName", subject.CommonName)
+	logger.V(4).Info("Certificate is not issued for subject", "commonName", subject.CommonName, "organization",
+		subject.Organization, "organizationalUnit", subject.OrganizationalUnit)
 	return false, nil
+}
+
+func certMatchSubject(cert *x509.Certificate, subject *pkix.Name) bool {
+	// check commonName
+	if cert.Subject.CommonName != subject.CommonName {
+		return false
+	}
+
+	// check groups (organization)
+	if !sets.New(cert.Subject.Organization...).Equal(sets.New(subject.Organization...)) {
+		return false
+	}
+
+	// check organizational units
+	return sets.New(cert.Subject.OrganizationalUnit...).Equal(sets.New(subject.OrganizationalUnit...))
 }
 
 // getCertValidityPeriod returns the validity period of the client certificate in the secret

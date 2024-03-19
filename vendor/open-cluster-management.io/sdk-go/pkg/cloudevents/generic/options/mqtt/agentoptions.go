@@ -38,6 +38,15 @@ func NewAgentOptions(mqttOptions *MQTTOptions, clusterName, agentID string) *opt
 }
 
 func (o *mqttAgentOptions) WithContext(ctx context.Context, evtCtx cloudevents.EventContext) (context.Context, error) {
+	topic, err := getAgentPubTopic(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if topic != nil {
+		return cloudeventscontext.WithTopic(ctx, string(*topic)), nil
+	}
+
 	eventType, err := types.ParseCloudEventsType(evtCtx.GetType())
 	if err != nil {
 		return nil, fmt.Errorf("unsupported event type %s, %v", eventType, err)
@@ -51,7 +60,7 @@ func (o *mqttAgentOptions) WithContext(ctx context.Context, evtCtx cloudevents.E
 	// agent request to sync resource spec from all sources
 	if eventType.Action == types.ResyncRequestAction && originalSource == types.SourceAll {
 		if len(o.Topics.AgentBroadcast) == 0 {
-			klog.Warningf("the source wild card resync topic not set, fall back to the agent events topic")
+			klog.Warningf("the agent broadcast topic not set, fall back to the agent events topic")
 
 			// TODO after supporting multiple sources, we should list each source
 			eventsTopic := replaceLast(o.Topics.AgentEvents, "+", o.clusterName)

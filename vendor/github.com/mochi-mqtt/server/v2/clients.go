@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -21,8 +22,13 @@ import (
 )
 
 const (
-	defaultKeepalive             uint16 = 10 // the default connection keepalive value in seconds
+	defaultKeepalive             uint16 = 10 // the default connection keepalive value in seconds.
 	defaultClientProtocolVersion byte   = 4  // the default mqtt protocol version of connecting clients (if somehow unspecified).
+	minimumKeepalive             uint16 = 5  // the minimum recommended keepalive - values under with display a warning.
+)
+
+var (
+	ErrMinimumKeepalive = errors.New("client keepalive is below minimum recommended value and may exhibit connection instability")
 )
 
 // ReadFn is the function signature for the function used for reading and processing new packets.
@@ -99,7 +105,7 @@ func (cl *Clients) GetByListener(id string) []*Client {
 type Client struct {
 	Properties   ClientProperties // client properties
 	State        ClientState      // the operational state of the client.
-	Net          ClientConnection // network connection state of the clinet
+	Net          ClientConnection // network connection state of the client
 	ID           string           // the client id.
 	ops          *ops             // ops provides a reference to server ops.
 	sync.RWMutex                  // mutex
@@ -107,11 +113,12 @@ type Client struct {
 
 // ClientConnection contains the connection transport and metadata for the client.
 type ClientConnection struct {
-	Conn     net.Conn          // the net.Conn used to establish the connection
-	bconn    *bufio.ReadWriter // a buffered net.Conn for reading packets
-	Remote   string            // the remote address of the client
-	Listener string            // listener id of the client
-	Inline   bool              // client is an inline programmetic client
+	Conn     net.Conn      // the net.Conn used to establish the connection
+	bconn    *bufio.Reader // a buffered net.Conn for reading packets
+	outbuf   *bytes.Buffer // a buffer for writing packets
+	Remote   string        // the remote address of the client
+	Listener string        // listener id of the client
+	Inline   bool          // if true, the client is the built-in 'inline' embedded client
 }
 
 // ClientProperties contains the properties which define the client behaviour.
@@ -134,7 +141,7 @@ type Will struct {
 	Retain            bool                   // -
 }
 
-// State tracks the state of the client.
+// ClientState tracks the state of the client.
 type ClientState struct {
 	TopicAliases    TopicAliases         // a map of topic aliases
 	stopCause       atomic.Value         // reason for stopping
@@ -174,11 +181,8 @@ func newClient(c net.Conn, o *ops) *Client {
 
 	if c != nil {
 		cl.Net = ClientConnection{
-			Conn: c,
-			bconn: bufio.NewReadWriter(
-				bufio.NewReaderSize(c, o.options.ClientNetReadBufferSize),
-				bufio.NewWriterSize(c, o.options.ClientNetWriteBufferSize),
-			),
+			Conn:   c,
+			bconn:  bufio.NewReaderSize(c, o.options.ClientNetReadBufferSize),
 			Remote: c.RemoteAddr().String(),
 		}
 	}
@@ -192,7 +196,8 @@ func (cl *Client) WriteLoop() {
 		select {
 		case pk := <-cl.State.outbound:
 			if err := cl.WritePacket(*pk); err != nil {
-				cl.ops.log.Debug().Err(err).Str("client", cl.ID).Interface("packet", pk).Msg("failed publishing packet")
+				// TODO : Figure out what to do with error
+				cl.ops.log.Debug("failed publishing packet", "error", err, "client", cl.ID, "packet", pk)
 			}
 			atomic.AddInt32(&cl.State.outboundQty, -1)
 		case <-cl.State.open.Done():
@@ -209,6 +214,19 @@ func (cl *Client) ParseConnect(lid string, pk packets.Packet) {
 	cl.Properties.Username = pk.Connect.Username
 	cl.Properties.Clean = pk.Connect.Clean
 	cl.Properties.Props = pk.Properties.Copy(false)
+
+	if cl.Properties.Props.ReceiveMaximum > cl.ops.options.Capabilities.MaximumInflight { // 3.3.4 Non-normative
+		cl.Properties.Props.ReceiveMaximum = cl.ops.options.Capabilities.MaximumInflight
+	}
+
+	if pk.Connect.Keepalive <= minimumKeepalive {
+		cl.ops.log.Warn(
+			ErrMinimumKeepalive.Error(),
+			"client", cl.ID,
+			"keepalive", pk.Connect.Keepalive,
+			"recommended", minimumKeepalive,
+		)
+	}
 
 	cl.State.Keepalive = pk.Connect.Keepalive                                              // [MQTT-3.2.2-22]
 	cl.State.Inflight.ResetReceiveQuota(int32(cl.ops.options.Capabilities.ReceiveMaximum)) // server receive max per client
@@ -310,11 +328,27 @@ func (cl *Client) ResendInflightMessages(force bool) error {
 	return nil
 }
 
-// ClearInflights deletes all inflight messages for the client, eg. for a disconnected user with a clean session.
-func (cl *Client) ClearInflights(now, maximumExpiry int64) []uint16 {
+// ClearInflights deletes all inflight messages for the client, e.g. for a disconnected user with a clean session.
+func (cl *Client) ClearInflights() {
+	for _, tk := range cl.State.Inflight.GetAll(false) {
+		if ok := cl.State.Inflight.Delete(tk.PacketID); ok {
+			cl.ops.hooks.OnQosDropped(cl, tk)
+			atomic.AddInt64(&cl.ops.info.Inflight, -1)
+		}
+	}
+}
+
+// ClearExpiredInflights deletes any inflight messages which have expired.
+func (cl *Client) ClearExpiredInflights(now, maximumExpiry int64) []uint16 {
 	deleted := []uint16{}
 	for _, tk := range cl.State.Inflight.GetAll(false) {
-		if (tk.Expiry > 0 && tk.Expiry < now) || tk.Created+maximumExpiry < now {
+		expired := tk.ProtocolVersion == 5 && tk.Expiry > 0 && tk.Expiry < now // [MQTT-3.3.2-5]
+
+		// If the maximum message expiry interval is set (greater than 0), and the message
+		// retention period exceeds the maximum expiry, the message will be forcibly removed.
+		enforced := maximumExpiry > 0 && now-tk.Created > maximumExpiry
+
+		if expired || enforced {
 			if ok := cl.State.Inflight.Delete(tk.PacketID); ok {
 				cl.ops.hooks.OnQosDropped(cl, tk)
 				atomic.AddInt64(&cl.ops.info.Inflight, -1)
@@ -552,11 +586,35 @@ func (cl *Client) WritePacket(pk packets.Packet) error {
 		return packets.ErrPacketTooLarge // [MQTT-3.1.2-24] [MQTT-3.1.2-25]
 	}
 
-	nb := net.Buffers{buf.Bytes()}
 	n, err := func() (int64, error) {
 		cl.Lock()
 		defer cl.Unlock()
-		return nb.WriteTo(cl.Net.Conn)
+		if len(cl.State.outbound) == 0 {
+			if cl.Net.outbuf == nil {
+				return buf.WriteTo(cl.Net.Conn)
+			}
+
+			// first write to buffer, then flush buffer
+			n, _ := cl.Net.outbuf.Write(buf.Bytes()) // will always be successful
+			err = cl.flushOutbuf()
+			return int64(n), err
+		}
+
+		// there are more writes in the queue
+		if cl.Net.outbuf == nil {
+			if buf.Len() >= cl.ops.options.ClientNetWriteBufferSize {
+				return buf.WriteTo(cl.Net.Conn)
+			}
+			cl.Net.outbuf = new(bytes.Buffer)
+		}
+
+		n, _ := cl.Net.outbuf.Write(buf.Bytes()) // will always be successful
+		if cl.Net.outbuf.Len() < cl.ops.options.ClientNetWriteBufferSize {
+			return int64(n), nil
+		}
+
+		err = cl.flushOutbuf()
+		return int64(n), err
 	}()
 	if err != nil {
 		return err
@@ -571,4 +629,16 @@ func (cl *Client) WritePacket(pk packets.Packet) error {
 	cl.ops.hooks.OnPacketSent(cl, pk, buf.Bytes())
 
 	return err
+}
+
+func (cl *Client) flushOutbuf() (err error) {
+	if cl.Net.outbuf == nil {
+		return
+	}
+
+	_, err = cl.Net.outbuf.WriteTo(cl.Net.Conn)
+	if err == nil {
+		cl.Net.outbuf = nil
+	}
+	return
 }

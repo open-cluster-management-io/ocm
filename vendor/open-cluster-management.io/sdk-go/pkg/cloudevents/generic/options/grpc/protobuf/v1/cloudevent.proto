@@ -1,0 +1,81 @@
+// After making changes to the *.proto files, always run the following
+// command in current directory to update the generated code:
+// go generate
+
+syntax = "proto3";
+
+package io.cloudevents.v1;
+
+option go_package = "open-cluster-management.io/sdk-go/cloudevents/generic/options/grpc/protobuf/v1";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+// CloudEvent is copied from
+// https://github.com/cloudevents/spec/blob/main/cloudevents/formats/protobuf-format.md.
+message CloudEvent {
+  // Unique event identifier.
+  string id = 1;
+  // URI of the event source.
+  string source = 2;
+  // Version of the spec in use.
+  string spec_version = 3;
+  // Event type identifier.
+  string type = 4;
+
+  // Optional & Extension Attributes
+  map<string, CloudEventAttributeValue> attributes = 5;
+
+  // CloudEvent Data (Bytes, Text, or Proto)
+  oneof data {
+    // If the event is binary data then the datacontenttype attribute
+    // should be set to an appropriate media-type.
+    bytes binary_data = 6;
+    // If the event is string data then the datacontenttype attribute
+    // should be set to an appropriate media-type such as application/json.
+    string text_data = 7;
+    // If the event is a protobuf then it must be encoded using this Any
+    // type. The datacontenttype attribute should be set to
+    // application/protobuf and the dataschema attribute set to the message
+    // type.
+    google.protobuf.Any proto_data = 8;
+  }
+}
+
+// CloudEventAttribute enables extensions to use any of the seven allowed
+// data types as the value of an envelope key.
+message CloudEventAttributeValue {
+  // The value can be any one of these types.
+  oneof attr {
+    // Boolean value.
+    bool ce_boolean = 1;
+    // Integer value.
+    int32 ce_integer = 2;
+    // String value.
+    string ce_string = 3;
+    // Byte string value.
+    bytes ce_bytes = 4;
+    // URI value.
+    string ce_uri = 5;
+    // URI reference value.
+    string ce_uri_ref = 6;
+    // Timestamp value.
+    google.protobuf.Timestamp ce_timestamp = 7;
+  }
+}
+
+message PublishRequest {
+  // Required. Define the CloudEvent to be published
+  CloudEvent event = 1;
+}
+
+message SubscriptionRequest {
+  // Required. The original source of the respond CloudEvent(s).
+  string source = 1;
+}
+
+service CloudEventService {
+  rpc Publish(PublishRequest) returns (google.protobuf.Empty) {}
+  rpc Subscribe(SubscriptionRequest) returns (stream CloudEvent) {}
+}

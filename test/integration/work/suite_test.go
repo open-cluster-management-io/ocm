@@ -108,9 +108,14 @@ var _ = ginkgo.BeforeSuite(func() {
 	hubClusterClient, err = clusterclientset.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
+	opts := hub.NewWorkHubManagerOptions()
+	opts.WorkDriver = "kube"
+	opts.WorkDriverConfig = sourceConfigFileName
+	hubConfig := hub.NewWorkHubManagerConfig(opts)
+
 	// start hub controller
 	go func() {
-		err := hub.RunWorkHubManager(envCtx, &controllercmd.ControllerContext{
+		err := hubConfig.RunWorkHubManager(envCtx, &controllercmd.ControllerContext{
 			KubeConfig:    cfg,
 			EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
 		})

@@ -48,8 +48,8 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		o = spoke.NewWorkloadAgentOptions()
 		o.StatusSyncInterval = 3 * time.Second
 		o.AppliedManifestWorkEvictionGracePeriod = 5 * time.Second
-		o.WorkloadSourceDriver.Type = sourceDriver
-		o.WorkloadSourceDriver.Config = sourceConfigFileName
+		o.WorkloadSourceDriver = sourceDriver
+		o.WorkloadSourceConfig = sourceConfigFileName
 
 		commOptions = commonoptions.NewAgentOptions()
 		commOptions.SpokeClusterName = utilrand.String(5)

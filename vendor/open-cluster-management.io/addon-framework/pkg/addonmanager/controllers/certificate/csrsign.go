@@ -71,7 +71,7 @@ func NewCSRSignController(
 			},
 			csrInformer.Informer()).
 		WithSync(c.sync).
-		ToController("CSRApprovingController")
+		ToController("CSRSignController")
 }
 
 func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContext, csrName string) error {

@@ -152,8 +152,12 @@ func (d *ManifestBundleCodec) Encode(source string, eventType types.CloudEventsT
 	}
 
 	evt := eventBuilder.NewEvent()
+	data := &payload.ManifestBundle{}
+	data.Manifests = work.Spec.Workload.Manifests
+	data.ManifestConfigs = work.Spec.ManifestConfigs
+	data.DeleteOption = work.Spec.DeleteOption
 
-	if err := evt.SetData(cloudevents.ApplicationJSON, &payload.ManifestBundle{Manifests: work.Spec.Workload.Manifests}); err != nil {
+	if err := evt.SetData(cloudevents.ApplicationJSON, data); err != nil {
 		return nil, fmt.Errorf("failed to encode manifests to cloud event: %v", err)
 	}
 

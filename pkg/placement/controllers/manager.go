@@ -46,7 +46,9 @@ func RunControllerManagerWithInformers(
 ) error {
 	broadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: kubeClient.EventsV1()})
 
-	broadcaster.StartRecordingToSink(ctx.Done())
+	if err := broadcaster.StartRecordingToSinkWithContext(ctx); err != nil {
+		return err
+	}
 
 	recorder := broadcaster.NewRecorder(clusterscheme.Scheme, "placementController")
 	metrics := metrics.NewScheduleMetrics(clock.RealClock{})

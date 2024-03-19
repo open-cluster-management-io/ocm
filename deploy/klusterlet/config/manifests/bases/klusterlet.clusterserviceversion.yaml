@@ -9,7 +9,7 @@ metadata:
     containerImage: quay.io/open-cluster-management/registration-operator:latest
     createdAt: "2023-05-24T20:00:31Z"
     description: Manages the installation and upgrade of the Klusterlet.
-    repository: https://github.com/open-cluster-management-io/registration-operator
+    repository: https://github.com/open-cluster-management-io/ocm
     support: Red Hat, Inc.
   name: klusterlet.vX.Y.Z
   namespace: placeholder
@@ -43,9 +43,8 @@ spec:
 
     ```
     $ kubectl get pods -n open-cluster-management-agent
-    NAME                                             READY   STATUS    RESTARTS   AGE
-    klusterlet-registration-agent-86b4858546-w5t7x   1/1     Running   1          65m
-    klusterlet-work-agent-94d67fb4b-985sr            1/1     Running   0          64m
+      NAME                                READY   STATUS    RESTARTS   AGE
+      klusterlet-agent-55c6574876-nfxm9   1/1     Running   0          8m38s
     ```
 
     There is a ManagedCluster created in the Hub cluster.
@@ -87,8 +86,8 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc.
-  replaces: klusterlet.v0.12.0
+  replaces: klusterlet.v0.13.0
   selector:
     matchLabels:
       app: klusterlet
-  version: 0.13.0
+  version: 0.14.0

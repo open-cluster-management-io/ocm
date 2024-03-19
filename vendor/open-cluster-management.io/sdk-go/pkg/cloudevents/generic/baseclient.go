@@ -30,6 +30,7 @@ type baseClient struct {
 	cloudEventsClient      cloudevents.Client
 	cloudEventsRateLimiter flowcontrol.RateLimiter
 	receiverChan           chan int
+	reconnectedChan        chan struct{}
 }
 
 func (c *baseClient) connect(ctx context.Context) error {
@@ -71,6 +72,7 @@ func (c *baseClient) connect(ctx context.Context) error {
 				klog.V(4).Infof("the cloudevents client is reconnected")
 				c.resetClient(cloudEventsClient)
 				c.sendReceiverSignal(restartReceiverSignal)
+				c.sendReconnectedSignal()
 			}
 
 			select {
@@ -153,8 +155,6 @@ func (c *baseClient) subscribe(ctx context.Context, receive receiveFn) {
 
 		for {
 			if cloudEventsClient != nil {
-				// TODO send a resync request
-
 				go func() {
 					if err := cloudEventsClient.StartReceiver(receiverCtx, func(evt cloudevents.Event) {
 						receive(receiverCtx, evt)
@@ -212,4 +212,10 @@ func (c *baseClient) sendReceiverSignal(signal int) {
 	if c.receiverChan != nil {
 		c.receiverChan <- signal
 	}
+}
+
+func (c *baseClient) sendReconnectedSignal() {
+	c.RLock()
+	defer c.RUnlock()
+	c.reconnectedChan <- struct{}{}
 }

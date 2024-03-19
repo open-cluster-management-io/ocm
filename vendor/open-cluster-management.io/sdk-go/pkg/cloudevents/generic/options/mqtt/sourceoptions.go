@@ -36,6 +36,15 @@ func NewSourceOptions(mqttOptions *MQTTOptions, clientID, sourceID string) *opti
 }
 
 func (o *mqttSourceOptions) WithContext(ctx context.Context, evtCtx cloudevents.EventContext) (context.Context, error) {
+	topic, err := getSourcePubTopic(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if topic != nil {
+		return cloudeventscontext.WithTopic(ctx, string(*topic)), nil
+	}
+
 	eventType, err := types.ParseCloudEventsType(evtCtx.GetType())
 	if err != nil {
 		return nil, fmt.Errorf("unsupported event type %s, %v", eventType, err)
@@ -47,9 +56,9 @@ func (o *mqttSourceOptions) WithContext(ctx context.Context, evtCtx cloudevents.
 	}
 
 	if eventType.Action == types.ResyncRequestAction && clusterName == types.ClusterAll {
-		// source request to get resources status from all sources
+		// source request to get resources status from all agents
 		if len(o.Topics.SourceBroadcast) == 0 {
-			return nil, fmt.Errorf("the source wild card resync topic not set")
+			return nil, fmt.Errorf("the source broadcast topic not set")
 		}
 
 		resyncTopic := strings.Replace(o.Topics.SourceBroadcast, "+", o.sourceID, 1)

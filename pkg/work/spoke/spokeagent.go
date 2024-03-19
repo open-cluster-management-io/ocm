@@ -2,7 +2,6 @@ package spoke
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -11,17 +10,17 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	ocmfeature "open-cluster-management.io/api/feature"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt"
+	workv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/work"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/codec"
 
-	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
+	"open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
@@ -44,12 +43,12 @@ const (
 )
 
 type WorkAgentConfig struct {
-	agentOptions *commonoptions.AgentOptions
+	agentOptions *options.AgentOptions
 	workOptions  *WorkloadAgentOptions
 }
 
 // NewWorkAgentConfig returns a WorkAgentConfig
-func NewWorkAgentConfig(commonOpts *commonoptions.AgentOptions, opts *WorkloadAgentOptions) *WorkAgentConfig {
+func NewWorkAgentConfig(commonOpts *options.AgentOptions, opts *WorkloadAgentOptions) *WorkAgentConfig {
 	return &WorkAgentConfig{
 		agentOptions: commonOpts,
 		workOptions:  opts,
@@ -92,10 +91,30 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		return err
 	}
 
-	// build hub client and informer
-	clientHolder, hubHash, agentID, err := o.buildHubClientHolder(ctx, o.agentOptions.SpokeClusterName, restMapper)
+	// To support consuming ManifestWorks from different drivers (like the Kubernetes apiserver or MQTT broker), we build
+	// ManifestWork client that implements the ManifestWorkInterface and ManifestWork informer based on different
+	// driver configuration.
+	// Refer to Event Based Manifestwork proposal in enhancements repo to get more details.
+	hubHost, config, err := cloudeventswork.NewConfigLoader(o.workOptions.WorkloadSourceDriver, o.workOptions.WorkloadSourceConfig).
+		LoadConfig()
 	if err != nil {
 		return err
+	}
+
+	clientHolder, err := cloudeventswork.NewClientHolderBuilder(config).
+		WithClientID(o.workOptions.CloudEventsClientID).
+		WithInformerConfig(5*time.Minute, workinformers.WithNamespace(o.agentOptions.SpokeClusterName)).
+		WithClusterName(o.agentOptions.SpokeClusterName).
+		WithCodecs(buildCodecs(o.workOptions.CloudEventsClientCodecs, restMapper)...).
+		NewAgentClientHolder(ctx)
+	if err != nil {
+		return err
+	}
+
+	agentID := o.agentOptions.AgentID
+	hubHash := helper.HubHash(hubHost)
+	if len(agentID) == 0 {
+		agentID = hubHash
 	}
 
 	hubWorkClient := clientHolder.ManifestWorks(o.agentOptions.SpokeClusterName)
@@ -171,6 +190,7 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		hubWorkClient,
 		hubWorkInformer,
 		hubWorkInformer.Lister().ManifestWorks(o.agentOptions.SpokeClusterName),
+		o.workOptions.MaxJSONRawLength,
 		o.workOptions.StatusSyncInterval,
 	)
 
@@ -190,55 +210,16 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 	return nil
 }
 
-// To support consuming ManifestWorks from different drivers (like the Kubernetes apiserver or MQTT broker), we build
-// ManifestWork client that implements the ManifestWorkInterface and ManifestWork informer based on different
-// driver configuration.
-// Refer to Event Based Manifestwork proposal in enhancements repo to get more details.
-func (o *WorkAgentConfig) buildHubClientHolder(ctx context.Context,
-	clusterName string, restMapper meta.RESTMapper) (*cloudeventswork.ClientHolder, string, string, error) {
-	agentID := o.agentOptions.AgentID
-	switch o.workOptions.WorkloadSourceDriver.Type {
-	case KubeDriver:
-		hubRestConfig, err := clientcmd.BuildConfigFromFlags("", o.workOptions.WorkloadSourceDriver.Config)
-		if err != nil {
-			return nil, "", "", err
+func buildCodecs(codecNames []string, restMapper meta.RESTMapper) []generic.Codec[*workv1.ManifestWork] {
+	codecs := []generic.Codec[*workv1.ManifestWork]{}
+	for _, name := range codecNames {
+		if name == manifestBundleCodecName {
+			codecs = append(codecs, codec.NewManifestBundleCodec())
 		}
 
-		hubHash := helper.HubHash(hubRestConfig.Host)
-		if len(agentID) == 0 {
-			agentID = hubHash
+		if name == manifestCodecName {
+			codecs = append(codecs, codec.NewManifestCodec(restMapper))
 		}
-
-		// Only watch the cluster namespace on hub
-		clientHolder, err := cloudeventswork.NewClientHolderBuilder(agentID, hubRestConfig).
-			WithInformerConfig(5*time.Minute, workinformers.WithNamespace(o.agentOptions.SpokeClusterName)).
-			NewClientHolder(ctx)
-		if err != nil {
-			return nil, "", "", err
-		}
-
-		return clientHolder, hubHash, agentID, nil
-	case MQTTDriver:
-		mqttOptions, err := mqtt.BuildMQTTOptionsFromFlags(o.workOptions.WorkloadSourceDriver.Config)
-		if err != nil {
-			return nil, "", "", err
-		}
-
-		hubHash := helper.HubHash(mqttOptions.BrokerHost)
-		if len(agentID) == 0 {
-			agentID = fmt.Sprintf("%s-work-agent", o.agentOptions.SpokeClusterName)
-		}
-
-		clientHolder, err := cloudeventswork.NewClientHolderBuilder(agentID, mqttOptions).
-			WithClusterName(o.agentOptions.SpokeClusterName).
-			WithCodecs(codec.NewManifestCodec(restMapper)). // TODO support manifestbundles
-			NewClientHolder(ctx)
-		if err != nil {
-			return nil, "", "", err
-		}
-
-		return clientHolder, hubHash, agentID, nil
 	}
-
-	return nil, "", "", fmt.Errorf("unsupported driver %s", o.workOptions.WorkloadSourceDriver.Type)
+	return codecs
 }

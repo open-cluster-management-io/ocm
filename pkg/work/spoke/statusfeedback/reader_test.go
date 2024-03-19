@@ -312,6 +312,21 @@ func TestStatusReader(t *testing.T) {
 			},
 		},
 		{
+			name:      "rawjson value exceed max length",
+			object:    unstrctureObject(podJson),
+			enableRaw: true,
+			rule: workapiv1.FeedbackRule{
+				Type: workapiv1.JSONPathsType,
+				JsonPaths: []workapiv1.JsonPath{
+					{
+						Name: "status",
+						Path: ".status",
+					},
+				},
+			},
+			expectError: true,
+		},
+		{
 			name:      "filtered rawjson value format",
 			object:    unstrctureObject(deploymentJsonMultiCondition),
 			enableRaw: true,
@@ -337,7 +352,7 @@ func TestStatusReader(t *testing.T) {
 		},
 	}
 
-	reader := NewStatusReader()
+	reader := NewStatusReader().WithMaxJsonRawLength(40)
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			err := features.SpokeMutableFeatureGate.Set(fmt.Sprintf("%s=%t", ocmfeature.RawFeedbackJsonString, c.enableRaw))

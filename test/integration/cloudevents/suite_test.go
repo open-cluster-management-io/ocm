@@ -10,6 +10,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"go.uber.org/zap/zapcore"
+	"gopkg.in/yaml.v2"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -17,9 +18,12 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/helper"
@@ -27,12 +31,12 @@ import (
 )
 
 const (
-	eventuallyTimeout  = 30 // seconds
+	eventuallyTimeout  = 60 // seconds
 	eventuallyInterval = 1  // seconds
 	cm1, cm2           = "cm1", "cm2"
 )
 
-// TODO consider to use one integration with part
+// TODO consider to use one integration with work integration
 // focus on source is a MQTT broker
 const workSourceDriver = "mqtt"
 
@@ -46,6 +50,12 @@ var workSource source.Source
 var workSourceConfigFileName string
 var workSourceWorkClient workclientset.Interface
 var workSourceHash string
+
+var mwrsConfigFileName string
+
+var hubRestConfig *rest.Config
+var hubClusterClient clusterclientset.Interface
+var hubWorkClient workclientset.Interface
 
 var spokeRestConfig *rest.Config
 var spokeKubeClient kubernetes.Interface
@@ -96,9 +106,16 @@ var _ = ginkgo.BeforeSuite(func() {
 	spokeWorkClient, err = workclientset.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
+	hubRestConfig = cfg
+	hubClusterClient, err = clusterclientset.NewForConfig(cfg)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	hubWorkClient, err = workclientset.NewForConfig(cfg)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 	switch workSourceDriver {
 	case "mqtt":
-		// create kubeconfig file for hub in a tmp dir
+		// create mqttconfig file for source in a tmp dir
 		workSourceConfigFileName = path.Join(tempDir, "mqttconfig")
 
 		workSource = source.NewMQTTSource(workSourceConfigFileName)
@@ -109,6 +126,22 @@ var _ = ginkgo.BeforeSuite(func() {
 
 		workSourceWorkClient = workSource.Workclientset()
 		gomega.Expect(workSourceWorkClient).ToNot(gomega.BeNil())
+
+		// create mqttconfig file for mwrsctrl in a tmp dir
+		mwrsConfigFileName = path.Join(tempDir, "mwrsctrl-mqttconfig")
+		config := mqtt.MQTTConfig{
+			BrokerHost: workSource.Host(),
+			Topics: &types.Topics{
+				SourceEvents:    "sources/mwrsctrl/clusters/+/sourceevents",
+				AgentEvents:     "sources/mwrsctrl/clusters/+/agentevents",
+				SourceBroadcast: "sources/mwrsctrl/sourcebroadcast",
+			},
+		}
+
+		configData, err := yaml.Marshal(config)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		err = os.WriteFile(mwrsConfigFileName, configData, 0600)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	default:
 		ginkgo.AbortSuite(fmt.Sprintf("unsupported source driver: %s", workSourceDriver))
 	}

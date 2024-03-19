@@ -100,6 +100,7 @@ func (m *MQTTSource) Start(ctx context.Context) error {
 		workLister,
 		work.ManifestWorkStatusHash,
 		&ManifestCodec{},
+		&ManifestBundleCodec{},
 	)
 	if err != nil {
 		return err

@@ -72,12 +72,16 @@ func (c *manifestWorkSourceClient) Create(ctx context.Context, manifestWork *wor
 		newObj.Generation = 1
 		newObj.Namespace = c.namespace
 
-		//TODO support manifestbundles
 		eventType := types.CloudEventsType{
 			CloudEventsDataType: payload.ManifestEventDataType,
 			SubResource:         types.SubResourceSpec,
 			Action:              "create_request",
 		}
+
+		if len(manifestWork.Spec.Workload.Manifests) > 1 {
+			eventType.CloudEventsDataType = payload.ManifestBundleEventDataType
+		}
+
 		if err := c.cloudEventsClient.Publish(ctx, eventType, newObj); err != nil {
 			return nil, err
 		}
@@ -109,12 +113,16 @@ func (c *manifestWorkSourceClient) Update(ctx context.Context, manifestWork *wor
 	updatedObj.Generation = updatedObj.Generation + 1
 	updatedObj.ResourceVersion = fmt.Sprintf("%d", updatedObj.Generation)
 
-	//TODO support manifestbundles
 	eventType := types.CloudEventsType{
 		CloudEventsDataType: payload.ManifestEventDataType,
 		SubResource:         types.SubResourceSpec,
 		Action:              "update_request",
 	}
+
+	if len(manifestWork.Spec.Workload.Manifests) > 1 {
+		eventType.CloudEventsDataType = payload.ManifestBundleEventDataType
+	}
+
 	if err := c.cloudEventsClient.Publish(ctx, eventType, updatedObj); err != nil {
 		return nil, err
 	}
@@ -142,11 +150,14 @@ func (c *manifestWorkSourceClient) Delete(ctx context.Context, name string, opts
 	now := metav1.Now()
 	deletedObj.DeletionTimestamp = &now
 
-	//TODO support manifestbundles
 	eventType := types.CloudEventsType{
 		CloudEventsDataType: payload.ManifestEventDataType,
 		SubResource:         types.SubResourceSpec,
 		Action:              "delete_request",
+	}
+
+	if len(manifestWork.Spec.Workload.Manifests) > 1 {
+		eventType.CloudEventsDataType = payload.ManifestBundleEventDataType
 	}
 
 	if err := c.cloudEventsClient.Publish(ctx, eventType, deletedObj); err != nil {
