@@ -36,6 +36,9 @@ const (
 	// ExternalManagedKubeConfigAgent is the secret name of kubeconfig secret to connecting to the managed cluster
 	// Only applicable to SingletonHosted mode, agent uses it to connect to the managed cluster.
 	ExternalManagedKubeConfigAgent = "external-managed-kubeconfig-agent"
+	// WorkDriverConfig is the secret name of work driver config to connect to work driver.
+	// Only applicable to non-kube work driver, hub controllers connect to work driver using this config.
+	WorkDriverConfig = "work-driver-config"
 
 	RegistrationWebhookSecret  = "registration-webhook-serving-cert"
 	RegistrationWebhookService = "cluster-manager-registration-webhook"

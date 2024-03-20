@@ -134,6 +134,12 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		return err
 	}
 
+	// default driver is kube
+	workDriver := operatorapiv1.WorkDriverTypeKube
+	if clusterManager.Spec.WorkConfiguration.WorkDriver != "" {
+		workDriver = clusterManager.Spec.WorkConfiguration.WorkDriver
+	}
+
 	// This config is used to render template of manifests.
 	config := manifests.HubConfig{
 		ClusterManagerName:      clusterManager.Name,
@@ -152,6 +158,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		},
 		ResourceRequirementResourceType: helpers.ResourceType(clusterManager),
 		ResourceRequirements:            resourceRequirements,
+		WorkDriver:                      string(workDriver),
 	}
 
 	var registrationFeatureMsgs, workFeatureMsgs, addonFeatureMsgs string
@@ -208,6 +215,17 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		return err
 	}
 	managementClient := n.operatorKubeClient // We assume that operator is always running on the management cluster.
+
+	// If the work driver is not kube, we need to sync the work driver config secret
+	if workDriver != operatorapiv1.WorkDriverTypeKube {
+		if err := helpers.SyncWorkConfigSecret(ctx, n.operatorKubeClient, clusterManagerNamespace); err != nil {
+			return err
+		}
+	} else {
+		if err := helpers.RemoveWorkConfigSecret(ctx, n.operatorKubeClient, clusterManagerNamespace); err != nil {
+			return err
+		}
+	}
 
 	var errs []error
 	reconcilers := []clusterManagerReconcile{

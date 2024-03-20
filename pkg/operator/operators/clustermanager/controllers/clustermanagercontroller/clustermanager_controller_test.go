@@ -75,6 +75,7 @@ func newClusterManager(name string) *operatorapiv1.ClusterManager {
 			},
 			WorkConfiguration: &operatorapiv1.WorkConfiguration{
 				FeatureGates: []operatorapiv1.FeatureGate{featureGate},
+				WorkDriver:   operatorapiv1.WorkDriverTypeKube,
 			},
 		},
 	}

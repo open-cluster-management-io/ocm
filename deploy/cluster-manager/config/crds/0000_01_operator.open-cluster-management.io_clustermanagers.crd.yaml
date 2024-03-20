@@ -323,6 +323,8 @@ spec:
                     type: string
                 type: object
               workConfiguration:
+                default:
+                  workDriver: kube
                 description: WorkConfiguration contains the configuration of work
                 properties:
                   featureGates:
@@ -356,6 +358,22 @@ spec:
                       - feature
                       type: object
                     type: array
+                  workDriver:
+                    default: kube
+                    description: "WorkDriver represents the type of work driver. Possible
+                      values are \"kube\", \"mqtt\", or \"grpc\". If not provided,
+                      the default value is \"kube\". If set to non-\"kube\" drivers,
+                      the klusterlet need to use the same driver. and the driver configuration
+                      must be provided in a secret named \"work-driver-config\" in
+                      the namespace where the cluster manager is running, adhering
+                      to the following structure: config.yaml: | <driver-config-in-yaml>
+                      \n For detailed driver configuration, please refer to the sdk-go
+                      documentation: https://github.com/open-cluster-management-io/sdk-go/blob/main/pkg/cloudevents/README.md#supported-protocols-and-drivers"
+                    enum:
+                    - kube
+                    - mqtt
+                    - grpc
+                    type: string
                 type: object
               workImagePullSpec:
                 default: quay.io/open-cluster-management/work

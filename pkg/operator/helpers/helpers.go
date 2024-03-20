@@ -3,6 +3,7 @@ package helpers
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 
@@ -722,6 +723,78 @@ func GetHubKubeconfig(ctx context.Context,
 		// backward compatible with previous crd.
 		return operatorKubeconfig, nil
 	}
+}
+
+// SyncWorkConfigSecret is used to sync the secret of work config from operator namespace to the cluster manager namespace.
+// For both Default and Hosted mode, the original secret of work config should be in the operator namespace.
+func SyncWorkConfigSecret(ctx context.Context,
+	operatorClient kubernetes.Interface,
+	clusterManagerNamespace string,
+) error {
+	// get the namespace of the operator
+	operatorNamespace, err := getOperatorNamespace()
+	if err != nil {
+		return err
+	}
+
+	// get secret of work config
+	workDriverSecret, err := operatorClient.CoreV1().Secrets(operatorNamespace).Get(ctx, WorkDriverConfig, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	// copy the secret of work config to new secret in the cluster manager namespace
+	newSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      workDriverSecret.Name,
+			Namespace: clusterManagerNamespace,
+		},
+		Data: workDriverSecret.Data,
+	}
+	// create or update secret of work config in the cluster manager namespace
+	_, err = operatorClient.CoreV1().Secrets(clusterManagerNamespace).Create(ctx, newSecret, metav1.CreateOptions{})
+	if err != nil {
+		if errors.IsAlreadyExists(err) {
+			_, err = operatorClient.CoreV1().Secrets(clusterManagerNamespace).Update(ctx, newSecret, metav1.UpdateOptions{})
+			return err
+		}
+		return err
+	}
+
+	return nil
+}
+
+// RemoveWorkConfigSecret is used to remove the secret of work config from the cluster manager namespace.
+func RemoveWorkConfigSecret(ctx context.Context,
+	operatorClient kubernetes.Interface,
+	clusterManagerNamespace string,
+) error {
+	if _, err := operatorClient.CoreV1().Namespaces().Get(ctx, clusterManagerNamespace, metav1.GetOptions{}); err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	err := operatorClient.CoreV1().Secrets(clusterManagerNamespace).Delete(ctx, WorkDriverConfig, metav1.DeleteOptions{})
+	if err != nil && errors.IsNotFound(err) {
+		return nil
+	}
+
+	return err
+}
+
+// getOperatorNamespace is used to get the namespace where the operator is running.
+func getOperatorNamespace() (string, error) {
+	podNamespace, exists := os.LookupEnv("POD_NAMESPACE")
+	if exists {
+		return podNamespace, nil
+	}
+	nsBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err != nil {
+		return "", err
+	}
+
+	return string(nsBytes), nil
 }
 
 func BuildFeatureCondition(invalidMsgs ...string) metav1.Condition {

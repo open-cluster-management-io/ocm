@@ -46,9 +46,14 @@ spec:
         args:
           - "/work"
           - "manager"
-          - "--work-driver=kube"
+          - "--work-driver={{ .WorkDriver }}"
+          {{ if eq .WorkDriver "kube" }}
           {{ if .HostedMode }}
           - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
+          {{ end }}
+          {{ else }}
+          - "--cloudevents-client-id=$(POD_NAME)"
+          - "--work-driver-config=/var/run/secrets/hub/config.yaml"
           {{ end }}
         env:
           - name: POD_NAME
@@ -92,16 +97,28 @@ spec:
         volumeMounts:
         - name: tmpdir
           mountPath: /tmp
+        {{ if eq .WorkDriver "kube" }}
         {{ if .HostedMode }}
         - mountPath: /var/run/secrets/hub
           name: kubeconfig
           readOnly: true
         {{ end }}
+        {{ else }}
+        - mountPath: /var/run/secrets/hub
+          name: workdriverconfig
+          readOnly: true
+        {{ end }}
       volumes:
       - name: tmpdir
         emptyDir: { }
+      {{ if eq .WorkDriver "kube" }}
       {{ if .HostedMode }}
       - name: kubeconfig
         secret:
           secretName: work-controller-sa-kubeconfig
+      {{ end }}
+      {{ else }}
+      - name: workdriverconfig
+        secret:
+          secretName: work-driver-config
       {{ end }}
