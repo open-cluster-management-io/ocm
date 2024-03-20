@@ -3,17 +3,18 @@ package managementaddon
 import (
 	"context"
 
+	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
+
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
-	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 // clusterManagementAddonController reconciles cma on the hub.

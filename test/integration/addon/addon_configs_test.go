@@ -49,6 +49,8 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 		_, err = createClusterManagementAddOn(testAddOnConfigsImpl.name, configDefaultNamespace, configDefaultName)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+		assertClusterManagementAddOnAnnotations(testAddOnConfigsImpl.name)
+
 		// prepare default config
 		configDefaultNS := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: configDefaultNamespace}}
 		_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), configDefaultNS, metav1.CreateOptions{})
@@ -132,9 +134,6 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 		cma, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), testAddOnConfigsImpl.name, metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		cma.Annotations = map[string]string{
-			addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue,
-		}
 		cma.Spec.InstallStrategy = addonapiv1alpha1.InstallStrategy{
 			Type: addonapiv1alpha1.AddonInstallStrategyPlacements,
 			Placements: []addonapiv1alpha1.PlacementStrategy{

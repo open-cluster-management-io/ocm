@@ -8,30 +8,14 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
+
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
-	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
-
-type testAgent struct {
-	name     string
-	strategy *agent.InstallStrategy
-}
-
-func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
-	return nil, nil
-}
-
-func (t *testAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
-	return agent.AgentAddonOptions{
-		AddonName:       t.name,
-		InstallStrategy: t.strategy,
-	}
-}
 
 func newClusterManagementAddonWithAnnotation(name string, annotations map[string]string) *addonv1alpha1.ClusterManagementAddOn {
 	cma := addontesting.NewClusterManagementAddon(name, "", "").Build()
@@ -44,7 +28,6 @@ func TestReconcile(t *testing.T) {
 		name                 string
 		syncKey              string
 		cma                  []runtime.Object
-		testaddons           map[string]agent.AgentAddon
 		validateAddonActions func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
@@ -63,9 +46,6 @@ func TestReconcile(t *testing.T) {
 				if len(cma.Annotations) != 1 || cma.Annotations[addonv1alpha1.AddonLifecycleAnnotationKey] != addonv1alpha1.AddonLifecycleAddonManagerAnnotationValue {
 					t.Errorf("cma annotation is not correct, expected addon-manager but got %s", cma.Annotations[addonv1alpha1.AddonLifecycleAnnotationKey])
 				}
-			},
-			testaddons: map[string]agent.AgentAddon{
-				"test": &testAgent{name: "test", strategy: agent.InstallAllStrategy("test")},
 			},
 		},
 		{
@@ -88,9 +68,6 @@ func TestReconcile(t *testing.T) {
 					t.Errorf("cma annotation is not correct, expected addon-manager but got %s", cma.Annotations[addonv1alpha1.AddonLifecycleAnnotationKey])
 				}
 			},
-			testaddons: map[string]agent.AgentAddon{
-				"test": &testAgent{name: "test", strategy: agent.InstallAllStrategy("test")},
-			},
 		},
 		{
 			name:    "no patch annotation if managed by self",
@@ -100,9 +77,6 @@ func TestReconcile(t *testing.T) {
 				addonv1alpha1.AddonLifecycleAnnotationKey: addonv1alpha1.AddonLifecycleSelfManageAnnotationValue,
 			})},
 			validateAddonActions: addontesting.AssertNoActions,
-			testaddons: map[string]agent.AgentAddon{
-				"test": &testAgent{name: "test", strategy: agent.InstallAllStrategy("test")},
-			},
 		},
 		{
 			name:    "no patch annotation if managed by addon-manager",
@@ -112,9 +86,6 @@ func TestReconcile(t *testing.T) {
 				addonv1alpha1.AddonLifecycleAnnotationKey: addonv1alpha1.AddonLifecycleAddonManagerAnnotationValue,
 			})},
 			validateAddonActions: addontesting.AssertNoActions,
-			testaddons: map[string]agent.AgentAddon{
-				"test": &testAgent{name: "test"},
-			},
 		},
 	}
 
