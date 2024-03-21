@@ -725,45 +725,6 @@ func GetHubKubeconfig(ctx context.Context,
 	}
 }
 
-// SyncWorkConfigSecret is used to sync the secret of work config from operator namespace to the cluster manager namespace.
-// For both Default and Hosted mode, the original secret of work config should be in the operator namespace.
-func SyncWorkConfigSecret(ctx context.Context,
-	operatorClient kubernetes.Interface,
-	clusterManagerNamespace string,
-) error {
-	// get the namespace of the operator
-	operatorNamespace, err := getOperatorNamespace()
-	if err != nil {
-		return err
-	}
-
-	// get secret of work config
-	workDriverSecret, err := operatorClient.CoreV1().Secrets(operatorNamespace).Get(ctx, WorkDriverConfig, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	// copy the secret of work config to new secret in the cluster manager namespace
-	newSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      workDriverSecret.Name,
-			Namespace: clusterManagerNamespace,
-		},
-		Data: workDriverSecret.Data,
-	}
-	// create or update secret of work config in the cluster manager namespace
-	_, err = operatorClient.CoreV1().Secrets(clusterManagerNamespace).Create(ctx, newSecret, metav1.CreateOptions{})
-	if err != nil {
-		if errors.IsAlreadyExists(err) {
-			_, err = operatorClient.CoreV1().Secrets(clusterManagerNamespace).Update(ctx, newSecret, metav1.UpdateOptions{})
-			return err
-		}
-		return err
-	}
-
-	return nil
-}
-
 // RemoveWorkConfigSecret is used to remove the secret of work config from the cluster manager namespace.
 func RemoveWorkConfigSecret(ctx context.Context,
 	operatorClient kubernetes.Interface,
@@ -783,8 +744,8 @@ func RemoveWorkConfigSecret(ctx context.Context,
 	return err
 }
 
-// getOperatorNamespace is used to get the namespace where the operator is running.
-func getOperatorNamespace() (string, error) {
+// GetOperatorNamespace is used to get the namespace where the operator is running.
+func GetOperatorNamespace() (string, error) {
 	podNamespace, exists := os.LookupEnv("POD_NAMESPACE")
 	if exists {
 		return podNamespace, nil

@@ -38,9 +38,10 @@ import (
 )
 
 const (
-	clusterManagerFinalizer   = "operator.open-cluster-management.io/cluster-manager-cleanup"
-	clusterManagerApplied     = "Applied"
-	clusterManagerProgressing = "Progressing"
+	clusterManagerFinalizer      = "operator.open-cluster-management.io/cluster-manager-cleanup"
+	clusterManagerApplied        = "Applied"
+	clusterManagerProgressing    = "Progressing"
+	workDriverConfigSecretSynced = "WorkDriverConfigSecretSynced"
 
 	defaultWebhookPort       = int32(9443)
 	clusterManagerReSyncTime = 5 * time.Second
@@ -216,14 +217,68 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	}
 	managementClient := n.operatorKubeClient // We assume that operator is always running on the management cluster.
 
-	// If the work driver is not kube, we need to sync the work driver config secret
-	if workDriver != operatorapiv1.WorkDriverTypeKube {
-		if err := helpers.SyncWorkConfigSecret(ctx, n.operatorKubeClient, clusterManagerNamespace); err != nil {
-			return err
-		}
-	} else {
-		if err := helpers.RemoveWorkConfigSecret(ctx, n.operatorKubeClient, clusterManagerNamespace); err != nil {
-			return err
+	if config.MWReplicaSetEnabled {
+		// If the work driver is not kube, we need to sync the work driver config secret
+		if workDriver != operatorapiv1.WorkDriverTypeKube {
+			operatorNamespace, err := helpers.GetOperatorNamespace()
+			if err != nil {
+				return err
+			}
+			// check the secret containing work driver config explicitly because
+			// resourceapply.SyncSecret below won't return err if the source secret is not found
+			_, err = n.operatorKubeClient.CoreV1().Secrets(operatorNamespace).Get(ctx, helpers.WorkDriverConfig, metav1.GetOptions{})
+			if err != nil {
+				if errors.IsNotFound(err) {
+					klog.Errorf("Secret %s not found in namespace %s", helpers.WorkDriverConfig, operatorNamespace)
+					conditionChanged := meta.SetStatusCondition(&clusterManager.Status.Conditions, metav1.Condition{
+						Type:    workDriverConfigSecretSynced,
+						Status:  metav1.ConditionFalse,
+						Reason:  "WorkDriverConfigSecretNotFound",
+						Message: "Work driver config secret is not found",
+					})
+					if conditionChanged {
+						clusterManager.Status.ObservedGeneration = clusterManager.Generation
+						_, err := n.patcher.PatchStatus(ctx, clusterManager, clusterManager.Status, originalClusterManager.Status)
+						if err != nil {
+							return err
+						}
+					}
+				}
+				return err
+			} else {
+				_, _, err = resourceapply.SyncSecret(ctx, n.operatorKubeClient.CoreV1(), n.recorder,
+					operatorNamespace, helpers.WorkDriverConfig, clusterManagerNamespace, helpers.WorkDriverConfig,
+					[]metav1.OwnerReference{})
+				if err != nil {
+					return err
+				}
+				conditionChanged := meta.SetStatusCondition(&clusterManager.Status.Conditions, metav1.Condition{
+					Type:    workDriverConfigSecretSynced,
+					Status:  metav1.ConditionTrue,
+					Reason:  "WorkDriverConfigSecretSynced",
+					Message: "Work driver config secret is synced",
+				})
+				if conditionChanged {
+					clusterManager.Status.ObservedGeneration = clusterManager.Generation
+					_, err := n.patcher.PatchStatus(ctx, clusterManager, clusterManager.Status, originalClusterManager.Status)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			// If the work driver is kube, we need to remove the work driver config secret if it exists
+			if err := helpers.RemoveWorkConfigSecret(ctx, n.operatorKubeClient, clusterManagerNamespace); err != nil {
+				return err
+			}
+			conditionChanged := meta.RemoveStatusCondition(&clusterManager.Status.Conditions, workDriverConfigSecretSynced)
+			if conditionChanged {
+				clusterManager.Status.ObservedGeneration = clusterManager.Generation
+				_, err := n.patcher.PatchStatus(ctx, clusterManager, clusterManager.Status, originalClusterManager.Status)
+				if err != nil {
+					return err
+				}
+			}
 		}
 	}
 
