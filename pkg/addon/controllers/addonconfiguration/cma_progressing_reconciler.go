@@ -13,12 +13,12 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 )
 
-type clusterManagementAddonProgressingReconciler struct {
+type cmaProgressingReconciler struct {
 	patcher patcher.Patcher[
 		*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus]
 }
 
-func (d *clusterManagementAddonProgressingReconciler) reconcile(
+func (d *cmaProgressingReconciler) reconcile(
 	ctx context.Context, cma *addonv1alpha1.ClusterManagementAddOn, graph *configurationGraph) (*addonv1alpha1.ClusterManagementAddOn, reconcileState, error) {
 	var errs []error
 	cmaCopy := cma.DeepCopy()

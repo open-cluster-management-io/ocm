@@ -26,8 +26,8 @@ import (
 	"open-cluster-management.io/ocm/pkg/addon/controllers/addonowner"
 	"open-cluster-management.io/ocm/pkg/addon/controllers/addonprogressing"
 	"open-cluster-management.io/ocm/pkg/addon/controllers/addontemplate"
-	"open-cluster-management.io/ocm/pkg/addon/controllers/managementaddon"
-	"open-cluster-management.io/ocm/pkg/addon/controllers/managementaddoninstallprogression"
+	"open-cluster-management.io/ocm/pkg/addon/controllers/cmainstallprogression"
+	"open-cluster-management.io/ocm/pkg/addon/controllers/cmamanagedby"
 )
 
 func RunManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
@@ -169,13 +169,13 @@ func RunControllerManagerWithInformers(
 	// This controller is used during migrating addons to be managed by addon-manager.
 	// This should be removed when the migration is done.
 	// The migration plan refer to https://github.com/open-cluster-management-io/ocm/issues/355.
-	managementAddonController := managementaddon.NewManagementAddonController(
+	managementAddonController := cmamanagedby.NewCMAManagedByController(
 		hubAddOnClient,
 		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 		controllerContext.EventRecorder,
 	)
 
-	mgmtAddonInstallProgressionController := managementaddoninstallprogression.NewManagementAddonInstallProgressionController(
+	mgmtAddonInstallProgressionController := cmainstallprogression.NewCMAInstallProgressionController(
 		hubAddOnClient,
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),

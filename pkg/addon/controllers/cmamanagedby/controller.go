@@ -1,4 +1,4 @@
-package managementaddon
+package cmamanagedby
 
 import (
 	"context"
@@ -17,19 +17,22 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
-// clusterManagementAddonController reconciles cma on the hub.
-type clusterManagementAddonController struct {
+// cmaManagedByController reconciles clustermanagementaddon on the hub
+// to update the annotation "addon.open-cluster-management.io/lifecycle" value.
+// It sets the value to "addon-manager" if "self" is not set, which indicate the
+// the installation and upgrade of addon should be handled by the general addon manager.
+type cmaManagedByController struct {
 	patcher patcher.Patcher[
 		*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus]
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
 }
 
-func NewManagementAddonController(
+func NewCMAManagedByController(
 	addonClient addonv1alpha1client.Interface,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	recorder events.Recorder,
 ) factory.Controller {
-	c := &clusterManagementAddonController{
+	c := &cmaManagedByController{
 		patcher: patcher.NewPatcher[
 			*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus](
 			addonClient.AddonV1alpha1().ClusterManagementAddOns()),
@@ -39,11 +42,11 @@ func NewManagementAddonController(
 	return factory.New().WithInformersQueueKeysFunc(
 		queue.QueueKeyByMetaName,
 		clusterManagementAddonInformers.Informer()).
-		WithSync(c.sync).ToController("management-addon-controller", recorder)
+		WithSync(c.sync).ToController("cma-managed-by-controller", recorder)
 
 }
 
-func (c *clusterManagementAddonController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+func (c *cmaManagedByController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	addonName := syncCtx.QueueKey()
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Reconciling addon", "addonName", addonName)

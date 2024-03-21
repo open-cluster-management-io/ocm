@@ -1,4 +1,4 @@
-package managementaddoninstallprogression
+package cmainstallprogression
 
 import (
 	"context"
@@ -17,23 +17,23 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
-// managementAddonInstallProgressionController reconciles instances of clustermanagementaddon the hub
+// cmaInstallProgressionController reconciles instances of clustermanagementaddon the hub
 // based to update related object and status condition.
-type managementAddonInstallProgressionController struct {
+type cmaInstallProgressionController struct {
 	patcher patcher.Patcher[
 		*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus]
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
 	addonFilterFunc              factory.EventFilterFunc
 }
 
-func NewManagementAddonInstallProgressionController(
+func NewCMAInstallProgressionController(
 	addonClient addonv1alpha1client.Interface,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	addonFilterFunc factory.EventFilterFunc,
 	recorder events.Recorder,
 ) factory.Controller {
-	c := &managementAddonInstallProgressionController{
+	c := &cmaInstallProgressionController{
 		patcher: patcher.NewPatcher[
 			*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus](
 			addonClient.AddonV1alpha1().ClusterManagementAddOns()),
@@ -44,11 +44,11 @@ func NewManagementAddonInstallProgressionController(
 	return factory.New().WithInformersQueueKeysFunc(
 		queue.QueueKeyByMetaName,
 		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
-		WithSync(c.sync).ToController("management-addon-status-controller", recorder)
+		WithSync(c.sync).ToController("cma-install-progression-controller", recorder)
 
 }
 
-func (c *managementAddonInstallProgressionController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+func (c *cmaInstallProgressionController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	addonName := syncCtx.QueueKey()
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Reconciling addon", "addonName", addonName)

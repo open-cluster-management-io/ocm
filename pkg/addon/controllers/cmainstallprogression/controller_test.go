@@ -1,4 +1,4 @@
-package managementaddoninstallprogression
+package cmainstallprogression
 
 import (
 	"context"
@@ -241,7 +241,7 @@ func TestReconcile(t *testing.T) {
 			syncContext := testingcommon.NewFakeSyncContext(t, c.syncKey)
 			recorder := syncContext.Recorder()
 
-			controller := NewManagementAddonInstallProgressionController(
+			controller := NewCMAInstallProgressionController(
 				fakeAddonClient,
 				addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 				addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),

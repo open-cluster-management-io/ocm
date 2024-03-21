@@ -1,4 +1,4 @@
-package managementaddon
+package cmamanagedby
 
 import (
 	"context"
@@ -103,7 +103,7 @@ func TestReconcile(t *testing.T) {
 			syncContext := testingcommon.NewFakeSyncContext(t, c.syncKey)
 			recorder := syncContext.Recorder()
 
-			controller := NewManagementAddonController(
+			controller := NewCMAManagedByController(
 				fakeAddonClient,
 				addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 				recorder,
