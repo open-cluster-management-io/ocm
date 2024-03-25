@@ -25,21 +25,11 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 
 	ginkgo.BeforeEach(func() {
 		// Create clustermanagement addon
-		cma = &addonapiv1alpha1.ClusterManagementAddOn{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("test-%s", suffix),
-				Annotations: map[string]string{
-					addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue,
-				},
-			},
-			Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
-				InstallStrategy: addonapiv1alpha1.InstallStrategy{
-					Type: addonapiv1alpha1.AddonInstallStrategyManual,
-				},
-			},
-		}
+		cma = newClusterManagementAddon(fmt.Sprintf("test-%s", suffix))
 		_, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(), cma, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		assertClusterManagementAddOnAnnotations(cma.Name)
 
 		placementNamespace = fmt.Sprintf("ns-%s", suffix)
 		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: placementNamespace}}

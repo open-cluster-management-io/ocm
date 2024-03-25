@@ -92,6 +92,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			cma, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+		assertClusterManagementAddOnAnnotations(testAddonImpl.name)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -112,13 +113,6 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		testAddonImpl.prober = &agent.HealthProber{
 			Type: agent.HealthProberTypeWork,
 		}
-
-		// Update clustermanagement addon annotattion
-		cma, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		cma.SetAnnotations(map[string]string{addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue})
-		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Update(context.Background(), cma, metav1.UpdateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		// Create ManagedClusterAddOn
 		addon := &addonapiv1alpha1.ManagedClusterAddOn{

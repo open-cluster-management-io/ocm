@@ -653,7 +653,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				managedClusterAddonIndexer:   addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetIndexer(),
 			}
 
-			reconcile := &clusterManagementAddonProgressingReconciler{
+			reconcile := &cmaProgressingReconciler{
 				patcher.NewPatcher[
 					*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus](
 					fakeAddonClient.AddonV1alpha1().ClusterManagementAddOns()),

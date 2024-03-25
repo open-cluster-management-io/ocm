@@ -79,7 +79,7 @@ func NewAddonConfigurationController(
 		&managedClusterAddonConfigurationReconciler{
 			addonClient: addonClient,
 		},
-		&clusterManagementAddonProgressingReconciler{
+		&cmaProgressingReconciler{
 			patcher: patcher.NewPatcher[
 				*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus](
 				addonClient.AddonV1alpha1().ClusterManagementAddOns()),

@@ -86,9 +86,6 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 		cma = &addonapiv1alpha1.ClusterManagementAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddOnConfigsImpl.name,
-				Annotations: map[string]string{
-					addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue,
-				},
 			},
 			Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
 				InstallStrategy: addonapiv1alpha1.InstallStrategy{
@@ -118,6 +115,8 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 		}
 		_, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(), cma, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		assertClusterManagementAddOnAnnotations(testAddOnConfigsImpl.name)
 
 		// prepare cluster
 		for i := 0; i < 4; i++ {
