@@ -1,4 +1,4 @@
-package managementaddoninstallprogression
+package cmainstallprogression
 
 import (
 	"context"
@@ -17,28 +17,26 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
-// managementAddonInstallProgressionController reconciles instances of clustermanagementaddon the hub
+// cmaInstallProgressionController reconciles instances of clustermanagementaddon the hub
 // based to update related object and status condition.
-type managementAddonInstallProgressionController struct {
+type cmaInstallProgressionController struct {
 	patcher patcher.Patcher[
 		*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus]
-	managedClusterAddonLister    addonlisterv1alpha1.ManagedClusterAddOnLister
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
 	addonFilterFunc              factory.EventFilterFunc
 }
 
-func NewManagementAddonInstallProgressionController(
+func NewCMAInstallProgressionController(
 	addonClient addonv1alpha1client.Interface,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	addonFilterFunc factory.EventFilterFunc,
 	recorder events.Recorder,
 ) factory.Controller {
-	c := &managementAddonInstallProgressionController{
+	c := &cmaInstallProgressionController{
 		patcher: patcher.NewPatcher[
 			*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus](
 			addonClient.AddonV1alpha1().ClusterManagementAddOns()),
-		managedClusterAddonLister:    addonInformers.Lister(),
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
 		addonFilterFunc:              addonFilterFunc,
 	}
@@ -46,11 +44,11 @@ func NewManagementAddonInstallProgressionController(
 	return factory.New().WithInformersQueueKeysFunc(
 		queue.QueueKeyByMetaName,
 		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
-		WithSync(c.sync).ToController("management-addon-status-controller", recorder)
+		WithSync(c.sync).ToController("cma-install-progression-controller", recorder)
 
 }
 
-func (c *managementAddonInstallProgressionController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+func (c *cmaInstallProgressionController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	addonName := syncCtx.QueueKey()
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Reconciling addon", "addonName", addonName)
@@ -64,15 +62,6 @@ func (c *managementAddonInstallProgressionController) sync(ctx context.Context, 
 
 	mgmtAddonCopy := mgmtAddon.DeepCopy()
 
-	clusterManagementAddon, err := c.clusterManagementAddonLister.Get(addonName)
-	if errors.IsNotFound(err) {
-		return nil
-	}
-
-	if err != nil {
-		return err
-	}
-
 	// set default config reference
 	mgmtAddonCopy.Status.DefaultConfigReferences = setDefaultConfigReference(mgmtAddonCopy.Spec.SupportedConfigs, mgmtAddonCopy.Status.DefaultConfigReferences)
 
@@ -84,7 +73,7 @@ func (c *managementAddonInstallProgressionController) sync(ctx context.Context, 
 	}
 
 	// only update default config references and skip updating install progression for self-managed addon
-	if !c.addonFilterFunc(clusterManagementAddon) {
+	if !c.addonFilterFunc(mgmtAddon) {
 		_, err = c.patcher.PatchStatus(ctx, mgmtAddonCopy, mgmtAddonCopy.Status, mgmtAddon.Status)
 		return err
 	}
