@@ -112,8 +112,7 @@ func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 	}
 
 	agentAddonOptions := agent.AgentAddonOptions{
-		AddonName:       a.addonName,
-		InstallStrategy: nil,
+		AddonName: a.addonName,
 		HealthProber: &agent.HealthProber{
 			Type: agent.HealthProberTypeDeploymentAvailability,
 		},

@@ -2,8 +2,6 @@ apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: ClusterManagementAddOn
 metadata:
   name: hello-template
-  annotations:
-    addon.open-cluster-management.io/lifecycle: "addon-manager"
 spec:
   addOnMeta:
     description: hello-template

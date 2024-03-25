@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -34,9 +35,12 @@ type AgentAddonFactory struct {
 	getValuesFuncs    []GetValuesFunc
 	agentAddonOptions agent.AgentAddonOptions
 	// trimCRDDescription flag is used to trim the description of CRDs in manifestWork. disabled by default.
-	trimCRDDescription    bool
+	trimCRDDescription bool
+	// Deprecated: use clusterClient to get the hosting cluster.
 	hostingCluster        *clusterv1.ManagedCluster
+	clusterClient         clusterclientset.Interface
 	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) string
+	helmEngineStrict      bool
 }
 
 // NewAgentAddonFactory builds an addonAgentFactory instance with addon name and fs.
@@ -53,12 +57,12 @@ func NewAgentAddonFactory(addonName string, fs embed.FS, dir string) *AgentAddon
 		agentAddonOptions: agent.AgentAddonOptions{
 			AddonName:           addonName,
 			Registration:        nil,
-			InstallStrategy:     nil,
 			HealthProber:        nil,
 			SupportedConfigGVRs: []schema.GroupVersionResource{},
 		},
 		trimCRDDescription: false,
 		scheme:             s,
+		helmEngineStrict:   false,
 	}
 }
 
@@ -75,19 +79,6 @@ func (f *AgentAddonFactory) WithScheme(s *runtime.Scheme) *AgentAddonFactory {
 // the values got from the big index Func will override the one from small index Func.
 func (f *AgentAddonFactory) WithGetValuesFuncs(getValuesFuncs ...GetValuesFunc) *AgentAddonFactory {
 	f.getValuesFuncs = getValuesFuncs
-	return f
-}
-
-// WithInstallStrategy defines the installation strategy of the manifests prescribed by Manifests(..).
-// Deprecated: add annotation "addon.open-cluster-management.io/lifecycle: addon-manager" to ClusterManagementAddon
-// and define install strategy in ClusterManagementAddon spec.installStrategy instead.
-// The migration plan refer to https://github.com/open-cluster-management-io/ocm/issues/355.
-func (f *AgentAddonFactory) WithInstallStrategy(strategy *agent.InstallStrategy) *AgentAddonFactory {
-	if strategy.InstallNamespace == "" {
-		strategy.InstallNamespace = AddonDefaultInstallNamespace
-	}
-	f.agentAddonOptions.InstallStrategy = strategy
-
 	return f
 }
 
@@ -115,6 +106,12 @@ func (f *AgentAddonFactory) WithTrimCRDDescription() *AgentAddonFactory {
 	return f
 }
 
+// WithHelmEngineStrict is to enable script go template rendering for Helm charts to generate manifestWork.
+func (f *AgentAddonFactory) WithHelmEngineStrict() *AgentAddonFactory {
+	f.helmEngineStrict = true
+	return f
+}
+
 // WithConfigGVRs defines the addon supported configuration GroupVersionResource
 func (f *AgentAddonFactory) WithConfigGVRs(gvrs ...schema.GroupVersionResource) *AgentAddonFactory {
 	f.agentAddonOptions.SupportedConfigGVRs = append(f.agentAddonOptions.SupportedConfigGVRs, gvrs...)
@@ -123,8 +120,15 @@ func (f *AgentAddonFactory) WithConfigGVRs(gvrs ...schema.GroupVersionResource) 
 
 // WithHostingCluster defines the hosting cluster used in hosted mode. An AgentAddon may use this to provide
 // additional metadata.
+// Deprecated: use WithManagedClusterClient to set a cluster client that can get the hosting cluster.
 func (f *AgentAddonFactory) WithHostingCluster(cluster *clusterv1.ManagedCluster) *AgentAddonFactory {
 	f.hostingCluster = cluster
+	return f
+}
+
+// WithManagedClusterClient defines the cluster client that can get the hosting cluster used in hosted mode.
+func (f *AgentAddonFactory) WithManagedClusterClient(c clusterclientset.Interface) *AgentAddonFactory {
+	f.clusterClient = c
 	return f
 }
 

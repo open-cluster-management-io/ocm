@@ -4,11 +4,8 @@ import (
 	"fmt"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -48,14 +45,6 @@ type AgentAddonOptions struct {
 	// Registration prescribes the custom behavior during CSR applying, approval and signing.
 	// +optional
 	Registration *RegistrationOption
-
-	// InstallStrategy defines that addon should be created in which clusters.
-	// Addon will not be installed automatically until a ManagedClusterAddon is applied to the cluster's
-	// namespace if InstallStrategy is nil.
-	// Deprecated: use installStrategy config in ClusterManagementAddOn API instead
-	// The migration plan refer to https://github.com/open-cluster-management-io/ocm/issues/355.
-	// +optional
-	InstallStrategy *InstallStrategy
 
 	// Updaters select a set of resources and define the strategies to update them.
 	// UpdateStrategy is Update if no Updater is defined for a resource.
@@ -157,23 +146,6 @@ type RegistrationOption struct {
 	CSRSign CSRSignerFunc
 }
 
-// InstallStrategy is the installation strategy of the manifests prescribed by Manifests(..).
-type InstallStrategy struct {
-	*installStrategy
-}
-
-type installStrategy struct {
-	// InstallNamespace is target deploying namespace in the managed cluster upon automatic addon installation.
-	InstallNamespace string
-
-	// managedClusterFilter will filter the clusters to install the addon to.
-	managedClusterFilter func(cluster *clusterv1.ManagedCluster) bool
-}
-
-func (s *InstallStrategy) GetManagedClusterFilter() func(cluster *clusterv1.ManagedCluster) bool {
-	return s.managedClusterFilter
-}
-
 type Updater struct {
 	// ResourceIdentifier sets what resources the strategy applies to
 	ResourceIdentifier workapiv1.ResourceIdentifier
@@ -255,54 +227,6 @@ func DefaultGroups(clusterName, addonName string) []string {
 		fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", clusterName, addonName),
 		fmt.Sprintf("system:open-cluster-management:addon:%s", addonName),
 		"system:authenticated",
-	}
-}
-
-// InstallAllStrategy indicate to install addon to all clusters
-func InstallAllStrategy(installNamespace string) *InstallStrategy {
-	return &InstallStrategy{
-		&installStrategy{
-			InstallNamespace: installNamespace,
-			managedClusterFilter: func(cluster *clusterv1.ManagedCluster) bool {
-				return true
-			},
-		},
-	}
-}
-
-// InstallByLabelStrategy indicate to install addon based on clusters' label
-func InstallByLabelStrategy(installNamespace string, selector metav1.LabelSelector) *InstallStrategy {
-	return &InstallStrategy{
-		&installStrategy{
-			InstallNamespace: installNamespace,
-			managedClusterFilter: func(cluster *clusterv1.ManagedCluster) bool {
-				selector, err := metav1.LabelSelectorAsSelector(&selector)
-				if err != nil {
-					klog.Warningf("labels selector is not correct: %v", err)
-					return false
-				}
-
-				if !selector.Matches(labels.Set(cluster.Labels)) {
-					return false
-				}
-				return true
-			},
-		},
-	}
-}
-
-// InstallByFilterFunctionStrategy indicate to install addon based on a filter function, and it will also install addons if the filter function is nil.
-func InstallByFilterFunctionStrategy(installNamespace string, f func(cluster *clusterv1.ManagedCluster) bool) *InstallStrategy {
-	if f == nil {
-		f = func(cluster *clusterv1.ManagedCluster) bool {
-			return true
-		}
-	}
-	return &InstallStrategy{
-		&installStrategy{
-			InstallNamespace:     installNamespace,
-			managedClusterFilter: f,
-		},
 	}
 }
 
