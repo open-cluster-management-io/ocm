@@ -139,6 +139,7 @@ var _ = ginkgo.BeforeSuite(func() {
 				Mode: operatorapiv1.InstallModeDefault,
 			},
 			WorkConfiguration: &operatorapiv1.WorkConfiguration{
+				WorkDriver: operatorapiv1.WorkDriverTypeKube,
 				FeatureGates: []operatorapiv1.FeatureGate{
 					{
 						Feature: string(feature.NilExecutorValidating),
@@ -177,10 +178,11 @@ var _ = ginkgo.BeforeSuite(func() {
 				},
 			},
 			WorkConfiguration: &operatorapiv1.WorkConfiguration{
+				WorkDriver: operatorapiv1.WorkDriverTypeKube,
 				FeatureGates: []operatorapiv1.FeatureGate{
 					{
-						Feature: "ManifestWorkReplicaSet",
-						Mode:    "Enable",
+						Feature: string(feature.ManifestWorkReplicaSet),
+						Mode:    operatorapiv1.FeatureGateModeTypeEnable,
 					},
 				},
 			},

@@ -11,12 +11,14 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/cert"
 
 	"open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work"
 
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/test/integration/util"
@@ -485,6 +487,147 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should have expected work driver when work driver is updated", func() {
+			ginkgo.By("Update work driver to grpc")
+			gomega.Eventually(func() error {
+				clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(
+					context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				clusterManager.Spec.WorkConfiguration.WorkDriver = work.ConfigTypeGRPC
+				_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(
+					context.Background(), clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			gomega.Eventually(func() error {
+				actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(
+					context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if !meta.IsStatusConditionFalse(actual.Status.Conditions, "WorkDriverConfigSecretSynced") {
+					return fmt.Errorf("should get WorkDriverConfigSecretSynced condition false")
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			_, err := hostedKubeClient.CoreV1().Secrets("default").Create(context.TODO(), &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      helpers.WorkDriverConfig,
+					Namespace: "default",
+				},
+				Data: map[string][]byte{
+					"config.yaml": []byte("url: grpc.example.com:8443"),
+				},
+			}, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			gomega.Eventually(func() error {
+				actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(
+					context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if !meta.IsStatusConditionTrue(actual.Status.Conditions, "WorkDriverConfigSecretSynced") {
+					return fmt.Errorf("should get WorkDriverConfigSecretSynced condition true")
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			gomega.Eventually(func() error {
+				actual, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(context.Background(),
+					hubWorkControllerDeployment, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				foundArg := false
+				for _, arg := range actual.Spec.Template.Spec.Containers[0].Args {
+					if arg == "--work-driver=grpc" {
+						foundArg = true
+					}
+				}
+				if !foundArg {
+					return fmt.Errorf("do not find the --work-driver=grpc args, got %v", actual.Spec.Template.Spec.Containers[0].Args)
+				}
+				foundVol := false
+				for _, vol := range actual.Spec.Template.Spec.Volumes {
+					if vol.Name == "workdriverconfig" && vol.Secret.SecretName == helpers.WorkDriverConfig {
+						foundVol = true
+					}
+				}
+				if !foundVol {
+					return fmt.Errorf("do not find the workdriverconfig volume, got %v", actual.Spec.Template.Spec.Volumes)
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			gomega.Eventually(func() error {
+				workConfigSecret, err := hostedKubeClient.CoreV1().Secrets(hubNamespaceHosted).Get(context.Background(),
+					helpers.WorkDriverConfig, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if string(workConfigSecret.Data["config.yaml"]) != "url: grpc.example.com:8443" {
+					return fmt.Errorf("do not find the expected config.yaml, got %v", string(workConfigSecret.Data["config.yaml"]))
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			ginkgo.By("Revert work driver back to kube")
+			gomega.Eventually(func() error {
+				clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(
+					context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				clusterManager.Spec.WorkConfiguration.WorkDriver = operatorapiv1.WorkDriverTypeKube
+				_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(
+					context.Background(), clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			gomega.Eventually(func() error {
+				actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(
+					context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if cond := meta.FindStatusCondition(actual.Status.Conditions, "WorkDriverConfigSecretSynced"); cond != nil {
+					return fmt.Errorf("should remove WorkDriverConfigSecretSynced condition")
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			gomega.Eventually(func() error {
+				actual, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(context.Background(),
+					hubWorkControllerDeployment, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				for _, arg := range actual.Spec.Template.Spec.Containers[0].Args {
+					if arg == "--work-driver=grpc" {
+						return err
+					}
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			gomega.Eventually(func() bool {
+				_, err := hostedKubeClient.CoreV1().Secrets(hubNamespaceHosted).Get(context.Background(),
+					helpers.WorkDriverConfig, metav1.GetOptions{})
+				if err == nil {
+					return false
+				}
+				return errors.IsNotFound(err)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			err = hostedKubeClient.CoreV1().Secrets("default").Delete(context.Background(),
+				helpers.WorkDriverConfig, metav1.DeleteOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
 		ginkgo.It("should have expected resource created/deleted successfully when feature gates AddOnManager enabled/disabled", func() {

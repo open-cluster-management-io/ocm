@@ -3,6 +3,7 @@ package helpers
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 
@@ -722,6 +723,39 @@ func GetHubKubeconfig(ctx context.Context,
 		// backward compatible with previous crd.
 		return operatorKubeconfig, nil
 	}
+}
+
+// RemoveWorkConfigSecret is used to remove the secret of work config from the cluster manager namespace.
+func RemoveWorkConfigSecret(ctx context.Context,
+	operatorClient kubernetes.Interface,
+	clusterManagerNamespace string,
+) error {
+	if _, err := operatorClient.CoreV1().Namespaces().Get(ctx, clusterManagerNamespace, metav1.GetOptions{}); err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	err := operatorClient.CoreV1().Secrets(clusterManagerNamespace).Delete(ctx, WorkDriverConfig, metav1.DeleteOptions{})
+	if err != nil && errors.IsNotFound(err) {
+		return nil
+	}
+
+	return err
+}
+
+// GetOperatorNamespace is used to get the namespace where the operator is running.
+func GetOperatorNamespace() (string, error) {
+	podNamespace, exists := os.LookupEnv("POD_NAMESPACE")
+	if exists {
+		return podNamespace, nil
+	}
+	nsBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err != nil {
+		return "", err
+	}
+
+	return string(nsBytes), nil
 }
 
 func BuildFeatureCondition(invalidMsgs ...string) metav1.Condition {
