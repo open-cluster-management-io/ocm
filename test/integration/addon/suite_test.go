@@ -133,7 +133,6 @@ type testAddon struct {
 	approveCSR          bool
 	cert                []byte
 	prober              *agent.HealthProber
-	installStrategy     *agent.InstallStrategy
 	hostedModeEnabled   bool
 	supportedConfigGVRs []schema.GroupVersionResource
 }
@@ -146,7 +145,6 @@ func (t *testAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 	option := agent.AgentAddonOptions{
 		AddonName:           t.name,
 		HealthProber:        t.prober,
-		InstallStrategy:     t.installStrategy,
 		HostedModeEnabled:   t.hostedModeEnabled,
 		SupportedConfigGVRs: t.supportedConfigGVRs,
 	}
