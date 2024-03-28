@@ -23,10 +23,10 @@ spec:
       name: klusterlets.operator.open-cluster-management.io
       version: v1
   description: |
-    The Klusterlet proivdes the registation to the Hub clusters as a managed cluster. This operator supports the installation and upgrade of Klusterlet.
+    The Klusterlet provides the registration to the Hub cluster as a managed cluster. This operator supports the installation and upgrade of Klusterlet.
 
     ## Prerequisites
-    You need a Hub cluster which has installed ClusterManager.
+    You need a Hub cluster with ClusterManager installed.
 
     ## How to Install
     * Install Klusterlet operator by following instructions in top right button `Install`.
@@ -34,7 +34,7 @@ spec:
     * Create a secret `bootstrap-hub-kubeconfig` with the kubeconfig file of hub cluster in the agent namespace.
 
       ```
-      $ kubectl create secret generic bootstrap-hub-kubeconfig --from-file=kubeconfig=<kubeconfig file of hub clsuter> -n <agent namespace>
+      $ kubectl create secret generic bootstrap-hub-kubeconfig --from-file=kubeconfig=<kubeconfig file of hub cluster> -n <agent namespace>
       ```
 
     * Create an instance of the Klusterlet resource to install the Klusterlet.
