@@ -144,7 +144,9 @@ func (c *crdMigrationController) sync(ctx context.Context, controllerContext fac
 	}
 
 	// do not apply storage version migrations until other resources are applied
-	if applied := meta.IsStatusConditionTrue(clusterManager.Status.Conditions, clusterManagerApplied); !applied {
+	err = clusterManagerAppliedSuccessfully(clusterManager)
+	if err != nil {
+		klog.Info(err.Error())
 		controllerContext.Queue().AddRateLimited(clusterManagerName)
 		return nil
 	}
@@ -203,6 +205,19 @@ func (c *crdMigrationController) sync(ctx context.Context, controllerContext fac
 		return err
 	}
 
+	return nil
+}
+
+func clusterManagerAppliedSuccessfully(clusterManager *operatorapiv1.ClusterManager) error {
+	clusterManagerAppliedCondition := meta.FindStatusCondition(clusterManager.Status.Conditions, clusterManagerApplied)
+	if clusterManagerAppliedCondition == nil || clusterManagerAppliedCondition.Status != metav1.ConditionTrue {
+		return fmt.Errorf("applied condition %v is not true, wait for cluster manager to be applied",
+			clusterManagerAppliedCondition)
+	}
+	if clusterManagerAppliedCondition.ObservedGeneration != clusterManager.Generation {
+		return fmt.Errorf("observedGeneration %v not match generation: %v, wait for cluster manager to be applied",
+			clusterManagerAppliedCondition.ObservedGeneration, clusterManager.Generation)
+	}
 	return nil
 }
 
