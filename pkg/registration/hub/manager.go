@@ -153,8 +153,6 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
 		csrReconciles = append(csrReconciles, csr.NewCSRBootstrapReconciler(
 			kubeClient,
-			clusterClient,
-			clusterInformers.Cluster().V1().ManagedClusters().Lister(),
 			m.ClusterAutoApprovalUsers,
 			controllerContext.EventRecorder,
 		))
