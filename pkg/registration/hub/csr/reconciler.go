@@ -11,15 +11,11 @@ import (
 	authorizationv1 "k8s.io/api/authorization/v1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
-	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
-	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/ocm/pkg/registration/hub/user"
@@ -95,21 +91,15 @@ func (r *csrRenewalReconciler) Reconcile(ctx context.Context, csr csrInfo, appro
 
 type csrBootstrapReconciler struct {
 	kubeClient    kubernetes.Interface
-	clusterClient clusterclientset.Interface
-	clusterLister clusterv1listers.ManagedClusterLister
 	approvalUsers sets.Set[string]
 	eventRecorder events.Recorder
 }
 
 func NewCSRBootstrapReconciler(kubeClient kubernetes.Interface,
-	clusterClient clusterclientset.Interface,
-	clusterLister clusterv1listers.ManagedClusterLister,
 	approvalUsers []string,
 	recorder events.Recorder) Reconciler {
 	return &csrBootstrapReconciler{
 		kubeClient:    kubeClient,
-		clusterClient: clusterClient,
-		clusterLister: clusterLister,
 		approvalUsers: sets.New(approvalUsers...),
 		eventRecorder: recorder.WithComponentSuffix("csr-approving-controller"),
 	}
@@ -129,37 +119,12 @@ func (b *csrBootstrapReconciler) Reconcile(ctx context.Context, csr csrInfo, app
 		return reconcileContinue, nil
 	}
 
-	err := b.accpetCluster(ctx, clusterName)
-	if errors.IsNotFound(err) {
-		// Current spoke cluster not found, could have been deleted, do nothing.
-		return reconcileStop, nil
-	}
-	if err != nil {
-		return reconcileContinue, err
-	}
-
 	if err := approveCSR(b.kubeClient); err != nil {
 		return reconcileContinue, err
 	}
 
 	b.eventRecorder.Eventf("ManagedClusterAutoApproved", "spoke cluster %q is auto approved.", clusterName)
 	return reconcileStop, nil
-}
-
-func (b *csrBootstrapReconciler) accpetCluster(ctx context.Context, managedClusterName string) error {
-	managedCluster, err := b.clusterLister.Get(managedClusterName)
-	if err != nil {
-		return err
-	}
-
-	if managedCluster.Spec.HubAcceptsClient {
-		return nil
-	}
-
-	patch := []byte("{\"spec\": {\"hubAcceptsClient\": true}}")
-	_, err = b.clusterClient.ClusterV1().ManagedClusters().Patch(
-		ctx, managedCluster.Name, types.MergePatchType, patch, metav1.PatchOptions{})
-	return err
 }
 
 // To validate a managed cluster csr, we check
