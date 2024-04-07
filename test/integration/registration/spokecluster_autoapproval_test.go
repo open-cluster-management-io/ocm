@@ -1,6 +1,7 @@
 package registration_test
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/onsi/gomega"
 	certificates "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
@@ -16,6 +18,8 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
+
+const expectedAnnotation = "open-cluster-management.io/automatically-accepted-on"
 
 var _ = ginkgo.Describe("Cluster Auto Approval", func() {
 	ginkgo.It("Cluster should be automatically approved", func() {
@@ -49,7 +53,6 @@ var _ = ginkgo.Describe("Cluster Auto Approval", func() {
 			if err != nil {
 				return false
 			}
-
 			return cluster.Spec.HubAcceptsClient
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
@@ -83,5 +86,59 @@ var _ = ginkgo.Describe("Cluster Auto Approval", func() {
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	})
+
+	ginkgo.It("Cluster can be denied by manually after automatically approved", func() {
+		clusterName := "autoapprovaltest-spoke-cluster1"
+		_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), &clusterv1.ManagedCluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: clusterName,
+			},
+		}, v1.CreateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		gomega.Eventually(func() error {
+			cluster, err := util.GetManagedCluster(clusterClient, clusterName)
+			if err != nil {
+				return err
+			}
+
+			if _, ok := cluster.Annotations[expectedAnnotation]; !ok {
+				return fmt.Errorf("cluster should have accepted annotation")
+			}
+
+			if !cluster.Spec.HubAcceptsClient {
+				return fmt.Errorf("cluster should be accepted")
+			}
+
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+		// we can deny the cluster after it is accepted
+		cluster, err := util.GetManagedCluster(clusterClient, clusterName)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		updatedCluster := cluster.DeepCopy()
+		updatedCluster.Spec.HubAcceptsClient = false
+
+		_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), updatedCluster, v1.UpdateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		gomega.Consistently(func() error {
+			cluster, err := util.GetManagedCluster(clusterClient, clusterName)
+			if err != nil {
+				return err
+			}
+
+			if _, ok := cluster.Annotations[expectedAnnotation]; !ok {
+				return fmt.Errorf("cluster should have accepted annotation")
+			}
+
+			if cluster.Spec.HubAcceptsClient {
+				return fmt.Errorf("cluster should be denied")
+			}
+
+			return nil
+		}, 10*time.Second, eventuallyInterval).Should(gomega.Succeed())
 	})
 })

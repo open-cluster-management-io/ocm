@@ -3,6 +3,7 @@ package managedcluster
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -16,18 +17,21 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	v1 "open-cluster-management.io/api/cluster/v1"
+	ocmfeature "open-cluster-management.io/api/feature"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/apply"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	"open-cluster-management.io/ocm/pkg/features"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
 func TestSyncManagedCluster(t *testing.T) {
 	cases := []struct {
-		name            string
-		startingObjects []runtime.Object
-		validateActions func(t *testing.T, actions []clienttesting.Action)
+		name                string
+		autoApprovalEnabled bool
+		startingObjects     []runtime.Object
+		validateActions     func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
 			name:            "sync a deleted spoke cluster",
@@ -97,7 +101,17 @@ func TestSyncManagedCluster(t *testing.T) {
 				testingcommon.AssertNoActions(t, actions)
 			},
 		},
+		{
+			name:                "should accept the clusters when auto approval is enabled",
+			autoApprovalEnabled: true,
+			startingObjects:     []runtime.Object{testinghelpers.NewManagedCluster()},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+			},
+		},
 	}
+
+	features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates)
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -112,8 +126,11 @@ func TestSyncManagedCluster(t *testing.T) {
 				}
 			}
 
+			features.HubMutableFeatureGate.Set(fmt.Sprintf("%s=%v", ocmfeature.ManagedClusterAutoApproval, c.autoApprovalEnabled))
+
 			ctrl := managedClusterController{
 				kubeClient,
+				clusterClient,
 				clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				apply.NewPermissionApplier(
 					kubeClient,

@@ -3,6 +3,7 @@ package managedcluster
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -12,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	rbacv1informers "k8s.io/client-go/informers/rbac/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -20,13 +22,19 @@ import (
 	informerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	listerv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	v1 "open-cluster-management.io/api/cluster/v1"
+	ocmfeature "open-cluster-management.io/api/feature"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/apply"
 	"open-cluster-management.io/ocm/pkg/common/queue"
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/manifests"
 )
+
+// this is an internal annotation to indicate a managed cluster is already accepted automatically, it is not
+// expected to be changed or removed outside.
+const clusterAcceptedAnnotationKey = "open-cluster-management.io/automatically-accepted-on"
 
 var staticFiles = []string{
 	"rbac/managedcluster-clusterrole.yaml",
@@ -38,6 +46,7 @@ var staticFiles = []string{
 // managedClusterController reconciles instances of ManagedCluster on the hub.
 type managedClusterController struct {
 	kubeClient    kubernetes.Interface
+	clusterClient clientset.Interface
 	clusterLister listerv1.ManagedClusterLister
 	applier       *apply.PermissionApplier
 	patcher       patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
@@ -56,6 +65,7 @@ func NewManagedClusterController(
 	recorder events.Recorder) factory.Controller {
 	c := &managedClusterController{
 		kubeClient:    kubeClient,
+		clusterClient: clusterClient,
 		clusterLister: clusterInformer.Lister(),
 		applier: apply.NewPermissionApplier(
 			kubeClient,
@@ -103,6 +113,14 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	}
 
 	if !managedCluster.Spec.HubAcceptsClient {
+		// If the ManagedClusterAutoApproval feature is enabled, we automatically accept a cluster only
+		// when it joins for the first time, afterwards users can deny it again.
+		if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
+			if _, ok := managedCluster.Annotations[clusterAcceptedAnnotationKey]; !ok {
+				return c.acceptCluster(ctx, managedClusterName)
+			}
+		}
+
 		// Current spoke cluster is not accepted, do nothing.
 		if !meta.IsStatusConditionTrue(managedCluster.Status.Conditions, v1.ManagedClusterConditionHubAccepted) {
 			return nil
@@ -198,4 +216,14 @@ func (c *managedClusterController) removeManagedClusterResources(ctx context.Con
 		}
 	}
 	return operatorhelpers.NewMultiLineAggregate(errs)
+}
+
+func (c *managedClusterController) acceptCluster(ctx context.Context, managedClusterName string) error {
+	// TODO support patching both annotations and spec simultaneously in the patcher
+	acceptedTime := time.Now()
+	patch := fmt.Sprintf(`{"metadata":{"annotations":{"%s":"%s"}},"spec":{"hubAcceptsClient":true}}`,
+		clusterAcceptedAnnotationKey, acceptedTime.Format(time.RFC3339))
+	_, err := c.clusterClient.ClusterV1().ManagedClusters().Patch(ctx, managedClusterName,
+		types.MergePatchType, []byte(patch), metav1.PatchOptions{})
+	return err
 }
