@@ -33,7 +33,7 @@ jobs:
       - name: unit
         run: make test
       - name: report coverage
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           files: ./coverage.out
           flags: unit
@@ -139,7 +139,7 @@ jobs:
     name: trigger clusteradm e2e
     runs-on: ubuntu-latest
     steps:
-      - uses: peter-evans/repository-dispatch@v2
+      - uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.OCM_BOT_PAT }}
           repository: open-cluster-management-io/clusteradm
