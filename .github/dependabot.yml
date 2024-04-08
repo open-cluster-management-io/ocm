@@ -1,0 +1,24 @@
+version: 2
+updates:
+- package-ecosystem: gomod
+  directory: "/"
+  schedule:
+    interval: daily
+  commit-message:
+      prefix: ":seedling:"
+  open-pull-requests-limit: 3
+- package-ecosystem: "github-actions"
+  directory: "/"
+  schedule:
+      interval: "weekly"
+  commit-message:
+      prefix: ":seedling:"
+  groups:
+    github-actions:
+      patterns:
+        - "*"
+      # These actions directly influence the build process and are excluded from grouped updates
+      exclude-patterns:
+        - "actions/setup-go"
+        - "arduino/setup-protoc"
+        - "goreleaser/goreleaser-action"
