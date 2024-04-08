@@ -52,7 +52,7 @@ jobs:
           fetch-depth: 1
           path: go/src/open-cluster-management.io/ocm
       - name: install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: install imagebuilder
