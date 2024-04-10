@@ -3,10 +3,10 @@ kind: ClusterManager
 metadata:
   name: cluster-manager
 spec:
-  registrationImagePullSpec: quay.io/open-cluster-management/registration
-  workImagePullSpec: quay.io/open-cluster-management/work
-  placementImagePullSpec: quay.io/open-cluster-management/placement
-  addOnManagerImagePullSpec: quay.io/open-cluster-management/addon-manager
+  registrationImagePullSpec: quay.io/open-cluster-management/registration:latest
+  workImagePullSpec: quay.io/open-cluster-management/work:latest
+  placementImagePullSpec: quay.io/open-cluster-management/placement:latest
+  addOnManagerImagePullSpec: quay.io/open-cluster-management/addon-manager:latest
   deployOption:
     mode: Hosted
     hosted:

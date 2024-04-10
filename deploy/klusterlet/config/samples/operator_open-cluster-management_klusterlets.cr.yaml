@@ -5,9 +5,9 @@ metadata:
 spec:
   deployOption:
     mode: Singleton
-  registrationImagePullSpec: quay.io/open-cluster-management/registration
-  workImagePullSpec: quay.io/open-cluster-management/work
-  imagePullSpec: quay.io/open-cluster-management/registration-operator
+  registrationImagePullSpec: quay.io/open-cluster-management/registration:latest
+  workImagePullSpec: quay.io/open-cluster-management/work:latest
+  imagePullSpec: quay.io/open-cluster-management/registration-operator:latest
   clusterName: cluster1
   namespace: open-cluster-management-agent
   externalServerURLs:

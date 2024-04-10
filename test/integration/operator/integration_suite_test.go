@@ -76,8 +76,8 @@ var _ = ginkgo.BeforeSuite(func() {
 	testEnv = &envtest.Environment{
 		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths: []string{
-			filepath.Join(".", "deploy", "cluster-manager", "olm-catalog", "cluster-manager", "manifests"),
-			filepath.Join(".", "deploy", "klusterlet", "olm-catalog", "klusterlet", "manifests"),
+			filepath.Join(".", "deploy", "cluster-manager", "olm-catalog", "latest", "manifests"),
+			filepath.Join(".", "deploy", "klusterlet", "olm-catalog", "latest", "manifests"),
 		},
 	}
 	cfg, err := testEnv.Start()
@@ -104,8 +104,8 @@ var _ = ginkgo.BeforeSuite(func() {
 	hostedTestEnv = &envtest.Environment{
 		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths: []string{
-			filepath.Join(".", "deploy", "cluster-manager", "olm-catalog", "cluster-manager", "manifests"),
-			filepath.Join(".", "deploy", "klusterlet", "olm-catalog", "klusterlet", "manifests"),
+			filepath.Join(".", "deploy", "cluster-manager", "olm-catalog", "latest", "manifests"),
+			filepath.Join(".", "deploy", "klusterlet", "olm-catalog", "latest", "manifests"),
 		},
 	}
 	hostedConfig, err := hostedTestEnv.Start()

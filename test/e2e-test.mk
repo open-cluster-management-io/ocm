@@ -12,9 +12,7 @@ KLUSTERLET_NAME?=klusterlet
 
 SED_CMD:=sed
 ifeq ($(GOHOSTOS),darwin)
-	ifeq ($(GOHOSTARCH),amd64)
-		SED_CMD:=gsed
-	endif
+	SED_CMD:=gsed
 endif
 
 hub-kubeconfig:
@@ -29,7 +27,7 @@ deploy-hub-operator: ensure-kustomize
 	mv deploy/cluster-manager/config/kustomization.yaml.tmp deploy/cluster-manager/config/kustomization.yaml
 
 apply-hub-cr:
-	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/placement,$(PLACEMENT_IMAGE)," -e "s,quay.io/open-cluster-management/addon-manager,$(ADDON_MANAGER_IMAGE)," deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers.cr.yaml | $(KUBECTL) apply -f -
+	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration:latest,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work:latest,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/placement:latest,$(PLACEMENT_IMAGE)," -e "s,quay.io/open-cluster-management/addon-manager:latest,$(ADDON_MANAGER_IMAGE)," deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers.cr.yaml | $(KUBECTL) apply -f -
 
 test-e2e: deploy-hub deploy-spoke-operator run-e2e
 
@@ -62,7 +60,7 @@ deploy-spoke-operator: ensure-kustomize
 
 apply-spoke-cr: bootstrap-secret
 	$(KUSTOMIZE) build deploy/klusterlet/config/samples \
-	| $(SED_CMD) -e "s,quay.io/open-cluster-management/registration$$,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/registration-operator,$(OPERATOR_IMAGE_NAME)," -e "s,cluster1,$(MANAGED_CLUSTER_NAME)," \
+	| $(SED_CMD) -e "s,quay.io/open-cluster-management/registration:latest,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work:latest,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/registration-operator:latest,$(OPERATOR_IMAGE_NAME)," -e "s,cluster1,$(MANAGED_CLUSTER_NAME)," \
 	| $(KUBECTL) apply -f -
 
 clean-hub-cr:
@@ -95,7 +93,7 @@ deploy-hub-hosted: deploy-hub-operator apply-hub-cr-hosted hub-kubeconfig-hosted
 deploy-spoke-hosted: deploy-spoke-operator apply-spoke-cr-hosted
 
 apply-hub-cr-hosted: external-hub-secret
-	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/placement,$(PLACEMENT_IMAGE)," -e "s,quay.io/open-cluster-management/addon-manager,$(ADDON_MANAGER_IMAGE)," deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers_hosted.cr.yaml | $(KUBECTL) apply -f -
+	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration:latest,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work:latest,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/placement:latest,$(PLACEMENT_IMAGE)," -e "s,quay.io/open-cluster-management/addon-manager:latest,$(ADDON_MANAGER_IMAGE)," deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers_hosted.cr.yaml | $(KUBECTL) apply -f -
 
 clean-spoke-hosted: clean-spoke-cr-hosted clean-spoke-operator
 
@@ -115,7 +113,7 @@ bootstrap-secret-hosted:
 	$(KUSTOMIZE) build deploy/klusterlet/config/samples/bootstrap | $(SED_CMD) -e "s,namespace: open-cluster-management-agent,namespace: $(KLUSTERLET_NAME)," | $(KUBECTL) apply -f -
 
 apply-spoke-cr-hosted: bootstrap-secret-hosted external-managed-secret
-	$(KUSTOMIZE) build deploy/klusterlet/config/samples | $(SED_CMD) -e "s,mode: Singleton,mode: SingletonHosted," -e "s,quay.io/open-cluster-management/registration$$,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/registration-operator,$(OPERATOR_IMAGE_NAME)," -e "s,cluster1,$(MANAGED_CLUSTER_NAME)," -e "s,name: klusterlet,name: $(KLUSTERLET_NAME)," -r | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build deploy/klusterlet/config/samples | $(SED_CMD) -e "s,mode: Singleton,mode: SingletonHosted," -e "s,quay.io/open-cluster-management/registration:latest,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work:latest,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/registration-operator:latest,$(OPERATOR_IMAGE_NAME)," -e "s,cluster1,$(MANAGED_CLUSTER_NAME)," -e "s,name: klusterlet,name: $(KLUSTERLET_NAME)," -r | $(KUBECTL) apply -f -
 
 clean-hub-cr-hosted:
 	$(KUBECTL) delete managedcluster --all --ignore-not-found
