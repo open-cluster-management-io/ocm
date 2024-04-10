@@ -64,7 +64,7 @@ type CRDTemplateAgentAddon struct {
 // NewCRDTemplateAgentAddon creates a CRDTemplateAgentAddon instance
 func NewCRDTemplateAgentAddon(
 	ctx context.Context,
-	addonName, agentName string,
+	addonName string,
 	hubKubeClient kubernetes.Interface,
 	addonClient addonv1alpha1client.Interface,
 	addonInformers addoninformers.SharedInformerFactory,
@@ -84,7 +84,7 @@ func NewCRDTemplateAgentAddon(
 		cmaLister:           addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
 		rolebindingLister:   rolebindingLister,
 		addonName:           addonName,
-		agentName:           agentName,
+		agentName:           fmt.Sprintf("%s-agent", addonName),
 	}
 
 	return a
