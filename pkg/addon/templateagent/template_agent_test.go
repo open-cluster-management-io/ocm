@@ -253,7 +253,6 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 		agentAddon := NewCRDTemplateAgentAddon(
 			ctx,
 			addonName,
-			"test-agent",
 			hubKubeClient,
 			addonClient,
 			addonInformerFactory,
@@ -369,7 +368,6 @@ func TestAgentInstallNamespace(t *testing.T) {
 		agentAddon := NewCRDTemplateAgentAddon(
 			ctx,
 			addonName,
-			"test-agent",
 			hubKubeClient,
 			addonClient,
 			addonInformerFactory,
@@ -533,7 +531,6 @@ func TestAgentManifestConfigs(t *testing.T) {
 		agentAddon := NewCRDTemplateAgentAddon(
 			ctx,
 			addonName,
-			"test-agent",
 			hubKubeClient,
 			addonClient,
 			addonInformerFactory,
