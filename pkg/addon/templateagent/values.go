@@ -36,6 +36,15 @@ func ToAddOnRegistriesPrivateValues(config addonapiv1alpha1.AddOnDeploymentConfi
 	}, nil
 }
 
+func ToAddOnInstallNamespacePrivateValues(config addonapiv1alpha1.AddOnDeploymentConfig) (addonfactory.Values, error) {
+	if len(config.Spec.AgentInstallNamespace) == 0 {
+		return nil, nil
+	}
+	return addonfactory.Values{
+		"INSTALL_NAMESPACE": config.Spec.AgentInstallNamespace,
+	}, nil
+}
+
 type keyValuePair struct {
 	name  string
 	value string
@@ -87,7 +96,7 @@ func (a *CRDTemplateAgentAddon) getValues(
 	if err != nil {
 		return presetValues, overrideValues, privateValues, nil
 	}
-	overrideValues = addonfactory.MergeValues(overrideValues, builtinValues)
+	overrideValues = addonfactory.MergeValues(builtinValues, overrideValues)
 
 	for k, v := range overrideValues {
 		_, ok := v.(string)
@@ -109,15 +118,9 @@ func (a *CRDTemplateAgentAddon) getValues(
 
 func (a *CRDTemplateAgentAddon) getBuiltinValues(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]string, addonfactory.Values, error) {
+	_ *addonapiv1alpha1.ManagedClusterAddOn) ([]string, addonfactory.Values, error) {
 	builtinValues := templateCRDBuiltinValues{}
 	builtinValues.ClusterName = cluster.GetName()
-
-	installNamespace := addon.Spec.InstallNamespace
-	if len(installNamespace) == 0 {
-		installNamespace = addonfactory.AddonDefaultInstallNamespace
-	}
-	builtinValues.AddonInstallNamespace = installNamespace
 
 	value, err := addonfactory.JsonStructToValues(builtinValues)
 	if err != nil {
@@ -127,8 +130,8 @@ func (a *CRDTemplateAgentAddon) getBuiltinValues(
 }
 
 func (a *CRDTemplateAgentAddon) getDefaultValues(
-	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn,
+	_ *clusterv1.ManagedCluster,
+	_ *addonapiv1alpha1.ManagedClusterAddOn,
 	template *addonapiv1alpha1.AddOnTemplate) ([]string, addonfactory.Values, error) {
 	defaultValues := templateCRDDefaultValues{}
 
@@ -161,7 +164,7 @@ func hubKubeconfigPath() string {
 func GetAddOnRegistriesPrivateValuesFromClusterAnnotation(
 	logger klog.Logger,
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+	_ *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
 	values := map[string]interface{}{}
 	annotations := cluster.GetAnnotations()
 	logger.V(4).Info("Try to get image registries from annotation",

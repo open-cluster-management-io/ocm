@@ -595,7 +595,7 @@ func prepareImageOverrideAddOnDeploymentConfig(namespace, installNamespace strin
 	return nil
 }
 
-func prepareNodePlacementAddOnDeploymentConfig(namespace, installNamespae string) error {
+func prepareNodePlacementAddOnDeploymentConfig(namespace, installNamespace string) error {
 	_, err := t.AddOnClinet.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
 		context.Background(), nodePlacementDeploymentConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
@@ -611,7 +611,7 @@ func prepareNodePlacementAddOnDeploymentConfig(namespace, installNamespae string
 						NodeSelector: nodeSelector,
 						Tolerations:  tolerations,
 					},
-					AgentInstallNamespace: installNamespae,
+					AgentInstallNamespace: installNamespace,
 				},
 			},
 			metav1.CreateOptions{},

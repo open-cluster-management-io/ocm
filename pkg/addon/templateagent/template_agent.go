@@ -33,8 +33,7 @@ const (
 // to convert it to Values by JsonStructToValues.
 // the built-in values can not be overridden by getValuesFuncs
 type templateCRDBuiltinValues struct {
-	ClusterName           string `json:"CLUSTER_NAME,omitempty"`
-	AddonInstallNamespace string `json:"INSTALL_NAMESPACE,omitempty"`
+	ClusterName string `json:"CLUSTER_NAME,omitempty"`
 }
 
 // templateDefaultValues includes the default values for crd template agentAddon.
@@ -170,43 +169,40 @@ func (a *CRDTemplateAgentAddon) renderObjects(
 		if err := object.UnmarshalJSON([]byte(manifestStr)); err != nil {
 			return objects, err
 		}
-		objects = append(objects, object)
-	}
 
-	objects, err = a.decorateObjects(template, objects, presetValues, configValues, privateValues)
-	if err != nil {
-		return objects, err
+		object, err = a.decorateObject(template, object, presetValues, configValues, privateValues)
+		if err != nil {
+			return objects, err
+		}
+		objects = append(objects, object)
 	}
 	return objects, nil
 }
 
-func (a *CRDTemplateAgentAddon) decorateObjects(
+func (a *CRDTemplateAgentAddon) decorateObject(
 	template *addonapiv1alpha1.AddOnTemplate,
-	objects []runtime.Object,
+	obj *unstructured.Unstructured,
 	orderedValues orderedValues,
-	configValues, privateValues addonfactory.Values) ([]runtime.Object, error) {
-	decorators := []deploymentDecorator{
-		newEnvironmentDecorator(orderedValues),
-		newVolumeDecorator(a.addonName, template),
-		newNodePlacementDecorator(privateValues),
-		newImageDecorator(privateValues),
+	configValues, privateValues addonfactory.Values) (*unstructured.Unstructured, error) {
+	decorators := []decorator{
+		newDeploymentDecorator(a.addonName, template, orderedValues, privateValues),
+		newNamespaceDecorator(configValues),
 	}
-	for index, obj := range objects {
-		deployment, err := utils.ConvertToDeployment(obj)
+
+	a.logger.V(4).Info("decorator",
+		"orderedValues", orderedValues,
+		"configValues", configValues,
+		"privateValues", privateValues)
+
+	var err error
+	for _, decorator := range decorators {
+		obj, err = decorator.decorate(obj)
 		if err != nil {
-			continue
+			return obj, err
 		}
-
-		for _, decorator := range decorators {
-			err = decorator.decorate(deployment)
-			if err != nil {
-				return objects, err
-			}
-		}
-		objects[index] = deployment
 	}
 
-	return objects, nil
+	return obj, nil
 }
 
 // getDesiredAddOnTemplateInner returns the desired template of the addon

@@ -7,10 +7,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	kubeinformers "k8s.io/client-go/informers"
@@ -145,13 +146,21 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 					t.Errorf("expected 4 objects, but got %v", len(objects))
 				}
 
-				object, ok := objects[0].(*appsv1.Deployment)
+				unstructObject, ok := objects[0].(*unstructured.Unstructured)
 				if !ok {
 					t.Errorf("expected object to be *appsv1.Deployment, but got %T", objects[0])
+				}
+				object, err := utils.ConvertToDeployment(unstructObject)
+				if err != nil {
+					t.Fatal(err)
 				}
 				image := object.Spec.Template.Spec.Containers[0].Image
 				if image != "quay.io/ocm/addon-examples:v1" {
 					t.Errorf("unexpected image %v", image)
+				}
+
+				if object.Namespace != "test-install-namespace" {
+					t.Errorf("unexpected namespace %s", object.Namespace)
 				}
 
 				nodeSelector := object.Spec.Template.Spec.NodeSelector
@@ -171,7 +180,6 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 					{Name: "LOG_LEVEL", Value: "4"},
 					{Name: "HUB_KUBECONFIG", Value: "/managed/hub-kubeconfig/kubeconfig"},
 					{Name: "CLUSTER_NAME", Value: clusterName},
-					{Name: "INSTALL_NAMESPACE", Value: "open-cluster-management-agent-addon"},
 				}
 				if !equality.Semantic.DeepEqual(envs, expectedEnvs) {
 					t.Errorf("unexpected envs %v", envs)
@@ -215,64 +223,81 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 				if !equality.Semantic.DeepEqual(volumeMounts, expectedVolumeMounts) {
 					t.Errorf("expected volumeMounts %v, but got: %v", expectedVolumeMounts, volumeMounts)
 				}
+
+				// check clusterrole
+				unstructObject, ok = objects[2].(*unstructured.Unstructured)
+				if !ok {
+					t.Errorf("expected object to be unstructured, but got %T", objects[0])
+				}
+				clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
+				err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructObject.Object, clusterRoleBinding)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if clusterRoleBinding.Subjects[0].Namespace != "test-install-namespace" {
+					t.Errorf("clusterRolebinding namespace does not match, got %s", clusterRoleBinding.Subjects[0].Namespace)
+				}
 			},
 		},
 	}
 
 	for _, tc := range cases {
-		var managedClusterAddon *addonapiv1alpha1.ManagedClusterAddOn
-		var objs []runtime.Object
-		if tc.managedClusterAddonBuilder != nil {
+		t.Run(tc.name, func(t *testing.T) {
+			var managedClusterAddon *addonapiv1alpha1.ManagedClusterAddOn
+			var objs []runtime.Object
+			if tc.managedClusterAddonBuilder != nil {
+				if tc.addonTemplate != nil {
+					tc.managedClusterAddonBuilder.withAddonTemplate(tc.addonTemplate)
+					objs = append(objs, tc.addonTemplate)
+				}
+				if tc.addonDeploymentConfig != nil {
+					tc.managedClusterAddonBuilder.withAddonDeploymentConfig(tc.addonDeploymentConfig)
+					objs = append(objs, tc.addonDeploymentConfig)
+				}
+				managedClusterAddon = tc.managedClusterAddonBuilder.build()
+				objs = append(objs, managedClusterAddon)
+			}
+			hubKubeClient := fakekube.NewSimpleClientset()
+			addonClient := fakeaddon.NewSimpleClientset(objs...)
+
+			addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
+			if managedClusterAddon != nil {
+				mcaStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
+				if err := mcaStore.Add(managedClusterAddon); err != nil {
+					t.Fatal(err)
+				}
+			}
 			if tc.addonTemplate != nil {
-				tc.managedClusterAddonBuilder.withAddonTemplate(tc.addonTemplate)
-				objs = append(objs, tc.addonTemplate)
+				atStore := addonInformerFactory.Addon().V1alpha1().AddOnTemplates().Informer().GetStore()
+				if err := atStore.Add(tc.addonTemplate); err != nil {
+					t.Fatal(err)
+				}
 			}
-			if tc.addonDeploymentConfig != nil {
-				tc.managedClusterAddonBuilder.withAddonDeploymentConfig(tc.addonDeploymentConfig)
-				objs = append(objs, tc.addonDeploymentConfig)
-			}
-			managedClusterAddon = tc.managedClusterAddonBuilder.build()
-			objs = append(objs, managedClusterAddon)
-		}
-		hubKubeClient := fakekube.NewSimpleClientset()
-		addonClient := fakeaddon.NewSimpleClientset(objs...)
+			kubeInformers := kubeinformers.NewSharedInformerFactoryWithOptions(hubKubeClient, 10*time.Minute)
 
-		addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
-		if managedClusterAddon != nil {
-			mcaStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
-			if err := mcaStore.Add(managedClusterAddon); err != nil {
-				t.Fatal(err)
-			}
-		}
-		if tc.addonTemplate != nil {
-			atStore := addonInformerFactory.Addon().V1alpha1().AddOnTemplates().Informer().GetStore()
-			if err := atStore.Add(tc.addonTemplate); err != nil {
-				t.Fatal(err)
-			}
-		}
-		kubeInformers := kubeinformers.NewSharedInformerFactoryWithOptions(hubKubeClient, 10*time.Minute)
+			agentAddon := NewCRDTemplateAgentAddon(
+				ctx,
+				addonName,
+				hubKubeClient,
+				addonClient,
+				addonInformerFactory,
+				kubeInformers.Rbac().V1().RoleBindings().Lister(),
+				addonfactory.GetAddOnDeploymentConfigValues(
+					utils.NewAddOnDeploymentConfigGetter(addonClient),
+					addonfactory.ToAddOnCustomizedVariableValues,
+					ToAddOnNodePlacementPrivateValues,
+					ToAddOnRegistriesPrivateValues,
+					ToAddOnInstallNamespacePrivateValues,
+				),
+			)
 
-		agentAddon := NewCRDTemplateAgentAddon(
-			ctx,
-			addonName,
-			hubKubeClient,
-			addonClient,
-			addonInformerFactory,
-			kubeInformers.Rbac().V1().RoleBindings().Lister(),
-			addonfactory.GetAddOnDeploymentConfigValues(
-				utils.NewAddOnDeploymentConfigGetter(addonClient),
-				addonfactory.ToAddOnCustomizedVariableValues,
-				ToAddOnNodePlacementPrivateValues,
-				ToAddOnRegistriesPrivateValues,
-			),
-		)
-
-		objects, err := agentAddon.Manifests(tc.managedCluster, managedClusterAddon)
-		if err != nil {
-			assert.Equal(t, tc.expectedErr, err.Error(), tc.name)
-		} else {
-			tc.validateObjects(t, objects)
-		}
+			objects, err := agentAddon.Manifests(tc.managedCluster, managedClusterAddon)
+			if err != nil {
+				assert.Equal(t, tc.expectedErr, err.Error(), tc.name)
+			} else {
+				tc.validateObjects(t, objects)
+			}
+		})
 	}
 }
 
