@@ -86,7 +86,7 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc.
-  replaces: klusterlet.v0.13.0
+  replaces: klusterlet.v0.13.1
   selector:
     matchLabels:
       app: klusterlet
