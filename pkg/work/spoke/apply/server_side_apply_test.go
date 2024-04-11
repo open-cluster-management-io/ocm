@@ -19,7 +19,6 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
-	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
 const defaultOwner = "test-owner"
@@ -38,15 +37,15 @@ func TestServerSideApply(t *testing.T) {
 			name:            "server side apply successfully",
 			owner:           metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
 			existing:        nil,
-			required:        spoketesting.NewUnstructured("v1", "Namespace", "", "test"),
+			required:        testingcommon.NewUnstructured("v1", "Namespace", "", "test"),
 			gvr:             schema.GroupVersionResource{Version: "v1", Resource: "namespaces"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {},
 		},
 		{
 			name:     "server side apply successfully conflict",
 			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
-			existing: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
-			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			existing: testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"),
+			required: testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			conflict: true,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -127,7 +126,7 @@ func (r *reactor) Handles(action clienttesting.Action) bool {
 func (r *reactor) React(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 	switch action.GetResource().Resource {
 	case "namespaces":
-		return true, spoketesting.NewUnstructured("v1", "Namespace", "", "test"), nil
+		return true, testingcommon.NewUnstructured("v1", "Namespace", "", "test"), nil
 	case "secrets":
 		return true, nil, apierrors.NewApplyConflict([]metav1.StatusCause{
 			{

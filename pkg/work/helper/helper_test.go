@@ -20,6 +20,7 @@ import (
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
@@ -611,7 +612,7 @@ func TestBuildResourceMeta(t *testing.T) {
 		{
 			name:        "secret success",
 			index:       1,
-			obj:         spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			obj:         testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"),
 			expectedErr: nil,
 			expectedGVR: schema.GroupVersionResource{
 				Group:    "",
@@ -631,7 +632,7 @@ func TestBuildResourceMeta(t *testing.T) {
 		{
 			name:        "unknow object type",
 			index:       1,
-			obj:         spoketesting.NewUnstructured("test/v1", "NewObject", "ns1", "test"),
+			obj:         testingcommon.NewUnstructured("test/v1", "NewObject", "ns1", "test"),
 			expectedErr: fmt.Errorf("the server doesn't have a resource type %q", "NewObject"),
 			expectedGVR: schema.GroupVersionResource{},
 			expectedMeta: workapiv1.ManifestResourceMeta{

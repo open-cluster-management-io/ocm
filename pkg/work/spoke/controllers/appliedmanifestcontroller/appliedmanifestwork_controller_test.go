@@ -61,31 +61,29 @@ func TestSyncManifestWork(t *testing.T) {
 					t.Fatal(spew.Sdump(actions))
 				}
 			},
-			expectedDeleteActions: []clienttesting.DeleteActionImpl{},
 		},
 		{
 			name:    "skip when no applied resource changed",
 			applied: true,
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
+				testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
 			},
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
 			},
 			manifests:                          []workapiv1.ManifestCondition{newManifest("", "v1", "secrets", "ns1", "n1")},
 			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
-			expectedDeleteActions:              []clienttesting.DeleteActionImpl{},
 		},
 		{
 			name:    "delete untracked resources",
 			applied: true,
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
-				spoketesting.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2", *owner),
-				spoketesting.NewUnstructuredSecret("ns3", "n3", false, "ns3-n3", *owner),
-				spoketesting.NewUnstructuredSecret("ns4", "n4", false, "ns4-n4", *owner),
-				spoketesting.NewUnstructuredSecret("ns5", "n5", false, "ns5-n5", *owner),
-				spoketesting.NewUnstructuredSecret("ns6", "n6", false, "ns6-n6", *owner),
+				testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
+				testingcommon.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2", *owner),
+				testingcommon.NewUnstructuredSecret("ns3", "n3", false, "ns3-n3", *owner),
+				testingcommon.NewUnstructuredSecret("ns4", "n4", false, "ns4-n4", *owner),
+				testingcommon.NewUnstructuredSecret("ns5", "n5", false, "ns5-n5", *owner),
+				testingcommon.NewUnstructuredSecret("ns6", "n6", false, "ns6-n6", *owner),
 			},
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
@@ -126,9 +124,9 @@ func TestSyncManifestWork(t *testing.T) {
 			name:    "requeue work when applied resource for stale manifest is deleting",
 			applied: true,
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
-				spoketesting.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2", *owner),
-				spoketesting.NewUnstructuredSecret("ns3", "n3", true, "ns3-n3", *owner),
+				testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
+				testingcommon.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2", *owner),
+				testingcommon.NewUnstructuredSecret("ns3", "n3", true, "ns3-n3", *owner),
 			},
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
@@ -140,16 +138,15 @@ func TestSyncManifestWork(t *testing.T) {
 				newManifest("", "v1", "secrets", "ns2", "n2"),
 			},
 			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
-			expectedDeleteActions:              []clienttesting.DeleteActionImpl{},
 			expectedQueueLen:                   1,
 		},
 		{
 			name:    "ignore re-created resource",
 			applied: true,
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns3", "n3", false, "ns3-n3-recreated", *owner),
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
-				spoketesting.NewUnstructuredSecret("ns5", "n5", false, "ns5-n5", *owner),
+				testingcommon.NewUnstructuredSecret("ns3", "n3", false, "ns3-n3-recreated", *owner),
+				testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
+				testingcommon.NewUnstructuredSecret("ns5", "n5", false, "ns5-n5", *owner),
 			},
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns3", Name: "n3"}, UID: "ns3-n3"},
@@ -173,14 +170,13 @@ func TestSyncManifestWork(t *testing.T) {
 					t.Fatal(spew.Sdump(actions))
 				}
 			},
-			expectedDeleteActions: []clienttesting.DeleteActionImpl{},
 		},
 		{
 			name:    "update resource uid",
 			applied: true,
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
-				spoketesting.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2-updated", *owner),
+				testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
+				testingcommon.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2-updated", *owner),
 			},
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
@@ -204,7 +200,6 @@ func TestSyncManifestWork(t *testing.T) {
 					t.Fatal(spew.Sdump(actions))
 				}
 			},
-			expectedDeleteActions: []clienttesting.DeleteActionImpl{},
 		},
 	}
 
@@ -252,7 +247,7 @@ func TestSyncManifestWork(t *testing.T) {
 			}
 			c.validateAppliedManifestWorkActions(t, fakeClient.Actions())
 
-			deleteActions := []clienttesting.DeleteActionImpl{}
+			var deleteActions []clienttesting.DeleteActionImpl
 			for _, action := range fakeDynamicClient.Actions() {
 				if action.GetVerb() == "delete" {
 					deleteActions = append(deleteActions, action.(clienttesting.DeleteActionImpl))

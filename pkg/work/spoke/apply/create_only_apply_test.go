@@ -13,7 +13,6 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
-	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
 func TestCreateOnlyApply(t *testing.T) {
@@ -29,7 +28,7 @@ func TestCreateOnlyApply(t *testing.T) {
 			name:     "create a non exist object",
 			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
 			existing: nil,
-			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			required: testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "get", "create")
@@ -48,8 +47,8 @@ func TestCreateOnlyApply(t *testing.T) {
 		{
 			name:     "create an already existing object",
 			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
-			existing: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
-			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			existing: testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"),
+			required: testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "get")
