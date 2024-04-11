@@ -59,7 +59,7 @@ func TestSyncManifestWork(t *testing.T) {
 		{
 			name: "No work applied condition",
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
+				testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
 			},
 			manifests: []workapiv1.ManifestCondition{
 				newManifestWthCondition("", "v1", "secrets", "ns1", "n1"),
@@ -69,7 +69,7 @@ func TestSyncManifestWork(t *testing.T) {
 		{
 			name: "Do not update if existing conditions are correct",
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
+				testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
 			},
 			manifests: []workapiv1.ManifestCondition{
 				newManifestWthCondition("", "v1", "secrets", "ns1", "n1"),
@@ -90,7 +90,7 @@ func TestSyncManifestWork(t *testing.T) {
 		{
 			name: "build status with existing resource",
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
+				testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
 			},
 			manifests: []workapiv1.ManifestCondition{
 				newManifest("", "v1", "secrets", "ns1", "n1"),
@@ -122,7 +122,7 @@ func TestSyncManifestWork(t *testing.T) {
 		{
 			name: "build status when one of resources does not exists",
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
+				testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
 			},
 			manifests: []workapiv1.ManifestCondition{
 				newManifest("", "v1", "secrets", "ns1", "n1"),
@@ -155,7 +155,7 @@ func TestSyncManifestWork(t *testing.T) {
 		{
 			name: "build status when one of resosurce has incompleted meta",
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
+				testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
 			},
 			manifests: []workapiv1.ManifestCondition{
 				newManifest("", "v1", "secrets", "ns1", "n1"),
@@ -231,7 +231,7 @@ func TestStatusFeedback(t *testing.T) {
 		{
 			name: "resource identifier is not matched",
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
+				testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
 			},
 			configOption: []workapiv1.ManifestConfigOption{
 				{
@@ -262,8 +262,8 @@ func TestStatusFeedback(t *testing.T) {
 		{
 			name: "get well known status",
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
-				spoketesting.NewUnstructuredWithContent("apps/v1", "Deployment", "ns1", "deploy1",
+				testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
+				testingcommon.NewUnstructuredWithContent("apps/v1", "Deployment", "ns1", "deploy1",
 					map[string]interface{}{
 						"status": map[string]interface{}{"readyReplicas": int64(2), "replicas": int64(3), "availableReplicas": int64(2)},
 					}),
@@ -323,7 +323,7 @@ func TestStatusFeedback(t *testing.T) {
 		{
 			name: "get wrong json path",
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredWithContent("apps/v1", "Deployment", "ns1", "deploy1",
+				testingcommon.NewUnstructuredWithContent("apps/v1", "Deployment", "ns1", "deploy1",
 					map[string]interface{}{
 						"status": map[string]interface{}{
 							"replicas":   int64(3),

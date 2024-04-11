@@ -21,7 +21,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	kubeversion "k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -260,19 +259,6 @@ func NewNode(name string, capacity, allocatable corev1.ResourceList) *corev1.Nod
 		Status: corev1.NodeStatus{
 			Capacity:    capacity,
 			Allocatable: allocatable,
-		},
-	}
-}
-
-func NewUnstructuredObj(apiVersion, kind, namespace, name string) *unstructured.Unstructured {
-	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": apiVersion,
-			"kind":       kind,
-			"metadata": map[string]interface{}{
-				"namespace": namespace,
-				"name":      name,
-			},
 		},
 	}
 }

@@ -40,7 +40,7 @@ func TestReconcile(t *testing.T) {
 			clusterManagementAddon: []runtime.Object{},
 			managedClusteraddon:    []runtime.Object{},
 			work:                   []runtime.Object{},
-			validateAddonActions:   addontesting.AssertNoActions,
+			validateAddonActions:   testingcommon.AssertNoActions,
 		},
 		{
 			name:                   "no managedClusteraddon",
@@ -48,7 +48,7 @@ func TestReconcile(t *testing.T) {
 			managedClusteraddon:    []runtime.Object{},
 			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").Build()},
 			work:                   []runtime.Object{},
-			validateAddonActions:   addontesting.AssertNoActions,
+			validateAddonActions:   testingcommon.AssertNoActions,
 		},
 		{
 			name:    "no work applied condition",
@@ -58,7 +58,7 @@ func TestReconcile(t *testing.T) {
 			},
 			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").Build()},
 			work:                   []runtime.Object{},
-			validateAddonActions:   addontesting.AssertNoActions,
+			validateAddonActions:   testingcommon.AssertNoActions,
 		},
 		{
 			name:    "update managedclusteraddon to installing when no work",
@@ -76,7 +76,7 @@ func TestReconcile(t *testing.T) {
 			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").Build()},
 			work:                   []runtime.Object{},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch")
+				testingcommon.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
 
 				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
@@ -121,8 +121,8 @@ func TestReconcile(t *testing.T) {
 				work := addontesting.NewManifestWork(
 					"addon-test-deploy",
 					"cluster1",
-					addontesting.NewUnstructured("v1", "ConfigMap", "default", "test1"),
-					addontesting.NewUnstructured("v1", "Deployment", "default", "test1"),
+					testingcommon.NewUnstructured("v1", "ConfigMap", "default", "test1"),
+					testingcommon.NewUnstructured("v1", "Deployment", "default", "test1"),
 				)
 				work.SetLabels(map[string]string{
 					addonapiv1alpha1.AddonLabelKey: "test",
@@ -143,7 +143,7 @@ func TestReconcile(t *testing.T) {
 				return work
 			}()},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch")
+				testingcommon.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
 
 				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
@@ -191,8 +191,8 @@ func TestReconcile(t *testing.T) {
 				work := addontesting.NewManifestWork(
 					"addon-test-deploy",
 					"cluster1",
-					addontesting.NewUnstructured("v1", "ConfigMap", "default", "test1"),
-					addontesting.NewUnstructured("v1", "Deployment", "default", "test1"),
+					testingcommon.NewUnstructured("v1", "ConfigMap", "default", "test1"),
+					testingcommon.NewUnstructured("v1", "Deployment", "default", "test1"),
 				)
 				work.SetLabels(map[string]string{
 					addonapiv1alpha1.AddonLabelKey: "test",
@@ -213,7 +213,7 @@ func TestReconcile(t *testing.T) {
 				return work
 			}()},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch")
+				testingcommon.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
 
 				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
@@ -261,8 +261,8 @@ func TestReconcile(t *testing.T) {
 				work := addontesting.NewManifestWork(
 					"addon-test-deploy",
 					"cluster1",
-					addontesting.NewUnstructured("v1", "ConfigMap", "default", "test1"),
-					addontesting.NewUnstructured("v1", "Deployment", "default", "test1"),
+					testingcommon.NewUnstructured("v1", "ConfigMap", "default", "test1"),
+					testingcommon.NewUnstructured("v1", "Deployment", "default", "test1"),
 				)
 				work.SetLabels(map[string]string{
 					addonapiv1alpha1.AddonLabelKey: "test",
@@ -283,7 +283,7 @@ func TestReconcile(t *testing.T) {
 				return work
 			}()},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch")
+				testingcommon.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
 
 				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
@@ -331,8 +331,8 @@ func TestReconcile(t *testing.T) {
 				work := addontesting.NewManifestWork(
 					"addon-test-deploy",
 					"cluster1",
-					addontesting.NewUnstructured("v1", "ConfigMap", "default", "test1"),
-					addontesting.NewUnstructured("v1", "Deployment", "default", "test1"),
+					testingcommon.NewUnstructured("v1", "ConfigMap", "default", "test1"),
+					testingcommon.NewUnstructured("v1", "Deployment", "default", "test1"),
 				)
 				work.SetLabels(map[string]string{
 					addonapiv1alpha1.AddonLabelKey: "test",
@@ -353,7 +353,7 @@ func TestReconcile(t *testing.T) {
 				return work
 			}()},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch")
+				testingcommon.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
 
 				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
@@ -401,8 +401,8 @@ func TestReconcile(t *testing.T) {
 				work := addontesting.NewManifestWork(
 					"addon-test-deploy",
 					"cluster1",
-					addontesting.NewUnstructured("v1", "ConfigMap", "default", "test1"),
-					addontesting.NewUnstructured("v1", "Deployment", "default", "test1"),
+					testingcommon.NewUnstructured("v1", "ConfigMap", "default", "test1"),
+					testingcommon.NewUnstructured("v1", "Deployment", "default", "test1"),
 				)
 				work.SetLabels(map[string]string{
 					addonapiv1alpha1.AddonLabelKey: "test",
@@ -423,7 +423,7 @@ func TestReconcile(t *testing.T) {
 				return work
 			}()},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch")
+				testingcommon.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
 
 				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
@@ -474,8 +474,8 @@ func TestReconcile(t *testing.T) {
 				work := addontesting.NewManifestWork(
 					"addon-test-deploy",
 					"cluster1",
-					addontesting.NewUnstructured("v1", "ConfigMap", "default", "test1"),
-					addontesting.NewUnstructured("v1", "Deployment", "default", "test1"),
+					testingcommon.NewUnstructured("v1", "ConfigMap", "default", "test1"),
+					testingcommon.NewUnstructured("v1", "Deployment", "default", "test1"),
 				)
 				work.SetLabels(map[string]string{
 					addonapiv1alpha1.AddonLabelKey: "test",
@@ -496,7 +496,7 @@ func TestReconcile(t *testing.T) {
 				return work
 			}()},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch")
+				testingcommon.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
 
 				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
@@ -552,7 +552,7 @@ func TestReconcile(t *testing.T) {
 			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").Build()},
 			work:                   []runtime.Object{},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch")
+				testingcommon.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)

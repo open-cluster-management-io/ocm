@@ -13,6 +13,7 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
@@ -36,7 +37,7 @@ func CreateTestManifestWorkReplicaSet(name string, ns string, placementNames ...
 
 func CreateTestManifestWorkReplicaSetWithRollOutStrategy(name string, ns string,
 	placements map[string]clusterv1alpha1.RolloutStrategy) *workapiv1alpha1.ManifestWorkReplicaSet {
-	obj := spoketesting.NewUnstructured("v1", "kind", "test-ns", "test-name")
+	obj := testingcommon.NewUnstructured("v1", "kind", "test-ns", "test-name")
 	mw, _ := spoketesting.NewManifestWork(0, obj)
 	var placementRefs []workapiv1alpha1.LocalPlacementReference
 
@@ -63,8 +64,8 @@ func CreateTestManifestWorkReplicaSetWithRollOutStrategy(name string, ns string,
 }
 
 func CreateTestManifestWorks(name, namespace string, placementName string, clusters ...string) []runtime.Object {
-	obj := spoketesting.NewUnstructured("v1", "kind", "test-ns", "test-name")
-	works := []runtime.Object{}
+	obj := testingcommon.NewUnstructured("v1", "kind", "test-ns", "test-name")
+	var works []runtime.Object
 	for _, c := range clusters {
 		mw, _ := spoketesting.NewManifestWork(0, obj)
 		mw.Name = name
@@ -87,7 +88,7 @@ func CreateTestManifestWorks(name, namespace string, placementName string, clust
 }
 
 func CreateTestManifestWork(name, namespace string, placementName string, clusterName string) *workapiv1.ManifestWork {
-	obj := spoketesting.NewUnstructured("v1", "kind", "test-ns", "test-name")
+	obj := testingcommon.NewUnstructured("v1", "kind", "test-ns", "test-name")
 	mw, _ := spoketesting.NewManifestWork(0, obj)
 	mw.Name = name
 	mw.Namespace = clusterName
@@ -108,14 +109,14 @@ func CreateTestManifestWork(name, namespace string, placementName string, cluste
 }
 
 func CreateTestManifestWorkSpecWithSecret(mApiVersion string, mKind string, mNS string, mName string) workapiv1.ManifestWorkSpec {
-	secret := spoketesting.NewUnstructuredSecret(mName, mNS, true, "0b1441ec-717f-4877-a165-27e5b59245f6")
-	obj := spoketesting.NewUnstructuredWithContent(mApiVersion, mKind, mNS, mName, secret.Object)
+	secret := testingcommon.NewUnstructuredSecret(mName, mNS, true, "0b1441ec-717f-4877-a165-27e5b59245f6")
+	obj := testingcommon.NewUnstructuredWithContent(mApiVersion, mKind, mNS, mName, secret.Object)
 	mw, _ := spoketesting.NewManifestWork(0, obj)
 
 	return mw.Spec
 }
 
-// Return placement with predicate of label cluster name
+// CreateTestPlacement Return placement with predicate of label cluster name
 func CreateTestPlacement(name string, ns string, clusters ...string) (*clusterv1beta1.Placement, *clusterv1beta1.PlacementDecision) {
 	placement, placementDesicions := CreateTestPlacementWithDecisionStrategy(name, ns, len(clusters), clusters...)
 
@@ -151,7 +152,7 @@ func CreateTestPlacementWithDecisionStrategy(name string, ns string, clsPerDecis
 	}
 
 	groupStrategy := clusterv1beta1.GroupStrategy{
-		ClustersPerDecisionGroup: intstr.FromInt(clsPerDecisionGroup),
+		ClustersPerDecisionGroup: intstr.FromInt32(int32(clsPerDecisionGroup)),
 	}
 	decisionStrategy := clusterv1beta1.DecisionStrategy{
 		GroupStrategy: groupStrategy,
@@ -182,7 +183,7 @@ func CreateTestPlacementWithDecisionStrategy(name string, ns string, clsPerDecis
 			},
 		}
 
-		decisions := []clusterv1beta1.ClusterDecision{}
+		var decisions []clusterv1beta1.ClusterDecision
 		for _, cls := range clsGroup {
 			decisions = append(decisions, clusterv1beta1.ClusterDecision{
 				ClusterName: cls,
@@ -214,7 +215,7 @@ func getClusterGroups(clusters []string, clsPerDecisionGroup int) [][]string {
 		return clusterGroups
 	}
 
-	decisionGroupCount := (len(clusters) / clsPerDecisionGroup)
+	decisionGroupCount := len(clusters) / clsPerDecisionGroup
 	if len(clusters)%clsPerDecisionGroup > 0 {
 		decisionGroupCount = decisionGroupCount + 1
 	}

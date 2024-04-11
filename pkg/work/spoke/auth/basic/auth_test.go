@@ -18,7 +18,7 @@ import (
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
-	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 func TestValidate(t *testing.T) {
@@ -139,7 +139,7 @@ func TestValidateEscalation(t *testing.T) {
 			},
 			namespace: "test-deny",
 			name:      "test",
-			obj:       spoketesting.NewUnstructured("v1", "ClusterRole", "", "test"),
+			obj:       testingcommon.NewUnstructured("v1", "ClusterRole", "", "test"),
 			expect: fmt.Errorf(
 				"not allowed to apply the resource rbac.authorization.k8s.io roles, " +
 					"test-deny test, error: permission escalation, will try again in 1m0s"),
@@ -156,7 +156,7 @@ func TestValidateEscalation(t *testing.T) {
 			},
 			namespace: "test-allow",
 			name:      "test",
-			obj:       spoketesting.NewUnstructured("v1", "Role", "ns1", "test"),
+			obj:       testingcommon.NewUnstructured("v1", "Role", "ns1", "test"),
 			expect:    nil,
 		},
 	}

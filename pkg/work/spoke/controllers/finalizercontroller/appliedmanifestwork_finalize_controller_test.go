@@ -106,8 +106,8 @@ func TestFinalize(t *testing.T) {
 			terminated:         true,
 			existingFinalizers: []string{workapiv1.AppliedManifestWorkFinalizer},
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", true, "ns1-n1", *owner),
-				spoketesting.NewUnstructuredSecret("ns2", "n2", true, "ns2-n2", *owner),
+				testingcommon.NewUnstructuredSecret("ns1", "n1", true, "ns1-n1", *owner),
+				testingcommon.NewUnstructuredSecret("ns2", "n2", true, "ns2-n2", *owner),
 			},
 			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
@@ -137,7 +137,7 @@ func TestFinalize(t *testing.T) {
 			terminated:         true,
 			existingFinalizers: []string{workapiv1.AppliedManifestWorkFinalizer},
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
+				testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
 			},
 			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "n1"},
