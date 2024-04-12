@@ -459,48 +459,110 @@ func TestSyncStorageVersionMigrationsCondition(t *testing.T) {
 	}
 }
 
-func TestSync(t *testing.T) {
-	clusterManager := newClusterManager("testhub")
-	tc, client := newTestController(t, clusterManager)
-
-	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
-	//Do not support migration
-	err := tc.sync(context.Background(), syncContext)
-	if err != nil {
-		t.Fatalf("Expected no error when sync, %v", err)
-	}
-
-	clusterManager, err = client.OperatorV1().ClusterManagers().Get(context.Background(), "testhub", metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Expected no error when sync, %v", err)
-	}
-
-	if notsucceeded := meta.IsStatusConditionFalse(clusterManager.Status.Conditions, MigrationSucceeded); !notsucceeded {
-		t.Errorf("Error to sync clusterManager.Status.Conditions %v", clusterManager.Status.Conditions)
-	}
-	// all resources applied
-	clusterManager.Status.Conditions = []metav1.Condition{
+func TestSyncNew(t *testing.T) {
+	cases := []struct {
+		name           string
+		clusterManager *operatorapiv1.ClusterManager
+		crds           []runtime.Object
+		validate       func(t *testing.T, clusterManager *operatorapiv1.ClusterManager)
+	}{
 		{
-			Type:   clusterManagerApplied,
-			Status: metav1.ConditionTrue,
+			name:           "no crd",
+			clusterManager: newClusterManager("testhub"),
+			validate: func(t *testing.T, clusterManager *operatorapiv1.ClusterManager) {
+				mc := meta.FindStatusCondition(clusterManager.Status.Conditions, MigrationSucceeded)
+				if mc == nil {
+					t.Fatalf("Migration condition should exist in conditions %v", clusterManager.Status.Conditions)
+				}
+				if mc.Status != metav1.ConditionFalse {
+					t.Errorf("Migration condition should be false %v", mc)
+				}
+				if mc.Message != "Do not support StorageVersionMigration" {
+					t.Errorf("Migration condition message not correct %v", mc)
+				}
+			},
+		},
+		{
+			name: "migration cr created",
+			clusterManager: newClusterManager("testhub", metav1.Condition{
+				Type:               clusterManagerApplied,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: 2,
+			}),
+			crds: []runtime.Object{
+				newFakeCRD(migrationRequestCRDName, "v1", "v1"),
+				newFakeCRD("foos.cluster.open-cluster-management.io", "v1beta2", "v1beta1", "v1beta2"),
+				newFakeCRD("bars.cluster.open-cluster-management.io", "v1beta2", "v1beta1", "v1beta2"),
+			},
+			validate: func(t *testing.T, clusterManager *operatorapiv1.ClusterManager) {
+				mc := meta.FindStatusCondition(clusterManager.Status.Conditions, MigrationSucceeded)
+				if mc == nil {
+					t.Fatalf("Migration condition should exist in conditions %v", clusterManager.Status.Conditions)
+				}
+				if mc.Status != metav1.ConditionFalse {
+					t.Errorf("Migration condition should be false %v", mc)
+				}
+				if mc.Message != "Wait StorageVersionMigration foo succeed." {
+					t.Errorf("Migration condition message not correct %v", mc)
+				}
+			},
+		},
+		{
+			name: "cluster manager applied condition generation not match",
+			clusterManager: newClusterManager("testhub", metav1.Condition{
+				Type:               clusterManagerApplied,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: 1,
+			}),
+			crds: []runtime.Object{
+				newFakeCRD(migrationRequestCRDName, "v1", "v1"),
+				newFakeCRD("foos.cluster.open-cluster-management.io", "v1beta2", "v1beta1", "v1beta2"),
+				newFakeCRD("bars.cluster.open-cluster-management.io", "v1beta2", "v1beta1", "v1beta2"),
+			},
+			validate: func(t *testing.T, clusterManager *operatorapiv1.ClusterManager) {
+				mc := meta.FindStatusCondition(clusterManager.Status.Conditions, MigrationSucceeded)
+				if mc != nil {
+					t.Fatalf("Migration condition should not exist in conditions %v", clusterManager.Status.Conditions)
+				}
+			},
+		},
+		{
+			name: "cluster manager not applied",
+			clusterManager: newClusterManager("testhub", metav1.Condition{
+				Type:               clusterManagerApplied,
+				Status:             metav1.ConditionFalse,
+				ObservedGeneration: 1,
+			}),
+			crds: []runtime.Object{
+				newFakeCRD(migrationRequestCRDName, "v1", "v1"),
+				newFakeCRD("foos.cluster.open-cluster-management.io", "v1beta2", "v1beta1", "v1beta2"),
+				newFakeCRD("bars.cluster.open-cluster-management.io", "v1beta2", "v1beta1", "v1beta2"),
+			},
+			validate: func(t *testing.T, clusterManager *operatorapiv1.ClusterManager) {
+				mc := meta.FindStatusCondition(clusterManager.Status.Conditions, MigrationSucceeded)
+				if mc != nil {
+					t.Fatalf("Migration condition should not exist in conditions %v", clusterManager.Status.Conditions)
+				}
+			},
 		},
 	}
+	for _, c := range cases {
+		tc, client := newTestController(t, c.clusterManager, c.crds...)
+		syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
+		//Do not support migration
+		err := tc.sync(context.Background(), syncContext)
+		if err != nil {
+			t.Fatalf("Expected no error when sync, %v", err)
+		}
+		cm, err := client.OperatorV1().ClusterManagers().Get(context.Background(), "testhub", metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Get cluster manager failed, %v", err)
+		}
+		if c.validate != nil {
+			c.validate(t, cm)
+		}
+	}
 
-	tc, client = newTestController(t, clusterManager,
-		newFakeCRD(migrationRequestCRDName, "v1", "v1"),
-		newFakeCRD("foos.cluster.open-cluster-management.io", "v1beta2", "v1beta1", "v1beta2"),
-		newFakeCRD("bars.cluster.open-cluster-management.io", "v1beta2", "v1beta1", "v1beta2"))
-	err = tc.sync(context.Background(), syncContext)
-	if err != nil {
-		t.Fatalf("Expected no error when sync, %v", err)
-	}
-	clusterManager, err = client.OperatorV1().ClusterManagers().Get(context.Background(), "testhub", metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Expected no error when sync, %v", err)
-	}
-	if notsucceeded := meta.IsStatusConditionFalse(clusterManager.Status.Conditions, MigrationSucceeded); !notsucceeded {
-		t.Errorf("Error to sync clusterManager.Status.Conditions %v", clusterManager.Status.Conditions)
-	}
 }
 
 func newTestController(
@@ -509,9 +571,14 @@ func newTestController(
 	crds ...runtime.Object) (*crdMigrationController, *fakeoperatorlient.Clientset) {
 	fakeOperatorClient := fakeoperatorlient.NewSimpleClientset(clustermanager)
 	operatorInformers := operatorinformers.NewSharedInformerFactory(fakeOperatorClient, 5*time.Minute)
+
 	fakeAPIExtensionClient := fakeapiextensions.NewSimpleClientset(crds...)
 	fakeMigrationClient := fakemigrationclient.NewSimpleClientset()
 
+	store := operatorInformers.Operator().V1().ClusterManagers().Informer().GetStore()
+	if err := store.Add(clustermanager); err != nil {
+		t.Fatal(err)
+	}
 	crdMigrationController := &crdMigrationController{
 		clusterManagerLister: operatorInformers.Operator().V1().ClusterManagers().Lister(),
 		recorder:             eventstesting.NewTestingEventRecorder(t),
@@ -529,18 +596,15 @@ func newTestController(
 			newFakeMigration("bar", "cluster.open-cluster-management.io", "bars", "v1beta1"),
 		}, nil
 	}
-	store := operatorInformers.Operator().V1().ClusterManagers().Informer().GetStore()
-	if err := store.Add(clustermanager); err != nil {
-		t.Fatal(err)
-	}
 
 	return crdMigrationController, fakeOperatorClient
 }
 
-func newClusterManager(name string) *operatorapiv1.ClusterManager {
-	return &operatorapiv1.ClusterManager{
+func newClusterManager(name string, conditions ...metav1.Condition) *operatorapiv1.ClusterManager {
+	cm := &operatorapiv1.ClusterManager{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name:       name,
+			Generation: 2,
 		},
 		Spec: operatorapiv1.ClusterManagerSpec{
 			RegistrationImagePullSpec: "testregistration",
@@ -549,4 +613,8 @@ func newClusterManager(name string) *operatorapiv1.ClusterManager {
 			},
 		},
 	}
+	for _, condition := range conditions {
+		meta.SetStatusCondition(&cm.Status.Conditions, condition)
+	}
+	return cm
 }

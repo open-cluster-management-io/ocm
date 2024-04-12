@@ -267,10 +267,11 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	clusterManager.Status.ObservedGeneration = clusterManager.Generation
 	if len(errs) == 0 {
 		meta.SetStatusCondition(&clusterManager.Status.Conditions, metav1.Condition{
-			Type:    clusterManagerApplied,
-			Status:  metav1.ConditionTrue,
-			Reason:  "ClusterManagerApplied",
-			Message: "Components of cluster manager are applied",
+			Type:               clusterManagerApplied,
+			Status:             metav1.ConditionTrue,
+			Reason:             "ClusterManagerApplied",
+			Message:            "Components of cluster manager are applied",
+			ObservedGeneration: clusterManager.Generation,
 		})
 	} else {
 		// When appliedCondition is false, we should not update related resources and resource generations
