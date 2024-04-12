@@ -1,4 +1,4 @@
-package cmaconfig
+package managementaddonconfig
 
 import (
 	"context"
@@ -30,8 +30,8 @@ const (
 
 type enqueueFunc func(obj interface{})
 
-// cmaConfigController reconciles all interested addon config types (GroupVersionResource) on the hub.
-type cmaConfigController struct {
+// clusterManagementAddonConfigController reconciles all interested addon config types (GroupVersionResource) on the hub.
+type clusterManagementAddonConfigController struct {
 	addonClient                   addonv1alpha1client.Interface
 	clusterManagementAddonLister  addonlisterv1alpha1.ClusterManagementAddOnLister
 	clusterManagementAddonIndexer cache.Indexer
@@ -44,7 +44,7 @@ type cmaConfigController struct {
 		addonapiv1alpha1.ClusterManagementAddOnStatus]
 }
 
-func NewCMAConfigController(
+func NewManagementAddonConfigController(
 	addonClient addonv1alpha1client.Interface,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	configInformerFactory dynamicinformer.DynamicSharedInformerFactory,
@@ -53,7 +53,7 @@ func NewCMAConfigController(
 ) factory.Controller {
 	syncCtx := factory.NewSyncContext(controllerName)
 
-	c := &cmaConfigController{
+	c := &clusterManagementAddonConfigController{
 		addonClient:                   addonClient,
 		clusterManagementAddonLister:  clusterManagementAddonInformers.Lister(),
 		clusterManagementAddonIndexer: clusterManagementAddonInformers.Informer().GetIndexer(),
@@ -78,7 +78,7 @@ func NewCMAConfigController(
 		WithSync(c.sync).ToController(controllerName)
 }
 
-func (c *cmaConfigController) buildConfigInformers(
+func (c *clusterManagementAddonConfigController) buildConfigInformers(
 	configInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	configGVRs map[schema.GroupVersionResource]bool,
 ) []factory.Informer {
@@ -104,7 +104,7 @@ func (c *cmaConfigController) buildConfigInformers(
 	return configInformers
 }
 
-func (c *cmaConfigController) enqueueClusterManagementAddOnsByConfig(gvr schema.GroupVersionResource) enqueueFunc {
+func (c *clusterManagementAddonConfigController) enqueueClusterManagementAddOnsByConfig(gvr schema.GroupVersionResource) enqueueFunc {
 	return func(obj interface{}) {
 		namespaceName, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 		if err != nil {
@@ -129,7 +129,7 @@ func (c *cmaConfigController) enqueueClusterManagementAddOnsByConfig(gvr schema.
 	}
 }
 
-func (c *cmaConfigController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
+func (c *clusterManagementAddonConfigController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
 	_, addonName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		// ignore addon whose key is invalid
@@ -158,7 +158,7 @@ func (c *cmaConfigController) sync(ctx context.Context, syncCtx factory.SyncCont
 	return err
 }
 
-func (c *cmaConfigController) updateConfigSpecHash(cma *addonapiv1alpha1.ClusterManagementAddOn) error {
+func (c *clusterManagementAddonConfigController) updateConfigSpecHash(cma *addonapiv1alpha1.ClusterManagementAddOn) error {
 
 	for i, defaultConfigReference := range cma.Status.DefaultConfigReferences {
 		if !utils.ContainGR(
@@ -203,7 +203,7 @@ func (c *cmaConfigController) updateConfigSpecHash(cma *addonapiv1alpha1.Cluster
 	return nil
 }
 
-func (c *cmaConfigController) getConfigSpecHash(gr addonapiv1alpha1.ConfigGroupResource,
+func (c *clusterManagementAddonConfigController) getConfigSpecHash(gr addonapiv1alpha1.ConfigGroupResource,
 	cr addonapiv1alpha1.ConfigReferent) (string, error) {
 	lister, ok := c.configListers[schema.GroupResource{Group: gr.Group, Resource: gr.Resource}]
 	if !ok {
