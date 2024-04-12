@@ -37,3 +37,6 @@ rules:
 - apiGroups: ["scheduling.k8s.io"]
   resources: ["priorityclasses"]
   verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources: [ "mutatingwebhookconfigurations", "validatingwebhookconfigurations" ]
+  verbs: [ "get", "list", "watch", "create", "update", "patch" ]
