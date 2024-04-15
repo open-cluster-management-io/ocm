@@ -1,4 +1,4 @@
-package cmamanagedby
+package managementaddon
 
 import (
 	"context"
@@ -17,15 +17,11 @@ import (
 )
 
 const (
-	controllerName = "cma-managed-by-controller"
+	controllerName = "management-addon-controller"
 )
 
-// cmaManagedByController reconciles clustermanagementaddon on the hub
-// to update the annotation "addon.open-cluster-management.io/lifecycle" value.
-// It removes the value "self" if exist, which indicate the
-// the installation and upgrade of addon will no longer be managed by addon itself.
-// Once removed, the value will be set to "addon-manager" by the general addon manager.
-type cmaManagedByController struct {
+// clusterManagementAddonController reconciles cma on the hub.
+type clusterManagementAddonController struct {
 	addonClient                  addonv1alpha1client.Interface
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
 	agentAddons                  map[string]agent.AgentAddon
@@ -35,7 +31,7 @@ type cmaManagedByController struct {
 		addonapiv1alpha1.ClusterManagementAddOnStatus]
 }
 
-func NewCMAManagedByController(
+func NewManagementAddonController(
 	addonClient addonv1alpha1client.Interface,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	agentAddons map[string]agent.AgentAddon,
@@ -43,7 +39,7 @@ func NewCMAManagedByController(
 ) factory.Controller {
 	syncCtx := factory.NewSyncContext(controllerName)
 
-	c := &cmaManagedByController{
+	c := &clusterManagementAddonController{
 		addonClient:                  addonClient,
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
 		agentAddons:                  agentAddons,
@@ -64,7 +60,7 @@ func NewCMAManagedByController(
 		WithSync(c.sync).ToController(controllerName)
 }
 
-func (c *cmaManagedByController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
+func (c *clusterManagementAddonController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
 	_, addonName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		// ignore addon whose key is invalid
@@ -80,14 +76,19 @@ func (c *cmaManagedByController) sync(ctx context.Context, syncCtx factory.SyncC
 		return err
 	}
 
-	// Remove the annotation value "self" since the WithInstallStrategy() is removed in addon-framework.
-	// The migration plan refer to https://github.com/open-cluster-management-io/ocm/issues/355.
-	cmaCopy := cma.DeepCopy()
-	if cmaCopy.Annotations == nil ||
-		cmaCopy.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey] != addonapiv1alpha1.AddonLifecycleSelfManageAnnotationValue {
+	addon := c.agentAddons[cma.GetName()]
+	if addon.GetAgentAddonOptions().InstallStrategy == nil {
 		return nil
 	}
-	cmaCopy.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey] = ""
+
+	// If the addon defines install strategy via WithInstallStrategy(), force add annotation "addon.open-cluster-management.io/lifecycle: self" to cma.
+	// The annotation with value "self" will be removed when remove WithInstallStrategy() in addon-framework.
+	// The migration plan refer to https://github.com/open-cluster-management-io/ocm/issues/355.
+	cmaCopy := cma.DeepCopy()
+	if cmaCopy.Annotations == nil {
+		cmaCopy.Annotations = map[string]string{}
+	}
+	cmaCopy.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey] = addonapiv1alpha1.AddonLifecycleSelfManageAnnotationValue
 
 	_, err = c.addonPatcher.PatchLabelAnnotations(ctx, cmaCopy, cmaCopy.ObjectMeta, cma.ObjectMeta)
 	return err
