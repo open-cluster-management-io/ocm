@@ -129,7 +129,7 @@ func (c *hubReoncile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterMa
 
 	if len(appliedErrs) > 0 {
 		meta.SetStatusCondition(&cm.Status.Conditions, metav1.Condition{
-			Type:    clusterManagerApplied,
+			Type:    operatorapiv1.ConditionClusterManagerApplied,
 			Status:  metav1.ConditionFalse,
 			Reason:  "HubResourceApplyFailed",
 			Message: fmt.Sprintf("Failed to apply hub resources: %v", utilerrors.NewAggregate(appliedErrs)),

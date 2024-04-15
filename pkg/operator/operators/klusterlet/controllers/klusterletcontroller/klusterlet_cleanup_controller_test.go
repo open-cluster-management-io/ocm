@@ -12,6 +12,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2"
 
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
@@ -73,7 +74,7 @@ func TestSyncDelete(t *testing.T) {
 func TestSyncDeleteHosted(t *testing.T) {
 	klusterlet := newKlusterletHosted("klusterlet", "testns", "cluster1")
 	meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-		Type: klusterletReadyToApply, Status: metav1.ConditionTrue, Reason: "KlusterletPrepared",
+		Type: operatorapiv1.ConditionReadyToApply, Status: metav1.ConditionTrue, Reason: "KlusterletPrepared",
 		Message: "Klusterlet is ready to apply",
 	})
 	now := metav1.Now()
@@ -149,7 +150,7 @@ func TestSyncDeleteHostedDeleteAgentNamespace(t *testing.T) {
 		newKlusterletHosted("klusterlet", "testns", "cluster1"),
 		klusterletHostedFinalizer)
 	meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-		Type: klusterletReadyToApply, Status: metav1.ConditionFalse, Reason: "KlusterletPrepareFailed",
+		Type: operatorapiv1.ConditionReadyToApply, Status: metav1.ConditionFalse, Reason: "KlusterletPrepareFailed",
 		Message: fmt.Sprintf("Failed to build managed cluster clients: %v", "namespaces \"klusterlet\" not found"),
 	})
 	now := metav1.Now()
@@ -209,7 +210,7 @@ func TestSyncAddHostedFinalizerWhenKubeconfigReady(t *testing.T) {
 	}
 
 	meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-		Type: klusterletReadyToApply, Status: metav1.ConditionTrue, Reason: "KlusterletPrepared",
+		Type: operatorapiv1.ConditionReadyToApply, Status: metav1.ConditionTrue, Reason: "KlusterletPrepared",
 		Message: "Klusterlet is ready to apply",
 	})
 	if err := c.operatorStore.Update(klusterlet); err != nil {

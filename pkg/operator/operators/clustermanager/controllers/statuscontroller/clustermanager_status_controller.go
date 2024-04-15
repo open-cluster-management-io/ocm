@@ -23,12 +23,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
-const (
-	registrationDegraded  = "HubRegistrationDegraded"
-	placementDegraded     = "HubPlacementDegraded"
-	clusterManagerApplied = "Applied"
-)
-
 type clusterManagerStatusController struct {
 	deploymentLister     appslister.DeploymentLister
 	patcher              patcher.Patcher[*operatorapiv1.ClusterManager, operatorapiv1.ClusterManagerSpec, operatorapiv1.ClusterManagerStatus]
@@ -73,7 +67,7 @@ func (s *clusterManagerStatusController) sync(ctx context.Context, controllerCon
 		return err
 	}
 
-	if meta.FindStatusCondition(clusterManager.Status.Conditions, clusterManagerApplied) == nil {
+	if meta.FindStatusCondition(clusterManager.Status.Conditions, operatorapiv1.ConditionClusterManagerApplied) == nil {
 		return nil
 	}
 
@@ -98,27 +92,27 @@ func (s *clusterManagerStatusController) updateStatusOfRegistration(clusterManag
 	registrationDeployment, err := s.deploymentLister.Deployments(clusterManagerNamespace).Get(registrationDeploymentName)
 	if err != nil {
 		return metav1.Condition{
-			Type:    registrationDegraded,
+			Type:    operatorapiv1.ConditionHubRegistrationDegraded,
 			Status:  metav1.ConditionTrue,
-			Reason:  "GetRegistrationDeploymentFailed",
+			Reason:  operatorapiv1.ReasonGetRegistrationDeploymentFailed,
 			Message: fmt.Sprintf("Failed to get registration deployment %q %q: %v", clusterManagerNamespace, registrationDeploymentName, err),
 		}
 	}
 
 	if unavailablePod := helpers.NumOfUnavailablePod(registrationDeployment); unavailablePod > 0 {
 		return metav1.Condition{
-			Type:   registrationDegraded,
+			Type:   operatorapiv1.ConditionHubRegistrationDegraded,
 			Status: metav1.ConditionTrue,
-			Reason: "UnavailableRegistrationPod",
+			Reason: operatorapiv1.ReasonUnavailableRegistrationPod,
 			Message: fmt.Sprintf("%v of requested instances are unavailable of registration deployment %q %q",
 				unavailablePod, clusterManagerNamespace, registrationDeploymentName),
 		}
 	}
 
 	return metav1.Condition{
-		Type:    registrationDegraded,
+		Type:    operatorapiv1.ConditionHubRegistrationDegraded,
 		Status:  metav1.ConditionFalse,
-		Reason:  "RegistrationFunctional",
+		Reason:  operatorapiv1.ReasonRegistrationFunctional,
 		Message: "Registration is managing credentials",
 	}
 }
@@ -130,27 +124,27 @@ func (s *clusterManagerStatusController) updateStatusOfPlacement(clusterManagerN
 	placementDeployment, err := s.deploymentLister.Deployments(clusterManagerNamespace).Get(placementDeploymentName)
 	if err != nil {
 		return metav1.Condition{
-			Type:    placementDegraded,
+			Type:    operatorapiv1.ConditionHubPlacementDegraded,
 			Status:  metav1.ConditionTrue,
-			Reason:  "GetPlacementDeploymentFailed",
+			Reason:  operatorapiv1.ReasonGetPlacementDeploymentFailed,
 			Message: fmt.Sprintf("Failed to get placement deployment %q %q: %v", clusterManagerNamespace, placementDeploymentName, err),
 		}
 	}
 
 	if unavailablePod := helpers.NumOfUnavailablePod(placementDeployment); unavailablePod > 0 {
 		return metav1.Condition{
-			Type:   placementDegraded,
+			Type:   operatorapiv1.ConditionHubPlacementDegraded,
 			Status: metav1.ConditionTrue,
-			Reason: "UnavailablePlacementPod",
+			Reason: operatorapiv1.ReasonUnavailablePlacementPod,
 			Message: fmt.Sprintf("%v of requested instances are unavailable of placement deployment %q %q",
 				unavailablePod, clusterManagerNamespace, placementDeploymentName),
 		}
 	}
 
 	return metav1.Condition{
-		Type:    placementDegraded,
+		Type:    operatorapiv1.ConditionHubPlacementDegraded,
 		Status:  metav1.ConditionFalse,
-		Reason:  "PlacementFunctional",
+		Reason:  operatorapiv1.ReasonPlacementFunctional,
 		Message: "Placement is scheduling placement decisions",
 	}
 }

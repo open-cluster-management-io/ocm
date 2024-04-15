@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	imagePullSecret               = "open-cluster-management-image-pull-credentials"
 	addonInstallNamespaceLabelKey = "addon.open-cluster-management.io/namespace"
 )
 
@@ -76,9 +75,9 @@ func (c *addonPullImageSecretController) sync(ctx context.Context, controllerCon
 		c.kubeClient.CoreV1(),
 		c.recorder,
 		c.operatorNamespace,
-		imagePullSecret,
+		helpers.ImagePullSecret,
 		namespace,
-		imagePullSecret,
+		helpers.ImagePullSecret,
 		[]metav1.OwnerReference{},
 	)
 	if err != nil {

@@ -65,6 +65,7 @@ type ClusterManagerSpec struct {
 
 	// WorkConfiguration contains the configuration of work
 	// +optional
+	// +kubebuilder:default={workDriver: kube}
 	WorkConfiguration *WorkConfiguration `json:"workConfiguration,omitempty"`
 
 	// AddOnManagerConfiguration contains the configuration of addon manager
@@ -119,7 +120,34 @@ type WorkConfiguration struct {
 	//  	he can set featuregate/Foo=false before upgrading. Let's say the cluster-admin wants featuregate/Foo=false.
 	// +optional
 	FeatureGates []FeatureGate `json:"featureGates,omitempty"`
+
+	// WorkDriver represents the type of work driver. Possible values are "kube", "mqtt", or "grpc".
+	// If not provided, the default value is "kube".
+	// If set to non-"kube" drivers, the klusterlet need to use the same driver.
+	// and the driver configuration must be provided in a secret named "work-driver-config"
+	// in the namespace where the cluster manager is running, adhering to the following structure:
+	// config.yaml: |
+	//   <driver-config-in-yaml>
+	//
+	// For detailed driver configuration, please refer to the sdk-go documentation: https://github.com/open-cluster-management-io/sdk-go/blob/main/pkg/cloudevents/README.md#supported-protocols-and-drivers
+	//
+	// +optional
+	// +kubebuilder:default:=kube
+	// +kubebuilder:validation:Enum=kube;mqtt;grpc
+	WorkDriver WorkDriverType `json:"workDriver,omitempty"`
 }
+
+// WorkDriverType represents the type of work driver.
+type WorkDriverType string
+
+const (
+	// WorkDriverTypeKube is the work driver type for kube.
+	WorkDriverTypeKube WorkDriverType = "kube"
+	// WorkDriverTypeMqtt is the work driver type for mqtt.
+	WorkDriverTypeMqtt WorkDriverType = "mqtt"
+	// WorkDriverTypeGrpc is the work driver type for grpc.
+	WorkDriverTypeGrpc WorkDriverType = "grpc"
+)
 
 type AddOnManagerConfiguration struct {
 	// FeatureGates represents the list of feature gates for addon manager
@@ -311,3 +339,54 @@ type ClusterManagerList struct {
 	// Items is a list of deployment configurations for registration and work distribution controllers.
 	Items []ClusterManager `json:"items"`
 }
+
+const (
+	// The types of ClusterManager condition status.
+	// ConditionClusterManagerApplied is the ClusterManager condition status which means all components have been applied on the hub.
+	ConditionClusterManagerApplied = "Applied"
+	// ConditionHubRegistrationDegraded is the ClusterManager condition status which means the registration is not ready to serve on the hub.
+	ConditionHubRegistrationDegraded = "HubRegistrationDegraded"
+	// ConditionHubPlacementDegraded is the ClusterManager condition status which means the placement is not ready to serve on the hub.
+	ConditionHubPlacementDegraded = "HubPlacementDegraded"
+	// ConditionProgressing is the ClusterManager condition status which means the ClusterManager are in upgrading phase.
+	ConditionProgressing = "Progressing"
+	// ConditionMigrationSucceeded is the ClusterManager condition status which means the API migration is succeeded on the hub.
+	ConditionMigrationSucceeded = "MigrationSucceeded"
+
+	// ReasonClusterManagerApplied is the reason of the ConditionClusterManagerApplied condition to show all resources are applied.
+	ReasonClusterManagerApplied = "ClusterManagerApplied"
+	// ReasonRuntimeResourceApplyFailed is the reason of the ConditionClusterManagerApplied condition to show it is failed to apply deployments.
+	ReasonRuntimeResourceApplyFailed = "RuntimeResourceApplyFailed"
+	// ReasonServiceAccountSyncFailed is the reason of the ConditionClusterManagerApplied condition to show it is failed to apply serviceAccounts.
+	ReasonServiceAccountSyncFailed = "ServiceAccountSyncFailed"
+	// ReasonClusterManagerCRDApplyFailed is the reason of the ConditionClusterManagerApplied condition to show it is failed to apply CRDs.
+	ReasonClusterManagerCRDApplyFailed = "CRDApplyFailed"
+	// ReasonWebhookApplyFailed is the reason of the ConditionClusterManagerApplied condition to show it is failed to apply webhooks.
+	ReasonWebhookApplyFailed = "WebhookApplyFailed"
+
+	// ReasonDeploymentRolling is the reason of the ConditionProgressing condition to show the deployed deployments are rolling.
+	ReasonDeploymentRolling = "ClusterManagerDeploymentRolling"
+	// ReasonUpToDate is the reason of the ConditionProgressing condition to show the deployed deployments are up-to-date.
+	ReasonUpToDate = "ClusterManagerUpToDate"
+
+	// ReasonStorageVersionMigrationFailed is the reason of the ConditionMigrationSucceeded condition to show the API storageVersion migration is failed.
+	ReasonStorageVersionMigrationFailed = "StorageVersionMigrationFailed"
+	// ReasonStorageVersionMigrationProcessing is the reason of the ConditionMigrationSucceeded condition to show the API storageVersion migration is not completed.
+	ReasonStorageVersionMigrationProcessing = "StorageVersionMigrationProcessing"
+	// ReasonStorageVersionMigrationSucceed is the reason of the ConditionMigrationSucceeded condition to show the API storageVersion migration is succeeded.
+	ReasonStorageVersionMigrationSucceed = "StorageVersionMigrationSucceed"
+
+	// ReasonGetRegistrationDeploymentFailed is the reason of the ConditionRegistrationDegraded condition to show getting registration deployment failed.
+	ReasonGetRegistrationDeploymentFailed = "GetRegistrationDeploymentFailed"
+	// ReasonUnavailableRegistrationPod is the reason of the ConditionRegistrationDegraded condition to show the registration pods are unavailable.
+	ReasonUnavailableRegistrationPod = "UnavailableRegistrationPod"
+	// ReasonRegistrationFunctional is the reason of the ConditionRegistrationDegraded condition to show registration is functional.
+	ReasonRegistrationFunctional = "RegistrationFunctional"
+
+	// ReasonGetPlacementDeploymentFailed is the reason of the ConditionPlacementDegraded condition to show it is failed get placement deployment.
+	ReasonGetPlacementDeploymentFailed = "GetPlacementDeploymentFailed"
+	// ReasonUnavailablePlacementPod is the reason of the ConditionPlacementDegraded condition to show  the registration pods are unavailable.
+	ReasonUnavailablePlacementPod = "UnavailablePlacementPod"
+	// ReasonPlacementFunctional is the reason of the ConditionPlacementDegraded condition to show placement is functional.
+	ReasonPlacementFunctional = "PlacementFunctional"
+)

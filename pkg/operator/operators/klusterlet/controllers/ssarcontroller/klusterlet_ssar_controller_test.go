@@ -184,7 +184,7 @@ func TestSync(t *testing.T) {
 			allowToOperateManagedClusterStatus: false,
 			allowToOperateManifestWorks:        false,
 			expectedConditions: []metav1.Condition{
-				testinghelper.NamedCondition(hubConnectionDegraded, "BootstrapSecretMissing,HubKubeConfigUnauthorized", metav1.ConditionTrue),
+				testinghelper.NamedCondition(operatorapiv1.ConditionHubConnectionDegraded, "BootstrapSecretMissing,HubKubeConfigUnauthorized", metav1.ConditionTrue),
 			},
 		},
 		{
@@ -197,7 +197,7 @@ func TestSync(t *testing.T) {
 			allowToOperateManagedClusterStatus: true,
 			allowToOperateManifestWorks:        true,
 			expectedConditions: []metav1.Condition{
-				testinghelper.NamedCondition(hubConnectionDegraded, "BootstrapSecretFunctional,HubKubeConfigSecretMissing", metav1.ConditionTrue),
+				testinghelper.NamedCondition(operatorapiv1.ConditionHubConnectionDegraded, "BootstrapSecretFunctional,HubKubeConfigSecretMissing", metav1.ConditionTrue),
 			},
 		},
 		{
@@ -211,7 +211,7 @@ func TestSync(t *testing.T) {
 			allowToOperateManifestWorks:        false,
 			klusterlet:                         newKlusterlet("testklusterlet", "test", "cluster1"),
 			expectedConditions: []metav1.Condition{
-				testinghelper.NamedCondition(hubConnectionDegraded, "BootstrapSecretError,HubKubeConfigUnauthorized", metav1.ConditionTrue),
+				testinghelper.NamedCondition(operatorapiv1.ConditionHubConnectionDegraded, "BootstrapSecretError,HubKubeConfigUnauthorized", metav1.ConditionTrue),
 			},
 		},
 		{
@@ -225,7 +225,7 @@ func TestSync(t *testing.T) {
 			allowToOperateManifestWorks:        true,
 			klusterlet:                         newKlusterlet("testklusterlet", "test", "cluster1"),
 			expectedConditions: []metav1.Condition{
-				testinghelper.NamedCondition(hubConnectionDegraded, "BootstrapSecretFunctional,HubKubeConfigError", metav1.ConditionTrue),
+				testinghelper.NamedCondition(operatorapiv1.ConditionHubConnectionDegraded, "BootstrapSecretFunctional,HubKubeConfigError", metav1.ConditionTrue),
 			},
 		},
 		{
@@ -239,7 +239,7 @@ func TestSync(t *testing.T) {
 			allowToOperateManifestWorks:        false,
 			klusterlet:                         newKlusterlet("testklusterlet", "test", "cluster1"),
 			expectedConditions: []metav1.Condition{
-				testinghelper.NamedCondition(hubConnectionDegraded, "BootstrapSecretUnauthorized,HubKubeConfigUnauthorized", metav1.ConditionTrue),
+				testinghelper.NamedCondition(operatorapiv1.ConditionHubConnectionDegraded, "BootstrapSecretUnauthorized,HubKubeConfigUnauthorized", metav1.ConditionTrue),
 			},
 		},
 		{
@@ -253,7 +253,7 @@ func TestSync(t *testing.T) {
 			allowToOperateManifestWorks:        true,
 			klusterlet:                         newKlusterlet("testklusterlet", "test", "cluster1"),
 			expectedConditions: []metav1.Condition{
-				testinghelper.NamedCondition(hubConnectionDegraded, "HubConnectionFunctional", metav1.ConditionFalse),
+				testinghelper.NamedCondition(operatorapiv1.ConditionHubConnectionDegraded, "HubConnectionFunctional", metav1.ConditionFalse),
 			},
 		},
 	}

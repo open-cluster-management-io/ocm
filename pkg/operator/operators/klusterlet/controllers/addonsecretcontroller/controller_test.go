@@ -13,6 +13,7 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
 func TestSync(t *testing.T) {
@@ -53,7 +54,7 @@ func TestSync(t *testing.T) {
 			objects: []runtime.Object{
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      imagePullSecret,
+						Name:      helpers.ImagePullSecret,
 						Namespace: "open-cluster-management",
 					},
 					Data: map[string][]byte{
@@ -71,7 +72,7 @@ func TestSync(t *testing.T) {
 				},
 			},
 			verify: func(t *testing.T, client *kubefake.Clientset) {
-				secret, err := client.CoreV1().Secrets("ns1").Get(context.TODO(), imagePullSecret, metav1.GetOptions{})
+				secret, err := client.CoreV1().Secrets("ns1").Get(context.TODO(), helpers.ImagePullSecret, metav1.GetOptions{})
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}

@@ -36,7 +36,7 @@ func newClusterManager() *operatorapiv1.ClusterManager {
 		Status: operatorapiv1.ClusterManagerStatus{
 			Conditions: []metav1.Condition{
 				{
-					Type:   clusterManagerApplied,
+					Type:   operatorapiv1.ConditionClusterManagerApplied,
 					Status: metav1.ConditionTrue,
 				},
 			},
@@ -76,7 +76,7 @@ func newPlacementDeployment(desiredReplica, availableReplica int32) *appsv1.Depl
 
 func TestSyncStatus(t *testing.T) {
 	appliedCond := metav1.Condition{
-		Type:   clusterManagerApplied,
+		Type:   operatorapiv1.ConditionClusterManagerApplied,
 		Status: metav1.ConditionTrue,
 	}
 	cases := []struct {
@@ -119,8 +119,8 @@ func TestSyncStatus(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				expectedCondition1 := testinghelper.NamedCondition(registrationDegraded, "GetRegistrationDeploymentFailed", metav1.ConditionTrue)
-				expectedCondition2 := testinghelper.NamedCondition(placementDegraded, "UnavailablePlacementPod", metav1.ConditionTrue)
+				expectedCondition1 := testinghelper.NamedCondition(operatorapiv1.ConditionHubRegistrationDegraded, "GetRegistrationDeploymentFailed", metav1.ConditionTrue)
+				expectedCondition2 := testinghelper.NamedCondition(operatorapiv1.ConditionHubPlacementDegraded, "UnavailablePlacementPod", metav1.ConditionTrue)
 				testinghelper.AssertOnlyConditions(t, klusterlet, appliedCond, expectedCondition1, expectedCondition2)
 			},
 		},
@@ -140,8 +140,8 @@ func TestSyncStatus(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				expectedCondition1 := testinghelper.NamedCondition(registrationDegraded, "UnavailableRegistrationPod", metav1.ConditionTrue)
-				expectedCondition2 := testinghelper.NamedCondition(placementDegraded, "PlacementFunctional", metav1.ConditionFalse)
+				expectedCondition1 := testinghelper.NamedCondition(operatorapiv1.ConditionHubRegistrationDegraded, "UnavailableRegistrationPod", metav1.ConditionTrue)
+				expectedCondition2 := testinghelper.NamedCondition(operatorapiv1.ConditionHubPlacementDegraded, "PlacementFunctional", metav1.ConditionFalse)
 				testinghelper.AssertOnlyConditions(t, klusterlet, appliedCond, expectedCondition1, expectedCondition2)
 			},
 		},
@@ -158,8 +158,8 @@ func TestSyncStatus(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				expectedCondition1 := testinghelper.NamedCondition(registrationDegraded, "RegistrationFunctional", metav1.ConditionFalse)
-				expectedCondition2 := testinghelper.NamedCondition(placementDegraded, "GetPlacementDeploymentFailed", metav1.ConditionTrue)
+				expectedCondition1 := testinghelper.NamedCondition(operatorapiv1.ConditionHubRegistrationDegraded, "RegistrationFunctional", metav1.ConditionFalse)
+				expectedCondition2 := testinghelper.NamedCondition(operatorapiv1.ConditionHubPlacementDegraded, "GetPlacementDeploymentFailed", metav1.ConditionTrue)
 				testinghelper.AssertOnlyConditions(t, klusterlet, appliedCond, expectedCondition1, expectedCondition2)
 			},
 		},

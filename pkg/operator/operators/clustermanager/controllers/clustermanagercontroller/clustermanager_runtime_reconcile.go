@@ -83,9 +83,9 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 			config.MWReplicaSetEnabled, config.AddOnManagerEnabled)
 		if err != nil {
 			meta.SetStatusCondition(&cm.Status.Conditions, metav1.Condition{
-				Type:    clusterManagerApplied,
+				Type:    operatorapiv1.ConditionClusterManagerApplied,
 				Status:  metav1.ConditionFalse,
-				Reason:  "ServiceAccountSyncFailed",
+				Reason:  operatorapiv1.ReasonServiceAccountSyncFailed,
 				Message: fmt.Sprintf("Failed to sync service account: %v", err),
 			})
 			return cm, reconcileStop, err
@@ -158,25 +158,25 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 
 	if len(progressingDeployments) > 0 {
 		meta.SetStatusCondition(&cm.Status.Conditions, metav1.Condition{
-			Type:    clusterManagerProgressing,
+			Type:    operatorapiv1.ConditionProgressing,
 			Status:  metav1.ConditionTrue,
-			Reason:  "ClusterManagerDeploymentRolling",
+			Reason:  operatorapiv1.ReasonDeploymentRolling,
 			Message: fmt.Sprintf("Deployments %s is still rolling", strings.Join(progressingDeployments, ",")),
 		})
 	} else {
 		meta.SetStatusCondition(&cm.Status.Conditions, metav1.Condition{
-			Type:    clusterManagerProgressing,
+			Type:    operatorapiv1.ConditionProgressing,
 			Status:  metav1.ConditionFalse,
-			Reason:  "ClusterManagerUpToDate",
+			Reason:  operatorapiv1.ReasonUpToDate,
 			Message: "Components of cluster manager are up to date",
 		})
 	}
 
 	if len(appliedErrs) > 0 {
 		meta.SetStatusCondition(&cm.Status.Conditions, metav1.Condition{
-			Type:    clusterManagerApplied,
+			Type:    operatorapiv1.ConditionClusterManagerApplied,
 			Status:  metav1.ConditionFalse,
-			Reason:  "RuntimeResourceApplyFailed",
+			Reason:  operatorapiv1.ReasonRuntimeResourceApplyFailed,
 			Message: fmt.Sprintf("Failed to apply runtime resources: %v", utilerrors.NewAggregate(appliedErrs)),
 		})
 		return cm, reconcileStop, utilerrors.NewAggregate(appliedErrs)

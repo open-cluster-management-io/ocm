@@ -96,11 +96,11 @@ func (r *runtimeReconcile) installAgent(ctx context.Context, klusterlet *operato
 	// * The work agent should not be scaled to 0 in degraded condition with other reasons,
 	//   because we still need work agent running even though the hub kubconfig is missing some certain permission.
 	//   It can ensure work agent to clean up the resources defined in manifestworks when cluster is detaching from the hub.
-	hubConnectionDegradedCondition := meta.FindStatusCondition(klusterlet.Status.Conditions, hubConnectionDegraded)
+	hubConnectionDegradedCondition := meta.FindStatusCondition(klusterlet.Status.Conditions, operatorapiv1.ConditionHubConnectionDegraded)
 	if hubConnectionDegradedCondition == nil {
 		workConfig.Replica = 0
 	} else if hubConnectionDegradedCondition.Status == metav1.ConditionTrue &&
-		strings.Contains(hubConnectionDegradedCondition.Reason, hubKubeConfigSecretMissing) {
+		strings.Contains(hubConnectionDegradedCondition.Reason, operatorapiv1.ReasonHubKubeConfigSecretMissing) {
 		workConfig.Replica = 0
 	}
 
@@ -203,7 +203,7 @@ func (r *runtimeReconcile) createManagedClusterKubeconfig(
 		r.managedClusterClients.kubeconfig, r.kubeClient.CoreV1(), tokenGetter, recorder)
 	if err != nil {
 		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
+			Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionFalse, Reason: operatorapiv1.ReasonKlusterletApplyFailed,
 			Message: fmt.Sprintf("Failed to create managed kubeconfig secret %s with error %v", secretName, err),
 		})
 	}
@@ -214,7 +214,7 @@ func (r *runtimeReconcile) getClusterNameFromHubKubeConfigSecret(ctx context.Con
 	hubSecret, err := r.kubeClient.CoreV1().Secrets(namespace).Get(ctx, helpers.HubKubeConfig, metav1.GetOptions{})
 	if err != nil {
 		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
+			Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionFalse, Reason: operatorapiv1.ReasonKlusterletApplyFailed,
 			Message: fmt.Sprintf("Failed to get cluster name from hub kubeconfig secret with error %v", err),
 		})
 		return "", err
@@ -223,7 +223,7 @@ func (r *runtimeReconcile) getClusterNameFromHubKubeConfigSecret(ctx context.Con
 	clusterName := hubSecret.Data["cluster-name"]
 	if len(clusterName) == 0 {
 		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
+			Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionFalse, Reason: operatorapiv1.ReasonKlusterletApplyFailed,
 			Message: fmt.Sprintf("Failed to get cluster name from hub kubeconfig secret with error %v", err),
 		})
 		return "", fmt.Errorf("the cluster name in the secret is empty")
