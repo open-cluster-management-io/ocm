@@ -33,8 +33,8 @@ func (o *grpcAgentOptions) WithContext(ctx context.Context, evtCtx cloudevents.E
 	return ctx, nil
 }
 
-func (o *grpcAgentOptions) Client(ctx context.Context) (cloudevents.Client, error) {
-	receiver, err := o.GetCloudEventsClient(
+func (o *grpcAgentOptions) Protocol(ctx context.Context) (options.CloudEventsProtocol, error) {
+	receiver, err := o.GetCloudEventsProtocol(
 		ctx,
 		func(err error) {
 			o.errorChan <- err

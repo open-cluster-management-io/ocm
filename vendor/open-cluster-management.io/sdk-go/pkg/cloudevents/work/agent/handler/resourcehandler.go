@@ -2,11 +2,9 @@ package handler
 
 import (
 	"fmt"
-	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/klog/v2"
 	workv1lister "open-cluster-management.io/api/client/work/listers/work/v1"
 
 	workv1 "open-cluster-management.io/api/work/v1"
@@ -27,21 +25,6 @@ func NewManifestWorkAgentHandler(lister workv1lister.ManifestWorkNamespaceLister
 			lastWork, err := lister.Get(work.Name)
 			if err != nil {
 				return err
-			}
-
-			resourceVersion, err := strconv.ParseInt(work.ResourceVersion, 10, 64)
-			if err != nil {
-				return fmt.Errorf("failed to parse the resourceVersion of the manifestwork %s, %v", work.Name, err)
-			}
-
-			lastResourceVersion, err := strconv.ParseInt(lastWork.ResourceVersion, 10, 64)
-			if err != nil {
-				return fmt.Errorf("failed to parse the resourceVersion of the manifestwork %s, %v", lastWork.Name, err)
-			}
-
-			if resourceVersion <= lastResourceVersion {
-				klog.Infof("The work %s resource version is less than or equal to cached, ignore", work.Name)
-				return nil
 			}
 
 			updatedWork := work.DeepCopy()

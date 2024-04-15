@@ -175,11 +175,6 @@ func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt ku
 		return nil, err
 	}
 
-	if generation <= lastWork.Generation {
-		return nil, fmt.Errorf("the work %s/%s current generation %d is less than or equal to the last generation %d",
-			c.namespace, name, generation, lastWork.Generation)
-	}
-
 	eventDataType, err := types.ParseCloudEventsDataType(lastWork.Annotations[common.CloudEventsDataTypeAnnotationKey])
 	if err != nil {
 		return nil, err
@@ -202,15 +197,19 @@ func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt ku
 	return newWork.DeepCopy(), nil
 }
 
+// getWorkGeneration retrieves the work generation from the annotation with the key
+// "cloudevents.open-cluster-management.io/generation".
+// if no generation is set in the annotation, then 0 is returned, which means the message
+// broker guarantees the message order.
 func getWorkGeneration(work *workv1.ManifestWork) (int64, error) {
 	generation, ok := work.Annotations[common.CloudEventsGenerationAnnotationKey]
 	if !ok {
-		return -1, fmt.Errorf("the annotation %s is not found from work %s", common.CloudEventsGenerationAnnotationKey, work.UID)
+		return 0, nil
 	}
 
 	generationInt, err := strconv.Atoi(generation)
 	if err != nil {
-		return -1, err
+		return 0, fmt.Errorf("failed to convert generation %s to int: %v", generation, err)
 	}
 
 	return int64(generationInt), nil

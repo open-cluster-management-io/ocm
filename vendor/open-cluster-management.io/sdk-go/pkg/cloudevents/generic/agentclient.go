@@ -282,7 +282,23 @@ func (c *CloudEventAgentClient[T]) specAction(source string, obj T) (evt types.R
 		return types.Deleted, nil
 	}
 
-	if obj.GetResourceVersion() == lastObj.GetResourceVersion() {
+	// if both the current and the last object have the resource version "0", then object
+	// is considered as modified, the message broker guarantees the order of the messages
+	if obj.GetResourceVersion() == "0" && lastObj.GetResourceVersion() == "0" {
+		return types.Modified, nil
+	}
+
+	resourceVersion, err := strconv.ParseInt(obj.GetResourceVersion(), 10, 64)
+	if err != nil {
+		return evt, err
+	}
+
+	lastResourceVersion, err := strconv.ParseInt(lastObj.GetResourceVersion(), 10, 64)
+	if err != nil {
+		return evt, err
+	}
+
+	if resourceVersion <= lastResourceVersion {
 		return evt, nil
 	}
 
