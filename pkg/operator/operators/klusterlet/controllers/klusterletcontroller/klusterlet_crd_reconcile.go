@@ -85,7 +85,7 @@ func (r *crdReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.
 
 	if applyErr != nil {
 		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "CRDApplyFailed",
+			Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionFalse, Reason: operatorapiv1.ReasonKlusterletCRDApplyFailed,
 			Message: applyErr.Error(),
 		})
 		return klusterlet, reconcileStop, applyErr

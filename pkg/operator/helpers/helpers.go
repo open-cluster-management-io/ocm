@@ -3,6 +3,7 @@ package helpers
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 
@@ -37,6 +38,7 @@ import (
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
+	"open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
 
@@ -49,16 +51,24 @@ const (
 	FeatureGatesReasonInvalidExisting = "InvalidFeatureGatesExisting"
 )
 
+const (
+	// ImagePullSecret is the image pull secret for operator components, which is synced from the operator ns to hub/spoke/addon ns.
+	ImagePullSecret = "open-cluster-management-image-pull-credentials"
+
+	// DefaultComponentNamespace is the default namespace in which the operator is deployed
+	DefaultComponentNamespace = "open-cluster-management"
+)
+
 var (
 	genericScheme = runtime.NewScheme()
 	genericCodecs = serializer.NewCodecFactory(genericScheme)
 	genericCodec  = genericCodecs.UniversalDeserializer()
 
 	DefaultHubRegistrationFeatureGates = []operatorapiv1.FeatureGate{
-		{Feature: "DefaultClusterSet", Mode: operatorapiv1.FeatureGateModeTypeEnable},
+		{Feature: string(feature.DefaultClusterSet), Mode: operatorapiv1.FeatureGateModeTypeEnable},
 	}
 	DefaultSpokeRegistrationFeatureGates = []operatorapiv1.FeatureGate{
-		{Feature: "AddonManagement", Mode: operatorapiv1.FeatureGateModeTypeEnable},
+		{Feature: string(feature.AddonManagement), Mode: operatorapiv1.FeatureGateModeTypeEnable},
 	}
 )
 
@@ -794,4 +804,13 @@ func IsSingleton(mode operatorapiv1.InstallMode) bool {
 
 func IsHosted(mode operatorapiv1.InstallMode) bool {
 	return mode == operatorapiv1.InstallModeHosted || mode == operatorapiv1.InstallModeSingletonHosted
+}
+
+func GetOperatorNamespace() string {
+	operatorNamespace := DefaultComponentNamespace
+	nsBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err == nil {
+		operatorNamespace = string(nsBytes)
+	}
+	return operatorNamespace
 }

@@ -20,10 +20,10 @@ import (
 
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
-	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/migrationcontroller"
 )
 
 var (
@@ -78,7 +78,7 @@ func (c *crdStatusController) sync(ctx context.Context, controllerContext factor
 	}
 
 	// need to wait storage version migrations succeed.
-	if succeeded := meta.IsStatusConditionTrue(clusterManager.Status.Conditions, migrationcontroller.MigrationSucceeded); !succeeded {
+	if succeeded := meta.IsStatusConditionTrue(clusterManager.Status.Conditions, operatorapiv1.ConditionMigrationSucceeded); !succeeded {
 		controllerContext.Queue().AddRateLimited(clusterManagerName)
 		klog.V(4).Info("Wait storage version migration succeed.")
 		return nil

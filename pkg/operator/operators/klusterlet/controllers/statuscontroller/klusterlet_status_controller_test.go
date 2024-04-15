@@ -43,7 +43,7 @@ func newKlusterlet(name, namespace, clustername string) *operatorapiv1.Klusterle
 		Status: operatorapiv1.KlusterletStatus{
 			Conditions: []metav1.Condition{
 				{
-					Type:   klusterletApplied,
+					Type:   operatorapiv1.ConditionKlusterletApplied,
 					Status: metav1.ConditionTrue,
 				},
 			},
@@ -108,9 +108,9 @@ func TestSync(t *testing.T) {
 
 			klusterlet: newKlusterlet("testklusterlet", "test", "cluster1"),
 			expectedConditions: []metav1.Condition{
-				testinghelper.NamedCondition(klusterletAvailable, "NoAvailablePods", metav1.ConditionFalse),
-				testinghelper.NamedCondition(klusterletRegistrationDesiredDegraded, "UnavailablePods", metav1.ConditionTrue),
-				testinghelper.NamedCondition(klusterletWorkDesiredDegraded, "UnavailablePods", metav1.ConditionTrue),
+				testinghelper.NamedCondition(operatorapiv1.ConditionKlusterletAvailable, "NoAvailablePods", metav1.ConditionFalse),
+				testinghelper.NamedCondition(operatorapiv1.ConditionRegistrationDesiredDegraded, "UnavailablePods", metav1.ConditionTrue),
+				testinghelper.NamedCondition(operatorapiv1.ConditionWorkDesiredDegraded, "UnavailablePods", metav1.ConditionTrue),
 			},
 		},
 		{
@@ -121,9 +121,9 @@ func TestSync(t *testing.T) {
 			},
 			klusterlet: newKlusterlet("testklusterlet", "test", "cluster1"),
 			expectedConditions: []metav1.Condition{
-				testinghelper.NamedCondition(klusterletAvailable, "NoAvailablePods", metav1.ConditionFalse),
-				testinghelper.NamedCondition(klusterletRegistrationDesiredDegraded, "UnavailablePods", metav1.ConditionTrue),
-				testinghelper.NamedCondition(klusterletWorkDesiredDegraded, "UnavailablePods", metav1.ConditionTrue),
+				testinghelper.NamedCondition(operatorapiv1.ConditionKlusterletAvailable, "NoAvailablePods", metav1.ConditionFalse),
+				testinghelper.NamedCondition(operatorapiv1.ConditionRegistrationDesiredDegraded, "UnavailablePods", metav1.ConditionTrue),
+				testinghelper.NamedCondition(operatorapiv1.ConditionWorkDesiredDegraded, "UnavailablePods", metav1.ConditionTrue),
 			},
 		},
 		{
@@ -134,9 +134,9 @@ func TestSync(t *testing.T) {
 			},
 			klusterlet: newKlusterlet("testklusterlet", "test", "cluster1"),
 			expectedConditions: []metav1.Condition{
-				testinghelper.NamedCondition(klusterletAvailable, "NoAvailablePods", metav1.ConditionFalse),
-				testinghelper.NamedCondition(klusterletRegistrationDesiredDegraded, "UnavailablePods", metav1.ConditionTrue),
-				testinghelper.NamedCondition(klusterletWorkDesiredDegraded, "UnavailablePods", metav1.ConditionTrue),
+				testinghelper.NamedCondition(operatorapiv1.ConditionKlusterletAvailable, "NoAvailablePods", metav1.ConditionFalse),
+				testinghelper.NamedCondition(operatorapiv1.ConditionRegistrationDesiredDegraded, "UnavailablePods", metav1.ConditionTrue),
+				testinghelper.NamedCondition(operatorapiv1.ConditionWorkDesiredDegraded, "UnavailablePods", metav1.ConditionTrue),
 			},
 		},
 		{
@@ -147,9 +147,9 @@ func TestSync(t *testing.T) {
 			},
 			klusterlet: newKlusterlet("testklusterlet", "test", "cluster1"),
 			expectedConditions: []metav1.Condition{
-				testinghelper.NamedCondition(klusterletAvailable, "klusterletAvailable", metav1.ConditionTrue),
-				testinghelper.NamedCondition(klusterletRegistrationDesiredDegraded, "UnavailablePods", metav1.ConditionTrue),
-				testinghelper.NamedCondition(klusterletWorkDesiredDegraded, "UnavailablePods", metav1.ConditionTrue),
+				testinghelper.NamedCondition(operatorapiv1.ConditionKlusterletAvailable, operatorapiv1.ReasonKlusterletAvailable, metav1.ConditionTrue),
+				testinghelper.NamedCondition(operatorapiv1.ConditionRegistrationDesiredDegraded, operatorapiv1.ReasonKlusterletUnavailablePods, metav1.ConditionTrue),
+				testinghelper.NamedCondition(operatorapiv1.ConditionWorkDesiredDegraded, operatorapiv1.ReasonKlusterletUnavailablePods, metav1.ConditionTrue),
 			},
 		},
 		{
@@ -160,9 +160,12 @@ func TestSync(t *testing.T) {
 			},
 			klusterlet: newKlusterlet("testklusterlet", "test", "cluster1"),
 			expectedConditions: []metav1.Condition{
-				testinghelper.NamedCondition(klusterletAvailable, "klusterletAvailable", metav1.ConditionTrue),
-				testinghelper.NamedCondition(klusterletRegistrationDesiredDegraded, "DeploymentsFunctional", metav1.ConditionFalse),
-				testinghelper.NamedCondition(klusterletWorkDesiredDegraded, "DeploymentsFunctional", metav1.ConditionFalse),
+				testinghelper.NamedCondition(operatorapiv1.ConditionKlusterletAvailable,
+					operatorapiv1.ReasonKlusterletAvailable, metav1.ConditionTrue),
+				testinghelper.NamedCondition(operatorapiv1.ConditionRegistrationDesiredDegraded,
+					operatorapiv1.ReasonKlusterletDeploymentsFunctional, metav1.ConditionFalse),
+				testinghelper.NamedCondition(operatorapiv1.ConditionWorkDesiredDegraded,
+					operatorapiv1.ReasonKlusterletDeploymentsFunctional, metav1.ConditionFalse),
 			},
 		},
 		{
@@ -176,9 +179,12 @@ func TestSync(t *testing.T) {
 				return k
 			}(),
 			expectedConditions: []metav1.Condition{
-				testinghelper.NamedCondition(klusterletAvailable, "klusterletAvailable", metav1.ConditionTrue),
-				testinghelper.NamedCondition(klusterletRegistrationDesiredDegraded, "DeploymentsFunctional", metav1.ConditionFalse),
-				testinghelper.NamedCondition(klusterletWorkDesiredDegraded, "DeploymentsFunctional", metav1.ConditionFalse),
+				testinghelper.NamedCondition(operatorapiv1.ConditionKlusterletAvailable,
+					operatorapiv1.ReasonKlusterletAvailable, metav1.ConditionTrue),
+				testinghelper.NamedCondition(operatorapiv1.ConditionRegistrationDesiredDegraded,
+					operatorapiv1.ReasonKlusterletDeploymentsFunctional, metav1.ConditionFalse),
+				testinghelper.NamedCondition(operatorapiv1.ConditionWorkDesiredDegraded,
+					operatorapiv1.ReasonKlusterletDeploymentsFunctional, metav1.ConditionFalse),
 			},
 		},
 	}
@@ -202,7 +208,8 @@ func TestSync(t *testing.T) {
 				t.Fatal(err)
 			}
 			expectedConditions := c.expectedConditions
-			meta.SetStatusCondition(&expectedConditions, testinghelper.NamedCondition(klusterletApplied, "", metav1.ConditionTrue))
+			meta.SetStatusCondition(&expectedConditions,
+				testinghelper.NamedCondition(operatorapiv1.ConditionKlusterletApplied, "", metav1.ConditionTrue))
 			c.expectedConditions = expectedConditions
 			testinghelper.AssertOnlyConditions(t, klusterlet, c.expectedConditions...)
 		})

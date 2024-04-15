@@ -38,9 +38,7 @@ import (
 )
 
 const (
-	clusterManagerFinalizer   = "operator.open-cluster-management.io/cluster-manager-cleanup"
-	clusterManagerApplied     = "Applied"
-	clusterManagerProgressing = "Progressing"
+	clusterManagerFinalizer = "operator.open-cluster-management.io/cluster-manager-cleanup"
 
 	defaultWebhookPort       = int32(9443)
 	clusterManagerReSyncTime = 5 * time.Second
@@ -267,9 +265,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	clusterManager.Status.ObservedGeneration = clusterManager.Generation
 	if len(errs) == 0 {
 		meta.SetStatusCondition(&clusterManager.Status.Conditions, metav1.Condition{
-			Type:    clusterManagerApplied,
+			Type:    operatorapiv1.ConditionClusterManagerApplied,
 			Status:  metav1.ConditionTrue,
-			Reason:  "ClusterManagerApplied",
+			Reason:  operatorapiv1.ReasonClusterManagerApplied,
 			Message: "Components of cluster manager are applied",
 		})
 	} else {

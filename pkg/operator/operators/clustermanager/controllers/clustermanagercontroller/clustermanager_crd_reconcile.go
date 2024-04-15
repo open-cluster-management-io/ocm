@@ -80,9 +80,9 @@ func (c *crdReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 		},
 		hubCRDResourceFiles...); err != nil {
 		meta.SetStatusCondition(&cm.Status.Conditions, metav1.Condition{
-			Type:    clusterManagerApplied,
+			Type:    operatorapiv1.ConditionClusterManagerApplied,
 			Status:  metav1.ConditionFalse,
-			Reason:  "CRDApplyFaild",
+			Reason:  operatorapiv1.ReasonClusterManagerCRDApplyFailed,
 			Message: fmt.Sprintf("Failed to apply crd: %v", err),
 		})
 		return cm, reconcileStop, err
