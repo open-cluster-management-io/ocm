@@ -27,6 +27,7 @@ type receiveFn func(ctx context.Context, evt cloudevents.Event)
 type baseClient struct {
 	sync.RWMutex
 	cloudEventsOptions     options.CloudEventsOptions
+	cloudEventsProtocol    options.CloudEventsProtocol
 	cloudEventsClient      cloudevents.Client
 	cloudEventsRateLimiter flowcontrol.RateLimiter
 	receiverChan           chan int
@@ -35,7 +36,7 @@ type baseClient struct {
 
 func (c *baseClient) connect(ctx context.Context) error {
 	var err error
-	c.cloudEventsClient, err = c.cloudEventsOptions.Client(ctx)
+	c.cloudEventsClient, err = c.newCloudEventsClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -57,7 +58,8 @@ func (c *baseClient) connect(ctx context.Context) error {
 		for {
 			if cloudEventsClient == nil {
 				klog.V(4).Infof("reconnecting the cloudevents client")
-				cloudEventsClient, err = c.cloudEventsOptions.Client(ctx)
+
+				c.cloudEventsClient, err = c.newCloudEventsClient(ctx)
 				// TODO enhance the cloudevents SKD to avoid wrapping the error type to distinguish the net connection
 				// errors
 				if err != nil {
@@ -77,6 +79,9 @@ func (c *baseClient) connect(ctx context.Context) error {
 
 			select {
 			case <-ctx.Done():
+				if c.receiverChan != nil {
+					close(c.receiverChan)
+				}
 				return
 			case err, ok := <-c.cloudEventsOptions.ErrorChan():
 				if !ok {
@@ -90,7 +95,12 @@ func (c *baseClient) connect(ctx context.Context) error {
 				// client to nil and retry
 				c.sendReceiverSignal(stopReceiverSignal)
 
+				err = c.cloudEventsProtocol.Close(ctx)
+				if err != nil {
+					runtime.HandleError(fmt.Errorf("failed to close the cloudevents protocol, %v", err))
+				}
 				cloudEventsClient = nil
+
 				c.resetClient(cloudEventsClient)
 
 				<-wait.RealTimer(delayFn()).C()
@@ -167,7 +177,6 @@ func (c *baseClient) subscribe(ctx context.Context, receive receiveFn) {
 			select {
 			case <-ctx.Done():
 				receiverCancel()
-				close(c.receiverChan)
 				return
 			case signal, ok := <-c.receiverChan:
 				if !ok {
@@ -218,4 +227,17 @@ func (c *baseClient) sendReconnectedSignal() {
 	c.RLock()
 	defer c.RUnlock()
 	c.reconnectedChan <- struct{}{}
+}
+
+func (c *baseClient) newCloudEventsClient(ctx context.Context) (cloudevents.Client, error) {
+	var err error
+	c.cloudEventsProtocol, err = c.cloudEventsOptions.Protocol(ctx)
+	if err != nil {
+		return nil, err
+	}
+	c.cloudEventsClient, err = cloudevents.NewClient(c.cloudEventsProtocol)
+	if err != nil {
+		return nil, err
+	}
+	return c.cloudEventsClient, nil
 }

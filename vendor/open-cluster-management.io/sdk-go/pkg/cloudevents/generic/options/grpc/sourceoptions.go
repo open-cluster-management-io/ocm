@@ -31,8 +31,8 @@ func (o *gRPCSourceOptions) WithContext(ctx context.Context, evtCtx cloudevents.
 	return ctx, nil
 }
 
-func (o *gRPCSourceOptions) Client(ctx context.Context) (cloudevents.Client, error) {
-	receiver, err := o.GetCloudEventsClient(
+func (o *gRPCSourceOptions) Protocol(ctx context.Context) (options.CloudEventsProtocol, error) {
+	receiver, err := o.GetCloudEventsProtocol(
 		ctx,
 		func(err error) {
 			o.errorChan <- err

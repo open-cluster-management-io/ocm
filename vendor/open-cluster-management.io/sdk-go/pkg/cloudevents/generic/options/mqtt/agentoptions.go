@@ -82,7 +82,7 @@ func (o *mqttAgentOptions) WithContext(ctx context.Context, evtCtx cloudevents.E
 	return cloudeventscontext.WithTopic(ctx, eventsTopic), nil
 }
 
-func (o *mqttAgentOptions) Client(ctx context.Context) (cloudevents.Client, error) {
+func (o *mqttAgentOptions) Protocol(ctx context.Context) (options.CloudEventsProtocol, error) {
 	subscribe := &paho.Subscribe{
 		Subscriptions: map[string]paho.SubscribeOptions{
 			// TODO support multiple sources, currently the client require the source events topic has a sourceID, in
@@ -97,7 +97,7 @@ func (o *mqttAgentOptions) Client(ctx context.Context) (cloudevents.Client, erro
 		subscribe.Subscriptions[o.Topics.SourceBroadcast] = paho.SubscribeOptions{QoS: byte(o.SubQoS)}
 	}
 
-	receiver, err := o.GetCloudEventsClient(
+	return o.GetCloudEventsProtocol(
 		ctx,
 		fmt.Sprintf("%s-client", o.agentID),
 		func(err error) {
@@ -106,10 +106,6 @@ func (o *mqttAgentOptions) Client(ctx context.Context) (cloudevents.Client, erro
 		cloudeventsmqtt.WithPublish(&paho.Publish{QoS: byte(o.PubQoS)}),
 		cloudeventsmqtt.WithSubscribe(subscribe),
 	)
-	if err != nil {
-		return nil, err
-	}
-	return receiver, nil
 }
 
 func (o *mqttAgentOptions) ErrorChan() <-chan error {
