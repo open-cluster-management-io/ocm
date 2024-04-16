@@ -56,7 +56,6 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 	_ = addonapiv1alpha1.Install(s)
 
 	templateResources := []string{
-		"addon/addon_deployment_config.yaml",
 		"addon/addon_template.yaml",
 		"addon/cluster_management_addon.yaml",
 		"addon/cluster_role.yaml",
@@ -316,7 +315,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 		ginkgo.By("Prepare a AddOnDeploymentConfig for addon image override config")
 		gomega.Eventually(func() error {
-			return prepareImageOverrideAddOnDeploymentConfig(clusterName)
+			return prepareImageOverrideAddOnDeploymentConfig(clusterName, addonInstallNamespace)
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
@@ -425,7 +424,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 	ginkgo.It("Template type addon should be configured by addon deployment config for node placement", func() {
 		ginkgo.By("Prepare a AddOnDeploymentConfig for addon image override config")
 		gomega.Eventually(func() error {
-			return prepareNodePlacementAddOnDeploymentConfig(clusterName)
+			return prepareNodePlacementAddOnDeploymentConfig(clusterName, addonInstallNamespace)
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
@@ -565,7 +564,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 })
 
-func prepareImageOverrideAddOnDeploymentConfig(namespace string) error {
+func prepareImageOverrideAddOnDeploymentConfig(namespace, installNamespace string) error {
 	_, err := t.AddOnClinet.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
 		context.Background(), imageOverrideDeploymentConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
@@ -577,7 +576,8 @@ func prepareImageOverrideAddOnDeploymentConfig(namespace string) error {
 					Namespace: namespace,
 				},
 				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					Registries: registries,
+					Registries:            registries,
+					AgentInstallNamespace: installNamespace,
 				},
 			},
 			metav1.CreateOptions{},
@@ -595,7 +595,7 @@ func prepareImageOverrideAddOnDeploymentConfig(namespace string) error {
 	return nil
 }
 
-func prepareNodePlacementAddOnDeploymentConfig(namespace string) error {
+func prepareNodePlacementAddOnDeploymentConfig(namespace, installNamespae string) error {
 	_, err := t.AddOnClinet.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
 		context.Background(), nodePlacementDeploymentConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
@@ -611,6 +611,7 @@ func prepareNodePlacementAddOnDeploymentConfig(namespace string) error {
 						NodeSelector: nodeSelector,
 						Tolerations:  tolerations,
 					},
+					AgentInstallNamespace: installNamespae,
 				},
 			},
 			metav1.CreateOptions{},

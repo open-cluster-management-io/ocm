@@ -118,12 +118,11 @@ func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 		},
 		SupportedConfigGVRs: supportedConfigGVRs,
 		Registration: &agent.RegistrationOption{
-			CSRConfigurations: a.TemplateCSRConfigurationsFunc(),
-			PermissionConfig:  a.TemplatePermissionConfigFunc(),
-			CSRApproveCheck:   a.TemplateCSRApproveCheckFunc(),
-			CSRSign:           a.TemplateCSRSignFunc(),
-			AgentInstallNamespace: utils.AgentInstallNamespaceFromDeploymentConfigFunc(
-				utils.NewAddOnDeploymentConfigGetter(a.addonClient)),
+			CSRConfigurations:     a.TemplateCSRConfigurationsFunc(),
+			PermissionConfig:      a.TemplatePermissionConfigFunc(),
+			CSRApproveCheck:       a.TemplateCSRApproveCheckFunc(),
+			CSRSign:               a.TemplateCSRSignFunc(),
+			AgentInstallNamespace: a.TemplateAgentRegistrationNamespaceFunc,
 		},
 		AgentDeployTriggerClusterFilter: func(old, new *clusterv1.ManagedCluster) bool {
 			return utils.ClusterImageRegistriesAnnotationChanged(old, new) ||
@@ -232,4 +231,40 @@ func (a *CRDTemplateAgentAddon) getDesiredAddOnTemplateInner(
 	}
 
 	return template.DeepCopy(), nil
+}
+
+// TemplateAgentRegistrationNamespaceFunc reads deployment resource in the manifests and use that namespace as the default
+// registration namespace. If addonDeploymentConfig is set, uses the namespace in it.
+func (a *CRDTemplateAgentAddon) TemplateAgentRegistrationNamespaceFunc(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
+	template, err := a.getDesiredAddOnTemplateInner(addon.Name, addon.Status.ConfigReferences)
+	if err != nil {
+		return "", err
+	}
+
+	// pick the namespace of the first deployment
+	var desiredNS = "open-cluster-management-agent-addon"
+	for _, manifest := range template.Spec.AgentSpec.Workload.Manifests {
+		object := &unstructured.Unstructured{}
+		if err := object.UnmarshalJSON(manifest.Raw); err != nil {
+			a.logger.Error(err, "failed to extract the object")
+			continue
+		}
+
+		if _, err = utils.ConvertToDeployment(object); err != nil {
+			continue
+		}
+
+		desiredNS = object.GetNamespace()
+		break
+	}
+
+	overrideNs, err := utils.AgentInstallNamespaceFromDeploymentConfigFunc(
+		utils.NewAddOnDeploymentConfigGetter(a.addonClient))(addon)
+	if err != nil {
+		return "", err
+	}
+	if len(overrideNs) > 0 {
+		desiredNS = overrideNs
+	}
+	return desiredNS, nil
 }

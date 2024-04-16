@@ -18,8 +18,7 @@ import (
 )
 
 type hostedSyncer struct {
-	buildWorks func(installMode, workNamespace string, cluster *clusterv1.ManagedCluster, existingWorks []*workapiv1.ManifestWork,
-		addon *addonapiv1alpha1.ManagedClusterAddOn) (appliedWorks, deleteWorks []*workapiv1.ManifestWork, err error)
+	buildWorks buildDeployWorkFunc
 
 	applyWork func(ctx context.Context, appliedType string,
 		work *workapiv1.ManifestWork, addon *addonapiv1alpha1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
@@ -42,7 +41,10 @@ func (s *hostedSyncer) sync(ctx context.Context,
 		return addon, nil
 	}
 
-	installMode, hostingClusterName := constants.GetHostedModeInfo(addon.GetAnnotations())
+	if s.agentAddon.GetAgentAddonOptions().HostedModeInfoFunc == nil {
+		return addon, nil
+	}
+	installMode, hostingClusterName := s.agentAddon.GetAgentAddonOptions().HostedModeInfoFunc(addon, cluster)
 	if installMode != constants.InstallModeHosted {
 		// the installMode is changed from hosted to default, cleanup the hosting resources
 		if err := s.cleanupDeployWork(ctx, addon); err != nil {
@@ -115,7 +117,7 @@ func (s *hostedSyncer) sync(ctx context.Context,
 		return addon, err
 	}
 
-	deployWorks, deleteWorks, err := s.buildWorks(constants.InstallModeHosted, hostingClusterName, cluster, currentWorks, addon)
+	deployWorks, deleteWorks, err := s.buildWorks(hostingClusterName, cluster, currentWorks, addon)
 	if err != nil {
 		return addon, err
 	}
