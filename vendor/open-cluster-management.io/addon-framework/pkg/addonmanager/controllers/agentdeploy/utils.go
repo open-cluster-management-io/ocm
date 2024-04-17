@@ -260,19 +260,16 @@ func (m *managedManifest) preDeleteHookManifestWorkName(addonNamespace, addonNam
 
 // BuildDeployWorks returns the deploy manifestWorks. if there is no manifest need
 // to deploy, will return nil.
-func (b *addonWorksBuilder) BuildDeployWorks(addonWorkNamespace string,
+func (b *addonWorksBuilder) BuildDeployWorks(installMode, addonWorkNamespace string,
 	addon *addonapiv1alpha1.ManagedClusterAddOn,
 	existingWorks []workapiv1.ManifestWork,
 	objects []runtime.Object,
 	manifestOptions []workapiv1.ManifestConfigOption) (deployWorks, deleteWorks []*workapiv1.ManifestWork, err error) {
 	var deployObjects []runtime.Object
-	var owner *metav1.OwnerReference
-	installMode, _ := constants.GetHostedModeInfo(addon.GetAnnotations())
-
 	// This owner is only added to the manifestWork deployed in managed cluster ns.
 	// the manifestWork in managed cluster ns is cleaned up via the addon ownerRef, so need to add the owner.
 	// the manifestWork in hosting cluster ns is cleaned up by its controller since it and its addon cross ns.
-	owner = metav1.NewControllerRef(addon, addonapiv1alpha1.GroupVersion.WithKind("ManagedClusterAddOn"))
+	owner := metav1.NewControllerRef(addon, addonapiv1alpha1.GroupVersion.WithKind("ManagedClusterAddOn"))
 
 	var deletionOrphaningRules []workapiv1.OrphaningRule
 	for _, object := range objects {
@@ -328,18 +325,13 @@ func (b *addonWorksBuilder) BuildDeployWorks(addonWorkNamespace string,
 
 // BuildHookWork returns the preDelete manifestWork, if there is no manifest need
 // to deploy, will return nil.
-func (b *addonWorksBuilder) BuildHookWork(addonWorkNamespace string,
+func (b *addonWorksBuilder) BuildHookWork(installMode, addonWorkNamespace string,
 	addon *addonapiv1alpha1.ManagedClusterAddOn,
 	objects []runtime.Object) (hookWork *workapiv1.ManifestWork, err error) {
 	var hookManifests []workapiv1.Manifest
 	var hookManifestConfigs []workapiv1.ManifestConfigOption
-	var owner *metav1.OwnerReference
-	installMode, _ := constants.GetHostedModeInfo(addon.GetAnnotations())
 
-	// only set addon as the owner of works in default mode. should not set owner in hosted mode.
-	if installMode == constants.InstallModeDefault {
-		owner = metav1.NewControllerRef(addon, addonapiv1alpha1.GroupVersion.WithKind("ManagedClusterAddOn"))
-	}
+	owner := metav1.NewControllerRef(addon, addonapiv1alpha1.GroupVersion.WithKind("ManagedClusterAddOn"))
 
 	for _, object := range objects {
 		deployable, err := b.processor.deployable(b.hostedModeEnabled, installMode, object)
@@ -367,7 +359,9 @@ func (b *addonWorksBuilder) BuildHookWork(addonWorkNamespace string,
 	}
 
 	hookWork = newManifestWork(addon.Namespace, addon.Name, addonWorkNamespace, hookManifests, b.processor.preDeleteHookManifestWorkName)
-	if owner != nil {
+
+	// This owner is only added to the manifestWork deployed in managed cluster ns.
+	if addon.Namespace == addonWorkNamespace {
 		hookWork.OwnerReferences = []metav1.OwnerReference{*owner}
 	}
 	hookWork.Spec.ManifestConfigs = hookManifestConfigs

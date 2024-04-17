@@ -13,6 +13,3 @@ spec:
       name: hello-template
   - group: addon.open-cluster-management.io
     resource: addondeploymentconfigs
-    defaultConfig:
-      name: hello-template
-      namespace: << Namespace >>

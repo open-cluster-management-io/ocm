@@ -18,8 +18,7 @@ import (
 )
 
 type hostedHookSyncer struct {
-	buildWorks func(installMode, workNamespace string, cluster *clusterv1.ManagedCluster,
-		addon *addonapiv1alpha1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
+	buildWorks buildDeployHookFunc
 
 	applyWork func(ctx context.Context, appliedType string,
 		work *workapiv1.ManifestWork, addon *addonapiv1alpha1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
@@ -43,7 +42,10 @@ func (s *hostedHookSyncer) sync(ctx context.Context,
 		return addon, nil
 	}
 
-	installMode, hostingClusterName := constants.GetHostedModeInfo(addon.GetAnnotations())
+	if s.agentAddon.GetAgentAddonOptions().HostedModeInfoFunc == nil {
+		return addon, nil
+	}
+	installMode, hostingClusterName := s.agentAddon.GetAgentAddonOptions().HostedModeInfoFunc(addon, cluster)
 	if installMode != constants.InstallModeHosted {
 		return addon, nil
 	}
@@ -70,7 +72,7 @@ func (s *hostedHookSyncer) sync(ctx context.Context,
 		addonRemoveFinalizer(addon, addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer)
 		return addon, nil
 	}
-	hookWork, err := s.buildWorks(constants.InstallModeHosted, hostingClusterName, cluster, addon)
+	hookWork, err := s.buildWorks(hostingClusterName, cluster, addon)
 	if err != nil {
 		return addon, err
 	}

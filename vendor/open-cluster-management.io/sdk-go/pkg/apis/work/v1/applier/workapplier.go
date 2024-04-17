@@ -128,7 +128,7 @@ func (w *WorkApplier) Delete(ctx context.Context, namespace, name string) error 
 }
 
 func shouldUpdateMap(required, existing map[string]string) bool {
-	if len(required) > len(existing) {
+	if len(required) != len(existing) {
 		return true
 	}
 	for key, value := range required {

@@ -7,7 +7,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -37,23 +36,29 @@ func (g *defaultAddOnDeploymentConfigGetter) Get(
 // matched addon deployment config, it will return an empty string.
 func AgentInstallNamespaceFromDeploymentConfigFunc(
 	adcgetter AddOnDeploymentConfigGetter,
-) func(*addonapiv1alpha1.ManagedClusterAddOn) string {
-	return func(addon *addonapiv1alpha1.ManagedClusterAddOn) string {
+) func(*addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
+	return func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
 		if addon == nil {
-			utilruntime.HandleError(fmt.Errorf("failed to get addon install namespace, addon is nil"))
-			return ""
+			return "", fmt.Errorf("failed to get addon install namespace, addon is nil")
 		}
 
 		config, err := GetDesiredAddOnDeploymentConfig(addon, adcgetter)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to get deployment config for addon %s: %v", addon.Name, err))
-			return ""
-		}
-		if config == nil {
-			return ""
+			return "", fmt.Errorf("failed to get deployment config for addon %s: %v", addon.Name, err)
 		}
 
-		return config.Spec.AgentInstallNamespace
+		// For now, we have no way of knowing if the addon depleoyment config is not configured, or
+		// is configured but not yet been added to the managedclusteraddon status config references,
+		// we expect no error will be returned when the addon deployment config is not configured
+		// so we can use the default namespace.
+		// TODO: Find a way to distinguish between the above two cases
+		if config == nil {
+			klog.InfoS("Addon deployment config is nil, return an empty string for agent install namespace",
+				"addonNamespace", addon.Namespace, "addonName", addon.Name)
+			return "", nil
+		}
+
+		return config.Spec.AgentInstallNamespace, nil
 	}
 }
 

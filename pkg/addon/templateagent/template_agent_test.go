@@ -27,6 +27,8 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1apha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 func TestAddonTemplateAgentManifests(t *testing.T) {
@@ -258,7 +260,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 			addonInformerFactory,
 			kubeInformers.Rbac().V1().RoleBindings().Lister(),
 			addonfactory.GetAddOnDeploymentConfigValues(
-				addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
+				utils.NewAddOnDeploymentConfigGetter(addonClient),
 				addonfactory.ToAddOnCustomizedVariableValues,
 				ToAddOnNodePlacementPrivateValues,
 				ToAddOnRegistriesPrivateValues,
@@ -279,10 +281,8 @@ func TestAgentInstallNamespace(t *testing.T) {
 	addonName := "hello"
 	clusterName := "cluster1"
 
-	s := runtime.NewScheme()
-	_ = scheme.AddToScheme(s)
-	_ = clusterv1apha1.Install(s)
-	_ = addonapiv1alpha1.Install(s)
+	deployment := testingcommon.NewUnstructured("apps/v1", "Deployment", "test-ns", "test")
+	deploymentRaw, _ := deployment.MarshalJSON()
 
 	cases := []struct {
 		name                       string
@@ -294,6 +294,18 @@ func TestAgentInstallNamespace(t *testing.T) {
 	}{
 		{
 			name: "install namespace is set",
+			addonTemplate: &addonapiv1alpha1.AddOnTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "hello-template",
+				},
+				Spec: addonapiv1alpha1.AddOnTemplateSpec{
+					AgentSpec: workapiv1.ManifestWorkSpec{
+						Workload: workapiv1.ManifestsTemplate{
+							Manifests: []workapiv1.Manifest{},
+						},
+					},
+				},
+			},
 			addonDeploymentConfig: &addonapiv1alpha1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "hello-config",
@@ -319,6 +331,13 @@ func TestAgentInstallNamespace(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "hello-template",
 				},
+				Spec: addonapiv1alpha1.AddOnTemplateSpec{
+					AgentSpec: workapiv1.ManifestWorkSpec{
+						Workload: workapiv1.ManifestsTemplate{
+							Manifests: []workapiv1.Manifest{},
+						},
+					},
+				},
 			},
 			managedClusterAddonBuilder: newManagedClusterAddonBuilder(
 				&addonapiv1alpha1.ManagedClusterAddOn{
@@ -328,60 +347,126 @@ func TestAgentInstallNamespace(t *testing.T) {
 					},
 				},
 			),
-			expected: "",
+			expected: "open-cluster-management-agent-addon",
+		},
+		{
+			name: "has deployment in the template",
+			addonTemplate: &addonapiv1alpha1.AddOnTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "hello-template",
+				},
+				Spec: addonapiv1alpha1.AddOnTemplateSpec{
+					AgentSpec: workapiv1.ManifestWorkSpec{
+						Workload: workapiv1.ManifestsTemplate{
+							Manifests: []workapiv1.Manifest{
+								{RawExtension: runtime.RawExtension{Raw: deploymentRaw}},
+							},
+						},
+					},
+				},
+			},
+			managedClusterAddonBuilder: newManagedClusterAddonBuilder(
+				&addonapiv1alpha1.ManagedClusterAddOn{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      addonName,
+						Namespace: clusterName,
+					},
+				},
+			),
+			expected: "test-ns",
+		},
+		{
+			name: "override deployment in the template",
+			addonTemplate: &addonapiv1alpha1.AddOnTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "hello-template",
+				},
+				Spec: addonapiv1alpha1.AddOnTemplateSpec{
+					AgentSpec: workapiv1.ManifestWorkSpec{
+						Workload: workapiv1.ManifestsTemplate{
+							Manifests: []workapiv1.Manifest{
+								{RawExtension: runtime.RawExtension{Raw: deploymentRaw}},
+							},
+						},
+					},
+				},
+			},
+			addonDeploymentConfig: &addonapiv1alpha1.AddOnDeploymentConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "hello-config",
+					Namespace: "default",
+				},
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					AgentInstallNamespace: "test-install-namespace",
+				},
+			},
+			managedClusterAddonBuilder: newManagedClusterAddonBuilder(
+				&addonapiv1alpha1.ManagedClusterAddOn{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      addonName,
+						Namespace: clusterName,
+					},
+				},
+			),
+			expected: "test-install-namespace",
 		},
 	}
 
 	for _, tc := range cases {
-		var managedClusterAddon *addonapiv1alpha1.ManagedClusterAddOn
-		var objs []runtime.Object
-		if tc.managedClusterAddonBuilder != nil {
+		t.Run(tc.name, func(t *testing.T) {
+			var managedClusterAddon *addonapiv1alpha1.ManagedClusterAddOn
+			var objs []runtime.Object
+			if tc.managedClusterAddonBuilder != nil {
+				if tc.addonTemplate != nil {
+					tc.managedClusterAddonBuilder.withAddonTemplate(tc.addonTemplate)
+					objs = append(objs, tc.addonTemplate)
+				}
+				if tc.addonDeploymentConfig != nil {
+					tc.managedClusterAddonBuilder.withAddonDeploymentConfig(tc.addonDeploymentConfig)
+					objs = append(objs, tc.addonDeploymentConfig)
+				}
+				managedClusterAddon = tc.managedClusterAddonBuilder.build()
+				objs = append(objs, managedClusterAddon)
+			}
+			hubKubeClient := fakekube.NewSimpleClientset()
+			addonClient := fakeaddon.NewSimpleClientset(objs...)
+
+			addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
+			if managedClusterAddon != nil {
+				mcaStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
+				if err := mcaStore.Add(managedClusterAddon); err != nil {
+					t.Fatal(err)
+				}
+			}
 			if tc.addonTemplate != nil {
-				tc.managedClusterAddonBuilder.withAddonTemplate(tc.addonTemplate)
-				objs = append(objs, tc.addonTemplate)
+				atStore := addonInformerFactory.Addon().V1alpha1().AddOnTemplates().Informer().GetStore()
+				if err := atStore.Add(tc.addonTemplate); err != nil {
+					t.Fatal(err)
+				}
 			}
-			if tc.addonDeploymentConfig != nil {
-				tc.managedClusterAddonBuilder.withAddonDeploymentConfig(tc.addonDeploymentConfig)
-				objs = append(objs, tc.addonDeploymentConfig)
-			}
-			managedClusterAddon = tc.managedClusterAddonBuilder.build()
-			objs = append(objs, managedClusterAddon)
-		}
-		hubKubeClient := fakekube.NewSimpleClientset()
-		addonClient := fakeaddon.NewSimpleClientset(objs...)
+			kubeInformers := kubeinformers.NewSharedInformerFactoryWithOptions(hubKubeClient, 10*time.Minute)
 
-		addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
-		if managedClusterAddon != nil {
-			mcaStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
-			if err := mcaStore.Add(managedClusterAddon); err != nil {
+			agentAddon := NewCRDTemplateAgentAddon(
+				ctx,
+				addonName,
+				hubKubeClient,
+				addonClient,
+				addonInformerFactory,
+				kubeInformers.Rbac().V1().RoleBindings().Lister(),
+				addonfactory.GetAddOnDeploymentConfigValues(
+					utils.NewAddOnDeploymentConfigGetter(addonClient),
+					addonfactory.ToAddOnCustomizedVariableValues,
+					ToAddOnNodePlacementPrivateValues,
+					ToAddOnRegistriesPrivateValues,
+				),
+			)
+
+			ns, err := agentAddon.GetAgentAddonOptions().Registration.AgentInstallNamespace(managedClusterAddon)
+			if err != nil {
 				t.Fatal(err)
 			}
-		}
-		if tc.addonTemplate != nil {
-			atStore := addonInformerFactory.Addon().V1alpha1().AddOnTemplates().Informer().GetStore()
-			if err := atStore.Add(tc.addonTemplate); err != nil {
-				t.Fatal(err)
-			}
-		}
-		kubeInformers := kubeinformers.NewSharedInformerFactoryWithOptions(hubKubeClient, 10*time.Minute)
-
-		agentAddon := NewCRDTemplateAgentAddon(
-			ctx,
-			addonName,
-			hubKubeClient,
-			addonClient,
-			addonInformerFactory,
-			kubeInformers.Rbac().V1().RoleBindings().Lister(),
-			addonfactory.GetAddOnDeploymentConfigValues(
-				addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
-				addonfactory.ToAddOnCustomizedVariableValues,
-				ToAddOnNodePlacementPrivateValues,
-				ToAddOnRegistriesPrivateValues,
-			),
-		)
-
-		ns := agentAddon.GetAgentAddonOptions().Registration.AgentInstallNamespace(managedClusterAddon)
-		assert.Equal(t, tc.expected, ns, tc.name)
+			assert.Equal(t, tc.expected, ns, tc.name)
+		})
 	}
 }
 
@@ -536,7 +621,7 @@ func TestAgentManifestConfigs(t *testing.T) {
 			addonInformerFactory,
 			kubeInformers.Rbac().V1().RoleBindings().Lister(),
 			addonfactory.GetAddOnDeploymentConfigValues(
-				addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
+				utils.NewAddOnDeploymentConfigGetter(addonClient),
 				addonfactory.ToAddOnCustomizedVariableValues,
 				ToAddOnNodePlacementPrivateValues,
 				ToAddOnRegistriesPrivateValues,

@@ -22,17 +22,14 @@ import (
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addonconfig"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addoninstall"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/agentdeploy"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/certificate"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/managementaddon"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/managementaddonconfig"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/cmaconfig"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/cmamanagedby"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/registration"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	"open-cluster-management.io/addon-framework/pkg/index"
-	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonconfiguration"
-	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonowner"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
@@ -241,33 +238,17 @@ func (a *addonManager) StartWithInformers(ctx context.Context,
 		a.addonAgents,
 	)
 
-	addonInstallController := addoninstall.NewAddonInstallController(
-		addonClient,
-		clusterInformers.Cluster().V1().ManagedClusters(),
-		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
-		a.addonAgents,
-	)
-
 	// This controller is used during migrating addons to be managed by addon-manager.
 	// This should be removed when the migration is done.
 	// The migration plan refer to https://github.com/open-cluster-management-io/ocm/issues/355.
-	managementAddonController := managementaddon.NewManagementAddonController(
+	managementAddonController := cmamanagedby.NewCMAManagedByController(
 		addonClient,
 		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 		a.addonAgents,
 		utils.FilterByAddonName(a.addonAgents),
 	)
 
-	// This is a duplicate controller in general addon-manager. This should be removed when we
-	// alway enable the addon-manager
-	addonOwnerController := addonowner.NewAddonOwnerController(
-		addonClient,
-		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
-		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
-		utils.ManagedBySelf(a.addonAgents),
-	)
-
-	var addonConfigController, managementAddonConfigController, addonConfigurationController factory.Controller
+	var addonConfigController, managementAddonConfigController factory.Controller
 	if len(a.addonConfigs) != 0 {
 		addonConfigController = addonconfig.NewAddonConfigController(
 			addonClient,
@@ -277,23 +258,12 @@ func (a *addonManager) StartWithInformers(ctx context.Context,
 			a.addonConfigs,
 			utils.FilterByAddonName(a.addonAgents),
 		)
-		managementAddonConfigController = managementaddonconfig.NewManagementAddonConfigController(
+		managementAddonConfigController = cmaconfig.NewCMAConfigController(
 			addonClient,
 			addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 			dynamicInformers,
 			a.addonConfigs,
 			utils.FilterByAddonName(a.addonAgents),
-		)
-
-		// start addonConfiguration controller, note this is to handle the case when the general addon-manager
-		// is not started, we should consider to remove this when the general addon-manager are always started.
-		// This controller will also ignore the installStrategy part.
-		addonConfigurationController = addonconfiguration.NewAddonConfigurationController(
-			addonClient,
-			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
-			addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
-			nil, nil,
-			utils.ManagedBySelf(a.addonAgents),
 		)
 	}
 
@@ -334,18 +304,13 @@ func (a *addonManager) StartWithInformers(ctx context.Context,
 
 	go deployController.Run(ctx, 1)
 	go registrationController.Run(ctx, 1)
-	go addonInstallController.Run(ctx, 1)
 	go managementAddonController.Run(ctx, 1)
 
-	go addonOwnerController.Run(ctx, 1)
 	if addonConfigController != nil {
 		go addonConfigController.Run(ctx, 1)
 	}
 	if managementAddonConfigController != nil {
 		go managementAddonConfigController.Run(ctx, 1)
-	}
-	if addonConfigurationController != nil {
-		go addonConfigurationController.Run(ctx, 1)
 	}
 	if csrApproveController != nil {
 		go csrApproveController.Run(ctx, 1)
