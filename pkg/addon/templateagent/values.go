@@ -41,7 +41,7 @@ func ToAddOnInstallNamespacePrivateValues(config addonapiv1alpha1.AddOnDeploymen
 		return nil, nil
 	}
 	return addonfactory.Values{
-		"INSTALL_NAMESPACE": config.Spec.AgentInstallNamespace,
+		InstallNamespacePrivateValueKey: config.Spec.AgentInstallNamespace,
 	}, nil
 }
 
@@ -66,11 +66,12 @@ func (a *CRDTemplateAgentAddon) getValues(
 	if err != nil {
 		return presetValues, overrideValues, privateValues, err
 	}
-	overrideValues = addonfactory.MergeValues(overrideValues, defaultValues)
+	overrideValues = addonfactory.MergeValues(defaultValues, overrideValues)
 
 	privateValuesKeys := map[string]struct{}{
-		NodePlacementPrivateValueKey: {},
-		RegistriesPrivateValueKey:    {},
+		NodePlacementPrivateValueKey:    {},
+		RegistriesPrivateValueKey:       {},
+		InstallNamespacePrivateValueKey: {},
 	}
 
 	for i := 0; i < len(a.getValuesFuncs); i++ {
@@ -96,7 +97,9 @@ func (a *CRDTemplateAgentAddon) getValues(
 	if err != nil {
 		return presetValues, overrideValues, privateValues, nil
 	}
-	overrideValues = addonfactory.MergeValues(builtinValues, overrideValues)
+	// builtinValues only contains CLUSTER_NAME, and it should override overrideValues if CLUSTER_NAME
+	// is also set in the overrideValues, since CLUSTER_NAME should not be set externally.
+	overrideValues = addonfactory.MergeValues(overrideValues, builtinValues)
 
 	for k, v := range overrideValues {
 		_, ok := v.(string)

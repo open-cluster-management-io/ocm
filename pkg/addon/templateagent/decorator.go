@@ -25,14 +25,14 @@ type namespaceDecorator struct {
 	paths map[string]string
 }
 
-func newNamespaceDecorator(configValues addonfactory.Values) *namespaceDecorator {
+func newNamespaceDecorator(privateValues addonfactory.Values) *namespaceDecorator {
 	decorator := &namespaceDecorator{
 		paths: map[string]string{
 			"ClusterRoleBinding": "subjects",
 			"RoleBinding":        "subjects",
 		},
 	}
-	namespace, ok := configValues["INSTALL_NAMESPACE"]
+	namespace, ok := privateValues[InstallNamespacePrivateValueKey]
 	if ok {
 		decorator.installNamespace = namespace.(string)
 	}
@@ -45,10 +45,9 @@ func (d *namespaceDecorator) decorate(obj *unstructured.Unstructured) (*unstruct
 		return obj, nil
 	}
 
-	// If obj has no namespace set, we do not mutate namespace assuming it is cluster scoped.
-	if len(obj.GetNamespace()) > 0 {
-		obj.SetNamespace(d.installNamespace)
-	}
+	// set namespace for all manifests, if the manifest is cluster scoped, namespace will be ignored when
+	// being applied.
+	obj.SetNamespace(d.installNamespace)
 
 	path, ok := d.paths[obj.GetKind()]
 	if !ok {
@@ -72,7 +71,7 @@ func (d *namespaceDecorator) decorate(obj *unstructured.Unstructured) (*unstruct
 			}
 		}
 	case interface{}:
-		if err := setNamespaceForObject(obj, d.installNamespace); err != nil {
+		if err := setNamespaceForObject(f, d.installNamespace); err != nil {
 			return obj, err
 		}
 	}
@@ -145,7 +144,6 @@ func newEnvironmentDecorator(orderedValues orderedValues) podTemplateSpecDecorat
 	}
 }
 func (d *environmentDecorator) decorate(pod *corev1.PodTemplateSpec) error {
-	fmt.Printf("ordered value is %v\n", d.orderedValues)
 	envVars := make([]corev1.EnvVar, len(d.orderedValues))
 	for index, value := range d.orderedValues {
 		envVars[index] = corev1.EnvVar{

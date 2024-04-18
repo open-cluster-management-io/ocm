@@ -24,8 +24,9 @@ import (
 )
 
 const (
-	NodePlacementPrivateValueKey = "__NODE_PLACEMENT"
-	RegistriesPrivateValueKey    = "__REGISTRIES"
+	NodePlacementPrivateValueKey    = "__NODE_PLACEMENT"
+	RegistriesPrivateValueKey       = "__REGISTRIES"
+	InstallNamespacePrivateValueKey = "__INSTALL_NAMESPACE"
 )
 
 // templateBuiltinValues includes the built-in values for crd template agentAddon.
@@ -170,7 +171,7 @@ func (a *CRDTemplateAgentAddon) renderObjects(
 			return objects, err
 		}
 
-		object, err = a.decorateObject(template, object, presetValues, configValues, privateValues)
+		object, err = a.decorateObject(template, object, presetValues, privateValues)
 		if err != nil {
 			return objects, err
 		}
@@ -183,16 +184,11 @@ func (a *CRDTemplateAgentAddon) decorateObject(
 	template *addonapiv1alpha1.AddOnTemplate,
 	obj *unstructured.Unstructured,
 	orderedValues orderedValues,
-	configValues, privateValues addonfactory.Values) (*unstructured.Unstructured, error) {
+	privateValues addonfactory.Values) (*unstructured.Unstructured, error) {
 	decorators := []decorator{
 		newDeploymentDecorator(a.addonName, template, orderedValues, privateValues),
-		newNamespaceDecorator(configValues),
+		newNamespaceDecorator(privateValues),
 	}
-
-	a.logger.V(4).Info("decorator",
-		"orderedValues", orderedValues,
-		"configValues", configValues,
-		"privateValues", privateValues)
 
 	var err error
 	for _, decorator := range decorators {

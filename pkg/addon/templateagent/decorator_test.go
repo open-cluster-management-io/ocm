@@ -28,14 +28,6 @@ func TestNamespaceDecorator(t *testing.T) {
 			},
 		},
 		{
-			name:      "cluster scoped",
-			object:    testingcommon.NewUnstructured("v1", "ClusterRole", "", "test"),
-			namespace: "newns",
-			validateObject: func(t *testing.T, obj *unstructured.Unstructured) {
-				testingcommon.AssertEqualNameNamespace(t, obj.GetName(), obj.GetNamespace(), "test", "")
-			},
-		},
-		{
 			name:      "namespace set",
 			object:    testingcommon.NewUnstructured("v1", "Pod", "default", "test"),
 			namespace: "newns",
@@ -127,7 +119,7 @@ func TestNamespaceDecorator(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			values := addonfactory.Values{}
 			if len(tc.namespace) > 0 {
-				values["INSTALL_NAMESPACE"] = tc.namespace
+				values[InstallNamespacePrivateValueKey] = tc.namespace
 			}
 
 			d := newNamespaceDecorator(values)
