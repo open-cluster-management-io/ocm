@@ -17,6 +17,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/common"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/utils"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/watcher"
 )
@@ -60,13 +61,10 @@ func (c *ManifestWorkSourceClient) Create(ctx context.Context, manifestWork *wor
 		return nil, err
 	}
 
-	eventDataType, err := types.ParseCloudEventsDataType(manifestWork.Annotations[common.CloudEventsDataTypeAnnotationKey])
-	if err != nil {
-		return nil, err
-	}
-
+	// TODO if we support multiple data type in future, we may need to get the data type from
+	// the cloudevents data type annotation
 	eventType := types.CloudEventsType{
-		CloudEventsDataType: *eventDataType,
+		CloudEventsDataType: payload.ManifestBundleEventDataType,
 		SubResource:         types.SubResourceSpec,
 		Action:              common.CreateRequestAction,
 	}
@@ -106,13 +104,10 @@ func (c *ManifestWorkSourceClient) Delete(ctx context.Context, name string, opts
 		return err
 	}
 
-	eventDataType, err := types.ParseCloudEventsDataType(work.Annotations[common.CloudEventsDataTypeAnnotationKey])
-	if err != nil {
-		return err
-	}
-
+	// TODO if we support multiple data type in future, we may need to get the data type from
+	// the cloudevents data type annotation
 	eventType := types.CloudEventsType{
-		CloudEventsDataType: *eventDataType,
+		CloudEventsDataType: payload.ManifestBundleEventDataType,
 		SubResource:         types.SubResourceSpec,
 		Action:              common.DeleteRequestAction,
 	}
@@ -175,13 +170,10 @@ func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt ku
 		return nil, err
 	}
 
-	eventDataType, err := types.ParseCloudEventsDataType(lastWork.Annotations[common.CloudEventsDataTypeAnnotationKey])
-	if err != nil {
-		return nil, err
-	}
-
+	// TODO if we support multiple data type in future, we may need to get the data type from
+	// the cloudevents data type annotation
 	eventType := types.CloudEventsType{
-		CloudEventsDataType: *eventDataType,
+		CloudEventsDataType: payload.ManifestBundleEventDataType,
 		SubResource:         types.SubResourceSpec,
 		Action:              common.UpdateRequestAction,
 	}

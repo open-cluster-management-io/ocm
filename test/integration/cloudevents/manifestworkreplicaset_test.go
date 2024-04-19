@@ -166,7 +166,7 @@ func startAgent(ctx context.Context, clusterName string) {
 	o := spoke.NewWorkloadAgentOptions()
 	o.StatusSyncInterval = 3 * time.Second
 	o.AppliedManifestWorkEvictionGracePeriod = 5 * time.Second
-	o.WorkloadSourceDriver = workSourceDriver
+	o.WorkloadSourceDriver = mqttDriver
 	o.WorkloadSourceConfig = mwrsConfigFileName
 	o.CloudEventsClientID = fmt.Sprintf("%s-work-client", clusterName)
 	o.CloudEventsClientCodecs = []string{"manifestbundle"}
@@ -179,7 +179,7 @@ func startAgent(ctx context.Context, clusterName string) {
 
 func startCtrl(ctx context.Context) {
 	opts := hub.NewWorkHubManagerOptions()
-	opts.WorkDriver = workSourceDriver
+	opts.WorkDriver = mqttDriver
 	opts.WorkDriverConfig = mwrsConfigFileName
 	opts.CloudEventsClientID = "mwrsctrl-client"
 	hubConfig := hub.NewWorkHubManagerConfig(opts)

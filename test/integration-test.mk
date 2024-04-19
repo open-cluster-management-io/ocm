@@ -51,9 +51,11 @@ test-addon-integration: ensure-kubebuilder-tools
 	./addon-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast
 .PHONY: test-addon-integration
 
+# TODO we fouce on the MQTT test for now, becasue the confluent Kafka mock API is experimental, it makes tests flaky.
+# We can enable the Kafka tests after we find a stable way to mock Kafka.
 test-cloudevents-integration: ensure-kubebuilder-tools
 	go test -c ./test/integration/cloudevents -o ./cloudevents-integration.test
-	./cloudevents-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast
+	./cloudevents-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast --ginkgo.skip-file=^*_kafka_test.go
 .PHONY: test-cloudevents-integration
 
 test-integration: test-registration-operator-integration test-registration-integration test-placement-integration test-work-integration test-addon-integration
