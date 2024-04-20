@@ -176,6 +176,7 @@ func TestReconcile(t *testing.T) {
 			nil,
 			hubKubeClient,
 			fakeAddonClient,
+			fakeWorkClient,
 			addonInformers,
 			clusterInformers,
 			dynamicInformerFactory,
