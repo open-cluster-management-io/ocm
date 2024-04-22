@@ -186,7 +186,7 @@ func ParseCloudEventsType(cloudEventsType string) (*CloudEventsType, error) {
 	types := strings.Split(cloudEventsType, ".")
 	length := len(types)
 	if length < 5 {
-		return nil, fmt.Errorf("unsupported cloudevents type format")
+		return nil, fmt.Errorf("unsupported cloudevents type format: %s", cloudEventsType)
 	}
 
 	subResource := EventSubResource(types[length-2])
