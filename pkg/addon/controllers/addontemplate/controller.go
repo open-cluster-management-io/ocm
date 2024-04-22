@@ -18,6 +18,7 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -198,10 +199,11 @@ func (c *addonTemplateController) runController(
 		// image overrides from cluster annotation has lower priority than from the addonDeploymentConfig
 		getValuesClosure,
 		addonfactory.GetAddOnDeploymentConfigValues(
-			addonfactory.NewAddOnDeploymentConfigGetter(c.addonClient),
+			utils.NewAddOnDeploymentConfigGetter(c.addonClient),
 			addonfactory.ToAddOnCustomizedVariableValues,
 			templateagent.ToAddOnNodePlacementPrivateValues,
 			templateagent.ToAddOnRegistriesPrivateValues,
+			templateagent.ToAddOnInstallNamespacePrivateValues,
 		),
 	)
 	err = mgr.AddAgent(agentAddon)
