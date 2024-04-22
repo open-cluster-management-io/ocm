@@ -2,7 +2,6 @@ package templateagent
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -110,12 +109,12 @@ func TestGetValues(t *testing.T) {
 		name             string
 		templateSpec     addonapiv1alpha1.AddOnTemplateSpec
 		values           addonfactory.Values
-		expectedDefault  orderedValues
+		expectedPreset   orderedValues
 		expectedOverride map[string]interface{}
 		expectedPrivate  map[string]interface{}
 	}{
 		{
-			name: "no override",
+			name: "with default value, registration set in template",
 			templateSpec: addonapiv1alpha1.AddOnTemplateSpec{
 				Registration: []addonapiv1alpha1.RegistrationSpec{
 					{
@@ -123,7 +122,7 @@ func TestGetValues(t *testing.T) {
 					},
 				},
 			},
-			expectedDefault: orderedValues{
+			expectedPreset: orderedValues{
 				{
 					name:  "HUB_KUBECONFIG",
 					value: "/managed/hub-kubeconfig/kubeconfig",
@@ -140,12 +139,12 @@ func TestGetValues(t *testing.T) {
 			expectedPrivate: map[string]interface{}{},
 		},
 		{
-			name:         "overrides builtin value",
+			name:         "without default value, registration not set in template",
 			templateSpec: addonapiv1alpha1.AddOnTemplateSpec{},
 			values: addonfactory.Values{
 				InstallNamespacePrivateValueKey: "default-ns",
 			},
-			expectedDefault: orderedValues{
+			expectedPreset: orderedValues{
 				{
 					name:  "CLUSTER_NAME",
 					value: "test-cluster",
@@ -159,13 +158,13 @@ func TestGetValues(t *testing.T) {
 			},
 		},
 		{
-			name:         "overrides public value",
+			name:         "with private and user defined values",
 			templateSpec: addonapiv1alpha1.AddOnTemplateSpec{},
 			values: addonfactory.Values{
 				InstallNamespacePrivateValueKey: "default-ns",
 				"key1":                          "value1",
 			},
-			expectedDefault: orderedValues{
+			expectedPreset: orderedValues{
 				{
 					name:  "CLUSTER_NAME",
 					value: "test-cluster",
@@ -180,20 +179,63 @@ func TestGetValues(t *testing.T) {
 			},
 		},
 		{
-			name:         "default should not be overridden",
-			templateSpec: addonapiv1alpha1.AddOnTemplateSpec{},
+			name: "default value should be overridden",
+			templateSpec: addonapiv1alpha1.AddOnTemplateSpec{
+				Registration: []addonapiv1alpha1.RegistrationSpec{
+					{
+						Type: addonapiv1alpha1.RegistrationTypeKubeClient,
+					},
+				},
+			},
 			values: addonfactory.Values{
 				InstallNamespacePrivateValueKey: "default-ns",
-				"CLUSTER_NAME":                  "another-cluster",
+				"HUB_KUBECONFIG":                "/managed/hub-kubeconfig/kubeconfig-test",
 			},
-			expectedDefault: orderedValues{
+			expectedPreset: orderedValues{
+				{
+					name:  "HUB_KUBECONFIG",
+					value: "/managed/hub-kubeconfig/kubeconfig-test",
+				},
 				{
 					name:  "CLUSTER_NAME",
 					value: "test-cluster",
 				},
 			},
 			expectedOverride: map[string]interface{}{
-				"CLUSTER_NAME": "test-cluster",
+				"HUB_KUBECONFIG": "/managed/hub-kubeconfig/kubeconfig-test",
+				"CLUSTER_NAME":   "test-cluster",
+			},
+			expectedPrivate: map[string]interface{}{
+				InstallNamespacePrivateValueKey: "default-ns",
+			},
+		},
+		{
+			name: "builtIn value should not be overridden",
+			templateSpec: addonapiv1alpha1.AddOnTemplateSpec{
+				Registration: []addonapiv1alpha1.RegistrationSpec{
+					{
+						Type: addonapiv1alpha1.RegistrationTypeKubeClient,
+					},
+				},
+			},
+			values: addonfactory.Values{
+				InstallNamespacePrivateValueKey: "default-ns",
+				"HUB_KUBECONFIG":                "/managed/hub-kubeconfig/kubeconfig-test",
+				"CLUSTER_NAME":                  "cluster1",
+			},
+			expectedPreset: orderedValues{
+				{
+					name:  "HUB_KUBECONFIG",
+					value: "/managed/hub-kubeconfig/kubeconfig-test",
+				},
+				{
+					name:  "CLUSTER_NAME",
+					value: "test-cluster",
+				},
+			},
+			expectedOverride: map[string]interface{}{
+				"HUB_KUBECONFIG": "/managed/hub-kubeconfig/kubeconfig-test",
+				"CLUSTER_NAME":   "test-cluster",
 			},
 			expectedPrivate: map[string]interface{}{
 				InstallNamespacePrivateValueKey: "default-ns",
@@ -225,21 +267,21 @@ func TestGetValues(t *testing.T) {
 				Spec:       c.templateSpec,
 			}
 
-			defaultValue, overrideValue, builtInValue, err := agentAddon.getValues(cluster, addon, addonTemplate)
+			presetValues, overrideValues, privateValues, err := agentAddon.getValues(cluster, addon, addonTemplate)
 			if err != nil {
 				t.Fatal(err)
 			}
-			fmt.Printf("defaultValue is %v\n", defaultValue)
-			if !orderedValueEquals(defaultValue, c.expectedDefault) {
-				t.Errorf("default value is not correct, expect %v, got %v", c.expectedDefault, defaultValue)
+
+			if !orderedValueEquals(presetValues, c.expectedPreset) {
+				t.Errorf("preset value is not correct, expect %v, got %v", c.expectedPreset, presetValues)
 			}
 
-			if !apiequality.Semantic.DeepEqual(overrideValue, c.expectedOverride) {
-				t.Errorf("override value is not correct, expect %v, got %v", c.expectedOverride, overrideValue)
+			if !apiequality.Semantic.DeepEqual(overrideValues, c.expectedOverride) {
+				t.Errorf("override value is not correct, expect %v, got %v", c.expectedOverride, overrideValues)
 			}
 
-			if !apiequality.Semantic.DeepEqual(builtInValue, c.expectedPrivate) {
-				t.Errorf("builtin value is not correct, expect %v, got %v", c.expectedPrivate, builtInValue)
+			if !apiequality.Semantic.DeepEqual(privateValues, c.expectedPrivate) {
+				t.Errorf("builtin value is not correct, expect %v, got %v", c.expectedPrivate, privateValues)
 			}
 		})
 	}
