@@ -24,6 +24,7 @@ import (
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
@@ -40,6 +41,7 @@ type addonTemplateController struct {
 
 	kubeConfig        *rest.Config
 	addonClient       addonv1alpha1client.Interface
+	workClient        workv1client.Interface
 	kubeClient        kubernetes.Interface
 	cmaLister         addonlisterv1alpha1.ClusterManagementAddOnLister
 	addonInformers    addoninformers.SharedInformerFactory
@@ -56,6 +58,7 @@ func NewAddonTemplateController(
 	hubKubeconfig *rest.Config,
 	hubKubeClient kubernetes.Interface,
 	addonClient addonv1alpha1client.Interface,
+	workClient workv1client.Interface,
 	addonInformers addoninformers.SharedInformerFactory,
 	clusterInformers clusterv1informers.SharedInformerFactory,
 	dynamicInformers dynamicinformer.DynamicSharedInformerFactory,
@@ -67,6 +70,7 @@ func NewAddonTemplateController(
 		kubeConfig:       hubKubeconfig,
 		kubeClient:       hubKubeClient,
 		addonClient:      addonClient,
+		workClient:       workClient,
 		cmaLister:        addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
 		addonManagers:    make(map[string]context.CancelFunc),
 		addonInformers:   addonInformers,
@@ -205,7 +209,8 @@ func (c *addonTemplateController) runController(
 		return err
 	}
 
-	err = mgr.StartWithInformers(ctx, kubeInformers, c.workInformers, c.addonInformers, c.clusterInformers, c.dynamicInformers)
+	err = mgr.StartWithInformers(ctx, c.workClient, c.workInformers.Work().V1().ManifestWorks(),
+		kubeInformers, c.addonInformers, c.clusterInformers, c.dynamicInformers)
 	if err != nil {
 		return err
 	}
