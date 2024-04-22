@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+
+	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/work"
 )
 
 const (
@@ -28,6 +30,8 @@ func NewWorkloadAgentOptions() *WorkloadAgentOptions {
 		MaxJSONRawLength:                       1024,
 		StatusSyncInterval:                     10 * time.Second,
 		AppliedManifestWorkEvictionGracePeriod: 60 * time.Minute,
+		WorkloadSourceDriver:                   cloudeventswork.ConfigTypeKube,
+		WorkloadSourceConfig:                   "/spoke/hub-kubeconfig/kubeconfig",
 	}
 }
 
