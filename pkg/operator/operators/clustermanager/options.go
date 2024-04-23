@@ -74,7 +74,9 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		kubeInformer.Apps().V1().Deployments(),
 		kubeInformer.Core().V1().ConfigMaps(),
 		controllerContext.EventRecorder,
-		o.SkipRemoveCRDs)
+		o.SkipRemoveCRDs,
+		controllerContext.OperatorNamespace,
+	)
 
 	statusController := clustermanagerstatuscontroller.NewClusterManagerStatusController(
 		operatorClient.OperatorV1().ClusterManagers(),

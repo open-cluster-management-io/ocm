@@ -24,6 +24,7 @@ rules:
     - "work-controller-sa-kubeconfig"
     - "addon-manager-controller-sa-kubeconfig"
     - "external-hub-kubeconfig"
+    - "work-driver-config"
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["create"]

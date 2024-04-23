@@ -181,6 +181,51 @@ spec:
                 description: RegistrationConfiguration contains the configuration
                   of registration
                 properties:
+                  bootstrapKubeConfigs:
+                    description: "BootstrapKubeConfigs defines the ordered list of
+                      bootstrap kubeconfigs. The order decides which bootstrap kubeconfig
+                      to use first when rebootstrap. \n When the agent loses the connection
+                      to the current hub over HubConnectionTimeoutSeconds, or the
+                      managedcluster CR is set `hubAcceptsClient=false` on the hub,
+                      the controller marks the related bootstrap kubeconfig as \"failed\".
+                      \n A failed bootstrapkubeconfig won't be used for the duration
+                      specified by SkipFailedBootstrapKubeConfigSeconds. But if the
+                      user updates the content of a failed bootstrapkubeconfig, the
+                      \"failed\" mark will be cleared."
+                    properties:
+                      localSecretsConfig:
+                        description: LocalSecretsConfig include a list of secrets
+                          that contains the kubeconfigs for ordered bootstrap kubeconifigs.
+                          The secrets must be in the same namespace where the agent
+                          controller runs.
+                        properties:
+                          hubConnectionTimeoutSeconds:
+                            default: 600
+                            description: HubConnectionTimeoutSeconds is used to set
+                              the timeout of connecting to the hub cluster. When agent
+                              loses the connection to the hub over the timeout seconds,
+                              the agent do a rebootstrap. By default is 10 mins.
+                            format: int32
+                            minimum: 180
+                            type: integer
+                          secretNames:
+                            description: SecretNames is a list of secret names. The
+                              secrets are in the same namespace where the agent controller
+                              runs.
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                      type:
+                        default: None
+                        description: Type specifies the type of priority bootstrap
+                          kubeconfigs. By default, it is set to None, representing
+                          no priority bootstrap kubeconfigs are set.
+                        enum:
+                        - None
+                        - LocalSecrets
+                        type: string
+                    type: object
                   clientCertExpirationSeconds:
                     description: clientCertExpirationSeconds represents the seconds
                       of a client certificate to expire. If it is not set or 0, the

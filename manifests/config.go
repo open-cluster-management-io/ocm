@@ -19,6 +19,8 @@ type HubConfig struct {
 	AddOnManagerImage              string
 	AddOnManagerEnabled            bool
 	MWReplicaSetEnabled            bool
+	CloudEventsDriverEnabled       bool
+	WorkDriver                     string
 	AutoApproveUsers               string
 	// ResourceRequirementResourceType is the resource requirement resource type for the cluster manager managed containers.
 	ResourceRequirementResourceType operatorapiv1.ResourceQosClass
