@@ -24,6 +24,8 @@ import (
 )
 
 const (
+	// Private value keys that are used internally by the addon template controller, should not be exposed to users.
+	// All private value keys should begin with "__"
 	NodePlacementPrivateValueKey    = "__NODE_PLACEMENT"
 	RegistriesPrivateValueKey       = "__REGISTRIES"
 	InstallNamespacePrivateValueKey = "__INSTALL_NAMESPACE"
@@ -42,8 +44,7 @@ type templateCRDBuiltinValues struct {
 // to convert it to Values by JsonStructToValues.
 // the default values can be overridden by getValuesFuncs
 type templateCRDDefaultValues struct {
-	HubKubeConfigPath     string `json:"HUB_KUBECONFIG,omitempty"`
-	ManagedKubeConfigPath string `json:"MANAGED_KUBECONFIG,omitempty"`
+	HubKubeConfigPath string `json:"HUB_KUBECONFIG,omitempty"`
 }
 
 type CRDTemplateAgentAddon struct {

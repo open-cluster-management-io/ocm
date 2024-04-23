@@ -58,8 +58,11 @@ func (a *CRDTemplateAgentAddon) getValues(
 	template *addonapiv1alpha1.AddOnTemplate,
 ) (orderedValues, map[string]interface{}, map[string]interface{}, error) {
 
+	// preset values are combined by default values and builtin values
 	presetValues := make([]keyValuePair, 0)
+	// override values are values that users can use in the template
 	overrideValues := map[string]interface{}{}
+	// private values are values that are not exposed to users
 	privateValues := map[string]interface{}{}
 
 	defaultSortedKeys, defaultValues, err := a.getDefaultValues(cluster, addon, template)
