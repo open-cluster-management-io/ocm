@@ -318,8 +318,8 @@ func TestSyncSecret(t *testing.T) {
 	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
 
 	err := tc.clusterManagerController.sync(ctx, syncContext)
-	if err == nil || err.Error() != "failed to sync secret as the source secret work-driver-config not found" {
-		t.Fatalf("Expected error 'failed to sync secret as the source secret work-driver-config not found' when sync but got, %v", err)
+	if err != nil {
+		t.Fatalf("Expected no error when sync, %v", err)
 	}
 
 	workDriverConfig := &corev1.Secret{

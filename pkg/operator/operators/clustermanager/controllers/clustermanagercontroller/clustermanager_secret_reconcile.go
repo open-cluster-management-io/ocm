@@ -8,7 +8,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
@@ -23,8 +23,8 @@ const (
 )
 
 var (
-	// secretNames is the set of secrets to be synced from source namespace to the target namespace
-	secretNames = sets.New[string]()
+	// secretNames is the slice of secrets to be synced from source namespace to the target namespace
+	secretNames = []string{}
 )
 
 type secretReconcile struct {
@@ -37,22 +37,15 @@ type secretReconcile struct {
 
 func (c *secretReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager,
 	config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
+	// create a local slice of secrets and copy the secretNames to avoid modifying the global variable
+	pendingSyncSecrets := make([]string, len(secretNames))
+	copy(pendingSyncSecrets, secretNames)
 	if config.CloudEventsDriverEnabled && config.WorkDriver != string(operatorapiv1.WorkDriverTypeKube) {
-		secretNames = secretNames.Insert(workDriverConfig)
-	} else {
-		secretNames = secretNames.Delete(workDriverConfig)
+		pendingSyncSecrets = append(pendingSyncSecrets, workDriverConfig)
 	}
 
-	for _, secretName := range secretNames.UnsortedList() {
-		// check the source secret explicitly as the 'helpers.SyncSecret' doesn't return an error
-		// when the source secret is not found.
-		if _, err := c.operatorKubeClient.CoreV1().Secrets(c.operatorNamespace).Get(ctx,
-			secretName, metav1.GetOptions{}); errors.IsNotFound(err) {
-			// TODO: set condition if the source secret doesn't exist,
-			return cm, reconcileStop,
-				fmt.Errorf("failed to sync secret as the source secret %s not found", secretName)
-		}
-
+	var syncedErrs []error
+	for _, secretName := range pendingSyncSecrets {
 		// sync the secret to target namespace
 		if _, _, err := helpers.SyncSecret(
 			ctx,
@@ -65,9 +58,13 @@ func (c *secretReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clust
 			secretName,
 			[]metav1.OwnerReference{},
 		); err != nil {
-			return cm, reconcileStop, fmt.Errorf("failed to sync secret %s: %v", secretName, err)
+			syncedErrs = append(syncedErrs, fmt.Errorf("failed to sync secret %s: %v", secretName, err))
 		}
-		// TODO: set condition to indicate if the secret is synced successfully
+	}
+
+	if len(syncedErrs) > 0 {
+		// TODO: set condition to indicate the secret sync error(s)
+		return cm, reconcileStop, utilerrors.NewAggregate(syncedErrs)
 	}
 
 	return cm, reconcileContinue, nil
@@ -75,7 +72,13 @@ func (c *secretReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clust
 
 func (c *secretReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterManager,
 	config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
-	for _, secretName := range secretNames.UnsortedList() {
+	// create a local slice of secrets and copy the secretNames to avoid modifying the global variable
+	pendingCleanSecrets := make([]string, len(secretNames))
+	copy(pendingCleanSecrets, secretNames)
+	if config.CloudEventsDriverEnabled && config.WorkDriver != string(operatorapiv1.WorkDriverTypeKube) {
+		pendingCleanSecrets = append(pendingCleanSecrets, workDriverConfig)
+	}
+	for _, secretName := range pendingCleanSecrets {
 		if err := c.hubKubeClient.CoreV1().Secrets(config.ClusterManagerNamespace).Delete(ctx,
 			secretName, metav1.DeleteOptions{}); err != nil {
 			if errors.IsNotFound(err) {
