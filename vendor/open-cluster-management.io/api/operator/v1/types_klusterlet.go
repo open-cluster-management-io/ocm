@@ -162,6 +162,52 @@ type RegistrationConfiguration struct {
 	// +optional
 	// +kubebuilder:default:=100
 	KubeAPIBurst int32 `json:"kubeAPIBurst,omitempty"`
+
+	// BootstrapKubeConfigs defines the ordered list of bootstrap kubeconfigs. The order decides which bootstrap kubeconfig to use first when rebootstrap.
+	//
+	// When the agent loses the connection to the current hub over HubConnectionTimeoutSeconds, or the managedcluster CR
+	// is set `hubAcceptsClient=false` on the hub, the controller marks the related bootstrap kubeconfig as "failed".
+	//
+	// A failed bootstrapkubeconfig won't be used for the duration specified by SkipFailedBootstrapKubeConfigSeconds.
+	// But if the user updates the content of a failed bootstrapkubeconfig, the "failed" mark will be cleared.
+	// +optional
+	BootstrapKubeConfigs BootstrapKubeConfigs `json:"bootstrapKubeConfigs,omitempty"`
+}
+
+type TypeBootstrapKubeConfigs string
+
+const (
+	LocalSecrets TypeBootstrapKubeConfigs = "LocalSecrets"
+	None         TypeBootstrapKubeConfigs = "None"
+)
+
+type BootstrapKubeConfigs struct {
+	// Type specifies the type of priority bootstrap kubeconfigs.
+	// By default, it is set to None, representing no priority bootstrap kubeconfigs are set.
+	// +required
+	// +kubebuilder:default:=None
+	// +kubebuilder:validation:Enum=None;LocalSecrets
+	Type TypeBootstrapKubeConfigs `json:"type,omitempty"`
+
+	// LocalSecretsConfig include a list of secrets that contains the kubeconfigs for ordered bootstrap kubeconifigs.
+	// The secrets must be in the same namespace where the agent controller runs.
+	// +optional
+	LocalSecrets LocalSecretsConfig `json:"localSecretsConfig,omitempty"`
+}
+
+type LocalSecretsConfig struct {
+	// SecretNames is a list of secret names. The secrets are in the same namespace where the agent controller runs.
+	// +required
+	// +kubebuilder:validation:minItems=2
+	SecretNames []string `json:"secretNames"`
+
+	// HubConnectionTimeoutSeconds is used to set the timeout of connecting to the hub cluster.
+	// When agent loses the connection to the hub over the timeout seconds, the agent do a rebootstrap.
+	// By default is 10 mins.
+	// +optional
+	// +kubebuilder:default:=600
+	// +kubebuilder:validation:Minimum=180
+	HubConnectionTimeoutSeconds int32 `json:"hubConnectionTimeoutSeconds,omitempty"`
 }
 
 type WorkAgentConfiguration struct {

@@ -31,6 +31,7 @@ import (
 
 	fakeoperatorlient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
+	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
@@ -75,6 +76,7 @@ func newClusterManager(name string) *operatorapiv1.ClusterManager {
 			},
 			WorkConfiguration: &operatorapiv1.WorkConfiguration{
 				FeatureGates: []operatorapiv1.FeatureGate{featureGate},
+				WorkDriver:   operatorapiv1.WorkDriverTypeKube,
 			},
 		},
 	}
@@ -296,6 +298,56 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.Cl
 		if strings.Contains(o.Name, "addon-manager") && hubCore.Spec.AddOnManagerImagePullSpec != o.Spec.Template.Spec.Containers[0].Image {
 			t.Errorf("AddOnManager image does not match to the expected.")
 		}
+	}
+}
+
+func TestSyncSecret(t *testing.T) {
+	operatorNamespace := metav1.NamespaceDefault
+	clusterManager := newClusterManager("testhub")
+	clusterManager.Spec.WorkConfiguration.FeatureGates = append(clusterManager.Spec.WorkConfiguration.FeatureGates,
+		operatorapiv1.FeatureGate{
+			Feature: string(ocmfeature.CloudEventsDrivers),
+			Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+		})
+	clusterManager.Spec.WorkConfiguration.WorkDriver = operatorapiv1.WorkDriverTypeGrpc
+	tc := newTestController(t, clusterManager)
+	tc.clusterManagerController.operatorNamespace = operatorNamespace
+	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
+	setup(t, tc, nil)
+
+	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
+
+	err := tc.clusterManagerController.sync(ctx, syncContext)
+	if err != nil {
+		t.Fatalf("Expected no error when sync, %v", err)
+	}
+
+	workDriverConfig := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "work-driver-config",
+		},
+		Data: map[string][]byte{
+			"config.yaml": []byte("url: grpc.example.com:8443"),
+		},
+	}
+
+	if _, err = tc.managementKubeClient.CoreV1().Secrets(operatorNamespace).Create(ctx, workDriverConfig, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create work driver config secret: %v", err)
+	}
+
+	err = tc.clusterManagerController.sync(ctx, syncContext)
+	if err != nil {
+		t.Fatalf("Expected no error when sync, %v", err)
+	}
+
+	// TODO: add test for secret sync condition
+	syncedSecret, err := tc.hubKubeClient.CoreV1().Secrets(clusterManagerNamespace).Get(ctx, "work-driver-config", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get synced work driver config secret: %v", err)
+	}
+
+	if string(syncedSecret.Data["config.yaml"]) != "url: grpc.example.com:8443" {
+		t.Fatalf("Expected secret data to be url: grpc.example.com:8443")
 	}
 }
 

@@ -58,7 +58,8 @@ type clusterManagerController struct {
 		mwctrEnabled, addonManagerEnabled bool) error
 	generateHubClusterClients func(hubConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface,
 		migrationclient.StorageVersionMigrationsGetter, error)
-	skipRemoveCRDs bool
+	skipRemoveCRDs    bool
+	operatorNamespace string
 }
 
 type clusterManagerReconcile interface {
@@ -83,6 +84,7 @@ func NewClusterManagerController(
 	configMapInformer corev1informers.ConfigMapInformer,
 	recorder events.Recorder,
 	skipRemoveCRDs bool,
+	operatorNamespace string,
 ) factory.Controller {
 	controller := &clusterManagerController{
 		operatorKubeClient: operatorKubeClient,
@@ -97,6 +99,7 @@ func NewClusterManagerController(
 		ensureSAKubeconfigs:       ensureSAKubeconfigs,
 		cache:                     resourceapply.NewResourceCache(),
 		skipRemoveCRDs:            skipRemoveCRDs,
+		operatorNamespace:         operatorNamespace,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -132,6 +135,12 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		return err
 	}
 
+	// default driver is kube
+	workDriver := operatorapiv1.WorkDriverTypeKube
+	if clusterManager.Spec.WorkConfiguration != nil && clusterManager.Spec.WorkConfiguration.WorkDriver != "" {
+		workDriver = clusterManager.Spec.WorkConfiguration.WorkDriver
+	}
+
 	// This config is used to render template of manifests.
 	config := manifests.HubConfig{
 		ClusterManagerName:      clusterManager.Name,
@@ -150,6 +159,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		},
 		ResourceRequirementResourceType: helpers.ResourceType(clusterManager),
 		ResourceRequirements:            resourceRequirements,
+		WorkDriver:                      string(workDriver),
 	}
 
 	var registrationFeatureMsgs, workFeatureMsgs, addonFeatureMsgs string
@@ -169,6 +179,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	}
 	config.WorkFeatureGates, workFeatureMsgs = helpers.ConvertToFeatureGateFlags("Work", workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates)
 	config.MWReplicaSetEnabled = helpers.FeatureGateEnabled(workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.ManifestWorkReplicaSet)
+	config.CloudEventsDriverEnabled = helpers.FeatureGateEnabled(workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.CloudEventsDrivers)
 
 	var addonFeatureGates []operatorapiv1.FeatureGate
 	if clusterManager.Spec.AddOnManagerConfiguration != nil {
@@ -211,6 +222,8 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	reconcilers := []clusterManagerReconcile{
 		&crdReconcile{cache: n.cache, recorder: n.recorder, hubAPIExtensionClient: hubApiExtensionClient,
 			hubMigrationClient: hubMigrationClient, skipRemoveCRDs: n.skipRemoveCRDs},
+		&secretReconcile{cache: n.cache, recorder: n.recorder, operatorKubeClient: n.operatorKubeClient,
+			hubKubeClient: hubClient, operatorNamespace: n.operatorNamespace},
 		&hubReoncile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient},
 		&runtimeReconcile{cache: n.cache, recorder: n.recorder, hubKubeConfig: hubKubeConfig, hubKubeClient: hubClient,
 			kubeClient: managementClient, ensureSAKubeconfigs: n.ensureSAKubeconfigs},

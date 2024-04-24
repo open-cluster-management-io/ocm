@@ -46,7 +46,13 @@ spec:
         args:
           - "/work"
           - "manager"
-          - "--work-driver=kube"
+          {{ if .CloudEventsDriverEnabled }}
+          - "--work-driver={{ .WorkDriver }}"
+          {{ if ne .WorkDriver "kube" }}
+          - "--cloudevents-client-id=work-controller-$(POD_NAME)"
+          - "--work-driver-config=/var/run/secrets/work/config.yaml"
+          {{ end }}
+          {{ end }}
           {{ if .HostedMode }}
           - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
           {{ end }}
@@ -97,6 +103,11 @@ spec:
           name: kubeconfig
           readOnly: true
         {{ end }}
+        {{ if and .CloudEventsDriverEnabled (ne .WorkDriver "kube") }}
+        - mountPath: /var/run/secrets/work
+          name: workdriverconfig
+          readOnly: true
+        {{ end }}
       volumes:
       - name: tmpdir
         emptyDir: { }
@@ -104,4 +115,9 @@ spec:
       - name: kubeconfig
         secret:
           secretName: work-controller-sa-kubeconfig
+      {{ end }}
+      {{ if and .CloudEventsDriverEnabled (ne .WorkDriver "kube") }}
+      - name: workdriverconfig
+        secret:
+          secretName: work-driver-config
       {{ end }}
