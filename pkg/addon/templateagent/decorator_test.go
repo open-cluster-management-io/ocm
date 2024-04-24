@@ -3,6 +3,7 @@ package templateagent
 import (
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -110,6 +111,32 @@ func TestNamespaceDecorator(t *testing.T) {
 					if s.Namespace != "newns" {
 						t.Errorf("namespace of subject is not correct, got %v", s)
 					}
+				}
+			},
+		},
+		{
+			name: "namespace",
+			object: func() *unstructured.Unstructured {
+				ns := &corev1.Namespace{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "Namespace",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test",
+					},
+				}
+				data, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(ns)
+				return &unstructured.Unstructured{Object: data}
+			}(),
+			namespace: "newns",
+			validateObject: func(t *testing.T, obj *unstructured.Unstructured) {
+				ns := &corev1.Namespace{}
+				err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, ns)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if ns.Name != "newns" {
+					t.Errorf("name of namespace is not correct, got %v", ns.Name)
 				}
 			},
 		},
