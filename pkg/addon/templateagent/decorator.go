@@ -22,14 +22,15 @@ type namespaceDecorator struct {
 	installNamespace string
 	// paths is the paths of a resource kind that the decorator needs to set namespace field in it.
 	// if the returned object is a list, decorator will set namespace for each item.
-	paths map[string]string
+	paths map[string][]string
 }
 
 func newNamespaceDecorator(privateValues addonfactory.Values) *namespaceDecorator {
 	decorator := &namespaceDecorator{
-		paths: map[string]string{
-			"ClusterRoleBinding": "subjects",
-			"RoleBinding":        "subjects",
+		paths: map[string][]string{
+			"ClusterRoleBinding": {"subjects", "namespace"},
+			"RoleBinding":        {"subjects", "namespace"},
+			"Namespace":          {"metadata", "name"},
 		},
 	}
 	namespace, ok := privateValues[InstallNamespacePrivateValueKey]
@@ -49,41 +50,35 @@ func (d *namespaceDecorator) decorate(obj *unstructured.Unstructured) (*unstruct
 	// being applied.
 	obj.SetNamespace(d.installNamespace)
 
-	path, ok := d.paths[obj.GetKind()]
+	paths, ok := d.paths[obj.GetKind()]
 	if !ok {
 		return obj, nil
 	}
 
-	field, found, err := unstructured.NestedFieldNoCopy(obj.Object, path)
-	if err != nil {
-		return obj, err
-	}
-	if !found {
-		return obj, fmt.Errorf("failed to find the path %s for kind %s", path, obj.GetKind())
-	}
-
-	// it cannot supported nested structure, only list or map.
-	switch f := field.(type) {
-	case []interface{}:
-		for _, item := range f {
-			if err := setNamespaceForObject(item, d.installNamespace); err != nil {
-				return obj, err
-			}
-		}
-	case interface{}:
-		if err := setNamespaceForObject(f, d.installNamespace); err != nil {
-			return obj, err
-		}
-	}
-	return obj, nil
+	err := setUnstructuredNestedField(obj.Object, d.installNamespace, paths)
+	return obj, err
 }
 
-func setNamespaceForObject(obj interface{}, namespace string) error {
-	mapVal, ok := obj.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("obj %v is not a map, cannot set", obj)
+// search the object to set the val, if an array is found, find every item in the array.
+func setUnstructuredNestedField(obj interface{}, val string, paths []string) error {
+	switch f := obj.(type) {
+	case []interface{}:
+		for _, item := range f {
+			if err := setUnstructuredNestedField(item, val, paths); err != nil {
+				return err
+			}
+		}
+	case map[string]interface{}:
+		if len(paths) == 1 {
+			f[paths[0]] = val
+			return nil
+		}
+		field, ok := f[paths[0]]
+		if !ok {
+			return fmt.Errorf("failed to find field %s", paths[0])
+		}
+		return setUnstructuredNestedField(field, val, paths[1:])
 	}
-	mapVal["namespace"] = namespace
 	return nil
 }
 
