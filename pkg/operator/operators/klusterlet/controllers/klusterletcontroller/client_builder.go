@@ -83,7 +83,7 @@ func (m *managedClusterClientsBuilder) build(ctx context.Context) (*managedClust
 	// Ensure the agent namespace for users to create the external-managed-kubeconfig secret in this
 	// namespace, so that in the next reconcile loop the controller can get the secret successfully after
 	// the secret was created.
-	if err := ensureAgentNamespace(ctx, m.kubeClient, m.secretNamespace, m.recorder); err != nil {
+	if err := ensureAgentNamespace(ctx, m.kubeClient, m.secretNamespace, map[string]string{}, m.recorder); err != nil {
 		return nil, err
 	}
 

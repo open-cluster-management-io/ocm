@@ -68,7 +68,7 @@ func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 	// TODO(zhujian7): In the future, we may consider deploy addons on the management cluster in Hosted mode.
 	addonNamespace := fmt.Sprintf("%s-addon", config.KlusterletNamespace)
 	// Ensure the addon namespace on the managed cluster
-	err := ensureNamespace(ctx, r.managedClusterClients.kubeClient, klusterlet, addonNamespace, r.recorder)
+	err := ensureKlusterletNamespace(ctx, r.managedClusterClients.kubeClient, klusterlet, addonNamespace, r.recorder)
 	if err != nil {
 		return klusterlet, reconcileStop, err
 	}
@@ -82,13 +82,9 @@ func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 		return klusterlet, reconcileStop, err
 	}
 
-	if helpers.IsHosted(config.InstallMode) {
-		// In hosted mode, we should ensure the namespace on the managed cluster since
-		// some resources(eg:service account) are still deployed on managed cluster.
-		err := ensureNamespace(ctx, r.managedClusterClients.kubeClient, klusterlet, config.KlusterletNamespace, r.recorder)
-		if err != nil {
-			return klusterlet, reconcileStop, err
-		}
+	err = ensureKlusterletNamespace(ctx, r.managedClusterClients.kubeClient, klusterlet, config.KlusterletNamespace, r.recorder)
+	if err != nil {
+		return klusterlet, reconcileStop, err
 	}
 
 	managedResource := managedStaticResourceFiles

@@ -40,6 +40,8 @@ const (
 	klusterletHostedFinalizer             = "operator.open-cluster-management.io/klusterlet-hosted-cleanup"
 	klusterletFinalizer                   = "operator.open-cluster-management.io/klusterlet-cleanup"
 	managedResourcesEvictionTimestampAnno = "operator.open-cluster-management.io/managed-resources-eviction-timestamp"
+	klusterletNamespaceLabelKey           = "operator.open-cluster-management.io/klusterlet"
+	hostedKlusterletLabelKey              = "operator.open-cluster-management.io/hosted-klusterlet"
 )
 
 type klusterletController struct {
@@ -311,6 +313,9 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			kubeClient:            n.kubeClient,
 			recorder:              controllerContext.Recorder(),
 			cache:                 n.cache},
+		&namespaceReconcile{
+			managedClusterClients: managedClusterClients,
+		},
 	}
 
 	var errs []error
@@ -369,13 +374,14 @@ func getManagedKubeConfig(ctx context.Context, kubeClient kubernetes.Interface, 
 }
 
 // ensureAgentNamespace create agent namespace if it is not exist
-func ensureAgentNamespace(ctx context.Context, kubeClient kubernetes.Interface, namespace string, recorder events.Recorder) error {
+func ensureAgentNamespace(ctx context.Context, kubeClient kubernetes.Interface, namespace string, labels map[string]string, recorder events.Recorder) error {
 	_, _, err := resourceapply.ApplyNamespace(ctx, kubeClient.CoreV1(), recorder, &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: namespace,
 			Annotations: map[string]string{
 				"workload.openshift.io/allowed": "management",
 			},
+			Labels: labels,
 		},
 	})
 	return err
@@ -405,11 +411,16 @@ func syncPullSecret(ctx context.Context, sourceClient, targetClient kubernetes.I
 	return nil
 }
 
-func ensureNamespace(ctx context.Context, kubeClient kubernetes.Interface, klusterlet *operatorapiv1.Klusterlet,
+// ensureKlusterletNamespace is to apply the namespace defined in klusterlet spec to the managed cluster
+func ensureKlusterletNamespace(ctx context.Context, kubeClient kubernetes.Interface, klusterlet *operatorapiv1.Klusterlet,
 	namespace string, recorder events.Recorder) error {
-	if err := ensureAgentNamespace(ctx, kubeClient, namespace, recorder); err != nil {
+	if err := ensureAgentNamespace(ctx, kubeClient, namespace, map[string]string{
+		klusterletNamespaceLabelKey: klusterlet.Name,
+	}, recorder); err != nil {
 		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-			Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionFalse, Reason: operatorapiv1.ReasonKlusterletApplyFailed,
+			Type:    operatorapiv1.ConditionKlusterletApplied,
+			Status:  metav1.ConditionFalse,
+			Reason:  operatorapiv1.ReasonKlusterletApplyFailed,
 			Message: fmt.Sprintf("Failed to ensure namespace %q: %v", namespace, err)})
 		return err
 	}
