@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	confluentkafka "github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
@@ -17,7 +16,6 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/kafka"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	agentclient "open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/client"
@@ -73,7 +71,6 @@ type ClientHolderBuilder struct {
 //   - Kubeconfig (*rest.Config): builds a manifestwork client with kubeconfig
 //   - MQTTOptions (*mqtt.MQTTOptions): builds a manifestwork client based on cloudevents with MQTT
 //   - GRPCOptions (*grpc.GRPCOptions): builds a manifestwork client based on cloudevents with GRPC
-//   - KafkaOptions (*kafka.KafkaOptions): builds a manifestwork client based on cloudevents with Kafka
 //
 // TODO using a specified config instead of any
 func NewClientHolderBuilder(config any) *ClientHolderBuilder {
@@ -110,8 +107,7 @@ func (b *ClientHolderBuilder) WithCodecs(codecs ...generic.Codec[*workv1.Manifes
 // WithInformerConfig set the ManifestWorkInformer configs. If the resync time is not set, the default time (10 minutes)
 // will be used when building the ManifestWorkInformer.
 func (b *ClientHolderBuilder) WithInformerConfig(
-	resyncTime time.Duration, options ...workinformers.SharedInformerOption,
-) *ClientHolderBuilder {
+	resyncTime time.Duration, options ...workinformers.SharedInformerOption) *ClientHolderBuilder {
 	b.informerResyncTime = resyncTime
 	b.informerOptions = options
 	return b
@@ -126,8 +122,6 @@ func (b *ClientHolderBuilder) NewSourceClientHolder(ctx context.Context) (*Clien
 		return b.newSourceClients(ctx, mqtt.NewSourceOptions(config, b.clientID, b.sourceID))
 	case *grpc.GRPCOptions:
 		return b.newSourceClients(ctx, grpc.NewSourceOptions(config, b.sourceID))
-	case *confluentkafka.ConfigMap:
-		return b.newSourceClients(ctx, kafka.NewSourceOptions(config, b.sourceID))
 	default:
 		return nil, fmt.Errorf("unsupported client configuration type %T", config)
 	}
@@ -142,8 +136,6 @@ func (b *ClientHolderBuilder) NewAgentClientHolder(ctx context.Context) (*Client
 		return b.newAgentClients(ctx, mqtt.NewAgentOptions(config, b.clusterName, b.clientID))
 	case *grpc.GRPCOptions:
 		return b.newAgentClients(ctx, grpc.NewAgentOptions(config, b.clusterName, b.clientID))
-	case *confluentkafka.ConfigMap:
-		return b.newAgentClients(ctx, kafka.NewAgentOptions(config, b.clusterName, b.clientID))
 	default:
 		return nil, fmt.Errorf("unsupported client configuration type %T", config)
 	}

@@ -3,8 +3,7 @@ module open-cluster-management.io/ocm
 go 1.21
 
 require (
-	github.com/cloudevents/sdk-go/v2 v2.15.3-0.20240329120647-e6a74efbacbf
-	github.com/confluentinc/confluent-kafka-go/v2 v2.3.0
+	github.com/cloudevents/sdk-go/v2 v2.15.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/evanphx/json-patch v5.9.0+incompatible
 	github.com/ghodss/yaml v1.0.0
@@ -37,7 +36,7 @@ require (
 	k8s.io/utils v0.0.0-20240310230437-4693a0247e57
 	open-cluster-management.io/addon-framework v0.9.1-0.20240419070222-e703fc5a2556
 	open-cluster-management.io/api v0.13.1-0.20240419062633-aacb530ea4ad
-	open-cluster-management.io/sdk-go v0.13.1-0.20240422015316-b61db1fa9e71
+	open-cluster-management.io/sdk-go v0.13.1-0.20240416062924-20307e6fe090
 	sigs.k8s.io/controller-runtime v0.17.3
 	sigs.k8s.io/kube-storage-version-migrator v0.0.6-0.20230721195810-5c8923c5ff96
 )
@@ -55,7 +54,6 @@ require (
 	github.com/bwmarrin/snowflake v0.3.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20240413090539-7fef29478991 // indirect
 	github.com/cloudevents/sdk-go/protocol/mqtt_paho/v2 v2.0.0-20231030012137-0836a524e995 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
@@ -93,8 +91,6 @@ require (
 	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
-	github.com/moby/patternmatcher v0.6.0 // indirect
-	github.com/moby/sys/sequential v0.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
