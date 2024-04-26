@@ -9,10 +9,8 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/yaml.v2"
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -27,34 +25,20 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 
-	"open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
-	"open-cluster-management.io/ocm/pkg/work/spoke"
+	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/test/integration/cloudevents/source"
-	"open-cluster-management.io/ocm/test/integration/util"
 )
-
-type sourceInfoGetter func() (workclientset.Interface, string, string, string)
-type clusterNameGetter func() string
-
-type kafkaClusterNameGenerator struct{ count int }
-
-func (g *kafkaClusterNameGenerator) generate() string {
-	g.count = g.count + 1
-	return fmt.Sprintf("kafka%d", g.count)
-}
 
 const (
 	eventuallyTimeout  = 60 // seconds
 	eventuallyInterval = 1  // seconds
-	cm1, cm2, cm3, cm4 = "cm1", "cm2", "cm3", "cm4"
+	cm1, cm2           = "cm1", "cm2"
 )
 
 // TODO consider to use one integration with work integration
-const (
-	mqttDriver  = "mqtt"
-	kafkaDriver = "kafka"
-)
+// focus on source is a MQTT broker
+const workSourceDriver = "mqtt"
 
 var tempDir string
 
@@ -62,13 +46,10 @@ var testEnv *envtest.Environment
 var envCtx context.Context
 var envCancel context.CancelFunc
 
-var mqttSource source.Source
-var mqttSourceConfigPath string
-var mqttSourceWorkClient workclientset.Interface
-
-var kafkaSource source.Source
-var kafkaSourceConfigPath string
-var kafkaSourceWorkClient workclientset.Interface
+var workSource source.Source
+var workSourceConfigFileName string
+var workSourceWorkClient workclientset.Interface
+var workSourceHash string
 
 var mwrsConfigFileName string
 
@@ -79,8 +60,6 @@ var hubWorkClient workclientset.Interface
 var spokeRestConfig *rest.Config
 var spokeKubeClient kubernetes.Interface
 var spokeWorkClient workclientset.Interface
-
-var kClusterNameGenerator *kafkaClusterNameGenerator = &kafkaClusterNameGenerator{}
 
 var CRDPaths = []string{
 	// hub
@@ -134,37 +113,38 @@ var _ = ginkgo.BeforeSuite(func() {
 	hubWorkClient, err = workclientset.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	// create source client with mqtt
-	mqttSourceConfigPath = path.Join(tempDir, "mqttconfig")
-	mqttSource = source.NewMQTTSource(mqttSourceConfigPath)
-	err = mqttSource.Start(envCtx)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	mqttSourceWorkClient = mqttSource.Workclientset()
-	gomega.Expect(mqttSourceWorkClient).ToNot(gomega.BeNil())
+	switch workSourceDriver {
+	case "mqtt":
+		// create mqttconfig file for source in a tmp dir
+		workSourceConfigFileName = path.Join(tempDir, "mqttconfig")
 
-	// create source client with kafka
-	kafkaSourceConfigPath = path.Join(tempDir, "kafkaconfig")
-	kafkaSource = source.NewKafkaSource(kafkaSourceConfigPath)
-	err = kafkaSource.Start(envCtx)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	kafkaSourceWorkClient = kafkaSource.Workclientset()
-	gomega.Expect(kafkaSourceWorkClient).ToNot(gomega.BeNil())
+		workSource = source.NewMQTTSource(workSourceConfigFileName)
+		err := workSource.Start(envCtx)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	// create mqttconfig file for mwrsctrl in a tmp dir
-	mwrsConfigFileName = path.Join(tempDir, "mwrsctrl-mqttconfig")
-	config := mqtt.MQTTConfig{
-		BrokerHost: mqttSource.Host(),
-		Topics: &types.Topics{
-			SourceEvents:    "sources/mwrsctrl/clusters/+/sourceevents",
-			AgentEvents:     "sources/mwrsctrl/clusters/+/agentevents",
-			SourceBroadcast: "sources/mwrsctrl/sourcebroadcast",
-		},
+		workSourceHash = helper.HubHash(workSource.Host())
+
+		workSourceWorkClient = workSource.Workclientset()
+		gomega.Expect(workSourceWorkClient).ToNot(gomega.BeNil())
+
+		// create mqttconfig file for mwrsctrl in a tmp dir
+		mwrsConfigFileName = path.Join(tempDir, "mwrsctrl-mqttconfig")
+		config := mqtt.MQTTConfig{
+			BrokerHost: workSource.Host(),
+			Topics: &types.Topics{
+				SourceEvents:    "sources/mwrsctrl/clusters/+/sourceevents",
+				AgentEvents:     "sources/mwrsctrl/clusters/+/agentevents",
+				SourceBroadcast: "sources/mwrsctrl/sourcebroadcast",
+			},
+		}
+
+		configData, err := yaml.Marshal(config)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		err = os.WriteFile(mwrsConfigFileName, configData, 0600)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	default:
+		ginkgo.AbortSuite(fmt.Sprintf("unsupported source driver: %s", workSourceDriver))
 	}
-	configData, err := yaml.Marshal(config)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	err = os.WriteFile(mwrsConfigFileName, configData, 0600)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
 })
 
 var _ = ginkgo.AfterSuite(func() {
@@ -172,10 +152,7 @@ var _ = ginkgo.AfterSuite(func() {
 
 	envCancel()
 
-	err := mqttSource.Stop()
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-	err = kafkaSource.Stop()
+	err := workSource.Stop()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	err = testEnv.Stop()
@@ -185,29 +162,3 @@ var _ = ginkgo.AfterSuite(func() {
 		os.RemoveAll(tempDir)
 	}
 })
-
-func runWorkAgent(ctx context.Context, o *spoke.WorkloadAgentOptions, commOption *options.AgentOptions) {
-	agentConfig := spoke.NewWorkAgentConfig(commOption, o)
-	err := agentConfig.RunWorkloadAgent(ctx, &controllercmd.ControllerContext{
-		KubeConfig:    spokeRestConfig,
-		EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
-	})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-}
-
-func mqttSourceInfo() (workclientset.Interface, string, string, string) {
-	return mqttSourceWorkClient, mqttDriver, mqttSourceConfigPath, mqttSource.Hash()
-}
-
-func kafkaSourceInfo() (workclientset.Interface, string, string, string) {
-	return kafkaSourceWorkClient, kafkaDriver, kafkaSourceConfigPath, kafkaSource.Hash()
-}
-
-func clusterName() string {
-	return utilrand.String(5)
-}
-
-func toAppliedManifestWorkName(hash string, work *workapiv1.ManifestWork) string {
-	// if the source is not kube, the uid will be used as the manifestwork name
-	return fmt.Sprintf("%s-%s", hash, work.UID)
-}
