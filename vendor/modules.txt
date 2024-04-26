@@ -35,13 +35,10 @@ github.com/cenkalti/backoff/v4
 # github.com/cespare/xxhash/v2 v2.2.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
-# github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20240413090539-7fef29478991
-## explicit; go 1.18
-github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2
 # github.com/cloudevents/sdk-go/protocol/mqtt_paho/v2 v2.0.0-20231030012137-0836a524e995
 ## explicit; go 1.18
 github.com/cloudevents/sdk-go/protocol/mqtt_paho/v2
-# github.com/cloudevents/sdk-go/v2 v2.15.3-0.20240329120647-e6a74efbacbf
+# github.com/cloudevents/sdk-go/v2 v2.15.2
 ## explicit; go 1.18
 github.com/cloudevents/sdk-go/v2
 github.com/cloudevents/sdk-go/v2/binding
@@ -57,10 +54,6 @@ github.com/cloudevents/sdk-go/v2/event/datacodec/xml
 github.com/cloudevents/sdk-go/v2/protocol
 github.com/cloudevents/sdk-go/v2/protocol/http
 github.com/cloudevents/sdk-go/v2/types
-# github.com/confluentinc/confluent-kafka-go/v2 v2.3.0
-## explicit; go 1.17
-github.com/confluentinc/confluent-kafka-go/v2/kafka
-github.com/confluentinc/confluent-kafka-go/v2/kafka/librdkafka_vendor
 # github.com/coreos/go-semver v0.3.1
 ## explicit; go 1.8
 github.com/coreos/go-semver/semver
@@ -240,10 +233,6 @@ github.com/mitchellh/copystructure
 # github.com/mitchellh/reflectwalk v1.0.2
 ## explicit
 github.com/mitchellh/reflectwalk
-# github.com/moby/patternmatcher v0.6.0
-## explicit; go 1.19
-# github.com/moby/sys/sequential v0.5.0
-## explicit; go 1.17
 # github.com/mochi-mqtt/server/v2 v2.4.6
 ## explicit; go 1.21
 github.com/mochi-mqtt/server/v2
@@ -1589,7 +1578,7 @@ open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/utils/work/v1/workvalidator
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v0.13.1-0.20240422015316-b61db1fa9e71
+# open-cluster-management.io/sdk-go v0.13.1-0.20240416062924-20307e6fe090
 ## explicit; go 1.21
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
@@ -1602,7 +1591,6 @@ open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protobuf/v1
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protocol
-open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/kafka
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types
