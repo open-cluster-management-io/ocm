@@ -1,0 +1,520 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  name: clustermanagers.operator.open-cluster-management.io
+spec:
+  group: operator.open-cluster-management.io
+  names:
+    kind: ClusterManager
+    listKind: ClusterManagerList
+    plural: clustermanagers
+    singular: clustermanager
+  scope: Cluster
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: ClusterManager configures the controllers on the hub that govern
+          registration and work distribution for attached Klusterlets. In Default
+          mode, ClusterManager will only be deployed in open-cluster-management-hub
+          namespace. In Hosted mode, ClusterManager will be deployed in the namespace
+          with the same name as cluster manager.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            default:
+              deployOption:
+                mode: Default
+            description: Spec represents a desired deployment configuration of controllers
+              that govern registration and work distribution for attached Klusterlets.
+            properties:
+              addOnManagerConfiguration:
+                description: AddOnManagerConfiguration contains the configuration
+                  of addon manager
+                properties:
+                  featureGates:
+                    description: 'FeatureGates represents the list of feature gates
+                      for addon manager If it is set empty, default feature gates
+                      will be used. If it is set, featuregate/Foo is an example of
+                      one item in FeatureGates: 1. If featuregate/Foo does not exist,
+                      registration-operator will discard it 2. If featuregate/Foo
+                      exists and is false by default. It is now possible to set featuregate/Foo=[false|true]
+                      3. If featuregate/Foo exists and is true by default. If a cluster-admin
+                      upgrading from 1 to 2 wants to continue having featuregate/Foo=false,
+                      he can set featuregate/Foo=false before upgrading. Let''s say
+                      the cluster-admin wants featuregate/Foo=false.'
+                    items:
+                      properties:
+                        feature:
+                          description: Feature is the key of feature gate. e.g. featuregate/Foo.
+                          type: string
+                        mode:
+                          default: Disable
+                          description: Mode is either Enable, Disable, "" where ""
+                            is Disable by default. In Enable mode, a valid feature
+                            gate `featuregate/Foo` will be set to "--featuregate/Foo=true".
+                            In Disable mode, a valid feature gate `featuregate/Foo`
+                            will be set to "--featuregate/Foo=false".
+                          enum:
+                          - Enable
+                          - Disable
+                          type: string
+                      required:
+                      - feature
+                      type: object
+                    type: array
+                type: object
+              addOnManagerImagePullSpec:
+                default: quay.io/open-cluster-management/addon-manager
+                description: AddOnManagerImagePullSpec represents the desired image
+                  configuration of addon manager controller/webhook installed on hub.
+                type: string
+              deployOption:
+                default:
+                  mode: Default
+                description: DeployOption contains the options of deploying a cluster-manager
+                  Default mode is used if DeployOption is not set.
+                properties:
+                  hosted:
+                    description: Hosted includes configurations we need for clustermanager
+                      in the Hosted mode.
+                    properties:
+                      registrationWebhookConfiguration:
+                        description: RegistrationWebhookConfiguration represents the
+                          customized webhook-server configuration of registration.
+                        properties:
+                          address:
+                            description: Address represents the address of a webhook-server.
+                              It could be in IP format or fqdn format. The Address
+                              must be reachable by apiserver of the hub cluster.
+                            pattern: ^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$
+                            type: string
+                          port:
+                            default: 443
+                            description: Port represents the port of a webhook-server.
+                              The default value of Port is 443.
+                            format: int32
+                            maximum: 65535
+                            type: integer
+                        required:
+                        - address
+                        type: object
+                      workWebhookConfiguration:
+                        description: WorkWebhookConfiguration represents the customized
+                          webhook-server configuration of work.
+                        properties:
+                          address:
+                            description: Address represents the address of a webhook-server.
+                              It could be in IP format or fqdn format. The Address
+                              must be reachable by apiserver of the hub cluster.
+                            pattern: ^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$
+                            type: string
+                          port:
+                            default: 443
+                            description: Port represents the port of a webhook-server.
+                              The default value of Port is 443.
+                            format: int32
+                            maximum: 65535
+                            type: integer
+                        required:
+                        - address
+                        type: object
+                    type: object
+                  mode:
+                    default: Default
+                    description: 'Mode can be Default or Hosted. In Default mode,
+                      the Hub is installed as a whole and all parts of Hub are deployed
+                      in the same cluster. In Hosted mode, only crd and configurations
+                      are installed on one cluster(defined as hub-cluster). Controllers
+                      run in another cluster (defined as management-cluster) and connect
+                      to the hub with the kubeconfig in secret of "external-hub-kubeconfig"(a
+                      kubeconfig of hub-cluster with cluster-admin permission). Note:
+                      Do not modify the Mode field once it''s applied.'
+                    enum:
+                    - Default
+                    - Hosted
+                    type: string
+                required:
+                - mode
+                type: object
+              nodePlacement:
+                description: NodePlacement enables explicit control over the scheduling
+                  of the deployed pods.
+                properties:
+                  nodeSelector:
+                    additionalProperties:
+                      type: string
+                    description: NodeSelector defines which Nodes the Pods are scheduled
+                      on. The default is an empty list.
+                    type: object
+                  tolerations:
+                    description: Tolerations are attached by pods to tolerate any
+                      taint that matches the triple <key,value,effect> using the matching
+                      operator <operator>. The default is an empty list.
+                    items:
+                      description: The pod this Toleration is attached to tolerates
+                        any taint that matches the triple <key,value,effect> using
+                        the matching operator <operator>.
+                      properties:
+                        effect:
+                          description: Effect indicates the taint effect to match.
+                            Empty means match all taint effects. When specified, allowed
+                            values are NoSchedule, PreferNoSchedule and NoExecute.
+                          type: string
+                        key:
+                          description: Key is the taint key that the toleration applies
+                            to. Empty means match all taint keys. If the key is empty,
+                            operator must be Exists; this combination means to match
+                            all values and all keys.
+                          type: string
+                        operator:
+                          description: Operator represents a key's relationship to
+                            the value. Valid operators are Exists and Equal. Defaults
+                            to Equal. Exists is equivalent to wildcard for value,
+                            so that a pod can tolerate all taints of a particular
+                            category.
+                          type: string
+                        tolerationSeconds:
+                          description: TolerationSeconds represents the period of
+                            time the toleration (which must be of effect NoExecute,
+                            otherwise this field is ignored) tolerates the taint.
+                            By default, it is not set, which means tolerate the taint
+                            forever (do not evict). Zero and negative values will
+                            be treated as 0 (evict immediately) by the system.
+                          format: int64
+                          type: integer
+                        value:
+                          description: Value is the taint value the toleration matches
+                            to. If the operator is Exists, the value should be empty,
+                            otherwise just a regular string.
+                          type: string
+                      type: object
+                    type: array
+                type: object
+              placementImagePullSpec:
+                default: quay.io/open-cluster-management/placement
+                description: PlacementImagePullSpec represents the desired image configuration
+                  of placement controller/webhook installed on hub.
+                type: string
+              registrationConfiguration:
+                description: RegistrationConfiguration contains the configuration
+                  of registration
+                properties:
+                  autoApproveUsers:
+                    description: AutoApproveUser represents a list of users that can
+                      auto approve CSR and accept client. If the credential of the
+                      bootstrap-hub-kubeconfig matches to the users, the cluster created
+                      by the bootstrap-hub-kubeconfig will be auto-registered into
+                      the hub cluster. This takes effect only when ManagedClusterAutoApproval
+                      feature gate is enabled.
+                    items:
+                      type: string
+                    type: array
+                  featureGates:
+                    description: 'FeatureGates represents the list of feature gates
+                      for registration If it is set empty, default feature gates will
+                      be used. If it is set, featuregate/Foo is an example of one
+                      item in FeatureGates: 1. If featuregate/Foo does not exist,
+                      registration-operator will discard it 2. If featuregate/Foo
+                      exists and is false by default. It is now possible to set featuregate/Foo=[false|true]
+                      3. If featuregate/Foo exists and is true by default. If a cluster-admin
+                      upgrading from 1 to 2 wants to continue having featuregate/Foo=false,
+                      he can set featuregate/Foo=false before upgrading. Let''s say
+                      the cluster-admin wants featuregate/Foo=false.'
+                    items:
+                      properties:
+                        feature:
+                          description: Feature is the key of feature gate. e.g. featuregate/Foo.
+                          type: string
+                        mode:
+                          default: Disable
+                          description: Mode is either Enable, Disable, "" where ""
+                            is Disable by default. In Enable mode, a valid feature
+                            gate `featuregate/Foo` will be set to "--featuregate/Foo=true".
+                            In Disable mode, a valid feature gate `featuregate/Foo`
+                            will be set to "--featuregate/Foo=false".
+                          enum:
+                          - Enable
+                          - Disable
+                          type: string
+                      required:
+                      - feature
+                      type: object
+                    type: array
+                type: object
+              registrationImagePullSpec:
+                default: quay.io/open-cluster-management/registration
+                description: RegistrationImagePullSpec represents the desired image
+                  of registration controller/webhook installed on hub.
+                type: string
+              resourceRequirement:
+                description: ResourceRequirement specify QoS classes of deployments
+                  managed by clustermanager. It applies to all the containers in the
+                  deployments.
+                properties:
+                  resourceRequirements:
+                    description: ResourceRequirements defines resource requests and
+                      limits when Type is ResourceQosClassResourceRequirement
+                    properties:
+                      claims:
+                        description: "Claims lists the names of resources, defined
+                          in spec.resourceClaims, that are used by this container.
+                          \n This is an alpha field and requires enabling the DynamicResourceAllocation
+                          feature gate. \n This field is immutable. It can only be
+                          set for containers."
+                        items:
+                          description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                          properties:
+                            name:
+                              description: Name must match the name of one entry in
+                                pod.spec.resourceClaims of the Pod where this field
+                                is used. It makes that resource available inside a
+                                container.
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
+                        x-kubernetes-list-map-keys:
+                        - name
+                        x-kubernetes-list-type: map
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: 'Limits describes the maximum amount of compute
+                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: 'Requests describes the minimum amount of compute
+                          resources required. If Requests is omitted for a container,
+                          it defaults to Limits if that is explicitly specified, otherwise
+                          to an implementation-defined value. Requests cannot exceed
+                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        type: object
+                    type: object
+                  type:
+                    default: Default
+                    enum:
+                    - Default
+                    - BestEffort
+                    - ResourceRequirement
+                    type: string
+                type: object
+              workConfiguration:
+                description: WorkConfiguration contains the configuration of work
+                properties:
+                  featureGates:
+                    description: 'FeatureGates represents the list of feature gates
+                      for work If it is set empty, default feature gates will be used.
+                      If it is set, featuregate/Foo is an example of one item in FeatureGates:
+                      1. If featuregate/Foo does not exist, registration-operator
+                      will discard it 2. If featuregate/Foo exists and is false by
+                      default. It is now possible to set featuregate/Foo=[false|true]
+                      3. If featuregate/Foo exists and is true by default. If a cluster-admin
+                      upgrading from 1 to 2 wants to continue having featuregate/Foo=false,
+                      he can set featuregate/Foo=false before upgrading. Let''s say
+                      the cluster-admin wants featuregate/Foo=false.'
+                    items:
+                      properties:
+                        feature:
+                          description: Feature is the key of feature gate. e.g. featuregate/Foo.
+                          type: string
+                        mode:
+                          default: Disable
+                          description: Mode is either Enable, Disable, "" where ""
+                            is Disable by default. In Enable mode, a valid feature
+                            gate `featuregate/Foo` will be set to "--featuregate/Foo=true".
+                            In Disable mode, a valid feature gate `featuregate/Foo`
+                            will be set to "--featuregate/Foo=false".
+                          enum:
+                          - Enable
+                          - Disable
+                          type: string
+                      required:
+                      - feature
+                      type: object
+                    type: array
+                type: object
+              workImagePullSpec:
+                default: quay.io/open-cluster-management/work
+                description: WorkImagePullSpec represents the desired image configuration
+                  of work controller/webhook installed on hub.
+                type: string
+            type: object
+          status:
+            description: Status represents the current status of controllers that
+              govern the lifecycle of managed clusters.
+            properties:
+              conditions:
+                description: 'Conditions contain the different condition statuses
+                  for this ClusterManager. Valid condition types are: Applied: Components
+                  in hub are applied. Available: Components in hub are available and
+                  ready to serve. Progressing: Components in hub are in a transitioning
+                  state. Degraded: Components in hub do not match the desired configuration
+                  and only provide degraded service.'
+                items:
+                  description: "Condition contains details for one aspect of the current
+                    state of this API Resource. --- This struct is intended for direct
+                    use as an array at the field path .status.conditions.  For example,
+                    \n type FooStatus struct{ // Represents the observations of a
+                    foo's current state. // Known .status.conditions.type are: \"Available\",
+                    \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
+                    // +listType=map // +listMapKey=type Conditions []metav1.Condition
+                    `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"
+                    protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+                  properties:
+                    lastTransitionTime:
+                      description: lastTransitionTime is the last time the condition
+                        transitioned from one status to another. This should be when
+                        the underlying condition changed.  If that is not known, then
+                        using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: message is a human readable message indicating
+                        details about the transition. This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: observedGeneration represents the .metadata.generation
+                        that the condition was set based upon. For instance, if .metadata.generation
+                        is currently 12, but the .status.conditions[x].observedGeneration
+                        is 9, the condition is out of date with respect to the current
+                        state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: reason contains a programmatic identifier indicating
+                        the reason for the condition's last transition. Producers
+                        of specific condition types may define expected values and
+                        meanings for this field, and whether the values are considered
+                        a guaranteed API. The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                        --- Many .condition.type values are consistent across resources
+                        like Available, but because arbitrary conditions can be useful
+                        (see .node.status.conditions), the ability to deconflict is
+                        important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              generations:
+                description: Generations are used to determine when an item needs
+                  to be reconciled or has changed in a way that needs a reaction.
+                items:
+                  description: GenerationStatus keeps track of the generation for
+                    a given resource so that decisions about forced updates can be
+                    made. The definition matches the GenerationStatus defined in github.com/openshift/api/v1
+                  properties:
+                    group:
+                      description: group is the group of the resource that you're
+                        tracking
+                      type: string
+                    lastGeneration:
+                      description: lastGeneration is the last generation of the resource
+                        that controller applies
+                      format: int64
+                      type: integer
+                    name:
+                      description: name is the name of the resource that you're tracking
+                      type: string
+                    namespace:
+                      description: namespace is where the resource that you're tracking
+                        is
+                      type: string
+                    resource:
+                      description: resource is the resource type of the resource that
+                        you're tracking
+                      type: string
+                    version:
+                      description: version is the version of the resource that you're
+                        tracking
+                      type: string
+                  type: object
+                type: array
+              observedGeneration:
+                description: ObservedGeneration is the last generation change you've
+                  dealt with
+                format: int64
+                type: integer
+              relatedResources:
+                description: RelatedResources are used to track the resources that
+                  are related to this ClusterManager.
+                items:
+                  description: RelatedResourceMeta represents the resource that is
+                    managed by an operator
+                  properties:
+                    group:
+                      description: group is the group of the resource that you're
+                        tracking
+                      type: string
+                    name:
+                      description: name is the name of the resource that you're tracking
+                      type: string
+                    namespace:
+                      description: namespace is where the thing you're tracking is
+                      type: string
+                    resource:
+                      description: resource is the resource type of the resource that
+                        you're tracking
+                      type: string
+                    version:
+                      description: version is the version of the thing you're tracking
+                      type: string
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

@@ -17,7 +17,7 @@ OPERATOR_SDK_VERSION?=v1.32.0
 operatorsdk_gen_dir:=$(dir $(OPERATOR_SDK))
 
 # RELEASED_CSV_VERSION is used to generate a released CSV manifests
-RELEASED_CSV_VERSION?=0.13.1
+RELEASED_CSV_VERSION?=0.13.2
 export RELEASED_CSV_VERSION
 
 # CSV_VERSION is used to generate latest CSV manifests
