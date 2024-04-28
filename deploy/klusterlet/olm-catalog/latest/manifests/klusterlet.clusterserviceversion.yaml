@@ -31,7 +31,7 @@ metadata:
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
     containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2024-04-10T15:46:14Z"
+    createdAt: "2024-04-26T08:18:23Z"
     description: Manages the installation and upgrade of the Klusterlet.
     operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -372,7 +372,7 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc.
-  replaces: klusterlet.v0.13.1
+  replaces: klusterlet.v0.13.2
   selector:
     matchLabels:
       app: klusterlet

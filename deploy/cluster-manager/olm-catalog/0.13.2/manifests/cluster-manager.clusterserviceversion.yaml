@@ -11,11 +11,11 @@ metadata:
             "name": "cluster-manager"
           },
           "spec": {
-            "addOnManagerImagePullSpec": "quay.io/open-cluster-management/addon-manager:latest",
+            "addOnManagerImagePullSpec": "quay.io/open-cluster-management/addon-manager:v0.13.2",
             "deployOption": {
               "mode": "Default"
             },
-            "placementImagePullSpec": "quay.io/open-cluster-management/placement:latest",
+            "placementImagePullSpec": "quay.io/open-cluster-management/placement:v0.13.2",
             "registrationConfiguration": {
               "featureGates": [
                 {
@@ -24,8 +24,8 @@ metadata:
                 }
               ]
             },
-            "registrationImagePullSpec": "quay.io/open-cluster-management/registration:latest",
-            "workImagePullSpec": "quay.io/open-cluster-management/work:latest"
+            "registrationImagePullSpec": "quay.io/open-cluster-management/registration:v0.13.2",
+            "workImagePullSpec": "quay.io/open-cluster-management/work:v0.13.2"
           }
         },
         {
@@ -35,7 +35,7 @@ metadata:
             "name": "cluster-manager"
           },
           "spec": {
-            "addOnManagerImagePullSpec": "quay.io/open-cluster-management/addon-manager:latest",
+            "addOnManagerImagePullSpec": "quay.io/open-cluster-management/addon-manager:v0.13.2",
             "deployOption": {
               "hosted": {
                 "registrationWebhookConfiguration": {
@@ -49,23 +49,23 @@ metadata:
               },
               "mode": "Hosted"
             },
-            "placementImagePullSpec": "quay.io/open-cluster-management/placement:latest",
-            "registrationImagePullSpec": "quay.io/open-cluster-management/registration:latest",
-            "workImagePullSpec": "quay.io/open-cluster-management/work:latest"
+            "placementImagePullSpec": "quay.io/open-cluster-management/placement:v0.13.2",
+            "registrationImagePullSpec": "quay.io/open-cluster-management/registration:v0.13.2",
+            "workImagePullSpec": "quay.io/open-cluster-management/work:v0.13.2"
           }
         }
       ]
     capabilities: Basic Install
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
-    containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2024-04-26T08:18:23Z"
+    containerImage: quay.io/open-cluster-management/registration-operator:v0.13.2
+    createdAt: "2024-04-26T07:43:05Z"
     description: Manages the installation and upgrade of the ClusterManager.
     operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/open-cluster-management-io/ocm
     support: Red Hat, Inc.
-  name: cluster-manager.v9.9.9
+  name: cluster-manager.v0.13.2
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -146,7 +146,6 @@ spec:
           - work-controller-sa-kubeconfig
           - addon-manager-controller-sa-kubeconfig
           - external-hub-kubeconfig
-          - work-driver-config
           resources:
           - secrets
           verbs:
@@ -551,7 +550,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.name
-                image: quay.io/open-cluster-management/registration-operator:latest
+                image: quay.io/open-cluster-management/registration-operator:v0.13.2
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -611,8 +610,8 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc.
-  replaces: cluster-manager.v0.13.2
+  replaces: cluster-manager.v0.13.1
   selector:
     matchLabels:
       app: cluster-manager
-  version: 9.9.9
+  version: 0.13.2
