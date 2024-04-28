@@ -224,7 +224,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 			hubMigrationClient: hubMigrationClient, skipRemoveCRDs: n.skipRemoveCRDs},
 		&secretReconcile{cache: n.cache, recorder: n.recorder, operatorKubeClient: n.operatorKubeClient,
 			hubKubeClient: hubClient, operatorNamespace: n.operatorNamespace},
-		&hubReoncile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient},
+		&hubReconcile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient},
 		&runtimeReconcile{cache: n.cache, recorder: n.recorder, hubKubeConfig: hubKubeConfig, hubKubeClient: hubClient,
 			kubeClient: managementClient, ensureSAKubeconfigs: n.ensureSAKubeconfigs},
 		&webhookReconcile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient, kubeClient: managementClient},
@@ -258,6 +258,12 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	encodedCaBundle := base64.StdEncoding.EncodeToString([]byte(caBundle))
 	config.RegistrationAPIServiceCABundle = encodedCaBundle
 	config.WorkAPIServiceCABundle = encodedCaBundle
+
+	// check imagePulSecret here because there will be a warning event FailedToRetrieveImagePullSecret
+	// if imagePullSecret does not exist.
+	if config.ImagePullSecret, err = n.getImagePullSecret(ctx); err != nil {
+		return err
+	}
 
 	for _, reconciler := range reconcilers {
 		var state reconcileState
@@ -378,4 +384,16 @@ func cleanResources(ctx context.Context, kubeClient kubernetes.Interface, cm *op
 		}
 	}
 	return cm, reconcileContinue, nil
+}
+
+func (n *clusterManagerController) getImagePullSecret(ctx context.Context) (string, error) {
+	_, err := n.operatorKubeClient.CoreV1().Secrets(n.operatorNamespace).Get(ctx, helpers.ImagePullSecret, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+
+	return helpers.ImagePullSecret, nil
 }

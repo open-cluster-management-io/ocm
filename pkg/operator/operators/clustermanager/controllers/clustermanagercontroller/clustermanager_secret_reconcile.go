@@ -7,6 +7,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes"
@@ -17,14 +18,9 @@ import (
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
-const (
-	// workDriverConfig is the secret that contains the work driver configurarion
-	workDriverConfig = "work-driver-config"
-)
-
 var (
-	// secretNames is the slice of secrets to be synced from source namespace to the target namespace
-	secretNames = []string{}
+	// secretNames is the slice of secrets to be synced from operator namespace to the clusterManager namespace
+	secretNames = []string{helpers.ImagePullSecret, helpers.WorkDriverConfigSecret}
 )
 
 type secretReconcile struct {
@@ -37,16 +33,16 @@ type secretReconcile struct {
 
 func (c *secretReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager,
 	config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
-	// create a local slice of secrets and copy the secretNames to avoid modifying the global variable
-	pendingSyncSecrets := make([]string, len(secretNames))
-	copy(pendingSyncSecrets, secretNames)
-	if config.CloudEventsDriverEnabled && config.WorkDriver != string(operatorapiv1.WorkDriverTypeKube) {
-		pendingSyncSecrets = append(pendingSyncSecrets, workDriverConfig)
-	}
-
 	var syncedErrs []error
-	for _, secretName := range pendingSyncSecrets {
+	isWorkDriver := config.CloudEventsDriverEnabled && config.WorkDriver != string(operatorapiv1.WorkDriverTypeKube)
+
+	for _, secretName := range secretNames {
+		if secretName == helpers.WorkDriverConfigSecret && !isWorkDriver {
+			continue
+		}
+
 		// sync the secret to target namespace
+		// will delete the secret in the target ns if the secret is not found in the source ns
 		if _, _, err := helpers.SyncSecret(
 			ctx,
 			c.operatorKubeClient.CoreV1(),
@@ -63,7 +59,11 @@ func (c *secretReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clust
 	}
 
 	if len(syncedErrs) > 0 {
-		// TODO: set condition to indicate the secret sync error(s)
+		meta.SetStatusCondition(&cm.Status.Conditions, metav1.Condition{
+			Type: operatorapiv1.ConditionClusterManagerApplied, Status: metav1.ConditionFalse, Reason: "HubResourceApplyFailed",
+			Message: fmt.Sprintf("Failed to sync secrets to clusterManager namespace %v: %v",
+				config.ClusterManagerNamespace, utilerrors.NewAggregate(syncedErrs))})
+
 		return cm, reconcileStop, utilerrors.NewAggregate(syncedErrs)
 	}
 
@@ -72,17 +72,11 @@ func (c *secretReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clust
 
 func (c *secretReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterManager,
 	config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
-	// create a local slice of secrets and copy the secretNames to avoid modifying the global variable
-	pendingCleanSecrets := make([]string, len(secretNames))
-	copy(pendingCleanSecrets, secretNames)
-	if config.CloudEventsDriverEnabled && config.WorkDriver != string(operatorapiv1.WorkDriverTypeKube) {
-		pendingCleanSecrets = append(pendingCleanSecrets, workDriverConfig)
-	}
-	for _, secretName := range pendingCleanSecrets {
+	for _, secretName := range secretNames {
 		if err := c.hubKubeClient.CoreV1().Secrets(config.ClusterManagerNamespace).Delete(ctx,
 			secretName, metav1.DeleteOptions{}); err != nil {
 			if errors.IsNotFound(err) {
-				return cm, reconcileContinue, nil
+				continue
 			}
 			return cm, reconcileStop, fmt.Errorf("failed to delete secret %s: %v", secretName, err)
 		}

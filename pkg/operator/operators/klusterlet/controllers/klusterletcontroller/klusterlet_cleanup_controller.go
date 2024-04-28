@@ -166,7 +166,7 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 					managedClusterClients: managedClusterClients,
 					kubeClient:            n.kubeClient,
 					kubeVersion:           n.kubeVersion,
-					opratorNamespace:      n.operatorNamespace,
+					operatorNamespace:     n.operatorNamespace,
 					recorder:              controllerContext.Recorder(),
 				},
 			)

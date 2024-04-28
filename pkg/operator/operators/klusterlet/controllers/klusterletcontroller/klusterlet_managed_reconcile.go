@@ -55,7 +55,7 @@ var (
 type managedReconcile struct {
 	managedClusterClients *managedClusterClients
 	kubeClient            kubernetes.Interface
-	opratorNamespace      string
+	operatorNamespace     string
 	kubeVersion           *version.Version
 	recorder              events.Recorder
 	cache                 resourceapply.ResourceCache
@@ -77,7 +77,7 @@ func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 	// addonsecretcontroller only watch namespaces in the same cluster klusterlet is running on.
 	// And if addons are deployed in default mode on the managed cluster, but klusterlet is deployed in hosted
 	// on management cluster, then we still need to sync the secret here in klusterlet-controller using `managedClusterClients.kubeClient`.
-	err = syncPullSecret(ctx, r.kubeClient, r.managedClusterClients.kubeClient, klusterlet, r.opratorNamespace, addonNamespace, r.recorder)
+	err = syncPullSecret(ctx, r.kubeClient, r.managedClusterClients.kubeClient, klusterlet, r.operatorNamespace, addonNamespace, r.recorder)
 	if err != nil {
 		return klusterlet, reconcileStop, err
 	}

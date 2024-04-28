@@ -147,6 +147,7 @@ spec:
           - addon-manager-controller-sa-kubeconfig
           - external-hub-kubeconfig
           - work-driver-config
+          - open-cluster-management-image-pull-credentials
           resources:
           - secrets
           verbs:
