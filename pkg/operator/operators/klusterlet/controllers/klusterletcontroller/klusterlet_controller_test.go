@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/client-go/kubernetes"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
@@ -64,6 +65,8 @@ type testController struct {
 	managedKubeClient         *fakekube.Clientset
 	managedApiExtensionClient *fakeapiextensions.Clientset
 	managedWorkClient         *fakeworkclient.Clientset
+
+	hubKubeClient *fakekube.Clientset
 }
 
 func newSecret(name, namespace string) *corev1.Secret {
@@ -236,6 +239,7 @@ func newTestControllerHosted(
 	saRegistrationSecret := newServiceAccountSecret(fmt.Sprintf("%s-token", serviceAccountName("registration-sa", klusterlet)), klusterlet.Name)
 	saWorkSecret := newServiceAccountSecret(fmt.Sprintf("%s-token", serviceAccountName("work-sa", klusterlet)), klusterlet.Name)
 	fakeManagedKubeClient := fakekube.NewSimpleClientset()
+	fakeHubClient := fakekube.NewSimpleClientset()
 	getRegistrationServiceAccountCount := 0
 	getWorkServiceAccountCount := 0
 	// fake the get serviceaccount, since there is no kubernetes controller to create service account related secret.
@@ -278,7 +282,7 @@ func newTestControllerHosted(
 
 	fakeManagedAPIExtensionClient := fakeapiextensions.NewSimpleClientset()
 	fakeManagedWorkClient := fakeworkclient.NewSimpleClientset(appliedManifestWorks...)
-	hubController := &klusterletController{
+	klusterletController := &klusterletController{
 		patcher: patcher.NewPatcher[
 			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](fakeOperatorClient.OperatorV1().Klusterlets()),
 		kubeClient:        fakeKubeClient,
@@ -290,6 +294,9 @@ func newTestControllerHosted(
 			fakeWorkClient:         fakeManagedWorkClient,
 			fakeAPIExtensionClient: fakeManagedAPIExtensionClient,
 			fakeKubeClient:         fakeManagedKubeClient,
+		},
+		hubClientBuilder: &fakeHubClientBuilder{
+			fakeKubeClient: fakeHubClient,
 		},
 	}
 	cleanupController := &klusterletCleanupController{
@@ -312,7 +319,7 @@ func newTestControllerHosted(
 	}
 
 	return &testController{
-		controller:         hubController,
+		controller:         klusterletController,
 		cleanupController:  cleanupController,
 		kubeClient:         fakeKubeClient,
 		apiExtensionClient: fakeAPIExtensionClient,
@@ -324,6 +331,8 @@ func newTestControllerHosted(
 		managedKubeClient:         fakeManagedKubeClient,
 		managedApiExtensionClient: fakeManagedAPIExtensionClient,
 		managedWorkClient:         fakeManagedWorkClient,
+
+		hubKubeClient: fakeHubClient,
 	}
 }
 
@@ -615,6 +624,46 @@ func TestSyncDeploySingleton(t *testing.T) {
 		testinghelper.NamedCondition(operatorapiv1.ConditionKlusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
 		testinghelper.NamedCondition(helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue),
 	)
+}
+
+func TestSendImportingEvent(t *testing.T) {
+	clusterName := "cluster1"
+	klusterlet := newKlusterletHosted("klusterlet", "testns", clusterName)
+	agentNamespace := helpers.AgentNamespace(klusterlet)
+	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, agentNamespace)
+	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, agentNamespace)
+	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	// externalManagedSecret := newSecret(helpers.ExternalManagedKubeConfig, agentNamespace)
+	// externalManagedSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	namespace := newNamespace(agentNamespace)
+	pullSecret := newSecret(helpers.ImagePullSecret, "open-cluster-management")
+
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestControllerHosted(t, klusterlet, syncContext.Recorder(), nil, bootStrapSecret,
+		hubKubeConfigSecret, namespace, pullSecret /*externalManagedSecret*/)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	err := controller.controller.sync(ctx, syncContext)
+	if err != nil {
+		t.Errorf("Expected no error when sync, %v", err)
+	}
+
+	<-ctx.Done() // wait for the event to be sent
+
+	if len(controller.hubKubeClient.Actions()) != 1 {
+		t.Errorf("Expected 1 event created in the sync loop, actual %d", len(controller.hubKubeClient.Actions()))
+	}
+	actionEvent := controller.hubKubeClient.Actions()[0]
+	if actionEvent.GetResource().Resource != "events" {
+		t.Errorf("Expected event created, actual %s", actionEvent.GetResource())
+	}
+	if actionEvent.GetNamespace() != "cluster1" {
+		t.Errorf("Expected event created in namespace %s, actual %s", clusterName, actionEvent.GetNamespace())
+	}
+	if actionEvent.GetVerb() != "create" {
+		t.Errorf("Expected event created, actual %s", actionEvent.GetVerb())
+	}
 }
 
 // TestSyncDeployHosted test deployment of klusterlet components in hosted mode
@@ -1239,4 +1288,12 @@ func (f *fakeManagedClusterBuilder) build(_ context.Context) (*managedClusterCli
 			},
 		},
 	}, nil
+}
+
+type fakeHubClientBuilder struct {
+	fakeKubeClient *fakekube.Clientset
+}
+
+func (b *fakeHubClientBuilder) build(_ context.Context, _ string, _ string) (kubernetes.Interface, error) {
+	return b.fakeKubeClient, nil
 }

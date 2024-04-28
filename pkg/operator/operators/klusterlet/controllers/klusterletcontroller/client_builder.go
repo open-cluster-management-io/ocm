@@ -9,6 +9,7 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
@@ -87,7 +88,7 @@ func (m *managedClusterClientsBuilder) build(ctx context.Context) (*managedClust
 		return nil, err
 	}
 
-	managedKubeConfig, err := getManagedKubeConfig(ctx, m.kubeClient, m.secretNamespace, m.secretName)
+	managedKubeConfig, err := getKubeConfig(ctx, m.kubeClient, m.secretNamespace, m.secretName)
 	if err != nil {
 		return nil, err
 	}
@@ -108,4 +109,39 @@ func (m *managedClusterClientsBuilder) build(ctx context.Context) (*managedClust
 	}
 	clients.appliedManifestWorkClient = workClient.WorkV1().AppliedManifestWorks()
 	return clients, nil
+}
+
+// getKubeConfig is a helper func to get kubeconfig from a secret
+func getKubeConfig(ctx context.Context, kubeClient kubernetes.Interface,
+	namespace, secretName string) (*rest.Config, error) {
+	kubeconfigSecret, err := kubeClient.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return helpers.LoadClientConfigFromSecret(kubeconfigSecret)
+}
+
+type hubClientBuilderInterface interface {
+	build(ctx context.Context, secretNamespace, secretName string) (kubernetes.Interface, error)
+}
+
+type hubClientBuilder struct {
+	kubeClient kubernetes.Interface
+}
+
+func newHubClientBuilder(kubeClient kubernetes.Interface) hubClientBuilderInterface {
+	return &hubClientBuilder{
+		kubeClient: kubeClient,
+	}
+}
+
+func (b *hubClientBuilder) build(ctx context.Context, secretNamespace, secretName string) (
+	kubernetes.Interface, error) {
+	kubeconfig, err := getKubeConfig(ctx, b.kubeClient, secretNamespace, secretName)
+	if err != nil {
+		return nil, err
+	}
+
+	return kubernetes.NewForConfig(kubeconfig)
 }

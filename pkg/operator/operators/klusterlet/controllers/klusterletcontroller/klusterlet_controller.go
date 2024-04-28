@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -18,13 +19,14 @@ import (
 	appsinformer "k8s.io/client-go/informers/apps/v1"
 	coreinformer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
+	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
@@ -51,6 +53,7 @@ type klusterletController struct {
 	skipHubSecretPlaceholder     bool
 	cache                        resourceapply.ResourceCache
 	managedClusterClientsBuilder managedClusterClientsBuilderInterface
+	hubClientBuilder             hubClientBuilderInterface
 }
 
 type klusterletReconcile interface {
@@ -63,6 +66,10 @@ type reconcileState int64
 const (
 	reconcileStop reconcileState = iota
 	reconcileContinue
+)
+
+const (
+	controllerName = "KlusterletController"
 )
 
 // NewKlusterletController construct klusterlet controller
@@ -88,6 +95,7 @@ func NewKlusterletController(
 		skipHubSecretPlaceholder:     skipHubSecretPlaceholder,
 		cache:                        resourceapply.NewResourceCache(),
 		managedClusterClientsBuilder: newManagedClusterClientsBuilder(kubeClient, apiExtensionClient, appliedManifestWorkClient, recorder),
+		hubClientBuilder:             newHubClientBuilder(kubeClient),
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -98,7 +106,7 @@ func NewKlusterletController(
 		WithInformersQueueKeysFunc(helpers.KlusterletDeploymentQueueKeyFunc(
 			controller.klusterletLister), deploymentInformer.Informer()).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, klusterletInformer.Informer()).
-		ToController("KlusterletController", recorder)
+		ToController(controllerName, recorder)
 }
 
 // klusterletConfig is used to render the template of hub manifests
@@ -213,6 +221,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	// update klusterletReadyToApply condition at first in hosted mode
 	// this conditions should be updated even when klusterlet is in deleting state.
 	if helpers.IsHosted(config.InstallMode) {
+		clientsBuildComplete := err == nil
 		if err != nil {
 			meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
 				Type: operatorapiv1.ConditionReadyToApply, Status: metav1.ConditionFalse, Reason: operatorapiv1.ReasonKlusterletPrepareFailed,
@@ -227,6 +236,10 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 		updated, updateErr := n.patcher.PatchStatus(ctx, klusterlet, klusterlet.Status, originalKlusterlet.Status)
 		if updated {
+			if clientsBuildComplete {
+				return n.sendImportingEvent(ctx, klusterlet.Spec.ClusterName,
+					config.AgentNamespace, config.BootStrapKubeConfigSecret)
+			}
 			return updateErr
 		}
 	}
@@ -345,6 +358,46 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	return utilerrors.NewAggregate(errs)
 }
 
+func (n *klusterletController) sendImportingEvent(ctx context.Context, clusterName string,
+	hubSecretNamespace, hubSecretName string) error {
+	hubClient, err := n.hubClientBuilder.build(ctx, hubSecretNamespace, hubSecretName)
+	if err != nil {
+		return err
+	}
+
+	// Use a new context with a timeout to send the event, since the context passed in is a long-lived context,
+	// if we create the broadcaster with this context, the broadcaster will not be closed until the context is done.
+	// Every time we send the event, there will be a new broadcaster created, so making sure it is closed after sending
+	// by a timeout context here is necessary.
+	eventCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-eventCtx.Done():
+		}
+		// we are not able to know if the event is sent, so just cancel the context here to pass the lint:
+		// "the cancel function returned by context.WithTimeout should be called, not discarded, to avoid
+		// a context leak"
+		cancel()
+	}()
+	hubEventRecorder, err := commonhelpers.NewEventRecorder(eventCtx, clusterscheme.Scheme, hubClient, controllerName)
+	if err != nil {
+		return err
+	}
+
+	hubEventRecorder.Eventf(
+		&clusterv1.ManagedCluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: clusterName,
+				// send the event to the managed cluster namespace even if the managed cluster resource
+				// is cluster-scoped
+				Namespace: clusterName,
+			},
+		},
+		nil, corev1.EventTypeNormal, "Importing", "Importing", "The %s is being imported now", clusterName)
+	return nil
+}
+
 // TODO also read CABundle from ExternalServerURLs and set into registration deployment
 func getServersFromKlusterlet(klusterlet *operatorapiv1.Klusterlet) string {
 	if klusterlet.Spec.ExternalServerURLs == nil {
@@ -355,17 +408,6 @@ func getServersFromKlusterlet(klusterlet *operatorapiv1.Klusterlet) string {
 		serverString = append(serverString, server.URL)
 	}
 	return strings.Join(serverString, ",")
-}
-
-// getManagedKubeConfig is a helper func for Hosted mode, it will retrieve managed cluster
-// kubeconfig from "external-managed-kubeconfig" secret.
-func getManagedKubeConfig(ctx context.Context, kubeClient kubernetes.Interface, namespace, secretName string) (*rest.Config, error) {
-	managedKubeconfigSecret, err := kubeClient.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	return helpers.LoadClientConfigFromSecret(managedKubeconfigSecret)
 }
 
 // ensureAgentNamespace create agent namespace if it is not exist
