@@ -298,7 +298,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			managedClusterClients: managedClusterClients,
 			kubeClient:            n.kubeClient,
 			kubeVersion:           n.kubeVersion,
-			opratorNamespace:      n.operatorNamespace,
+			operatorNamespace:     n.operatorNamespace,
 			recorder:              controllerContext.Recorder(),
 			cache:                 n.cache},
 		&managementReconcile{

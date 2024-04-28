@@ -36,6 +36,10 @@ spec:
                   operator: In
                   values:
                   - clustermanager-addon-manager-controller
+      {{- if .ImagePullSecret }}
+      imagePullSecrets:
+      - name: {{ .ImagePullSecret }}
+      {{- end }}
       {{ if not .HostedMode }}
       serviceAccountName: addon-manager-controller-sa
       {{ end }}

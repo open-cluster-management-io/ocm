@@ -77,13 +77,13 @@ var (
 	hubHostedWebhookEndpointWork         = "cluster-manager/hub/cluster-manager-work-webhook-endpoint-hosted.yaml"
 )
 
-type hubReoncile struct {
+type hubReconcile struct {
 	hubKubeClient kubernetes.Interface
 	cache         resourceapply.ResourceCache
 	recorder      events.Recorder
 }
 
-func (c *hubReoncile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager,
+func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager,
 	config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
 	// If AddOnManager is not enabled, remove related resources
 	if !config.AddOnManagerEnabled {
@@ -140,7 +140,7 @@ func (c *hubReoncile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterMa
 	return cm, reconcileContinue, nil
 }
 
-func (c *hubReoncile) clean(ctx context.Context, cm *operatorapiv1.ClusterManager,
+func (c *hubReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterManager,
 	config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
 	hubResources := getHubResources(cm.Spec.DeployOption.Mode, config)
 	return cleanResources(ctx, c.hubKubeClient, cm, config, hubResources...)

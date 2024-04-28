@@ -55,6 +55,9 @@ const (
 	// ImagePullSecret is the image pull secret for operator components, which is synced from the operator ns to hub/spoke/addon ns.
 	ImagePullSecret = "open-cluster-management-image-pull-credentials"
 
+	// WorkDriverConfigSecret is the secret that contains the work driver configuration
+	WorkDriverConfigSecret = "work-driver-config"
+
 	// DefaultComponentNamespace is the default namespace in which the operator is deployed
 	DefaultComponentNamespace = "open-cluster-management"
 )
