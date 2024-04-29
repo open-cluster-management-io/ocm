@@ -81,7 +81,7 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc.
-  replaces: cluster-manager.v0.13.0
+  replaces: cluster-manager.v0.13.2
   selector:
     matchLabels:
       app: cluster-manager

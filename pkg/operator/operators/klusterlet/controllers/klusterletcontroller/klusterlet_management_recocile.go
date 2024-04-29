@@ -87,7 +87,7 @@ func (r *managementReconcile) reconcile(ctx context.Context, klusterlet *operato
 	if len(errs) > 0 {
 		applyErrors := utilerrors.NewAggregate(errs)
 		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "ManagementClusterResourceApplyFailed",
+			Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionFalse, Reason: operatorapiv1.ReasonManagementClusterResourceApplyFailed,
 			Message: applyErrors.Error(),
 		})
 		return klusterlet, reconcileStop, applyErrors

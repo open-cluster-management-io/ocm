@@ -12,11 +12,11 @@ import (
 	"time"
 
 	cloudeventsmqtt "github.com/cloudevents/sdk-go/protocol/mqtt_paho/v2"
-	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/eclipse/paho.golang/packets"
 	"github.com/eclipse/paho.golang/paho"
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/errors"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
@@ -198,12 +198,12 @@ func (o *MQTTOptions) GetMQTTConnectOption(clientID string) *paho.Connect {
 	return connect
 }
 
-func (o *MQTTOptions) GetCloudEventsClient(
+func (o *MQTTOptions) GetCloudEventsProtocol(
 	ctx context.Context,
 	clientID string,
 	errorHandler func(error),
 	clientOpts ...cloudeventsmqtt.Option,
-) (cloudevents.Client, error) {
+) (options.CloudEventsProtocol, error) {
 	netConn, err := o.GetNetConn()
 	if err != nil {
 		return nil, err
@@ -217,12 +217,7 @@ func (o *MQTTOptions) GetCloudEventsClient(
 
 	opts := []cloudeventsmqtt.Option{cloudeventsmqtt.WithConnect(o.GetMQTTConnectOption(clientID))}
 	opts = append(opts, clientOpts...)
-	protocol, err := cloudeventsmqtt.New(ctx, config, opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	return cloudevents.NewClient(protocol)
+	return cloudeventsmqtt.New(ctx, config, opts...)
 }
 
 func validateTopics(topics *types.Topics) error {

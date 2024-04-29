@@ -4,6 +4,7 @@ import (
 	"context"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+	"github.com/cloudevents/sdk-go/v2/protocol"
 )
 
 // CloudEventsOptions provides cloudevents clients to send/receive cloudevents based on different event protocol.
@@ -16,12 +17,20 @@ type CloudEventsOptions interface {
 	// the MQTT topic, for Kafka, the context should contain the message key, etc.
 	WithContext(ctx context.Context, evtContext cloudevents.EventContext) (context.Context, error)
 
-	// Client returns a cloudevents client for sending and receiving cloudevents
-	Client(ctx context.Context) (cloudevents.Client, error)
+	// Protocol returns a specific protocol to initialize the cloudevents client
+	Protocol(ctx context.Context) (CloudEventsProtocol, error)
 
 	// ErrorChan returns a chan which will receive the cloudevents connection error. The source/agent client will try to
 	// reconnect the when this error occurs.
 	ErrorChan() <-chan error
+}
+
+// CloudEventsProtocol is a set of interfaces for a specific binding need to implemented
+// Reference: https://cloudevents.github.io/sdk-go/protocol_implementations.html#protocol-interfaces
+type CloudEventsProtocol interface {
+	protocol.Sender
+	protocol.Receiver
+	protocol.Closer
 }
 
 // EventRateLimit for limiting the event sending rate.

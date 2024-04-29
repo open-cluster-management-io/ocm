@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 const (
@@ -35,8 +36,11 @@ func PreDeleteHookHostingWorkName(addonNamespace, addonName string) string {
 }
 
 // GetHostedModeInfo returns addon installation mode and hosting cluster name.
-func GetHostedModeInfo(annotations map[string]string) (string, string) {
-	hostingClusterName, ok := annotations[addonv1alpha1.HostingClusterNameAnnotationKey]
+func GetHostedModeInfo(addon *addonv1alpha1.ManagedClusterAddOn, _ *clusterv1.ManagedCluster) (string, string) {
+	if len(addon.Annotations) == 0 {
+		return InstallModeDefault, ""
+	}
+	hostingClusterName, ok := addon.Annotations[addonv1alpha1.HostingClusterNameAnnotationKey]
 	if !ok {
 		return InstallModeDefault, ""
 	}

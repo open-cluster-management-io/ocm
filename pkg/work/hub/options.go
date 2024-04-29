@@ -13,7 +13,9 @@ type WorkHubManagerOptions struct {
 }
 
 func NewWorkHubManagerOptions() *WorkHubManagerOptions {
-	return &WorkHubManagerOptions{}
+	return &WorkHubManagerOptions{
+		WorkDriver: "kube",
+	}
 }
 
 // AddFlags register and binds the default flags

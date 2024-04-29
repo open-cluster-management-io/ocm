@@ -10,15 +10,13 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 )
 
 type defaultHookSyncer struct {
-	buildWorks func(installMode, workNamespace string, cluster *clusterv1.ManagedCluster,
-		addon *addonapiv1alpha1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
-	applyWork func(ctx context.Context, appliedType string,
+	buildWorks buildDeployHookFunc
+	applyWork  func(ctx context.Context, appliedType string,
 		work *workapiv1.ManifestWork, addon *addonapiv1alpha1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
 	agentAddon agent.AgentAddon
 }
@@ -29,7 +27,7 @@ func (s *defaultHookSyncer) sync(ctx context.Context,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.ManagedClusterAddOn, error) {
 	deployWorkNamespace := addon.Namespace
 
-	hookWork, err := s.buildWorks(constants.InstallModeDefault, deployWorkNamespace, cluster, addon)
+	hookWork, err := s.buildWorks(deployWorkNamespace, cluster, addon)
 	if err != nil {
 		return addon, err
 	}

@@ -212,8 +212,6 @@ func TestSync(t *testing.T) {
 					NewCSRRenewalReconciler(kubeClient, recorder),
 					NewCSRBootstrapReconciler(
 						kubeClient,
-						clusterClient,
-						clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 						c.approvalUsers,
 						recorder,
 					),

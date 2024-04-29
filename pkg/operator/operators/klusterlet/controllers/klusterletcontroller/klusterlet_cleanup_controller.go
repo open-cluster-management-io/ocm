@@ -166,7 +166,7 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 					managedClusterClients: managedClusterClients,
 					kubeClient:            n.kubeClient,
 					kubeVersion:           n.kubeVersion,
-					opratorNamespace:      n.operatorNamespace,
+					operatorNamespace:     n.operatorNamespace,
 					recorder:              controllerContext.Recorder(),
 				},
 			)
@@ -267,7 +267,7 @@ func readyToAddHostedFinalizer(klusterlet *operatorapiv1.Klusterlet, mode operat
 		return false
 	}
 
-	return meta.IsStatusConditionTrue(klusterlet.Status.Conditions, klusterletReadyToApply)
+	return meta.IsStatusConditionTrue(klusterlet.Status.Conditions, operatorapiv1.ConditionReadyToApply)
 }
 
 func hasFinalizer(klusterlet *operatorapiv1.Klusterlet, finalizer string) bool {

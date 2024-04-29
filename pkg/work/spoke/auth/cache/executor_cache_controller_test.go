@@ -22,6 +22,7 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/basic"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/store"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
@@ -178,8 +179,8 @@ func TestCacheController(t *testing.T) {
 	ctx := context.TODO()
 
 	work, _ := spoketesting.NewManifestWork(0,
-		spoketesting.NewUnstructured("v1", "Secret", allowNS, "test"),
-		spoketesting.NewUnstructured("v1", "Secret", denyNS, "test"),
+		testingcommon.NewUnstructured("v1", "Secret", allowNS, "test"),
+		testingcommon.NewUnstructured("v1", "Secret", denyNS, "test"),
 	)
 	work.Spec.Executor = executor
 	work.Spec.DeleteOption = &workapiv1.DeleteOption{

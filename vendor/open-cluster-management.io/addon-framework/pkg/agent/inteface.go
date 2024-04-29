@@ -63,13 +63,16 @@ type AgentAddonOptions struct {
 	// +optional
 	HostedModeEnabled bool
 
+	// HostedModeInfoFunc returns whether an addon is in hosted mode, and its hosting cluster.
+	HostedModeInfoFunc func(addon *addonapiv1alpha1.ManagedClusterAddOn, cluster *clusterv1.ManagedCluster) (string, string)
+
 	// SupportedConfigGVRs is a list of addon supported configuration GroupVersionResource
 	// each configuration GroupVersionResource should be unique
 	SupportedConfigGVRs []schema.GroupVersionResource
 
 	// AgentDeployTriggerClusterFilter defines the filter func to trigger the agent deploy/redploy when cluster info is
 	// changed. Addons that need information from the ManagedCluster resource when deploying the agent should use this
-	// field to set what information they need, otherwise the expected/up-to-date agent may be deployed delayed since
+	// field to set what information they need, otherwise the expected/up-to-date agent may be deployed updates since
 	// the default filter func returns false when the ManagedCluster resource is updated.
 	//
 	// For example, the agentAddon needs information from the ManagedCluster annotation, it can set the filter function
@@ -117,7 +120,7 @@ type RegistrationOption struct {
 	// Note: Set this very carefully. If this is set, the addon agent must be deployed in the same namespace, which
 	// means when implementing Manifests function in AgentAddon interface, the namespace of the addon agent manifest
 	// must be set to the same value returned by this function.
-	AgentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) string
+	AgentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error)
 
 	// CSRApproveCheck checks whether the addon agent registration should be approved by the hub.
 	// Addon hub controller can implement this func to auto-approve all the CSRs. A better CSR check is

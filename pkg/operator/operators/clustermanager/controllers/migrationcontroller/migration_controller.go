@@ -3,7 +3,6 @@ package migrationcontroller
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -53,11 +52,7 @@ var (
 )
 
 const (
-	clusterManagerApplied = "Applied"
-	MigrationSucceeded    = "MigrationSucceeded"
-
 	migrationRequestCRDName = "storageversionmigrations.migration.k8s.io"
-	reSyncTime              = time.Second * 5
 )
 
 type crdMigrationController struct {
@@ -134,9 +129,9 @@ func (c *crdMigrationController) sync(ctx context.Context, controllerContext fac
 	if !supported {
 		newClusterManager := clusterManager.DeepCopy()
 		meta.SetStatusCondition(&newClusterManager.Status.Conditions, metav1.Condition{
-			Type:    MigrationSucceeded,
+			Type:    operatorapiv1.ConditionMigrationSucceeded,
 			Status:  metav1.ConditionFalse,
-			Reason:  "StorageVersionMigrationFailed",
+			Reason:  operatorapiv1.ReasonStorageVersionMigrationFailed,
 			Message: "Do not support StorageVersionMigration",
 		})
 		_, err = c.patcher.PatchStatus(ctx, newClusterManager, newClusterManager.Status, clusterManager.Status)
@@ -144,7 +139,7 @@ func (c *crdMigrationController) sync(ctx context.Context, controllerContext fac
 	}
 
 	// do not apply storage version migrations until other resources are applied
-	if applied := meta.IsStatusConditionTrue(clusterManager.Status.Conditions, clusterManagerApplied); !applied {
+	if applied := meta.IsStatusConditionTrue(clusterManager.Status.Conditions, operatorapiv1.ConditionClusterManagerApplied); !applied {
 		controllerContext.Queue().AddRateLimited(clusterManagerName)
 		return nil
 	}
@@ -162,7 +157,7 @@ func (c *crdMigrationController) sync(ctx context.Context, controllerContext fac
 			return
 		}
 
-		//If migration not succeed, wait for all StorageVersionMigrations succeed.
+		// If migration not succeed, wait for all StorageVersionMigrations succeed.
 		if migrationCond.Status != metav1.ConditionTrue {
 			klog.V(4).Infof("Wait all StorageVersionMigrations succeed. migrationCond: %v. error: %v", migrationCond, err)
 			controllerContext.Queue().AddRateLimited(clusterManagerName)
@@ -176,9 +171,9 @@ func (c *crdMigrationController) sync(ctx context.Context, controllerContext fac
 		c.recorder.Warningf("StorageVersionMigrationFailed", "Failed to check CRD current storage version. %v", err)
 
 		migrationCond = metav1.Condition{
-			Type:    MigrationSucceeded,
+			Type:    operatorapiv1.ConditionMigrationSucceeded,
 			Status:  metav1.ConditionFalse,
-			Reason:  "StorageVersionMigrationFailed",
+			Reason:  operatorapiv1.ReasonStorageVersionMigrationFailed,
 			Message: fmt.Sprintf("Failed to check CRD current storage version. %v", err),
 		}
 		return nil
@@ -189,9 +184,9 @@ func (c *crdMigrationController) sync(ctx context.Context, controllerContext fac
 		klog.Errorf("Failed to apply StorageVersionMigrations. %v", err)
 
 		migrationCond = metav1.Condition{
-			Type:    MigrationSucceeded,
+			Type:    operatorapiv1.ConditionMigrationSucceeded,
 			Status:  metav1.ConditionFalse,
-			Reason:  "StorageVersionMigrationFailed",
+			Reason:  operatorapiv1.ReasonStorageVersionMigrationFailed,
 			Message: fmt.Sprintf("Failed to create StorageVersionMigrations. %v", err),
 		}
 		return err
@@ -308,9 +303,9 @@ func syncStorageVersionMigrationsCondition(ctx context.Context, toSyncMigrations
 		migrationStatusCondition := getStorageVersionMigrationStatusCondition(existing)
 		if migrationStatusCondition == nil {
 			return metav1.Condition{
-				Type:    MigrationSucceeded,
+				Type:    operatorapiv1.ConditionMigrationSucceeded,
 				Status:  metav1.ConditionFalse,
-				Reason:  "StorageVersionMigrationProcessing",
+				Reason:  operatorapiv1.ReasonStorageVersionMigrationProcessing,
 				Message: fmt.Sprintf("Wait StorageVersionMigration %v succeed.", existing.Name),
 			}, nil
 		}
@@ -319,14 +314,14 @@ func syncStorageVersionMigrationsCondition(ctx context.Context, toSyncMigrations
 			continue
 		case migrationv1alpha1.MigrationFailed:
 			return metav1.Condition{
-				Type:    MigrationSucceeded,
+				Type:    operatorapiv1.ConditionMigrationSucceeded,
 				Status:  metav1.ConditionFalse,
 				Reason:  fmt.Sprintf("StorageVersionMigration Failed. %v", migrationStatusCondition.Reason),
 				Message: fmt.Sprintf("Failed to wait StorageVersionMigration %v succeed. %v", existing.Name, migrationStatusCondition.Message),
 			}, nil
 		case migrationv1alpha1.MigrationRunning:
 			return metav1.Condition{
-				Type:    MigrationSucceeded,
+				Type:    operatorapiv1.ConditionMigrationSucceeded,
 				Status:  metav1.ConditionFalse,
 				Reason:  fmt.Sprintf("StorageVersionMigration Running. %v", migrationStatusCondition.Reason),
 				Message: fmt.Sprintf("Wait StorageVersionMigration %v succeed. %v", existing.Name, migrationStatusCondition.Message),
@@ -334,9 +329,9 @@ func syncStorageVersionMigrationsCondition(ctx context.Context, toSyncMigrations
 		}
 	}
 	return metav1.Condition{
-		Type:    MigrationSucceeded,
+		Type:    operatorapiv1.ConditionMigrationSucceeded,
 		Status:  metav1.ConditionTrue,
-		Reason:  "StorageVersionMigrationSucceed",
+		Reason:  operatorapiv1.ReasonStorageVersionMigrationSucceed,
 		Message: "All StorageVersionMigrations Succeed",
 	}, nil
 }

@@ -43,10 +43,6 @@ type klusterletLocker struct {
 	klusterletInChecking map[string]struct{}
 }
 
-const (
-	hubConnectionDegraded = "HubConnectionDegraded"
-)
-
 func NewKlusterletSSARController(
 	kubeClient kubernetes.Interface,
 	klusterletClient operatorv1client.KlusterletInterface,
@@ -125,7 +121,7 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 
 		hubConfigDegradedCondition := checkAgentDegradedCondition(
 			ctx, c.kubeClient,
-			hubConnectionDegraded,
+			operatorapiv1.ConditionHubConnectionDegraded,
 			klusterletAgent{
 				clusterName: klusterlet.Spec.ClusterName,
 				namespace:   agentNamespace,
@@ -149,7 +145,7 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 
 		bootstrapDegradedCondition := checkAgentDegradedCondition(
 			ctx, c.kubeClient,
-			hubConnectionDegraded,
+			operatorapiv1.ConditionHubConnectionDegraded,
 			klusterletAgent{
 				clusterName: klusterlet.Spec.ClusterName,
 				namespace:   agentNamespace,
@@ -161,7 +157,7 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 		// The status is always true here since the hub kubeconfig check fails. Need to add the additional
 		// message relating to bootstrap kubeconfig check here.
 		meta.SetStatusCondition(&newKlusterlet.Status.Conditions, metav1.Condition{
-			Type:               hubConnectionDegraded,
+			Type:               operatorapiv1.ConditionHubConnectionDegraded,
 			Status:             metav1.ConditionTrue,
 			ObservedGeneration: klusterlet.Generation,
 			Reason:             bootstrapDegradedCondition.Reason + "," + hubConfigDegradedCondition.Reason,
@@ -267,7 +263,7 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 	if err != nil {
 		return metav1.Condition{
 			Status:  metav1.ConditionTrue,
-			Reason:  "HubKubeConfigSecretMissing",
+			Reason:  operatorapiv1.ReasonHubKubeConfigSecretMissing,
 			Message: fmt.Sprintf("Failed to get hub kubeconfig secret %q %q: %v", agent.namespace, helpers.HubKubeConfig, err),
 		}
 	}
@@ -275,7 +271,7 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 	if hubConfigSecret.Data["kubeconfig"] == nil {
 		return metav1.Condition{
 			Status: metav1.ConditionTrue,
-			Reason: "HubKubeConfigMissing",
+			Reason: operatorapiv1.ReasonHubKubeConfigMissing,
 			Message: fmt.Sprintf("Failed to get kubeconfig from `kubectl get secret -n %q %q -ojsonpath='{.data.kubeconfig}'`. "+
 				"This is set by the klusterlet registration deployment, but the CSR must be approved by the cluster-admin on the hub.",
 				hubConfigSecret.Namespace, hubConfigSecret.Name),
@@ -286,7 +282,7 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 	if err != nil {
 		return metav1.Condition{
 			Status: metav1.ConditionTrue,
-			Reason: "HubKubeConfigError",
+			Reason: operatorapiv1.ReasonHubKubeConfigError,
 			Message: fmt.Sprintf("Failed to build hub kube client with hub config secret %q %q: %v",
 				hubConfigSecret.Namespace, hubConfigSecret.Name, err),
 		}
@@ -298,7 +294,7 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 		if hubConfigSecret.Data["cluster-name"] == nil {
 			return metav1.Condition{
 				Status: metav1.ConditionTrue,
-				Reason: "ClusterNameMissing",
+				Reason: operatorapiv1.ReasonClusterNameMissing,
 				Message: fmt.Sprintf(
 					"Failed to get cluster name from `kubectl get secret -n %q %q -ojsonpath='{.data.cluster-name}`."+
 						" This is set by the klusterlet registration deployment.", hubConfigSecret.Namespace, hubConfigSecret.Name),
@@ -312,7 +308,7 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 	if err != nil {
 		return metav1.Condition{
 			Status: metav1.ConditionTrue,
-			Reason: "HubKubeConfigError",
+			Reason: operatorapiv1.ReasonHubKubeConfigError,
 			Message: fmt.Sprintf("Failed to create %+v with hub config secret %q/%q to apiserver %s: %v",
 				failedReview, hubConfigSecret.Namespace, hubConfigSecret.Name, host, err),
 		}
@@ -320,7 +316,7 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 	if !allowed {
 		return metav1.Condition{
 			Status: metav1.ConditionTrue,
-			Reason: "HubKubeConfigUnauthorized",
+			Reason: operatorapiv1.ReasonHubKubeConfigUnauthorized,
 			Message: fmt.Sprintf("Operation for resource %+v is not allowed with hub config secret %q/%q to apiserver %s",
 				failedReview.Spec.ResourceAttributes, hubConfigSecret.Namespace, hubConfigSecret.Name, host),
 		}
@@ -328,7 +324,7 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 
 	return metav1.Condition{
 		Status: metav1.ConditionFalse,
-		Reason: "HubConnectionFunctional",
+		Reason: operatorapiv1.ReasonHubConnectionFunctional,
 		Message: fmt.Sprintf("Hub kubeconfig secret %s/%s to apiserver %s is working",
 			agent.namespace, helpers.HubKubeConfig, host),
 	}

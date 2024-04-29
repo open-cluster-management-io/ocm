@@ -8,7 +8,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	kubeinformers "k8s.io/client-go/informers"
@@ -19,12 +18,14 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
@@ -41,6 +42,7 @@ type addonTemplateController struct {
 
 	kubeConfig        *rest.Config
 	addonClient       addonv1alpha1client.Interface
+	workClient        workv1client.Interface
 	kubeClient        kubernetes.Interface
 	cmaLister         addonlisterv1alpha1.ClusterManagementAddOnLister
 	addonInformers    addoninformers.SharedInformerFactory
@@ -57,6 +59,7 @@ func NewAddonTemplateController(
 	hubKubeconfig *rest.Config,
 	hubKubeClient kubernetes.Interface,
 	addonClient addonv1alpha1client.Interface,
+	workClient workv1client.Interface,
 	addonInformers addoninformers.SharedInformerFactory,
 	clusterInformers clusterv1informers.SharedInformerFactory,
 	dynamicInformers dynamicinformer.DynamicSharedInformerFactory,
@@ -68,6 +71,7 @@ func NewAddonTemplateController(
 		kubeConfig:       hubKubeconfig,
 		kubeClient:       hubKubeClient,
 		addonClient:      addonClient,
+		workClient:       workClient,
 		cmaLister:        addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
 		addonManagers:    make(map[string]context.CancelFunc),
 		addonInformers:   addonInformers,
@@ -188,8 +192,6 @@ func (c *addonTemplateController) runController(
 	agentAddon := templateagent.NewCRDTemplateAgentAddon(
 		ctx,
 		addonName,
-		// TODO: agentName should not be changed after restarting the agent
-		utilrand.String(5),
 		c.kubeClient,
 		c.addonClient,
 		c.addonInformers,
@@ -197,10 +199,11 @@ func (c *addonTemplateController) runController(
 		// image overrides from cluster annotation has lower priority than from the addonDeploymentConfig
 		getValuesClosure,
 		addonfactory.GetAddOnDeploymentConfigValues(
-			addonfactory.NewAddOnDeploymentConfigGetter(c.addonClient),
+			utils.NewAddOnDeploymentConfigGetter(c.addonClient),
 			addonfactory.ToAddOnCustomizedVariableValues,
 			templateagent.ToAddOnNodePlacementPrivateValues,
 			templateagent.ToAddOnRegistriesPrivateValues,
+			templateagent.ToAddOnInstallNamespacePrivateValues,
 		),
 	)
 	err = mgr.AddAgent(agentAddon)
@@ -208,7 +211,8 @@ func (c *addonTemplateController) runController(
 		return err
 	}
 
-	err = mgr.StartWithInformers(ctx, kubeInformers, c.workInformers, c.addonInformers, c.clusterInformers, c.dynamicInformers)
+	err = mgr.StartWithInformers(ctx, c.workClient, c.workInformers.Work().V1().ManifestWorks(),
+		kubeInformers, c.addonInformers, c.clusterInformers, c.dynamicInformers)
 	if err != nil {
 		return err
 	}

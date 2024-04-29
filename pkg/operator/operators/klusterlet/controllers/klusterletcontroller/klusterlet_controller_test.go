@@ -551,7 +551,7 @@ func TestSyncDeploy(t *testing.T) {
 	}
 	testinghelper.AssertOnlyConditions(
 		t, klusterlet,
-		testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
+		testinghelper.NamedCondition(operatorapiv1.ConditionKlusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
 		testinghelper.NamedCondition(helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue),
 	)
 }
@@ -612,7 +612,7 @@ func TestSyncDeploySingleton(t *testing.T) {
 	}
 	testinghelper.AssertOnlyConditions(
 		t, klusterlet,
-		testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
+		testinghelper.NamedCondition(operatorapiv1.ConditionKlusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
 		testinghelper.NamedCondition(helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue),
 	)
 }
@@ -621,7 +621,7 @@ func TestSyncDeploySingleton(t *testing.T) {
 func TestSyncDeployHosted(t *testing.T) {
 	klusterlet := newKlusterletHosted("klusterlet", "testns", "cluster1")
 	meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-		Type: klusterletReadyToApply, Status: metav1.ConditionTrue, Reason: "KlusterletPrepared",
+		Type: operatorapiv1.ConditionReadyToApply, Status: metav1.ConditionTrue, Reason: "KlusterletPrepared",
 		Message: "Klusterlet is ready to apply",
 	})
 	agentNamespace := helpers.AgentNamespace(klusterlet)
@@ -631,7 +631,7 @@ func TestSyncDeployHosted(t *testing.T) {
 	// externalManagedSecret := newSecret(helpers.ExternalManagedKubeConfig, agentNamespace)
 	// externalManagedSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	namespace := newNamespace(agentNamespace)
-	pullSecret := newSecret(imagePullSecret, "open-cluster-management")
+	pullSecret := newSecret(helpers.ImagePullSecret, "open-cluster-management")
 
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestControllerHosted(t, klusterlet, syncContext.Recorder(), nil, bootStrapSecret,
@@ -707,8 +707,8 @@ func TestSyncDeployHosted(t *testing.T) {
 		klog.Infof("operator actions, verb:%v \t resource:%v \t namespace:%v", action.GetVerb(), action.GetResource(), action.GetNamespace())
 	}
 
-	conditionReady := testinghelper.NamedCondition(klusterletReadyToApply, "KlusterletPrepared", metav1.ConditionTrue)
-	conditionApplied := testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue)
+	conditionReady := testinghelper.NamedCondition(operatorapiv1.ConditionReadyToApply, "KlusterletPrepared", metav1.ConditionTrue)
+	conditionApplied := testinghelper.NamedCondition(operatorapiv1.ConditionKlusterletApplied, "KlusterletApplied", metav1.ConditionTrue)
 	conditionFeaturesValid := testinghelper.NamedCondition(
 		helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue)
 	testingcommon.AssertActions(t, operatorAction, "patch")
@@ -726,7 +726,7 @@ func TestSyncDeployHosted(t *testing.T) {
 func TestSyncDeployHostedCreateAgentNamespace(t *testing.T) {
 	klusterlet := newKlusterletHosted("klusterlet", "testns", "cluster1")
 	meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-		Type: klusterletReadyToApply, Status: metav1.ConditionFalse, Reason: "KlusterletPrepareFailed",
+		Type: operatorapiv1.ConditionReadyToApply, Status: metav1.ConditionFalse, Reason: "KlusterletPrepareFailed",
 		Message: "Failed to build managed cluster clients: secrets \"external-managed-kubeconfig\" not found",
 	})
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
@@ -815,7 +815,7 @@ func TestReplica(t *testing.T) {
 	klusterlet = newKlusterlet("klusterlet", "testns", "cluster1")
 	klusterlet.Status.Conditions = []metav1.Condition{
 		{
-			Type:   hubConnectionDegraded,
+			Type:   operatorapiv1.ConditionHubConnectionDegraded,
 			Status: metav1.ConditionFalse,
 		},
 	}
@@ -952,7 +952,7 @@ func TestSyncWithPullSecret(t *testing.T) {
 	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
 	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	namespace := newNamespace("testns")
-	pullSecret := newSecret(imagePullSecret, "open-cluster-management")
+	pullSecret := newSecret(helpers.ImagePullSecret, "open-cluster-management")
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, bootStrapSecret, hubKubeConfigSecret, namespace, pullSecret)
 
@@ -970,7 +970,7 @@ func TestSyncWithPullSecret(t *testing.T) {
 		}
 	}
 
-	if createdSecret == nil || createdSecret.Name != imagePullSecret {
+	if createdSecret == nil || createdSecret.Name != helpers.ImagePullSecret {
 		t.Errorf("Failed to sync pull secret")
 	}
 }
@@ -1024,7 +1024,7 @@ func TestDeployOnKube111(t *testing.T) {
 
 	testinghelper.AssertOnlyConditions(
 		t, updatedKlusterlet,
-		testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
+		testinghelper.NamedCondition(operatorapiv1.ConditionKlusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
 		testinghelper.NamedCondition(helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue),
 	)
 

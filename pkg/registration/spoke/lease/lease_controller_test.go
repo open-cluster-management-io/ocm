@@ -6,10 +6,8 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
-	coordinationv1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
-	clienttesting "k8s.io/client-go/testing"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
@@ -18,37 +16,76 @@ import (
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
-func TestLeaseUpdate(t *testing.T) {
+func TestSync(t *testing.T) {
 	cases := []struct {
-		name                    string
-		clusters                []runtime.Object
-		validateActions         func(t *testing.T, actions []clienttesting.Action)
-		needToStartUpdateBefore bool
-		expectedErr             string
+		name                               string
+		clusters                           []runtime.Object
+		controllerlastLeaseDurationSeconds int32
+		expectSyncErr                      string
+		validateActions                    func(fakeLeaseUpdater *fakeLeaseUpdater)
 	}{
 		{
-			name:     "start lease update routine",
-			clusters: []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertUpdateActions(t, actions)
-				leaseObj := actions[1].(clienttesting.UpdateActionImpl).Object
-				lastLeaseObj := actions[len(actions)-1].(clienttesting.UpdateActionImpl).Object
-				testinghelpers.AssertLeaseUpdated(t, leaseObj.(*coordinationv1.Lease), lastLeaseObj.(*coordinationv1.Lease))
+			name:                               "start lease update routine",
+			clusters:                           []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
+			controllerlastLeaseDurationSeconds: testinghelpers.TestLeaseDurationSeconds,
+			validateActions: func(fakeLeaseUpdater *fakeLeaseUpdater) {
+				// start method should be called
+				if !fakeLeaseUpdater.startCalled {
+					t.Error("start method should be called")
+				}
+				// stop method should not be called
+				if fakeLeaseUpdater.stopCalled {
+					t.Error("stop method should not be called")
+				}
 			},
 		},
 		{
-			name:                    "delete a managed cluster after lease update routine is started",
-			clusters:                []runtime.Object{},
-			needToStartUpdateBefore: true,
-			validateActions:         testingcommon.AssertNoMoreUpdates,
-			expectedErr: "unable to get managed cluster \"testmanagedcluster\" from hub: " +
+			name:                               "the managed cluster can not be found",
+			clusters:                           []runtime.Object{},
+			controllerlastLeaseDurationSeconds: testinghelpers.TestLeaseDurationSeconds,
+			expectSyncErr: "unable to get managed cluster \"testmanagedcluster\" from hub: " +
 				"managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
+			validateActions: func(fakeLeaseUpdater *fakeLeaseUpdater) {
+				// start method should not be called
+				if fakeLeaseUpdater.startCalled {
+					t.Error("start method should not be called")
+				}
+				// stop method should be called
+				if !fakeLeaseUpdater.stopCalled {
+					t.Error("stop method should be called")
+				}
+			},
 		},
 		{
-			name:                    "unaccept a managed cluster after lease update routine is started",
-			clusters:                []runtime.Object{testinghelpers.NewManagedCluster()},
-			needToStartUpdateBefore: true,
-			validateActions:         testingcommon.AssertNoMoreUpdates,
+			name:                               "unaccept a managed cluster",
+			clusters:                           []runtime.Object{testinghelpers.NewManagedCluster()},
+			controllerlastLeaseDurationSeconds: testinghelpers.TestLeaseDurationSeconds,
+			validateActions: func(fakeLeaseUpdater *fakeLeaseUpdater) {
+				// start method should not be called
+				if fakeLeaseUpdater.startCalled {
+					t.Error("start method should not be called")
+				}
+				// stop method should be called
+				if !fakeLeaseUpdater.stopCalled {
+					t.Error("stop method should be called")
+				}
+			},
+		},
+		{
+			name:                               "update the lease duration",
+			clusters:                           []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
+			controllerlastLeaseDurationSeconds: testinghelpers.TestLeaseDurationSeconds + 1,
+			validateActions: func(fakeLeaseUpdater *fakeLeaseUpdater) {
+				// first stop the old lease update routine, and then start a new lease update routine
+				// stop method should be called
+				if !fakeLeaseUpdater.stopCalled {
+					t.Error("stop method should be called eventually")
+				}
+				// start method should be called
+				if !fakeLeaseUpdater.startCalled {
+					t.Error("start method should not called eventually")
+				}
+			},
 		},
 	}
 
@@ -63,32 +100,74 @@ func TestLeaseUpdate(t *testing.T) {
 				}
 			}
 
-			hubClient := kubefake.NewSimpleClientset(testinghelpers.NewManagedClusterLease("managed-cluster-lease", time.Now()))
-
-			leaseUpdater := &leaseUpdater{
-				hubClient:   hubClient,
-				clusterName: testinghelpers.TestManagedClusterName,
-				leaseName:   "managed-cluster-lease",
-				recorder:    eventstesting.NewTestingEventRecorder(t),
-			}
-
-			if c.needToStartUpdateBefore {
-				leaseUpdater.start(context.TODO(), time.Duration(testinghelpers.TestLeaseDurationSeconds)*time.Second)
-				// wait a few milliseconds to start the lease update routine
-				time.Sleep(500 * time.Millisecond)
-			}
-
 			ctrl := &managedClusterLeaseController{
-				clusterName:      testinghelpers.TestManagedClusterName,
-				hubClusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				leaseUpdater:     leaseUpdater,
+				clusterName:              testinghelpers.TestManagedClusterName,
+				hubClusterLister:         clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
+				leaseUpdater:             &fakeLeaseUpdater{},
+				lastLeaseDurationSeconds: c.controllerlastLeaseDurationSeconds,
 			}
-			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""))
-			testingcommon.AssertError(t, syncErr, c.expectedErr)
 
-			// wait one cycle (1 ~ 1.25s)
-			time.Sleep(2000 * time.Millisecond)
-			c.validateActions(t, hubClient.Actions())
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""))
+			testingcommon.AssertError(t, syncErr, c.expectSyncErr)
+
+			if c.validateActions != nil {
+				c.validateActions(ctrl.leaseUpdater.(*fakeLeaseUpdater))
+			}
 		})
+	}
+}
+
+type fakeLeaseUpdater struct {
+	startCalled bool
+	stopCalled  bool
+}
+
+func (f *fakeLeaseUpdater) start(ctx context.Context, leaseDuration time.Duration) {
+	f.startCalled = true
+}
+
+func (f *fakeLeaseUpdater) stop() {
+	f.stopCalled = true
+}
+
+func TestLeaseUpdater(t *testing.T) {
+	initRenewTime := time.Now()
+	hubClient := kubefake.NewSimpleClientset(testinghelpers.NewManagedClusterLease("managed-cluster-lease", initRenewTime))
+	leaseUpdater := &leaseUpdater{
+		hubClient:   hubClient,
+		clusterName: testinghelpers.TestManagedClusterName,
+		leaseName:   "managed-cluster-lease",
+		recorder:    eventstesting.NewTestingEventRecorder(t),
+	}
+
+	// start the updater
+	ctx := context.Background()
+	leaseUpdater.start(ctx, time.Second*1)
+
+	// wait for 3 second, the all actions should be in get,update pairs
+	time.Sleep(time.Second * 3)
+	actions := hubClient.Actions()
+	if len(actions) == 0 {
+		t.Error("expect at least 1 update actions, but got 0")
+		return
+	}
+	for i := 0; i < len(actions); i += 2 {
+		if actions[i].GetVerb() != "get" {
+			t.Errorf("expect get action, but got %s", actions[i].GetVerb())
+		}
+		if actions[i+1].GetVerb() != "update" {
+			t.Errorf("expect update action, but got %s", actions[i+1].GetVerb())
+		}
+	}
+
+	// stop the updater
+	leaseUpdater.stop()
+	actionLen := len(actions)
+
+	// wait for 3 second, no new actions should be added
+	time.Sleep(time.Second * 3)
+	actions = hubClient.Actions()
+	if len(actions) != actionLen {
+		t.Errorf("expect %d actions, but got %d", actionLen, len(actions))
 	}
 }

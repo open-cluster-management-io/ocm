@@ -15,8 +15,13 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 OPERATOR_SDK?=$(PERMANENT_TMP_GOPATH)/bin/operator-sdk
 OPERATOR_SDK_VERSION?=v1.32.0
 operatorsdk_gen_dir:=$(dir $(OPERATOR_SDK))
-# CSV_VERSION is used to generate new CSV manifests
-CSV_VERSION?=0.14.0
+
+# RELEASED_CSV_VERSION is used to generate a released CSV manifests
+RELEASED_CSV_VERSION?=0.13.2
+export RELEASED_CSV_VERSION
+
+# CSV_VERSION is used to generate latest CSV manifests
+CSV_VERSION?=9.9.9
 export CSV_VERSION
 
 OPERATOR_SDK_ARCHOS:=linux_amd64
@@ -58,8 +63,13 @@ copy-crd:
 update: copy-crd update-csv
 
 update-csv: ensure-operator-sdk
-	cd deploy/cluster-manager && ../../$(OPERATOR_SDK) generate bundle --version $(CSV_VERSION) --package cluster-manager --channels stable --default-channel stable --input-dir config --output-dir olm-catalog/cluster-manager
-	cd deploy/klusterlet && ../../$(OPERATOR_SDK) generate bundle --version $(CSV_VERSION) --package klusterlet --channels stable --default-channel stable --input-dir config --output-dir olm-catalog/klusterlet
+	# update the replaces to released version in csv
+	$(SED_CMD) -i 's/cluster-manager\.v[0-9]\+\.[0-9]\+\.[0-9]\+/cluster-manager\.v$(RELEASED_CSV_VERSION)/g' deploy/cluster-manager/config/manifests/bases/cluster-manager.clusterserviceversion.yaml
+	$(SED_CMD) -i 's/klusterlet\.v[0-9]\+\.[0-9]\+\.[0-9]\+/klusterlet\.v$(RELEASED_CSV_VERSION)/g' deploy/klusterlet/config/manifests/bases/klusterlet.clusterserviceversion.yaml
+
+	# generate current csv bundle files
+	cd deploy/cluster-manager && ../../$(OPERATOR_SDK) generate bundle --version $(CSV_VERSION) --package cluster-manager --channels stable --default-channel stable --input-dir config --output-dir olm-catalog/latest
+	cd deploy/klusterlet && ../../$(OPERATOR_SDK) generate bundle --version $(CSV_VERSION) --package klusterlet --channels stable --default-channel stable --input-dir config --output-dir olm-catalog/latest
 
 	# delete bundle.Dockerfile since we do not use it to build image.
 	rm ./deploy/cluster-manager/bundle.Dockerfile

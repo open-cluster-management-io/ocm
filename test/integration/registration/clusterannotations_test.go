@@ -45,8 +45,8 @@ var _ = ginkgo.Describe("Cluster Annotations", func() {
 				return err
 			}
 
-			if len(mc.Annotations) != 1 {
-				return fmt.Errorf("expected 1 annotation, got %d", len(mc.Annotations))
+			if _, ok := mc.Annotations["foo"]; ok {
+				return fmt.Errorf("unexpected annotations %v", mc.Annotations)
 			}
 
 			if mc.Annotations["agent.open-cluster-management.io/foo"] != "bar" {

@@ -38,9 +38,7 @@ import (
 )
 
 const (
-	clusterManagerFinalizer   = "operator.open-cluster-management.io/cluster-manager-cleanup"
-	clusterManagerApplied     = "Applied"
-	clusterManagerProgressing = "Progressing"
+	clusterManagerFinalizer = "operator.open-cluster-management.io/cluster-manager-cleanup"
 
 	defaultWebhookPort       = int32(9443)
 	clusterManagerReSyncTime = 5 * time.Second
@@ -60,7 +58,8 @@ type clusterManagerController struct {
 		mwctrEnabled, addonManagerEnabled bool) error
 	generateHubClusterClients func(hubConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface,
 		migrationclient.StorageVersionMigrationsGetter, error)
-	skipRemoveCRDs bool
+	skipRemoveCRDs    bool
+	operatorNamespace string
 }
 
 type clusterManagerReconcile interface {
@@ -85,6 +84,7 @@ func NewClusterManagerController(
 	configMapInformer corev1informers.ConfigMapInformer,
 	recorder events.Recorder,
 	skipRemoveCRDs bool,
+	operatorNamespace string,
 ) factory.Controller {
 	controller := &clusterManagerController{
 		operatorKubeClient: operatorKubeClient,
@@ -99,6 +99,7 @@ func NewClusterManagerController(
 		ensureSAKubeconfigs:       ensureSAKubeconfigs,
 		cache:                     resourceapply.NewResourceCache(),
 		skipRemoveCRDs:            skipRemoveCRDs,
+		operatorNamespace:         operatorNamespace,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -134,6 +135,12 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		return err
 	}
 
+	// default driver is kube
+	workDriver := operatorapiv1.WorkDriverTypeKube
+	if clusterManager.Spec.WorkConfiguration != nil && clusterManager.Spec.WorkConfiguration.WorkDriver != "" {
+		workDriver = clusterManager.Spec.WorkConfiguration.WorkDriver
+	}
+
 	// This config is used to render template of manifests.
 	config := manifests.HubConfig{
 		ClusterManagerName:      clusterManager.Name,
@@ -152,6 +159,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		},
 		ResourceRequirementResourceType: helpers.ResourceType(clusterManager),
 		ResourceRequirements:            resourceRequirements,
+		WorkDriver:                      string(workDriver),
 	}
 
 	var registrationFeatureMsgs, workFeatureMsgs, addonFeatureMsgs string
@@ -171,6 +179,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	}
 	config.WorkFeatureGates, workFeatureMsgs = helpers.ConvertToFeatureGateFlags("Work", workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates)
 	config.MWReplicaSetEnabled = helpers.FeatureGateEnabled(workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.ManifestWorkReplicaSet)
+	config.CloudEventsDriverEnabled = helpers.FeatureGateEnabled(workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.CloudEventsDrivers)
 
 	var addonFeatureGates []operatorapiv1.FeatureGate
 	if clusterManager.Spec.AddOnManagerConfiguration != nil {
@@ -213,7 +222,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	reconcilers := []clusterManagerReconcile{
 		&crdReconcile{cache: n.cache, recorder: n.recorder, hubAPIExtensionClient: hubApiExtensionClient,
 			hubMigrationClient: hubMigrationClient, skipRemoveCRDs: n.skipRemoveCRDs},
-		&hubReoncile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient},
+		&secretReconcile{cache: n.cache, recorder: n.recorder, operatorKubeClient: n.operatorKubeClient,
+			hubKubeClient: hubClient, operatorNamespace: n.operatorNamespace},
+		&hubReconcile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient},
 		&runtimeReconcile{cache: n.cache, recorder: n.recorder, hubKubeConfig: hubKubeConfig, hubKubeClient: hubClient,
 			kubeClient: managementClient, ensureSAKubeconfigs: n.ensureSAKubeconfigs},
 		&webhookReconcile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient, kubeClient: managementClient},
@@ -248,6 +259,12 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	config.RegistrationAPIServiceCABundle = encodedCaBundle
 	config.WorkAPIServiceCABundle = encodedCaBundle
 
+	// check imagePulSecret here because there will be a warning event FailedToRetrieveImagePullSecret
+	// if imagePullSecret does not exist.
+	if config.ImagePullSecret, err = n.getImagePullSecret(ctx); err != nil {
+		return err
+	}
+
 	for _, reconciler := range reconcilers {
 		var state reconcileState
 		var rqe commonhelper.RequeueError
@@ -267,9 +284,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	clusterManager.Status.ObservedGeneration = clusterManager.Generation
 	if len(errs) == 0 {
 		meta.SetStatusCondition(&clusterManager.Status.Conditions, metav1.Condition{
-			Type:    clusterManagerApplied,
+			Type:    operatorapiv1.ConditionClusterManagerApplied,
 			Status:  metav1.ConditionTrue,
-			Reason:  "ClusterManagerApplied",
+			Reason:  operatorapiv1.ReasonClusterManagerApplied,
 			Message: "Components of cluster manager are applied",
 		})
 	} else {
@@ -367,4 +384,16 @@ func cleanResources(ctx context.Context, kubeClient kubernetes.Interface, cm *op
 		}
 	}
 	return cm, reconcileContinue, nil
+}
+
+func (n *clusterManagerController) getImagePullSecret(ctx context.Context) (string, error) {
+	_, err := n.operatorKubeClient.CoreV1().Secrets(n.operatorNamespace).Get(ctx, helpers.ImagePullSecret, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+
+	return helpers.ImagePullSecret, nil
 }

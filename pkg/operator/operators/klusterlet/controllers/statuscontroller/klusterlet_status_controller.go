@@ -32,13 +32,6 @@ type klusterletStatusController struct {
 	klusterletLister operatorlister.KlusterletLister
 }
 
-const (
-	klusterletRegistrationDesiredDegraded = "RegistrationDesiredDegraded"
-	klusterletWorkDesiredDegraded         = "WorkDesiredDegraded"
-	klusterletAvailable                   = "Available"
-	klusterletApplied                     = "Applied"
-)
-
 // NewKlusterletStatusController returns a klusterletStatusController
 func NewKlusterletStatusController(
 	kubeClient kubernetes.Interface,
@@ -75,7 +68,7 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 	}
 
 	// Do nothing when the klusterlet is not applied yet
-	if meta.FindStatusCondition(klusterlet.Status.Conditions, klusterletApplied) == nil {
+	if meta.FindStatusCondition(klusterlet.Status.Conditions, operatorapiv1.ConditionKlusterletApplied) == nil {
 		return nil
 	}
 
@@ -107,11 +100,11 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 	meta.SetStatusCondition(&newKlusterlet.Status.Conditions, availableCondition)
 
 	registrationDesiredCondition := checkAgentDeploymentDesired(ctx,
-		k.kubeClient, agentNamespace, registrationDeploymentName, klusterletRegistrationDesiredDegraded)
+		k.kubeClient, agentNamespace, registrationDeploymentName, operatorapiv1.ConditionRegistrationDesiredDegraded)
 	registrationDesiredCondition.ObservedGeneration = klusterlet.Generation
 	meta.SetStatusCondition(&newKlusterlet.Status.Conditions, registrationDesiredCondition)
 
-	workDesiredCondition := checkAgentDeploymentDesired(ctx, k.kubeClient, agentNamespace, workDeploymentName, klusterletWorkDesiredDegraded)
+	workDesiredCondition := checkAgentDeploymentDesired(ctx, k.kubeClient, agentNamespace, workDeploymentName, operatorapiv1.ConditionWorkDesiredDegraded)
 	workDesiredCondition.ObservedGeneration = klusterlet.Generation
 	meta.SetStatusCondition(&newKlusterlet.Status.Conditions, workDesiredCondition)
 
@@ -131,7 +124,7 @@ func checkAgentDeploymentDesired(ctx context.Context, kubeClient kubernetes.Inte
 		return metav1.Condition{
 			Type:    conditionType,
 			Status:  metav1.ConditionTrue,
-			Reason:  "GetDeploymentFailed",
+			Reason:  operatorapiv1.ReasonKlusterletGetDeploymentFailed,
 			Message: fmt.Sprintf("Failed to get deployment %q %q: %v", namespace, deploymentName, err),
 		}
 	}
@@ -139,7 +132,7 @@ func checkAgentDeploymentDesired(ctx context.Context, kubeClient kubernetes.Inte
 		return metav1.Condition{
 			Type:   conditionType,
 			Status: metav1.ConditionTrue,
-			Reason: "UnavailablePods",
+			Reason: operatorapiv1.ReasonKlusterletUnavailablePods,
 			Message: fmt.Sprintf("%v of requested instances are unavailable of deployment %q %q",
 				unavailablePod, namespace, deploymentName),
 		}
@@ -147,7 +140,7 @@ func checkAgentDeploymentDesired(ctx context.Context, kubeClient kubernetes.Inte
 	return metav1.Condition{
 		Type:    conditionType,
 		Status:  metav1.ConditionFalse,
-		Reason:  "DeploymentsFunctional",
+		Reason:  operatorapiv1.ReasonKlusterletDeploymentsFunctional,
 		Message: fmt.Sprintf("deployments replicas are desired: %d", *deployment.Spec.Replicas),
 	}
 }
@@ -159,17 +152,17 @@ func checkAgentsDeploymentAvailable(ctx context.Context, kubeClient kubernetes.I
 		deployment, err := kubeClient.AppsV1().Deployments(agent.namespace).Get(ctx, agent.deploymentName, metav1.GetOptions{})
 		if err != nil {
 			return metav1.Condition{
-				Type:    klusterletAvailable,
+				Type:    operatorapiv1.ConditionKlusterletAvailable,
 				Status:  metav1.ConditionFalse,
-				Reason:  "GetDeploymentFailed",
+				Reason:  operatorapiv1.ReasonKlusterletGetDeploymentFailed,
 				Message: fmt.Sprintf("Failed to get deployment %q %q: %v", agent.namespace, agent.deploymentName, err),
 			}
 		}
 		if deployment.Status.AvailableReplicas <= 0 {
 			return metav1.Condition{
-				Type:   klusterletAvailable,
+				Type:   operatorapiv1.ConditionKlusterletAvailable,
 				Status: metav1.ConditionFalse,
-				Reason: "NoAvailablePods",
+				Reason: operatorapiv1.ReasonKlusterletNoAvailablePods,
 				Message: fmt.Sprintf("%v of requested instances are available of deployment %q %q",
 					deployment.Status.AvailableReplicas, agent.namespace, agent.deploymentName),
 			}
@@ -178,9 +171,9 @@ func checkAgentsDeploymentAvailable(ctx context.Context, kubeClient kubernetes.I
 	}
 
 	return metav1.Condition{
-		Type:    klusterletAvailable,
+		Type:    operatorapiv1.ConditionKlusterletAvailable,
 		Status:  metav1.ConditionTrue,
-		Reason:  "klusterletAvailable",
+		Reason:  operatorapiv1.ReasonKlusterletAvailable,
 		Message: fmt.Sprintf("deployments are ready: %s", strings.Join(availableMessages, ",")),
 	}
 }

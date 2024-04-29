@@ -39,11 +39,6 @@ const (
 	// klusterletHostedFinalizer is used to clean up resources on the managed/hosted cluster in Hosted mode
 	klusterletHostedFinalizer             = "operator.open-cluster-management.io/klusterlet-hosted-cleanup"
 	klusterletFinalizer                   = "operator.open-cluster-management.io/klusterlet-cleanup"
-	imagePullSecret                       = "open-cluster-management-image-pull-credentials"
-	klusterletApplied                     = "Applied"
-	klusterletReadyToApply                = "ReadyToApply"
-	hubConnectionDegraded                 = "HubConnectionDegraded"
-	hubKubeConfigSecretMissing            = "HubKubeConfigSecretMissing" // #nosec G101
 	managedResourcesEvictionTimestampAnno = "operator.open-cluster-management.io/managed-resources-eviction-timestamp"
 )
 
@@ -220,12 +215,12 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	if helpers.IsHosted(config.InstallMode) {
 		if err != nil {
 			meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-				Type: klusterletReadyToApply, Status: metav1.ConditionFalse, Reason: "KlusterletPrepareFailed",
+				Type: operatorapiv1.ConditionReadyToApply, Status: metav1.ConditionFalse, Reason: operatorapiv1.ReasonKlusterletPrepareFailed,
 				Message: fmt.Sprintf("Failed to build managed cluster clients: %v", err),
 			})
 		} else {
 			meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-				Type: klusterletReadyToApply, Status: metav1.ConditionTrue, Reason: "KlusterletPrepared",
+				Type: operatorapiv1.ConditionReadyToApply, Status: metav1.ConditionTrue, Reason: operatorapiv1.ReasonKlusterletPrepared,
 				Message: "Klusterlet is ready to apply",
 			})
 		}
@@ -303,7 +298,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			managedClusterClients: managedClusterClients,
 			kubeClient:            n.kubeClient,
 			kubeVersion:           n.kubeVersion,
-			opratorNamespace:      n.operatorNamespace,
+			operatorNamespace:     n.operatorNamespace,
 			recorder:              controllerContext.Recorder(),
 			cache:                 n.cache},
 		&managementReconcile{
@@ -334,7 +329,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 	if len(errs) == 0 {
 		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-			Type: klusterletApplied, Status: metav1.ConditionTrue, Reason: "KlusterletApplied",
+			Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionTrue, Reason: operatorapiv1.ReasonKlusterletApplied,
 			Message: "Klusterlet Component Applied"})
 	} else {
 		// When appliedCondition is false, we should not update related resources and resource generations
@@ -395,15 +390,15 @@ func syncPullSecret(ctx context.Context, sourceClient, targetClient kubernetes.I
 		targetClient.CoreV1(),
 		recorder,
 		operatorNamespace,
-		imagePullSecret,
+		helpers.ImagePullSecret,
 		namespace,
-		imagePullSecret,
+		helpers.ImagePullSecret,
 		[]metav1.OwnerReference{},
 	)
 
 	if err != nil {
 		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
+			Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionFalse, Reason: operatorapiv1.ReasonKlusterletApplyFailed,
 			Message: fmt.Sprintf("Failed to sync image pull secret to namespace %q: %v", namespace, err)})
 		return err
 	}
@@ -414,7 +409,7 @@ func ensureNamespace(ctx context.Context, kubeClient kubernetes.Interface, klust
 	namespace string, recorder events.Recorder) error {
 	if err := ensureAgentNamespace(ctx, kubeClient, namespace, recorder); err != nil {
 		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
+			Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionFalse, Reason: operatorapiv1.ReasonKlusterletApplyFailed,
 			Message: fmt.Sprintf("Failed to ensure namespace %q: %v", namespace, err)})
 		return err
 	}

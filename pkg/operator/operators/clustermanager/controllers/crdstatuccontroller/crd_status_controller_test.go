@@ -21,7 +21,6 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
-	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/migrationcontroller"
 )
 
 func TestSync(t *testing.T) {
@@ -29,7 +28,7 @@ func TestSync(t *testing.T) {
 	tc := newTestController(t, clusterManager)
 
 	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
-	//Do not support migration
+	// Do not support migration
 	err := tc.sync(context.Background(), syncContext)
 	if err != nil {
 		t.Fatalf("Expected no error when sync, %v", err)
@@ -38,7 +37,7 @@ func TestSync(t *testing.T) {
 	// migration succeed
 	clusterManager.Status.Conditions = []metav1.Condition{
 		{
-			Type:   migrationcontroller.MigrationSucceeded,
+			Type:   operatorapiv1.ConditionMigrationSucceeded,
 			Status: metav1.ConditionTrue,
 		},
 	}

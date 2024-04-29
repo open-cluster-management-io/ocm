@@ -30,35 +30,35 @@ func TestIsSameUnstructured(t *testing.T) {
 	}{
 		{
 			name:     "different kind",
-			obj1:     spoketesting.NewUnstructured("v1", "Kind1", "ns1", "n1"),
-			obj2:     spoketesting.NewUnstructured("v1", "Kind2", "ns1", "n1"),
+			obj1:     testingcommon.NewUnstructured("v1", "Kind1", "ns1", "n1"),
+			obj2:     testingcommon.NewUnstructured("v1", "Kind2", "ns1", "n1"),
 			expected: false,
 		},
 		{
 			name:     "different namespace",
-			obj1:     spoketesting.NewUnstructured("v1", "Kind1", "ns1", "n1"),
-			obj2:     spoketesting.NewUnstructured("v1", "Kind1", "ns2", "n1"),
+			obj1:     testingcommon.NewUnstructured("v1", "Kind1", "ns1", "n1"),
+			obj2:     testingcommon.NewUnstructured("v1", "Kind1", "ns2", "n1"),
 			expected: false,
 		},
 		{
 			name:     "different name",
-			obj1:     spoketesting.NewUnstructured("v1", "Kind1", "ns1", "n1"),
-			obj2:     spoketesting.NewUnstructured("v1", "Kind1", "ns1", "n2"),
+			obj1:     testingcommon.NewUnstructured("v1", "Kind1", "ns1", "n1"),
+			obj2:     testingcommon.NewUnstructured("v1", "Kind1", "ns1", "n2"),
 			expected: false,
 		},
 		{
 			name: "different spec",
-			obj1: spoketesting.NewUnstructuredWithContent(
+			obj1: testingcommon.NewUnstructuredWithContent(
 				"v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}}),
-			obj2: spoketesting.NewUnstructuredWithContent(
+			obj2: testingcommon.NewUnstructuredWithContent(
 				"v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val2"}}),
 			expected: false,
 		},
 		{
 			name: "same spec, different status",
-			obj1: spoketesting.NewUnstructuredWithContent(
+			obj1: testingcommon.NewUnstructuredWithContent(
 				"v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}, "status": "status1"}),
-			obj2: spoketesting.NewUnstructuredWithContent(
+			obj2: testingcommon.NewUnstructuredWithContent(
 				"v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}, "status": "status2"}),
 			expected: true,
 		},
@@ -86,7 +86,7 @@ func TestApplyUnstructred(t *testing.T) {
 		{
 			name:     "create a new object with owner",
 			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
-			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			required: testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "get", "create")
@@ -104,7 +104,7 @@ func TestApplyUnstructred(t *testing.T) {
 		{
 			name:     "create a new object without owner",
 			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner-"},
-			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			required: testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
@@ -122,10 +122,10 @@ func TestApplyUnstructred(t *testing.T) {
 		},
 		{
 			name: "update an object owner",
-			existing: spoketesting.NewUnstructured(
+			existing: testingcommon.NewUnstructured(
 				"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"}),
 			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
-			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			required: testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
@@ -150,10 +150,10 @@ func TestApplyUnstructred(t *testing.T) {
 		},
 		{
 			name: "update an object without owner",
-			existing: spoketesting.NewUnstructured(
+			existing: testingcommon.NewUnstructured(
 				"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"}),
 			owner:    metav1.OwnerReference{Name: "test", UID: "testowner-"},
-			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			required: testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 1 {
@@ -163,10 +163,10 @@ func TestApplyUnstructred(t *testing.T) {
 		},
 		{
 			name: "remove an object owner",
-			existing: spoketesting.NewUnstructured(
+			existing: testingcommon.NewUnstructured(
 				"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner}),
 			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner-"},
-			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			required: testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
@@ -184,14 +184,14 @@ func TestApplyUnstructred(t *testing.T) {
 		{
 			name: "merge labels",
 			existing: func() *unstructured.Unstructured {
-				obj := spoketesting.NewUnstructured(
+				obj := testingcommon.NewUnstructured(
 					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
 				obj.SetLabels(map[string]string{"foo": "bar"})
 				return obj
 			}(),
 			owner: metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"},
 			required: func() *unstructured.Unstructured {
-				obj := spoketesting.NewUnstructured(
+				obj := testingcommon.NewUnstructured(
 					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
 				obj.SetLabels(map[string]string{"foo1": "bar1"})
 				return obj
@@ -213,14 +213,14 @@ func TestApplyUnstructred(t *testing.T) {
 		{
 			name: "merge annotation",
 			existing: func() *unstructured.Unstructured {
-				obj := spoketesting.NewUnstructured(
+				obj := testingcommon.NewUnstructured(
 					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
 				obj.SetAnnotations(map[string]string{"foo": "bar"})
 				return obj
 			}(),
 			owner: metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"},
 			required: func() *unstructured.Unstructured {
-				obj := spoketesting.NewUnstructured(
+				obj := testingcommon.NewUnstructured(
 					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
 				obj.SetAnnotations(map[string]string{"foo1": "bar1"})
 				return obj
@@ -242,14 +242,14 @@ func TestApplyUnstructred(t *testing.T) {
 		{
 			name: "set existing finalizer",
 			existing: func() *unstructured.Unstructured {
-				obj := spoketesting.NewUnstructured(
+				obj := testingcommon.NewUnstructured(
 					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
 				obj.SetFinalizers([]string{"foo"})
 				return obj
 			}(),
 			owner: metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"},
 			required: func() *unstructured.Unstructured {
-				obj := spoketesting.NewUnstructured(
+				obj := testingcommon.NewUnstructured(
 					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
 				obj.SetFinalizers([]string{"foo1"})
 				return obj
@@ -264,7 +264,7 @@ func TestApplyUnstructred(t *testing.T) {
 		{
 			name: "nothing to update",
 			existing: func() *unstructured.Unstructured {
-				obj := spoketesting.NewUnstructured(
+				obj := testingcommon.NewUnstructured(
 					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
 				obj.SetLabels(map[string]string{"foo": "bar"})
 				obj.SetAnnotations(map[string]string{"foo": "bar"})
@@ -272,7 +272,7 @@ func TestApplyUnstructred(t *testing.T) {
 			}(),
 			owner: metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"},
 			required: func() *unstructured.Unstructured {
-				obj := spoketesting.NewUnstructured(
+				obj := testingcommon.NewUnstructured(
 					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
 				obj.SetLabels(map[string]string{"foo": "bar"})
 				obj.SetAnnotations(map[string]string{"foo": "bar"})
@@ -323,7 +323,7 @@ func TestUpdateApplyKube(t *testing.T) {
 		{
 			name:     "apply non exist object using kube client",
 			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
-			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			required: testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
@@ -337,7 +337,7 @@ func TestUpdateApplyKube(t *testing.T) {
 			name:     "apply existing object using kube client",
 			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
 			existing: spoketesting.NewSecretWithType("test", "ns1", "foo", corev1.SecretTypeOpaque),
-			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			required: testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
@@ -409,15 +409,15 @@ func TestUpdateApplyDynamic(t *testing.T) {
 		{
 			name:         "apply non exist object using dynamic client",
 			owner:        metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
-			required:     spoketesting.NewUnstructured("monitoring.coreos.com/v1", "ServiceMonitor", "ns1", "test"),
+			required:     testingcommon.NewUnstructured("monitoring.coreos.com/v1", "ServiceMonitor", "ns1", "test"),
 			gvr:          schema.GroupVersionResource{Group: "monitoring.coreos.com", Version: "v1", Resource: "servicemonitors"},
 			ownerApplied: true,
 		},
 		{
 			name:         "apply existing object using dynamic client",
 			owner:        metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
-			existing:     spoketesting.NewUnstructured("monitoring.coreos.com/v1", "ServiceMonitor", "ns1", "test"),
-			required:     spoketesting.NewUnstructured("monitoring.coreos.com/v1", "ServiceMonitor", "ns1", "test"),
+			existing:     testingcommon.NewUnstructured("monitoring.coreos.com/v1", "ServiceMonitor", "ns1", "test"),
+			required:     testingcommon.NewUnstructured("monitoring.coreos.com/v1", "ServiceMonitor", "ns1", "test"),
 			gvr:          schema.GroupVersionResource{Group: "monitoring.coreos.com", Version: "v1", Resource: "servicemonitors"},
 			ownerApplied: false,
 		},
@@ -478,7 +478,7 @@ func TestUpdateApplyApiExtension(t *testing.T) {
 		{
 			name:     "apply non exist object using api extension client",
 			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
-			required: spoketesting.NewUnstructured("apiextensions.k8s.io/v1", "CustomResourceDefinition", "", "testcrd"),
+			required: testingcommon.NewUnstructured("apiextensions.k8s.io/v1", "CustomResourceDefinition", "", "testcrd"),
 			gvr:      schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinition"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
@@ -492,7 +492,7 @@ func TestUpdateApplyApiExtension(t *testing.T) {
 			name:     "apply existing object using api extension client",
 			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
 			existing: newCRD("testcrd"),
-			required: spoketesting.NewUnstructured("apiextensions.k8s.io/v1", "CustomResourceDefinition", "", "testcrd"),
+			required: testingcommon.NewUnstructured("apiextensions.k8s.io/v1", "CustomResourceDefinition", "", "testcrd"),
 			gvr:      schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinition"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {

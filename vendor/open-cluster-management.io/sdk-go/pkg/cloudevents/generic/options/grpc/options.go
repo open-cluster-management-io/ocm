@@ -14,8 +14,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"gopkg.in/yaml.v2"
 
-	cloudevents "github.com/cloudevents/sdk-go/v2"
-
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protocol"
 )
 
@@ -119,7 +118,7 @@ func (o *GRPCOptions) GetGRPCClientConn() (*grpc.ClientConn, error) {
 	return conn, nil
 }
 
-func (o *GRPCOptions) GetCloudEventsClient(ctx context.Context, errorHandler func(error), clientOpts ...protocol.Option) (cloudevents.Client, error) {
+func (o *GRPCOptions) GetCloudEventsProtocol(ctx context.Context, errorHandler func(error), clientOpts ...protocol.Option) (options.CloudEventsProtocol, error) {
 	conn, err := o.GetGRPCClientConn()
 	if err != nil {
 		return nil, err
@@ -146,10 +145,5 @@ func (o *GRPCOptions) GetCloudEventsClient(ctx context.Context, errorHandler fun
 
 	opts := []protocol.Option{}
 	opts = append(opts, clientOpts...)
-	p, err := protocol.NewProtocol(conn, opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	return cloudevents.NewClient(p)
+	return protocol.NewProtocol(conn, opts...)
 }

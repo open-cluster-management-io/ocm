@@ -26,7 +26,7 @@ type managedClusterLeaseController struct {
 	clusterName              string
 	hubClusterLister         clusterv1listers.ManagedClusterLister
 	lastLeaseDurationSeconds int32
-	leaseUpdater             *leaseUpdater
+	leaseUpdater             leaseUpdaterInterface
 }
 
 // NewManagedClusterLeaseController creates a new managed cluster lease controller on the managed cluster.
@@ -83,6 +83,11 @@ func (c *managedClusterLeaseController) sync(ctx context.Context, syncCtx factor
 	// ensure there is a starting lease update routine.
 	c.leaseUpdater.start(ctx, time.Duration(c.lastLeaseDurationSeconds)*time.Second)
 	return nil
+}
+
+type leaseUpdaterInterface interface {
+	start(ctx context.Context, leaseDuration time.Duration)
+	stop()
 }
 
 // leaseUpdater periodically updates the lease of a managed cluster

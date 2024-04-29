@@ -23,7 +23,6 @@ import (
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 )
 
@@ -56,7 +55,7 @@ type HelmAgentAddon struct {
 	// Deprecated: use clusterClient to get the hosting cluster.
 	hostingCluster        *clusterv1.ManagedCluster
 	clusterClient         clusterclientset.Interface
-	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) string
+	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error)
 	helmEngineStrict      bool
 }
 
@@ -205,8 +204,12 @@ func (a *HelmAgentAddon) getValues(
 
 	overrideValues = MergeValues(overrideValues, builtinValues)
 
+	releaseOptions, err := a.releaseOptions(addon)
+	if err != nil {
+		return nil, err
+	}
 	values, err := chartutil.ToRenderValues(a.chart, overrideValues,
-		a.releaseOptions(addon), a.capabilities(cluster, addon))
+		releaseOptions, a.capabilities(cluster, addon))
 	if err != nil {
 		klog.Errorf("failed to render helm chart with values %v. err:%v", overrideValues, err)
 		return values, err
@@ -215,18 +218,25 @@ func (a *HelmAgentAddon) getValues(
 	return values, nil
 }
 
-func (a *HelmAgentAddon) getValueAgentInstallNamespace(addon *addonapiv1alpha1.ManagedClusterAddOn) string {
+func (a *HelmAgentAddon) getValueAgentInstallNamespace(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
 	installNamespace := addon.Spec.InstallNamespace
 	if len(installNamespace) == 0 {
 		installNamespace = AddonDefaultInstallNamespace
 	}
 	if a.agentInstallNamespace != nil {
-		ns := a.agentInstallNamespace(addon)
+		ns, err := a.agentInstallNamespace(addon)
+		if err != nil {
+			klog.Errorf("failed to get agentInstallNamespace from addon %s. err: %v", addon.Name, err)
+			return "", err
+		}
 		if len(ns) > 0 {
 			installNamespace = ns
+		} else {
+			klog.InfoS("Namespace for addon returned by agent install namespace func is empty",
+				"addonNamespace", addon.Namespace, "addonName", addon)
 		}
 	}
-	return installNamespace
+	return installNamespace, nil
 }
 
 func (a *HelmAgentAddon) getBuiltinValues(
@@ -235,9 +245,13 @@ func (a *HelmAgentAddon) getBuiltinValues(
 	builtinValues := helmBuiltinValues{}
 	builtinValues.ClusterName = cluster.GetName()
 
-	builtinValues.AddonInstallNamespace = a.getValueAgentInstallNamespace(addon)
+	addonInstallNamespace, err := a.getValueAgentInstallNamespace(addon)
+	if err != nil {
+		return nil, err
+	}
+	builtinValues.AddonInstallNamespace = addonInstallNamespace
 
-	builtinValues.InstallMode, _ = constants.GetHostedModeInfo(addon.GetAnnotations())
+	builtinValues.InstallMode, _ = a.agentAddonOptions.HostedModeInfoFunc(addon, cluster)
 
 	helmBuiltinValues, err := JsonStructToValues(builtinValues)
 	if err != nil {
@@ -268,7 +282,7 @@ func (a *HelmAgentAddon) getDefaultValues(
 	if a.hostingCluster != nil {
 		defaultValues.HostingClusterCapabilities = *a.capabilities(a.hostingCluster, addon)
 	} else if a.clusterClient != nil {
-		hostingClusterName := addon.GetAnnotations()[addonapiv1alpha1.HostingClusterNameAnnotationKey]
+		_, hostingClusterName := a.agentAddonOptions.HostedModeInfoFunc(addon, cluster)
 		if len(hostingClusterName) > 0 {
 			hostingCluster, err := a.clusterClient.ClusterV1().ManagedClusters().
 				Get(context.TODO(), hostingClusterName, metav1.GetOptions{})
@@ -303,11 +317,16 @@ func (a *HelmAgentAddon) capabilities(
 
 // only support Release.Name, Release.Namespace
 func (a *HelmAgentAddon) releaseOptions(
-	addon *addonapiv1alpha1.ManagedClusterAddOn) chartutil.ReleaseOptions {
-	return chartutil.ReleaseOptions{
-		Name:      a.agentAddonOptions.AddonName,
-		Namespace: a.getValueAgentInstallNamespace(addon),
+	addon *addonapiv1alpha1.ManagedClusterAddOn) (chartutil.ReleaseOptions, error) {
+	releaseOptions := chartutil.ReleaseOptions{
+		Name: a.agentAddonOptions.AddonName,
 	}
+	namespace, err := a.getValueAgentInstallNamespace(addon)
+	if err != nil {
+		return releaseOptions, err
+	}
+	releaseOptions.Namespace = namespace
+	return releaseOptions, nil
 }
 
 // manifest represents a manifest file, which has a name and some content.

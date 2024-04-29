@@ -293,7 +293,7 @@ func TestSyncStorageVersionMigrationsCondition(t *testing.T) {
 			},
 			wantErr: false,
 			want: metav1.Condition{
-				Type:   MigrationSucceeded,
+				Type:   operatorapiv1.ConditionMigrationSucceeded,
 				Status: metav1.ConditionFalse,
 			},
 		},
@@ -329,7 +329,7 @@ func TestSyncStorageVersionMigrationsCondition(t *testing.T) {
 			},
 			wantErr: false,
 			want: metav1.Condition{
-				Type:   MigrationSucceeded,
+				Type:   operatorapiv1.ConditionMigrationSucceeded,
 				Status: metav1.ConditionFalse,
 			},
 		},
@@ -365,7 +365,7 @@ func TestSyncStorageVersionMigrationsCondition(t *testing.T) {
 			},
 			wantErr: false,
 			want: metav1.Condition{
-				Type:   MigrationSucceeded,
+				Type:   operatorapiv1.ConditionMigrationSucceeded,
 				Status: metav1.ConditionFalse,
 			},
 		},
@@ -401,7 +401,7 @@ func TestSyncStorageVersionMigrationsCondition(t *testing.T) {
 			},
 			wantErr: false,
 			want: metav1.Condition{
-				Type:   MigrationSucceeded,
+				Type:   operatorapiv1.ConditionMigrationSucceeded,
 				Status: metav1.ConditionFalse,
 			},
 		},
@@ -437,7 +437,7 @@ func TestSyncStorageVersionMigrationsCondition(t *testing.T) {
 			},
 			wantErr: false,
 			want: metav1.Condition{
-				Type:   MigrationSucceeded,
+				Type:   operatorapiv1.ConditionMigrationSucceeded,
 				Status: metav1.ConditionTrue,
 			},
 		},
@@ -464,7 +464,7 @@ func TestSync(t *testing.T) {
 	tc, client := newTestController(t, clusterManager)
 
 	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
-	//Do not support migration
+	// Do not support migration
 	err := tc.sync(context.Background(), syncContext)
 	if err != nil {
 		t.Fatalf("Expected no error when sync, %v", err)
@@ -475,13 +475,13 @@ func TestSync(t *testing.T) {
 		t.Fatalf("Expected no error when sync, %v", err)
 	}
 
-	if notsucceeded := meta.IsStatusConditionFalse(clusterManager.Status.Conditions, MigrationSucceeded); !notsucceeded {
+	if notsucceeded := meta.IsStatusConditionFalse(clusterManager.Status.Conditions, operatorapiv1.ConditionMigrationSucceeded); !notsucceeded {
 		t.Errorf("Error to sync clusterManager.Status.Conditions %v", clusterManager.Status.Conditions)
 	}
 	// all resources applied
 	clusterManager.Status.Conditions = []metav1.Condition{
 		{
-			Type:   clusterManagerApplied,
+			Type:   operatorapiv1.ConditionClusterManagerApplied,
 			Status: metav1.ConditionTrue,
 		},
 	}
@@ -498,7 +498,7 @@ func TestSync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error when sync, %v", err)
 	}
-	if notsucceeded := meta.IsStatusConditionFalse(clusterManager.Status.Conditions, MigrationSucceeded); !notsucceeded {
+	if notsucceeded := meta.IsStatusConditionFalse(clusterManager.Status.Conditions, operatorapiv1.ConditionMigrationSucceeded); !notsucceeded {
 		t.Errorf("Error to sync clusterManager.Status.Conditions %v", clusterManager.Status.Conditions)
 	}
 }

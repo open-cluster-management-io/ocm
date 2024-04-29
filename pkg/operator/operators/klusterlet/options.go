@@ -2,7 +2,6 @@ package klusterlet
 
 import (
 	"context"
-	"os"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -24,9 +23,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/ssarcontroller"
 	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/statuscontroller"
 )
-
-// defaultSpokeComponentNamespace is the default namespace in which the operator is deployed
-const defaultComponentNamespace = "open-cluster-management"
 
 type Options struct {
 	SkipPlaceholderHubSecret bool
@@ -90,13 +86,6 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		return err
 	}
 
-	// Read component namespace
-	operatorNamespace := defaultComponentNamespace
-	nsBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-	if err == nil {
-		operatorNamespace = string(nsBytes)
-	}
-
 	klusterletController := klusterletcontroller.NewKlusterletController(
 		kubeClient,
 		apiExtensionClient,
@@ -106,7 +95,7 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		deploymentInformer.Apps().V1().Deployments(),
 		workClient.WorkV1().AppliedManifestWorks(),
 		kubeVersion,
-		operatorNamespace,
+		helpers.GetOperatorNamespace(),
 		controllerContext.EventRecorder,
 		o.SkipPlaceholderHubSecret)
 
@@ -119,7 +108,7 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		deploymentInformer.Apps().V1().Deployments(),
 		workClient.WorkV1().AppliedManifestWorks(),
 		kubeVersion,
-		operatorNamespace,
+		helpers.GetOperatorNamespace(),
 		controllerContext.EventRecorder)
 
 	ssarController := ssarcontroller.NewKlusterletSSARController(
@@ -140,7 +129,7 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 
 	addonController := addonsecretcontroller.NewAddonPullImageSecretController(
 		kubeClient,
-		operatorNamespace,
+		helpers.GetOperatorNamespace(),
 		kubeInformer.Core().V1().Namespaces(),
 		controllerContext.EventRecorder,
 	)

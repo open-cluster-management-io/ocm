@@ -24,8 +24,11 @@ import (
 )
 
 const (
-	NodePlacementPrivateValueKey = "__NODE_PLACEMENT"
-	RegistriesPrivateValueKey    = "__REGISTRIES"
+	// Private value keys that are used internally by the addon template controller, should not be exposed to users.
+	// All private value keys should begin with "__"
+	NodePlacementPrivateValueKey    = "__NODE_PLACEMENT"
+	RegistriesPrivateValueKey       = "__REGISTRIES"
+	InstallNamespacePrivateValueKey = "__INSTALL_NAMESPACE"
 )
 
 // templateBuiltinValues includes the built-in values for crd template agentAddon.
@@ -33,8 +36,7 @@ const (
 // to convert it to Values by JsonStructToValues.
 // the built-in values can not be overridden by getValuesFuncs
 type templateCRDBuiltinValues struct {
-	ClusterName           string `json:"CLUSTER_NAME,omitempty"`
-	AddonInstallNamespace string `json:"INSTALL_NAMESPACE,omitempty"`
+	ClusterName string `json:"CLUSTER_NAME,omitempty"`
 }
 
 // templateDefaultValues includes the default values for crd template agentAddon.
@@ -42,8 +44,7 @@ type templateCRDBuiltinValues struct {
 // to convert it to Values by JsonStructToValues.
 // the default values can be overridden by getValuesFuncs
 type templateCRDDefaultValues struct {
-	HubKubeConfigPath     string `json:"HUB_KUBECONFIG,omitempty"`
-	ManagedKubeConfigPath string `json:"MANAGED_KUBECONFIG,omitempty"`
+	HubKubeConfigPath string `json:"HUB_KUBECONFIG,omitempty"`
 }
 
 type CRDTemplateAgentAddon struct {
@@ -64,7 +65,7 @@ type CRDTemplateAgentAddon struct {
 // NewCRDTemplateAgentAddon creates a CRDTemplateAgentAddon instance
 func NewCRDTemplateAgentAddon(
 	ctx context.Context,
-	addonName, agentName string,
+	addonName string,
 	hubKubeClient kubernetes.Interface,
 	addonClient addonv1alpha1client.Interface,
 	addonInformers addoninformers.SharedInformerFactory,
@@ -84,7 +85,7 @@ func NewCRDTemplateAgentAddon(
 		cmaLister:           addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
 		rolebindingLister:   rolebindingLister,
 		addonName:           addonName,
-		agentName:           agentName,
+		agentName:           fmt.Sprintf("%s-agent", addonName),
 	}
 
 	return a
@@ -118,12 +119,11 @@ func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 		},
 		SupportedConfigGVRs: supportedConfigGVRs,
 		Registration: &agent.RegistrationOption{
-			CSRConfigurations: a.TemplateCSRConfigurationsFunc(),
-			PermissionConfig:  a.TemplatePermissionConfigFunc(),
-			CSRApproveCheck:   a.TemplateCSRApproveCheckFunc(),
-			CSRSign:           a.TemplateCSRSignFunc(),
-			AgentInstallNamespace: utils.AgentInstallNamespaceFromDeploymentConfigFunc(
-				utils.NewAddOnDeploymentConfigGetter(a.addonClient)),
+			CSRConfigurations:     a.TemplateCSRConfigurationsFunc(),
+			PermissionConfig:      a.TemplatePermissionConfigFunc(),
+			CSRApproveCheck:       a.TemplateCSRApproveCheckFunc(),
+			CSRSign:               a.TemplateCSRSignFunc(),
+			AgentInstallNamespace: a.TemplateAgentRegistrationNamespaceFunc,
 		},
 		AgentDeployTriggerClusterFilter: func(old, new *clusterv1.ManagedCluster) bool {
 			return utils.ClusterImageRegistriesAnnotationChanged(old, new) ||
@@ -171,43 +171,35 @@ func (a *CRDTemplateAgentAddon) renderObjects(
 		if err := object.UnmarshalJSON([]byte(manifestStr)); err != nil {
 			return objects, err
 		}
-		objects = append(objects, object)
-	}
 
-	objects, err = a.decorateObjects(template, objects, presetValues, configValues, privateValues)
-	if err != nil {
-		return objects, err
+		object, err = a.decorateObject(template, object, presetValues, privateValues)
+		if err != nil {
+			return objects, err
+		}
+		objects = append(objects, object)
 	}
 	return objects, nil
 }
 
-func (a *CRDTemplateAgentAddon) decorateObjects(
+func (a *CRDTemplateAgentAddon) decorateObject(
 	template *addonapiv1alpha1.AddOnTemplate,
-	objects []runtime.Object,
+	obj *unstructured.Unstructured,
 	orderedValues orderedValues,
-	configValues, privateValues addonfactory.Values) ([]runtime.Object, error) {
-	decorators := []deploymentDecorator{
-		newEnvironmentDecorator(orderedValues),
-		newVolumeDecorator(a.addonName, template),
-		newNodePlacementDecorator(privateValues),
-		newImageDecorator(privateValues),
+	privateValues addonfactory.Values) (*unstructured.Unstructured, error) {
+	decorators := []decorator{
+		newDeploymentDecorator(a.addonName, template, orderedValues, privateValues),
+		newNamespaceDecorator(privateValues),
 	}
-	for index, obj := range objects {
-		deployment, err := utils.ConvertToDeployment(obj)
+
+	var err error
+	for _, decorator := range decorators {
+		obj, err = decorator.decorate(obj)
 		if err != nil {
-			continue
+			return obj, err
 		}
-
-		for _, decorator := range decorators {
-			err = decorator.decorate(deployment)
-			if err != nil {
-				return objects, err
-			}
-		}
-		objects[index] = deployment
 	}
 
-	return objects, nil
+	return obj, nil
 }
 
 // getDesiredAddOnTemplateInner returns the desired template of the addon
@@ -232,4 +224,40 @@ func (a *CRDTemplateAgentAddon) getDesiredAddOnTemplateInner(
 	}
 
 	return template.DeepCopy(), nil
+}
+
+// TemplateAgentRegistrationNamespaceFunc reads deployment resource in the manifests and use that namespace as the default
+// registration namespace. If addonDeploymentConfig is set, uses the namespace in it.
+func (a *CRDTemplateAgentAddon) TemplateAgentRegistrationNamespaceFunc(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
+	template, err := a.getDesiredAddOnTemplateInner(addon.Name, addon.Status.ConfigReferences)
+	if err != nil {
+		return "", err
+	}
+
+	// pick the namespace of the first deployment
+	var desiredNS = "open-cluster-management-agent-addon"
+	for _, manifest := range template.Spec.AgentSpec.Workload.Manifests {
+		object := &unstructured.Unstructured{}
+		if err := object.UnmarshalJSON(manifest.Raw); err != nil {
+			a.logger.Error(err, "failed to extract the object")
+			continue
+		}
+
+		if _, err = utils.ConvertToDeployment(object); err != nil {
+			continue
+		}
+
+		desiredNS = object.GetNamespace()
+		break
+	}
+
+	overrideNs, err := utils.AgentInstallNamespaceFromDeploymentConfigFunc(
+		utils.NewAddOnDeploymentConfigGetter(a.addonClient))(addon)
+	if err != nil {
+		return "", err
+	}
+	if len(overrideNs) > 0 {
+		desiredNS = overrideNs
+	}
+	return desiredNS, nil
 }

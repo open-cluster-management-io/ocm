@@ -252,25 +252,37 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 
 	syncers := []addonDeploySyncer{
 		&defaultSyncer{
-			buildWorks:     c.buildDeployManifestWorks,
+			buildWorks: c.buildDeployManifestWorksFunc(
+				newAddonWorksBuilder(agentAddon.GetAgentAddonOptions().HostedModeEnabled, c.workBuilder),
+				addonapiv1alpha1.ManagedClusterAddOnManifestApplied,
+			),
 			applyWork:      c.applyWork,
 			getWorkByAddon: c.getWorksByAddonFn(index.ManifestWorkByAddon),
 			deleteWork:     c.workApplier.Delete,
 			agentAddon:     agentAddon,
 		},
 		&hostedSyncer{
-			buildWorks:     c.buildDeployManifestWorks,
+			buildWorks: c.buildDeployManifestWorksFunc(
+				newHostingAddonWorksBuilder(agentAddon.GetAgentAddonOptions().HostedModeEnabled, c.workBuilder),
+				addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied,
+			),
 			applyWork:      c.applyWork,
 			deleteWork:     c.workApplier.Delete,
 			getCluster:     c.managedClusterLister.Get,
 			getWorkByAddon: c.getWorksByAddonFn(index.ManifestWorkByHostedAddon),
 			agentAddon:     agentAddon},
 		&defaultHookSyncer{
-			buildWorks: c.buildHookManifestWork,
+			buildWorks: c.buildHookManifestWorkFunc(
+				newAddonWorksBuilder(agentAddon.GetAgentAddonOptions().HostedModeEnabled, c.workBuilder),
+				addonapiv1alpha1.ManagedClusterAddOnManifestApplied,
+			),
 			applyWork:  c.applyWork,
 			agentAddon: agentAddon},
 		&hostedHookSyncer{
-			buildWorks:     c.buildHookManifestWork,
+			buildWorks: c.buildHookManifestWorkFunc(
+				newHostingAddonWorksBuilder(agentAddon.GetAgentAddonOptions().HostedModeEnabled, c.workBuilder),
+				addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied,
+			),
 			applyWork:      c.applyWork,
 			deleteWork:     c.workApplier.Delete,
 			getCluster:     c.managedClusterLister.Get,
@@ -354,103 +366,109 @@ func (c *addonDeployController) applyWork(ctx context.Context, appliedType strin
 	return work, nil
 }
 
-func (c *addonDeployController) buildDeployManifestWorks(installMode, workNamespace string,
+type buildDeployWorkFunc func(
+	workNamespace string,
 	cluster *clusterv1.ManagedCluster, existingWorks []*workapiv1.ManifestWork,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (appliedWorks, deleteWorks []*workapiv1.ManifestWork, err error) {
-	var appliedType string
-	var addonWorkBuilder *addonWorksBuilder
+	addon *addonapiv1alpha1.ManagedClusterAddOn) (appliedWorks, deleteWorks []*workapiv1.ManifestWork, err error)
 
-	agentAddon := c.agentAddons[addon.Name]
-	if agentAddon == nil {
-		return nil, nil, fmt.Errorf("failed to get agentAddon")
-	}
+func (c *addonDeployController) buildDeployManifestWorksFunc(addonWorkBuilder *addonWorksBuilder, appliedType string) buildDeployWorkFunc {
+	return func(
+		workNamespace string,
+		cluster *clusterv1.ManagedCluster, existingWorks []*workapiv1.ManifestWork,
+		addon *addonapiv1alpha1.ManagedClusterAddOn) (appliedWorks, deleteWorks []*workapiv1.ManifestWork, err error) {
+		agentAddon := c.agentAddons[addon.Name]
+		if agentAddon == nil {
+			return nil, nil, fmt.Errorf("failed to get agentAddon")
+		}
 
-	switch installMode {
-	case constants.InstallModeHosted:
-		appliedType = addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied
-		addonWorkBuilder = newHostingAddonWorksBuilder(agentAddon.GetAgentAddonOptions().HostedModeEnabled, c.workBuilder)
-	case constants.InstallModeDefault:
-		appliedType = addonapiv1alpha1.ManagedClusterAddOnManifestApplied
-		addonWorkBuilder = newAddonWorksBuilder(agentAddon.GetAgentAddonOptions().HostedModeEnabled, c.workBuilder)
-	default:
-		return nil, nil, fmt.Errorf("invalid install mode %v", installMode)
-	}
+		objects, err := agentAddon.Manifests(cluster, addon)
+		if err != nil {
+			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+				Type:    appliedType,
+				Status:  metav1.ConditionFalse,
+				Reason:  addonapiv1alpha1.AddonManifestAppliedReasonWorkApplyFailed,
+				Message: fmt.Sprintf("failed to get manifest from agent interface: %v", err),
+			})
+			return nil, nil, err
+		}
+		if len(objects) == 0 {
+			return nil, nil, nil
+		}
 
-	objects, err := agentAddon.Manifests(cluster, addon)
-	if err != nil {
-		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-			Type:    appliedType,
-			Status:  metav1.ConditionFalse,
-			Reason:  addonapiv1alpha1.AddonManifestAppliedReasonWorkApplyFailed,
-			Message: fmt.Sprintf("failed to get manifest from agent interface: %v", err),
-		})
-		return nil, nil, err
-	}
-	if len(objects) == 0 {
-		return nil, nil, nil
-	}
+		// this is to retrieve the intended mode of the addon.
+		var mode string
+		if agentAddon.GetAgentAddonOptions().HostedModeInfoFunc == nil {
+			mode = constants.InstallModeDefault
+		} else {
+			mode, _ = agentAddon.GetAgentAddonOptions().HostedModeInfoFunc(addon, cluster)
+		}
 
-	manifestOptions := getManifestConfigOption(agentAddon, cluster, addon)
-	existingWorksCopy := []workapiv1.ManifestWork{}
-	for _, work := range existingWorks {
-		existingWorksCopy = append(existingWorksCopy, *work)
+		manifestOptions := getManifestConfigOption(agentAddon, cluster, addon)
+		existingWorksCopy := []workapiv1.ManifestWork{}
+		for _, work := range existingWorks {
+			existingWorksCopy = append(existingWorksCopy, *work)
+		}
+		appliedWorks, deleteWorks, err = addonWorkBuilder.BuildDeployWorks(
+			mode, workNamespace, addon, existingWorksCopy, objects, manifestOptions)
+		if err != nil {
+			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+				Type:    appliedType,
+				Status:  metav1.ConditionFalse,
+				Reason:  addonapiv1alpha1.AddonManifestAppliedReasonWorkApplyFailed,
+				Message: fmt.Sprintf("failed to build manifestwork: %v", err),
+			})
+			return nil, nil, err
+		}
+		return appliedWorks, deleteWorks, nil
 	}
-	appliedWorks, deleteWorks, err = addonWorkBuilder.BuildDeployWorks(workNamespace, addon, existingWorksCopy, objects, manifestOptions)
-	if err != nil {
-		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-			Type:    appliedType,
-			Status:  metav1.ConditionFalse,
-			Reason:  addonapiv1alpha1.AddonManifestAppliedReasonWorkApplyFailed,
-			Message: fmt.Sprintf("failed to build manifestwork: %v", err),
-		})
-		return nil, nil, err
-	}
-	return appliedWorks, deleteWorks, nil
 }
-func (c *addonDeployController) buildHookManifestWork(installMode, workNamespace string,
-	cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error) {
-	var appliedType string
-	var addonWorkBuilder *addonWorksBuilder
 
-	agentAddon := c.agentAddons[addon.Name]
-	if agentAddon == nil {
-		return nil, fmt.Errorf("failed to get agentAddon")
-	}
+type buildDeployHookFunc func(
+	workNamespace string,
+	cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1alpha1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
 
-	switch installMode {
-	case constants.InstallModeHosted:
-		appliedType = addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied
-		addonWorkBuilder = newHostingAddonWorksBuilder(agentAddon.GetAgentAddonOptions().HostedModeEnabled, c.workBuilder)
-	case constants.InstallModeDefault:
-		appliedType = addonapiv1alpha1.ManagedClusterAddOnManifestApplied
-		addonWorkBuilder = newAddonWorksBuilder(agentAddon.GetAgentAddonOptions().HostedModeEnabled, c.workBuilder)
-	default:
-		return nil, fmt.Errorf("invalid install mode %v", installMode)
-	}
+func (c *addonDeployController) buildHookManifestWorkFunc(addonWorkBuilder *addonWorksBuilder, appliedType string) buildDeployHookFunc {
+	return func(
+		workNamespace string,
+		cluster *clusterv1.ManagedCluster,
+		addon *addonapiv1alpha1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error) {
+		agentAddon := c.agentAddons[addon.Name]
+		if agentAddon == nil {
+			return nil, fmt.Errorf("failed to get agentAddon")
+		}
 
-	objects, err := agentAddon.Manifests(cluster, addon)
-	if err != nil {
-		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-			Type:    appliedType,
-			Status:  metav1.ConditionFalse,
-			Reason:  addonapiv1alpha1.AddonManifestAppliedReasonWorkApplyFailed,
-			Message: fmt.Sprintf("failed to get manifest from agent interface: %v", err),
-		})
-		return nil, err
-	}
-	if len(objects) == 0 {
-		return nil, nil
-	}
+		objects, err := agentAddon.Manifests(cluster, addon)
+		if err != nil {
+			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+				Type:    appliedType,
+				Status:  metav1.ConditionFalse,
+				Reason:  addonapiv1alpha1.AddonManifestAppliedReasonWorkApplyFailed,
+				Message: fmt.Sprintf("failed to get manifest from agent interface: %v", err),
+			})
+			return nil, err
+		}
+		if len(objects) == 0 {
+			return nil, nil
+		}
 
-	hookWork, err := addonWorkBuilder.BuildHookWork(workNamespace, addon, objects)
-	if err != nil {
-		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-			Type:    appliedType,
-			Status:  metav1.ConditionFalse,
-			Reason:  addonapiv1alpha1.AddonManifestAppliedReasonWorkApplyFailed,
-			Message: fmt.Sprintf("failed to build manifestwork: %v", err),
-		})
-		return nil, err
+		// this is to retrieve the intended mode of the addon.
+		var mode string
+		if agentAddon.GetAgentAddonOptions().HostedModeInfoFunc == nil {
+			mode = constants.InstallModeDefault
+		} else {
+			mode, _ = agentAddon.GetAgentAddonOptions().HostedModeInfoFunc(addon, cluster)
+		}
+		hookWork, err := addonWorkBuilder.BuildHookWork(mode, workNamespace, addon, objects)
+		if err != nil {
+			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+				Type:    appliedType,
+				Status:  metav1.ConditionFalse,
+				Reason:  addonapiv1alpha1.AddonManifestAppliedReasonWorkApplyFailed,
+				Message: fmt.Sprintf("failed to build manifestwork: %v", err),
+			})
+			return nil, err
+		}
+		return hookWork, nil
 	}
-	return hookWork, nil
 }

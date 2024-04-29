@@ -1,0 +1,5 @@
+channels:
+- currentCSV: klusterlet.v9.9.9
+  name: stable
+defaultChannel: stable
+packageName: klusterlet

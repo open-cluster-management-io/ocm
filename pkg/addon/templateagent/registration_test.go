@@ -29,7 +29,6 @@ import (
 func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 	cases := []struct {
 		name            string
-		agentName       string
 		cluster         *clusterv1.ManagedCluster
 		addon           *addonapiv1alpha1.ManagedClusterAddOn
 		template        *addonapiv1alpha1.AddOnTemplate
@@ -37,16 +36,14 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 	}{
 		{
 			name:            "empty",
-			agentName:       "agent1",
 			cluster:         NewFakeManagedCluster("cluster1"),
 			addon:           NewFakeTemplateManagedClusterAddon("addon1", "cluster1", "", ""),
 			template:        NewFakeAddonTemplate("template1", []addonapiv1alpha1.RegistrationSpec{}),
 			expectedConfigs: []addonapiv1alpha1.RegistrationConfig{},
 		},
 		{
-			name:      "kubeclient",
-			agentName: "agent1",
-			cluster:   NewFakeManagedCluster("cluster1"),
+			name:    "kubeclient",
+			cluster: NewFakeManagedCluster("cluster1"),
 			template: NewFakeAddonTemplate("template1", []addonapiv1alpha1.RegistrationSpec{
 				{
 					Type: addonapiv1alpha1.RegistrationTypeKubeClient,
@@ -72,7 +69,7 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 				{
 					SignerName: certificates.KubeAPIServerClientSignerName,
 					Subject: addonapiv1alpha1.Subject{
-						User: "system:open-cluster-management:cluster:cluster1:addon:addon1:agent:agent1",
+						User: "system:open-cluster-management:cluster:cluster1:addon:addon1:agent:addon1-agent",
 
 						Groups: []string{
 							"system:open-cluster-management:cluster:cluster1:addon:addon1",
@@ -85,9 +82,8 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 			},
 		},
 		{
-			name:      "customsigner",
-			agentName: "agent1",
-			cluster:   NewFakeManagedCluster("cluster1"),
+			name:    "customsigner",
+			cluster: NewFakeManagedCluster("cluster1"),
 			template: NewFakeAddonTemplate("template1", []addonapiv1alpha1.RegistrationSpec{
 				{
 					Type: addonapiv1alpha1.RegistrationTypeCustomSigner,
@@ -136,7 +132,7 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, c.agentName, nil, addonClient, addonInformerFactory, nil, nil)
+		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, nil, addonClient, addonInformerFactory, nil, nil)
 		f := agent.TemplateCSRConfigurationsFunc()
 		registrationConfigs := f(c.cluster)
 		if !equality.Semantic.DeepEqual(registrationConfigs, c.expectedConfigs) {
@@ -148,7 +144,6 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 func TestTemplateCSRApproveCheckFunc(t *testing.T) {
 	cases := []struct {
 		name            string
-		agentName       string
 		cluster         *clusterv1.ManagedCluster
 		addon           *addonapiv1alpha1.ManagedClusterAddOn
 		template        *addonapiv1alpha1.AddOnTemplate
@@ -157,16 +152,14 @@ func TestTemplateCSRApproveCheckFunc(t *testing.T) {
 	}{
 		{
 			name:            "empty",
-			agentName:       "agent1",
 			cluster:         NewFakeManagedCluster("cluster1"),
 			addon:           NewFakeTemplateManagedClusterAddon("addon1", "cluster1", "", ""),
 			template:        NewFakeAddonTemplate("template1", []addonapiv1alpha1.RegistrationSpec{}),
 			expectedApprove: false,
 		},
 		{
-			name:      "kubeclient",
-			agentName: "agent1",
-			cluster:   NewFakeManagedCluster("cluster1"),
+			name:    "kubeclient",
+			cluster: NewFakeManagedCluster("cluster1"),
 			template: NewFakeAddonTemplate("template1", []addonapiv1alpha1.RegistrationSpec{
 				{
 					Type: addonapiv1alpha1.RegistrationTypeKubeClient,
@@ -199,9 +192,8 @@ func TestTemplateCSRApproveCheckFunc(t *testing.T) {
 			expectedApprove: false, // fake csr data
 		},
 		{
-			name:      "customsigner",
-			agentName: "agent1",
-			cluster:   NewFakeManagedCluster("cluster1"),
+			name:    "customsigner",
+			cluster: NewFakeManagedCluster("cluster1"),
 			template: NewFakeAddonTemplate("template1", []addonapiv1alpha1.RegistrationSpec{
 				{
 					Type: addonapiv1alpha1.RegistrationTypeCustomSigner,
@@ -245,7 +237,7 @@ func TestTemplateCSRApproveCheckFunc(t *testing.T) {
 		if err := atStore.Add(c.template); err != nil {
 			t.Fatal(err)
 		}
-		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, c.agentName, nil, addonClient, addonInformerFactory, nil, nil)
+		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, nil, addonClient, addonInformerFactory, nil, nil)
 		f := agent.TemplateCSRApproveCheckFunc()
 		approve := f(c.cluster, c.addon, c.csr)
 		if approve != c.expectedApprove {
@@ -257,7 +249,6 @@ func TestTemplateCSRApproveCheckFunc(t *testing.T) {
 func TestTemplateCSRSignFunc(t *testing.T) {
 	cases := []struct {
 		name         string
-		agentName    string
 		cluster      *clusterv1.ManagedCluster
 		addon        *addonapiv1alpha1.ManagedClusterAddOn
 		template     *addonapiv1alpha1.AddOnTemplate
@@ -265,9 +256,8 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 		expectedCert []byte
 	}{
 		{
-			name:      "kubeclient",
-			agentName: "agent1",
-			cluster:   NewFakeManagedCluster("cluster1"),
+			name:    "kubeclient",
+			cluster: NewFakeManagedCluster("cluster1"),
 			template: NewFakeAddonTemplate("template1", []addonapiv1alpha1.RegistrationSpec{
 				{
 					Type: addonapiv1alpha1.RegistrationTypeKubeClient,
@@ -301,9 +291,8 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 			expectedCert: nil,
 		},
 		{
-			name:      "customsigner no ca secret",
-			agentName: "agent1",
-			cluster:   NewFakeManagedCluster("cluster1"),
+			name:    "customsigner no ca secret",
+			cluster: NewFakeManagedCluster("cluster1"),
 			template: NewFakeAddonTemplate("template1", []addonapiv1alpha1.RegistrationSpec{
 				{
 					Type: addonapiv1alpha1.RegistrationTypeCustomSigner,
@@ -350,7 +339,7 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, c.agentName, hubKubeClient, addonClient, addonInformerFactory, nil, nil)
+		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, hubKubeClient, addonClient, addonInformerFactory, nil, nil)
 		f := agent.TemplateCSRSignFunc()
 		cert := f(c.csr)
 		if !bytes.Equal(cert, c.expectedCert) {
@@ -438,7 +427,6 @@ func NewFakeRoleBinding(addonName, namespace string, subject []rbacv1.Subject, r
 func TestTemplatePermissionConfigFunc(t *testing.T) {
 	cases := []struct {
 		name                   string
-		agentName              string
 		cluster                *clusterv1.ManagedCluster
 		addon                  *addonapiv1alpha1.ManagedClusterAddOn
 		template               *addonapiv1alpha1.AddOnTemplate
@@ -447,9 +435,8 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 		validatePermissionFunc func(*testing.T, kubernetes.Interface)
 	}{
 		{
-			name:      "kubeclient current cluster binding, rolebinding not exist",
-			agentName: "agent1",
-			cluster:   NewFakeManagedCluster("cluster1"),
+			name:    "kubeclient current cluster binding, rolebinding not exist",
+			cluster: NewFakeManagedCluster("cluster1"),
 			template: NewFakeAddonTemplate("template1", []addonapiv1alpha1.RegistrationSpec{
 				{
 					Type: addonapiv1alpha1.RegistrationTypeKubeClient,
@@ -496,9 +483,8 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 			},
 		},
 		{
-			name:      "kubeclient current cluster binding, rolebinding exists",
-			agentName: "agent1",
-			cluster:   NewFakeManagedCluster("cluster1"),
+			name:    "kubeclient current cluster binding, rolebinding exists",
+			cluster: NewFakeManagedCluster("cluster1"),
 			template: NewFakeAddonTemplate("template1", []addonapiv1alpha1.RegistrationSpec{
 				{
 					Type: addonapiv1alpha1.RegistrationTypeKubeClient,
@@ -561,9 +547,8 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 			},
 		},
 		{
-			name:      "kubeclient single namespace binding",
-			agentName: "agent1",
-			cluster:   NewFakeManagedCluster("cluster1"),
+			name:    "kubeclient single namespace binding",
+			cluster: NewFakeManagedCluster("cluster1"),
 			template: NewFakeAddonTemplate("template1", []addonapiv1alpha1.RegistrationSpec{
 				{
 					Type: addonapiv1alpha1.RegistrationTypeKubeClient,
@@ -604,9 +589,8 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 			},
 		},
 		{
-			name:      "customsigner",
-			agentName: "agent1",
-			cluster:   NewFakeManagedCluster("cluster1"),
+			name:    "customsigner",
+			cluster: NewFakeManagedCluster("cluster1"),
 			template: NewFakeAddonTemplate("template1", []addonapiv1alpha1.RegistrationSpec{
 				{
 					Type: addonapiv1alpha1.RegistrationTypeCustomSigner,
@@ -655,7 +639,7 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 			}
 		}
 
-		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, c.agentName, hubKubeClient, addonClient, addonInformerFactory,
+		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, hubKubeClient, addonClient, addonInformerFactory,
 			kubeInformers.Rbac().V1().RoleBindings().Lister(), nil)
 		f := agent.TemplatePermissionConfigFunc()
 		err := f(c.cluster, c.addon)

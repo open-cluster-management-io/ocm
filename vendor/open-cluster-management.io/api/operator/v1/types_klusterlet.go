@@ -162,6 +162,52 @@ type RegistrationConfiguration struct {
 	// +optional
 	// +kubebuilder:default:=100
 	KubeAPIBurst int32 `json:"kubeAPIBurst,omitempty"`
+
+	// BootstrapKubeConfigs defines the ordered list of bootstrap kubeconfigs. The order decides which bootstrap kubeconfig to use first when rebootstrap.
+	//
+	// When the agent loses the connection to the current hub over HubConnectionTimeoutSeconds, or the managedcluster CR
+	// is set `hubAcceptsClient=false` on the hub, the controller marks the related bootstrap kubeconfig as "failed".
+	//
+	// A failed bootstrapkubeconfig won't be used for the duration specified by SkipFailedBootstrapKubeConfigSeconds.
+	// But if the user updates the content of a failed bootstrapkubeconfig, the "failed" mark will be cleared.
+	// +optional
+	BootstrapKubeConfigs BootstrapKubeConfigs `json:"bootstrapKubeConfigs,omitempty"`
+}
+
+type TypeBootstrapKubeConfigs string
+
+const (
+	LocalSecrets TypeBootstrapKubeConfigs = "LocalSecrets"
+	None         TypeBootstrapKubeConfigs = "None"
+)
+
+type BootstrapKubeConfigs struct {
+	// Type specifies the type of priority bootstrap kubeconfigs.
+	// By default, it is set to None, representing no priority bootstrap kubeconfigs are set.
+	// +required
+	// +kubebuilder:default:=None
+	// +kubebuilder:validation:Enum=None;LocalSecrets
+	Type TypeBootstrapKubeConfigs `json:"type,omitempty"`
+
+	// LocalSecretsConfig include a list of secrets that contains the kubeconfigs for ordered bootstrap kubeconifigs.
+	// The secrets must be in the same namespace where the agent controller runs.
+	// +optional
+	LocalSecrets LocalSecretsConfig `json:"localSecretsConfig,omitempty"`
+}
+
+type LocalSecretsConfig struct {
+	// SecretNames is a list of secret names. The secrets are in the same namespace where the agent controller runs.
+	// +required
+	// +kubebuilder:validation:minItems=2
+	SecretNames []string `json:"secretNames"`
+
+	// HubConnectionTimeoutSeconds is used to set the timeout of connecting to the hub cluster.
+	// When agent loses the connection to the hub over the timeout seconds, the agent do a rebootstrap.
+	// By default is 10 mins.
+	// +optional
+	// +kubebuilder:default:=600
+	// +kubebuilder:validation:Minimum=180
+	HubConnectionTimeoutSeconds int32 `json:"hubConnectionTimeoutSeconds,omitempty"`
 }
 
 type WorkAgentConfiguration struct {
@@ -244,3 +290,66 @@ type KlusterletList struct {
 	// Items is a list of Klusterlet agents.
 	Items []Klusterlet `json:"items"`
 }
+
+const (
+	// The types of klusterlet condition status.
+	// ConditionKlusterletApplied is the klusterlet condition status which means all components have been applied on the managed cluster.
+	ConditionKlusterletApplied = "Applied"
+	// ConditionReadyToApply is a klusterlet condition status which means it is ready to apply the resources on the managed cluster.
+	ConditionReadyToApply = "ReadyToApply"
+	// ConditionKlusterletAvailable is the klusterlet condition status which means all components are available and ready to serve.
+	ConditionKlusterletAvailable = "Available"
+	// ConditionHubConnectionDegraded is the klusterlet condition status which means the agent on the managed cluster cannot access the hub cluster.
+	ConditionHubConnectionDegraded = "HubConnectionDegraded"
+	// ConditionRegistrationDesiredDegraded is the klusterlet condition status which means the registration agent on the managed cluster is not ready to serve.
+	ConditionRegistrationDesiredDegraded = "RegistrationDesiredDegraded"
+	// ConditionWorkDesiredDegraded is the klusterlet condition status which means the work agent on the managed cluster is not ready to serve.
+	ConditionWorkDesiredDegraded = "WorkDesiredDegraded"
+
+	// ReasonKlusterletApplied is the reason of ConditionKlusterletApplied condition to show resources are applied.
+	ReasonKlusterletApplied = "KlusterletApplied"
+	// ReasonKlusterletApplyFailed is the reason of ConditionKlusterletApplied condition to show it is failed to apply resources.
+	ReasonKlusterletApplyFailed = "KlusterletApplyFailed"
+	// ReasonKlusterletCRDApplyFailed is the reason of ConditionKlusterletApplied condition to show it is failed to apply CRDs.
+	ReasonKlusterletCRDApplyFailed = "CRDApplyFailed"
+	// ReasonManagedClusterResourceApplyFailed is the reason of ConditionKlusterletApplied condition to show it is failed to apply resources on managed cluster.
+	ReasonManagedClusterResourceApplyFailed = "ManagedClusterResourceApplyFailed"
+	// ReasonManagementClusterResourceApplyFailed is the reason of ConditionKlusterletApplied condition to show it is failed to apply resources on management cluster.
+	ReasonManagementClusterResourceApplyFailed = "ManagementClusterResourceApplyFailed"
+
+	// ReasonKlusterletPrepareFailed is the reason of ConditionReadyToApply condition to show it is failed to get the kubeConfig
+	// of managed cluster from the external-managed-kubeconfig secret in the hosted mode.
+	ReasonKlusterletPrepareFailed = "KlusterletPrepareFailed"
+	// ReasonKlusterletPrepared is the reason of ConditionReadyToApply condition to show the kubeConfig of managed cluster is
+	// validated from the external-managed-kubeconfig secret in the hosted mode.
+	ReasonKlusterletPrepared = "KlusterletPrepared"
+
+	// ReasonKlusterletGetDeploymentFailed is the reason of ConditionKlusterletAvailable/ConditionRegistrationDesiredDegraded/ConditionWorkDesiredDegraded
+	// condition to show it is failed to get deployments.
+	ReasonKlusterletGetDeploymentFailed = "GetDeploymentFailed"
+	// ReasonKlusterletUnavailablePods is the reason of ConditionKlusterletAvailable/ConditionRegistrationDesiredDegraded/ConditionWorkDesiredDegraded
+	// condition to show there is unavailable pod.
+	ReasonKlusterletUnavailablePods = "UnavailablePods"
+	// ReasonKlusterletDeploymentsFunctional is the reason of ConditionKlusterletAvailable/ConditionRegistrationDesiredDegraded/ConditionWorkDesiredDegraded
+	// condition to show all deployments are functional.
+	ReasonKlusterletDeploymentsFunctional = "DeploymentsFunctional"
+	// ReasonKlusterletNoAvailablePods is the reason of ConditionKlusterletAvailable/ConditionRegistrationDesiredDegraded/ConditionWorkDesiredDegraded
+	// condition to show there is no available pod.
+	ReasonKlusterletNoAvailablePods = "NoAvailablePods"
+
+	// ReasonKlusterletAvailable is the reason of ConditionKlusterletAvailable condition to show all deployed resources are available.
+	ReasonKlusterletAvailable = "KlusterletAvailable"
+
+	// ReasonHubConnectionFunctional is the reason of ConditionHubConnectionDegraded condition to show spoke cluster connects hub cluster.
+	ReasonHubConnectionFunctional = "HubConnectionFunctional"
+	// ReasonHubKubeConfigSecretMissing is the reason of ConditionHubConnectionDegraded condition to show hubKubeConfigSecret is missing.
+	ReasonHubKubeConfigSecretMissing = "HubKubeConfigSecretMissing"
+	// ReasonHubKubeConfigMissing is the reason of ConditionHubConnectionDegraded condition to show hubKubeConfig in hubKubeConfigSecret is missing.
+	ReasonHubKubeConfigMissing = "HubKubeConfigMissing"
+	// ReasonHubKubeConfigError is the reason of ConditionHubConnectionDegraded condition to show it is failed to get hubKubeConfig.
+	ReasonHubKubeConfigError = "HubKubeConfigError"
+	// ReasonClusterNameMissing is the reason of ConditionHubConnectionDegraded condition to show the cluster-name is missing in the hubKubeConfigSecret.
+	ReasonClusterNameMissing = "ClusterNameMissing"
+	// ReasonHubKubeConfigUnauthorized is the reason of ConditionHubConnectionDegraded condition to show there is no permission to access hub using the hubKubeConfigSecret.
+	ReasonHubKubeConfigUnauthorized = "HubKubeConfigUnauthorized"
+)

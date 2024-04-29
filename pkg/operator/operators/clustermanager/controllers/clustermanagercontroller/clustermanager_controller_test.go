@@ -31,6 +31,7 @@ import (
 
 	fakeoperatorlient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
+	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
@@ -75,6 +76,7 @@ func newClusterManager(name string) *operatorapiv1.ClusterManager {
 			},
 			WorkConfiguration: &operatorapiv1.WorkConfiguration{
 				FeatureGates: []operatorapiv1.FeatureGate{featureGate},
+				WorkDriver:   operatorapiv1.WorkDriverTypeKube,
 			},
 		},
 	}
@@ -299,6 +301,132 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.Cl
 	}
 }
 
+func TestSyncSecret(t *testing.T) {
+	operatorNamespace := helpers.DefaultComponentNamespace
+	tests := []struct {
+		name                                    string
+		clusterManager                          func() *operatorapiv1.ClusterManager
+		imagePullSecret, workDriverConfigSecret *corev1.Secret
+	}{
+		{
+			name: "sync imagePullSecret, workDriverConfigSecret",
+			clusterManager: func() *operatorapiv1.ClusterManager {
+				clusterManager := newClusterManager("testhub")
+				clusterManager.Spec.WorkConfiguration.FeatureGates = append(clusterManager.Spec.WorkConfiguration.FeatureGates,
+					operatorapiv1.FeatureGate{
+						Feature: string(ocmfeature.CloudEventsDrivers),
+						Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+					})
+				clusterManager.Spec.WorkConfiguration.WorkDriver = operatorapiv1.WorkDriverTypeGrpc
+				return clusterManager
+			},
+			imagePullSecret: newSecret(helpers.ImagePullSecret, operatorNamespace),
+			workDriverConfigSecret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: helpers.WorkDriverConfigSecret,
+				},
+				Data: map[string][]byte{
+					"config.yaml": []byte("url: grpc.example.com:8443"),
+				},
+			},
+		},
+		{
+			name: "sync imagePullSecret",
+			clusterManager: func() *operatorapiv1.ClusterManager {
+				return newClusterManager("testhub")
+			},
+			imagePullSecret: newSecret(helpers.ImagePullSecret, operatorNamespace),
+		},
+		{
+			name: "sync workDriverConfigSecret",
+			clusterManager: func() *operatorapiv1.ClusterManager {
+				clusterManager := newClusterManager("testhub")
+				clusterManager.Spec.WorkConfiguration.FeatureGates = append(clusterManager.Spec.WorkConfiguration.FeatureGates,
+					operatorapiv1.FeatureGate{
+						Feature: string(ocmfeature.CloudEventsDrivers),
+						Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+					})
+				clusterManager.Spec.WorkConfiguration.WorkDriver = operatorapiv1.WorkDriverTypeGrpc
+				return clusterManager
+			},
+			workDriverConfigSecret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: helpers.WorkDriverConfigSecret,
+				},
+				Data: map[string][]byte{
+					"config.yaml": []byte("url: grpc.example.com:8443"),
+				},
+			},
+		},
+	}
+	for _, c := range tests {
+		cm := c.clusterManager()
+		tc := newTestController(t, cm)
+		tc.clusterManagerController.operatorNamespace = operatorNamespace
+		clusterManagerNamespace := helpers.ClusterManagerNamespace(cm.Name, cm.Spec.DeployOption.Mode)
+		setup(t, tc, nil)
+
+		syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
+
+		if c.imagePullSecret != nil {
+			if _, err := tc.managementKubeClient.CoreV1().Secrets(operatorNamespace).Create(ctx, c.imagePullSecret, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create image pull secret: %v", err)
+			}
+		}
+
+		if c.workDriverConfigSecret != nil {
+			if _, err := tc.managementKubeClient.CoreV1().Secrets(operatorNamespace).Create(ctx, c.workDriverConfigSecret, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create work driver config secret: %v", err)
+			}
+		}
+
+		err := tc.clusterManagerController.sync(ctx, syncContext)
+		if err != nil {
+			t.Fatalf("Expected no error when sync, %v", err)
+		}
+
+		syncedSecret, err := tc.hubKubeClient.CoreV1().Secrets(clusterManagerNamespace).Get(ctx, helpers.WorkDriverConfigSecret, metav1.GetOptions{})
+		if c.workDriverConfigSecret == nil && !errors.IsNotFound(err) {
+			t.Fatalf("excpected no secret %v but got: %v", helpers.WorkDriverConfigSecret, err)
+		}
+		if c.workDriverConfigSecret != nil {
+			if err != nil {
+				t.Fatalf("Failed to get synced work driver config secret: %v", err)
+			}
+
+			if string(syncedSecret.Data["config.yaml"]) != "url: grpc.example.com:8443" {
+				t.Fatalf("Expected secret data to be url: grpc.example.com:8443")
+			}
+		}
+
+		_, err = tc.hubKubeClient.CoreV1().Secrets(clusterManagerNamespace).Get(ctx, helpers.ImagePullSecret, metav1.GetOptions{})
+		if c.imagePullSecret == nil && !errors.IsNotFound(err) {
+			t.Fatalf("excpected no secret %v but got: %v", helpers.ImagePullSecret, err)
+		}
+		if c.imagePullSecret != nil && err != nil {
+			t.Fatalf("Failed to get synced image pull secret: %v", err)
+		}
+
+		deploymentList, err := tc.hubKubeClient.AppsV1().Deployments(clusterManagerNamespace).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			t.Fatalf("Failed to list deployment: %v", err)
+		}
+		for _, deployment := range deploymentList.Items {
+			if c.imagePullSecret == nil && len(deployment.Spec.Template.Spec.ImagePullSecrets) != 0 {
+				t.Fatalf("Expected no image pull secret in deployment. %v", deployment.Name)
+			}
+
+			if c.imagePullSecret != nil && len(deployment.Spec.Template.Spec.ImagePullSecrets) == 0 {
+				t.Fatalf("Expected image pull secret in deployment. %v", deployment.Name)
+			}
+
+			if c.imagePullSecret != nil && deployment.Spec.Template.Spec.ImagePullSecrets[0].Name != helpers.ImagePullSecret {
+				t.Fatalf("Expected correct image pull secret name in deployment. %v", deployment.Name)
+			}
+		}
+	}
+}
+
 // TestSyncDeploy tests sync manifests of hub component
 func TestSyncDeploy(t *testing.T) {
 	clusterManager := newClusterManager("testhub")
@@ -407,7 +535,7 @@ func TestSyncDelete(t *testing.T) {
 			deleteKubeActions = append(deleteKubeActions, deleteKubeAction)
 		}
 	}
-	testingcommon.AssertEqualNumber(t, len(deleteKubeActions), 28) // delete namespace both from the hub cluster and the mangement cluster
+	testingcommon.AssertEqualNumber(t, len(deleteKubeActions), 30) // delete namespace both from the hub cluster and the mangement cluster
 
 	var deleteCRDActions []clienttesting.DeleteActionImpl
 	crdActions := tc.apiExtensionClient.Actions()
@@ -603,5 +731,15 @@ func getManifestFiles() []string {
 		"cluster-manager/management/cluster-manager-registration-deployment.yaml",
 		"cluster-manager/management/cluster-manager-registration-webhook-deployment.yaml",
 		"cluster-manager/management/cluster-manager-work-webhook-deployment.yaml",
+	}
+}
+
+func newSecret(name, namespace string) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{},
 	}
 }

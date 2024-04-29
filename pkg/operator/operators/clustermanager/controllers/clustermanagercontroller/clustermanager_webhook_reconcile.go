@@ -48,7 +48,7 @@ func (c *webhookReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 	config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
 	var appliedErrs []error
 
-	if !meta.IsStatusConditionFalse(cm.Status.Conditions, clusterManagerProgressing) {
+	if !meta.IsStatusConditionFalse(cm.Status.Conditions, operatorapiv1.ConditionProgressing) {
 		return cm, reconcileStop, commonhelpers.NewRequeueError("Deployment is not ready", clusterManagerReSyncTime)
 	}
 
@@ -81,9 +81,9 @@ func (c *webhookReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 
 	if len(appliedErrs) > 0 {
 		meta.SetStatusCondition(&cm.Status.Conditions, metav1.Condition{
-			Type:    clusterManagerApplied,
+			Type:    operatorapiv1.ConditionClusterManagerApplied,
 			Status:  metav1.ConditionFalse,
-			Reason:  "WebhookApplyFailed",
+			Reason:  operatorapiv1.ReasonWebhookApplyFailed,
 			Message: fmt.Sprintf("Failed to apply webhook resources: %v", utilerrors.NewAggregate(appliedErrs)),
 		})
 		return cm, reconcileStop, utilerrors.NewAggregate(appliedErrs)

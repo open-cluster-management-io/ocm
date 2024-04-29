@@ -70,7 +70,7 @@ func (o *mqttSourceOptions) WithContext(ctx context.Context, evtCtx cloudevents.
 	return cloudeventscontext.WithTopic(ctx, eventsTopic), nil
 }
 
-func (o *mqttSourceOptions) Client(ctx context.Context) (cloudevents.Client, error) {
+func (o *mqttSourceOptions) Protocol(ctx context.Context) (options.CloudEventsProtocol, error) {
 	topicSource, err := getSourceFromEventsTopic(o.Topics.AgentEvents)
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ func (o *mqttSourceOptions) Client(ctx context.Context) (cloudevents.Client, err
 		subscribe.Subscriptions[o.Topics.AgentBroadcast] = paho.SubscribeOptions{QoS: byte(o.SubQoS)}
 	}
 
-	receiver, err := o.GetCloudEventsClient(
+	receiver, err := o.GetCloudEventsProtocol(
 		ctx,
 		o.clientID,
 		func(err error) {

@@ -28,6 +28,7 @@ import (
 const (
 	nodePlacementDeploymentConfigName = "node-placement-deploy-config"
 	imageOverrideDeploymentConfigName = "image-override-deploy-config"
+	namespaceOverrideConfigName       = "namespace-override-config"
 	originalImageValue                = "quay.io/open-cluster-management/addon-examples:latest"
 	overrideImageValue                = "quay.io/ocm/addon-examples:latest"
 	customSignerName                  = "example.com/signer-name"
@@ -56,7 +57,6 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 	_ = addonapiv1alpha1.Install(s)
 
 	templateResources := []string{
-		"addon/addon_deployment_config.yaml",
 		"addon/addon_template.yaml",
 		"addon/cluster_management_addon.yaml",
 		"addon/cluster_role.yaml",
@@ -316,7 +316,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 		ginkgo.By("Prepare a AddOnDeploymentConfig for addon image override config")
 		gomega.Eventually(func() error {
-			return prepareImageOverrideAddOnDeploymentConfig(clusterName)
+			return prepareImageOverrideAddOnDeploymentConfig(clusterName, addonInstallNamespace)
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
@@ -425,7 +425,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 	ginkgo.It("Template type addon should be configured by addon deployment config for node placement", func() {
 		ginkgo.By("Prepare a AddOnDeploymentConfig for addon image override config")
 		gomega.Eventually(func() error {
-			return prepareNodePlacementAddOnDeploymentConfig(clusterName)
+			return prepareNodePlacementAddOnDeploymentConfig(clusterName, addonInstallNamespace)
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
@@ -475,6 +475,55 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
+	})
+
+	ginkgo.It("Template type addon should be configured by addon deployment config for namespace", func() {
+		ginkgo.By("Prepare a AddOnDeploymentConfig for namespace config")
+		overrideNamespace := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "another-addon-namespace",
+			},
+		}
+		_, err := t.SpokeKubeClient.CoreV1().Namespaces().Create(context.TODO(), overrideNamespace, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gomega.Eventually(func() error {
+			return prepareInstallNamespace(clusterName, overrideNamespace.Name)
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Add the configs to ManagedClusterAddOn")
+		gomega.Eventually(func() error {
+			addon, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(
+				context.Background(), addOnName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			newAddon := addon.DeepCopy()
+			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+				{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						Group:    "addon.open-cluster-management.io",
+						Resource: "addondeploymentconfigs",
+					},
+					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+						Namespace: clusterName,
+						Name:      namespaceOverrideConfigName,
+					},
+				},
+			}
+			_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Update(
+				context.Background(), newAddon, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Make sure addon is configured")
+		gomega.Eventually(func() error {
+			_, err := t.SpokeKubeClient.AppsV1().Deployments(overrideNamespace.Name).Get(
+				context.Background(), "hello-template-agent", metav1.GetOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("Template type addon's image should be overrode by cluster annotation", func() {
@@ -565,7 +614,33 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 })
 
-func prepareImageOverrideAddOnDeploymentConfig(namespace string) error {
+func prepareInstallNamespace(namespace, installNamespace string) error {
+	_, err := t.AddOnClinet.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
+		context.Background(), namespaceOverrideConfigName, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		if _, err := t.AddOnClinet.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Create(
+			context.Background(),
+			&addonapiv1alpha1.AddOnDeploymentConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      namespaceOverrideConfigName,
+					Namespace: namespace,
+				},
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					AgentInstallNamespace: installNamespace,
+				},
+			},
+			metav1.CreateOptions{},
+		); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	return err
+}
+
+func prepareImageOverrideAddOnDeploymentConfig(namespace, installNamespace string) error {
 	_, err := t.AddOnClinet.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
 		context.Background(), imageOverrideDeploymentConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
@@ -577,7 +652,8 @@ func prepareImageOverrideAddOnDeploymentConfig(namespace string) error {
 					Namespace: namespace,
 				},
 				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					Registries: registries,
+					Registries:            registries,
+					AgentInstallNamespace: installNamespace,
 				},
 			},
 			metav1.CreateOptions{},
@@ -588,14 +664,10 @@ func prepareImageOverrideAddOnDeploymentConfig(namespace string) error {
 		return nil
 	}
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
-func prepareNodePlacementAddOnDeploymentConfig(namespace string) error {
+func prepareNodePlacementAddOnDeploymentConfig(namespace, installNamespace string) error {
 	_, err := t.AddOnClinet.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
 		context.Background(), nodePlacementDeploymentConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
@@ -611,6 +683,7 @@ func prepareNodePlacementAddOnDeploymentConfig(namespace string) error {
 						NodeSelector: nodeSelector,
 						Tolerations:  tolerations,
 					},
+					AgentInstallNamespace: installNamespace,
 				},
 			},
 			metav1.CreateOptions{},
@@ -621,11 +694,7 @@ func prepareNodePlacementAddOnDeploymentConfig(namespace string) error {
 		return nil
 	}
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func copySignerSecret(ctx context.Context, kubeClient kubernetes.Interface, srcNs, srcName, dstNs, dstName string) error {
