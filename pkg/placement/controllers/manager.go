@@ -8,13 +8,13 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/events"
 	"k8s.io/utils/clock"
 
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/scheduling"
 	"open-cluster-management.io/ocm/pkg/placement/debugger"
@@ -44,13 +44,11 @@ func RunControllerManagerWithInformers(
 	clusterClient clusterclient.Interface,
 	clusterInformers clusterinformers.SharedInformerFactory,
 ) error {
-	broadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: kubeClient.EventsV1()})
-
-	if err := broadcaster.StartRecordingToSinkWithContext(ctx); err != nil {
+	recorder, err := helpers.NewEventRecorder(ctx, clusterscheme.Scheme, kubeClient, "placementController")
+	if err != nil {
 		return err
 	}
 
-	recorder := broadcaster.NewRecorder(clusterscheme.Scheme, "placementController")
 	metrics := metrics.NewScheduleMetrics(clock.RealClock{})
 
 	scheduler := scheduling.NewPluginScheduler(
