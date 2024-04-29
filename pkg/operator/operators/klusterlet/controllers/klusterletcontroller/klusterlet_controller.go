@@ -373,20 +373,6 @@ func getManagedKubeConfig(ctx context.Context, kubeClient kubernetes.Interface, 
 	return helpers.LoadClientConfigFromSecret(managedKubeconfigSecret)
 }
 
-// ensureAgentNamespace create agent namespace if it is not exist
-func ensureAgentNamespace(ctx context.Context, kubeClient kubernetes.Interface, namespace string, labels map[string]string, recorder events.Recorder) error {
-	_, _, err := resourceapply.ApplyNamespace(ctx, kubeClient.CoreV1(), recorder, &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespace,
-			Annotations: map[string]string{
-				"workload.openshift.io/allowed": "management",
-			},
-			Labels: labels,
-		},
-	})
-	return err
-}
-
 // syncPullSecret will sync pull secret from the sourceClient cluster to the targetClient cluster in desired namespace.
 func syncPullSecret(ctx context.Context, sourceClient, targetClient kubernetes.Interface,
 	klusterlet *operatorapiv1.Klusterlet, operatorNamespace, namespace string, recorder events.Recorder) error {
@@ -411,17 +397,28 @@ func syncPullSecret(ctx context.Context, sourceClient, targetClient kubernetes.I
 	return nil
 }
 
-// ensureKlusterletNamespace is to apply the namespace defined in klusterlet spec to the managed cluster
-func ensureKlusterletNamespace(ctx context.Context, kubeClient kubernetes.Interface, klusterlet *operatorapiv1.Klusterlet,
-	namespace string, recorder events.Recorder) error {
-	if err := ensureAgentNamespace(ctx, kubeClient, namespace, map[string]string{
-		klusterletNamespaceLabelKey: klusterlet.Name,
-	}, recorder); err != nil {
+// ensureNamespace is to apply the namespace defined in klusterlet spec to the managed cluster. The namespace
+// will have a klusterlet label.
+func ensureNamespace(
+	ctx context.Context,
+	kubeClient kubernetes.Interface,
+	klusterlet *operatorapiv1.Klusterlet,
+	namespace string, labels map[string]string, recorder events.Recorder) error {
+	_, _, err := resourceapply.ApplyNamespace(ctx, kubeClient.CoreV1(), recorder, &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+			Annotations: map[string]string{
+				"workload.openshift.io/allowed": "management",
+			},
+			Labels: labels,
+		},
+	})
+	if err != nil {
 		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
 			Type:    operatorapiv1.ConditionKlusterletApplied,
 			Status:  metav1.ConditionFalse,
 			Reason:  operatorapiv1.ReasonKlusterletApplyFailed,
-			Message: fmt.Sprintf("Failed to ensure namespace %q: %v", namespace, err)})
+			Message: fmt.Sprintf("Failed to ensure namespace of klusterlet %q: %v", namespace, err)})
 		return err
 	}
 	return nil

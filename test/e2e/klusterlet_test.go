@@ -201,9 +201,12 @@ var _ = Describe("Create klusterlet CR", func() {
 
 		By("old namespace should be removed")
 		Eventually(func() error {
-			_, err = t.SpokeKubeClient.CoreV1().Namespaces().Get(context.TODO(), klusterletNamespace, metav1.GetOptions{})
+			ns, err := t.SpokeKubeClient.CoreV1().Namespaces().Get(context.TODO(), klusterletNamespace, metav1.GetOptions{})
 			if errors.IsNotFound(err) {
 				return nil
+			}
+			if err == nil {
+				By(fmt.Sprintf("ns is %s, %v", ns.Name, ns.Labels))
 			}
 			return fmt.Errorf("namespace still exists")
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())

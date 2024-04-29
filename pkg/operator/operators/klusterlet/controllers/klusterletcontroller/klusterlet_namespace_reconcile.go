@@ -23,10 +23,11 @@ func (r *namespaceReconcile) reconcile(
 	ctx context.Context,
 	klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
-	if !meta.IsStatusConditionTrue(klusterlet.Status.Conditions, operatorapiv1.ConditionKlusterletApplied) {
+	cond := meta.FindStatusCondition(klusterlet.Status.Conditions, operatorapiv1.ConditionKlusterletApplied)
+	if cond == nil || cond.Status == metav1.ConditionFalse || klusterlet.Generation != klusterlet.Status.ObservedGeneration {
 		return klusterlet, reconcileContinue, nil
 	}
-	// filters namespace for klusterlet and not in hosted mo
+	// filters namespace for klusterlet and not in hosted mode
 	namespaces, err := r.managedClusterClients.kubeClient.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
 		LabelSelector: fmt.Sprintf(
 			"%s=%s",
