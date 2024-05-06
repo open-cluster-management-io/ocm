@@ -7,9 +7,13 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/discovery"
 	corev1informers "k8s.io/client-go/informers/core/v1"
+	kevents "k8s.io/client-go/tools/events"
 
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
@@ -26,6 +30,7 @@ type managedClusterStatusController struct {
 	reconcilers      []statusReconcile
 	patcher          patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus]
 	hubClusterLister clusterv1listers.ManagedClusterLister
+	hubEventRecorder kevents.EventRecorder
 }
 
 type statusReconcile interface {
@@ -49,7 +54,8 @@ func NewManagedClusterStatusController(
 	nodeInformer corev1informers.NodeInformer,
 	maxCustomClusterClaims int,
 	resyncInterval time.Duration,
-	recorder events.Recorder) factory.Controller {
+	recorder events.Recorder,
+	hubEventRecorder kevents.EventRecorder) factory.Controller {
 	c := newManagedClusterStatusController(
 		clusterName,
 		hubClusterClient,
@@ -59,6 +65,7 @@ func NewManagedClusterStatusController(
 		nodeInformer,
 		maxCustomClusterClaims,
 		recorder,
+		hubEventRecorder,
 	)
 
 	return factory.New().
@@ -76,7 +83,8 @@ func newManagedClusterStatusController(
 	claimInformer clusterv1alpha1informer.ClusterClaimInformer,
 	nodeInformer corev1informers.NodeInformer,
 	maxCustomClusterClaims int,
-	recorder events.Recorder) *managedClusterStatusController {
+	recorder events.Recorder,
+	hubEventRecorder kevents.EventRecorder) *managedClusterStatusController {
 	return &managedClusterStatusController{
 		clusterName: clusterName,
 		patcher: patcher.NewPatcher[
@@ -88,6 +96,7 @@ func newManagedClusterStatusController(
 			&claimReconcile{claimLister: claimInformer.Lister(), recorder: recorder, maxCustomClusterClaims: maxCustomClusterClaims},
 		},
 		hubClusterLister: hubClusterInformer.Lister(),
+		hubEventRecorder: hubEventRecorder,
 	}
 }
 
@@ -112,9 +121,38 @@ func (c *managedClusterStatusController) sync(ctx context.Context, syncCtx facto
 		}
 	}
 
-	if _, err := c.patcher.PatchStatus(ctx, newCluster, newCluster.Status, cluster.Status); err != nil {
+	changed, err := c.patcher.PatchStatus(ctx, newCluster, newCluster.Status, cluster.Status)
+	if err != nil {
 		errs = append(errs, err)
 	}
-
+	if changed {
+		c.sendAvailableConditionEvent(cluster, newCluster)
+	}
 	return errors.NewAggregate(errs)
+}
+
+func (c *managedClusterStatusController) sendAvailableConditionEvent(
+	cluster, newCluster *clusterv1.ManagedCluster) {
+	condition := meta.FindStatusCondition(cluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
+	newCondition := meta.FindStatusCondition(newCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
+	if newCondition == nil {
+		return
+	}
+	if condition != nil && condition.Status == newCondition.Status {
+
+		return
+	}
+
+	// send event to hub cluster in cluster namespace
+	newCluster.SetNamespace(newCluster.Name)
+	switch newCondition.Status {
+	case metav1.ConditionTrue:
+		c.hubEventRecorder.Eventf(newCluster, nil, corev1.EventTypeNormal, "Available", "Available",
+			"The managed cluster (%s) is available now", cluster.Name)
+
+	case metav1.ConditionFalse:
+		c.hubEventRecorder.Eventf(newCluster, nil, corev1.EventTypeWarning, "Unavailable", "Unavailable",
+			"The Kube API server of managed cluster (%s) is unavailable.", cluster.Name)
+	}
+
 }

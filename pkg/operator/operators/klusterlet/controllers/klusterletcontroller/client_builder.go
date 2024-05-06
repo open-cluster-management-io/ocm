@@ -8,7 +8,10 @@ import (
 	"context"
 
 	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	corev1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
@@ -83,7 +86,15 @@ func (m *managedClusterClientsBuilder) build(ctx context.Context) (*managedClust
 	// Ensure the agent namespace for users to create the external-managed-kubeconfig secret in this
 	// namespace, so that in the next reconcile loop the controller can get the secret successfully after
 	// the secret was created.
-	if err := ensureAgentNamespace(ctx, m.kubeClient, m.secretNamespace, m.recorder); err != nil {
+	_, _, err := resourceapply.ApplyNamespace(ctx, m.kubeClient.CoreV1(), m.recorder, &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: m.secretNamespace,
+			Annotations: map[string]string{
+				"workload.openshift.io/allowed": "management",
+			},
+		},
+	})
+	if err != nil {
 		return nil, err
 	}
 

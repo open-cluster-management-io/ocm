@@ -10,13 +10,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeinformers "k8s.io/client-go/informers"
+	fakekube "k8s.io/client-go/kubernetes/fake"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
@@ -78,6 +81,13 @@ func TestSyncManagedCluster(t *testing.T) {
 				}
 			}
 
+			fakeHubClient := fakekube.NewSimpleClientset()
+			ctx := context.TODO()
+			hubEventRecorder, err := helpers.NewEventRecorder(ctx,
+				clusterscheme.Scheme, fakeHubClient, "test")
+			if err != nil {
+				t.Fatal(err)
+			}
 			ctrl := newManagedClusterStatusController(
 				testinghelpers.TestManagedClusterName,
 				clusterClient,
@@ -87,9 +97,10 @@ func TestSyncManagedCluster(t *testing.T) {
 				kubeInformerFactory.Core().V1().Nodes(),
 				20,
 				eventstesting.NewTestingEventRecorder(t),
+				hubEventRecorder,
 			)
 
-			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""))
+			syncErr := ctrl.sync(ctx, testingcommon.NewFakeSyncContext(t, ""))
 			testingcommon.AssertError(t, syncErr, c.expectedErr)
 
 			c.validateActions(t, clusterClient.Actions())

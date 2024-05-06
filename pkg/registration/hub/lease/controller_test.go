@@ -14,11 +14,13 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	v1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
@@ -57,7 +59,7 @@ func TestSync(t *testing.T) {
 				testinghelpers.NewManagedClusterLease("managed-cluster-lease", now.Add(-5*time.Minute)),
 				testinghelpers.NewManagedClusterLease(fmt.Sprintf("cluster-lease-%s", testinghelpers.TestManagedClusterName), now.Add(-5*time.Minute)),
 			},
-			validateActions: func(t *testing.T, leaseActions, clusterActions []clienttesting.Action) {
+			validateActions: func(t *testing.T, hubKubeActions, clusterActions []clienttesting.Action) {
 				expected := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionUnknown,
@@ -72,6 +74,22 @@ func TestSync(t *testing.T) {
 					t.Fatal(err)
 				}
 				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expected)
+
+				if len(hubKubeActions) != 1 {
+					t.Errorf("Expected 1 event created in the sync loop, actual %d",
+						len(hubKubeActions))
+				}
+				actionEvent := hubKubeActions[0]
+				if actionEvent.GetResource().Resource != "events" {
+					t.Errorf("Expected event created, actual %s", actionEvent.GetResource())
+				}
+				if actionEvent.GetNamespace() != testinghelpers.TestManagedClusterName {
+					t.Errorf("Expected event created in namespace %s, actual %s",
+						testinghelpers.TestManagedClusterName, actionEvent.GetNamespace())
+				}
+				if actionEvent.GetVerb() != "create" {
+					t.Errorf("Expected event created, actual %s", actionEvent.GetVerb())
+				}
 			},
 		},
 		{
@@ -123,8 +141,8 @@ func TestSync(t *testing.T) {
 				}
 			}
 
-			leaseClient := kubefake.NewSimpleClientset(c.clusterLeases...)
-			leaseInformerFactory := kubeinformers.NewSharedInformerFactory(leaseClient, time.Minute*10)
+			hubClient := kubefake.NewSimpleClientset(c.clusterLeases...)
+			leaseInformerFactory := kubeinformers.NewSharedInformerFactory(hubClient, time.Minute*10)
 			leaseStore := leaseInformerFactory.Coordination().V1().Leases().Informer().GetStore()
 			for _, lease := range c.clusterLeases {
 				if err := leaseStore.Add(lease); err != nil {
@@ -132,22 +150,29 @@ func TestSync(t *testing.T) {
 				}
 			}
 
+			ctx := context.TODO()
 			syncCtx := testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName)
-
+			mcEventRecorder, err := helpers.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient, "test")
+			if err != nil {
+				t.Fatal(err)
+			}
 			ctrl := &leaseController{
-				kubeClient: leaseClient,
+				kubeClient: hubClient,
 				patcher: patcher.NewPatcher[
 					*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
 					clusterClient.ClusterV1().ManagedClusters()),
-				clusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				leaseLister:   leaseInformerFactory.Coordination().V1().Leases().Lister(),
-				eventRecorder: syncCtx.Recorder(),
+				clusterLister:   clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
+				leaseLister:     leaseInformerFactory.Coordination().V1().Leases().Lister(),
+				mcEventRecorder: mcEventRecorder,
 			}
 			syncErr := ctrl.sync(context.TODO(), syncCtx)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}
-			c.validateActions(t, leaseClient.Actions(), clusterClient.Actions())
+
+			// wait for the event to be recorded
+			time.Sleep(100 * time.Millisecond)
+			c.validateActions(t, hubClient.Actions(), clusterClient.Actions())
 		})
 	}
 }

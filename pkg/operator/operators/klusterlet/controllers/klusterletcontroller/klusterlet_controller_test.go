@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
@@ -742,6 +743,62 @@ func TestSyncDeployHostedCreateAgentNamespace(t *testing.T) {
 	testingcommon.AssertAction(t, kubeActions[1], createVerb)
 	if kubeActions[1].GetResource().Resource != "namespaces" {
 		t.Errorf("expect object namespaces, but got %v", kubeActions[2].GetResource().Resource)
+	}
+}
+
+func TestRemoveOldNamespace(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
+	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
+	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	namespace := newNamespace("testns")
+	oldNamespace := newNamespace("oldns")
+	oldNamespace.Labels = map[string]string{
+		klusterletNamespaceLabelKey: "klusterlet",
+	}
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, bootStrapSecret, hubKubeConfigSecret, namespace, oldNamespace)
+
+	err := controller.controller.sync(context.TODO(), syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	var deleteNamespaces []string
+	kubeActions := controller.kubeClient.Actions()
+	for _, action := range kubeActions {
+		if action.GetVerb() == deleteVerb && action.GetResource().Resource == "namespaces" {
+			ns := action.(clienttesting.DeleteActionImpl).Name
+			deleteNamespaces = append(deleteNamespaces, ns)
+		}
+	}
+	if len(deleteNamespaces) != 0 {
+		t.Errorf("expect no namespace deleted before applied")
+	}
+
+	controller.kubeClient.ClearActions()
+	meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
+		Type:   operatorapiv1.ConditionKlusterletApplied,
+		Status: metav1.ConditionTrue,
+	})
+	controller.operatorStore.Update(klusterlet)
+	err = controller.controller.sync(context.TODO(), syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	kubeActions = controller.kubeClient.Actions()
+	for _, action := range kubeActions {
+		if action.GetVerb() == deleteVerb && action.GetResource().Resource == "namespaces" {
+			ns := action.(clienttesting.DeleteActionImpl).Name
+			deleteNamespaces = append(deleteNamespaces, ns)
+		}
+	}
+
+	expectedSet := sets.New[string]("oldns")
+	actualSet := sets.New[string](deleteNamespaces...)
+	if !expectedSet.Equal(actualSet) {
+		t.Errorf("ns deletion not correct, got %v", actualSet)
 	}
 }
 
