@@ -152,7 +152,7 @@ func TestSync(t *testing.T) {
 
 			ctx := context.TODO()
 			syncCtx := testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName)
-			mcEventRecorder, err := helpers.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient, "leaseController")
+			mcEventRecorder, err := helpers.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient, "test")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -163,7 +163,6 @@ func TestSync(t *testing.T) {
 					clusterClient.ClusterV1().ManagedClusters()),
 				clusterLister:   clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				leaseLister:     leaseInformerFactory.Coordination().V1().Leases().Lister(),
-				eventRecorder:   syncCtx.Recorder(),
 				mcEventRecorder: mcEventRecorder,
 			}
 			syncErr := ctrl.sync(context.TODO(), syncCtx)

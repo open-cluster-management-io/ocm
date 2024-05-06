@@ -84,7 +84,7 @@ func TestSyncManagedCluster(t *testing.T) {
 			fakeHubClient := fakekube.NewSimpleClientset()
 			ctx := context.TODO()
 			hubEventRecorder, err := helpers.NewEventRecorder(ctx,
-				clusterscheme.Scheme, fakeHubClient, "joinController")
+				clusterscheme.Scheme, fakeHubClient, "test")
 			if err != nil {
 				t.Fatal(err)
 			}

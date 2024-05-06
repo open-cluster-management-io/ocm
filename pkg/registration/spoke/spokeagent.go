@@ -373,7 +373,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		recorder,
 	)
 
-	hubEventRecorder, err := helpers.NewEventRecorder(ctx, clusterscheme.Scheme, hubKubeClient, "registrationAgent")
+	hubEventRecorder, err := helpers.NewEventRecorder(ctx, clusterscheme.Scheme, hubKubeClient, "klusterlet-agent")
 	if err != nil {
 		return err
 	}

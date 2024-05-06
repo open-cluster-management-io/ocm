@@ -40,7 +40,6 @@ type leaseController struct {
 	patcher         patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus]
 	clusterLister   clusterv1listers.ManagedClusterLister
 	leaseLister     coordlisters.LeaseLister
-	eventRecorder   events.Recorder
 	mcEventRecorder kevents.EventRecorder
 }
 
@@ -59,7 +58,6 @@ func NewClusterLeaseController(
 			clusterClient.ClusterV1().ManagedClusters()),
 		clusterLister:   clusterInformer.Lister(),
 		leaseLister:     leaseInformer.Lister(),
-		eventRecorder:   recorder.WithComponentSuffix("managed-cluster-lease-controller"),
 		mcEventRecorder: mcEventRecorder,
 	}
 	return factory.New().
@@ -152,12 +150,8 @@ func (c *leaseController) updateClusterStatus(ctx context.Context, cluster *clus
 
 	updated, err := c.patcher.PatchStatus(ctx, newCluster, newCluster.Status, cluster.Status)
 	if updated {
-		c.eventRecorder.Eventf("ManagedClusterAvailableConditionUpdated",
-			"update managed cluster %q available condition to unknown, due to its lease is not updated constantly",
-			cluster.Name)
-		newClusterCopy := newCluster.DeepCopy()
-		newClusterCopy.SetNamespace(newClusterCopy.Name)
-		c.mcEventRecorder.Eventf(newClusterCopy, nil, corev1.EventTypeWarning, "AvailableUnknown", "AvailableUnknown",
+		newCluster.SetNamespace(newCluster.Name)
+		c.mcEventRecorder.Eventf(newCluster, nil, corev1.EventTypeWarning, "AvailableUnknown", "AvailableUnknown",
 			"The managed cluster (%s) cannot connect to the hub cluster.", cluster.Name)
 	}
 

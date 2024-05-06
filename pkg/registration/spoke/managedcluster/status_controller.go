@@ -143,16 +143,15 @@ func (c *managedClusterStatusController) sendAvailableConditionEvent(
 		return
 	}
 
-	newClusterCopy := newCluster.DeepCopy()
 	// send event to hub cluster in cluster namespace
-	newClusterCopy.SetNamespace(newClusterCopy.Name)
+	newCluster.SetNamespace(newCluster.Name)
 	switch newCondition.Status {
 	case metav1.ConditionTrue:
-		c.hubEventRecorder.Eventf(newClusterCopy, nil, corev1.EventTypeNormal, "Available", "Available",
+		c.hubEventRecorder.Eventf(newCluster, nil, corev1.EventTypeNormal, "Available", "Available",
 			"The managed cluster (%s) is available now", cluster.Name)
 
 	case metav1.ConditionFalse:
-		c.hubEventRecorder.Eventf(newClusterCopy, nil, corev1.EventTypeWarning, "Unavailable", "Unavailable",
+		c.hubEventRecorder.Eventf(newCluster, nil, corev1.EventTypeWarning, "Unavailable", "Unavailable",
 			"The Kube API server of managed cluster (%s) is unavailable.", cluster.Name)
 	}
 

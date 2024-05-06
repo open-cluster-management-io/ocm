@@ -318,7 +318,7 @@ func TestHealthCheck(t *testing.T) {
 
 			ctx := context.TODO()
 			hubEventRecorder, err := helpers.NewEventRecorder(ctx,
-				clusterscheme.Scheme, fakeHubClient, "resourceController")
+				clusterscheme.Scheme, fakeHubClient, "test")
 			if err != nil {
 				t.Fatal(err)
 			}

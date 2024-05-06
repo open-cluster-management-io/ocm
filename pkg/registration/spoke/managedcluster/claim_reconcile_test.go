@@ -113,7 +113,7 @@ func TestSync(t *testing.T) {
 			fakeHubClient := fakekube.NewSimpleClientset()
 			ctx := context.TODO()
 			hubEventRecorder, err := helpers.NewEventRecorder(ctx,
-				clusterscheme.Scheme, fakeHubClient, "claimController")
+				clusterscheme.Scheme, fakeHubClient, "test")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -344,7 +344,7 @@ func TestExposeClaims(t *testing.T) {
 			fakeHubClient := fakekube.NewSimpleClientset()
 			ctx := context.TODO()
 			hubEventRecorder, err := helpers.NewEventRecorder(ctx,
-				clusterscheme.Scheme, fakeHubClient, "claimController")
+				clusterscheme.Scheme, fakeHubClient, "test")
 			if err != nil {
 				t.Fatal(err)
 			}

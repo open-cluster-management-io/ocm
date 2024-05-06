@@ -188,7 +188,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		)
 	}
 
-	mcRecorder, err := commonhelpers.NewEventRecorder(ctx, clusterscheme.Scheme, kubeClient, "registrationHub")
+	mcRecorder, err := commonhelpers.NewEventRecorder(ctx, clusterscheme.Scheme, kubeClient, "registration-controller")
 	if err != nil {
 		return err
 	}
