@@ -24,10 +24,12 @@ import (
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/clientcert"
@@ -371,6 +373,10 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		recorder,
 	)
 
+	hubEventRecorder, err := helpers.NewEventRecorder(ctx, clusterscheme.Scheme, hubKubeClient, "klusterlet-agent")
+	if err != nil {
+		return err
+	}
 	// create NewManagedClusterStatusController to update the spoke cluster status
 	managedClusterHealthCheckController := managedcluster.NewManagedClusterStatusController(
 		o.agentOptions.SpokeClusterName,
@@ -382,6 +388,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		o.registrationOption.MaxCustomClusterClaims,
 		o.registrationOption.ClusterHealthCheckPeriod,
 		recorder,
+		hubEventRecorder,
 	)
 
 	var addOnLeaseController factory.Controller

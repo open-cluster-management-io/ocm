@@ -20,12 +20,14 @@ import (
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/addon"
@@ -186,12 +188,17 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		)
 	}
 
+	mcRecorder, err := commonhelpers.NewEventRecorder(ctx, clusterscheme.Scheme, kubeClient, "registration-controller")
+	if err != nil {
+		return err
+	}
 	leaseController := lease.NewClusterLeaseController(
 		kubeClient,
 		clusterClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		kubeInformers.Coordination().V1().Leases(),
 		controllerContext.EventRecorder,
+		mcRecorder,
 	)
 
 	clockSyncController := lease.NewClockSyncController(

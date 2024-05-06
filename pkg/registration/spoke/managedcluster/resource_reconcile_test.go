@@ -15,14 +15,17 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	kubeinformers "k8s.io/client-go/informers"
+	fakekube "k8s.io/client-go/kubernetes/fake"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
@@ -81,13 +84,13 @@ func TestHealthCheck(t *testing.T) {
 		nodes           []runtime.Object
 		httpStatus      int
 		responseMsg     string
-		validateActions func(t *testing.T, clusterClient *clusterfake.Clientset)
+		validateActions func(t *testing.T, clusterClient *clusterfake.Clientset, hubClient *kubefake.Clientset)
 		expectedErr     string
 	}{
 		{
 			name:     "there are no managed clusters",
 			clusters: []runtime.Object{},
-			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset) {
+			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset, _ *kubefake.Clientset) {
 				testingcommon.AssertNoActions(t, clusterClient.Actions())
 			},
 			expectedErr: "unable to get managed cluster \"testmanagedcluster\" from hub: " +
@@ -98,7 +101,7 @@ func TestHealthCheck(t *testing.T) {
 			clusters:    []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			httpStatus:  http.StatusInternalServerError,
 			responseMsg: "internal server error",
-			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset) {
+			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset, hubClient *kubefake.Clientset) {
 				expectedCondition := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionFalse,
@@ -114,6 +117,23 @@ func TestHealthCheck(t *testing.T) {
 					t.Fatal(err)
 				}
 				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
+
+				if len(hubClient.Actions()) != 1 {
+					t.Errorf("Expected 1 event created in the sync loop, actual %d",
+						len(hubClient.Actions()))
+				}
+				actionEvent := hubClient.Actions()[0]
+				if actionEvent.GetResource().Resource != "events" {
+					t.Errorf("Expected event created, actual %s", actionEvent.GetResource())
+				}
+				if actionEvent.GetNamespace() != testinghelpers.TestManagedClusterName {
+					t.Errorf("Expected event created in namespace %s, actual %s",
+						testinghelpers.TestManagedClusterName, actionEvent.GetNamespace())
+				}
+				if actionEvent.GetVerb() != "create" {
+					t.Errorf("Expected event created, actual %s", actionEvent.GetVerb())
+				}
+
 			},
 		},
 		{
@@ -123,7 +143,7 @@ func TestHealthCheck(t *testing.T) {
 				testinghelpers.NewNode("testnode1", testinghelpers.NewResourceList(32, 64), testinghelpers.NewResourceList(16, 32)),
 			},
 			httpStatus: http.StatusOK,
-			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset) {
+			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset, hubClient *kubefake.Clientset) {
 				expectedCondition := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionTrue,
@@ -153,6 +173,22 @@ func TestHealthCheck(t *testing.T) {
 				}
 				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
 				testinghelpers.AssertManagedClusterStatus(t, managedCluster.Status, expectedStatus)
+
+				if len(hubClient.Actions()) != 1 {
+					t.Errorf("Expected 1 event created in the sync loop, actual %d",
+						len(hubClient.Actions()))
+				}
+				actionEvent := hubClient.Actions()[0]
+				if actionEvent.GetResource().Resource != "events" {
+					t.Errorf("Expected event created, actual %s", actionEvent.GetResource())
+				}
+				if actionEvent.GetNamespace() != testinghelpers.TestManagedClusterName {
+					t.Errorf("Expected event created in namespace %s, actual %s",
+						testinghelpers.TestManagedClusterName, actionEvent.GetNamespace())
+				}
+				if actionEvent.GetVerb() != "create" {
+					t.Errorf("Expected event created, actual %s", actionEvent.GetVerb())
+				}
 			},
 		},
 		{
@@ -160,7 +196,7 @@ func TestHealthCheck(t *testing.T) {
 			clusters:   []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			nodes:      []runtime.Object{},
 			httpStatus: http.StatusNotFound,
-			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset) {
+			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset, hubClient *kubefake.Clientset) {
 				expectedCondition := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionTrue,
@@ -183,7 +219,7 @@ func TestHealthCheck(t *testing.T) {
 			clusters:   []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			nodes:      []runtime.Object{},
 			httpStatus: http.StatusForbidden,
-			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset) {
+			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset, hubClient *kubefake.Clientset) {
 				expectedCondition := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionTrue,
@@ -220,7 +256,7 @@ func TestHealthCheck(t *testing.T) {
 				testinghelpers.NewNode("testnode2", testinghelpers.NewResourceList(32, 64), testinghelpers.NewResourceList(16, 32)),
 			},
 			httpStatus: http.StatusOK,
-			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset) {
+			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset, hubClient *kubefake.Clientset) {
 				expectedCondition := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionJoined,
 					Status:  metav1.ConditionTrue,
@@ -277,6 +313,15 @@ func TestHealthCheck(t *testing.T) {
 
 			serverResponse.httpStatus = c.httpStatus
 			serverResponse.responseMsg = c.responseMsg
+
+			fakeHubClient := fakekube.NewSimpleClientset()
+
+			ctx := context.TODO()
+			hubEventRecorder, err := helpers.NewEventRecorder(ctx,
+				clusterscheme.Scheme, fakeHubClient, "test")
+			if err != nil {
+				t.Fatal(err)
+			}
 			ctrl := newManagedClusterStatusController(
 				testinghelpers.TestManagedClusterName,
 				clusterClient,
@@ -286,11 +331,14 @@ func TestHealthCheck(t *testing.T) {
 				kubeInformerFactory.Core().V1().Nodes(),
 				20,
 				eventstesting.NewTestingEventRecorder(t),
+				hubEventRecorder,
 			)
 			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""))
 			testingcommon.AssertError(t, syncErr, c.expectedErr)
 
-			c.validateActions(t, clusterClient)
+			// wait for the event to be sent
+			time.Sleep(100 * time.Millisecond)
+			c.validateActions(t, clusterClient, fakeHubClient)
 		})
 	}
 }

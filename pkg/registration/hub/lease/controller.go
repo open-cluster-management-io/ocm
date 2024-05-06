@@ -7,12 +7,14 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	coordv1 "k8s.io/api/coordination/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	coordinformers "k8s.io/client-go/informers/coordination/v1"
 	"k8s.io/client-go/kubernetes"
 	coordlisters "k8s.io/client-go/listers/coordination/v1"
+	kevents "k8s.io/client-go/tools/events"
 	"k8s.io/utils/pointer"
 
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
@@ -34,11 +36,11 @@ var (
 
 // leaseController checks the lease of managed clusters on hub cluster to determine whether a managed cluster is available.
 type leaseController struct {
-	kubeClient    kubernetes.Interface
-	patcher       patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus]
-	clusterLister clusterv1listers.ManagedClusterLister
-	leaseLister   coordlisters.LeaseLister
-	eventRecorder events.Recorder
+	kubeClient      kubernetes.Interface
+	patcher         patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus]
+	clusterLister   clusterv1listers.ManagedClusterLister
+	leaseLister     coordlisters.LeaseLister
+	mcEventRecorder kevents.EventRecorder
 }
 
 // NewClusterLeaseController creates a cluster lease controller on hub cluster.
@@ -47,15 +49,16 @@ func NewClusterLeaseController(
 	clusterClient clientset.Interface,
 	clusterInformer clusterv1informer.ManagedClusterInformer,
 	leaseInformer coordinformers.LeaseInformer,
-	recorder events.Recorder) factory.Controller {
+	recorder events.Recorder,
+	mcEventRecorder kevents.EventRecorder) factory.Controller {
 	c := &leaseController{
 		kubeClient: kubeClient,
 		patcher: patcher.NewPatcher[
 			*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
 			clusterClient.ClusterV1().ManagedClusters()),
-		clusterLister: clusterInformer.Lister(),
-		leaseLister:   leaseInformer.Lister(),
-		eventRecorder: recorder.WithComponentSuffix("managed-cluster-lease-controller"),
+		clusterLister:   clusterInformer.Lister(),
+		leaseLister:     leaseInformer.Lister(),
+		mcEventRecorder: mcEventRecorder,
 	}
 	return factory.New().
 		WithFilteredEventsInformersQueueKeysFunc(
@@ -147,9 +150,9 @@ func (c *leaseController) updateClusterStatus(ctx context.Context, cluster *clus
 
 	updated, err := c.patcher.PatchStatus(ctx, newCluster, newCluster.Status, cluster.Status)
 	if updated {
-		c.eventRecorder.Eventf("ManagedClusterAvailableConditionUpdated",
-			"update managed cluster %q available condition to unknown, due to its lease is not updated constantly",
-			cluster.Name)
+		newCluster.SetNamespace(newCluster.Name)
+		c.mcEventRecorder.Eventf(newCluster, nil, corev1.EventTypeWarning, "AvailableUnknown", "AvailableUnknown",
+			"The managed cluster (%s) cannot connect to the hub cluster.", cluster.Name)
 	}
 
 	return err

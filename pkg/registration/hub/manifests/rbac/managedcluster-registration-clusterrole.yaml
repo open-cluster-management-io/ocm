@@ -20,3 +20,7 @@ rules:
 - apiGroups: ["addon.open-cluster-management.io"]
   resources: ["managedclusteraddons/status"]
   verbs: ["patch", "update"]
+# Allow agent to send events to the hub
+- apiGroups: ["events.k8s.io"]
+  resources: ["events"]
+  verbs: ["create"]
