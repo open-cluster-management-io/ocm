@@ -115,7 +115,7 @@ spec:
                   like service accounts, roles and rolebindings, while the agent is
                   deployed to the namespace with the same name as klusterlet on the
                   management cluster.
-                maxLength: 63
+                maxLength: 57
                 pattern: ^open-cluster-management-[-a-z0-9]*[a-z0-9]$
                 type: string
               nodePlacement:
@@ -358,6 +358,14 @@ spec:
               workConfiguration:
                 description: WorkConfiguration contains the configuration of work
                 properties:
+                  appliedManifestWorkEvictionGracePeriod:
+                    description: AppliedManifestWorkEvictionGracePeriod is the eviction
+                      grace period the work agent will wait before evicting the AppliedManifestWorks,
+                      whose corresponding ManifestWorks are missing on the hub cluster,
+                      from the managed cluster. If not present, the default value
+                      of the work agent will be used.
+                    pattern: ^([0-9]+(s|m|h))+$
+                    type: string
                   featureGates:
                     description: 'FeatureGates represents the list of feature gates
                       for work If it is set empty, default feature gates will be used.

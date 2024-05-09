@@ -143,6 +143,7 @@ type klusterletConfig struct {
 	ExternalManagedKubeConfigWorkSecret         string
 	ExternalManagedKubeConfigAgentSecret        string
 	InstallMode                                 operatorapiv1.InstallMode
+	AppliedManifestWorkEvictionGracePeriod      string
 
 	// PriorityClassName is the name of the PriorityClass used by the deployed agents
 	PriorityClassName string
@@ -179,20 +180,21 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 
 	config := klusterletConfig{
-		KlusterletName:            klusterlet.Name,
-		KlusterletNamespace:       helpers.KlusterletNamespace(klusterlet),
-		AgentNamespace:            helpers.AgentNamespace(klusterlet),
-		AgentID:                   string(klusterlet.UID),
-		RegistrationImage:         klusterlet.Spec.RegistrationImagePullSpec,
-		WorkImage:                 klusterlet.Spec.WorkImagePullSpec,
-		ClusterName:               klusterlet.Spec.ClusterName,
-		SingletonImage:            klusterlet.Spec.ImagePullSpec,
-		BootStrapKubeConfigSecret: helpers.BootstrapHubKubeConfig,
-		HubKubeConfigSecret:       helpers.HubKubeConfig,
-		ExternalServerURL:         getServersFromKlusterlet(klusterlet),
-		OperatorNamespace:         n.operatorNamespace,
-		Replica:                   helpers.DetermineReplica(ctx, n.kubeClient, klusterlet.Spec.DeployOption.Mode, n.kubeVersion),
-		PriorityClassName:         helpers.AgentPriorityClassName(klusterlet, n.kubeVersion),
+		KlusterletName:                         klusterlet.Name,
+		KlusterletNamespace:                    helpers.KlusterletNamespace(klusterlet),
+		AgentNamespace:                         helpers.AgentNamespace(klusterlet),
+		AgentID:                                string(klusterlet.UID),
+		RegistrationImage:                      klusterlet.Spec.RegistrationImagePullSpec,
+		WorkImage:                              klusterlet.Spec.WorkImagePullSpec,
+		ClusterName:                            klusterlet.Spec.ClusterName,
+		SingletonImage:                         klusterlet.Spec.ImagePullSpec,
+		BootStrapKubeConfigSecret:              helpers.BootstrapHubKubeConfig,
+		HubKubeConfigSecret:                    helpers.HubKubeConfig,
+		ExternalServerURL:                      getServersFromKlusterlet(klusterlet),
+		OperatorNamespace:                      n.operatorNamespace,
+		Replica:                                helpers.DetermineReplica(ctx, n.kubeClient, klusterlet.Spec.DeployOption.Mode, n.kubeVersion),
+		PriorityClassName:                      helpers.AgentPriorityClassName(klusterlet, n.kubeVersion),
+		AppliedManifestWorkEvictionGracePeriod: getAppliedManifestWorkEvictionGracePeriod(klusterlet),
 
 		ExternalManagedKubeConfigSecret:             helpers.ExternalManagedKubeConfig,
 		ExternalManagedKubeConfigRegistrationSecret: helpers.ExternalManagedKubeConfigRegistration,
@@ -360,6 +362,22 @@ func getServersFromKlusterlet(klusterlet *operatorapiv1.Klusterlet) string {
 		serverString = append(serverString, server.URL)
 	}
 	return strings.Join(serverString, ",")
+}
+
+func getAppliedManifestWorkEvictionGracePeriod(klusterlet *operatorapiv1.Klusterlet) string {
+	if klusterlet == nil {
+		return ""
+	}
+
+	if klusterlet.Spec.WorkConfiguration == nil {
+		return ""
+	}
+
+	if klusterlet.Spec.WorkConfiguration.AppliedManifestWorkEvictionGracePeriod == nil {
+		return ""
+	}
+
+	return klusterlet.Spec.WorkConfiguration.AppliedManifestWorkEvictionGracePeriod.Duration.String()
 }
 
 // getManagedKubeConfig is a helper func for Hosted mode, it will retrieve managed cluster
