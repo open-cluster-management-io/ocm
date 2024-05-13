@@ -10,8 +10,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
-
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	ocmfeature "open-cluster-management.io/api/feature"
@@ -19,6 +17,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/work"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/codec"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	"open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
@@ -95,7 +94,7 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 	// ManifestWork client that implements the ManifestWorkInterface and ManifestWork informer based on different
 	// driver configuration.
 	// Refer to Event Based Manifestwork proposal in enhancements repo to get more details.
-	hubHost, config, err := cloudeventswork.NewConfigLoader(o.workOptions.WorkloadSourceDriver, o.workOptions.WorkloadSourceConfig).
+	hubHost, config, err := generic.NewConfigLoader(o.workOptions.WorkloadSourceDriver, o.workOptions.WorkloadSourceConfig).
 		LoadConfig()
 	if err != nil {
 		return err

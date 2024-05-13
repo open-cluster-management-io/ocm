@@ -11,6 +11,8 @@ import (
 //
 // Available implementations:
 //   - MQTT
+//   - KAFKA
+//   - gRPC
 type CloudEventsOptions interface {
 	// WithContext returns back a new context with the given cloudevent context. The new context will be used when
 	// sending a cloudevent.The new context is protocol-dependent, for example, for MQTT, the new context should contain

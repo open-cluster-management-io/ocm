@@ -6,12 +6,12 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapplier "open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/work"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/codec"
 
@@ -51,7 +51,7 @@ func (c *WorkHubManagerConfig) RunWorkHubManager(ctx context.Context, controller
 	// ManifestWork client that implements the ManifestWorkInterface and ManifestWork informer based on different
 	// driver configuration.
 	// Refer to Event Based Manifestwork proposal in enhancements repo to get more details.
-	_, config, err := cloudeventswork.NewConfigLoader(c.workOptions.WorkDriver, c.workOptions.WorkDriverConfig).
+	_, config, err := generic.NewConfigLoader(c.workOptions.WorkDriver, c.workOptions.WorkDriverConfig).
 		WithKubeConfig(controllerContext.KubeConfig).
 		LoadConfig()
 	if err != nil {
