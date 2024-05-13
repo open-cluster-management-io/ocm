@@ -90,6 +90,9 @@ spec:
           {{if gt .AgentKubeAPIBurst 0}}
           - "--kube-api-burst={{ .AgentKubeAPIBurst }}"
           {{end}}
+          {{if .AppliedManifestWorkEvictionGracePeriod}}
+          - "--appliedmanifestwork-eviction-grace-period={{ .AppliedManifestWorkEvictionGracePeriod }}"
+          {{end}}
         env:
           - name: POD_NAME
             valueFrom:

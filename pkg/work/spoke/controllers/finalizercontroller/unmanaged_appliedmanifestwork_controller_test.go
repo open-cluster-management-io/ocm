@@ -186,6 +186,55 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 			expectedQueueLen:                   1,
 			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
 		},
+		{
+			name:                    "disable the eviction",
+			appliedManifestWorkName: "hubhash-test",
+			hubHash:                 "hubhash",
+			agentID:                 "test-agent",
+			evictionGracePeriod:     EvictionGracePeriodBound,
+			works:                   []runtime.Object{},
+			appliedWorks: []runtime.Object{
+				&workapiv1.AppliedManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "hubhash-test",
+					},
+					Spec: workapiv1.AppliedManifestWorkSpec{
+						ManifestWorkName: "test",
+						HubHash:          "hubhash",
+						AgentID:          "test-agent",
+					},
+				},
+			},
+			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
+		},
+		{
+			name:                    "disable the eviction and remove the EvictionStartTime",
+			appliedManifestWorkName: "hubhash-test",
+			hubHash:                 "hubhash",
+			agentID:                 "test-agent",
+			evictionGracePeriod:     EvictionGracePeriodBound,
+			works:                   []runtime.Object{},
+			appliedWorks: []runtime.Object{
+				&workapiv1.AppliedManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "hubhash-test",
+					},
+					Spec: workapiv1.AppliedManifestWorkSpec{
+						ManifestWorkName: "test",
+						HubHash:          "hubhash",
+						AgentID:          "test-agent",
+					},
+					Status: workapiv1.AppliedManifestWorkStatus{
+						EvictionStartTime: &metav1.Time{
+							Time: time.Now().Add(-5 * time.Minute),
+						},
+					},
+				},
+			},
+			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+			},
+		},
 	}
 
 	for _, c := range cases {

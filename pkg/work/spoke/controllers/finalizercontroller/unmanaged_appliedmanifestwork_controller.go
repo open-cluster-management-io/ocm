@@ -25,6 +25,13 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/helper"
 )
 
+const (
+	// the upper bound of the AppliedManifestWork eviction grace period
+	// If the AppliedManifestWork eviction grace period is set with a value that is larger than or equal to
+	// the bound, the eviction feature will be disabled.
+	EvictionGracePeriodBound = 100 * 365 * 24 * time.Hour
+)
+
 type unmanagedAppliedWorkController struct {
 	manifestWorkLister        worklister.ManifestWorkNamespaceLister
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
@@ -43,7 +50,7 @@ type unmanagedAppliedWorkController struct {
 //   - the appliedmanifestwork hub hash does not match the current hub hash of the work agent.
 //
 // One unmanaged appliedmanifestwork will be evicted from the managed cluster after a grace period (by
-// default, 10 minutes), after one appliedmanifestwork is evicted from the managed cluster, its owned
+// default, 60 minutes), after one appliedmanifestwork is evicted from the managed cluster, its owned
 // resources will also be evicted from the managed cluster with Kubernetes garbage collection.
 func NewUnManagedAppliedWorkController(
 	recorder events.Recorder,
@@ -89,6 +96,12 @@ func (m *unmanagedAppliedWorkController) sync(ctx context.Context, controllerCon
 	}
 	if err != nil {
 		return err
+	}
+
+	// Do NOT evict the AppliedManifestWorks if the eviction grace period reaches or exceeds the
+	// EvictionGracePeriodBound
+	if m.evictionGracePeriod >= EvictionGracePeriodBound {
+		return m.stopToEvictAppliedManifestWork(ctx, appliedManifestWork)
 	}
 
 	_, err = m.manifestWorkLister.Get(appliedManifestWork.Spec.ManifestWorkName)
