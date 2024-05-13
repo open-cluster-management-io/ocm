@@ -64,7 +64,7 @@ metadata:
     operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/open-cluster-management-io/ocm
-    support: Red Hat, Inc.
+    support: Open Cluster Management Community
   name: cluster-manager.v0.13.1
   namespace: placeholder
 spec:
@@ -609,7 +609,7 @@ spec:
     name: Jian Qiu
   maturity: alpha
   provider:
-    name: Red Hat, Inc.
+    name: Open Cluster Management Community
   replaces: cluster-manager.v0.13.0
   selector:
     matchLabels:

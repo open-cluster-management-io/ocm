@@ -13,6 +13,7 @@ import (
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	fakeapiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
@@ -1296,4 +1297,59 @@ func (f *fakeManagedClusterBuilder) build(_ context.Context) (*managedClusterCli
 			},
 		},
 	}, nil
+}
+
+func TestGetAppliedManifestWorkEvictionGracePeriod(t *testing.T) {
+	cases := []struct {
+		name                        string
+		klusterlet                  *operatorapiv1.Klusterlet
+		workConfiguration           *operatorapiv1.WorkAgentConfiguration
+		expectedEvictionGracePeriod string
+	}{
+		{
+			name: "klusterlet is nil",
+		},
+		{
+			name:       "without workConfiguration",
+			klusterlet: newKlusterlet("test", "test-ns", "test"),
+		},
+		{
+			name:              "without appliedManifestWorkEvictionGracePeriod",
+			klusterlet:        newKlusterlet("test", "test-ns", "test"),
+			workConfiguration: &operatorapiv1.WorkAgentConfiguration{},
+		},
+		{
+			name:       "with appliedManifestWorkEvictionGracePeriod",
+			klusterlet: newKlusterlet("test", "test-ns", "test"),
+			workConfiguration: &operatorapiv1.WorkAgentConfiguration{
+				AppliedManifestWorkEvictionGracePeriod: &metav1.Duration{
+					Duration: 10 * time.Minute,
+				},
+			},
+			expectedEvictionGracePeriod: "10m",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if c.klusterlet != nil {
+				c.klusterlet.Spec.WorkConfiguration = c.workConfiguration
+			}
+
+			actualString := getAppliedManifestWorkEvictionGracePeriod(c.klusterlet)
+			if len(actualString) == 0 || len(c.expectedEvictionGracePeriod) == 0 {
+				assert.Equal(t, c.expectedEvictionGracePeriod, actualString)
+			} else {
+				expected, err := time.ParseDuration(c.expectedEvictionGracePeriod)
+				if err != nil {
+					t.Errorf("Failed to parse duration: %s", c.expectedEvictionGracePeriod)
+				}
+				actual, err := time.ParseDuration(actualString)
+				if err != nil {
+					t.Errorf("Failed to parse duration: %s", actualString)
+				}
+				assert.Equal(t, expected, actual)
+			}
+		})
+	}
 }

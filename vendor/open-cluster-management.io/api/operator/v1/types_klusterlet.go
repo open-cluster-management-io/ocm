@@ -36,7 +36,7 @@ type KlusterletSpec struct {
 	// necessary resources, like service accounts, roles and rolebindings, while the agent
 	// is deployed to the namespace with the same name as klusterlet on the management cluster.
 	// +optional
-	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:MaxLength=57
 	// +kubebuilder:validation:Pattern=^open-cluster-management-[-a-z0-9]*[a-z0-9]$
 	Namespace string `json:"namespace,omitempty"`
 
@@ -232,6 +232,14 @@ type WorkAgentConfiguration struct {
 	// +optional
 	// +kubebuilder:default:=100
 	KubeAPIBurst int32 `json:"kubeAPIBurst,omitempty"`
+
+	// AppliedManifestWorkEvictionGracePeriod is the eviction grace period the work agent will wait before
+	// evicting the AppliedManifestWorks, whose corresponding ManifestWorks are missing on the hub cluster, from
+	// the managed cluster. If not present, the default value of the work agent will be used.
+	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Pattern="^([0-9]+(s|m|h))+$"
+	AppliedManifestWorkEvictionGracePeriod *metav1.Duration `json:"appliedManifestWorkEvictionGracePeriod,omitempty"`
 }
 
 const (

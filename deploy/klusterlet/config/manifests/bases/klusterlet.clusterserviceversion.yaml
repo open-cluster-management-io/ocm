@@ -10,7 +10,7 @@ metadata:
     createdAt: "2023-05-24T20:00:31Z"
     description: Manages the installation and upgrade of the Klusterlet.
     repository: https://github.com/open-cluster-management-io/ocm
-    support: Red Hat, Inc.
+    support: Open Cluster Management Community
   name: klusterlet.vX.Y.Z
   namespace: placeholder
 spec:
@@ -85,7 +85,7 @@ spec:
     name: Jian Qiu
   maturity: alpha
   provider:
-    name: Red Hat, Inc.
+    name: Open Cluster Management Community
   replaces: klusterlet.v0.13.2
   selector:
     matchLabels:

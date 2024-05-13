@@ -293,6 +293,76 @@ var _ = ginkgo.Describe("Unmanaged ApplieManifestWork", func() {
 
 		})
 	})
+
+	ginkgo.Context("Should disable the eviction if the grace period is really large", func() {
+		ginkgo.BeforeEach(func() {
+			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			// stop the agent
+			if cancel != nil {
+				cancel()
+			}
+
+			// fore delete the work from hub
+			err := forceDeleteManifestWork(context.TODO(), work)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should stop eviction of the appliemanifestwork after the work agent reconnected to the hub", func() {
+			// restart the work agent
+			var ctx context.Context
+			ctx, cancel = context.WithCancel(context.Background())
+			newOption := spoke.NewWorkloadAgentOptions()
+			newOption.AppliedManifestWorkEvictionGracePeriod = 5 * time.Minute
+			newOption.WorkloadSourceDriver = sourceDriver
+			newOption.WorkloadSourceConfig = sourceConfigFileName
+			go startWorkAgent(ctx, newOption, commOptions)
+
+			// ensure the eviction of the applied manifestwork starts
+			gomega.Eventually(func() error {
+				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.TODO(), appliedManifestWorkName, metav1.GetOptions{})
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				if err != nil {
+					return err
+				}
+
+				if appliedManifestWork.Status.EvictionStartTime == nil {
+					return fmt.Errorf("eviction of the appliedmanifestwork %s does not start", appliedManifestWorkName)
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			// stop the agent
+			cancel()
+
+			// restart the work agent with a really large eviction grace period
+			ctx, cancel = context.WithCancel(context.Background())
+			newOption.AppliedManifestWorkEvictionGracePeriod = 100 * 365 * 24 * time.Hour
+			go startWorkAgent(ctx, newOption, commOptions)
+
+			// ensure the eviction of the applied manifestwork stops
+			gomega.Eventually(func() error {
+				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.TODO(), appliedManifestWorkName, metav1.GetOptions{})
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				if err != nil {
+					return err
+				}
+
+				if appliedManifestWork.Status.EvictionStartTime != nil {
+					return fmt.Errorf("eviction of the appliedmanifestwork %s does not stop", appliedManifestWorkName)
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+	})
 })
 
 func forceDeleteManifestWork(ctx context.Context, work *workapiv1.ManifestWork) error {
