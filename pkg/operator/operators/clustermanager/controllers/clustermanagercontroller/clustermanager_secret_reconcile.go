@@ -64,7 +64,7 @@ func (c *secretReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clust
 			Message: fmt.Sprintf("Failed to sync secrets to clusterManager namespace %v: %v",
 				config.ClusterManagerNamespace, utilerrors.NewAggregate(syncedErrs))})
 
-		return cm, reconcileStop, utilerrors.NewAggregate(syncedErrs)
+		return cm, reconcileContinue, utilerrors.NewAggregate(syncedErrs)
 	}
 
 	return cm, reconcileContinue, nil
@@ -78,7 +78,7 @@ func (c *secretReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterMa
 			if errors.IsNotFound(err) {
 				continue
 			}
-			return cm, reconcileStop, fmt.Errorf("failed to delete secret %s: %v", secretName, err)
+			return cm, reconcileContinue, fmt.Errorf("failed to delete secret %s: %v", secretName, err)
 		}
 	}
 
