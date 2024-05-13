@@ -247,9 +247,8 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Check addon namespace
-			addonNamespace := fmt.Sprintf("%s-addon", klusterletNamespace)
 			gomega.Eventually(func() bool {
-				if _, err := hostedKubeClient.CoreV1().Namespaces().Get(context.Background(), addonNamespace, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.CoreV1().Namespaces().Get(context.Background(), helpers.DefaultAddonNamespace, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true

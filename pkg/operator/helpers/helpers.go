@@ -49,6 +49,9 @@ const (
 	FeatureGatesTypeValid             = "ValidFeatureGates"
 	FeatureGatesReasonAllValid        = "FeatureGatesAllValid"
 	FeatureGatesReasonInvalidExisting = "InvalidFeatureGatesExisting"
+
+	// DefaultAddonNamespace is the default namespace for agent addon
+	DefaultAddonNamespace = "open-cluster-management-agent-addon"
 )
 
 const (
