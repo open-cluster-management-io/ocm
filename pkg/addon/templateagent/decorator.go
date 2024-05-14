@@ -46,9 +46,10 @@ func (d *namespaceDecorator) decorate(obj *unstructured.Unstructured) (*unstruct
 		return obj, nil
 	}
 
-	// set namespace for all manifests, if the manifest is cluster scoped, namespace will be ignored when
-	// being applied.
-	obj.SetNamespace(d.installNamespace)
+	// If obj has no namespace set, we do not mutate namespace assuming it is cluster scoped.
+	if len(obj.GetNamespace()) > 0 {
+		obj.SetNamespace(d.installNamespace)
+	}
 
 	paths, ok := d.paths[obj.GetKind()]
 	if !ok {
