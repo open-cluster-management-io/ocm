@@ -19,7 +19,6 @@ import (
 var _ = ginkgo.Describe("Klusterlet Singleton mode", func() {
 	var cancel context.CancelFunc
 	var klusterlet *operatorapiv1.Klusterlet
-	var klusterletNamespace string
 	var agentNamespace string
 	var registrationManagementRoleName string
 	var registrationManagedRoleName string
@@ -47,7 +46,6 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode", func() {
 				},
 			},
 		}
-		klusterletNamespace = helpers.KlusterletNamespace(klusterlet)
 		agentNamespace = helpers.AgentNamespace(klusterlet)
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
@@ -202,9 +200,8 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Check addon namespace
-			addonNamespace := fmt.Sprintf("%s-addon", klusterletNamespace)
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.CoreV1().Namespaces().Get(context.Background(), addonNamespace, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.CoreV1().Namespaces().Get(context.Background(), helpers.DefaultAddonNamespace, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true

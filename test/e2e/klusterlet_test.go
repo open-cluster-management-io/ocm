@@ -11,6 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
 var _ = Describe("Create klusterlet CR", func() {
@@ -201,14 +203,17 @@ var _ = Describe("Create klusterlet CR", func() {
 
 		By("old namespace should be removed")
 		Eventually(func() error {
-			ns, err := t.SpokeKubeClient.CoreV1().Namespaces().Get(context.TODO(), klusterletNamespace, metav1.GetOptions{})
+			_, err := t.SpokeKubeClient.CoreV1().Namespaces().Get(context.TODO(), klusterletNamespace, metav1.GetOptions{})
 			if errors.IsNotFound(err) {
 				return nil
 			}
-			if err == nil {
-				By(fmt.Sprintf("ns is %s, %v", ns.Name, ns.Labels))
-			}
 			return fmt.Errorf("namespace still exists")
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+
+		By("addon namespace should be kept")
+		Eventually(func() error {
+			_, err := t.SpokeKubeClient.CoreV1().Namespaces().Get(context.TODO(), helpers.DefaultAddonNamespace, metav1.GetOptions{})
+			return err
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
 
 		By(fmt.Sprintf("approve the managed cluster %v since it is registered in the new namespace", clusterName))

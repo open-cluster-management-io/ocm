@@ -9,6 +9,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
 // namespaceReconcile is the reconciler to handle the case when spec.namespace is changed, and we need to
@@ -37,7 +39,7 @@ func (r *namespaceReconcile) reconcile(
 		return klusterlet, reconcileStop, err
 	}
 	for _, ns := range namespaces.Items {
-		if ns.Name == config.KlusterletNamespace || ns.Name == config.KlusterletNamespace+"-addon" {
+		if ns.Name == config.KlusterletNamespace || ns.Name == helpers.DefaultAddonNamespace {
 			continue
 		}
 		if err := r.managedClusterClients.kubeClient.CoreV1().Namespaces().Delete(
