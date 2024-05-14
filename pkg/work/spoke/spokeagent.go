@@ -95,7 +95,7 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 	// ManifestWork client that implements the ManifestWorkInterface and ManifestWork informer based on different
 	// driver configuration.
 	// Refer to Event Based Manifestwork proposal in enhancements repo to get more details.
-	hubHost, config, err := cloudeventswork.NewConfigLoader(o.workOptions.WorkloadSourceDriver, o.workOptions.WorkloadSourceConfig).
+	hubHost, config, err := generic.NewConfigLoader(o.workOptions.WorkloadSourceDriver, o.workOptions.WorkloadSourceConfig).
 		LoadConfig()
 	if err != nil {
 		return err
