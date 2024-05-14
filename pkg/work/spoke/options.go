@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/work"
+	cloudeventsconstants "open-cluster-management.io/sdk-go/pkg/cloudevents/constants"
 )
 
 const (
@@ -30,7 +30,7 @@ func NewWorkloadAgentOptions() *WorkloadAgentOptions {
 		MaxJSONRawLength:                       1024,
 		StatusSyncInterval:                     10 * time.Second,
 		AppliedManifestWorkEvictionGracePeriod: 60 * time.Minute,
-		WorkloadSourceDriver:                   cloudeventswork.ConfigTypeKube,
+		WorkloadSourceDriver:                   cloudeventsconstants.ConfigTypeKube,
 		WorkloadSourceConfig:                   "/spoke/hub-kubeconfig/kubeconfig",
 	}
 }
@@ -44,7 +44,7 @@ func (o *WorkloadAgentOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&o.AppliedManifestWorkEvictionGracePeriod, "appliedmanifestwork-eviction-grace-period",
 		o.AppliedManifestWorkEvictionGracePeriod, "Grace period for appliedmanifestwork eviction")
 	fs.StringVar(&o.WorkloadSourceDriver, "workload-source-driver",
-		o.WorkloadSourceDriver, "The type of workload source driver, currently it can be kube, mqtt or grpc")
+		o.WorkloadSourceDriver, "The type of workload source driver, currently it can be kube, mqtt, grpc or kafka")
 	fs.StringVar(&o.WorkloadSourceConfig, "workload-source-config",
 		o.WorkloadSourceConfig, "The config file path of current workload source")
 	fs.StringVar(&o.CloudEventsClientID, "cloudevents-client-id",

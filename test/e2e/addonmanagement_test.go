@@ -22,6 +22,7 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/ocm/pkg/addon/templateagent"
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/test/e2e/manifests"
 )
 
@@ -65,7 +66,6 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 	}
 
 	ginkgo.BeforeEach(func() {
-		addonInstallNamespace = fmt.Sprintf("%s-addon", agentNamespace)
 		ginkgo.By("create addon custom sign secret")
 		err := copySignerSecret(context.TODO(), t.HubKubeClient, "open-cluster-management-hub",
 			"signer-secret", templateagent.AddonManagerNamespace(), customSignerSecretName)
@@ -73,6 +73,8 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 		// the addon manager deployment should be running
 		gomega.Eventually(t.CheckHubReady, t.EventuallyTimeout, t.EventuallyInterval).Should(gomega.Succeed())
+
+		addonInstallNamespace = helpers.DefaultAddonNamespace
 
 		ginkgo.By(fmt.Sprintf("create addon template resources for cluster %v", clusterName))
 		err = createResourcesFromYamlFiles(context.Background(), t.HubDynamicClient, t.hubRestMapper, s,

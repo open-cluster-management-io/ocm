@@ -17,7 +17,7 @@ import (
 
 	"open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work"
+	cloudeventsconstants "open-cluster-management.io/sdk-go/pkg/cloudevents/constants"
 
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/test/integration/util"
@@ -516,7 +516,7 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				}
 				clusterManager.Spec.WorkConfiguration = &operatorapiv1.WorkConfiguration{
 					FeatureGates: featureGates,
-					WorkDriver:   work.ConfigTypeGRPC,
+					WorkDriver:   cloudeventsconstants.ConfigTypeGRPC,
 				}
 				_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(
 					context.Background(), clusterManager, metav1.UpdateOptions{})
