@@ -262,7 +262,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	// check imagePulSecret here because there will be a warning event FailedToRetrieveImagePullSecret
 	// if imagePullSecret does not exist.
 	if config.ImagePullSecret, err = n.getImagePullSecret(ctx); err != nil {
-		return err
+		// may meet permission error in the upgrade case when the new rbac is not upgraded, so ignore err in this release.
+		// TODO: need return err if fail to get secret in the next release.
+		klog.Warningf("failed to get image pull secret: %v", err)
 	}
 
 	for _, reconciler := range reconcilers {
