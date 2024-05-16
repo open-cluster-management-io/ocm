@@ -437,7 +437,7 @@ func newManagedClusterAddOn(namespace, name string, registrations []addonv1alpha
 	}
 
 	if hostedMode {
-		addon.SetAnnotations(map[string]string{hostingClusterNameAnnotation: "test"})
+		addon.SetAnnotations(map[string]string{addonv1alpha1.HostingClusterNameAnnotationKey: "test"})
 	}
 	return addon
 }

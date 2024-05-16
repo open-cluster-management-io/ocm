@@ -296,7 +296,7 @@ func TestSync(t *testing.T) {
 					Namespace: testinghelpers.TestManagedClusterName,
 					Name:      "test",
 					Annotations: map[string]string{
-						hostingClusterNameAnnotation: "cluster1",
+						addonv1alpha1.HostingClusterNameAnnotationKey: "cluster1",
 					},
 				},
 				Spec: addonv1alpha1.ManagedClusterAddOnSpec{

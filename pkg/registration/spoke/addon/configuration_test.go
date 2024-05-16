@@ -85,7 +85,7 @@ func TestGetRegistrationConfigs(t *testing.T) {
 					Namespace: testinghelpers.TestManagedClusterName,
 					Name:      addOnName,
 					Annotations: map[string]string{
-						hostingClusterNameAnnotation: "test",
+						addonv1alpha1.HostingClusterNameAnnotationKey: "test",
 					},
 				},
 				Spec: addonv1alpha1.ManagedClusterAddOnSpec{
