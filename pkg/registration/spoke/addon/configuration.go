@@ -15,8 +15,6 @@ import (
 
 const (
 	defaultAddOnInstallationNamespace = "open-cluster-management-agent-addon"
-	// hostingClusterNameAnnotation is the annotation for indicating the hosting cluster name
-	hostingClusterNameAnnotation = "addon.open-cluster-management.io/hosting-cluster-name"
 )
 
 // registrationConfig contains necessary information for addon registration
@@ -76,7 +74,7 @@ func getAddOnInstallationNamespace(addOn *addonv1alpha1.ManagedClusterAddOn) str
 
 // isAddonRunningOutsideManagedCluster returns whether the addon agent is running on the managed cluster
 func isAddonRunningOutsideManagedCluster(addOn *addonv1alpha1.ManagedClusterAddOn) bool {
-	hostingCluster, ok := addOn.Annotations[hostingClusterNameAnnotation]
+	hostingCluster, ok := addOn.Annotations[addonv1alpha1.HostingClusterNameAnnotationKey]
 	if ok && len(hostingCluster) != 0 {
 		return true
 	}
