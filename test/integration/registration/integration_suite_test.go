@@ -91,6 +91,7 @@ func runAgentWithContext(ctx context.Context, name string, opt *spoke.SpokeAgent
 			EventRecorder: util.NewIntegrationTestEventRecorder(name),
 		})
 		if err != nil {
+			fmt.Printf("Failed to run agent %s: %v\n", name, err)
 			return
 		}
 	}()
