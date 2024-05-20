@@ -63,7 +63,15 @@ func handleProduceEvents(producerEvents chan kafka.Event, errChan chan error) {
 			case kafka.Error:
 				// Generic client instance-level errors, such as
 				// broker connection failures, authentication issues, etc.
-				errChan <- fmt.Errorf("client error %w", ev)
+				if ev.Code() == kafka.ErrAllBrokersDown {
+					// ALL_BROKERS_DOWN doesn't really mean anything to librdkafka, it is just a friendly indication
+					// to the application that currently there are no brokers to communicate with.
+					// But librdkafka will continue to try to reconnect indefinately,
+					// and it will attempt to re-send messages until message.timeout.ms or message.max.retries are exceeded.
+					klog.V(4).Infof("Producer received the error %v", ev)
+				} else {
+					errChan <- fmt.Errorf("client error %w", ev)
+				}
 			}
 		}
 	}()
@@ -123,7 +131,10 @@ func BuildKafkaOptionsFromFlags(configPath string) (*KafkaOptions, error) {
 
 		// earliest: automatically reset the offset to the earliest offset
 		// latest: automatically reset the offset to the latest offset
-		"auto.offset.reset": "latest",
+		// We must use earliest due to the source client may not start to watch a new topic
+		// when the agent is sending the events to that topic.
+		// the source client may lose the events if we set as latest.
+		"auto.offset.reset": "earliest",
 
 		// The frequency in milliseconds that the consumer offsets are commited (written) to offset storage
 		"auto.commit.interval.ms": 5000,

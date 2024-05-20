@@ -66,7 +66,7 @@ func (l *ConfigLoader) LoadConfig() (string, any, error) {
 			return "", nil, err
 		}
 
-		return mqttOptions.BrokerHost, mqttOptions, nil
+		return mqttOptions.Dialer.BrokerHost, mqttOptions, nil
 	case constants.ConfigTypeGRPC:
 		grpcOptions, err := grpc.BuildGRPCOptionsFromFlags(l.configPath)
 		if err != nil {
