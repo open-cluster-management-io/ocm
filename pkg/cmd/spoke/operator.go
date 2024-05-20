@@ -34,8 +34,11 @@ func NewKlusterletOperatorCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&klOptions.SkipPlaceholderHubSecret, "skip-placeholder-hub-secret", false,
 		"If set, will skip ensuring a placeholder hub secret which is originally intended for pulling "+
 			"work image before approved")
-	cmd.Flags().StringToStringVar(&klOptions.MasterNodeLabelSelector, "master-node-label-selector", map[string]string{"node-role.kubernetes.io/master": ""}, "master node label selector. e.g. 'node-role.kubernetes.io/master='")
-	cmd.Flags().Int32Var(&klOptions.ControllerReplicas, "controller-replicas", 0, "Number of controller replicas, operator will automatically determine replicas if not set")
+	cmd.Flags().StringToStringVar(&klOptions.MasterNodeLabelSelector, "master-node-label-selector",
+		map[string]string{"node-role.kubernetes.io/master": ""}, "master node label selector. "+
+			"e.g. 'node-role.kubernetes.io/master='")
+	cmd.Flags().Int32Var(&klOptions.ControllerReplicas, "controller-replicas", 0,
+		"Number of controller replicas, operator will automatically determine replicas if not set")
 	opts.AddFlags(flags)
 
 	return cmd

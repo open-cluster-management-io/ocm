@@ -432,7 +432,8 @@ func LoadClientConfigFromSecret(secret *corev1.Secret) (*rest.Config, error) {
 // - kube version: if the kube version is less than v1.14 reutn 1
 // - node: list master nodes in the cluster and return 1 if the
 // number of master nodes is equal or less than 1. Return 3 otherwise.
-func DetermineReplica(ctx context.Context, kubeClient kubernetes.Interface, mode operatorapiv1.InstallMode, kubeVersion *version.Version, masterNodeLabelSelector map[string]string) int32 {
+func DetermineReplica(ctx context.Context, kubeClient kubernetes.Interface, mode operatorapiv1.InstallMode, kubeVersion *version.Version,
+	masterNodeLabelSelector map[string]string) int32 {
 	// For hosted mode, there may be many cluster-manager/klusterlet running on the management cluster,
 	// set the replica to 1 to reduce the footprint of the management cluster.
 	if IsHosted(mode) {
