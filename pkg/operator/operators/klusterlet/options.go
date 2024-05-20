@@ -27,7 +27,7 @@ import (
 type Options struct {
 	SkipPlaceholderHubSecret bool
 	MasterNodeLabelSelector  map[string]string
-	ControllerReplicas       int32
+	DeploymentReplicas       int32
 }
 
 // RunKlusterletOperator starts a new klusterlet operator
@@ -99,7 +99,7 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		kubeVersion,
 		helpers.GetOperatorNamespace(),
 		o.MasterNodeLabelSelector,
-		o.ControllerReplicas,
+		o.DeploymentReplicas,
 		controllerContext.EventRecorder,
 		o.SkipPlaceholderHubSecret)
 
@@ -114,7 +114,7 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		kubeVersion,
 		helpers.GetOperatorNamespace(),
 		o.MasterNodeLabelSelector,
-		o.ControllerReplicas,
+		o.DeploymentReplicas,
 		controllerContext.EventRecorder)
 
 	ssarController := ssarcontroller.NewKlusterletSSARController(

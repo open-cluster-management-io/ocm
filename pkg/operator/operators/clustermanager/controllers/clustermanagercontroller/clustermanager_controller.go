@@ -60,7 +60,7 @@ type clusterManagerController struct {
 		migrationclient.StorageVersionMigrationsGetter, error)
 	skipRemoveCRDs          bool
 	masterNodeLabelSelector map[string]string
-	controllerReplicas      int32
+	deploymentReplicas      int32
 	operatorNamespace       string
 }
 
@@ -87,7 +87,7 @@ func NewClusterManagerController(
 	recorder events.Recorder,
 	skipRemoveCRDs bool,
 	masterNodeLabelSelector map[string]string,
-	controllerReplicas int32,
+	deploymentReplicas int32,
 	operatorNamespace string,
 ) factory.Controller {
 	controller := &clusterManagerController{
@@ -104,7 +104,7 @@ func NewClusterManagerController(
 		cache:                     resourceapply.NewResourceCache(),
 		skipRemoveCRDs:            skipRemoveCRDs,
 		masterNodeLabelSelector:   masterNodeLabelSelector,
-		controllerReplicas:        controllerReplicas,
+		deploymentReplicas:        deploymentReplicas,
 		operatorNamespace:         operatorNamespace,
 	}
 
@@ -147,7 +147,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		workDriver = clusterManager.Spec.WorkConfiguration.WorkDriver
 	}
 
-	replica := n.controllerReplicas
+	replica := n.deploymentReplicas
 	if replica <= 0 {
 		replica = helpers.DetermineReplica(ctx, n.operatorKubeClient, clusterManager.Spec.DeployOption.Mode, nil, n.masterNodeLabelSelector)
 	}

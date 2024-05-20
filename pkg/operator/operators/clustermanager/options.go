@@ -25,7 +25,7 @@ import (
 type Options struct {
 	SkipRemoveCRDs          bool
 	MasterNodeLabelSelector map[string]string
-	ControllerReplicas      int32
+	DeploymentReplicas      int32
 }
 
 // RunClusterManagerOperator starts a new cluster manager operator
@@ -78,7 +78,7 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		controllerContext.EventRecorder,
 		o.SkipRemoveCRDs,
 		o.MasterNodeLabelSelector,
-		o.ControllerReplicas,
+		o.DeploymentReplicas,
 		controllerContext.OperatorNamespace,
 	)
 

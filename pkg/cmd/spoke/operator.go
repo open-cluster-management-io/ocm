@@ -37,8 +37,8 @@ func NewKlusterletOperatorCmd() *cobra.Command {
 	cmd.Flags().StringToStringVar(&klOptions.MasterNodeLabelSelector, "master-node-label-selector",
 		map[string]string{"node-role.kubernetes.io/master": ""}, "master node label selector. "+
 			"e.g. 'node-role.kubernetes.io/master='")
-	cmd.Flags().Int32Var(&klOptions.ControllerReplicas, "controller-replicas", 0,
-		"Number of controller replicas, operator will automatically determine replicas if not set")
+	cmd.Flags().Int32Var(&klOptions.DeploymentReplicas, "deployment-replicas", 0,
+		"Number of deployment replicas, operator will automatically determine replicas if not set")
 	opts.AddFlags(flags)
 
 	return cmd
