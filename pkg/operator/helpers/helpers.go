@@ -37,7 +37,6 @@ import (
 	"k8s.io/klog/v2"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
-
 	"open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
@@ -432,7 +431,7 @@ func LoadClientConfigFromSecret(secret *corev1.Secret) (*rest.Config, error) {
 // - kube version: if the kube version is less than v1.14 reutn 1
 // - node: list master nodes in the cluster and return 1 if the
 // number of master nodes is equal or less than 1. Return 3 otherwise.
-func DetermineReplica(ctx context.Context, kubeClient kubernetes.Interface, mode operatorapiv1.InstallMode, kubeVersion *version.Version) int32 {
+func DetermineReplica(ctx context.Context, kubeClient kubernetes.Interface, mode operatorapiv1.InstallMode, kubeVersion *version.Version, masterNodeLabelSelector map[string]string) int32 {
 	// For hosted mode, there may be many cluster-manager/klusterlet running on the management cluster,
 	// set the replica to 1 to reduce the footprint of the management cluster.
 	if IsHosted(mode) {
@@ -451,14 +450,15 @@ func DetermineReplica(ctx context.Context, kubeClient kubernetes.Interface, mode
 		}
 	}
 
-	return DetermineReplicaByNodes(ctx, kubeClient)
+	return DetermineReplicaByNodes(ctx, kubeClient, masterNodeLabelSelector)
 }
 
 // DetermineReplicaByNodes determines the replica of deployment based on:
 // list master nodes in the cluster and return 1 if
 // the number of master nodes is equal or less than 1. Return 3 otherwise.
-func DetermineReplicaByNodes(ctx context.Context, kubeClient kubernetes.Interface) int32 {
-	nodes, err := kubeClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{LabelSelector: "node-role.kubernetes.io/master="})
+func DetermineReplicaByNodes(ctx context.Context, kubeClient kubernetes.Interface, masterNodeLabelSelector map[string]string) int32 {
+	labelSelector := mapToString(masterNodeLabelSelector)
+	nodes, err := kubeClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
 		return defaultReplica
 	}
@@ -468,6 +468,14 @@ func DetermineReplicaByNodes(ctx context.Context, kubeClient kubernetes.Interfac
 	}
 
 	return defaultReplica
+}
+
+func mapToString(m map[string]string) string {
+	var kvStr []string
+	for key, value := range m {
+		kvStr = append(kvStr, fmt.Sprintf("%s=%s", key, value))
+	}
+	return strings.Join(kvStr, ",")
 }
 
 func GenerateRelatedResource(objBytes []byte) (operatorapiv1.RelatedResourceMeta, error) {

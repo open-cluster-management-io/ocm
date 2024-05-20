@@ -535,7 +535,7 @@ func TestDeterminReplica(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fakeKubeClient := fakekube.NewSimpleClientset(c.existingNodes...)
-			replica := DetermineReplica(context.Background(), fakeKubeClient, c.mode, c.kubeVersion)
+			replica := DetermineReplica(context.Background(), fakeKubeClient, c.mode, c.kubeVersion, map[string]string{"node-role.kubernetes.io/master": ""})
 			if replica != c.expectedReplica {
 				t.Errorf("Unexpected replica, actual: %d, expected: %d", replica, c.expectedReplica)
 			}

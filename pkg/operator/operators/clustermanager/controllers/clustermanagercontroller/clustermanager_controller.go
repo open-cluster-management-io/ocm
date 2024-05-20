@@ -58,8 +58,10 @@ type clusterManagerController struct {
 		mwctrEnabled, addonManagerEnabled bool) error
 	generateHubClusterClients func(hubConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface,
 		migrationclient.StorageVersionMigrationsGetter, error)
-	skipRemoveCRDs    bool
-	operatorNamespace string
+	skipRemoveCRDs          bool
+	masterNodeLabelSelector map[string]string
+	controllerReplicas      int32
+	operatorNamespace       string
 }
 
 type clusterManagerReconcile interface {
@@ -84,6 +86,8 @@ func NewClusterManagerController(
 	configMapInformer corev1informers.ConfigMapInformer,
 	recorder events.Recorder,
 	skipRemoveCRDs bool,
+	masterNodeLabelSelector map[string]string,
+	controllerReplicas int32,
 	operatorNamespace string,
 ) factory.Controller {
 	controller := &clusterManagerController{
@@ -99,6 +103,8 @@ func NewClusterManagerController(
 		ensureSAKubeconfigs:       ensureSAKubeconfigs,
 		cache:                     resourceapply.NewResourceCache(),
 		skipRemoveCRDs:            skipRemoveCRDs,
+		masterNodeLabelSelector:   masterNodeLabelSelector,
+		controllerReplicas:        controllerReplicas,
 		operatorNamespace:         operatorNamespace,
 	}
 
@@ -141,6 +147,11 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		workDriver = clusterManager.Spec.WorkConfiguration.WorkDriver
 	}
 
+	replica := n.controllerReplicas
+	if replica <= 0 {
+		replica = helpers.DetermineReplica(ctx, n.operatorKubeClient, clusterManager.Spec.DeployOption.Mode, nil, n.masterNodeLabelSelector)
+	}
+
 	// This config is used to render template of manifests.
 	config := manifests.HubConfig{
 		ClusterManagerName:      clusterManager.Name,
@@ -149,7 +160,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		WorkImage:               clusterManager.Spec.WorkImagePullSpec,
 		PlacementImage:          clusterManager.Spec.PlacementImagePullSpec,
 		AddOnManagerImage:       clusterManager.Spec.AddOnManagerImagePullSpec,
-		Replica:                 helpers.DetermineReplica(ctx, n.operatorKubeClient, clusterManager.Spec.DeployOption.Mode, nil),
+		Replica:                 replica,
 		HostedMode:              clusterManager.Spec.DeployOption.Mode == operatorapiv1.InstallModeHosted,
 		RegistrationWebhook: manifests.Webhook{
 			Port: defaultWebhookPort,

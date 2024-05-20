@@ -53,6 +53,8 @@ type klusterletController struct {
 	skipHubSecretPlaceholder     bool
 	cache                        resourceapply.ResourceCache
 	managedClusterClientsBuilder managedClusterClientsBuilderInterface
+	masterNodeLabelSelector      map[string]string
+	controllerReplicas           int32
 }
 
 type klusterletReconcile interface {
@@ -78,6 +80,8 @@ func NewKlusterletController(
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
 	kubeVersion *version.Version,
 	operatorNamespace string,
+	masterNodeLabelSelector map[string]string,
+	controllerReplicas int32,
 	recorder events.Recorder,
 	skipHubSecretPlaceholder bool) factory.Controller {
 	controller := &klusterletController{
@@ -90,6 +94,8 @@ func NewKlusterletController(
 		skipHubSecretPlaceholder:     skipHubSecretPlaceholder,
 		cache:                        resourceapply.NewResourceCache(),
 		managedClusterClientsBuilder: newManagedClusterClientsBuilder(kubeClient, apiExtensionClient, appliedManifestWorkClient, recorder),
+		masterNodeLabelSelector:      masterNodeLabelSelector,
+		controllerReplicas:           controllerReplicas,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -179,6 +185,11 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		return err
 	}
 
+	replica := n.controllerReplicas
+	if replica <= 0 {
+		replica = helpers.DetermineReplica(ctx, n.kubeClient, klusterlet.Spec.DeployOption.Mode, n.kubeVersion, n.masterNodeLabelSelector)
+	}
+
 	config := klusterletConfig{
 		KlusterletName:                         klusterlet.Name,
 		KlusterletNamespace:                    helpers.KlusterletNamespace(klusterlet),
@@ -192,7 +203,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		HubKubeConfigSecret:                    helpers.HubKubeConfig,
 		ExternalServerURL:                      getServersFromKlusterlet(klusterlet),
 		OperatorNamespace:                      n.operatorNamespace,
-		Replica:                                helpers.DetermineReplica(ctx, n.kubeClient, klusterlet.Spec.DeployOption.Mode, n.kubeVersion),
+		Replica:                                replica,
 		PriorityClassName:                      helpers.AgentPriorityClassName(klusterlet, n.kubeVersion),
 		AppliedManifestWorkEvictionGracePeriod: getAppliedManifestWorkEvictionGracePeriod(klusterlet),
 

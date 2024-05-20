@@ -38,6 +38,8 @@ type klusterletCleanupController struct {
 	kubeVersion                  *version.Version
 	operatorNamespace            string
 	managedClusterClientsBuilder managedClusterClientsBuilderInterface
+	masterNodeLabelSelector      map[string]string
+	controllerReplicas           int32
 }
 
 // NewKlusterletCleanupController construct klusterlet cleanup controller
@@ -51,6 +53,8 @@ func NewKlusterletCleanupController(
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
 	kubeVersion *version.Version,
 	operatorNamespace string,
+	masterNodeLabelSelector map[string]string,
+	controllerReplicas int32,
 	recorder events.Recorder) factory.Controller {
 	controller := &klusterletCleanupController{
 		kubeClient: kubeClient,
@@ -61,6 +65,8 @@ func NewKlusterletCleanupController(
 		kubeVersion:                  kubeVersion,
 		operatorNamespace:            operatorNamespace,
 		managedClusterClientsBuilder: newManagedClusterClientsBuilder(kubeClient, apiExtensionClient, appliedManifestWorkClient, recorder),
+		masterNodeLabelSelector:      masterNodeLabelSelector,
+		controllerReplicas:           controllerReplicas,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -93,6 +99,10 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 		_, err := n.patcher.AddFinalizer(ctx, klusterlet, desiredFinalizers...)
 		return err
 	}
+	replica := n.controllerReplicas
+	if replica <= 0 {
+		replica = helpers.DetermineReplica(ctx, n.kubeClient, klusterlet.Spec.DeployOption.Mode, n.kubeVersion, n.masterNodeLabelSelector)
+	}
 	// Klusterlet is deleting, we remove its related resources on managed and management cluster
 	config := klusterletConfig{
 		KlusterletName:            klusterlet.Name,
@@ -105,7 +115,7 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 		HubKubeConfigSecret:       helpers.HubKubeConfig,
 		ExternalServerURL:         getServersFromKlusterlet(klusterlet),
 		OperatorNamespace:         n.operatorNamespace,
-		Replica:                   helpers.DetermineReplica(ctx, n.kubeClient, klusterlet.Spec.DeployOption.Mode, n.kubeVersion),
+		Replica:                   replica,
 
 		ExternalManagedKubeConfigSecret:             helpers.ExternalManagedKubeConfig,
 		ExternalManagedKubeConfigRegistrationSecret: helpers.ExternalManagedKubeConfigRegistration,
