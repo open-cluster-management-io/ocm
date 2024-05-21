@@ -213,7 +213,8 @@ func (c *CloudEventAgentClient[T]) receive(ctx context.Context, evt cloudevents.
 //     received resource status hash with the current resource status hash. If they are not equal, the agent sends the
 //     resource status message.
 func (c *CloudEventAgentClient[T]) respondResyncStatusRequest(
-	ctx context.Context, eventDataType types.CloudEventsDataType, evt cloudevents.Event) error {
+	ctx context.Context, eventDataType types.CloudEventsDataType, evt cloudevents.Event,
+) error {
 	objs, err := c.lister.List(types.ListOptions{ClusterName: c.clusterName, Source: evt.Source()})
 	if err != nil {
 		return err
