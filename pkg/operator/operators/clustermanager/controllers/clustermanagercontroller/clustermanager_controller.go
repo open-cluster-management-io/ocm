@@ -58,10 +58,10 @@ type clusterManagerController struct {
 		mwctrEnabled, addonManagerEnabled bool) error
 	generateHubClusterClients func(hubConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface,
 		migrationclient.StorageVersionMigrationsGetter, error)
-	skipRemoveCRDs          bool
-	masterNodeLabelSelector map[string]string
-	deploymentReplicas      int32
-	operatorNamespace       string
+	skipRemoveCRDs         bool
+	controlPlaneNodeLabels map[string]string
+	deploymentReplicas     int32
+	operatorNamespace      string
 }
 
 type clusterManagerReconcile interface {
@@ -86,7 +86,7 @@ func NewClusterManagerController(
 	configMapInformer corev1informers.ConfigMapInformer,
 	recorder events.Recorder,
 	skipRemoveCRDs bool,
-	masterNodeLabelSelector map[string]string,
+	controlPlaneNodeLabels map[string]string,
 	deploymentReplicas int32,
 	operatorNamespace string,
 ) factory.Controller {
@@ -103,7 +103,7 @@ func NewClusterManagerController(
 		ensureSAKubeconfigs:       ensureSAKubeconfigs,
 		cache:                     resourceapply.NewResourceCache(),
 		skipRemoveCRDs:            skipRemoveCRDs,
-		masterNodeLabelSelector:   masterNodeLabelSelector,
+		controlPlaneNodeLabels:    controlPlaneNodeLabels,
 		deploymentReplicas:        deploymentReplicas,
 		operatorNamespace:         operatorNamespace,
 	}
@@ -149,7 +149,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 
 	replica := n.deploymentReplicas
 	if replica <= 0 {
-		replica = helpers.DetermineReplica(ctx, n.operatorKubeClient, clusterManager.Spec.DeployOption.Mode, nil, n.masterNodeLabelSelector)
+		replica = helpers.DetermineReplica(ctx, n.operatorKubeClient, clusterManager.Spec.DeployOption.Mode, nil, n.controlPlaneNodeLabels)
 	}
 
 	// This config is used to render template of manifests.

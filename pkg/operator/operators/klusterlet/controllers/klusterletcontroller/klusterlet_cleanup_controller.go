@@ -38,7 +38,7 @@ type klusterletCleanupController struct {
 	kubeVersion                  *version.Version
 	operatorNamespace            string
 	managedClusterClientsBuilder managedClusterClientsBuilderInterface
-	masterNodeLabelSelector      map[string]string
+	controlPlaneNodeLabels       map[string]string
 	deploymentReplicas           int32
 }
 
@@ -53,7 +53,7 @@ func NewKlusterletCleanupController(
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
 	kubeVersion *version.Version,
 	operatorNamespace string,
-	masterNodeLabelSelector map[string]string,
+	controlPlaneNodeLabels map[string]string,
 	deploymentReplicas int32,
 	recorder events.Recorder) factory.Controller {
 	controller := &klusterletCleanupController{
@@ -65,7 +65,7 @@ func NewKlusterletCleanupController(
 		kubeVersion:                  kubeVersion,
 		operatorNamespace:            operatorNamespace,
 		managedClusterClientsBuilder: newManagedClusterClientsBuilder(kubeClient, apiExtensionClient, appliedManifestWorkClient, recorder),
-		masterNodeLabelSelector:      masterNodeLabelSelector,
+		controlPlaneNodeLabels:       controlPlaneNodeLabels,
 		deploymentReplicas:           deploymentReplicas,
 	}
 
@@ -101,7 +101,7 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 	}
 	replica := n.deploymentReplicas
 	if replica <= 0 {
-		replica = helpers.DetermineReplica(ctx, n.kubeClient, klusterlet.Spec.DeployOption.Mode, n.kubeVersion, n.masterNodeLabelSelector)
+		replica = helpers.DetermineReplica(ctx, n.kubeClient, klusterlet.Spec.DeployOption.Mode, n.kubeVersion, n.controlPlaneNodeLabels)
 	}
 	// Klusterlet is deleting, we remove its related resources on managed and management cluster
 	config := klusterletConfig{

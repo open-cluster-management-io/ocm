@@ -53,7 +53,7 @@ type klusterletController struct {
 	skipHubSecretPlaceholder     bool
 	cache                        resourceapply.ResourceCache
 	managedClusterClientsBuilder managedClusterClientsBuilderInterface
-	masterNodeLabelSelector      map[string]string
+	controlPlaneNodeLabels       map[string]string
 	deploymentReplicas           int32
 }
 
@@ -80,7 +80,7 @@ func NewKlusterletController(
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
 	kubeVersion *version.Version,
 	operatorNamespace string,
-	masterNodeLabelSelector map[string]string,
+	controlPlaneNodeLabels map[string]string,
 	deploymentReplicas int32,
 	recorder events.Recorder,
 	skipHubSecretPlaceholder bool) factory.Controller {
@@ -94,7 +94,7 @@ func NewKlusterletController(
 		skipHubSecretPlaceholder:     skipHubSecretPlaceholder,
 		cache:                        resourceapply.NewResourceCache(),
 		managedClusterClientsBuilder: newManagedClusterClientsBuilder(kubeClient, apiExtensionClient, appliedManifestWorkClient, recorder),
-		masterNodeLabelSelector:      masterNodeLabelSelector,
+		controlPlaneNodeLabels:       controlPlaneNodeLabels,
 		deploymentReplicas:           deploymentReplicas,
 	}
 
@@ -187,7 +187,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 	replica := n.deploymentReplicas
 	if replica <= 0 {
-		replica = helpers.DetermineReplica(ctx, n.kubeClient, klusterlet.Spec.DeployOption.Mode, n.kubeVersion, n.masterNodeLabelSelector)
+		replica = helpers.DetermineReplica(ctx, n.kubeClient, klusterlet.Spec.DeployOption.Mode, n.kubeVersion, n.controlPlaneNodeLabels)
 	}
 
 	config := klusterletConfig{
