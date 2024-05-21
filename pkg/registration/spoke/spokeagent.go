@@ -236,11 +236,12 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 			managementKubeClient, 10*time.Minute, informers.WithNamespace(o.agentOptions.ComponentNamespace))
 
 		// create a kubeconfig with references to the key/cert files in the same secret
-		srever, proxyURL, caData, err := parseKubeconfig(o.registrationOption.BootstrapKubeconfig)
+		contextClusterName, srever, proxyURL, caData, err := parseKubeconfig(o.registrationOption.BootstrapKubeconfig)
 		if err != nil {
 			return err
 		}
-		kubeconfig := clientcert.BuildKubeconfig(srever, caData, proxyURL, clientcert.TLSCertFile, clientcert.TLSKeyFile)
+		kubeconfig := clientcert.BuildKubeconfig(contextClusterName, srever, caData,
+			proxyURL, clientcert.TLSCertFile, clientcert.TLSKeyFile)
 		kubeconfigData, err := clientcmd.Write(kubeconfig)
 		if err != nil {
 			return err
@@ -330,11 +331,12 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	recorder.Event("HubClientConfigReady", "Client config for hub is ready.")
 
 	// create a kubeconfig with references to the key/cert files in the same secret
-	server, proxyURL, caData, err := parseKubeconfig(o.agentOptions.HubKubeconfigFile)
+	contextClusterName, server, proxyURL, caData, err := parseKubeconfig(o.agentOptions.HubKubeconfigFile)
 	if err != nil {
 		return err
 	}
-	kubeconfig := clientcert.BuildKubeconfig(server, caData, proxyURL, clientcert.TLSCertFile, clientcert.TLSKeyFile)
+	kubeconfig := clientcert.BuildKubeconfig(contextClusterName, server, caData,
+		proxyURL, clientcert.TLSCertFile, clientcert.TLSKeyFile)
 	kubeconfigData, err := clientcmd.Write(kubeconfig)
 	if err != nil {
 		return err
@@ -505,16 +507,26 @@ func (o *SpokeAgentConfig) HasValidHubClientConfig(ctx context.Context) (bool, e
 // 2. The proxy url
 // 3. The CA bundle
 func (o *SpokeAgentConfig) isHubKubeconfigValid(ctx context.Context) (bool, error) {
-	bootstrapServer, bootstrapProxyURL, bootstrapCABndle, err := parseKubeconfig(o.registrationOption.BootstrapKubeconfig)
+	bootstrapCtxCluster, bootstrapServer, bootstrapProxyURL, bootstrapCABndle, err := parseKubeconfig(
+		o.registrationOption.BootstrapKubeconfig)
 	if err != nil {
 		return false, err
 	}
 
-	server, proxyURL, caBundle, err := parseKubeconfig(o.agentOptions.HubKubeconfigFile)
+	ctxCluster, server, proxyURL, caBundle, err := parseKubeconfig(o.agentOptions.HubKubeconfigFile)
 	switch {
 	case err != nil:
 		return false, err
-	case bootstrapServer != server, bootstrapProxyURL != proxyURL, !reflect.DeepEqual(bootstrapCABndle, caBundle):
+	case bootstrapServer != server,
+		bootstrapProxyURL != proxyURL,
+		!reflect.DeepEqual(bootstrapCABndle, caBundle),
+		// Here in addition to the server, proxyURL and CA bundle, we also need to compare the cluster name,
+		// because in some cases even the hub cluster API server serving certificate(kubeconfig ca bundle)
+		// is the same, but the signer certificate may be different(i.e the hub kubernetes cluster is rebuilt
+		// with a same serving certificate and url), so setting the cluster name in the bootstrap kubeconfig
+		// can help to distinguish the different clusters(signer certificate). And comparing the cluster name
+		// can help to avoid the situation that the hub kubeconfig is valid but not for the current cluster.
+		bootstrapCtxCluster != ctxCluster:
 		return false, nil
 	default:
 		return true, nil
@@ -536,21 +548,22 @@ func (o *SpokeAgentConfig) getSpokeClusterCABundle(kubeConfig *rest.Config) ([]b
 	return data, nil
 }
 
-func parseKubeconfig(filename string) (string, string, []byte, error) {
+func parseKubeconfig(filename string) (string, string, string, []byte, error) {
 	config, err := clientcmd.LoadFromFile(filename)
 	if err != nil {
-		return "", "", nil, err
+		return "", "", "", nil, err
 	}
 
 	context, ok := config.Contexts[config.CurrentContext]
 	if !ok {
-		return "", "", nil, fmt.Errorf("kubeconfig %q does not contains context: %s", filename, config.CurrentContext)
+		return "", "", "", nil,
+			fmt.Errorf("kubeconfig %q does not contains context: %s", filename, config.CurrentContext)
 	}
 
 	cluster, ok := config.Clusters[context.Cluster]
 	if !ok {
-		return "", "", nil, fmt.Errorf("kubeconfig %q does not contains cluster: %s", filename, context.Cluster)
+		return "", "", "", nil, fmt.Errorf("kubeconfig %q does not contains cluster: %s", filename, context.Cluster)
 	}
 
-	return cluster.Server, cluster.ProxyURL, cluster.CertificateAuthorityData, nil
+	return context.Cluster, cluster.Server, cluster.ProxyURL, cluster.CertificateAuthorityData, nil
 }
