@@ -23,9 +23,9 @@ import (
 )
 
 type Options struct {
-	SkipRemoveCRDs         bool
-	ControlPlaneNodeLabels map[string]string
-	DeploymentReplicas     int32
+	SkipRemoveCRDs                bool
+	ControlPlaneNodeLabelSelector string
+	DeploymentReplicas            int32
 }
 
 // RunClusterManagerOperator starts a new cluster manager operator
@@ -77,7 +77,7 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		kubeInformer.Core().V1().ConfigMaps(),
 		controllerContext.EventRecorder,
 		o.SkipRemoveCRDs,
-		o.ControlPlaneNodeLabels,
+		o.ControlPlaneNodeLabelSelector,
 		o.DeploymentReplicas,
 		controllerContext.OperatorNamespace,
 	)

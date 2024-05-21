@@ -58,10 +58,10 @@ type clusterManagerController struct {
 		mwctrEnabled, addonManagerEnabled bool) error
 	generateHubClusterClients func(hubConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface,
 		migrationclient.StorageVersionMigrationsGetter, error)
-	skipRemoveCRDs         bool
-	controlPlaneNodeLabels map[string]string
-	deploymentReplicas     int32
-	operatorNamespace      string
+	skipRemoveCRDs                bool
+	controlPlaneNodeLabelSelector string
+	deploymentReplicas            int32
+	operatorNamespace             string
 }
 
 type clusterManagerReconcile interface {
@@ -86,7 +86,7 @@ func NewClusterManagerController(
 	configMapInformer corev1informers.ConfigMapInformer,
 	recorder events.Recorder,
 	skipRemoveCRDs bool,
-	controlPlaneNodeLabels map[string]string,
+	controlPlaneNodeLabelSelector string,
 	deploymentReplicas int32,
 	operatorNamespace string,
 ) factory.Controller {
@@ -96,16 +96,16 @@ func NewClusterManagerController(
 		patcher: patcher.NewPatcher[
 			*operatorapiv1.ClusterManager, operatorapiv1.ClusterManagerSpec, operatorapiv1.ClusterManagerStatus](
 			clusterManagerClient),
-		clusterManagerLister:      clusterManagerInformer.Lister(),
-		configMapLister:           configMapInformer.Lister(),
-		recorder:                  recorder,
-		generateHubClusterClients: generateHubClients,
-		ensureSAKubeconfigs:       ensureSAKubeconfigs,
-		cache:                     resourceapply.NewResourceCache(),
-		skipRemoveCRDs:            skipRemoveCRDs,
-		controlPlaneNodeLabels:    controlPlaneNodeLabels,
-		deploymentReplicas:        deploymentReplicas,
-		operatorNamespace:         operatorNamespace,
+		clusterManagerLister:          clusterManagerInformer.Lister(),
+		configMapLister:               configMapInformer.Lister(),
+		recorder:                      recorder,
+		generateHubClusterClients:     generateHubClients,
+		ensureSAKubeconfigs:           ensureSAKubeconfigs,
+		cache:                         resourceapply.NewResourceCache(),
+		skipRemoveCRDs:                skipRemoveCRDs,
+		controlPlaneNodeLabelSelector: controlPlaneNodeLabelSelector,
+		deploymentReplicas:            deploymentReplicas,
+		operatorNamespace:             operatorNamespace,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -149,7 +149,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 
 	replica := n.deploymentReplicas
 	if replica <= 0 {
-		replica = helpers.DetermineReplica(ctx, n.operatorKubeClient, clusterManager.Spec.DeployOption.Mode, nil, n.controlPlaneNodeLabels)
+		replica = helpers.DetermineReplica(ctx, n.operatorKubeClient, clusterManager.Spec.DeployOption.Mode, nil, n.controlPlaneNodeLabelSelector)
 	}
 
 	// This config is used to render template of manifests.

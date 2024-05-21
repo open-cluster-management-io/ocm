@@ -32,14 +32,14 @@ import (
 )
 
 type klusterletCleanupController struct {
-	patcher                      patcher.Patcher[*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus]
-	klusterletLister             operatorlister.KlusterletLister
-	kubeClient                   kubernetes.Interface
-	kubeVersion                  *version.Version
-	operatorNamespace            string
-	managedClusterClientsBuilder managedClusterClientsBuilderInterface
-	controlPlaneNodeLabels       map[string]string
-	deploymentReplicas           int32
+	patcher                       patcher.Patcher[*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus]
+	klusterletLister              operatorlister.KlusterletLister
+	kubeClient                    kubernetes.Interface
+	kubeVersion                   *version.Version
+	operatorNamespace             string
+	managedClusterClientsBuilder  managedClusterClientsBuilderInterface
+	controlPlaneNodeLabelSelector string
+	deploymentReplicas            int32
 }
 
 // NewKlusterletCleanupController construct klusterlet cleanup controller
@@ -53,7 +53,7 @@ func NewKlusterletCleanupController(
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
 	kubeVersion *version.Version,
 	operatorNamespace string,
-	controlPlaneNodeLabels map[string]string,
+	controlPlaneNodeLabelSelector string,
 	deploymentReplicas int32,
 	recorder events.Recorder) factory.Controller {
 	controller := &klusterletCleanupController{
@@ -61,12 +61,12 @@ func NewKlusterletCleanupController(
 		patcher: patcher.NewPatcher[
 			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](klusterletClient).
 			WithOptions(patcher.PatchOptions{IgnoreResourceVersion: true}),
-		klusterletLister:             klusterletInformer.Lister(),
-		kubeVersion:                  kubeVersion,
-		operatorNamespace:            operatorNamespace,
-		managedClusterClientsBuilder: newManagedClusterClientsBuilder(kubeClient, apiExtensionClient, appliedManifestWorkClient, recorder),
-		controlPlaneNodeLabels:       controlPlaneNodeLabels,
-		deploymentReplicas:           deploymentReplicas,
+		klusterletLister:              klusterletInformer.Lister(),
+		kubeVersion:                   kubeVersion,
+		operatorNamespace:             operatorNamespace,
+		managedClusterClientsBuilder:  newManagedClusterClientsBuilder(kubeClient, apiExtensionClient, appliedManifestWorkClient, recorder),
+		controlPlaneNodeLabelSelector: controlPlaneNodeLabelSelector,
+		deploymentReplicas:            deploymentReplicas,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -101,7 +101,7 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 	}
 	replica := n.deploymentReplicas
 	if replica <= 0 {
-		replica = helpers.DetermineReplica(ctx, n.kubeClient, klusterlet.Spec.DeployOption.Mode, n.kubeVersion, n.controlPlaneNodeLabels)
+		replica = helpers.DetermineReplica(ctx, n.kubeClient, klusterlet.Spec.DeployOption.Mode, n.kubeVersion, n.controlPlaneNodeLabelSelector)
 	}
 	// Klusterlet is deleting, we remove its related resources on managed and management cluster
 	config := klusterletConfig{
