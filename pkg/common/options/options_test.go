@@ -61,7 +61,7 @@ func TestComplete(t *testing.T) {
 			secret: testinghelpers.NewHubKubeconfigSecret(
 				componentNamespace, "hub-kubeconfig-secret", "",
 				testinghelpers.NewTestCert("system:open-cluster-management:cluster2:agent2", 60*time.Second), map[string][]byte{
-					"kubeconfig":   testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "", nil, nil, nil),
+					"kubeconfig":   testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil),
 					"cluster-name": []byte("cluster3"),
 					"agent-name":   []byte("agent3"),
 				}),

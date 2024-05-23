@@ -95,7 +95,7 @@ func TestHasValidHubClientConfig(t *testing.T) {
 	cert1 := testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second)
 	cert2 := testinghelpers.NewTestCert("test", 60*time.Second)
 
-	kubeconfig := testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "", nil, nil, nil)
+	kubeconfig := testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil)
 
 	cases := []struct {
 		name               string
@@ -132,11 +132,21 @@ func TestHasValidHubClientConfig(t *testing.T) {
 			isValid:     false,
 		},
 		{
+			name:               "context cluster changes",
+			clusterName:        "cluster1",
+			agentName:          "agent1",
+			kubeconfig:         kubeconfig,
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c2", "https://127.0.0.1:6001", "", nil, nil, nil),
+			tlsKey:             cert1.Key,
+			tlsCert:            cert1.Cert,
+			isValid:            false,
+		},
+		{
 			name:               "hub server url changes",
 			clusterName:        "cluster1",
 			agentName:          "agent1",
 			kubeconfig:         kubeconfig,
-			bootstapKubeconfig: testinghelpers.NewKubeconfig("https://127.0.0.2:6001", "", nil, nil, nil),
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.2:6001", "", nil, nil, nil),
 			tlsKey:             cert1.Key,
 			tlsCert:            cert1.Cert,
 			isValid:            false,
@@ -146,7 +156,7 @@ func TestHasValidHubClientConfig(t *testing.T) {
 			clusterName:        "cluster1",
 			agentName:          "agent1",
 			kubeconfig:         kubeconfig,
-			bootstapKubeconfig: testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "https://127.0.0.1:3129", nil, nil, nil),
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "https://127.0.0.1:3129", nil, nil, nil),
 			tlsKey:             cert1.Key,
 			tlsCert:            cert1.Cert,
 			isValid:            false,
@@ -156,7 +166,7 @@ func TestHasValidHubClientConfig(t *testing.T) {
 			clusterName:        "cluster1",
 			agentName:          "agent1",
 			kubeconfig:         kubeconfig,
-			bootstapKubeconfig: testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "", []byte("test"), nil, nil),
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", []byte("test"), nil, nil),
 			tlsKey:             cert1.Key,
 			tlsCert:            cert1.Cert,
 			isValid:            false,
@@ -166,7 +176,7 @@ func TestHasValidHubClientConfig(t *testing.T) {
 			clusterName:        "cluster1",
 			agentName:          "agent1",
 			kubeconfig:         kubeconfig,
-			bootstapKubeconfig: testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "", nil, nil, nil),
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil),
 			tlsKey:             cert1.Key,
 			tlsCert:            cert1.Cert,
 			isValid:            true,
@@ -287,8 +297,10 @@ func TestParseKubeconfig(t *testing.T) {
 	caData2 := []byte("fake-ca-data2")
 	proxyURL := "https://127.0.0.1:3129"
 
-	kubeconfigWithoutProxy := clientcert.BuildKubeconfig(server1, caData1, "", "tls.crt", "tls.key")
-	kubeconfigWithProxy := clientcert.BuildKubeconfig(server2, caData2, proxyURL, "tls.crt", "tls.key")
+	kubeconfigWithoutProxy := clientcert.BuildKubeconfig(
+		"test-cluster", server1, caData1, "", "tls.crt", "tls.key")
+	kubeconfigWithProxy := clientcert.BuildKubeconfig(
+		"test-cluster", server2, caData2, proxyURL, "tls.crt", "tls.key")
 
 	cases := []struct {
 		name             string
@@ -319,9 +331,13 @@ func TestParseKubeconfig(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			server, proxyURL, caData, err := parseKubeconfig(filename)
+			ctxCluster, server, proxyURL, caData, err := parseKubeconfig(filename)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
+			}
+
+			if ctxCluster != "test-cluster" {
+				t.Errorf("expect context cluster %s, but %s", "test-cluster", ctxCluster)
 			}
 
 			if c.expectedServer != server {

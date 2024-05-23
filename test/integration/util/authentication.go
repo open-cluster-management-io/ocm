@@ -50,8 +50,8 @@ type TestAuthn struct {
 	caKeyFile string
 }
 
-func createKubeConfigByClientCertWithProxy(context string, securePort string, serverCertFile, certFile, keyFile,
-	proxyURL string, proxyServerCertData []byte) (*clientcmdapi.Config, error) {
+func createKubeConfigByClientCertWithProxy(context, contextCluster string, securePort string,
+	serverCertFile, certFile, keyFile, proxyURL string, proxyServerCertData []byte) (*clientcmdapi.Config, error) {
 	caData, err := os.ReadFile(serverCertFile)
 	if err != nil {
 		return nil, err
@@ -70,13 +70,13 @@ func createKubeConfigByClientCertWithProxy(context string, securePort string, se
 	if len(proxyURL) > 0 {
 		hubCluster.ProxyURL = proxyURL
 	}
-	config.Clusters["hub"] = hubCluster
+	config.Clusters[contextCluster] = hubCluster
 	config.AuthInfos["user"] = &clientcmdapi.AuthInfo{
 		ClientCertificate: certFile,
 		ClientKey:         keyFile,
 	}
 	config.Contexts[context] = &clientcmdapi.Context{
-		Cluster:  "hub",
+		Cluster:  contextCluster,
 		AuthInfo: "user",
 	}
 	config.CurrentContext = context
@@ -122,8 +122,10 @@ func mergeCertificateData(caBundles ...[]byte) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-func createKubeConfigByClientCert(context string, securePort string, serverCertFile, certFile, keyFile string) (*clientcmdapi.Config, error) {
-	return createKubeConfigByClientCertWithProxy(context, securePort, serverCertFile, certFile, keyFile, "", nil)
+func createKubeConfigByClientCert(context, contextCluster string, securePort string,
+	serverCertFile, certFile, keyFile string) (*clientcmdapi.Config, error) {
+	return createKubeConfigByClientCertWithProxy(context, contextCluster,
+		securePort, serverCertFile, certFile, keyFile, "", nil)
 }
 
 func NewTestAuthn(caFile, caKeyFile string) *TestAuthn {
@@ -213,12 +215,19 @@ func (t *TestAuthn) Stop() error {
 	return nil
 }
 
-func (t *TestAuthn) CreateBootstrapKubeConfigWithCertAge(configFileName, serverCertFile, securePort string, certAge time.Duration) error {
-	return t.CreateBootstrapKubeConfig(configFileName, serverCertFile, securePort, bootstrapUser, certAge)
+func (t *TestAuthn) CreateBootstrapKubeConfigWithCertAge(configFileName, serverCertFile, securePort string,
+	certAge time.Duration, contextCluster ...string) error {
+	cluster := "hub"
+	if len(contextCluster) > 0 {
+		cluster = contextCluster[0]
+	}
+
+	return t.CreateBootstrapKubeConfig(configFileName, serverCertFile, securePort, bootstrapUser,
+		certAge, cluster)
 }
 
 func (t *TestAuthn) CreateBootstrapKubeConfigWithUser(configFileName, serverCertFile, securePort, bootstrapUser string) error {
-	return t.CreateBootstrapKubeConfig(configFileName, serverCertFile, securePort, bootstrapUser, 24*time.Hour)
+	return t.CreateBootstrapKubeConfig(configFileName, serverCertFile, securePort, bootstrapUser, 24*time.Hour, "hub")
 }
 
 func (t *TestAuthn) CreateBootstrapKubeConfigWithProxy(configFileName, serverCertFile, securePort, proxyURL string, proxyServerCertData []byte) error {
@@ -241,7 +250,7 @@ func (t *TestAuthn) CreateBootstrapKubeConfigWithProxy(configFileName, serverCer
 		return err
 	}
 
-	config, err := createKubeConfigByClientCertWithProxy(configFileName, securePort, serverCertFile,
+	config, err := createKubeConfigByClientCertWithProxy(configFileName, "hub", securePort, serverCertFile,
 		path.Join(configDir, "bootstrap.crt"), path.Join(configDir, "bootstrap.key"), proxyURL, proxyServerCertData)
 	if err != nil {
 		return err
@@ -250,7 +259,8 @@ func (t *TestAuthn) CreateBootstrapKubeConfigWithProxy(configFileName, serverCer
 	return clientcmd.WriteToFile(*config, configFileName)
 }
 
-func (t *TestAuthn) CreateBootstrapKubeConfig(configFileName, serverCertFile, securePort, bootstrapUser string, certAge time.Duration) error {
+func (t *TestAuthn) CreateBootstrapKubeConfig(configFileName, serverCertFile, securePort, bootstrapUser string,
+	certAge time.Duration, contextCluster string) error {
 	certData, keyData, err := t.signClientCertKeyWithCA(bootstrapUser, bootstrapGroups, certAge)
 	if err != nil {
 		return err
@@ -270,7 +280,7 @@ func (t *TestAuthn) CreateBootstrapKubeConfig(configFileName, serverCertFile, se
 		return err
 	}
 
-	config, err := createKubeConfigByClientCert(configFileName, securePort, serverCertFile,
+	config, err := createKubeConfigByClientCert(configFileName, contextCluster, securePort, serverCertFile,
 		path.Join(configDir, "bootstrap.crt"), path.Join(configDir, "bootstrap.key"))
 	if err != nil {
 		return err

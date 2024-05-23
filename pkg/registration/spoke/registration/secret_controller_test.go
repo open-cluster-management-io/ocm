@@ -34,7 +34,7 @@ func TestDumpSecret(t *testing.T) {
 		}
 	}()
 
-	kubeConfigFile := testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "", nil, nil, nil)
+	kubeConfigFile := testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil)
 
 	cases := []struct {
 		name          string
@@ -66,7 +66,7 @@ func TestDumpSecret(t *testing.T) {
 				map[string][]byte{
 					clientcert.ClusterNameFile: []byte("test"),
 					clientcert.AgentNameFile:   []byte("test"),
-					clientcert.KubeconfigFile:  testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "", nil, nil, nil),
+					clientcert.KubeconfigFile:  testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil),
 				},
 			),
 			validateFiles: func(t *testing.T, hubKubeconfigDir string) {
@@ -91,7 +91,7 @@ func TestDumpSecret(t *testing.T) {
 				map[string][]byte{
 					clientcert.ClusterNameFile: []byte("test1"),
 					clientcert.AgentNameFile:   []byte("test"),
-					clientcert.KubeconfigFile:  testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "", nil, nil, nil),
+					clientcert.KubeconfigFile:  testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil),
 				},
 			),
 			validateFiles: func(t *testing.T, hubKubeconfigDir string) {

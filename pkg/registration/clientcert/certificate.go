@@ -164,16 +164,18 @@ func getCertValidityPeriod(secret *corev1.Secret) (*time.Time, *time.Time, error
 }
 
 // BuildKubeconfig builds a kubeconfig based on a rest config template with a cert/key pair
-func BuildKubeconfig(server string, caData []byte, proxyURL, clientCertPath, clientKeyPath string) clientcmdapi.Config {
+func BuildKubeconfig(clusterName, server string, caData []byte,
+	proxyURL, clientCertPath, clientKeyPath string) clientcmdapi.Config {
 	// Build kubeconfig.
 	kubeconfig := clientcmdapi.Config{
 		// Define a cluster stanza based on the bootstrap kubeconfig.
-		Clusters: map[string]*clientcmdapi.Cluster{"default-cluster": {
-			Server:                   server,
-			InsecureSkipTLSVerify:    false,
-			CertificateAuthorityData: caData,
-			ProxyURL:                 proxyURL,
-		}},
+		Clusters: map[string]*clientcmdapi.Cluster{
+			clusterName: {
+				Server:                   server,
+				InsecureSkipTLSVerify:    false,
+				CertificateAuthorityData: caData,
+				ProxyURL:                 proxyURL,
+			}},
 		// Define auth based on the obtained client cert.
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{"default-auth": {
 			ClientCertificate: clientCertPath,
@@ -181,7 +183,7 @@ func BuildKubeconfig(server string, caData []byte, proxyURL, clientCertPath, cli
 		}},
 		// Define a context that connects the auth info and cluster, and set it as the default
 		Contexts: map[string]*clientcmdapi.Context{"default-context": {
-			Cluster:   "default-cluster",
+			Cluster:   clusterName,
 			AuthInfo:  "default-auth",
 			Namespace: "configuration",
 		}},
