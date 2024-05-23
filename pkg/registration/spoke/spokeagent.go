@@ -236,11 +236,11 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 			managementKubeClient, 10*time.Minute, informers.WithNamespace(o.agentOptions.ComponentNamespace))
 
 		// create a kubeconfig with references to the key/cert files in the same secret
-		contextClusterName, srever, proxyURL, caData, err := parseKubeconfig(o.registrationOption.BootstrapKubeconfig)
+		contextClusterName, server, proxyURL, caData, err := parseKubeconfig(o.registrationOption.BootstrapKubeconfig)
 		if err != nil {
 			return err
 		}
-		kubeconfig := clientcert.BuildKubeconfig(contextClusterName, srever, caData,
+		kubeconfig := clientcert.BuildKubeconfig(contextClusterName, server, caData,
 			proxyURL, clientcert.TLSCertFile, clientcert.TLSKeyFile)
 		kubeconfigData, err := clientcmd.Write(kubeconfig)
 		if err != nil {
@@ -455,7 +455,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 //  4. Certificate in TLSCertFile is issued for the current cluster/agent;
 //  5. Certificate in TLSCertFile is not expired;
 //  6. Hub kubeconfig and bootstrap hub kubeconfig include the same server, proxyURL
-//     and CA bundle.
+//     CA bundle and cluster name.
 //
 // Normally, KubeconfigFile/TLSKeyFile/TLSCertFile will be created once the bootstrap process
 // completes. Changing the name of the cluster will make the existing hub kubeconfig invalid,
@@ -506,6 +506,7 @@ func (o *SpokeAgentConfig) HasValidHubClientConfig(ctx context.Context) (bool, e
 // 1. The hub server
 // 2. The proxy url
 // 3. The CA bundle
+// 4. The current context cluster name
 func (o *SpokeAgentConfig) isHubKubeconfigValid(ctx context.Context) (bool, error) {
 	bootstrapCtxCluster, bootstrapServer, bootstrapProxyURL, bootstrapCABndle, err := parseKubeconfig(
 		o.registrationOption.BootstrapKubeconfig)
