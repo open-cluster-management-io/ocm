@@ -198,9 +198,10 @@ func (r *runtimeReconcile) createManagedClusterKubeconfig(
 	klusterlet *operatorapiv1.Klusterlet,
 	klusterletNamespace, agentNamespace, saName, secretName string,
 	recorder events.Recorder) error {
+	labels := helpers.GetKlusterletAgentLabels(klusterlet)
 	tokenGetter := helpers.SATokenGetter(ctx, saName, klusterletNamespace, r.managedClusterClients.kubeClient)
 	err := helpers.SyncKubeConfigSecret(ctx, secretName, agentNamespace, "/spoke/config/kubeconfig",
-		r.managedClusterClients.kubeconfig, r.kubeClient.CoreV1(), tokenGetter, recorder)
+		r.managedClusterClients.kubeconfig, r.kubeClient.CoreV1(), tokenGetter, recorder, labels)
 	if err != nil {
 		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
 			Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionFalse, Reason: operatorapiv1.ReasonKlusterletApplyFailed,
