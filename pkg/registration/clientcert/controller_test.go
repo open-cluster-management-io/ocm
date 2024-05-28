@@ -101,7 +101,7 @@ func TestSync(t *testing.T) {
 				testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "1", testinghelpers.NewTestCert(commonName, 10000*time.Second), map[string][]byte{
 					ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
 					AgentNameFile:   []byte(testAgentName),
-					KubeconfigFile:  testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "", nil, nil, nil),
+					KubeconfigFile:  testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil),
 				}),
 			},
 			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
@@ -116,7 +116,7 @@ func TestSync(t *testing.T) {
 				testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "1", testinghelpers.NewTestCert(commonName, -3*time.Second), map[string][]byte{
 					ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
 					AgentNameFile:   []byte(testAgentName),
-					KubeconfigFile:  testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "", nil, nil, nil),
+					KubeconfigFile:  testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil),
 				}),
 			},
 			keyDataExpected: true,

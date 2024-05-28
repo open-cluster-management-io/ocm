@@ -215,7 +215,8 @@ func (c *CloudEventSourceClient[T]) receive(ctx context.Context, evt cloudevents
 //   - If the requested resource version is older than the source's current maintained resource version, the source
 //     sends the resource.
 func (c *CloudEventSourceClient[T]) respondResyncSpecRequest(
-	ctx context.Context, evtDataType types.CloudEventsDataType, evt cloudevents.Event) error {
+	ctx context.Context, evtDataType types.CloudEventsDataType, evt cloudevents.Event,
+) error {
 	resourceVersions, err := payload.DecodeSpecResyncRequest(evt)
 	if err != nil {
 		return err
