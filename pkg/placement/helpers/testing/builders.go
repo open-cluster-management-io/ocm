@@ -300,6 +300,15 @@ func (b *ManagedClusterBuilder) WithTaint(taint *clusterapiv1.Taint) *ManagedClu
 	return b
 }
 
+func (b *ManagedClusterBuilder) WithDeletionTimestamp() *ManagedClusterBuilder {
+	if b.cluster.DeletionTimestamp.IsZero() {
+		t := metav1.Now()
+		b.cluster.DeletionTimestamp = &t
+	}
+
+	return b
+}
+
 func (b *ManagedClusterBuilder) Build() *clusterapiv1.ManagedCluster {
 	return b.cluster
 }
