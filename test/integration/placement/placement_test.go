@@ -104,6 +104,69 @@ var _ = ginkgo.Describe("Placement", func() {
 				[]clusterapiv1beta1.DecisionGroupStatus{{Decisions: []string{testinghelpers.PlacementDecisionName(placementName, 1)}, ClustersCount: 5}})
 		})
 
+		ginkgo.It("Should re-create placementdecisions successfully once selected clusters are terminating", func() {
+			assertBindingClusterSet(clusterSet1Name, namespace)
+			assertCreatingClusters(clusterSet1Name, 5)
+			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(10).Build()
+			assertCreatingPlacementWithDecision(placement, 5, 1)
+
+			ctx := context.Background()
+
+			ginkgo.By("Find the first managedcluster")
+			clusters, err := clusterClient.ClusterV1().ManagedClusters().List(ctx, metav1.ListOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(clusters.Items).To(gomega.HaveLen(5))
+			terminatingCluster := clusters.Items[0].Name
+
+			ginkgo.By("Add a finalizer for the managedcluster: " + terminatingCluster)
+			gomega.Eventually(func() error {
+				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(ctx,
+					terminatingCluster, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				managedCluster.Finalizers = append(managedCluster.Finalizers, "test")
+				_, err = clusterClient.ClusterV1().ManagedClusters().Update(ctx,
+					managedCluster, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+			ginkgo.By("Delete the managedcluster: " + terminatingCluster)
+			err = clusterClient.ClusterV1().ManagedClusters().Delete(ctx, terminatingCluster, metav1.DeleteOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// check if the placementdecisions are re-created
+			placement, err = clusterClient.ClusterV1beta1().Placements(namespace).Get(ctx,
+				placementName, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			assertPlacementDecisionCreated(placement)
+			assertPlacementDecisionNumbers(placementName, namespace, 4, 1)
+			assertPlacementStatusDecisionGroups(
+				placementName, namespace,
+				[]clusterapiv1beta1.DecisionGroupStatus{
+					{Decisions: []string{testinghelpers.PlacementDecisionName(placementName, 1)}, ClustersCount: 4},
+				})
+
+			ginkgo.By("Delete the finalizer for the managedcluster: " + terminatingCluster)
+			gomega.Eventually(func() error {
+				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(ctx,
+					terminatingCluster, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				finalizers := []string{}
+				for _, finalizer := range managedCluster.Finalizers {
+					if finalizer != "test" {
+						finalizers = append(finalizers, finalizer)
+					}
+				}
+				managedCluster.Finalizers = finalizers
+				_, err = clusterClient.ClusterV1().ManagedClusters().Update(ctx,
+					managedCluster, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		})
+
 		ginkgo.It("Should create empty placementdecision when no cluster selected", func() {
 			placement := testinghelpers.NewPlacement(namespace, placementName).Build()
 			assertCreatingPlacementWithDecision(placement, 0, 1)

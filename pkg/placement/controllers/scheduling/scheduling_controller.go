@@ -330,6 +330,7 @@ func (c *schedulingController) getEligibleClusterSets(placement *clusterapiv1bet
 // getAvailableClusters returns available clusters for the given placement. The clusters must
 // 1) Be from clustersets bound to the placement namespace;
 // 2) Belong to one of particular clustersets if .spec.clusterSets is specified;
+// 3) Not in terminating state;
 func (c *schedulingController) getAvailableClusters(clusterSetNames []string) ([]*clusterapiv1.ManagedCluster, error) {
 	if len(clusterSetNames) == 0 {
 		return nil, nil
@@ -351,7 +352,9 @@ func (c *schedulingController) getAvailableClusters(clusterSetNames []string) ([
 			return nil, fmt.Errorf("failed to get clusterset: %v, clusters, Error: %v", clusterSet.Name, err)
 		}
 		for i := range clusters {
-			availableClusters[clusters[i].Name] = clusters[i]
+			if clusters[i].DeletionTimestamp.IsZero() {
+				availableClusters[clusters[i].Name] = clusters[i]
+			}
 		}
 	}
 
