@@ -734,6 +734,19 @@ func TestGetAvailableClusters(t *testing.T) {
 			expectedClusterNames: []string{"cluster1", "cluster2"},
 		},
 		{
+			name:            "exclude clusters with deletion timestamp",
+			clusterSetNames: []string{"clusterset1", "clusterset2"},
+			initObjs: []runtime.Object{
+				testinghelpers.NewClusterSet("clusterset1").Build(),
+				testinghelpers.NewClusterSet("clusterset2").Build(),
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, "clusterset1").Build(),
+				testinghelpers.NewManagedCluster("cluster2").
+					WithLabel(clusterapiv1beta2.ClusterSetLabel, "clusterset2").
+					WithDeletionTimestamp().Build(),
+			},
+			expectedClusterNames: []string{"cluster1"},
+		},
+		{
 			name:            "clusterset has no ClusterSelector",
 			clusterSetNames: []string{"clusterset1"},
 			initObjs: []runtime.Object{
