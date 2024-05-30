@@ -28,6 +28,7 @@ type Options struct {
 	SkipPlaceholderHubSecret      bool
 	ControlPlaneNodeLabelSelector string
 	DeploymentReplicas            int32
+	DisableAddonNamespace         bool
 }
 
 // RunKlusterletOperator starts a new klusterlet operator
@@ -100,8 +101,8 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		helpers.GetOperatorNamespace(),
 		o.ControlPlaneNodeLabelSelector,
 		o.DeploymentReplicas,
-		controllerContext.EventRecorder,
-		o.SkipPlaceholderHubSecret)
+		o.DisableAddonNamespace,
+		controllerContext.EventRecorder)
 
 	klusterletCleanupController := klusterletcontroller.NewKlusterletCleanupController(
 		kubeClient,
@@ -115,6 +116,7 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		helpers.GetOperatorNamespace(),
 		o.ControlPlaneNodeLabelSelector,
 		o.DeploymentReplicas,
+		o.DisableAddonNamespace,
 		controllerContext.EventRecorder)
 
 	ssarController := ssarcontroller.NewKlusterletSSARController(
