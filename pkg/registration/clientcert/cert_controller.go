@@ -312,6 +312,7 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 		}); updateErr != nil {
 			return updateErr
 		}
+		syncCtx.Recorder().Eventf("ClientCertificateCreationHalted", "Stop creating csr since there are too many csr created already on hub", c.controllerName)
 		return nil
 	}
 
