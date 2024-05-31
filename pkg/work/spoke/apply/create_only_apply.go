@@ -14,6 +14,8 @@ import (
 	"k8s.io/client-go/dynamic"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
+	"open-cluster-management.io/ocm/pkg/work/helper"
 )
 
 type CreateOnlyApply struct {
@@ -43,6 +45,10 @@ func (c *CreateOnlyApply) Apply(ctx context.Context,
 			recorder.Eventf(fmt.Sprintf(
 				"%s Created", required.GetKind()), "Created %s/%s because it was missing", required.GetNamespace(), required.GetName())
 		}
+	}
+
+	if err == nil {
+		err = helper.ApplyOwnerReferences(ctx, c.client, gvr, obj, owner)
 	}
 
 	return obj, err

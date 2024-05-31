@@ -284,11 +284,14 @@ spec:
                                 server side apply with work-controller as the field
                                 manager. If there is conflict, the related Applied
                                 condition of manifest will be in the status of False
-                                with the reason of ApplyConflict.
+                                with the reason of ApplyConflict. ReadOnly type means
+                                the agent will only check the existence of the resource
+                                based on its metadata.
                               enum:
                               - Update
                               - CreateOnly
                               - ServerSideApply
+                              - ReadOnly
                               type: string
                           required:
                           - type

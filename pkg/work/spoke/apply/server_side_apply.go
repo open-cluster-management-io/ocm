@@ -14,6 +14,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
+	"open-cluster-management.io/ocm/pkg/work/helper"
 )
 
 type ServerSideApply struct {
@@ -36,7 +38,7 @@ func (c *ServerSideApply) Apply(
 	ctx context.Context,
 	gvr schema.GroupVersionResource,
 	required *unstructured.Unstructured,
-	_ metav1.OwnerReference,
+	owner metav1.OwnerReference,
 	applyOption *workapiv1.ManifestConfigOption,
 	recorder events.Recorder) (runtime.Object, error) {
 
@@ -64,6 +66,9 @@ func (c *ServerSideApply) Apply(
 		return obj, &ServerSideApplyConflictError{ssaErr: err}
 	}
 
-	return obj, err
+	if err == nil {
+		err = helper.ApplyOwnerReferences(ctx, c.client, gvr, obj, owner)
+	}
 
+	return obj, err
 }

@@ -332,11 +332,6 @@ func (m *ManifestWorkController) applyOneManifest(
 	applier := m.appliers.GetApplier(strategy.Type)
 	result.Result, result.Error = applier.Apply(ctx, gvr, required, requiredOwner, option, recorder)
 
-	// patch the ownerref
-	if result.Error == nil {
-		result.Error = helper.ApplyOwnerReferences(ctx, m.spokeDynamicClient, gvr, result.Result, requiredOwner)
-	}
-
 	return result
 }
 

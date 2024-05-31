@@ -51,7 +51,7 @@ func TestCreateOnlyApply(t *testing.T) {
 			required: testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "get")
+				testingcommon.AssertActions(t, actions, "get", "patch")
 
 				action := actions[0].(clienttesting.GetActionImpl)
 				if action.Namespace != "ns1" || action.Name != "test" {
