@@ -7,5 +7,6 @@ Below is a list of companies and projects that have adopted Open Cluster Managem
 - [Alibaba Cloud](https://www.alibabacloud.com/)
 - [Ant Group](https://www.antgroup.com/)
 - [AppsCode Inc.](https://appscode.com)
+- [RamenDR](https://github.com/RamenDR)
 - [Red Hat](https://www.redhat.com/)
 - [Xiao Hong Shu](https://www.xiaohongshu.com/)
