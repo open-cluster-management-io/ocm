@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
@@ -38,8 +39,12 @@ func (r *namespaceReconcile) reconcile(
 	if err != nil {
 		return klusterlet, reconcileStop, err
 	}
+	skippedNamespaces := sets.New[string](config.KlusterletNamespace)
+	if !config.DisableAddonNamespace {
+		skippedNamespaces.Insert(helpers.DefaultAddonNamespace)
+	}
 	for _, ns := range namespaces.Items {
-		if ns.Name == config.KlusterletNamespace || ns.Name == helpers.DefaultAddonNamespace {
+		if skippedNamespaces.Has(ns.Name) {
 			continue
 		}
 		if err := r.managedClusterClients.kubeClient.CoreV1().Namespaces().Delete(
