@@ -1,15 +1,15 @@
 package webhook
 
 import (
+	"context"
 	"crypto/tls"
-
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -44,32 +44,34 @@ func (c *Options) RunWebhookServer() error {
 		}),
 	})
 
+	logger := klog.LoggerWithName(klog.FromContext(context.Background()), "work webhook")
+	ctrl.SetLogger(logger)
 	if err != nil {
-		klog.Error(err, "unable to start manager")
+		logger.Error(err, "unable to start manager")
 		return err
 	}
 
 	// add healthz/readyz check handler
 	if err := mgr.AddHealthzCheck("healthz-ping", healthz.Ping); err != nil {
-		klog.Errorf("unable to add healthz check handler: %v", err)
+		logger.Error(err, "unable to add healthz check handler")
 		return err
 	}
 
 	if err := mgr.AddReadyzCheck("readyz-ping", healthz.Ping); err != nil {
-		klog.Errorf("unable to add readyz check handler: %v", err)
+		logger.Error(err, "unable to add readyz check handler")
 		return err
 	}
 
 	common.ManifestValidator.WithLimit(c.ManifestLimit)
 
 	if err = (&webhookv1.ManifestWorkWebhook{}).Init(mgr); err != nil {
-		klog.Error(err, "unable to create ManagedCluster webhook")
+		logger.Error(err, "unable to create ManagedCluster webhook")
 		return err
 	}
 
-	klog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		klog.Error(err, "problem running manager")
+	logger.Info("starting manager")
+	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		logger.Error(err, "problem running manager")
 		return err
 	}
 	return nil
