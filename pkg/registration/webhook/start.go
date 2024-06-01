@@ -45,6 +45,9 @@ func (c *Options) RunWebhookServer() error {
 	})
 	logger := klog.LoggerWithName(klog.FromContext(context.Background()), "Webhook Server") //MYTODO: Recheck it later
 
+	// This line prevents controller-runtime from complaining about log.SetLogger never being called
+	ctrl.SetLogger(logger)
+
 	if err != nil {
 		logger.Error(err, "unable to start manager")
 		return err
