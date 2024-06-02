@@ -30,6 +30,9 @@ func init() {
 }
 
 func (c *Options) RunWebhookServer() error {
+	logger := klog.LoggerWithName(klog.FromContext(context.Background()), "work webhook")
+	ctrl.SetLogger(logger)
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		HealthProbeBindAddress: ":8000",
@@ -43,9 +46,6 @@ func (c *Options) RunWebhookServer() error {
 			CertDir: c.CertDir,
 		}),
 	})
-
-	logger := klog.LoggerWithName(klog.FromContext(context.Background()), "work webhook")
-	ctrl.SetLogger(logger)
 	if err != nil {
 		logger.Error(err, "unable to start manager")
 		return err
