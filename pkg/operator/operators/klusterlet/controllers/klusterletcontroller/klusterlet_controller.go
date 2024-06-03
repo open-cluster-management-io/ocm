@@ -41,7 +41,6 @@ const (
 	klusterletFinalizer                   = "operator.open-cluster-management.io/klusterlet-cleanup"
 	managedResourcesEvictionTimestampAnno = "operator.open-cluster-management.io/managed-resources-eviction-timestamp"
 	klusterletNamespaceLabelKey           = "operator.open-cluster-management.io/klusterlet"
-	hostedKlusterletLabelKey              = "operator.open-cluster-management.io/hosted-klusterlet"
 )
 
 type klusterletController struct {
@@ -50,11 +49,11 @@ type klusterletController struct {
 	kubeClient                    kubernetes.Interface
 	kubeVersion                   *version.Version
 	operatorNamespace             string
-	skipHubSecretPlaceholder      bool
 	cache                         resourceapply.ResourceCache
 	managedClusterClientsBuilder  managedClusterClientsBuilderInterface
 	controlPlaneNodeLabelSelector string
 	deploymentReplicas            int32
+	disableAddonNamespace         bool
 }
 
 type klusterletReconcile interface {
@@ -82,8 +81,8 @@ func NewKlusterletController(
 	operatorNamespace string,
 	controlPlaneNodeLabelSelector string,
 	deploymentReplicas int32,
-	recorder events.Recorder,
-	skipHubSecretPlaceholder bool) factory.Controller {
+	disableAddonNamespace bool,
+	recorder events.Recorder) factory.Controller {
 	controller := &klusterletController{
 		kubeClient: kubeClient,
 		patcher: patcher.NewPatcher[
@@ -91,11 +90,11 @@ func NewKlusterletController(
 		klusterletLister:              klusterletInformer.Lister(),
 		kubeVersion:                   kubeVersion,
 		operatorNamespace:             operatorNamespace,
-		skipHubSecretPlaceholder:      skipHubSecretPlaceholder,
 		cache:                         resourceapply.NewResourceCache(),
 		managedClusterClientsBuilder:  newManagedClusterClientsBuilder(kubeClient, apiExtensionClient, appliedManifestWorkClient, recorder),
 		controlPlaneNodeLabelSelector: controlPlaneNodeLabelSelector,
 		deploymentReplicas:            deploymentReplicas,
+		disableAddonNamespace:         disableAddonNamespace,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -164,6 +163,9 @@ type klusterletConfig struct {
 	// ResourceRequirements is the resource requirements for the klusterlet managed containers.
 	// The type has to be []byte to use "indent" template function.
 	ResourceRequirements []byte
+
+	// DisableAddonNamespace is the flag to disable the creationg of default addon namespace.
+	DisableAddonNamespace bool
 }
 
 func (n *klusterletController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
@@ -218,6 +220,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		WorkServiceAccount:              serviceAccountName("work-sa", klusterlet),
 		ResourceRequirementResourceType: helpers.ResourceType(klusterlet),
 		ResourceRequirements:            resourceRequirements,
+		DisableAddonNamespace:           n.disableAddonNamespace,
 	}
 
 	managedClusterClients, err := n.managedClusterClientsBuilder.

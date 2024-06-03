@@ -31,14 +31,20 @@ func NewKlusterletOperatorCmd() *cobra.Command {
 
 	// add disable leader election flag
 	flags := cmd.Flags()
-	cmd.Flags().BoolVar(&klOptions.SkipPlaceholderHubSecret, "skip-placeholder-hub-secret", false,
+	flags.BoolVar(&klOptions.SkipPlaceholderHubSecret, "skip-placeholder-hub-secret", false,
 		"If set, will skip ensuring a placeholder hub secret which is originally intended for pulling "+
 			"work image before approved")
-	cmd.Flags().StringVar(&klOptions.ControlPlaneNodeLabelSelector, "control-plane-node-label-selector",
+	if err := flags.MarkDeprecated("skip-placeholder-hub-secret", "flag is not used in the operator."); err != nil {
+		utilruntime.Must(err)
+	}
+	flags.StringVar(&klOptions.ControlPlaneNodeLabelSelector, "control-plane-node-label-selector",
 		"node-role.kubernetes.io/master=", "control plane node labels, "+
 			"e.g. 'environment=production', 'tier notin (frontend,backend)'")
-	cmd.Flags().Int32Var(&klOptions.DeploymentReplicas, "deployment-replicas", 0,
+	flags.Int32Var(&klOptions.DeploymentReplicas, "deployment-replicas", 0,
 		"Number of deployment replicas, operator will automatically determine replicas if not set")
+	flags.BoolVar(&klOptions.DisableAddonNamespace, "disable-default-addon-namespace", false,
+		"If set, will not create default open-cluster-management-agent-addon ns")
+
 	opts.AddFlags(flags)
 
 	return cmd

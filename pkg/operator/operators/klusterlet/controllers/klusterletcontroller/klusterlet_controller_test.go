@@ -782,7 +782,9 @@ func TestRemoveOldNamespace(t *testing.T) {
 		Type:   operatorapiv1.ConditionKlusterletApplied,
 		Status: metav1.ConditionTrue,
 	})
-	controller.operatorStore.Update(klusterlet)
+	if err := controller.operatorStore.Update(klusterlet); err != nil {
+		t.Fatal(err)
+	}
 	err = controller.controller.sync(context.TODO(), syncContext)
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
@@ -801,6 +803,53 @@ func TestRemoveOldNamespace(t *testing.T) {
 	if !expectedSet.Equal(actualSet) {
 		t.Errorf("ns deletion not correct, got %v", actualSet)
 	}
+}
+
+// TestSyncDeploy test deployment of klusterlet components
+func TestSyncDisableAddonNamespace(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
+	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
+	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	namespace := newNamespace("testns")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, bootStrapSecret, hubKubeConfigSecret, namespace)
+	controller.controller.disableAddonNamespace = true
+
+	err := controller.controller.sync(context.TODO(), syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	var ns []runtime.Object
+	kubeActions := controller.kubeClient.Actions()
+	for _, action := range kubeActions {
+		if action.GetVerb() == createVerb {
+			object := action.(clienttesting.CreateActionImpl).Object
+			if object.GetObjectKind().GroupVersionKind().Kind == "Namespace" {
+				ns = append(ns, object)
+			}
+		}
+	}
+
+	// Check if resources are created as expected, only 0 ns is created
+	if len(ns) != 0 {
+		t.Errorf("Expect 0 ns created in the sync loop, actual %d", len(ns))
+	}
+
+	operatorAction := controller.operatorClient.Actions()
+	testingcommon.AssertActions(t, operatorAction, "patch")
+	klusterlet = &operatorapiv1.Klusterlet{}
+	patchData := operatorAction[0].(clienttesting.PatchActionImpl).Patch
+	err = json.Unmarshal(patchData, klusterlet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testinghelper.AssertOnlyConditions(
+		t, klusterlet,
+		testinghelper.NamedCondition(operatorapiv1.ConditionKlusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
+		testinghelper.NamedCondition(helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue),
+	)
 }
 
 // TestGetServersFromKlusterlet tests getServersFromKlusterlet func
