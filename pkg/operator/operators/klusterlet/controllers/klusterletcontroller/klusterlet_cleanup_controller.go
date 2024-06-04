@@ -40,6 +40,7 @@ type klusterletCleanupController struct {
 	managedClusterClientsBuilder  managedClusterClientsBuilderInterface
 	controlPlaneNodeLabelSelector string
 	deploymentReplicas            int32
+	disableAddonNamespace         bool
 }
 
 // NewKlusterletCleanupController construct klusterlet cleanup controller
@@ -55,6 +56,7 @@ func NewKlusterletCleanupController(
 	operatorNamespace string,
 	controlPlaneNodeLabelSelector string,
 	deploymentReplicas int32,
+	disableAddonNamespace bool,
 	recorder events.Recorder) factory.Controller {
 	controller := &klusterletCleanupController{
 		kubeClient: kubeClient,
@@ -67,6 +69,7 @@ func NewKlusterletCleanupController(
 		managedClusterClientsBuilder:  newManagedClusterClientsBuilder(kubeClient, apiExtensionClient, appliedManifestWorkClient, recorder),
 		controlPlaneNodeLabelSelector: controlPlaneNodeLabelSelector,
 		deploymentReplicas:            deploymentReplicas,
+		disableAddonNamespace:         disableAddonNamespace,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -122,6 +125,7 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 		ExternalManagedKubeConfigWorkSecret:         helpers.ExternalManagedKubeConfigWork,
 		InstallMode:                                 klusterlet.Spec.DeployOption.Mode,
 		HubApiServerHostAlias:                       klusterlet.Spec.HubApiServerHostAlias,
+		DisableAddonNamespace:                       n.disableAddonNamespace,
 
 		RegistrationServiceAccount: serviceAccountName("registration-sa", klusterlet),
 		WorkServiceAccount:         serviceAccountName("work-sa", klusterlet),

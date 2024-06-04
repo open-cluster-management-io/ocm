@@ -63,29 +63,36 @@ type managedReconcile struct {
 
 func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
-	// For now, whether in Default or Hosted mode, the addons will be deployed on the managed cluster.
-	// sync image pull secret from management cluster to managed cluster for addon namespace
-	// TODO(zhujian7): In the future, we may consider deploy addons on the management cluster in Hosted mode.
-	// Ensure the addon namespace on the managed cluster
-	err := ensureNamespace(ctx, r.managedClusterClients.kubeClient, klusterlet, helpers.DefaultAddonNamespace, nil, r.recorder)
-	if err != nil {
-		return klusterlet, reconcileStop, err
-	}
-	// Sync pull secret to the klusterlet addon namespace
-	// The reason we keep syncing secret instead of adding a label to trigger addonsecretcontroller to sync is:
-	// addonsecretcontroller only watch namespaces in the same cluster klusterlet is running on.
-	// And if addons are deployed in default mode on the managed cluster, but klusterlet is deployed in hosted
-	// on management cluster, then we still need to sync the secret here in klusterlet-controller using `managedClusterClients.kubeClient`.
-	err = syncPullSecret(ctx, r.kubeClient, r.managedClusterClients.kubeClient, klusterlet, r.operatorNamespace, helpers.DefaultAddonNamespace, r.recorder)
-	if err != nil {
-		return klusterlet, reconcileStop, err
+	if !config.DisableAddonNamespace {
+		// For now, whether in Default or Hosted mode, the addons will be deployed on the managed cluster.
+		// sync image pull secret from management cluster to managed cluster for addon namespace
+		// TODO(zhujian7): In the future, we may consider deploy addons on the management cluster in Hosted mode.
+		// Ensure the addon namespace on the managed cluster
+		if err := ensureNamespace(
+			ctx,
+			r.managedClusterClients.kubeClient,
+			klusterlet, helpers.DefaultAddonNamespace, nil, r.recorder); err != nil {
+			return klusterlet, reconcileStop, err
+		}
+
+		// Sync pull secret to the klusterlet addon namespace
+		// The reason we keep syncing secret instead of adding a label to trigger addonsecretcontroller to sync is:
+		// addonsecretcontroller only watch namespaces in the same cluster klusterlet is running on.
+		// And if addons are deployed in default mode on the managed cluster, but klusterlet is deployed in hosted
+		// on management cluster, then we still need to sync the secret here in klusterlet-controller using `managedClusterClients.kubeClient`.
+		if err := syncPullSecret(
+			ctx,
+			r.kubeClient,
+			r.managedClusterClients.kubeClient,
+			klusterlet, r.operatorNamespace, helpers.DefaultAddonNamespace, r.recorder); err != nil {
+			return klusterlet, reconcileStop, err
+		}
 	}
 
-	err = ensureNamespace(
+	if err := ensureNamespace(
 		ctx, r.managedClusterClients.kubeClient, klusterlet, config.KlusterletNamespace, map[string]string{
 			klusterletNamespaceLabelKey: klusterlet.Name,
-		}, r.recorder)
-	if err != nil {
+		}, r.recorder); err != nil {
 		return klusterlet, reconcileStop, err
 	}
 
@@ -197,7 +204,10 @@ func (r *managedReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.
 
 	// remove the klusterlet namespace and klusterlet addon namespace on the managed cluster
 	// For now, whether in Default or Hosted mode, the addons could be deployed on the managed cluster.
-	namespaces := []string{config.KlusterletNamespace, fmt.Sprintf("%s-addon", config.KlusterletNamespace)}
+	namespaces := []string{config.KlusterletNamespace}
+	if !config.DisableAddonNamespace {
+		namespaces = append(namespaces, helpers.DefaultAddonNamespace)
+	}
 	for _, namespace := range namespaces {
 		if err := r.managedClusterClients.kubeClient.CoreV1().Namespaces().Delete(
 			ctx, namespace, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {

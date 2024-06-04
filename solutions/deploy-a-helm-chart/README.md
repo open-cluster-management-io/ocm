@@ -16,7 +16,7 @@ clusteradm install hub-addon --names application-manager
 Install application manager agent on all the managed clusters
 
 ```
-clusteradm addon enable --name application-manager --cluster cluster1,cluster2
+clusteradm addon enable --names application-manager --cluster cluster1,cluster2
 ```
 
 You will see that all agents is available after waiting a while

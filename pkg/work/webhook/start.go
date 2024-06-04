@@ -1,6 +1,7 @@
 package webhook
 
 import (
+	"context"
 	"crypto/tls"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,6 +31,9 @@ func init() {
 }
 
 func (c *Options) RunWebhookServer() error {
+	logger := klog.LoggerWithName(klog.FromContext(context.Background()), "work webhook")
+	ctrl.SetLogger(logger)
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		HealthProbeBindAddress: ":8000",
@@ -43,33 +47,32 @@ func (c *Options) RunWebhookServer() error {
 			CertDir: c.CertDir,
 		}),
 	})
-
 	if err != nil {
-		klog.Error(err, "unable to start manager")
+		logger.Error(err, "unable to start manager")
 		return err
 	}
 
 	// add healthz/readyz check handler
 	if err := mgr.AddHealthzCheck("healthz-ping", healthz.Ping); err != nil {
-		klog.Errorf("unable to add healthz check handler: %v", err)
+		logger.Error(err, "unable to add healthz check handler")
 		return err
 	}
 
 	if err := mgr.AddReadyzCheck("readyz-ping", healthz.Ping); err != nil {
-		klog.Errorf("unable to add readyz check handler: %v", err)
+		logger.Error(err, "unable to add readyz check handler")
 		return err
 	}
 
 	common.ManifestValidator.WithLimit(c.ManifestLimit)
 
 	if err = (&webhookv1.ManifestWorkWebhook{}).Init(mgr); err != nil {
-		klog.Error(err, "unable to create ManagedCluster webhook")
+		logger.Error(err, "unable to create ManagedCluster webhook")
 		return err
 	}
 
-	klog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		klog.Error(err, "problem running manager")
+	logger.Info("starting manager")
+	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		logger.Error(err, "problem running manager")
 		return err
 	}
 	return nil
