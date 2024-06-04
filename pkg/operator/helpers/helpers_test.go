@@ -1477,7 +1477,8 @@ func TestSyncSecret(t *testing.T) {
 			clientTarget := fakekube.NewSimpleClientset()
 			secret, changed, err := SyncSecret(
 				context.TODO(), client.CoreV1(), clientTarget.CoreV1(),
-				events.NewInMemoryRecorder("test"), tc.sourceNamespace, tc.sourceName, tc.targetNamespace, tc.targetName, tc.ownerRefs)
+				events.NewInMemoryRecorder("test"), tc.sourceNamespace, tc.sourceName,
+				tc.targetNamespace, tc.targetName, tc.ownerRefs, nil)
 
 			if (err == nil && len(tc.expectedErr) != 0) || (err != nil && err.Error() != tc.expectedErr) {
 				t.Errorf("%s: expected error %v, got %v", tc.name, tc.expectedErr, err)

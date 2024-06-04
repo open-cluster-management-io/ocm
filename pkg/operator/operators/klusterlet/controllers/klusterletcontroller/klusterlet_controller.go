@@ -8,6 +8,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -160,6 +161,9 @@ type klusterletConfig struct {
 	// ResourceRequirements is the resource requirements for the klusterlet managed containers.
 	// The type has to be []byte to use "indent" template function.
 	ResourceRequirements []byte
+
+	// Labels of the agents are synced from klusterlet CR.
+	Labels map[string]string
 }
 
 func (n *klusterletController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
@@ -208,6 +212,8 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		WorkServiceAccount:              serviceAccountName("work-sa", klusterlet),
 		ResourceRequirementResourceType: helpers.ResourceType(klusterlet),
 		ResourceRequirements:            resourceRequirements,
+
+		Labels: helpers.GetKlusterletAgentLabels(klusterlet),
 	}
 
 	managedClusterClients, err := n.managedClusterClientsBuilder.
@@ -399,6 +405,7 @@ func syncPullSecret(ctx context.Context, sourceClient, targetClient kubernetes.I
 		namespace,
 		imagePullSecret,
 		[]metav1.OwnerReference{},
+		helpers.GetKlusterletAgentLabels(klusterlet),
 	)
 
 	if err != nil {
@@ -410,9 +417,25 @@ func syncPullSecret(ctx context.Context, sourceClient, targetClient kubernetes.I
 	return nil
 }
 
-func ensureNamespace(ctx context.Context, kubeClient kubernetes.Interface, klusterlet *operatorapiv1.Klusterlet,
-	namespace string, recorder events.Recorder) error {
-	if err := ensureAgentNamespace(ctx, kubeClient, namespace, recorder); err != nil {
+// ensureNamespace is to apply the namespace defined in klusterlet spec to the managed cluster. The namespace
+// will have a klusterlet label.
+func ensureNamespace(
+	ctx context.Context,
+	kubeClient kubernetes.Interface,
+	klusterlet *operatorapiv1.Klusterlet,
+	namespace string, labels map[string]string, recorder events.Recorder) error {
+	modified := resourcemerge.BoolPtr(false)
+	resourcemerge.MergeMap(modified, &labels, helpers.GetKlusterletAgentLabels(klusterlet))
+	_, _, err := resourceapply.ApplyNamespace(ctx, kubeClient.CoreV1(), recorder, &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+			Annotations: map[string]string{
+				"workload.openshift.io/allowed": "management",
+			},
+			Labels: labels,
+		},
+	})
+	if err != nil {
 		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
 			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
 			Message: fmt.Sprintf("Failed to ensure namespace %q: %v", namespace, err)})

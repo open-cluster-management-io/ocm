@@ -159,6 +159,7 @@ func (r *managedReconcile) createAggregationRule(ctx context.Context, klusterlet
 			},
 			Rules: []rbacv1.PolicyRule{},
 		}
+		aggregateClusterRole.SetLabels(helpers.GetKlusterletAgentLabels(klusterlet))
 		_, createErr := r.managedClusterClients.kubeClient.RbacV1().ClusterRoles().Create(ctx, aggregateClusterRole, metav1.CreateOptions{})
 		return createErr
 	}
