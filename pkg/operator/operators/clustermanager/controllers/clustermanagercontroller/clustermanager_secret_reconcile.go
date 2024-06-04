@@ -53,6 +53,7 @@ func (c *secretReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clust
 			config.ClusterManagerNamespace,
 			secretName,
 			[]metav1.OwnerReference{},
+			nil,
 		); err != nil {
 			syncedErrs = append(syncedErrs, fmt.Errorf("failed to sync secret %s: %v", secretName, err))
 		}

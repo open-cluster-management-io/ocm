@@ -463,6 +463,11 @@ func ensureObject(t *testing.T, object runtime.Object, klusterlet *operatorapiv1
 		return
 	}
 
+	if !helpers.MapCompare(helpers.GetKlusterletAgentLabels(klusterlet), access.GetLabels()) {
+		t.Errorf("the labels of klusterlet are not synced to %v", access.GetName())
+		return
+	}
+
 	namespace := helpers.AgentNamespace(klusterlet)
 	switch o := object.(type) {
 	case *appsv1.Deployment:
@@ -560,6 +565,7 @@ func TestSyncDeploy(t *testing.T) {
 
 func TestSyncDeploySingleton(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	klusterlet.SetLabels(map[string]string{"test": "test", "abc": "abc"})
 	klusterlet.Spec.DeployOption.Mode = operatorapiv1.InstallModeSingleton
 	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
 	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")

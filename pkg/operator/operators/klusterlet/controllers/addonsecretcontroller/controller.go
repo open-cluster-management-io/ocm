@@ -79,6 +79,7 @@ func (c *addonPullImageSecretController) sync(ctx context.Context, controllerCon
 		namespace,
 		helpers.ImagePullSecret,
 		[]metav1.OwnerReference{},
+		nil,
 	)
 	if err != nil {
 		return err
