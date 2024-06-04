@@ -10,3 +10,4 @@ Below is a list of companies and projects that have adopted Open Cluster Managem
 - [RamenDR](https://github.com/RamenDR)
 - [Red Hat](https://www.redhat.com/)
 - [Xiao Hong Shu](https://www.xiaohongshu.com/)
+- [Guidewire Software](https://www.guidewire.com/)
