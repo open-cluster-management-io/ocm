@@ -74,6 +74,9 @@ const (
 
 	// ResourceCleanup will start gc controller to clean up resources in cluster ns after cluster is deleted.
 	ResourceCleanup featuregate.Feature = "ResourceCleanup"
+
+	// MultipleHubs allows user to configure multiple bootstrapkubeconfig connecting to different hubs via Klusterlet and let agent decide which one to use
+	MultipleHubs featuregate.Feature = "MultipleHubs"
 )
 
 // DefaultSpokeRegistrationFeatureGates consists of all known ocm-registration
@@ -83,6 +86,7 @@ var DefaultSpokeRegistrationFeatureGates = map[featuregate.Feature]featuregate.F
 	ClusterClaim:               {Default: true, PreRelease: featuregate.Beta},
 	AddonManagement:            {Default: true, PreRelease: featuregate.Alpha},
 	V1beta1CSRAPICompatibility: {Default: false, PreRelease: featuregate.Alpha},
+	MultipleHubs:               {Default: false, PreRelease: featuregate.Alpha},
 }
 
 // DefaultHubRegistrationFeatureGates consists of all known ocm-registration

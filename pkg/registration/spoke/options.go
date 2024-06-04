@@ -8,6 +8,9 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/apiserver/pkg/server/healthz"
 
+	ocmfeature "open-cluster-management.io/api/feature"
+
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 )
 
@@ -15,8 +18,20 @@ var ClientCertHealthCheckInterval = 30 * time.Second
 
 // SpokeAgentOptions holds configuration for spoke cluster agent
 type SpokeAgentOptions struct {
-	BootstrapKubeconfig         string
-	BootstrapKubeconfigSecret   string
+	// The differences among BootstrapKubeconfig, BootstrapKubeconfigSecret, BootstrapKubeconfigSecrets are:
+	// 1. BootstrapKubeconfig is a file path, the controller uses it to build the client.
+	// 2. BootstrapKubeconfigSecret is the secret, a event handler will watch it, if the secret is changed, then rebootstrap.
+	// 3. BootstrapKubeconfigs is a list of file path, the controller uses one of its item to build the client.
+	// BootstrapKubeconfigs can only be used when MultipleHubs is enabled.
+	BootstrapKubeconfig       string
+	BootstrapKubeconfigSecret string
+	BootstrapKubeconfigs      []string
+
+	// TODO: The hubConnectionTimoutSeconds should always greater than leaseDurationSeconds, we need to make timeout as a build-in part of
+	// leaseController in the furture and relate timeoutseconds to leaseDurationSeconds. @xuezhaojun
+	// See more details in: https://github.com/open-cluster-management-io/ocm/pull/443#discussion_r1610868646
+	HubConnectionTimeoutSeconds int32
+
 	HubKubeconfigSecret         string
 	SpokeExternalServerURLs     []string
 	ClusterHealthCheckPeriod    time.Duration
@@ -26,6 +41,7 @@ type SpokeAgentOptions struct {
 
 	clientCertHealthChecker          *clientCertHealthChecker
 	bootstrapKubeconfigHealthChecker *bootstrapKubeconfigHealthChecker
+	reSelectChecker                  *reSelectChecker
 }
 
 func NewSpokeAgentOptions() *SpokeAgentOptions {
@@ -38,6 +54,8 @@ func NewSpokeAgentOptions() *SpokeAgentOptions {
 		clientCertHealthChecker: &clientCertHealthChecker{
 			interval: ClientCertHealthCheckInterval,
 		},
+		HubConnectionTimeoutSeconds: 600, // by default, the timeout is 10 minutes
+		reSelectChecker:             &reSelectChecker{shouldReSelect: false},
 	}
 
 	options.bootstrapKubeconfigHealthChecker = &bootstrapKubeconfigHealthChecker{
@@ -53,6 +71,10 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 		"The path of the kubeconfig file for agent bootstrap.")
 	fs.StringVar(&o.BootstrapKubeconfigSecret, "bootstrap-kubeconfig-secret", o.BootstrapKubeconfigSecret,
 		"The name of secret in component namespace storing kubeconfig for agent bootstrap.")
+	fs.StringArrayVar(&o.BootstrapKubeconfigs, "bootstrap-kubeconfigs", o.BootstrapKubeconfigs,
+		"The name of secrets in component namespace storing bootstrap kubeconfigs for agent bootstrap.")
+	fs.Int32Var(&o.HubConnectionTimeoutSeconds, "hub-connection-timeout-seconds", o.HubConnectionTimeoutSeconds,
+		"The timeout in seconds to connect to hub cluster.")
 	fs.StringVar(&o.HubKubeconfigSecret, "hub-kubeconfig-secret", o.HubKubeconfigSecret,
 		"The name of secret in component namespace storing kubeconfig for hub.")
 	fs.StringArrayVar(&o.SpokeExternalServerURLs, "spoke-external-server-urls", o.SpokeExternalServerURLs,
@@ -70,8 +92,15 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 
 // Validate verifies the inputs.
 func (o *SpokeAgentOptions) Validate() error {
-	if o.BootstrapKubeconfig == "" {
-		return errors.New("bootstrap-kubeconfig is required")
+	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.MultipleHubs) {
+		// expect BootstrapKubeconfig is empty and BootstrapKubeconfigs has at least 2 items
+		if len(o.BootstrapKubeconfigs) < 2 {
+			return errors.New("expect at least 2 bootstrap kubeconfigs")
+		}
+	} else if !features.SpokeMutableFeatureGate.Enabled(ocmfeature.MultipleHubs) {
+		if o.BootstrapKubeconfig == "" {
+			return errors.New("bootstrap-kubeconfig is required")
+		}
 	}
 
 	// if SpokeExternalServerURLs is specified we validate every URL in it, we expect the spoke external server URL is https
@@ -98,5 +127,6 @@ func (o *SpokeAgentOptions) GetHealthCheckers() []healthz.HealthChecker {
 	return []healthz.HealthChecker{
 		o.bootstrapKubeconfigHealthChecker,
 		o.clientCertHealthChecker,
+		o.reSelectChecker,
 	}
 }

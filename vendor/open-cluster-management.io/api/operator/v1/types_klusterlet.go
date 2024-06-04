@@ -196,10 +196,10 @@ type BootstrapKubeConfigs struct {
 }
 
 type LocalSecretsConfig struct {
-	// SecretNames is a list of secret names. The secrets are in the same namespace where the agent controller runs.
+	// KubeConfigSecrets is a list of secret names. The secrets are in the same namespace where the agent controller runs.
 	// +required
 	// +kubebuilder:validation:minItems=2
-	SecretNames []string `json:"secretNames"`
+	KubeConfigSecrets []KubeConfigSecret `json:"kubeConfigSecrets"`
 
 	// HubConnectionTimeoutSeconds is used to set the timeout of connecting to the hub cluster.
 	// When agent loses the connection to the hub over the timeout seconds, the agent do a rebootstrap.
@@ -208,6 +208,12 @@ type LocalSecretsConfig struct {
 	// +kubebuilder:default:=600
 	// +kubebuilder:validation:Minimum=180
 	HubConnectionTimeoutSeconds int32 `json:"hubConnectionTimeoutSeconds,omitempty"`
+}
+
+type KubeConfigSecret struct {
+	// Name is the name of the secret.
+	// +required
+	Name string `json:"name"`
 }
 
 type WorkAgentConfiguration struct {
