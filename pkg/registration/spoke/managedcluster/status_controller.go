@@ -153,7 +153,7 @@ func (c *managedClusterStatusController) sendAvailableConditionEvent(
 
 	case metav1.ConditionFalse:
 		c.hubEventRecorder.Eventf(newCluster, nil, corev1.EventTypeWarning, "Unavailable", "Unavailable",
-			" The %s is successfully imported. However, its Kube API server is unavailable", cluster.Name)
+			"The %s is successfully imported. However, its Kube API server is unavailable", cluster.Name)
 	}
 
 }
