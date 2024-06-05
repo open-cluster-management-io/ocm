@@ -202,13 +202,15 @@ func (a *CRDTemplateAgentAddon) decorateObject(
 	return obj, nil
 }
 
-// getDesiredAddOnTemplateInner returns the desired template of the addon
+// getDesiredAddOnTemplateInner returns the desired template of the addon,
+// if the desired template is not found in the configReferences, it will
+// return nil and no error, the caller should handle the nil template case.
 func (a *CRDTemplateAgentAddon) getDesiredAddOnTemplateInner(
 	addonName string, configReferences []addonapiv1alpha1.ConfigReference,
 ) (*addonapiv1alpha1.AddOnTemplate, error) {
 	ok, templateRef := AddonTemplateConfigRef(configReferences)
 	if !ok {
-		a.logger.V(4).Info("Addon template config in status is empty", "addonName", addonName)
+		a.logger.Info("Addon template config in addon status is empty", "addonName", addonName)
 		return nil, nil
 	}
 
@@ -226,12 +228,16 @@ func (a *CRDTemplateAgentAddon) getDesiredAddOnTemplateInner(
 	return template.DeepCopy(), nil
 }
 
-// TemplateAgentRegistrationNamespaceFunc reads deployment resource in the manifests and use that namespace as the default
-// registration namespace. If addonDeploymentConfig is set, uses the namespace in it.
-func (a *CRDTemplateAgentAddon) TemplateAgentRegistrationNamespaceFunc(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
+// TemplateAgentRegistrationNamespaceFunc reads deployment resource in the manifests and use that namespace
+// as the default registration namespace. If addonDeploymentConfig is set, uses the namespace in it.
+func (a *CRDTemplateAgentAddon) TemplateAgentRegistrationNamespaceFunc(
+	addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
 	template, err := a.getDesiredAddOnTemplateInner(addon.Name, addon.Status.ConfigReferences)
 	if err != nil {
 		return "", err
+	}
+	if template == nil {
+		return "", fmt.Errorf("addon %s template not found in status", addon.Name)
 	}
 
 	// pick the namespace of the first deployment
