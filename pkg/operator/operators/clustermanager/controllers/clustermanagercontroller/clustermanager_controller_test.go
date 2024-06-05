@@ -400,11 +400,8 @@ func TestSyncSecret(t *testing.T) {
 		}
 
 		_, err = tc.hubKubeClient.CoreV1().Secrets(clusterManagerNamespace).Get(ctx, helpers.ImagePullSecret, metav1.GetOptions{})
-		if c.imagePullSecret == nil && !errors.IsNotFound(err) {
-			t.Fatalf("excpected no secret %v but got: %v", helpers.ImagePullSecret, err)
-		}
-		if c.imagePullSecret != nil && err != nil {
-			t.Fatalf("Failed to get synced image pull secret: %v", err)
+		if err != nil {
+			t.Fatalf("excpected pull secret %v but meet error %v", helpers.ImagePullSecret, err)
 		}
 
 		deploymentList, err := tc.hubKubeClient.AppsV1().Deployments(clusterManagerNamespace).List(ctx, metav1.ListOptions{})
@@ -453,7 +450,8 @@ func TestSyncDeploy(t *testing.T) {
 
 	// Check if resources are created as expected
 	// We expect create the namespace twice respectively in the management cluster and the hub cluster.
-	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 28)
+	// + 2 pull secrets
+	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 30)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager)
 	}
@@ -493,7 +491,8 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 
 	// Check if resources are created as expected
 	// We expect create the namespace twice respectively in the management cluster and the hub cluster.
-	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 30)
+	// +2 pull secrets
+	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 32)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager)
 	}

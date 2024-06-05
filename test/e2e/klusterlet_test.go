@@ -109,6 +109,13 @@ var _ = Describe("Create klusterlet CR", func() {
 			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
 			return err
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+
+		By(fmt.Sprintf("check image pull secret %s exists", helpers.ImagePullSecret))
+		Eventually(func() error {
+			_, err := t.SpokeKubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.TODO(), helpers.ImagePullSecret,
+				metav1.GetOptions{})
+			return err
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
 	})
 
 	It("Created klusterlet without managed cluster name", func() {

@@ -1469,6 +1469,27 @@ func TestSyncSecret(t *testing.T) {
 			expectedChanged: true,
 			expectedErr:     "",
 		},
+		{
+			name:            "syncing image pull secret succeeds when the source is missing",
+			sourceNamespace: "sourceNamespace",
+			sourceName:      ImagePullSecret,
+			targetNamespace: "targetNamespace",
+			targetName:      ImagePullSecret,
+			ownerRefs:       nil,
+			existingObjects: []runtime.Object{},
+			expectedSecret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "targetNamespace",
+					Name:      ImagePullSecret,
+				},
+				Type: corev1.SecretTypeDockerConfigJson,
+				Data: map[string][]byte{
+					corev1.DockerConfigJsonKey: []byte("{}"),
+				},
+			},
+			expectedChanged: true,
+			expectedErr:     "",
+		},
 	}
 
 	for _, tc := range tt {

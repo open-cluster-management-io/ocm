@@ -673,46 +673,69 @@ func SyncSecret(ctx context.Context, client, targetClient coreclientv1.SecretsGe
 	source, err := client.Secrets(sourceNamespace).Get(ctx, sourceName, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
-		if _, getErr := targetClient.Secrets(targetNamespace).Get(ctx, targetName, metav1.GetOptions{}); getErr != nil && errors.IsNotFound(getErr) {
-			return nil, true, nil
+		if sourceName != ImagePullSecret {
+			if _, getErr := targetClient.Secrets(targetNamespace).Get(ctx, targetName, metav1.GetOptions{}); getErr != nil && errors.IsNotFound(getErr) {
+				return nil, true, nil
+			}
+			deleteErr := targetClient.Secrets(targetNamespace).Delete(ctx, targetName, metav1.DeleteOptions{})
+			if errors.IsNotFound(deleteErr) {
+				return nil, false, nil
+			}
+			if deleteErr == nil {
+				recorder.Eventf("TargetSecretDeleted", "Deleted target secret %s/%s because source config does not exist", targetNamespace, targetName)
+				return nil, true, nil
+			}
+			return nil, false, deleteErr
 		}
-		deleteErr := targetClient.Secrets(targetNamespace).Delete(ctx, targetName, metav1.DeleteOptions{})
-		if errors.IsNotFound(deleteErr) {
-			return nil, false, nil
+
+		if source, _, err = applyEmptyPullSecret(ctx, sourceNamespace, client, recorder, labels); err != nil {
+			return nil, false, err
 		}
-		if deleteErr == nil {
-			recorder.Eventf("TargetSecretDeleted", "Deleted target secret %s/%s because source config does not exist", targetNamespace, targetName)
-			return nil, true, nil
-		}
-		return nil, false, deleteErr
+
 	case err != nil:
 		return nil, false, err
-	default:
-		if source.Type == corev1.SecretTypeServiceAccountToken {
+	}
 
-			// Make sure the token is already present, otherwise we have to wait before creating the target
-			if len(source.Data[corev1.ServiceAccountTokenKey]) == 0 {
-				return nil, false, fmt.Errorf("secret %s/%s doesn't have a token yet", source.Namespace, source.Name)
-			}
-
-			if source.Annotations != nil {
-				// When syncing a service account token we have to remove the SA annotation to disable injection into copies
-				delete(source.Annotations, corev1.ServiceAccountNameKey)
-				// To make it clean, remove the dormant annotations as well
-				delete(source.Annotations, corev1.ServiceAccountUIDKey)
-			}
-
-			// SecretTypeServiceAccountToken implies required fields and injection which we do not want in copies
-			source.Type = corev1.SecretTypeOpaque
+	if source.Type == corev1.SecretTypeServiceAccountToken {
+		// Make sure the token is already present, otherwise we have to wait before creating the target
+		if len(source.Data[corev1.ServiceAccountTokenKey]) == 0 {
+			return nil, false, fmt.Errorf("secret %s/%s doesn't have a token yet", source.Namespace, source.Name)
 		}
 
-		source.Namespace = targetNamespace
-		source.Name = targetName
-		source.ResourceVersion = ""
-		source.OwnerReferences = ownerRefs
-		source.Labels = labels
-		return resourceapply.ApplySecret(ctx, targetClient, recorder, source)
+		if source.Annotations != nil {
+			// When syncing a service account token we have to remove the SA annotation to disable injection into copies
+			delete(source.Annotations, corev1.ServiceAccountNameKey)
+			// To make it clean, remove the dormant annotations as well
+			delete(source.Annotations, corev1.ServiceAccountUIDKey)
+		}
+
+		// SecretTypeServiceAccountToken implies required fields and injection which we do not want in copies
+		source.Type = corev1.SecretTypeOpaque
 	}
+
+	source.Namespace = targetNamespace
+	source.Name = targetName
+	source.ResourceVersion = ""
+	source.OwnerReferences = ownerRefs
+	source.Labels = labels
+	return resourceapply.ApplySecret(ctx, targetClient, recorder, source)
+
+}
+
+func applyEmptyPullSecret(ctx context.Context, namespace string,
+	client coreclientv1.SecretsGetter, recorder events.Recorder, labels map[string]string) (*corev1.Secret, bool, error) {
+	emptyPullSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ImagePullSecret,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+		Data: map[string][]byte{
+			corev1.DockerConfigJsonKey: []byte("{}"),
+		},
+		Type: corev1.SecretTypeDockerConfigJson,
+	}
+	return resourceapply.ApplySecret(ctx, client, recorder, emptyPullSecret)
 }
 
 // GetHubKubeconfig is used to get the kubeconfig of the hub cluster.

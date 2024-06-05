@@ -529,7 +529,8 @@ func TestSyncDeploy(t *testing.T) {
 
 	// Check if resources are created as expected
 	// 11 managed static manifests + 12 management static manifests - 2 duplicated service account manifests + 1 addon namespace + 2 deployments
-	if len(createObjects) != 24 {
+	// + 3 pull secrets
+	if len(createObjects) != 27 {
 		t.Errorf("Expect 24 objects created in the sync loop, actual %d", len(createObjects))
 	}
 	for _, object := range createObjects {
@@ -591,7 +592,8 @@ func TestSyncDeploySingleton(t *testing.T) {
 
 	// Check if resources are created as expected
 	// 10 managed static manifests + 11 management static manifests - 1 service account manifests + 1 addon namespace + 1 deployments
-	if len(createObjects) != 22 {
+	// +3 pull secrets
+	if len(createObjects) != 25 {
 		t.Errorf("Expect 21 objects created in the sync loop, actual %d", len(createObjects))
 	}
 	for _, object := range createObjects {
@@ -1119,7 +1121,8 @@ func TestDeployOnKube111(t *testing.T) {
 	// Check if resources are created as expected
 	// 12 managed static manifests + 11 management static manifests -
 	// 2 duplicated service account manifests + 1 addon namespace + 2 deployments + 2 kube111 clusterrolebindings
-	if len(createObjects) != 26 {
+	// +3 pull secrets
+	if len(createObjects) != 29 {
 		t.Errorf("Expect 26 objects created in the sync loop, actual %d", len(createObjects))
 	}
 	for _, object := range createObjects {
