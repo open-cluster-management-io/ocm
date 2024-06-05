@@ -115,6 +115,9 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 			return nil, fmt.Errorf("failed to get deletiontimestamp, %v", err)
 		}
 
+		// In the case of an agent restart, the manifestwork finalizer is cleared.
+		// Explicitly re-add the finalizer to ensure proper cleanup of the manifestwork.
+		work.Finalizers = []string{workv1.ManifestWorkFinalizer}
 		work.DeletionTimestamp = &metav1.Time{Time: deletionTimestamp}
 		return work, nil
 	}

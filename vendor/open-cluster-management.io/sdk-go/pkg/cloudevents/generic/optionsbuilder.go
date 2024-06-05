@@ -3,9 +3,6 @@ package generic
 import (
 	"fmt"
 
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/constants"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc"
@@ -17,14 +14,11 @@ import (
 type ConfigLoader struct {
 	configType string
 	configPath string
-
-	kubeConfig *rest.Config
 }
 
 // NewConfigLoader returns a ConfigLoader with the given configuration type and configuration file path.
 //
 // Available configuration types:
-//   - kube
 //   - mqtt
 //   - grpc
 //   - kafka
@@ -35,31 +29,9 @@ func NewConfigLoader(configType, configPath string) *ConfigLoader {
 	}
 }
 
-// WithKubeConfig sets a kube config, this config will be used when configuration type is kube and the kube
-// configuration file path not set.
-func (l *ConfigLoader) WithKubeConfig(kubeConfig *rest.Config) *ConfigLoader {
-	l.kubeConfig = kubeConfig
-	return l
-}
-
 // TODO using a specified config instead of any
 func (l *ConfigLoader) LoadConfig() (string, any, error) {
 	switch l.configType {
-	case constants.ConfigTypeKube:
-		if l.configPath == "" {
-			if l.kubeConfig == nil {
-				return "", nil, fmt.Errorf("neither the kube config path nor kube config object was specified")
-			}
-
-			return l.kubeConfig.Host, l.kubeConfig, nil
-		}
-
-		kubeConfig, err := clientcmd.BuildConfigFromFlags("", l.configPath)
-		if err != nil {
-			return "", nil, err
-		}
-
-		return kubeConfig.Host, kubeConfig, nil
 	case constants.ConfigTypeMQTT:
 		mqttOptions, err := mqtt.BuildMQTTOptionsFromFlags(l.configPath)
 		if err != nil {

@@ -65,8 +65,12 @@ func (c *ManifestCodec) Encode(source string, eventType types.CloudEventsType, w
 		return nil, fmt.Errorf("failed to find originalsource from the work %s", work.UID)
 	}
 
-	if len(work.Spec.Workload.Manifests) != 1 {
-		return nil, fmt.Errorf("too many manifests in the work %s", work.UID)
+	// for the manifest deletion case: no manifest in the spec will be rebuilt in the cache upon agent restart.
+	// for status update cases other than manifest deletion case, there should be only one manifest in the work.
+	if !meta.IsStatusConditionTrue(work.Status.Conditions, common.ManifestsDeleted) {
+		if len(work.Spec.Workload.Manifests) != 1 {
+			return nil, fmt.Errorf("too many manifests in the work %s", work.UID)
+		}
 	}
 
 	evt := types.NewEventBuilder(source, eventType).
@@ -142,6 +146,9 @@ func (c *ManifestCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWork, er
 			return nil, fmt.Errorf("failed to get deletiontimestamp, %v", err)
 		}
 
+		// In the case of an agent restart, the manifestwork finalizer is cleared.
+		// Explicitly re-add the finalizer to ensure proper cleanup of the manifestwork.
+		work.Finalizers = []string{workv1.ManifestWorkFinalizer}
 		work.DeletionTimestamp = &metav1.Time{Time: deletionTimestamp}
 		return work, nil
 	}
