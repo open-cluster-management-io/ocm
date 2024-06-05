@@ -152,7 +152,7 @@ func (c *leaseController) updateClusterStatus(ctx context.Context, cluster *clus
 	if updated {
 		newCluster.SetNamespace(newCluster.Name)
 		c.mcEventRecorder.Eventf(newCluster, nil, corev1.EventTypeWarning, "AvailableUnknown", "AvailableUnknown",
-			"The managed cluster (%s) cannot connect to the hub cluster.", cluster.Name)
+			"The %s is successfully imported. However, the connection check from the managed cluster to the hub cluster has failed", cluster.Name)
 	}
 
 	return err
