@@ -50,6 +50,10 @@ func AddonManagerNamespace() string {
 	return podNamespace
 }
 
+// GetDesiredAddOnTemplate returns the desired AddOnTemplate for the given ManagedClusterAddOn.
+// If the desired AddOnTemplate is not found in the ManagedClusterAddOn Status ConfigReferences,
+// it will return a nil AddOnTemplate with no error. the caller should handle the nil
+// AddOnTemplate case.
 func (a *CRDTemplateAgentAddon) GetDesiredAddOnTemplate(addon *addonapiv1alpha1.ManagedClusterAddOn,
 	clusterName, addonName string) (*addonapiv1alpha1.AddOnTemplate, error) {
 	if addon != nil {
