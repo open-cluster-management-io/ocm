@@ -153,7 +153,7 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(
 		return patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
 	}
 
-	var hostingClusterName string = ""
+	var hostingClusterName string
 	if newaddon.Annotations != nil && len(newaddon.Annotations[addonapiv1alpha1.HostingClusterNameAnnotationKey]) > 0 {
 		hostingClusterName = newaddon.Annotations[addonapiv1alpha1.HostingClusterNameAnnotationKey]
 	}
@@ -182,16 +182,20 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(
 	}
 
 	// get addon works
+	// first get all works for addon in default mode.
 	requirement, _ := labels.NewRequirement(addonapiv1alpha1.AddonLabelKey, selection.Equals, []string{newaddon.Name})
-	selector := labels.NewSelector().Add(*requirement)
+	namespaceNotExistRequirement, _ := labels.NewRequirement(addonapiv1alpha1.AddonNamespaceLabelKey, selection.DoesNotExist, []string{})
+	selector := labels.NewSelector().Add(*requirement).Add(*namespaceNotExistRequirement)
 	addonWorks, err := c.workLister.ManifestWorks(newaddon.Namespace).List(selector)
 	if err != nil {
 		setAddOnProgressingAndLastApplied(isUpgrade, ProgressingFailed, err.Error(), newaddon)
 		return patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
 	}
 
+	// next get all works for addon in hosted mode
 	if len(hostingClusterName) > 0 {
-		// get hosted addon works
+		namespaceRequirement, _ := labels.NewRequirement(addonapiv1alpha1.AddonNamespaceLabelKey, selection.Equals, []string{newaddon.Namespace})
+		selector = labels.NewSelector().Add(*requirement).Add(*namespaceRequirement)
 		hostedAddonWorks, err := c.workLister.ManifestWorks(hostingClusterName).List(selector)
 		if err != nil {
 			setAddOnProgressingAndLastApplied(isUpgrade, ProgressingFailed, err.Error(), newaddon)
