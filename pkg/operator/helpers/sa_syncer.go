@@ -36,6 +36,7 @@ func SATokenGetter(ctx context.Context, saName, saNamespace string, saClient kub
 		additionalData := map[string][]byte{
 			"serviceaccount_namespace": []byte(saNamespace),
 			"serviceaccount_name":      []byte(saName),
+			"serviceaccount_uid":       []byte(sa.UID),
 		}
 
 		for _, secret := range sa.Secrets {
@@ -75,30 +76,6 @@ func SATokenGetter(ctx context.Context, saName, saNamespace string, saClient kub
 			return nil, nil, additionalData, nil
 		}
 		return []byte(tr.Status.Token), expiration, additionalData, nil
-	}
-}
-
-// SATokenCreater create the saToken of target sa.
-func SATokenCreater(ctx context.Context, saName, saNamespace string, saClient kubernetes.Interface) TokenGetterFunc {
-	return func() ([]byte, []byte, map[string][]byte, error) {
-		// 8640 hour
-		tr, err := saClient.CoreV1().ServiceAccounts(saNamespace).
-			CreateToken(ctx, saName, &authv1.TokenRequest{
-				Spec: authv1.TokenRequestSpec{
-					ExpirationSeconds: pointer.Int64(8640 * 3600),
-				},
-			}, metav1.CreateOptions{})
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		expiration, err := tr.Status.ExpirationTimestamp.MarshalText()
-		if err != nil {
-			return nil, nil, nil, nil
-		}
-		return []byte(tr.Status.Token), expiration, map[string][]byte{
-			"serviceaccount_namespace": []byte(saNamespace),
-			"serviceaccount_name":      []byte(saName),
-		}, nil
 	}
 }
 
