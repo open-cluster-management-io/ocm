@@ -34,6 +34,9 @@ func NewKlusterletOperatorCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&klOptions.SkipPlaceholderHubSecret, "skip-placeholder-hub-secret", false,
 		"If set, will skip ensuring a placeholder hub secret which is originally intended for pulling "+
 			"work image before approved")
+
+	flags.BoolVar(&klOptions.EnableSyncLabels, "enable-sync-labels", false,
+		"If set, will sync the labels of Klusterlet CR to all agent resources")
 	opts.AddFlags(flags)
 
 	return cmd

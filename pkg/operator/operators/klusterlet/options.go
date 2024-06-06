@@ -30,6 +30,7 @@ const defaultComponentNamespace = "open-cluster-management"
 
 type Options struct {
 	SkipPlaceholderHubSecret bool
+	EnableSyncLabels         bool
 }
 
 // RunKlusterletOperator starts a new klusterlet operator
@@ -116,7 +117,8 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		kubeVersion,
 		operatorNamespace,
 		controllerContext.EventRecorder,
-		o.SkipPlaceholderHubSecret)
+		o.SkipPlaceholderHubSecret,
+		o.EnableSyncLabels)
 
 	klusterletCleanupController := klusterletcontroller.NewKlusterletCleanupController(
 		kubeClient,

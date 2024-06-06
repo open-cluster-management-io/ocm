@@ -57,6 +57,7 @@ type klusterletController struct {
 	skipHubSecretPlaceholder     bool
 	cache                        resourceapply.ResourceCache
 	managedClusterClientsBuilder managedClusterClientsBuilderInterface
+	enableSyncLabels             bool
 }
 
 type klusterletReconcile interface {
@@ -83,7 +84,8 @@ func NewKlusterletController(
 	kubeVersion *version.Version,
 	operatorNamespace string,
 	recorder events.Recorder,
-	skipHubSecretPlaceholder bool) factory.Controller {
+	skipHubSecretPlaceholder bool,
+	enableSyncLabels bool) factory.Controller {
 	controller := &klusterletController{
 		kubeClient: kubeClient,
 		patcher: patcher.NewPatcher[
@@ -94,6 +96,7 @@ func NewKlusterletController(
 		skipHubSecretPlaceholder:     skipHubSecretPlaceholder,
 		cache:                        resourceapply.NewResourceCache(),
 		managedClusterClientsBuilder: newManagedClusterClientsBuilder(kubeClient, apiExtensionClient, appliedManifestWorkClient, recorder),
+		enableSyncLabels:             enableSyncLabels,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -212,8 +215,10 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		WorkServiceAccount:              serviceAccountName("work-sa", klusterlet),
 		ResourceRequirementResourceType: helpers.ResourceType(klusterlet),
 		ResourceRequirements:            resourceRequirements,
+	}
 
-		Labels: helpers.GetKlusterletAgentLabels(klusterlet),
+	if n.enableSyncLabels {
+		config.Labels = helpers.GetKlusterletAgentLabels(klusterlet)
 	}
 
 	managedClusterClients, err := n.managedClusterClientsBuilder.

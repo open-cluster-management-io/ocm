@@ -32,7 +32,8 @@ func TestSyncDelete(t *testing.T) {
 		newAppliedManifestWorks("testhost-2", []string{workv1.AppliedManifestWorkFinalizer}, false),
 	}
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
-	controller := newTestController(t, klusterlet, syncContext.Recorder(), appliedManifestWorks, namespace, bootstrapKubeConfigSecret)
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), appliedManifestWorks, false,
+		namespace, bootstrapKubeConfigSecret)
 
 	err := controller.cleanupController.sync(context.TODO(), syncContext)
 	if err != nil {
