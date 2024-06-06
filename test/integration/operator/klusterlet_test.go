@@ -23,7 +23,7 @@ import (
 )
 
 func startKlusterletOperator(ctx context.Context) {
-	o := &klusterlet.Options{}
+	o := &klusterlet.Options{EnableSyncLabels: true}
 	err := o.RunKlusterletOperator(ctx, &controllercmd.ControllerContext{
 		KubeConfig:    restConfig,
 		EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
@@ -167,14 +167,14 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Check clusterrole/clusterrolebinding
-			gomega.Eventually(func() bool {
+			gomega.Eventually(func() error {
 				clusterRoles, err := kubeClient.RbacV1().ClusterRoles().List(context.Background(),
 					metav1.ListOptions{LabelSelector: agentLabelSelector})
 				if err != nil {
-					return false
+					return fmt.Errorf("unable to list cluster roles: %v", err)
 				}
 				if len(clusterRoles.Items) != 6 {
-					return false
+					return fmt.Errorf("expected 6 clusterRoles.Items, got %v", len(clusterRoles.Items))
 				}
 				for _, clusterRole := range clusterRoles.Items {
 					if clusterRole.GetName() != registrationManagedRoleName &&
@@ -183,11 +183,11 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 						clusterRole.GetName() != addonManagementRoleName2 &&
 						clusterRole.GetName() != workExecutionRoleName &&
 						clusterRole.GetName() != workAggregateRoleName {
-						return false
+						return fmt.Errorf("unexpected clusterRole %s", clusterRole.GetName())
 					}
 				}
-				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			gomega.Eventually(func() bool {
 				clusterRoleBindings, err := kubeClient.RbacV1().ClusterRoleBindings().List(context.Background(),

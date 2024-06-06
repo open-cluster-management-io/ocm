@@ -45,6 +45,9 @@ func NewKlusterletOperatorCmd() *cobra.Command {
 	flags.BoolVar(&klOptions.DisableAddonNamespace, "disable-default-addon-namespace", false,
 		"If set, will not create default open-cluster-management-agent-addon ns")
 
+	flags.BoolVar(&klOptions.EnableSyncLabels, "enable-sync-labels", false,
+		"If set, will sync the labels of Klusterlet CR to all agent resources")
+
 	opts.AddFlags(flags)
 
 	return cmd
