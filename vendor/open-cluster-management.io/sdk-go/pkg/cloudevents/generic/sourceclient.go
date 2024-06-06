@@ -176,31 +176,14 @@ func (c *CloudEventSourceClient[T]) receive(ctx context.Context, evt cloudevents
 		return
 	}
 
-	clusterName, err := evt.Context.GetExtension(types.ExtensionClusterName)
-	if err != nil {
-		klog.Errorf("failed to find cluster name, %v", err)
-		return
-	}
-
 	obj, err := codec.Decode(&evt)
 	if err != nil {
 		klog.Errorf("failed to decode status, %v", err)
 		return
 	}
 
-	action, err := c.statusAction(fmt.Sprintf("%s", clusterName), obj)
-	if err != nil {
-		klog.Errorf("failed to generate status event %s, %v", evt, err)
-		return
-	}
-
-	if len(action) == 0 {
-		// no action is required, ignore
-		return
-	}
-
 	for _, handler := range handlers {
-		if err := handler(action, obj); err != nil {
+		if err := handler(types.StatusModified, obj); err != nil {
 			klog.Errorf("failed to handle status event %s, %v", evt, err)
 		}
 	}
@@ -238,14 +221,32 @@ func (c *CloudEventSourceClient[T]) respondResyncSpecRequest(
 		return err
 	}
 
+	// TODO we cannot list objs now, the lister may be not ready, we may need to add HasSynced
+	// for the lister
+	if len(objs) == 0 {
+		klog.V(4).Infof("there are is no objs from the list, do nothing")
+		return nil
+	}
+
 	for _, obj := range objs {
-		lastResourceVersion := findResourceVersion(string(obj.GetUID()), resourceVersions.Versions)
-		currentResourceVersion, err := strconv.ParseInt(obj.GetResourceVersion(), 10, 64)
-		if err != nil {
+		// respond with the deleting resource regardless of the resource version
+		if !obj.GetDeletionTimestamp().IsZero() {
+			if err := c.Publish(ctx, eventType, obj); err != nil {
+				return err
+			}
 			continue
 		}
 
-		if currentResourceVersion > lastResourceVersion {
+		lastResourceVersion := findResourceVersion(string(obj.GetUID()), resourceVersions.Versions)
+		currentResourceVersion, err := strconv.ParseInt(obj.GetResourceVersion(), 10, 64)
+		if err != nil {
+			klog.V(4).Infof("ignore the obj %v since it has a invalid resourceVersion, %v", obj, err)
+			continue
+		}
+
+		// the version of the work is not maintained on source or the source's work is newer than agent, send
+		// the newer work to agent
+		if currentResourceVersion == 0 || currentResourceVersion > lastResourceVersion {
 			if err := c.Publish(ctx, eventType, obj); err != nil {
 				return err
 			}
@@ -272,36 +273,6 @@ func (c *CloudEventSourceClient[T]) respondResyncSpecRequest(
 	}
 
 	return nil
-}
-
-func (c *CloudEventSourceClient[T]) statusAction(clusterName string, obj T) (evt types.ResourceAction, err error) {
-	objs, err := c.lister.List(types.ListOptions{ClusterName: clusterName, Source: c.sourceID})
-	if err != nil {
-		return evt, err
-	}
-
-	lastObj, exists := getObj(string(obj.GetUID()), objs)
-	if !exists {
-		return evt, nil
-	}
-
-	lastStatusHash, err := c.statusHashGetter(lastObj)
-	if err != nil {
-		klog.Warningf("failed to hash object %s status, %v", lastObj.GetUID(), err)
-		return evt, err
-	}
-
-	currentStatusHash, err := c.statusHashGetter(obj)
-	if err != nil {
-		klog.Warningf("failed to hash object %s status, %v", obj.GetUID(), err)
-		return evt, nil
-	}
-
-	if lastStatusHash == currentStatusHash {
-		return evt, nil
-	}
-
-	return types.StatusModified, nil
 }
 
 func findResourceVersion(id string, versions []payload.ResourceVersion) int64 {

@@ -80,10 +80,16 @@ func NewManifestWorkReplicaSetController(
 	manifestWorkReplicaSetInformer workinformerv1alpha1.ManifestWorkReplicaSetInformer,
 	manifestWorkInformer workinformerv1.ManifestWorkInformer,
 	placementInformer clusterinformerv1beta1.PlacementInformer,
-	placeDecisionInformer clusterinformerv1beta1.PlacementDecisionInformer) factory.Controller {
-
+	placeDecisionInformer clusterinformerv1beta1.PlacementDecisionInformer,
+) factory.Controller {
 	controller := newController(
-		workClient, workApplier, manifestWorkReplicaSetInformer, manifestWorkInformer, placementInformer, placeDecisionInformer)
+		workClient,
+		workApplier,
+		manifestWorkReplicaSetInformer,
+		manifestWorkInformer,
+		placementInformer,
+		placeDecisionInformer,
+	)
 
 	err := manifestWorkReplicaSetInformer.Informer().AddIndexers(
 		cache.Indexers{
@@ -114,12 +120,14 @@ func NewManifestWorkReplicaSetController(
 		WithSync(controller.sync).ToController("ManifestWorkReplicaSetController", recorder)
 }
 
-func newController(workClient workclientset.Interface,
+func newController(
+	workClient workclientset.Interface,
 	workApplier *workapplier.WorkApplier,
 	manifestWorkReplicaSetInformer workinformerv1alpha1.ManifestWorkReplicaSetInformer,
 	manifestWorkInformer workinformerv1.ManifestWorkInformer,
 	placementInformer clusterinformerv1beta1.PlacementInformer,
-	placeDecisionInformer clusterinformerv1beta1.PlacementDecisionInformer) *ManifestWorkReplicaSetController {
+	placeDecisionInformer clusterinformerv1beta1.PlacementDecisionInformer,
+) *ManifestWorkReplicaSetController {
 	return &ManifestWorkReplicaSetController{
 		workClient:                    workClient,
 		manifestWorkReplicaSetLister:  manifestWorkReplicaSetInformer.Lister(),

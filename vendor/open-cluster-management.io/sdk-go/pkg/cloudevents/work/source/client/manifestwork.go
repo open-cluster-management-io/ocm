@@ -3,56 +3,63 @@ package client
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/klog/v2"
 
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
-	workv1lister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
+
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/common"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/store"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/utils"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/watcher"
 )
 
 // ManifestWorkSourceClient implements the ManifestWorkInterface.
 type ManifestWorkSourceClient struct {
 	cloudEventsClient *generic.CloudEventSourceClient[*workv1.ManifestWork]
-	watcher           *watcher.ManifestWorkWatcher
-	lister            workv1lister.ManifestWorkLister
+	watcherStore      store.WorkClientWatcherStore
 	namespace         string
 	sourceID          string
 }
 
 var _ workv1client.ManifestWorkInterface = &ManifestWorkSourceClient{}
 
-func NewManifestWorkSourceClient(sourceID string,
+func NewManifestWorkSourceClient(
+	sourceID string,
 	cloudEventsClient *generic.CloudEventSourceClient[*workv1.ManifestWork],
-	watcher *watcher.ManifestWorkWatcher) *ManifestWorkSourceClient {
+	watcherStore store.WorkClientWatcherStore,
+) *ManifestWorkSourceClient {
 	return &ManifestWorkSourceClient{
 		cloudEventsClient: cloudEventsClient,
-		watcher:           watcher,
+		watcherStore:      watcherStore,
 		sourceID:          sourceID,
 	}
 }
 
-func (c *ManifestWorkSourceClient) SetLister(lister workv1lister.ManifestWorkLister) {
-	c.lister = lister
-}
-
-func (mw *ManifestWorkSourceClient) SetNamespace(namespace string) {
-	mw.namespace = namespace
+func (c *ManifestWorkSourceClient) SetNamespace(namespace string) {
+	c.namespace = namespace
 }
 
 func (c *ManifestWorkSourceClient) Create(ctx context.Context, manifestWork *workv1.ManifestWork, opts metav1.CreateOptions) (*workv1.ManifestWork, error) {
-	_, err := c.lister.ManifestWorks(c.namespace).Get(manifestWork.Name)
+	if manifestWork.Namespace != "" && manifestWork.Namespace != c.namespace {
+		return nil, errors.NewInvalid(common.ManifestWorkGK, "namespace", field.ErrorList{
+			field.Invalid(
+				field.NewPath("metadata").Child("namespace"),
+				manifestWork.Namespace,
+				fmt.Sprintf("does not match the namespace %s", c.namespace),
+			),
+		})
+	}
+
+	_, err := c.watcherStore.Get(c.namespace, manifestWork.Name)
 	if err == nil {
 		return nil, errors.NewAlreadyExists(common.ManifestWorkGR, manifestWork.Name)
 	}
@@ -69,21 +76,23 @@ func (c *ManifestWorkSourceClient) Create(ctx context.Context, manifestWork *wor
 		Action:              common.CreateRequestAction,
 	}
 
-	generation, err := getWorkGeneration(manifestWork)
-	if err != nil {
+	newWork := manifestWork.DeepCopy()
+	newWork.UID = kubetypes.UID(utils.UID(c.sourceID, c.namespace, newWork.Name))
+	newWork.Namespace = c.namespace
+	newWork.ResourceVersion = getWorkResourceVersion(manifestWork)
+
+	if err := utils.Validate(newWork); err != nil {
 		return nil, err
 	}
 
-	newWork := manifestWork.DeepCopy()
-	newWork.UID = kubetypes.UID(utils.UID(c.sourceID, c.namespace, newWork.Name))
-	newWork.Generation = generation
-	ensureSourceLabel(c.sourceID, newWork)
 	if err := c.cloudEventsClient.Publish(ctx, eventType, newWork); err != nil {
 		return nil, err
 	}
 
-	// add the new work to the ManifestWorkInformer local cache.
-	c.watcher.Receive(watch.Event{Type: watch.Added, Object: newWork})
+	// add the new work to the local cache.
+	if err := c.watcherStore.Add(newWork); err != nil {
+		return nil, err
+	}
 	return newWork.DeepCopy(), nil
 }
 
@@ -96,7 +105,7 @@ func (c *ManifestWorkSourceClient) UpdateStatus(ctx context.Context, manifestWor
 }
 
 func (c *ManifestWorkSourceClient) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	work, err := c.lister.ManifestWorks(c.namespace).Get(name)
+	work, err := c.watcherStore.Get(c.namespace, name)
 	if errors.IsNotFound(err) {
 		return nil
 	}
@@ -120,9 +129,16 @@ func (c *ManifestWorkSourceClient) Delete(ctx context.Context, name string, opts
 		return err
 	}
 
-	// update the deleting work in the ManifestWorkInformer local cache.
-	c.watcher.Receive(watch.Event{Type: watch.Modified, Object: deletingWork})
-	return nil
+	if len(work.Finalizers) == 0 {
+		// the work has no any finalizers, there are two cases in this scenario
+		// 1) the agent does not start yet, we delete this work from the local cache directly.
+		// 2) the agent is running, but the status response does not be handled by source yet,
+		//    after the deleted status is back, we need ignore this work in the ManifestWorkSourceHandler.
+		return c.watcherStore.Delete(deletingWork)
+	}
+
+	// update the work with deletion timestamp in the local cache.
+	return c.watcherStore.Update(deletingWork)
 }
 
 func (c *ManifestWorkSourceClient) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
@@ -131,21 +147,26 @@ func (c *ManifestWorkSourceClient) DeleteCollection(ctx context.Context, opts me
 
 func (c *ManifestWorkSourceClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*workv1.ManifestWork, error) {
 	klog.V(4).Infof("getting manifestwork %s", name)
-	return c.lister.ManifestWorks(c.namespace).Get(name)
+	return c.watcherStore.Get(c.namespace, name)
 }
 
 func (c *ManifestWorkSourceClient) List(ctx context.Context, opts metav1.ListOptions) (*workv1.ManifestWorkList, error) {
 	klog.V(4).Infof("list manifestworks")
-	// send resync request to fetch manifestwork status from agents when the ManifestWorkInformer starts
-	if err := c.cloudEventsClient.Resync(ctx, types.ClusterAll); err != nil {
+	works, err := c.watcherStore.List(opts)
+	if err != nil {
 		return nil, err
 	}
 
-	return &workv1.ManifestWorkList{}, nil
+	items := []workv1.ManifestWork{}
+	for _, work := range works {
+		items = append(items, *work)
+	}
+
+	return &workv1.ManifestWorkList{Items: items}, nil
 }
 
 func (c *ManifestWorkSourceClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.watcher, nil
+	return c.watcherStore, nil
 }
 
 func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt kubetypes.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *workv1.ManifestWork, err error) {
@@ -155,17 +176,12 @@ func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt ku
 		return nil, fmt.Errorf("unsupported to update subresources %v", subresources)
 	}
 
-	lastWork, err := c.lister.ManifestWorks(c.namespace).Get(name)
+	lastWork, err := c.watcherStore.Get(c.namespace, name)
 	if err != nil {
 		return nil, err
 	}
 
 	patchedWork, err := utils.Patch(pt, lastWork, data)
-	if err != nil {
-		return nil, err
-	}
-
-	generation, err := getWorkGeneration(patchedWork)
 	if err != nil {
 		return nil, err
 	}
@@ -179,38 +195,32 @@ func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt ku
 	}
 
 	newWork := patchedWork.DeepCopy()
-	newWork.Generation = generation
+	newWork.ResourceVersion = getWorkResourceVersion(patchedWork)
+
+	if err := utils.Validate(newWork); err != nil {
+		return nil, err
+	}
+
 	if err := c.cloudEventsClient.Publish(ctx, eventType, newWork); err != nil {
 		return nil, err
 	}
 
-	// refresh the work in the ManifestWorkInformer local cache with patched work.
-	c.watcher.Receive(watch.Event{Type: watch.Modified, Object: newWork})
+	// modify the updated work in the local cache.
+	if err := c.watcherStore.Update(newWork); err != nil {
+		return nil, err
+	}
 	return newWork.DeepCopy(), nil
 }
 
-// getWorkGeneration retrieves the work generation from the annotation with the key
-// "cloudevents.open-cluster-management.io/generation".
-// if no generation is set in the annotation, then 0 is returned, which means the message
-// broker guarantees the message order.
-func getWorkGeneration(work *workv1.ManifestWork) (int64, error) {
-	generation, ok := work.Annotations[common.CloudEventsGenerationAnnotationKey]
+// getWorkResourceVersion retrieves the work generation from the annotation with the key
+// "cloudevents.open-cluster-management.io/resourceversion".
+// If no value is set in this annotation, then "0" is returned, which means the version of the work will not be
+// maintained on source, the message broker guarantees the work update order.
+func getWorkResourceVersion(work *workv1.ManifestWork) string {
+	resourceVersion, ok := work.Annotations[common.CloudEventsResourceVersionAnnotationKey]
 	if !ok {
-		return 0, nil
+		return "0"
 	}
 
-	generationInt, err := strconv.Atoi(generation)
-	if err != nil {
-		return 0, fmt.Errorf("failed to convert generation %s to int: %v", generation, err)
-	}
-
-	return int64(generationInt), nil
-}
-
-func ensureSourceLabel(sourceID string, work *workv1.ManifestWork) {
-	if work.Labels == nil {
-		work.Labels = map[string]string{}
-	}
-
-	work.Labels[common.CloudEventsOriginalSourceLabelKey] = sourceID
+	return resourceVersion
 }

@@ -10,8 +10,11 @@ const (
 	// CloudEventsDataTypeAnnotationKey is the key of the cloudevents data type annotation.
 	CloudEventsDataTypeAnnotationKey = "cloudevents.open-cluster-management.io/datatype"
 
-	// CloudEventsGenerationAnnotationKey is the key of the manifestwork generation annotation.
-	CloudEventsGenerationAnnotationKey = "cloudevents.open-cluster-management.io/generation"
+	// CloudEventsResourceVersionAnnotationKey is the key of the manifestwork resourceversion annotation.
+	//
+	// This annotation is used for tracing the ManifestWork specific changes, the value of this annotation
+	// should be a sequence number representing the ManifestWork specific generation.
+	CloudEventsResourceVersionAnnotationKey = "cloudevents.open-cluster-management.io/resourceversion"
 )
 
 // CloudEventsOriginalSourceLabelKey is the key of the cloudevents original source label.
@@ -26,4 +29,5 @@ const (
 	DeleteRequestAction = "delete_request"
 )
 
+var ManifestWorkGK = schema.GroupKind{Group: workv1.GroupName, Kind: "ManifestWork"}
 var ManifestWorkGR = schema.GroupResource{Group: workv1.GroupName, Resource: "manifestworks"}
