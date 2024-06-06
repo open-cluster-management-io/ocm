@@ -29,6 +29,7 @@ type Options struct {
 	ControlPlaneNodeLabelSelector string
 	DeploymentReplicas            int32
 	DisableAddonNamespace         bool
+	EnableSyncLabels              bool
 }
 
 // RunKlusterletOperator starts a new klusterlet operator
@@ -110,6 +111,7 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		o.ControlPlaneNodeLabelSelector,
 		o.DeploymentReplicas,
 		o.DisableAddonNamespace,
+		o.EnableSyncLabels,
 		controllerContext.EventRecorder)
 
 	klusterletCleanupController := klusterletcontroller.NewKlusterletCleanupController(
