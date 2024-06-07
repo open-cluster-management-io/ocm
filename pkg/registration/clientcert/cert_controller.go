@@ -316,24 +316,39 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 		return nil
 	}
 
-	// create a new private key
-	keyData, err := keyutil.MakeEllipticPrivateKeyPEM()
+	keyData, createdCSRName, err := func() ([]byte, string, error) {
+		// create a new private key
+		keyData, err := keyutil.MakeEllipticPrivateKeyPEM()
+		if err != nil {
+			return nil, "", err
+		}
+
+		privateKey, err := keyutil.ParsePrivateKeyPEM(keyData)
+		if err != nil {
+			return keyData, "", fmt.Errorf("invalid private key for certificate request: %w", err)
+		}
+		csrData, err := certutil.MakeCSR(privateKey, c.Subject, c.DNSNames, nil)
+		if err != nil {
+			return keyData, "", fmt.Errorf("unable to generate certificate request: %w", err)
+		}
+		createdCSRName, err := c.csrControl.create(ctx, syncCtx.Recorder(), c.ObjectMeta, csrData, c.SignerName, c.ExpirationSeconds)
+		if err != nil {
+			return keyData, "", err
+		}
+		return keyData, createdCSRName, nil
+	}()
 	if err != nil {
+		if updateErr := c.statusUpdater(ctx, metav1.Condition{
+			Type:    "ClusterCertificateRotated",
+			Status:  metav1.ConditionFalse,
+			Reason:  "ClientCertificateUpdateFailed",
+			Message: fmt.Sprintf("Failed to create CSR %v", err),
+		}); updateErr != nil {
+			return updateErr
+		}
 		return err
 	}
 
-	privateKey, err := keyutil.ParsePrivateKeyPEM(keyData)
-	if err != nil {
-		return fmt.Errorf("invalid private key for certificate request: %w", err)
-	}
-	csrData, err := certutil.MakeCSR(privateKey, c.Subject, c.DNSNames, nil)
-	if err != nil {
-		return fmt.Errorf("unable to generate certificate request: %w", err)
-	}
-	createdCSRName, err := c.csrControl.create(ctx, syncCtx.Recorder(), c.ObjectMeta, csrData, c.SignerName, c.ExpirationSeconds)
-	if err != nil {
-		return err
-	}
 	c.keyData = keyData
 	c.csrName = createdCSRName
 	return nil
