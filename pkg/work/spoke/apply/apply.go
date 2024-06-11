@@ -34,6 +34,7 @@ func NewAppliers(dynamicClient dynamic.Interface, kubeclient kubernetes.Interfac
 			workapiv1.UpdateStrategyTypeCreateOnly:      NewCreateOnlyApply(dynamicClient),
 			workapiv1.UpdateStrategyTypeServerSideApply: NewServerSideApply(dynamicClient),
 			workapiv1.UpdateStrategyTypeUpdate:          NewUpdateApply(dynamicClient, kubeclient, apiExtensionClient),
+			workapiv1.UpdateStrategyTypeReadOnly:        NewReadOnlyApply(),
 		},
 	}
 }

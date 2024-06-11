@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	testclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
@@ -19,6 +20,7 @@ import (
 func TestTokenGetter(t *testing.T) {
 	saName := "test-sa"
 	saNamespace := "test-ns"
+	saUID := "test-uid"
 
 	tests := []struct {
 		name           string
@@ -56,6 +58,7 @@ func TestTokenGetter(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      saName,
 						Namespace: saNamespace,
+						UID:       types.UID(saUID),
 					},
 					Secrets: []corev1.ObjectReference{},
 				},
@@ -91,6 +94,9 @@ func TestTokenGetter(t *testing.T) {
 				}
 				if !reflect.DeepEqual(additionalData["serviceaccount_name"], []byte(saName)) {
 					t.Errorf("serviceaccount_name is not correct, got %s", string(additionalData["serviceaccount_name"]))
+				}
+				if !reflect.DeepEqual(additionalData["serviceaccount_uid"], []byte(saUID)) {
+					t.Errorf("serviceaccount_uid is not correct, got %s", string(additionalData["serviceaccount_uid"]))
 				}
 			}
 

@@ -8,6 +8,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -120,6 +121,124 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 
 				if *deploy.Spec.Replicas != 1 {
 					return fmt.Errorf("replicas should not be changed")
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+	})
+
+	ginkgo.Context("Read only strategy", func() {
+		var cm *corev1.ConfigMap
+		ginkgo.BeforeEach(func() {
+			cm = util.NewConfigmap(commOptions.SpokeClusterName, "cm1", map[string]string{"test": "testdata"}, []string{})
+			_, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Create(context.TODO(), cm, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			manifests = append(manifests, util.ToManifest(cm))
+		})
+
+		ginkgo.AfterEach(func() {
+			err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Delete(context.TODO(), "cm1", metav1.DeleteOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("read cm from the cluster", func() {
+			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Resource:  "configmaps",
+						Namespace: commOptions.SpokeClusterName,
+						Name:      "cm1",
+					},
+					UpdateStrategy: &workapiv1.UpdateStrategy{
+						Type: workapiv1.UpdateStrategyTypeReadOnly,
+					},
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.JSONPathsType,
+							JsonPaths: []workapiv1.JsonPath{
+								{
+									Name: "test",
+									Path: ".data.test",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("get configmap values from the work")
+			gomega.Eventually(func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if len(work.Status.ResourceStatus.Manifests) != 1 {
+					return fmt.Errorf("the size of resource status is not correct, expect to be 1 but got %d", len(work.Status.ResourceStatus.Manifests))
+				}
+
+				values := work.Status.ResourceStatus.Manifests[0].StatusFeedbacks.Values
+
+				expectedValues := []workapiv1.FeedbackValue{
+					{
+						Name: "test",
+						Value: workapiv1.FieldValue{
+							Type:   workapiv1.String,
+							String: ptr.To[string]("testdata"),
+						},
+					},
+				}
+				if !apiequality.Semantic.DeepEqual(values, expectedValues) {
+					return fmt.Errorf("status feedback values are not correct, we got %v", values)
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			ginkgo.By("update configmap")
+			gomega.Eventually(func() error {
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				cm.Data["test"] = "testdata-updated"
+
+				_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Update(context.Background(), cm, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			ginkgo.By("get updated configmap values from the work")
+			gomega.Eventually(func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if len(work.Status.ResourceStatus.Manifests) != 1 {
+					return fmt.Errorf("the size of resource status is not correct, expect to be 1 but got %d", len(work.Status.ResourceStatus.Manifests))
+				}
+
+				values := work.Status.ResourceStatus.Manifests[0].StatusFeedbacks.Values
+
+				expectedValues := []workapiv1.FeedbackValue{
+					{
+						Name: "test",
+						Value: workapiv1.FieldValue{
+							Type:   workapiv1.String,
+							String: ptr.To[string]("testdata-updated"),
+						},
+					},
+				}
+				if !apiequality.Semantic.DeepEqual(values, expectedValues) {
+					return fmt.Errorf("status feedback values are not correct, we got %v", values)
 				}
 
 				return nil

@@ -55,6 +55,7 @@ type klusterletController struct {
 	controlPlaneNodeLabelSelector string
 	deploymentReplicas            int32
 	disableAddonNamespace         bool
+	enableSyncLabels              bool
 }
 
 type klusterletReconcile interface {
@@ -83,6 +84,7 @@ func NewKlusterletController(
 	controlPlaneNodeLabelSelector string,
 	deploymentReplicas int32,
 	disableAddonNamespace bool,
+	enableSyncLabels bool,
 	recorder events.Recorder) factory.Controller {
 	controller := &klusterletController{
 		kubeClient: kubeClient,
@@ -96,6 +98,7 @@ func NewKlusterletController(
 		controlPlaneNodeLabelSelector: controlPlaneNodeLabelSelector,
 		deploymentReplicas:            deploymentReplicas,
 		disableAddonNamespace:         disableAddonNamespace,
+		enableSyncLabels:              enableSyncLabels,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -225,7 +228,10 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		ResourceRequirementResourceType: helpers.ResourceType(klusterlet),
 		ResourceRequirements:            resourceRequirements,
 		DisableAddonNamespace:           n.disableAddonNamespace,
-		Labels:                          helpers.GetKlusterletAgentLabels(klusterlet),
+	}
+
+	if n.enableSyncLabels {
+		config.Labels = helpers.GetKlusterletAgentLabels(klusterlet)
 	}
 
 	managedClusterClients, err := n.managedClusterClientsBuilder.
