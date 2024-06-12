@@ -356,7 +356,7 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 			})
 
 			ginkgo.By("update work status to avoid addon status update")
-			for i := 0; i < 4; i++ {
+			for i := 0; i < 2; i++ {
 				updateManifestWorkStatus(hubWorkClient, clusterNames[i], manifestWorkName, metav1.ConditionFalse)
 			}
 
@@ -503,6 +503,9 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 			for i := 0; i < 2; i++ {
 				updateManifestWorkStatus(hubWorkClient, clusterNames[i], manifestWorkName, metav1.ConditionTrue)
 			}
+			for i := 3; i < 4; i++ {
+				updateManifestWorkStatus(hubWorkClient, clusterNames[i], manifestWorkName, metav1.ConditionFalse)
+			}
 
 			ginkgo.By("check mca status")
 			for i := 0; i < 2; i++ {
@@ -627,7 +630,7 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 			})
 
 			ginkgo.By("update work status to avoid addon status update")
-			for i := 0; i < 4; i++ {
+			for i := 0; i < 2; i++ {
 				updateManifestWorkStatus(hubWorkClient, clusterNames[i], manifestWorkName, metav1.ConditionFalse)
 			}
 
@@ -761,6 +764,9 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 			start = metav1.Now()
 			for i := 0; i < 2; i++ {
 				updateManifestWorkStatus(hubWorkClient, clusterNames[i], manifestWorkName, metav1.ConditionTrue)
+			}
+			for i := 2; i < 4; i++ {
+				updateManifestWorkStatus(hubWorkClient, clusterNames[i], manifestWorkName, metav1.ConditionFalse)
 			}
 			assertClusterManagementAddOnNoConditions(testAddOnConfigsImpl.name, start, 3*time.Second, metav1.Condition{
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
