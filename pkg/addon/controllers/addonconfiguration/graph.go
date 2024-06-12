@@ -77,10 +77,10 @@ func (n *addonNode) setRolloutStatus() {
 				// desired config spec hash matches actual, but last applied config spec hash doesn't match actual
 			} else if !equality.Semantic.DeepEqual(actual.LastAppliedConfig, actual.DesiredConfig) {
 				switch progressingCond.Reason {
-				case addonv1alpha1.ProgressingReasonInstallFailed, addonv1alpha1.ProgressingReasonUpgradeFailed:
+				case addonv1alpha1.ProgressingReasonFailed:
 					n.status.Status = clustersdkv1alpha1.Failed
 					n.status.LastTransitionTime = &progressingCond.LastTransitionTime
-				case addonv1alpha1.ProgressingReasonInstalling, addonv1alpha1.ProgressingReasonUpgrading:
+				case addonv1alpha1.ProgressingReasonProgressing:
 					n.status.Status = clustersdkv1alpha1.Progressing
 					n.status.LastTransitionTime = &progressingCond.LastTransitionTime
 				default:
@@ -96,7 +96,7 @@ func (n *addonNode) setRolloutStatus() {
 
 	// succeed
 	n.status.Status = clustersdkv1alpha1.Succeeded
-	if progressingCond.Reason == addonv1alpha1.ProgressingReasonInstallSucceed || progressingCond.Reason == addonv1alpha1.ProgressingReasonUpgradeSucceed {
+	if progressingCond.Reason == addonv1alpha1.ProgressingReasonCompleted {
 		n.status.LastTransitionTime = &progressingCond.LastTransitionTime
 	}
 }

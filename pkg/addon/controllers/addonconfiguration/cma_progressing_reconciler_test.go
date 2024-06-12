@@ -92,10 +92,10 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].ConfigReferences[0].LastKnownGoodConfig != nil {
 					t.Errorf("InstallProgressions LastKnownGoodConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonInstalling {
+				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonProgressing {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions[0].Reason)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "0/2 installing..., 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "0/2 progressing..., 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions[0].Message)
 				}
 			},
@@ -185,10 +185,10 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].ConfigReferences[0].LastKnownGoodConfig != nil {
 					t.Errorf("InstallProgressions LastKnownGoodConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonInstalling {
+				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonProgressing {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions[0].Reason)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/2 installing..., 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/2 progressing..., 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions[0].Message)
 				}
 			},
@@ -268,10 +268,10 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 					cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig) {
 					t.Errorf("InstallProgressions LastKnownGoodConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonInstallSucceed {
+				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonCompleted {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/1 install completed with no errors, 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/1 completed with no errors, 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
 			},
@@ -344,10 +344,10 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].ConfigReferences[0].LastKnownGoodConfig != nil {
 					t.Errorf("InstallProgressions LastKnownGoodConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonUpgrading {
+				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonProgressing {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/2 upgrading..., 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/2 progressing..., 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
 			},
@@ -431,10 +431,10 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 					cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig) {
 					t.Errorf("InstallProgressions LastKnownGoodConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonUpgradeSucceed {
+				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonCompleted {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/1 upgrade completed with no errors, 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/1 completed with no errors, 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
 			},
@@ -517,10 +517,10 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].ConfigReferences[0].LastKnownGoodConfig != nil {
 					t.Errorf("InstallProgressions LastKnownGoodConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonUpgrading {
+				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonProgressing {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "0/1 upgrading..., 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "0/1 progressing..., 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
 			},
@@ -592,10 +592,10 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].ConfigReferences[0].LastKnownGoodConfig != nil {
 					t.Errorf("InstallProgressions LastKnownGoodConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonInstalling {
+				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonProgressing {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/2 installing..., 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/2 progressing..., 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions[0].Message)
 				}
 			},
