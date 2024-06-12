@@ -291,7 +291,7 @@ func NewCSRControl(logger klog.Logger, hubCSRInformer certificatesinformers.Inte
 				hubCSRLister:   hubCSRInformer.V1beta1().CertificateSigningRequests().Lister(),
 				hubCSRClient:   hubKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
 			}
-			logger.Info("Using v1beta1 CSR api to manage spoke client certificate")
+			logger.Info("Using v1beta1 CSR api to manage managed cluster client certificate")
 			return csrCtrl, nil
 		}
 	}

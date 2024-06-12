@@ -175,7 +175,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 				csrReconciles,
 				controllerContext.EventRecorder,
 			)
-			logger.Info("Using v1beta1 CSR api to manage spoke client certificate")
+			logger.Info("Using v1beta1 CSR api to manage managed cluster client certificate")
 		}
 	}
 	if csrController == nil {

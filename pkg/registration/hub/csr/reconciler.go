@@ -85,7 +85,7 @@ func (r *csrRenewalReconciler) Reconcile(ctx context.Context, csr csrInfo, appro
 		return reconcileContinue, err
 	}
 
-	r.eventRecorder.Eventf("ManagedClusterCSRAutoApproved", "spoke cluster csr %q is auto approved by hub csr controller", csr.name)
+	r.eventRecorder.Eventf("ManagedClusterCSRAutoApproved", "managed cluster csr %q is auto approved by hub csr controller", csr.name)
 	return reconcileStop, nil
 }
 
@@ -123,7 +123,7 @@ func (b *csrBootstrapReconciler) Reconcile(ctx context.Context, csr csrInfo, app
 		return reconcileContinue, err
 	}
 
-	b.eventRecorder.Eventf("ManagedClusterAutoApproved", "spoke cluster %q is auto approved.", clusterName)
+	b.eventRecorder.Eventf("ManagedClusterAutoApproved", "managed cluster %q is auto approved.", clusterName)
 	return reconcileStop, nil
 }
 
