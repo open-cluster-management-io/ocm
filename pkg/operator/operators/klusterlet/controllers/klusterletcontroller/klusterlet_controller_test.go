@@ -172,7 +172,7 @@ func newServiceAccount(name, namespace string, referenceSecret string) *corev1.S
 }
 
 func newTestController(t *testing.T, klusterlet *operatorapiv1.Klusterlet, recorder events.Recorder,
-	appliedManifestWorks []runtime.Object, objects ...runtime.Object) *testController {
+	appliedManifestWorks []runtime.Object, enableSyncLabels bool, objects ...runtime.Object) *testController {
 	fakeKubeClient := fakekube.NewSimpleClientset(objects...)
 	fakeAPIExtensionClient := fakeapiextensions.NewSimpleClientset()
 	fakeOperatorClient := fakeoperatorclient.NewSimpleClientset(klusterlet)
@@ -190,6 +190,7 @@ func newTestController(t *testing.T, klusterlet *operatorapiv1.Klusterlet, recor
 		cache:             resourceapply.NewResourceCache(),
 		managedClusterClientsBuilder: newManagedClusterClientsBuilder(fakeKubeClient, fakeAPIExtensionClient,
 			fakeWorkClient.WorkV1().AppliedManifestWorks(), recorder),
+		enableSyncLabels: enableSyncLabels,
 	}
 
 	cleanupController := &klusterletCleanupController{
@@ -454,10 +455,15 @@ func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, cl
 	}
 }
 
-func ensureObject(t *testing.T, object runtime.Object, klusterlet *operatorapiv1.Klusterlet) {
+func ensureObject(t *testing.T, object runtime.Object, klusterlet *operatorapiv1.Klusterlet, enableSyncLabels bool) {
 	access, err := meta.Accessor(object)
 	if err != nil {
 		t.Errorf("Unable to access objectmeta: %v", err)
+		return
+	}
+
+	if enableSyncLabels && !helpers.MapCompare(helpers.GetKlusterletAgentLabels(klusterlet), access.GetLabels()) {
+		t.Errorf("the labels of klusterlet are not synced to %v", access.GetName())
 		return
 	}
 
@@ -497,124 +503,166 @@ func ensureObject(t *testing.T, object runtime.Object, klusterlet *operatorapiv1
 
 // TestSyncDeploy test deployment of klusterlet components
 func TestSyncDeploy(t *testing.T) {
-	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
-	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
-	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
-	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
-	namespace := newNamespace("testns")
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
-	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, bootStrapSecret, hubKubeConfigSecret, namespace)
-
-	err := controller.controller.sync(context.TODO(), syncContext)
-	if err != nil {
-		t.Errorf("Expected non error when sync, %v", err)
+	cases := []struct {
+		name             string
+		enableSyncLabels bool
+	}{
+		{
+			name:             "disable sync labels",
+			enableSyncLabels: false,
+		},
+		{
+			name:             "enable sync labels",
+			enableSyncLabels: true,
+		},
 	}
 
-	var createObjects []runtime.Object
-	kubeActions := controller.kubeClient.Actions()
-	for _, action := range kubeActions {
-		if action.GetVerb() == createVerb {
-			object := action.(clienttesting.CreateActionImpl).Object
-			createObjects = append(createObjects, object)
+	for _, c := range cases {
+		klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+		bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
+		hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
+		hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+		namespace := newNamespace("testns")
+		syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
-		}
+		t.Run(c.name, func(t *testing.T) {
+			controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, c.enableSyncLabels,
+				bootStrapSecret, hubKubeConfigSecret, namespace)
+
+			err := controller.controller.sync(context.TODO(), syncContext)
+			if err != nil {
+				t.Errorf("Expected non error when sync, %v", err)
+			}
+
+			var createObjects []runtime.Object
+			kubeActions := controller.kubeClient.Actions()
+			for _, action := range kubeActions {
+				if action.GetVerb() == createVerb {
+					object := action.(clienttesting.CreateActionImpl).Object
+					createObjects = append(createObjects, object)
+				}
+			}
+
+			// Check if resources are created as expected
+			// 11 managed static manifests + 12 management static manifests - 2 duplicated service account manifests + 1 addon namespace + 2 deployments
+			if len(createObjects) != 24 {
+				t.Errorf("Expect 24 objects created in the sync loop, actual %d", len(createObjects))
+			}
+			for _, object := range createObjects {
+				ensureObject(t, object, klusterlet, false)
+			}
+
+			apiExtenstionAction := controller.apiExtensionClient.Actions()
+			var createCRDObjects []runtime.Object
+			for _, action := range apiExtenstionAction {
+				if action.GetVerb() == createVerb && action.GetResource().Resource == crdResourceName {
+					object := action.(clienttesting.CreateActionImpl).Object
+					createCRDObjects = append(createCRDObjects, object)
+				}
+			}
+			if len(createCRDObjects) != 2 {
+				t.Errorf("Expect 2 objects created in the sync loop, actual %d", len(createCRDObjects))
+			}
+
+			operatorAction := controller.operatorClient.Actions()
+			testingcommon.AssertActions(t, operatorAction, "patch")
+			klusterlet = &operatorapiv1.Klusterlet{}
+			patchData := operatorAction[0].(clienttesting.PatchActionImpl).Patch
+			err = json.Unmarshal(patchData, klusterlet)
+			if err != nil {
+				t.Fatal(err)
+			}
+			testinghelper.AssertOnlyConditions(
+				t, klusterlet,
+				testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
+				testinghelper.NamedCondition(helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue),
+			)
+		})
 	}
 
-	// Check if resources are created as expected
-	// 11 managed static manifests + 12 management static manifests - 2 duplicated service account manifests + 1 addon namespace + 2 deployments
-	if len(createObjects) != 24 {
-		t.Errorf("Expect 24 objects created in the sync loop, actual %d", len(createObjects))
-	}
-	for _, object := range createObjects {
-		ensureObject(t, object, klusterlet)
-	}
-
-	apiExtenstionAction := controller.apiExtensionClient.Actions()
-	var createCRDObjects []runtime.Object
-	for _, action := range apiExtenstionAction {
-		if action.GetVerb() == createVerb && action.GetResource().Resource == crdResourceName {
-			object := action.(clienttesting.CreateActionImpl).Object
-			createCRDObjects = append(createCRDObjects, object)
-		}
-	}
-	if len(createCRDObjects) != 2 {
-		t.Errorf("Expect 2 objects created in the sync loop, actual %d", len(createCRDObjects))
-	}
-
-	operatorAction := controller.operatorClient.Actions()
-	testingcommon.AssertActions(t, operatorAction, "patch")
-	klusterlet = &operatorapiv1.Klusterlet{}
-	patchData := operatorAction[0].(clienttesting.PatchActionImpl).Patch
-	err = json.Unmarshal(patchData, klusterlet)
-	if err != nil {
-		t.Fatal(err)
-	}
-	testinghelper.AssertOnlyConditions(
-		t, klusterlet,
-		testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
-		testinghelper.NamedCondition(helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue),
-	)
 }
 
 func TestSyncDeploySingleton(t *testing.T) {
-	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
-	klusterlet.Spec.DeployOption.Mode = operatorapiv1.InstallModeSingleton
-	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
-	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
-	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
-	namespace := newNamespace("testns")
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
-	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, bootStrapSecret, hubKubeConfigSecret, namespace)
-
-	err := controller.controller.sync(context.TODO(), syncContext)
-	if err != nil {
-		t.Errorf("Expected non error when sync, %v", err)
+	cases := []struct {
+		name             string
+		enableSyncLabels bool
+	}{
+		{
+			name:             "disable sync labels",
+			enableSyncLabels: false,
+		},
+		{
+			name:             "enable sync labels",
+			enableSyncLabels: true,
+		},
 	}
 
-	var createObjects []runtime.Object
-	kubeActions := controller.kubeClient.Actions()
-	for _, action := range kubeActions {
-		if action.GetVerb() == createVerb {
-			object := action.(clienttesting.CreateActionImpl).Object
-			createObjects = append(createObjects, object)
+	for _, c := range cases {
+		klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+		klusterlet.SetLabels(map[string]string{"test": "test", "abc": "abc"})
+		klusterlet.Spec.DeployOption.Mode = operatorapiv1.InstallModeSingleton
+		bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
+		hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
+		hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+		namespace := newNamespace("testns")
+		syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
-		}
+		t.Run(c.name, func(t *testing.T) {
+			controller := newTestController(t, klusterlet, syncContext.Recorder(), nil,
+				c.enableSyncLabels, bootStrapSecret, hubKubeConfigSecret, namespace)
+
+			err := controller.controller.sync(context.TODO(), syncContext)
+			if err != nil {
+				t.Errorf("Expected non error when sync, %v", err)
+			}
+
+			var createObjects []runtime.Object
+			kubeActions := controller.kubeClient.Actions()
+			for _, action := range kubeActions {
+				if action.GetVerb() == createVerb {
+					object := action.(clienttesting.CreateActionImpl).Object
+					createObjects = append(createObjects, object)
+
+				}
+			}
+
+			// Check if resources are created as expected
+			// 10 managed static manifests + 11 management static manifests - 1 service account manifests + 1 addon namespace + 1 deployments
+			if len(createObjects) != 22 {
+				t.Errorf("Expect 21 objects created in the sync loop, actual %d", len(createObjects))
+			}
+			for _, object := range createObjects {
+				ensureObject(t, object, klusterlet, false)
+			}
+
+			apiExtenstionAction := controller.apiExtensionClient.Actions()
+			var createCRDObjects []runtime.Object
+			for _, action := range apiExtenstionAction {
+				if action.GetVerb() == createVerb && action.GetResource().Resource == crdResourceName {
+					object := action.(clienttesting.CreateActionImpl).Object
+					createCRDObjects = append(createCRDObjects, object)
+				}
+			}
+			if len(createCRDObjects) != 2 {
+				t.Errorf("Expect 2 objects created in the sync loop, actual %d", len(createCRDObjects))
+			}
+
+			operatorAction := controller.operatorClient.Actions()
+			testingcommon.AssertActions(t, operatorAction, "patch")
+			klusterlet = &operatorapiv1.Klusterlet{}
+			patchData := operatorAction[0].(clienttesting.PatchActionImpl).Patch
+			err = json.Unmarshal(patchData, klusterlet)
+			if err != nil {
+				t.Fatal(err)
+			}
+			testinghelper.AssertOnlyConditions(
+				t, klusterlet,
+				testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
+				testinghelper.NamedCondition(helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue),
+			)
+		})
 	}
 
-	// Check if resources are created as expected
-	// 10 managed static manifests + 11 management static manifests - 1 service account manifests + 1 addon namespace + 1 deployments
-	if len(createObjects) != 22 {
-		t.Errorf("Expect 21 objects created in the sync loop, actual %d", len(createObjects))
-	}
-	for _, object := range createObjects {
-		ensureObject(t, object, klusterlet)
-	}
-
-	apiExtenstionAction := controller.apiExtensionClient.Actions()
-	var createCRDObjects []runtime.Object
-	for _, action := range apiExtenstionAction {
-		if action.GetVerb() == createVerb && action.GetResource().Resource == crdResourceName {
-			object := action.(clienttesting.CreateActionImpl).Object
-			createCRDObjects = append(createCRDObjects, object)
-		}
-	}
-	if len(createCRDObjects) != 2 {
-		t.Errorf("Expect 2 objects created in the sync loop, actual %d", len(createCRDObjects))
-	}
-
-	operatorAction := controller.operatorClient.Actions()
-	testingcommon.AssertActions(t, operatorAction, "patch")
-	klusterlet = &operatorapiv1.Klusterlet{}
-	patchData := operatorAction[0].(clienttesting.PatchActionImpl).Patch
-	err = json.Unmarshal(patchData, klusterlet)
-	if err != nil {
-		t.Fatal(err)
-	}
-	testinghelper.AssertOnlyConditions(
-		t, klusterlet,
-		testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
-		testinghelper.NamedCondition(helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue),
-	)
 }
 
 // TestSyncDeployHosted test deployment of klusterlet components in hosted mode
@@ -658,7 +706,7 @@ func TestSyncDeployHosted(t *testing.T) {
 		t.Errorf("Expect 16 objects created in the sync loop, actual %d", len(createObjectsManagement))
 	}
 	for _, object := range createObjectsManagement {
-		ensureObject(t, object, klusterlet)
+		ensureObject(t, object, klusterlet, false)
 	}
 
 	var createObjectsManaged []runtime.Object
@@ -676,7 +724,7 @@ func TestSyncDeployHosted(t *testing.T) {
 		t.Errorf("Expect 15 objects created in the sync loop, actual %d", len(createObjectsManaged))
 	}
 	for _, object := range createObjectsManaged {
-		ensureObject(t, object, klusterlet)
+		ensureObject(t, object, klusterlet, false)
 	}
 
 	apiExtenstionAction := controller.apiExtensionClient.Actions()
@@ -801,7 +849,8 @@ func TestReplica(t *testing.T) {
 	}
 
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
-	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, objects...)
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
+		objects...)
 
 	err := controller.controller.sync(context.TODO(), syncContext)
 	if err != nil {
@@ -866,7 +915,8 @@ func TestClusterNameChange(t *testing.T) {
 	hubSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	hubSecret.Data["cluster-name"] = []byte("cluster1")
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
-	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, bootStrapSecret, hubSecret, namespace)
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
+		bootStrapSecret, hubSecret, namespace)
 
 	err := controller.controller.sync(context.TODO(), syncContext)
 	if err != nil {
@@ -954,7 +1004,8 @@ func TestSyncWithPullSecret(t *testing.T) {
 	namespace := newNamespace("testns")
 	pullSecret := newSecret(imagePullSecret, "open-cluster-management")
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
-	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, bootStrapSecret, hubKubeConfigSecret, namespace, pullSecret)
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
+		bootStrapSecret, hubKubeConfigSecret, namespace, pullSecret)
 
 	err := controller.controller.sync(context.TODO(), syncContext)
 	if err != nil {
@@ -983,7 +1034,8 @@ func TestDeployOnKube111(t *testing.T) {
 	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	namespace := newNamespace("testns")
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
-	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, bootStrapSecret, hubKubeConfigSecret, namespace)
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
+		bootStrapSecret, hubKubeConfigSecret, namespace)
 	kubeVersion, _ := version.ParseGeneric("v1.11.0")
 	controller.controller.kubeVersion = kubeVersion
 	controller.cleanupController.kubeVersion = kubeVersion
@@ -1010,7 +1062,7 @@ func TestDeployOnKube111(t *testing.T) {
 		t.Errorf("Expect 26 objects created in the sync loop, actual %d", len(createObjects))
 	}
 	for _, object := range createObjects {
-		ensureObject(t, object, klusterlet)
+		ensureObject(t, object, klusterlet, false)
 	}
 
 	operatorAction := controller.operatorClient.Actions()

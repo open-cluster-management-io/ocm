@@ -317,7 +317,7 @@ func ensureSAKubeconfigs(ctx context.Context, clusterManagerName, clusterManager
 			TLSClientConfig: rest.TLSClientConfig{
 				CAData: hubKubeConfig.CAData,
 			},
-		}, managementClient.CoreV1(), tokenGetter, recorder)
+		}, managementClient.CoreV1(), tokenGetter, recorder, nil)
 		if err != nil {
 			return err
 		}

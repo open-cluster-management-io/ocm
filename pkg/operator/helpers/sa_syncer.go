@@ -96,12 +96,12 @@ func SATokenCreater(ctx context.Context, saName, saNamespace string, saClient ku
 
 func SyncKubeConfigSecret(ctx context.Context, secretName, secretNamespace, kubeconfigPath string,
 	templateKubeconfig *rest.Config, secretClient coreclientv1.SecretsGetter,
-	tokenGetter TokenGetterFunc, recorder events.Recorder) error {
+	tokenGetter TokenGetterFunc, recorder events.Recorder, labels map[string]string) error {
 	secret, err := secretClient.Secrets(secretNamespace).Get(ctx, secretName, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		return applyKubeconfigSecret(ctx, templateKubeconfig, secretName, secretNamespace,
-			kubeconfigPath, secretClient, tokenGetter, recorder)
+			kubeconfigPath, secretClient, tokenGetter, recorder, labels)
 	case err != nil:
 		return err
 	}
@@ -110,7 +110,8 @@ func SyncKubeConfigSecret(ctx context.Context, secretName, secretNamespace, kube
 		return nil
 	}
 
-	return applyKubeconfigSecret(ctx, templateKubeconfig, secretName, secretNamespace, kubeconfigPath, secretClient, tokenGetter, recorder)
+	return applyKubeconfigSecret(ctx, templateKubeconfig, secretName, secretNamespace, kubeconfigPath,
+		secretClient, tokenGetter, recorder, labels)
 }
 
 func tokenValid(secret *corev1.Secret) bool {
@@ -181,7 +182,7 @@ func clusterInfoNotChanged(secret *corev1.Secret, templateKubeconfig *rest.Confi
 // applyKubeconfigSecret would render saToken to a secret.
 func applyKubeconfigSecret(ctx context.Context, templateKubeconfig *rest.Config, secretName, secretNamespace,
 	kubeconfigPath string, secretClient coreclientv1.SecretsGetter, tokenGetter TokenGetterFunc,
-	recorder events.Recorder) error {
+	recorder events.Recorder, labels map[string]string) error {
 
 	token, expiration, err := tokenGetter()
 	if err != nil {
@@ -220,6 +221,7 @@ func applyKubeconfigSecret(ctx context.Context, templateKubeconfig *rest.Config,
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: secretNamespace,
 			Name:      secretName,
+			Labels:    labels,
 		},
 		Data: map[string][]byte{
 			"kubeconfig": kubeconfigContent,

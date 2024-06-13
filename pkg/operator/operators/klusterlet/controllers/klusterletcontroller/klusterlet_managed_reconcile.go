@@ -59,16 +59,22 @@ type managedReconcile struct {
 	kubeVersion           *version.Version
 	recorder              events.Recorder
 	cache                 resourceapply.ResourceCache
+	enableSyncLabels      bool
 }
 
 func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+	labels := map[string]string{}
+	if r.enableSyncLabels {
+		labels = helpers.GetKlusterletAgentLabels(klusterlet)
+	}
+
 	// For now, whether in Default or Hosted mode, the addons will be deployed on the managed cluster.
 	// sync image pull secret from management cluster to managed cluster for addon namespace
 	// TODO(zhujian7): In the future, we may consider deploy addons on the management cluster in Hosted mode.
 	addonNamespace := fmt.Sprintf("%s-addon", config.KlusterletNamespace)
 	// Ensure the addon namespace on the managed cluster
-	err := ensureNamespace(ctx, r.managedClusterClients.kubeClient, klusterlet, addonNamespace, r.recorder)
+	err := ensureNamespace(ctx, r.managedClusterClients.kubeClient, klusterlet, addonNamespace, labels, r.recorder)
 	if err != nil {
 		return klusterlet, reconcileStop, err
 	}
@@ -77,7 +83,7 @@ func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 	// addonsecretcontroller only watch namespaces in the same cluster klusterlet is running on.
 	// And if addons are deployed in default mode on the managed cluster, but klusterlet is deployed in hosted
 	// on management cluster, then we still need to sync the secret here in klusterlet-controller using `managedClusterClients.kubeClient`.
-	err = syncPullSecret(ctx, r.kubeClient, r.managedClusterClients.kubeClient, klusterlet, r.opratorNamespace, addonNamespace, r.recorder)
+	err = syncPullSecret(ctx, r.kubeClient, r.managedClusterClients.kubeClient, klusterlet, r.opratorNamespace, addonNamespace, labels, r.recorder)
 	if err != nil {
 		return klusterlet, reconcileStop, err
 	}
@@ -85,7 +91,7 @@ func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 	if helpers.IsHosted(config.InstallMode) {
 		// In hosted mode, we should ensure the namespace on the managed cluster since
 		// some resources(eg:service account) are still deployed on managed cluster.
-		err := ensureNamespace(ctx, r.managedClusterClients.kubeClient, klusterlet, config.KlusterletNamespace, r.recorder)
+		err := ensureNamespace(ctx, r.managedClusterClients.kubeClient, klusterlet, config.KlusterletNamespace, labels, r.recorder)
 		if err != nil {
 			return klusterlet, reconcileStop, err
 		}
@@ -158,6 +164,9 @@ func (r *managedReconcile) createAggregationRule(ctx context.Context, klusterlet
 				},
 			},
 			Rules: []rbacv1.PolicyRule{},
+		}
+		if r.enableSyncLabels {
+			aggregateClusterRole.SetLabels(helpers.GetKlusterletAgentLabels(klusterlet))
 		}
 		_, createErr := r.managedClusterClients.kubeClient.RbacV1().ClusterRoles().Create(ctx, aggregateClusterRole, metav1.CreateOptions{})
 		return createErr

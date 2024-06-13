@@ -5,7 +5,11 @@ metadata:
   namespace: {{ .AgentNamespace }}
   labels:
     app: klusterlet-manifestwork-agent
-    createdBy: klusterlet
+    {{ if gt (len .Labels) 0 }}
+    {{ range $key, $value := .Labels }}
+    {{ $key }}: {{ $value }}
+    {{ end }}
+    {{ end }}
 spec:
   replicas: {{ .Replica }}
   selector:
@@ -17,6 +21,11 @@ spec:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: klusterlet-manifestwork-agent
+        {{ if gt (len .Labels) 0 }}
+        {{ range $key, $value := .Labels }}
+        {{ $key }}: {{ $value }}
+        {{ end }}
+        {{ end }}
     spec:
       {{if .HubApiServerHostAlias }}
       hostAliases:
