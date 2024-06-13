@@ -296,12 +296,8 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			// Check addon namespace
 			addonNamespace := fmt.Sprintf("%s-addon", klusterletNamespace)
 			gomega.Eventually(func() bool {
-<<<<<<< HEAD
-				if _, err := kubeClient.CoreV1().Namespaces().Get(context.Background(), addonNamespace, metav1.GetOptions{}); err != nil {
-=======
 				namespaces, err := kubeClient.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{LabelSelector: agentLabelSelector})
 				if err != nil {
->>>>>>> 7fd73308 (sync labels from klusterlet to all agent resources (#475))
 					return false
 				}
 				if len(namespaces.Items) != 2 {
@@ -309,7 +305,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				}
 				for _, namespace := range namespaces.Items {
 					if namespace.GetName() != klusterletNamespace &&
-						namespace.GetName() != helpers.DefaultAddonNamespace {
+						namespace.GetName() != addonNamespace {
 						return false
 					}
 				}

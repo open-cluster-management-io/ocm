@@ -8,7 +8,6 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
-	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -316,17 +315,20 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			kubeVersion:           n.kubeVersion,
 			opratorNamespace:      n.operatorNamespace,
 			recorder:              controllerContext.Recorder(),
-			cache:                 n.cache},
+			cache:                 n.cache,
+			enableSyncLabels:      n.enableSyncLabels},
 		&managementReconcile{
 			kubeClient:        n.kubeClient,
 			operatorNamespace: n.operatorNamespace,
 			recorder:          controllerContext.Recorder(),
-			cache:             n.cache},
+			cache:             n.cache,
+			enableSyncLabels:  n.enableSyncLabels},
 		&runtimeReconcile{
 			managedClusterClients: managedClusterClients,
 			kubeClient:            n.kubeClient,
 			recorder:              controllerContext.Recorder(),
-			cache:                 n.cache},
+			cache:                 n.cache,
+			enableSyncLabels:      n.enableSyncLabels},
 	}
 
 	var errs []error
@@ -399,7 +401,7 @@ func ensureAgentNamespace(ctx context.Context, kubeClient kubernetes.Interface, 
 
 // syncPullSecret will sync pull secret from the sourceClient cluster to the targetClient cluster in desired namespace.
 func syncPullSecret(ctx context.Context, sourceClient, targetClient kubernetes.Interface,
-	klusterlet *operatorapiv1.Klusterlet, operatorNamespace, namespace string, recorder events.Recorder) error {
+	klusterlet *operatorapiv1.Klusterlet, operatorNamespace, namespace string, labels map[string]string, recorder events.Recorder) error {
 	_, _, err := helpers.SyncSecret(
 		ctx,
 		sourceClient.CoreV1(),
@@ -410,7 +412,7 @@ func syncPullSecret(ctx context.Context, sourceClient, targetClient kubernetes.I
 		namespace,
 		imagePullSecret,
 		[]metav1.OwnerReference{},
-		helpers.GetKlusterletAgentLabels(klusterlet),
+		labels,
 	)
 
 	if err != nil {
@@ -429,8 +431,6 @@ func ensureNamespace(
 	kubeClient kubernetes.Interface,
 	klusterlet *operatorapiv1.Klusterlet,
 	namespace string, labels map[string]string, recorder events.Recorder) error {
-	modified := resourcemerge.BoolPtr(false)
-	resourcemerge.MergeMap(modified, &labels, helpers.GetKlusterletAgentLabels(klusterlet))
 	_, _, err := resourceapply.ApplyNamespace(ctx, kubeClient.CoreV1(), recorder, &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: namespace,

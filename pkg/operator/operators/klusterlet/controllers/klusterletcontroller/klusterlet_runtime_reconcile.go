@@ -29,6 +29,7 @@ type runtimeReconcile struct {
 	kubeClient            kubernetes.Interface
 	recorder              events.Recorder
 	cache                 resourceapply.ResourceCache
+	enableSyncLabels      bool
 }
 
 func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
@@ -198,7 +199,11 @@ func (r *runtimeReconcile) createManagedClusterKubeconfig(
 	klusterlet *operatorapiv1.Klusterlet,
 	klusterletNamespace, agentNamespace, saName, secretName string,
 	recorder events.Recorder) error {
-	labels := helpers.GetKlusterletAgentLabels(klusterlet)
+	labels := map[string]string{}
+	if r.enableSyncLabels {
+		labels = helpers.GetKlusterletAgentLabels(klusterlet)
+	}
+
 	tokenGetter := helpers.SATokenGetter(ctx, saName, klusterletNamespace, r.managedClusterClients.kubeClient)
 	err := helpers.SyncKubeConfigSecret(ctx, secretName, agentNamespace, "/spoke/config/kubeconfig",
 		r.managedClusterClients.kubeconfig, r.kubeClient.CoreV1(), tokenGetter, recorder, labels)
