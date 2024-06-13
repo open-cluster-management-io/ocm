@@ -44,17 +44,24 @@ type managementReconcile struct {
 	recorder          events.Recorder
 	operatorNamespace string
 	cache             resourceapply.ResourceCache
+	enableSyncLabels  bool
 }
 
 func (r *managementReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
-	err := ensureNamespace(ctx, r.kubeClient, klusterlet, config.AgentNamespace, nil, r.recorder)
+	labels := map[string]string{}
+	if r.enableSyncLabels {
+		labels = helpers.GetKlusterletAgentLabels(klusterlet)
+	}
+
+	err := ensureNamespace(ctx, r.kubeClient, klusterlet, config.AgentNamespace, labels, r.recorder)
 	if err != nil {
 		return klusterlet, reconcileStop, err
 	}
 
 	// Sync pull secret to the agent namespace
-	err = syncPullSecret(ctx, r.kubeClient, r.kubeClient, klusterlet, r.operatorNamespace, config.AgentNamespace, r.recorder)
+	err = syncPullSecret(ctx, r.kubeClient, r.kubeClient, klusterlet, r.operatorNamespace, config.AgentNamespace,
+		labels, r.recorder)
 	if err != nil {
 		return klusterlet, reconcileStop, err
 	}
