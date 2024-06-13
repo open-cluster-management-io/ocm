@@ -22,6 +22,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/work"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/codec"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/store"
 
 	"open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
@@ -213,45 +214,60 @@ func (o *WorkAgentConfig) newHubWorkClientAndInformer(
 	ctx context.Context,
 	restMapper meta.RESTMapper,
 ) (string, workv1client.ManifestWorkInterface, workv1informers.ManifestWorkInformer, error) {
+	var workClient workclientset.Interface
+	var watcherStore *store.AgentInformerWatcherStore
+	var hubHost string
+
 	if o.workOptions.WorkloadSourceDriver == "kube" {
 		config, err := clientcmd.BuildConfigFromFlags("", o.workOptions.WorkloadSourceConfig)
 		if err != nil {
 			return "", nil, nil, err
 		}
 
-		kubeWorkClientSet, err := workclientset.NewForConfig(config)
+		workClient, err = workclientset.NewForConfig(config)
 		if err != nil {
 			return "", nil, nil, err
 		}
 
-		factory := workinformers.NewSharedInformerFactoryWithOptions(
-			kubeWorkClientSet,
-			5*time.Minute,
-			workinformers.WithNamespace(o.agentOptions.SpokeClusterName),
-		)
-		informer := factory.Work().V1().ManifestWorks()
+		hubHost = config.Host
+	} else {
+		// For cloudevents drivers, we build ManifestWork client that implements the
+		// ManifestWorkInterface and ManifestWork informer based on different driver configuration.
+		// Refer to Event Based Manifestwork proposal in enhancements repo to get more details.
 
-		return config.Host, kubeWorkClientSet.WorkV1().ManifestWorks(o.agentOptions.SpokeClusterName), informer, nil
+		watcherStore = store.NewAgentInformerWatcherStore()
+
+		serverHost, config, err := generic.NewConfigLoader(o.workOptions.WorkloadSourceDriver, o.workOptions.WorkloadSourceConfig).
+			LoadConfig()
+		if err != nil {
+			return "", nil, nil, err
+		}
+
+		clientHolder, err := cloudeventswork.NewClientHolderBuilder(config).
+			WithClientID(o.workOptions.CloudEventsClientID).
+			WithClusterName(o.agentOptions.SpokeClusterName).
+			WithCodecs(buildCodecs(o.workOptions.CloudEventsClientCodecs, restMapper)...).
+			WithWorkClientWatcherStore(watcherStore).
+			NewAgentClientHolder(ctx)
+		if err != nil {
+			return "", nil, nil, err
+		}
+
+		hubHost = serverHost
+		workClient = clientHolder.WorkInterface()
 	}
 
-	// For cloudevents drivers, we build ManifestWork client that implements the
-	// ManifestWorkInterface and ManifestWork informer based on different driver configuration.
-	// Refer to Event Based Manifestwork proposal in enhancements repo to get more details.
-	hubHost, config, err := generic.NewConfigLoader(o.workOptions.WorkloadSourceDriver, o.workOptions.WorkloadSourceConfig).
-		LoadConfig()
-	if err != nil {
-		return "", nil, nil, err
+	factory := workinformers.NewSharedInformerFactoryWithOptions(
+		workClient,
+		5*time.Minute,
+		workinformers.WithNamespace(o.agentOptions.SpokeClusterName),
+	)
+	informer := factory.Work().V1().ManifestWorks()
+
+	// For cloudevents work client, we use the informer store as the client store
+	if watcherStore != nil {
+		watcherStore.SetStore(informer.Informer().GetStore())
 	}
 
-	clientHolder, informer, err := cloudeventswork.NewClientHolderBuilder(config).
-		WithClientID(o.workOptions.CloudEventsClientID).
-		WithInformerConfig(5*time.Minute, workinformers.WithNamespace(o.agentOptions.SpokeClusterName)).
-		WithClusterName(o.agentOptions.SpokeClusterName).
-		WithCodecs(buildCodecs(o.workOptions.CloudEventsClientCodecs, restMapper)...).
-		NewAgentClientHolderWithInformer(ctx)
-	if err != nil {
-		return "", nil, nil, err
-	}
-
-	return hubHost, clientHolder.ManifestWorks(o.agentOptions.SpokeClusterName), informer, err
+	return hubHost, workClient.WorkV1().ManifestWorks(o.agentOptions.SpokeClusterName), informer, nil
 }

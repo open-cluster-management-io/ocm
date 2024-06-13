@@ -28,6 +28,11 @@ type ManifestBundle struct {
 // ManifestBundleStatus represents the data in a cloudevent, it contains the status of a ManifestBundle on a managed
 // cluster.
 type ManifestBundleStatus struct {
+	// ManifestBundle represents the specific of this status.
+	// This is an optional field, it can be used by a source work client without local cache to
+	// rebuild a whole work when received the work's status update.
+	ManifestBundle *ManifestBundle `json:"manifestBundle,omitempty"`
+
 	// Conditions contains the different condition statuses for a ManifestBundle on managed cluster.
 	// Valid condition types are:
 	// 1. Applied represents the manifests in a ManifestBundle are applied successfully on a managed cluster.

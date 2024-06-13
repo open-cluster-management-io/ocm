@@ -1,6 +1,7 @@
 package codec
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -14,6 +15,9 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload"
 )
+
+// ExtensionWorkMeta is an extension attribute for work meta data.
+const ExtensionWorkMeta = "metadata"
 
 // ManifestBundleCodec is a codec to encode/decode a ManifestWork/cloudevent with ManifestBundle for a source.
 type ManifestBundleCodec struct{}
@@ -43,6 +47,14 @@ func (c *ManifestBundleCodec) Encode(source string, eventType types.CloudEventsT
 		WithResourceID(string(work.UID)).
 		WithResourceVersion(int64(resourceVersion)).
 		NewEvent()
+
+	// set the work's meta data to its cloud event
+	metaJson, err := json.Marshal(work.ObjectMeta)
+	if err != nil {
+		return nil, err
+	}
+	evt.SetExtension(ExtensionWorkMeta, string(metaJson))
+
 	if !work.DeletionTimestamp.IsZero() {
 		evt.SetExtension(types.ExtensionDeletionTimestamp, work.DeletionTimestamp.Time)
 		return &evt, nil
@@ -83,17 +95,40 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 		return nil, fmt.Errorf("failed to get resourceversion extension: %v", err)
 	}
 
+	metaObj := metav1.ObjectMeta{}
+
+	// the agent sends the work meta data back, restore the meta to the received work, otherwise only set the
+	// UID and ResourceVersion to the received work, for the work's other meta data will be got from the work
+	// client local cache.
+	if workMetaExtension, ok := evtExtensions[ExtensionWorkMeta]; ok {
+		metaJson, err := cloudeventstypes.ToString(workMetaExtension)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := json.Unmarshal([]byte(metaJson), &metaObj); err != nil {
+			return nil, err
+		}
+	}
+
+	metaObj.UID = kubetypes.UID(resourceID)
+	metaObj.ResourceVersion = fmt.Sprintf("%d", resourceVersion)
+
 	work := &workv1.ManifestWork{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			UID:             kubetypes.UID(resourceID),
-			ResourceVersion: fmt.Sprintf("%d", resourceVersion),
-		},
+		TypeMeta:   metav1.TypeMeta{},
+		ObjectMeta: metaObj,
 	}
 
 	manifestStatus := &payload.ManifestBundleStatus{}
 	if err := evt.DataAs(manifestStatus); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal event data %s, %v", string(evt.Data()), err)
+	}
+
+	// the agent sends the work spec back, restore it
+	if manifestStatus.ManifestBundle != nil {
+		work.Spec.Workload.Manifests = manifestStatus.ManifestBundle.Manifests
+		work.Spec.DeleteOption = manifestStatus.ManifestBundle.DeleteOption
+		work.Spec.ManifestConfigs = manifestStatus.ManifestBundle.ManifestConfigs
 	}
 
 	work.Status = workv1.ManifestWorkStatus{
