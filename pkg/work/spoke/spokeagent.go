@@ -10,10 +10,13 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
+	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 	workv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
@@ -91,22 +94,7 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		return err
 	}
 
-	// To support consuming ManifestWorks from different drivers (like the Kubernetes apiserver or MQTT broker), we build
-	// ManifestWork client that implements the ManifestWorkInterface and ManifestWork informer based on different
-	// driver configuration.
-	// Refer to Event Based Manifestwork proposal in enhancements repo to get more details.
-	hubHost, config, err := generic.NewConfigLoader(o.workOptions.WorkloadSourceDriver, o.workOptions.WorkloadSourceConfig).
-		LoadConfig()
-	if err != nil {
-		return err
-	}
-
-	clientHolder, err := cloudeventswork.NewClientHolderBuilder(config).
-		WithClientID(o.workOptions.CloudEventsClientID).
-		WithInformerConfig(5*time.Minute, workinformers.WithNamespace(o.agentOptions.SpokeClusterName)).
-		WithClusterName(o.agentOptions.SpokeClusterName).
-		WithCodecs(buildCodecs(o.workOptions.CloudEventsClientCodecs, restMapper)...).
-		NewAgentClientHolder(ctx)
+	hubHost, hubWorkClient, hubWorkInformer, err := o.newHubWorkClientAndInformer(ctx, restMapper)
 	if err != nil {
 		return err
 	}
@@ -116,9 +104,6 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 	if len(agentID) == 0 {
 		agentID = hubHash
 	}
-
-	hubWorkClient := clientHolder.ManifestWorks(o.agentOptions.SpokeClusterName)
-	hubWorkInformer := clientHolder.ManifestWorkInformer()
 
 	// create controllers
 	validator := auth.NewFactory(
@@ -222,4 +207,51 @@ func buildCodecs(codecNames []string, restMapper meta.RESTMapper) []generic.Code
 		}
 	}
 	return codecs
+}
+
+func (o *WorkAgentConfig) newHubWorkClientAndInformer(
+	ctx context.Context,
+	restMapper meta.RESTMapper,
+) (string, workv1client.ManifestWorkInterface, workv1informers.ManifestWorkInformer, error) {
+	if o.workOptions.WorkloadSourceDriver == "kube" {
+		config, err := clientcmd.BuildConfigFromFlags("", o.workOptions.WorkloadSourceConfig)
+		if err != nil {
+			return "", nil, nil, err
+		}
+
+		kubeWorkClientSet, err := workclientset.NewForConfig(config)
+		if err != nil {
+			return "", nil, nil, err
+		}
+
+		factory := workinformers.NewSharedInformerFactoryWithOptions(
+			kubeWorkClientSet,
+			5*time.Minute,
+			workinformers.WithNamespace(o.agentOptions.SpokeClusterName),
+		)
+		informer := factory.Work().V1().ManifestWorks()
+
+		return config.Host, kubeWorkClientSet.WorkV1().ManifestWorks(o.agentOptions.SpokeClusterName), informer, nil
+	}
+
+	// For cloudevents drivers, we build ManifestWork client that implements the
+	// ManifestWorkInterface and ManifestWork informer based on different driver configuration.
+	// Refer to Event Based Manifestwork proposal in enhancements repo to get more details.
+	hubHost, config, err := generic.NewConfigLoader(o.workOptions.WorkloadSourceDriver, o.workOptions.WorkloadSourceConfig).
+		LoadConfig()
+	if err != nil {
+		return "", nil, nil, err
+	}
+
+	clientHolder, informer, err := cloudeventswork.NewClientHolderBuilder(config).
+		WithClientID(o.workOptions.CloudEventsClientID).
+		WithInformerConfig(5*time.Minute, workinformers.WithNamespace(o.agentOptions.SpokeClusterName)).
+		WithClusterName(o.agentOptions.SpokeClusterName).
+		WithCodecs(buildCodecs(o.workOptions.CloudEventsClientCodecs, restMapper)...).
+		NewAgentClientHolderWithInformer(ctx)
+	if err != nil {
+		return "", nil, nil, err
+	}
+
+	return hubHost, clientHolder.ManifestWorks(o.agentOptions.SpokeClusterName), informer, err
 }

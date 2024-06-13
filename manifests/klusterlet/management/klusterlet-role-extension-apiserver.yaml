@@ -7,6 +7,12 @@ kind: Role
 metadata:
   name: open-cluster-management:management:{{ .KlusterletName }}:extension-apiserver
   namespace: kube-system
+  labels:
+    {{ if gt (len .Labels) 0 }}
+    {{ range $key, $value := .Labels }}
+    {{ $key }}: {{ $value }}
+    {{ end }}
+    {{ end }}
 rules:
 - apiGroups: [""]
   resources: ["configmaps"]

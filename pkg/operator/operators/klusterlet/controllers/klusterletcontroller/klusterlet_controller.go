@@ -54,6 +54,7 @@ type klusterletController struct {
 	controlPlaneNodeLabelSelector string
 	deploymentReplicas            int32
 	disableAddonNamespace         bool
+	enableSyncLabels              bool
 }
 
 type klusterletReconcile interface {
@@ -82,6 +83,7 @@ func NewKlusterletController(
 	controlPlaneNodeLabelSelector string,
 	deploymentReplicas int32,
 	disableAddonNamespace bool,
+	enableSyncLabels bool,
 	recorder events.Recorder) factory.Controller {
 	controller := &klusterletController{
 		kubeClient: kubeClient,
@@ -95,6 +97,7 @@ func NewKlusterletController(
 		controlPlaneNodeLabelSelector: controlPlaneNodeLabelSelector,
 		deploymentReplicas:            deploymentReplicas,
 		disableAddonNamespace:         disableAddonNamespace,
+		enableSyncLabels:              enableSyncLabels,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -166,6 +169,9 @@ type klusterletConfig struct {
 
 	// DisableAddonNamespace is the flag to disable the creationg of default addon namespace.
 	DisableAddonNamespace bool
+
+	// Labels of the agents are synced from klusterlet CR.
+	Labels map[string]string
 }
 
 func (n *klusterletController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
@@ -221,6 +227,10 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		ResourceRequirementResourceType: helpers.ResourceType(klusterlet),
 		ResourceRequirements:            resourceRequirements,
 		DisableAddonNamespace:           n.disableAddonNamespace,
+	}
+
+	if n.enableSyncLabels {
+		config.Labels = helpers.GetKlusterletAgentLabels(klusterlet)
 	}
 
 	managedClusterClients, err := n.managedClusterClientsBuilder.
@@ -318,17 +328,20 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			kubeVersion:           n.kubeVersion,
 			operatorNamespace:     n.operatorNamespace,
 			recorder:              controllerContext.Recorder(),
-			cache:                 n.cache},
+			cache:                 n.cache,
+			enableSyncLabels:      n.enableSyncLabels},
 		&managementReconcile{
 			kubeClient:        n.kubeClient,
 			operatorNamespace: n.operatorNamespace,
 			recorder:          controllerContext.Recorder(),
-			cache:             n.cache},
+			cache:             n.cache,
+			enableSyncLabels:  n.enableSyncLabels},
 		&runtimeReconcile{
 			managedClusterClients: managedClusterClients,
 			kubeClient:            n.kubeClient,
 			recorder:              controllerContext.Recorder(),
-			cache:                 n.cache},
+			cache:                 n.cache,
+			enableSyncLabels:      n.enableSyncLabels},
 		&namespaceReconcile{
 			managedClusterClients: managedClusterClients,
 		},
@@ -407,7 +420,7 @@ func getManagedKubeConfig(ctx context.Context, kubeClient kubernetes.Interface, 
 
 // syncPullSecret will sync pull secret from the sourceClient cluster to the targetClient cluster in desired namespace.
 func syncPullSecret(ctx context.Context, sourceClient, targetClient kubernetes.Interface,
-	klusterlet *operatorapiv1.Klusterlet, operatorNamespace, namespace string, recorder events.Recorder) error {
+	klusterlet *operatorapiv1.Klusterlet, operatorNamespace, namespace string, labels map[string]string, recorder events.Recorder) error {
 	_, _, err := helpers.SyncSecret(
 		ctx,
 		sourceClient.CoreV1(),
@@ -418,6 +431,7 @@ func syncPullSecret(ctx context.Context, sourceClient, targetClient kubernetes.I
 		namespace,
 		helpers.ImagePullSecret,
 		[]metav1.OwnerReference{},
+		labels,
 	)
 
 	if err != nil {

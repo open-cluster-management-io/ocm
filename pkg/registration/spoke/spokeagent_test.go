@@ -9,15 +9,23 @@ import (
 	"testing"
 	"time"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
+	ocmfeature "open-cluster-management.io/api/feature"
+
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
+
+func init() {
+	utilruntime.Must(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeRegistrationFeatureGates))
+}
 
 func TestValidate(t *testing.T) {
 	defaultCompletedOptions := NewSpokeAgentOptions()
@@ -26,6 +34,7 @@ func TestValidate(t *testing.T) {
 	cases := []struct {
 		name        string
 		options     *SpokeAgentOptions
+		pre         func()
 		expectedErr string
 	}{
 		{
@@ -76,9 +85,47 @@ func TestValidate(t *testing.T) {
 			},
 			expectedErr: "",
 		},
+		{
+			name: "MultipleHubs enabled, but bootstrapkubeconfigs is empty",
+			options: &SpokeAgentOptions{
+				HubKubeconfigSecret:         "hub-kubeconfig-secret",
+				ClusterHealthCheckPeriod:    1 * time.Minute,
+				MaxCustomClusterClaims:      20,
+				BootstrapKubeconfigs:        []string{},
+				ClientCertExpirationSeconds: 3600,
+			},
+			pre: func() {
+				_ = features.SpokeMutableFeatureGate.SetFromMap(map[string]bool{
+					string(ocmfeature.MultipleHubs): true,
+				})
+			},
+			expectedErr: "expect at least 2 bootstrap kubeconfigs",
+		},
+		{
+			name: "MultipleHubs enabled with 2 bootstrapkubeconfigs",
+			options: &SpokeAgentOptions{
+				HubKubeconfigSecret:      "hub-kubeconfig-secret",
+				ClusterHealthCheckPeriod: 1 * time.Minute,
+				MaxCustomClusterClaims:   20,
+				BootstrapKubeconfigs: []string{
+					"/spoke/bootstrap/kubeconfig-hub1",
+					"/spoke/bootstrap/kubeconfig-hub2",
+				},
+				ClientCertExpirationSeconds: 3600,
+			},
+			pre: func() {
+				_ = features.SpokeMutableFeatureGate.SetFromMap(map[string]bool{
+					string(ocmfeature.MultipleHubs): true,
+				})
+			},
+			expectedErr: "",
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			if c.pre != nil {
+				c.pre()
+			}
 			err := c.options.Validate()
 			testingcommon.AssertError(t, err, c.expectedErr)
 		})
@@ -209,6 +256,8 @@ func TestHasValidHubClientConfig(t *testing.T) {
 			if err := agentOpts.Complete(); err != nil {
 				t.Fatal(err)
 			}
+			cfg.currentBootstrapKubeConfig = cfg.registrationOption.BootstrapKubeconfig
+
 			valid, err := cfg.HasValidHubClientConfig(context.TODO())
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)

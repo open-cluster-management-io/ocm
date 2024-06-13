@@ -59,10 +59,16 @@ type managedReconcile struct {
 	kubeVersion           *version.Version
 	recorder              events.Recorder
 	cache                 resourceapply.ResourceCache
+	enableSyncLabels      bool
 }
 
 func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+	labels := map[string]string{}
+	if r.enableSyncLabels {
+		labels = helpers.GetKlusterletAgentLabels(klusterlet)
+	}
+
 	if !config.DisableAddonNamespace {
 		// For now, whether in Default or Hosted mode, the addons will be deployed on the managed cluster.
 		// sync image pull secret from management cluster to managed cluster for addon namespace
@@ -71,7 +77,7 @@ func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 		if err := ensureNamespace(
 			ctx,
 			r.managedClusterClients.kubeClient,
-			klusterlet, helpers.DefaultAddonNamespace, nil, r.recorder); err != nil {
+			klusterlet, helpers.DefaultAddonNamespace, labels, r.recorder); err != nil {
 			return klusterlet, reconcileStop, err
 		}
 
@@ -84,15 +90,14 @@ func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 			ctx,
 			r.kubeClient,
 			r.managedClusterClients.kubeClient,
-			klusterlet, r.operatorNamespace, helpers.DefaultAddonNamespace, r.recorder); err != nil {
+			klusterlet, r.operatorNamespace, helpers.DefaultAddonNamespace, labels, r.recorder); err != nil {
 			return klusterlet, reconcileStop, err
 		}
 	}
 
+	labels[klusterletNamespaceLabelKey] = klusterlet.Name
 	if err := ensureNamespace(
-		ctx, r.managedClusterClients.kubeClient, klusterlet, config.KlusterletNamespace, map[string]string{
-			klusterletNamespaceLabelKey: klusterlet.Name,
-		}, r.recorder); err != nil {
+		ctx, r.managedClusterClients.kubeClient, klusterlet, config.KlusterletNamespace, labels, r.recorder); err != nil {
 		return klusterlet, reconcileStop, err
 	}
 
@@ -163,6 +168,9 @@ func (r *managedReconcile) createAggregationRule(ctx context.Context, klusterlet
 				},
 			},
 			Rules: []rbacv1.PolicyRule{},
+		}
+		if r.enableSyncLabels {
+			aggregateClusterRole.SetLabels(helpers.GetKlusterletAgentLabels(klusterlet))
 		}
 		_, createErr := r.managedClusterClients.kubeClient.RbacV1().ClusterRoles().Create(ctx, aggregateClusterRole, metav1.CreateOptions{})
 		return createErr

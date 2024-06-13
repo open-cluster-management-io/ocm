@@ -341,13 +341,14 @@ func ensureSAKubeconfigs(ctx context.Context, clusterManagerName, clusterManager
 	hubKubeConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder,
 	mwctrEnabled, addonManagerEnabled bool) error {
 	for _, sa := range getSAs(mwctrEnabled, addonManagerEnabled) {
-		tokenGetter := helpers.SATokenCreater(ctx, sa, clusterManagerNamespace, hubClient)
-		err := helpers.SyncKubeConfigSecret(ctx, sa+"-kubeconfig", clusterManagerNamespace, "/var/run/secrets/hub/kubeconfig", &rest.Config{
-			Host: hubKubeConfig.Host,
-			TLSClientConfig: rest.TLSClientConfig{
-				CAData: hubKubeConfig.CAData,
-			},
-		}, managementClient.CoreV1(), tokenGetter, recorder)
+		tokenGetter := helpers.SATokenGetter(ctx, sa, clusterManagerNamespace, hubClient)
+		err := helpers.SyncKubeConfigSecret(ctx, sa+"-kubeconfig", clusterManagerNamespace,
+			"/var/run/secrets/hub/kubeconfig", &rest.Config{
+				Host: hubKubeConfig.Host,
+				TLSClientConfig: rest.TLSClientConfig{
+					CAData: hubKubeConfig.CAData,
+				},
+			}, managementClient.CoreV1(), tokenGetter, recorder, nil)
 		if err != nil {
 			return err
 		}

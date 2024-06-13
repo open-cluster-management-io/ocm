@@ -203,11 +203,23 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 	assertClientCertCondition := func(clusterName, addonName string) {
 		ginkgo.By("Check clientcert addon status condition")
 		gomega.Eventually(func() bool {
-			addon, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+			addon, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).
+				Get(context.TODO(), addonName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
 			return meta.IsStatusConditionTrue(addon.Status.Conditions, clientcert.ClusterCertificateRotatedCondition)
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+	}
+	assertClientCertConditionFalse := func(clusterName, addonName string) {
+		ginkgo.By("Check if clientcert addon status condition is false")
+		gomega.Eventually(func() bool {
+			addon, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).
+				Get(context.TODO(), addonName, metav1.GetOptions{})
+			if err != nil {
+				return false
+			}
+			return meta.IsStatusConditionFalse(addon.Status.Conditions, clientcert.ClusterCertificateRotatedCondition)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	}
 
@@ -227,7 +239,28 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	}
 
-	assertSuccessAddOnBootstrap := func(signerName string) {
+	assertAddOnSignerUpdate := func(signerName string) {
+		gomega.Eventually(func() error {
+			addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
+				Get(context.TODO(), addOnName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			addOn.Status = addonv1alpha1.ManagedClusterAddOnStatus{
+				Registrations: []addonv1alpha1.RegistrationConfig{
+					{
+						SignerName: signerName,
+					},
+				},
+			}
+			_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
+				UpdateStatus(context.TODO(), addOn, metav1.UpdateOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+	}
+
+	assertSuccessAddOnEnabling := func() {
 		ginkgo.By("Create ManagedClusterAddOn cr with required annotations")
 		// create addon namespace
 		ns := &corev1.Namespace{
@@ -251,18 +284,13 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		created, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+		_, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		created.Status = addonv1alpha1.ManagedClusterAddOnStatus{
-			Registrations: []addonv1alpha1.RegistrationConfig{
-				{
-					SignerName: signerName,
-				},
-			},
-		}
-		_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.TODO(), created, metav1.UpdateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	}
 
+	assertSuccessAddOnBootstrap := func(signerName string) {
+		assertSuccessAddOnEnabling()
+		assertAddOnSignerUpdate(signerName)
 		assertSuccessCSRApproval()
 		assertValidClientCertificate(addOnName, getSecretName(addOnName, signerName), signerName, expectedProxyURL)
 		assertAddonLabel(managedClusterName, addOnName, "unreachable")
@@ -362,6 +390,20 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			assertSuccessClusterBootstrap()
 			signerName := "example.com/signer1"
 			assertSuccessAddOnBootstrap(signerName)
+		})
+
+		ginkgo.It("should register addon failed with invalid custom signer", func() {
+			assertSuccessClusterBootstrap()
+			assertSuccessAddOnEnabling()
+			assertAddOnSignerUpdate("addon-xxx")
+			assertClientCertConditionFalse(managedClusterName, addOnName)
+
+			signerName := "example.com/signer1"
+			assertAddOnSignerUpdate(signerName)
+			assertSuccessCSRApproval()
+			assertValidClientCertificate(addOnName, getSecretName(addOnName, signerName), signerName, expectedProxyURL)
+			assertAddonLabel(managedClusterName, addOnName, "unreachable")
+			assertClientCertCondition(managedClusterName, addOnName)
 		})
 
 		ginkgo.It("should addon registraton config updated successfully", func() {

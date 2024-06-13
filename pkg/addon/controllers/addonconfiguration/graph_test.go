@@ -228,7 +228,7 @@ func TestConfigurationGraph(t *testing.T) {
 				}, []metav1.Condition{
 					{
 						Type:               addonv1alpha1.ManagedClusterAddOnConditionProgressing,
-						Reason:             addonv1alpha1.ProgressingReasonUpgradeFailed,
+						Reason:             addonv1alpha1.ProgressingReasonFailed,
 						LastTransitionTime: fakeTime,
 					},
 				}),
@@ -245,7 +245,7 @@ func TestConfigurationGraph(t *testing.T) {
 				}, []metav1.Condition{
 					{
 						Type:               addonv1alpha1.ManagedClusterAddOnConditionProgressing,
-						Reason:             addonv1alpha1.ProgressingReasonUpgrading,
+						Reason:             addonv1alpha1.ProgressingReasonProgressing,
 						LastTransitionTime: fakeTime,
 					},
 				}),
@@ -266,7 +266,7 @@ func TestConfigurationGraph(t *testing.T) {
 				}, []metav1.Condition{
 					{
 						Type:               addonv1alpha1.ManagedClusterAddOnConditionProgressing,
-						Reason:             addonv1alpha1.ProgressingReasonUpgradeSucceed,
+						Reason:             addonv1alpha1.ProgressingReasonCompleted,
 						LastTransitionTime: fakeTime,
 					},
 				}),
@@ -287,7 +287,7 @@ func TestConfigurationGraph(t *testing.T) {
 				}, []metav1.Condition{
 					{
 						Type:               addonv1alpha1.ManagedClusterAddOnConditionProgressing,
-						Reason:             addonv1alpha1.ProgressingReasonUpgradeSucceed,
+						Reason:             addonv1alpha1.ProgressingReasonCompleted,
 						LastTransitionTime: fakeTime,
 					},
 				}),

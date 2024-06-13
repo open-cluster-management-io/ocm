@@ -23,6 +23,9 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     steps:
+      - name: add permisson to docker.sock
+        run: sudo chown runner:docker /var/run/docker.sock
+        if: ${{ env.ACT }} # this step only runs locally when using the https://github.com/nektos/act to debug the e2e
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Go
@@ -32,7 +35,7 @@ jobs:
       - name: Setup kind
         uses: engineerd/setup-kind@v0.5.0
         with:
-          version: v0.17.0
+          version: v0.22.0
       - name: install imagebuilder
         run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
       - name: Build images
@@ -52,6 +55,9 @@ jobs:
   e2e-hosted:
     runs-on: ubuntu-latest
     steps:
+      - name: add permisson to docker.sock
+        run: sudo chown runner:docker /var/run/docker.sock
+        if: ${{ env.ACT }} # this step only runs locally when using the https://github.com/nektos/act to debug the e2e
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Go
@@ -61,7 +67,7 @@ jobs:
       - name: Setup kind
         uses: engineerd/setup-kind@v0.5.0
         with:
-          version: v0.17.0
+          version: v0.22.0
       - name: install imagebuilder
         run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
       - name: Build images
@@ -81,6 +87,9 @@ jobs:
   e2e-singleton:
     runs-on: ubuntu-latest
     steps:
+      - name: add permisson to docker.sock
+        run: sudo chown runner:docker /var/run/docker.sock
+        if: ${{ env.ACT }} # this step only runs locally when using the https://github.com/nektos/act to debug the e2e
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Go
@@ -90,7 +99,7 @@ jobs:
       - name: Setup kind
         uses: engineerd/setup-kind@v0.5.0
         with:
-          version: v0.17.0
+          version: v0.22.0
       - name: install imagebuilder
         run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
       - name: Build images

@@ -6,15 +6,18 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/clientcmd"
 
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
+	workv1informer "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	workapplier "open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
-	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/work"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/codec"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/store"
 
 	"open-cluster-management.io/ocm/pkg/work/hub/controllers/manifestworkreplicasetcontroller"
 )
@@ -48,17 +51,6 @@ func (c *WorkHubManagerConfig) RunWorkHubManager(ctx context.Context, controller
 		return err
 	}
 
-	// To support sending ManifestWorks to different drivers (like the Kubernetes apiserver or MQTT broker), we build
-	// ManifestWork client that implements the ManifestWorkInterface and ManifestWork informer based on different
-	// driver configuration.
-	// Refer to Event Based Manifestwork proposal in enhancements repo to get more details.
-	_, config, err := generic.NewConfigLoader(c.workOptions.WorkDriver, c.workOptions.WorkDriverConfig).
-		WithKubeConfig(controllerContext.KubeConfig).
-		LoadConfig()
-	if err != nil {
-		return err
-	}
-
 	// we need a separated filtered manifestwork informers so we only watch the manifestworks that manifestworkreplicaset cares.
 	// This could reduce a lot of memory consumptions
 	workInformOption := workinformers.WithTweakListOptions(
@@ -75,35 +67,82 @@ func (c *WorkHubManagerConfig) RunWorkHubManager(ctx context.Context, controller
 		},
 	)
 
-	clientHolder, err := cloudeventswork.NewClientHolderBuilder(config).
-		WithClientID(c.workOptions.CloudEventsClientID).
-		WithSourceID(sourceID).
-		WithInformerConfig(30*time.Minute, workInformOption).
-		WithCodecs(codec.NewManifestBundleCodec()).
-		NewSourceClientHolder(ctx)
-	if err != nil {
-		return err
+	var workClient workclientset.Interface
+	var watcherStore *store.InformerWatcherStore
+
+	if c.workOptions.WorkDriver == "kube" {
+		config := controllerContext.KubeConfig
+		if c.workOptions.WorkDriverConfig != "" {
+			config, err = clientcmd.BuildConfigFromFlags("", c.workOptions.WorkDriverConfig)
+			if err != nil {
+				return err
+			}
+		}
+
+		workClient, err = workclientset.NewForConfig(config)
+		if err != nil {
+			return err
+		}
+	} else {
+		// For cloudevents drivers, we build ManifestWork client that implements the
+		// ManifestWorkInterface and ManifestWork informer based on different driver configuration.
+		// Refer to Event Based Manifestwork proposal in enhancements repo to get more details.
+
+		watcherStore = store.NewInformerWatcherStore(ctx)
+
+		_, config, err := generic.NewConfigLoader(c.workOptions.WorkDriver, c.workOptions.WorkDriverConfig).
+			LoadConfig()
+		if err != nil {
+			return err
+		}
+
+		clientHolder, err := work.NewClientHolderBuilder(config).
+			WithClientID(c.workOptions.CloudEventsClientID).
+			WithSourceID(sourceID).
+			WithCodecs(codec.NewManifestBundleCodec()).
+			WithWorkClientWatcherStore(watcherStore).
+			NewSourceClientHolder(ctx)
+		if err != nil {
+			return err
+		}
+
+		workClient = clientHolder.WorkInterface()
 	}
 
-	return RunControllerManagerWithInformers(ctx, controllerContext, replicaSetsClient, clientHolder, clusterInformerFactory)
+	factory := workinformers.NewSharedInformerFactoryWithOptions(workClient, 30*time.Minute, workInformOption)
+	informer := factory.Work().V1().ManifestWorks()
+
+	// For cloudevents work client, we use the informer store as the client store
+	if watcherStore != nil {
+		watcherStore.SetStore(informer.Informer().GetStore())
+	}
+
+	return RunControllerManagerWithInformers(
+		ctx,
+		controllerContext,
+		replicaSetsClient,
+		workClient,
+		informer,
+		clusterInformerFactory,
+	)
 }
 
 func RunControllerManagerWithInformers(
 	ctx context.Context,
 	controllerContext *controllercmd.ControllerContext,
 	replicaSetClient workclientset.Interface,
-	hubWorkClientHolder *cloudeventswork.ClientHolder,
+	workClient workclientset.Interface,
+	workInformer workv1informer.ManifestWorkInformer,
 	clusterInformers clusterinformers.SharedInformerFactory,
 ) error {
 	replicaSetInformerFactory := workinformers.NewSharedInformerFactory(replicaSetClient, 30*time.Minute)
-	hubWorkInformer := hubWorkClientHolder.ManifestWorkInformer()
 
 	manifestWorkReplicaSetController := manifestworkreplicasetcontroller.NewManifestWorkReplicaSetController(
 		controllerContext.EventRecorder,
 		replicaSetClient,
-		workapplier.NewWorkApplierWithTypedClient(hubWorkClientHolder.WorkInterface(), hubWorkInformer.Lister()),
+		workapplier.NewWorkApplierWithTypedClient(workClient, workInformer.Lister()),
 		replicaSetInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets(),
-		hubWorkInformer,
+		workInformer,
 		clusterInformers.Cluster().V1beta1().Placements(),
 		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
 	)
@@ -112,7 +151,7 @@ func RunControllerManagerWithInformers(
 	go replicaSetInformerFactory.Start(ctx.Done())
 	go manifestWorkReplicaSetController.Run(ctx, 5)
 
-	go hubWorkInformer.Informer().Run(ctx.Done())
+	go workInformer.Informer().Run(ctx.Done())
 
 	<-ctx.Done()
 	return nil

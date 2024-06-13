@@ -132,11 +132,15 @@ spec:
                           format: int32
                           default: 600
                           minimum: 180
-                        secretNames:
-                          description: SecretNames is a list of secret names. The secrets are in the same namespace where the agent controller runs.
+                        kubeConfigSecrets:
+                          description: KubeConfigSecrets is a list of secret names. The secrets are in the same namespace where the agent controller runs.
                           type: array
                           items:
-                            type: string
+                            type: object
+                            properties:
+                              name:
+                                description: Name is the name of the secret.
+                                type: string
                     type:
                       description: Type specifies the type of priority bootstrap kubeconfigs. By default, it is set to None, representing no priority bootstrap kubeconfigs are set.
                       type: string

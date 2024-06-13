@@ -162,8 +162,9 @@ type UpdateStrategy struct {
 	// ServerSideApply type means to update resource using server side apply with work-controller as the field manager.
 	// If there is conflict, the related Applied condition of manifest will be in the status of False with the
 	// reason of ApplyConflict.
+	// ReadOnly type means the agent will only check the existence of the resource based on its metadata.
 	// +kubebuilder:default=Update
-	// +kubebuilder:validation:Enum=Update;CreateOnly;ServerSideApply
+	// +kubebuilder:validation:Enum=Update;CreateOnly;ServerSideApply;ReadOnly
 	// +kubebuilder:validation:Required
 	// +required
 	Type UpdateStrategyType `json:"type,omitempty"`
@@ -177,18 +178,23 @@ type UpdateStrategy struct {
 type UpdateStrategyType string
 
 const (
-	// Update type means to update resource by an update call.
+	// UpdateStrategyTypeUpdate means to update resource by an update call.
 	UpdateStrategyTypeUpdate UpdateStrategyType = "Update"
 
-	// CreateOnly type means do not update resource based on current manifest. This should be used only when
+	// UpdateStrategyTypeCreateOnly means do not update resource based on current manifest. This should be used only when
 	// ServerSideApply type is not support on the spoke, and the user on hub would like some other controller
 	// on the spoke to own the control of the resource.
 	UpdateStrategyTypeCreateOnly UpdateStrategyType = "CreateOnly"
 
-	// ServerSideApply type means to update resource using server side apply with work-controller as the field manager.
+	// UpdateStrategyTypeServerSideApply means to update resource using server side apply with work-controller as the field manager.
 	// If there is conflict, the related Applied condition of manifest will be in the status of False with the
 	// reason of ApplyConflict. This type allows another controller on the spoke to control certain field of the resource.
 	UpdateStrategyTypeServerSideApply UpdateStrategyType = "ServerSideApply"
+
+	// UpdateStrategyTypeReadOnly type means only check the existence of the resource based on the resource's metadata.
+	// If the statusFeedBackRules are set, the feedbackResult will also be returned.
+	// The resource will not be removed when the type is ReadOnly, and only resource metadata is required.
+	UpdateStrategyTypeReadOnly UpdateStrategyType = "ReadOnly"
 )
 
 type ServerSideApplyConfig struct {

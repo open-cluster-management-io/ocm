@@ -315,7 +315,8 @@ func TestAgentInstallNamespace(t *testing.T) {
 		addonDeploymentConfig      *addonapiv1alpha1.AddOnDeploymentConfig
 		managedClusterAddonBuilder *testManagedClusterAddOnBuilder
 
-		expected string
+		expected    string
+		expectedErr string
 	}{
 		{
 			name: "install namespace is set",
@@ -399,6 +400,32 @@ func TestAgentInstallNamespace(t *testing.T) {
 				},
 			),
 			expected: "test-ns",
+		},
+		{
+			name: "has deployment in the template, addon status config references is not set",
+			addonTemplate: &addonapiv1alpha1.AddOnTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "hello-template",
+				},
+				Spec: addonapiv1alpha1.AddOnTemplateSpec{
+					AgentSpec: workapiv1.ManifestWorkSpec{
+						Workload: workapiv1.ManifestsTemplate{
+							Manifests: []workapiv1.Manifest{
+								{RawExtension: runtime.RawExtension{Raw: deploymentRaw}},
+							},
+						},
+					},
+				},
+			},
+			managedClusterAddonBuilder: newManagedClusterAddonBuilder(
+				&addonapiv1alpha1.ManagedClusterAddOn{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      addonName,
+						Namespace: clusterName,
+					},
+				},
+			).withSetStatusConfigReferences(false),
+			expectedErr: fmt.Sprintf("addon %s template not found in status", addonName),
 		},
 		{
 			name: "override deployment in the template",
@@ -487,10 +514,12 @@ func TestAgentInstallNamespace(t *testing.T) {
 			)
 
 			ns, err := agentAddon.GetAgentAddonOptions().Registration.AgentInstallNamespace(managedClusterAddon)
-			if err != nil {
-				t.Fatal(err)
+			if err == nil {
+				assert.Equal(t, tc.expected, ns, tc.name)
+			} else if tc.expectedErr != err.Error() {
+				t.Fatalf("Expected error %v, but got %v", tc.expectedErr, err)
 			}
-			assert.Equal(t, tc.expected, ns, tc.name)
+
 		})
 	}
 }
@@ -659,14 +688,16 @@ func TestAgentManifestConfigs(t *testing.T) {
 }
 
 type testManagedClusterAddOnBuilder struct {
-	managedClusterAddOn   *addonapiv1alpha1.ManagedClusterAddOn
-	addonTemplate         *addonapiv1alpha1.AddOnTemplate
-	addonDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
+	managedClusterAddOn       *addonapiv1alpha1.ManagedClusterAddOn
+	addonTemplate             *addonapiv1alpha1.AddOnTemplate
+	addonDeploymentConfig     *addonapiv1alpha1.AddOnDeploymentConfig
+	setStatusConfigReferences bool
 }
 
 func newManagedClusterAddonBuilder(mca *addonapiv1alpha1.ManagedClusterAddOn) *testManagedClusterAddOnBuilder {
 	return &testManagedClusterAddOnBuilder{
-		managedClusterAddOn: mca,
+		managedClusterAddOn:       mca,
+		setStatusConfigReferences: true,
 	}
 }
 
@@ -679,6 +710,11 @@ func (b *testManagedClusterAddOnBuilder) withAddonTemplate(
 func (b *testManagedClusterAddOnBuilder) withAddonDeploymentConfig(
 	adc *addonapiv1alpha1.AddOnDeploymentConfig) *testManagedClusterAddOnBuilder {
 	b.addonDeploymentConfig = adc
+	return b
+}
+
+func (b *testManagedClusterAddOnBuilder) withSetStatusConfigReferences(set bool) *testManagedClusterAddOnBuilder {
+	b.setStatusConfigReferences = set
 	return b
 }
 
@@ -702,7 +738,11 @@ func (b *testManagedClusterAddOnBuilder) build() *addonapiv1alpha1.ManagedCluste
 				SpecHash: hash,
 			},
 		}
-		b.managedClusterAddOn.Status.ConfigReferences = append(b.managedClusterAddOn.Status.ConfigReferences, configReference)
+		if b.setStatusConfigReferences {
+			b.managedClusterAddOn.Status.ConfigReferences = append(
+				b.managedClusterAddOn.Status.ConfigReferences, configReference)
+		}
+
 		b.managedClusterAddOn.Spec.Configs = append(b.managedClusterAddOn.Spec.Configs,
 			addonapiv1alpha1.AddOnConfig{
 				ConfigGroupResource: configReference.ConfigGroupResource,
@@ -727,7 +767,10 @@ func (b *testManagedClusterAddOnBuilder) build() *addonapiv1alpha1.ManagedCluste
 				SpecHash: hash,
 			},
 		}
-		b.managedClusterAddOn.Status.ConfigReferences = append(b.managedClusterAddOn.Status.ConfigReferences, configReference)
+		if b.setStatusConfigReferences {
+			b.managedClusterAddOn.Status.ConfigReferences = append(
+				b.managedClusterAddOn.Status.ConfigReferences, configReference)
+		}
 		b.managedClusterAddOn.Spec.Configs = append(b.managedClusterAddOn.Spec.Configs,
 			addonapiv1alpha1.AddOnConfig{
 				ConfigGroupResource: configReference.ConfigGroupResource,

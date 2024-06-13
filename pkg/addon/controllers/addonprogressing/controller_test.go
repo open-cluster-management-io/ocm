@@ -101,7 +101,7 @@ func TestReconcile(t *testing.T) {
 					t.Fatal(err)
 				}
 				configCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing)
-				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonInstalling && configCond.Status == metav1.ConditionTrue) {
+				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonProgressing && configCond.Status == metav1.ConditionTrue) {
 					t.Errorf("Condition Progressing is incorrect")
 				}
 			},
@@ -168,7 +168,7 @@ func TestReconcile(t *testing.T) {
 					t.Fatal(err)
 				}
 				configCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing)
-				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonInstalling && configCond.Status == metav1.ConditionTrue) {
+				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonProgressing && configCond.Status == metav1.ConditionTrue) {
 					t.Errorf("Condition Progressing is incorrect")
 				}
 				if len(addOn.Status.ConfigReferences) != 0 {
@@ -238,7 +238,7 @@ func TestReconcile(t *testing.T) {
 					t.Fatal(err)
 				}
 				configCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing)
-				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonInstalling && configCond.Status == metav1.ConditionTrue) {
+				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonProgressing && configCond.Status == metav1.ConditionTrue) {
 					t.Errorf("Condition Progressing is incorrect")
 				}
 				if len(addOn.Status.ConfigReferences) != 0 {
@@ -308,7 +308,7 @@ func TestReconcile(t *testing.T) {
 					t.Fatal(err)
 				}
 				configCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing)
-				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonUpgrading && configCond.Status == metav1.ConditionTrue) {
+				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonProgressing && configCond.Status == metav1.ConditionTrue) {
 					t.Errorf("Condition Progressing is incorrect")
 				}
 				if len(addOn.Status.ConfigReferences) != 0 {
@@ -378,7 +378,7 @@ func TestReconcile(t *testing.T) {
 					t.Fatal(err)
 				}
 				configCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing)
-				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonUpgrading && configCond.Status == metav1.ConditionTrue) {
+				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonProgressing && configCond.Status == metav1.ConditionTrue) {
 					t.Errorf("Condition Progressing is incorrect")
 				}
 				if len(addOn.Status.ConfigReferences) != 0 {
@@ -448,7 +448,7 @@ func TestReconcile(t *testing.T) {
 					t.Fatal(err)
 				}
 				configCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing)
-				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonInstallSucceed && configCond.Status == metav1.ConditionFalse) {
+				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonCompleted && configCond.Status == metav1.ConditionFalse) {
 					t.Errorf("Condition Progressing is incorrect")
 				}
 				if len(addOn.Status.ConfigReferences) != 1 {
@@ -521,7 +521,89 @@ func TestReconcile(t *testing.T) {
 					t.Fatal(err)
 				}
 				configCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing)
-				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonUpgradeSucceed && configCond.Status == metav1.ConditionFalse) {
+				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonCompleted && configCond.Status == metav1.ConditionFalse) {
+					t.Errorf("Condition Progressing is incorrect")
+				}
+				if len(addOn.Status.ConfigReferences) != 1 {
+					t.Errorf("ConfigReferences object is not correct: %v", addOn.Status.ConfigReferences)
+				}
+				if addOn.Status.ConfigReferences[0].LastAppliedConfig.SpecHash != addOn.Status.ConfigReferences[0].DesiredConfig.SpecHash {
+					t.Errorf("LastAppliedConfig object is not correct: %v", addOn.Status.ConfigReferences[0].LastAppliedConfig.SpecHash)
+				}
+			},
+		},
+		{
+			name:    "works for hosted and default addon in the same namespace",
+			syncKey: "cluster1/test",
+			managedClusteraddon: []runtime.Object{func() *addonapiv1alpha1.ManagedClusterAddOn {
+				addon := addontesting.NewAddon("test", "cluster1")
+				addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					{
+						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "foo"},
+						DesiredConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test", Namespace: "open-cluster-management"},
+							SpecHash:       "hashnew",
+						},
+						LastAppliedConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test", Namespace: "open-cluster-management"},
+							SpecHash:       "hash",
+						},
+					},
+				}
+				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnManifestApplied,
+					Status:  metav1.ConditionTrue,
+					Reason:  addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied,
+					Message: "manifests of addon are applied successfully",
+				})
+				return addon
+			}()},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").Build()},
+			work: func() []runtime.Object {
+				work := addontesting.NewManifestWork(
+					"addon-test-deploy",
+					"cluster1",
+					testingcommon.NewUnstructured("v1", "ConfigMap", "default", "test1"),
+					testingcommon.NewUnstructured("v1", "Deployment", "default", "test1"),
+				)
+				work.SetLabels(map[string]string{
+					addonapiv1alpha1.AddonLabelKey: "test",
+				})
+				work.SetAnnotations(map[string]string{
+					workapiv1.ManifestConfigSpecHashAnnotationKey: "{\"foo.core/open-cluster-management/test\":\"hashnew\"}",
+				})
+				work.Status.Conditions = []metav1.Condition{
+					{
+						Type:   workapiv1.WorkApplied,
+						Status: metav1.ConditionTrue,
+					},
+					{
+						Type:   workapiv1.WorkAvailable,
+						Status: metav1.ConditionTrue,
+					},
+				}
+				hostedWork := addontesting.NewManifestWork(
+					"addon-test-deploy-hosting-another-cluster",
+					"cluster1",
+					testingcommon.NewUnstructured("v1", "ConfigMap", "default", "test1"),
+				)
+				hostedWork.SetLabels(map[string]string{
+					addonapiv1alpha1.AddonLabelKey:          "test",
+					addonapiv1alpha1.AddonNamespaceLabelKey: "another-cluster",
+				})
+				return []runtime.Object{work, hostedWork}
+			}(),
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				actual := actions[0].(clienttesting.PatchActionImpl).Patch
+
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(actual, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				configCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing)
+				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonCompleted && configCond.Status == metav1.ConditionFalse) {
 					t.Errorf("Condition Progressing is incorrect")
 				}
 				if len(addOn.Status.ConfigReferences) != 1 {
@@ -736,7 +818,7 @@ func TestReconcileHostedAddons(t *testing.T) {
 				configCond := meta.FindStatusCondition(
 					addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing)
 				if !(configCond != nil &&
-					configCond.Reason == addonapiv1alpha1.ProgressingReasonInstalling &&
+					configCond.Reason == addonapiv1alpha1.ProgressingReasonProgressing &&
 					configCond.Status == metav1.ConditionTrue) {
 					t.Errorf("Condition Progressing is incorrect")
 				}
@@ -818,7 +900,7 @@ func TestReconcileHostedAddons(t *testing.T) {
 				configCond := meta.FindStatusCondition(
 					addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing)
 				if !(configCond != nil &&
-					configCond.Reason == addonapiv1alpha1.ProgressingReasonInstalling &&
+					configCond.Reason == addonapiv1alpha1.ProgressingReasonProgressing &&
 					configCond.Status == metav1.ConditionTrue) {
 					t.Errorf("Condition Progressing is incorrect")
 				}
@@ -899,7 +981,7 @@ func TestReconcileHostedAddons(t *testing.T) {
 					t.Fatal(err)
 				}
 				configCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing)
-				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonInstalling && configCond.Status == metav1.ConditionTrue) {
+				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonProgressing && configCond.Status == metav1.ConditionTrue) {
 					t.Errorf("Condition Progressing is incorrect")
 				}
 				if len(addOn.Status.ConfigReferences) != 0 {
@@ -981,7 +1063,7 @@ func TestReconcileHostedAddons(t *testing.T) {
 				configCond := meta.FindStatusCondition(
 					addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing)
 				if !(configCond != nil &&
-					configCond.Reason == addonapiv1alpha1.ProgressingReasonUpgrading &&
+					configCond.Reason == addonapiv1alpha1.ProgressingReasonProgressing &&
 					configCond.Status == metav1.ConditionTrue) {
 					t.Errorf("Condition Progressing is incorrect")
 				}
@@ -1064,7 +1146,7 @@ func TestReconcileHostedAddons(t *testing.T) {
 				configCond := meta.FindStatusCondition(
 					addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing)
 				if !(configCond != nil &&
-					configCond.Reason == addonapiv1alpha1.ProgressingReasonUpgrading &&
+					configCond.Reason == addonapiv1alpha1.ProgressingReasonProgressing &&
 					configCond.Status == metav1.ConditionTrue) {
 					t.Errorf("Condition Progressing is incorrect")
 				}
@@ -1147,7 +1229,7 @@ func TestReconcileHostedAddons(t *testing.T) {
 				configCond := meta.FindStatusCondition(
 					addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing)
 				if !(configCond != nil &&
-					configCond.Reason == addonapiv1alpha1.ProgressingReasonInstallSucceed &&
+					configCond.Reason == addonapiv1alpha1.ProgressingReasonCompleted &&
 					configCond.Status == metav1.ConditionFalse) {
 					t.Errorf("Condition Progressing is incorrect")
 				}
@@ -1235,7 +1317,7 @@ func TestReconcileHostedAddons(t *testing.T) {
 				configCond := meta.FindStatusCondition(
 					addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing)
 				if !(configCond != nil &&
-					configCond.Reason == addonapiv1alpha1.ProgressingReasonUpgradeSucceed &&
+					configCond.Reason == addonapiv1alpha1.ProgressingReasonCompleted &&
 					configCond.Status == metav1.ConditionFalse) {
 					t.Errorf("Condition Progressing is incorrect")
 				}

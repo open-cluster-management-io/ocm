@@ -52,6 +52,9 @@ const (
 
 	// DefaultAddonNamespace is the default namespace for agent addon
 	DefaultAddonNamespace = "open-cluster-management-agent-addon"
+
+	// AgentLabelKey is used to filter resources in informers
+	AgentLabelKey = "createdByKlusterlet"
 )
 
 const (
@@ -666,7 +669,7 @@ func AgentPriorityClassName(klusterlet *operatorapiv1.Klusterlet, kubeVersion *v
 // https://github.com/openshift/library-go/blob/d9cdfbd844ea08465b938c46a16bed2ea23207e4/pkg/operator/resource/resourceapply/core.go#L357,
 // add an addition targetClient parameter to support sync secret to another cluster.
 func SyncSecret(ctx context.Context, client, targetClient coreclientv1.SecretsGetter, recorder events.Recorder,
-	sourceNamespace, sourceName, targetNamespace, targetName string, ownerRefs []metav1.OwnerReference) (*corev1.Secret, bool, error) {
+	sourceNamespace, sourceName, targetNamespace, targetName string, ownerRefs []metav1.OwnerReference, labels map[string]string) (*corev1.Secret, bool, error) {
 	source, err := client.Secrets(sourceNamespace).Get(ctx, sourceName, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
@@ -707,6 +710,7 @@ func SyncSecret(ctx context.Context, client, targetClient coreclientv1.SecretsGe
 		source.Name = targetName
 		source.ResourceVersion = ""
 		source.OwnerReferences = ownerRefs
+		source.Labels = labels
 		return resourceapply.ApplySecret(ctx, targetClient, recorder, source)
 	}
 }
@@ -820,4 +824,25 @@ func GetOperatorNamespace() string {
 		operatorNamespace = string(nsBytes)
 	}
 	return operatorNamespace
+}
+
+func GetKlusterletAgentLabels(klusterlet *operatorapiv1.Klusterlet) map[string]string {
+	labels := klusterlet.GetLabels()
+	if labels == nil {
+		labels = map[string]string{}
+	}
+
+	// This label key is used to filter resources in deployment informer
+	labels[AgentLabelKey] = klusterlet.GetName()
+
+	return labels
+}
+
+func MapCompare(required, existing map[string]string) bool {
+	for k, v := range required {
+		if existing[k] != v {
+			return false
+		}
+	}
+	return true
 }

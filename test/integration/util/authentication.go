@@ -19,6 +19,7 @@ import (
 	certificates "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -287,6 +288,92 @@ func (t *TestAuthn) CreateBootstrapKubeConfig(configFileName, serverCertFile, se
 	}
 
 	return clientcmd.WriteToFile(*config, configFileName)
+}
+
+func GetBootstrapKubeConfigData(filePath string) (map[string][]byte, error) {
+	bootstrapKubeconfigDir := path.Dir(filePath)
+	files, err := os.ReadDir(bootstrapKubeconfigDir)
+	if err != nil {
+		return nil, err
+	}
+
+	data := map[string][]byte{}
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		filePath := path.Join(bootstrapKubeconfigDir, file.Name())
+		fileData, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, err
+		}
+		data[file.Name()] = fileData
+	}
+
+	return data, nil
+}
+
+func SyncBootstrapKubeConfigFilesToSecret(
+	filePath, secretNS, secretName string,
+	kubeClient kubernetes.Interface) error {
+	data, err := GetBootstrapKubeConfigData(filePath)
+	if err != nil {
+		return err
+	}
+
+	secret, err := kubeClient.CoreV1().Secrets(secretNS).Get(context.Background(), secretName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		secret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: secretNS,
+			},
+			Data: data,
+		}
+		_, err = kubeClient.CoreV1().Secrets(secretNS).Create(context.Background(), secret, metav1.CreateOptions{})
+		if err != nil {
+			return err
+		}
+	}
+	if err != nil {
+		return err
+	}
+
+	if reflect.DeepEqual(secret.Data, data) {
+		return nil
+	}
+	secretCopy := secret.DeepCopy()
+	secretCopy.Data = data
+	_, err = kubeClient.CoreV1().Secrets(secretNS).Update(context.Background(), secretCopy, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func SyncBootstrapKubeConfigSecretToFiles(
+	filePath, secretNS, secretName string,
+	kubeClient kubernetes.Interface) error {
+	secret, err := kubeClient.CoreV1().Secrets(secretNS).Get(context.Background(), secretName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	dir := path.Dir(filePath)
+
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err = os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	}
+
+	for k, v := range secret.Data {
+		f := path.Join(dir, k)
+		if err := os.WriteFile(f, v, 0600); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (t *TestAuthn) signClientCertKeyWithCA(user string, groups []string, maxAge time.Duration) ([]byte, []byte, error) {

@@ -32,12 +32,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
-const (
-	ProgressingDoing   string = "Doing"
-	ProgressingSucceed string = "Succeed"
-	ProgressingFailed  string = "Failed"
-)
-
 // addonProgressingController reconciles instances of managedclusteraddon on the hub
 // based to update the status progressing condition and last applied config
 type addonProgressingController struct {
@@ -153,7 +147,7 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(
 		return patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
 	}
 
-	var hostingClusterName string = ""
+	var hostingClusterName string
 	if newaddon.Annotations != nil && len(newaddon.Annotations[addonapiv1alpha1.HostingClusterNameAnnotationKey]) > 0 {
 		hostingClusterName = newaddon.Annotations[addonapiv1alpha1.HostingClusterNameAnnotationKey]
 	}
@@ -172,36 +166,31 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(
 		}
 	}
 
-	// set upgrade flag
-	isUpgrade := false
-	for _, configReference := range newaddon.Status.ConfigReferences {
-		if configReference.LastAppliedConfig != nil && configReference.LastAppliedConfig.SpecHash != "" {
-			isUpgrade = true
-			break
-		}
-	}
-
 	// get addon works
+	// first get all works for addon in default mode.
 	requirement, _ := labels.NewRequirement(addonapiv1alpha1.AddonLabelKey, selection.Equals, []string{newaddon.Name})
-	selector := labels.NewSelector().Add(*requirement)
+	namespaceNotExistRequirement, _ := labels.NewRequirement(addonapiv1alpha1.AddonNamespaceLabelKey, selection.DoesNotExist, []string{})
+	selector := labels.NewSelector().Add(*requirement).Add(*namespaceNotExistRequirement)
 	addonWorks, err := c.workLister.ManifestWorks(newaddon.Namespace).List(selector)
 	if err != nil {
-		setAddOnProgressingAndLastApplied(isUpgrade, ProgressingFailed, err.Error(), newaddon)
+		setAddOnProgressingAndLastApplied(addonapiv1alpha1.ProgressingReasonFailed, err.Error(), newaddon)
 		return patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
 	}
 
+	// next get all works for addon in hosted mode
 	if len(hostingClusterName) > 0 {
-		// get hosted addon works
+		namespaceRequirement, _ := labels.NewRequirement(addonapiv1alpha1.AddonNamespaceLabelKey, selection.Equals, []string{newaddon.Namespace})
+		selector = labels.NewSelector().Add(*requirement).Add(*namespaceRequirement)
 		hostedAddonWorks, err := c.workLister.ManifestWorks(hostingClusterName).List(selector)
 		if err != nil {
-			setAddOnProgressingAndLastApplied(isUpgrade, ProgressingFailed, err.Error(), newaddon)
+			setAddOnProgressingAndLastApplied(addonapiv1alpha1.ProgressingReasonFailed, err.Error(), newaddon)
 			return patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
 		}
 		addonWorks = append(addonWorks, hostedAddonWorks...)
 	}
 
 	if len(addonWorks) == 0 {
-		setAddOnProgressingAndLastApplied(isUpgrade, ProgressingDoing, "no addon works", newaddon)
+		setAddOnProgressingAndLastApplied(addonapiv1alpha1.ProgressingReasonProgressing, "no addon works", newaddon)
 		return patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
 	}
 
@@ -214,19 +203,19 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(
 
 		// check if work configs matches addon configs
 		if !workConfigsMatchesAddon(klog.FromContext(ctx), work, newaddon) {
-			setAddOnProgressingAndLastApplied(isUpgrade, ProgressingDoing, "configs mismatch", newaddon)
+			setAddOnProgressingAndLastApplied(addonapiv1alpha1.ProgressingReasonProgressing, "mca and work configs mismatch", newaddon)
 			return patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
 		}
 
 		// check if work is ready
 		if !workIsReady(work) {
-			setAddOnProgressingAndLastApplied(isUpgrade, ProgressingDoing, "work is not ready", newaddon)
+			setAddOnProgressingAndLastApplied(addonapiv1alpha1.ProgressingReasonProgressing, "work is not ready", newaddon)
 			return patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
 		}
 	}
 
 	// set lastAppliedConfig when all the work matches addon and are ready.
-	setAddOnProgressingAndLastApplied(isUpgrade, ProgressingSucceed, "", newaddon)
+	setAddOnProgressingAndLastApplied(addonapiv1alpha1.ProgressingReasonCompleted, "", newaddon)
 	return patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
 }
 
@@ -294,54 +283,29 @@ func workIsReady(work *workapiv1.ManifestWork) bool {
 	return true
 }
 
-// set addon progressing condition and last applied
-func setAddOnProgressingAndLastApplied(isUpgrade bool, status string, message string, addon *addonapiv1alpha1.ManagedClusterAddOn) {
-	// always update progressing condition when there is no config
-	// skip update progressing condition when last applied config already the same as desired
-	skip := len(addon.Status.ConfigReferences) > 0
-	for _, configReference := range addon.Status.ConfigReferences {
-		if !equality.Semantic.DeepEqual(configReference.LastAppliedConfig, configReference.DesiredConfig) {
-			skip = false
-		}
-	}
-	if skip {
-		return
-	}
-
+// Set addon progressing condition and last applied
+// Once completed, the LastAppliedConfig will set to DesiredConfig. Even the condition status
+// changes later, eg, spoke cluster becomes unhealthy, status becomes progressing or failed after completed,
+// the LastAppliedConfig and DesiredConfig won't change. this is to avoid back and forth in rollout.
+// The setRolloutStatus() func in graph.go only look at the LastAppliedConfig and DesiredConfig.
+func setAddOnProgressingAndLastApplied(reason string, message string, addon *addonapiv1alpha1.ManagedClusterAddOn) {
 	condition := metav1.Condition{
-		Type: addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
+		Type:   addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
+		Reason: reason,
 	}
-	switch status {
-	case ProgressingDoing:
+	switch reason {
+	case addonapiv1alpha1.ProgressingReasonProgressing:
 		condition.Status = metav1.ConditionTrue
-		if isUpgrade {
-			condition.Reason = addonapiv1alpha1.ProgressingReasonUpgrading
-			condition.Message = fmt.Sprintf("upgrading... %v", message)
-		} else {
-			condition.Reason = addonapiv1alpha1.ProgressingReasonInstalling
-			condition.Message = fmt.Sprintf("installing... %v", message)
-		}
-	case ProgressingSucceed:
+		condition.Message = fmt.Sprintf("progressing... %v", message)
+	case addonapiv1alpha1.ProgressingReasonCompleted:
 		condition.Status = metav1.ConditionFalse
 		for i, configReference := range addon.Status.ConfigReferences {
 			addon.Status.ConfigReferences[i].LastAppliedConfig = configReference.DesiredConfig.DeepCopy()
 		}
-		if isUpgrade {
-			condition.Reason = addonapiv1alpha1.ProgressingReasonUpgradeSucceed
-			condition.Message = "upgrade completed with no errors."
-		} else {
-			condition.Reason = addonapiv1alpha1.ProgressingReasonInstallSucceed
-			condition.Message = "install completed with no errors."
-		}
-	case ProgressingFailed:
+		condition.Message = "completed with no errors."
+	case addonapiv1alpha1.ProgressingReasonFailed:
 		condition.Status = metav1.ConditionFalse
-		if isUpgrade {
-			condition.Reason = addonapiv1alpha1.ProgressingReasonUpgradeFailed
-			condition.Message = message
-		} else {
-			condition.Reason = addonapiv1alpha1.ProgressingReasonInstallFailed
-			condition.Message = message
-		}
+		condition.Message = message
 	}
 	meta.SetStatusCondition(&addon.Status.Conditions, condition)
 }

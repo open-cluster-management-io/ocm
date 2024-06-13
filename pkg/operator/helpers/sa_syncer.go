@@ -36,6 +36,7 @@ func SATokenGetter(ctx context.Context, saName, saNamespace string, saClient kub
 		additionalData := map[string][]byte{
 			"serviceaccount_namespace": []byte(saNamespace),
 			"serviceaccount_name":      []byte(saName),
+			"serviceaccount_uid":       []byte(sa.UID),
 		}
 
 		for _, secret := range sa.Secrets {
@@ -78,38 +79,14 @@ func SATokenGetter(ctx context.Context, saName, saNamespace string, saClient kub
 	}
 }
 
-// SATokenCreater create the saToken of target sa.
-func SATokenCreater(ctx context.Context, saName, saNamespace string, saClient kubernetes.Interface) TokenGetterFunc {
-	return func() ([]byte, []byte, map[string][]byte, error) {
-		// 8640 hour
-		tr, err := saClient.CoreV1().ServiceAccounts(saNamespace).
-			CreateToken(ctx, saName, &authv1.TokenRequest{
-				Spec: authv1.TokenRequestSpec{
-					ExpirationSeconds: pointer.Int64(8640 * 3600),
-				},
-			}, metav1.CreateOptions{})
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		expiration, err := tr.Status.ExpirationTimestamp.MarshalText()
-		if err != nil {
-			return nil, nil, nil, nil
-		}
-		return []byte(tr.Status.Token), expiration, map[string][]byte{
-			"serviceaccount_namespace": []byte(saNamespace),
-			"serviceaccount_name":      []byte(saName),
-		}, nil
-	}
-}
-
 func SyncKubeConfigSecret(ctx context.Context, secretName, secretNamespace, kubeconfigPath string,
 	templateKubeconfig *rest.Config, secretClient coreclientv1.SecretsGetter,
-	tokenGetter TokenGetterFunc, recorder events.Recorder) error {
+	tokenGetter TokenGetterFunc, recorder events.Recorder, labels map[string]string) error {
 	secret, err := secretClient.Secrets(secretNamespace).Get(ctx, secretName, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		return applyKubeconfigSecret(ctx, templateKubeconfig, secretName, secretNamespace,
-			kubeconfigPath, secretClient, tokenGetter, recorder)
+			kubeconfigPath, secretClient, tokenGetter, recorder, labels)
 	case err != nil:
 		return err
 	}
@@ -118,7 +95,8 @@ func SyncKubeConfigSecret(ctx context.Context, secretName, secretNamespace, kube
 		return nil
 	}
 
-	return applyKubeconfigSecret(ctx, templateKubeconfig, secretName, secretNamespace, kubeconfigPath, secretClient, tokenGetter, recorder)
+	return applyKubeconfigSecret(ctx, templateKubeconfig, secretName, secretNamespace, kubeconfigPath,
+		secretClient, tokenGetter, recorder, labels)
 }
 
 func tokenValid(secret *corev1.Secret, tokenGetter TokenGetterFunc) bool {
@@ -200,7 +178,7 @@ func clusterInfoNotChanged(secret *corev1.Secret, templateKubeconfig *rest.Confi
 // applyKubeconfigSecret would render saToken to a secret.
 func applyKubeconfigSecret(ctx context.Context, templateKubeconfig *rest.Config, secretName, secretNamespace,
 	kubeconfigPath string, secretClient coreclientv1.SecretsGetter, tokenGetter TokenGetterFunc,
-	recorder events.Recorder) error {
+	recorder events.Recorder, labels map[string]string) error {
 
 	token, expiration, additionalData, err := tokenGetter()
 	if err != nil {
@@ -239,6 +217,7 @@ func applyKubeconfigSecret(ctx context.Context, templateKubeconfig *rest.Config,
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: secretNamespace,
 			Name:      secretName,
+			Labels:    labels,
 		},
 		Data: map[string][]byte{
 			"kubeconfig": kubeconfigContent,

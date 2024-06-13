@@ -244,8 +244,16 @@ func (KlusterletStatus) SwaggerDoc() map[string]string {
 	return map_KlusterletStatus
 }
 
+var map_KubeConfigSecret = map[string]string{
+	"name": "Name is the name of the secret.",
+}
+
+func (KubeConfigSecret) SwaggerDoc() map[string]string {
+	return map_KubeConfigSecret
+}
+
 var map_LocalSecretsConfig = map[string]string{
-	"secretNames":                 "SecretNames is a list of secret names. The secrets are in the same namespace where the agent controller runs.",
+	"kubeConfigSecrets":           "KubeConfigSecrets is a list of secret names. The secrets are in the same namespace where the agent controller runs.",
 	"hubConnectionTimeoutSeconds": "HubConnectionTimeoutSeconds is used to set the timeout of connecting to the hub cluster. When agent loses the connection to the hub over the timeout seconds, the agent do a rebootstrap. By default is 10 mins.",
 }
 

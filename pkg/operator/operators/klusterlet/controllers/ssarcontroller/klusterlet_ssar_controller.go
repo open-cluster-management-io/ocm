@@ -8,7 +8,6 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -23,6 +22,7 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
@@ -216,7 +216,7 @@ func checkBootstrapSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 	}
 
 	// Check the bootstrap client permissions by creating SelfSubjectAccessReviews
-	allowed, failedReview, err := createSelfSubjectAccessReviews(ctx, bootstrapClient, getBootstrapSSARs())
+	allowed, failedReview, err := commonhelpers.CreateSelfSubjectAccessReviews(ctx, bootstrapClient, commonhelpers.GetBootstrapSSARs())
 	if err != nil {
 		return metav1.Condition{
 			Status: metav1.ConditionTrue,
@@ -240,21 +240,6 @@ func checkBootstrapSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 		Message: fmt.Sprintf("Bootstrap secret %s/%s to apiserver %s is configured correctly",
 			agent.namespace, helpers.BootstrapHubKubeConfig, host),
 	}
-}
-
-func getBootstrapSSARs() []authorizationv1.SelfSubjectAccessReview {
-	var reviews []authorizationv1.SelfSubjectAccessReview
-	clusterResource := authorizationv1.ResourceAttributes{
-		Group:    "cluster.open-cluster-management.io",
-		Resource: "managedclusters",
-	}
-	reviews = append(reviews, generateSelfSubjectAccessReviews(clusterResource, "create", "get")...)
-
-	certResource := authorizationv1.ResourceAttributes{
-		Group:    "certificates.k8s.io",
-		Resource: "certificatesigningrequests",
-	}
-	return append(reviews, generateSelfSubjectAccessReviews(certResource, "create", "get", "list", "watch")...)
 }
 
 // Check hub-kubeconfig-secret, if the secret is invalid, return degraded condition
@@ -304,7 +289,8 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 	}
 
 	// Check the hub kubeconfig permissions by creating SelfSubjectAccessReviews
-	allowed, failedReview, err := createSelfSubjectAccessReviews(ctx, hubClient, getHubConfigSSARs(clusterName))
+	allowed, failedReview, err := commonhelpers.CreateSelfSubjectAccessReviews(ctx, hubClient,
+		commonhelpers.GetHubConfigSSARs(clusterName))
 	if err != nil {
 		return metav1.Condition{
 			Status: metav1.ConditionTrue,
@@ -328,76 +314,6 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 		Message: fmt.Sprintf("Hub kubeconfig secret %s/%s to apiserver %s is working",
 			agent.namespace, helpers.HubKubeConfig, host),
 	}
-}
-
-func getHubConfigSSARs(clusterName string) []authorizationv1.SelfSubjectAccessReview {
-	var reviews []authorizationv1.SelfSubjectAccessReview
-	// registration resources
-	certResource := authorizationv1.ResourceAttributes{
-		Group:    "certificates.k8s.io",
-		Resource: "certificatesigningrequests",
-	}
-	reviews = append(reviews, generateSelfSubjectAccessReviews(certResource, "get", "list", "watch")...)
-
-	clusterResource := authorizationv1.ResourceAttributes{
-		Group:    "cluster.open-cluster-management.io",
-		Resource: "managedclusters",
-		Name:     clusterName,
-	}
-	reviews = append(reviews, generateSelfSubjectAccessReviews(clusterResource, "get", "list", "update", "watch")...)
-
-	clusterStatusResource := authorizationv1.ResourceAttributes{
-		Group:       "cluster.open-cluster-management.io",
-		Resource:    "managedclusters",
-		Subresource: "status",
-		Name:        clusterName,
-	}
-	reviews = append(reviews, generateSelfSubjectAccessReviews(clusterStatusResource, "patch", "update")...)
-
-	clusterCertResource := authorizationv1.ResourceAttributes{
-		Group:       "register.open-cluster-management.io",
-		Resource:    "managedclusters",
-		Subresource: "clientcertificates",
-	}
-	reviews = append(reviews, generateSelfSubjectAccessReviews(clusterCertResource, "renew")...)
-
-	leaseResource := authorizationv1.ResourceAttributes{
-		Group:     "coordination.k8s.io",
-		Resource:  "leases",
-		Name:      "managed-cluster-lease",
-		Namespace: clusterName,
-	}
-	reviews = append(reviews, generateSelfSubjectAccessReviews(leaseResource, "get", "update")...)
-
-	// work resources
-	eventResource := authorizationv1.ResourceAttributes{
-		Resource:  "events",
-		Namespace: clusterName,
-	}
-	reviews = append(reviews, generateSelfSubjectAccessReviews(eventResource, "create", "patch", "update")...)
-
-	eventResource = authorizationv1.ResourceAttributes{
-		Group:     "events.k8s.io",
-		Resource:  "events",
-		Namespace: clusterName,
-	}
-	reviews = append(reviews, generateSelfSubjectAccessReviews(eventResource, "create", "patch", "update")...)
-
-	workResource := authorizationv1.ResourceAttributes{
-		Group:     "work.open-cluster-management.io",
-		Resource:  "manifestworks",
-		Namespace: clusterName,
-	}
-	reviews = append(reviews, generateSelfSubjectAccessReviews(workResource, "get", "list", "watch", "update")...)
-
-	workStatusResource := authorizationv1.ResourceAttributes{
-		Group:       "work.open-cluster-management.io",
-		Resource:    "manifestworks",
-		Subresource: "status",
-		Namespace:   clusterName,
-	}
-	reviews = append(reviews, generateSelfSubjectAccessReviews(workStatusResource, "patch", "update")...)
-	return reviews
 }
 
 func buildKubeClientWithSecret(secret *corev1.Secret) (kubernetes.Interface, string, error) {
@@ -427,42 +343,4 @@ func buildKubeClientWithSecret(secret *corev1.Secret) (kubernetes.Interface, str
 	}
 
 	return client, restConfig.Host, nil
-}
-
-func generateSelfSubjectAccessReviews(resource authorizationv1.ResourceAttributes, verbs ...string) []authorizationv1.SelfSubjectAccessReview {
-	var reviews []authorizationv1.SelfSubjectAccessReview
-	for _, verb := range verbs {
-		reviews = append(reviews, authorizationv1.SelfSubjectAccessReview{
-			Spec: authorizationv1.SelfSubjectAccessReviewSpec{
-				ResourceAttributes: &authorizationv1.ResourceAttributes{
-					Group:       resource.Group,
-					Resource:    resource.Resource,
-					Subresource: resource.Subresource,
-					Name:        resource.Name,
-					Namespace:   resource.Namespace,
-					Verb:        verb,
-				},
-			},
-		})
-	}
-	return reviews
-}
-
-func createSelfSubjectAccessReviews(
-	ctx context.Context,
-	kubeClient kubernetes.Interface,
-	selfSubjectAccessReviews []authorizationv1.SelfSubjectAccessReview) (bool, *authorizationv1.SelfSubjectAccessReview, error) {
-
-	for i := range selfSubjectAccessReviews {
-		subjectAccessReview := selfSubjectAccessReviews[i]
-
-		ssar, err := kubeClient.AuthorizationV1().SelfSubjectAccessReviews().Create(ctx, &subjectAccessReview, metav1.CreateOptions{})
-		if err != nil {
-			return false, &subjectAccessReview, err
-		}
-		if !ssar.Status.Allowed {
-			return false, &subjectAccessReview, nil
-		}
-	}
-	return true, nil, nil
 }

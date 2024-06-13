@@ -29,6 +29,7 @@ type Options struct {
 	ControlPlaneNodeLabelSelector string
 	DeploymentReplicas            int32
 	DisableAddonNamespace         bool
+	EnableSyncLabels              bool
 }
 
 // RunKlusterletOperator starts a new klusterlet operator
@@ -73,8 +74,16 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 	}
 
 	deploymentInformer := informers.NewSharedInformerFactoryWithOptions(kubeClient, 5*time.Minute,
-		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-			options.LabelSelector = "createdBy=klusterlet"
+		informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
+			selector := &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      helpers.AgentLabelKey,
+						Operator: metav1.LabelSelectorOpExists,
+					},
+				},
+			}
+			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
 		}))
 
 	// Build operator client and informer
@@ -102,6 +111,7 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		o.ControlPlaneNodeLabelSelector,
 		o.DeploymentReplicas,
 		o.DisableAddonNamespace,
+		o.EnableSyncLabels,
 		controllerContext.EventRecorder)
 
 	klusterletCleanupController := klusterletcontroller.NewKlusterletCleanupController(

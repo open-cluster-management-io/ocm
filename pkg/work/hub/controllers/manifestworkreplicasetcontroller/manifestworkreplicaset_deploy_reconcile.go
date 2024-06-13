@@ -16,8 +16,6 @@ import (
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 	clustersdkv1alpha1 "open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1"
 	workapplier "open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/common"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/work/helper"
@@ -264,10 +262,16 @@ func getCondition(conditionType string, reason string, message string, status me
 	}
 }
 
-func CreateManifestWork(mwrSet *workapiv1alpha1.ManifestWorkReplicaSet, clusterNS string, placementRefName string) (*workv1.ManifestWork, error) {
+func CreateManifestWork(
+	mwrSet *workapiv1alpha1.ManifestWorkReplicaSet,
+	clusterNS string,
+	placementRefName string,
+) (*workv1.ManifestWork, error) {
 	if clusterNS == "" {
 		return nil, fmt.Errorf("invalid cluster namespace")
 	}
+
+	// TODO consider how to trace the manifestworks spec changes for cloudevents work client
 
 	return &workv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
@@ -277,12 +281,9 @@ func CreateManifestWork(mwrSet *workapiv1alpha1.ManifestWorkReplicaSet, clusterN
 				ManifestWorkReplicaSetControllerNameLabelKey: manifestWorkReplicaSetKey(mwrSet),
 				ManifestWorkReplicaSetPlacementNameLabelKey:  placementRefName,
 			},
-			Annotations: map[string]string{
-				common.CloudEventsDataTypeAnnotationKey:   payload.ManifestBundleEventDataType.String(),
-				common.CloudEventsGenerationAnnotationKey: fmt.Sprintf("%d", mwrSet.Generation),
-			},
 		},
-		Spec: mwrSet.Spec.ManifestWorkTemplate}, nil
+		Spec: mwrSet.Spec.ManifestWorkTemplate,
+	}, nil
 }
 
 func getAvailableDecisionGroupProgressMessage(groupNum int, existingClsCount int, totalCls int32) string {
