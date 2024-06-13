@@ -283,20 +283,12 @@ func workIsReady(work *workapiv1.ManifestWork) bool {
 	return true
 }
 
-// set addon progressing condition and last applied
+// Set addon progressing condition and last applied
+// Once completed, the LastAppliedConfig will set to DesiredConfig. Even the condition status
+// changes later, eg, spoke cluster becomes unhealthy, status becomes progressing or failed after completed,
+// the LastAppliedConfig and DesiredConfig won't change. this is to avoid back and forth in rollout.
+// The setRolloutStatus() func in graph.go only look at the LastAppliedConfig and DesiredConfig.
 func setAddOnProgressingAndLastApplied(reason string, message string, addon *addonapiv1alpha1.ManagedClusterAddOn) {
-	// always update progressing condition when there is no config
-	// skip update progressing condition when last applied config already the same as desired
-	skip := len(addon.Status.ConfigReferences) > 0
-	for _, configReference := range addon.Status.ConfigReferences {
-		if !equality.Semantic.DeepEqual(configReference.LastAppliedConfig, configReference.DesiredConfig) {
-			skip = false
-		}
-	}
-	if skip {
-		return
-	}
-
 	condition := metav1.Condition{
 		Type:   addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
 		Reason: reason,
