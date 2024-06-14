@@ -68,7 +68,7 @@ func (c *WorkHubManagerConfig) RunWorkHubManager(ctx context.Context, controller
 	)
 
 	var workClient workclientset.Interface
-	var watcherStore *store.InformerWatcherStore
+	var watcherStore *store.SourceInformerWatcherStore
 
 	if c.workOptions.WorkDriver == "kube" {
 		config := controllerContext.KubeConfig
@@ -88,7 +88,7 @@ func (c *WorkHubManagerConfig) RunWorkHubManager(ctx context.Context, controller
 		// ManifestWorkInterface and ManifestWork informer based on different driver configuration.
 		// Refer to Event Based Manifestwork proposal in enhancements repo to get more details.
 
-		watcherStore = store.NewInformerWatcherStore(ctx)
+		watcherStore = store.NewSourceInformerWatcherStore(ctx)
 
 		_, config, err := generic.NewConfigLoader(c.workOptions.WorkDriver, c.workOptions.WorkDriverConfig).
 			LoadConfig()

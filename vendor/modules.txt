@@ -1589,7 +1589,7 @@ open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/utils/work/v1/workvalidator
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v0.13.1-0.20240605055850-874c2c7ac523
+# open-cluster-management.io/sdk-go v0.13.1-0.20240614070053-a01091a14da7
 ## explicit; go 1.21
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
@@ -1611,7 +1611,7 @@ open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types
 open-cluster-management.io/sdk-go/pkg/cloudevents/work
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/client
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/codec
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/handler
+open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/lister
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/common
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/internal
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload

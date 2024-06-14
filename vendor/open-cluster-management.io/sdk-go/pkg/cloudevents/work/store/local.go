@@ -25,17 +25,19 @@ type watchEvent struct {
 	Type watch.EventType
 }
 
-var _ watch.Interface = &LocalWatcherStore{}
-var _ WorkClientWatcherStore = &LocalWatcherStore{}
+var _ watch.Interface = &SourceLocalWatcherStore{}
+var _ WorkClientWatcherStore = &SourceLocalWatcherStore{}
 
-// LocalWatcherStore caches the works in this local store and provide the watch ability by watch event channel.
-type LocalWatcherStore struct {
+// SourceLocalWatcherStore caches the works in this local store and provide the watch ability by watch event channel.
+//
+// It is used for building ManifestWork source client.
+type SourceLocalWatcherStore struct {
 	baseStore
 	eventQueue cache.Queue
 }
 
-// NewLocalWatcherStore returns a LocalWatcherStore with works that list by ListLocalWorksFunc
-func NewLocalWatcherStore(ctx context.Context, listFunc ListLocalWorksFunc) (*LocalWatcherStore, error) {
+// NewSourceLocalWatcherStore returns a LocalWatcherStore with works that list by ListLocalWorksFunc
+func NewSourceLocalWatcherStore(ctx context.Context, listFunc ListLocalWorksFunc) (*SourceLocalWatcherStore, error) {
 	works, err := listFunc(ctx)
 	if err != nil {
 		return nil, err
@@ -53,7 +55,7 @@ func NewLocalWatcherStore(ctx context.Context, listFunc ListLocalWorksFunc) (*Lo
 		}
 	}
 
-	s := &LocalWatcherStore{
+	s := &SourceLocalWatcherStore{
 		baseStore: baseStore{
 			// A channel for watcher, it's easy for a consumer to add buffering via an extra
 			// goroutine/channel, but impossible for them to remove it, so nonbuffered is better.
@@ -95,7 +97,7 @@ func NewLocalWatcherStore(ctx context.Context, listFunc ListLocalWorksFunc) (*Lo
 }
 
 // Add a work to the cache and send an event to the event queue
-func (s *LocalWatcherStore) Add(work *workv1.ManifestWork) error {
+func (s *SourceLocalWatcherStore) Add(work *workv1.ManifestWork) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -107,7 +109,7 @@ func (s *LocalWatcherStore) Add(work *workv1.ManifestWork) error {
 }
 
 // Update a work in the cache and send an event to the event queue
-func (s *LocalWatcherStore) Update(work *workv1.ManifestWork) error {
+func (s *SourceLocalWatcherStore) Update(work *workv1.ManifestWork) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -119,7 +121,7 @@ func (s *LocalWatcherStore) Update(work *workv1.ManifestWork) error {
 }
 
 // Delete a work from the cache and send an event to the event queue
-func (s *LocalWatcherStore) Delete(work *workv1.ManifestWork) error {
+func (s *SourceLocalWatcherStore) Delete(work *workv1.ManifestWork) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -131,7 +133,7 @@ func (s *LocalWatcherStore) Delete(work *workv1.ManifestWork) error {
 }
 
 // processLoop drains the work event queue and send the event to the watch channel.
-func (s *LocalWatcherStore) processLoop() {
+func (s *SourceLocalWatcherStore) processLoop() {
 	for {
 		// this will be blocked until the event queue has events
 		obj, err := s.eventQueue.Pop(func(interface{}, bool) error {
@@ -200,7 +202,7 @@ func (s *LocalWatcherStore) processLoop() {
 	}
 }
 
-func (c *LocalWatcherStore) HasInitiated() bool {
+func (c *SourceLocalWatcherStore) HasInitiated() bool {
 	return c.initiated
 }
 

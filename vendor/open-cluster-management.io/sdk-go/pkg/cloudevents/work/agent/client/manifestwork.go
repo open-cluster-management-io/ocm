@@ -12,34 +12,35 @@ import (
 	"k8s.io/klog/v2"
 
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
-	workv1lister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
+
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/common"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/store"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/utils"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/watcher"
 )
 
 // ManifestWorkAgentClient implements the ManifestWorkInterface. It sends the manifestworks status back to source by
 // CloudEventAgentClient.
 type ManifestWorkAgentClient struct {
 	cloudEventsClient *generic.CloudEventAgentClient[*workv1.ManifestWork]
-	watcher           *watcher.ManifestWorkWatcher
-	lister            workv1lister.ManifestWorkNamespaceLister
+	watcherStore      store.WorkClientWatcherStore
+	clusterName       string
 }
 
 var _ workv1client.ManifestWorkInterface = &ManifestWorkAgentClient{}
 
-func NewManifestWorkAgentClient(cloudEventsClient *generic.CloudEventAgentClient[*workv1.ManifestWork], watcher *watcher.ManifestWorkWatcher) *ManifestWorkAgentClient {
+func NewManifestWorkAgentClient(
+	cloudEventsClient *generic.CloudEventAgentClient[*workv1.ManifestWork],
+	watcherStore store.WorkClientWatcherStore,
+	clusterName string,
+) *ManifestWorkAgentClient {
 	return &ManifestWorkAgentClient{
 		cloudEventsClient: cloudEventsClient,
-		watcher:           watcher,
+		watcherStore:      watcherStore,
+		clusterName:       clusterName,
 	}
-}
-
-func (c *ManifestWorkAgentClient) SetLister(lister workv1lister.ManifestWorkNamespaceLister) {
-	c.lister = lister
 }
 
 func (c *ManifestWorkAgentClient) Create(ctx context.Context, manifestWork *workv1.ManifestWork, opts metav1.CreateOptions) (*workv1.ManifestWork, error) {
@@ -64,27 +65,32 @@ func (c *ManifestWorkAgentClient) DeleteCollection(ctx context.Context, opts met
 
 func (c *ManifestWorkAgentClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*workv1.ManifestWork, error) {
 	klog.V(4).Infof("getting manifestwork %s", name)
-	return c.lister.Get(name)
+	return c.watcherStore.Get(c.clusterName, name)
 }
 
 func (c *ManifestWorkAgentClient) List(ctx context.Context, opts metav1.ListOptions) (*workv1.ManifestWorkList, error) {
-	klog.V(4).Infof("sync manifestworks")
-	// send resync request to fetch manifestworks from source when the ManifestWorkInformer starts
-	if err := c.cloudEventsClient.Resync(ctx, types.SourceAll); err != nil {
+	klog.V(4).Infof("list manifestworks")
+	works, err := c.watcherStore.List(opts)
+	if err != nil {
 		return nil, err
 	}
 
-	return &workv1.ManifestWorkList{}, nil
+	items := []workv1.ManifestWork{}
+	for _, work := range works {
+		items = append(items, *work)
+	}
+
+	return &workv1.ManifestWorkList{Items: items}, nil
 }
 
 func (c *ManifestWorkAgentClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.watcher, nil
+	return c.watcherStore, nil
 }
 
 func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kubetypes.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *workv1.ManifestWork, err error) {
 	klog.V(4).Infof("patching manifestwork %s", name)
 
-	lastWork, err := c.lister.Get(name)
+	lastWork, err := c.watcherStore.Get(c.clusterName, name)
 	if err != nil {
 		return nil, err
 	}
@@ -117,8 +123,10 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 			return nil, err
 		}
 
-		// refresh the work status in the ManifestWorkInformer local cache with patched work.
-		c.watcher.Receive(watch.Event{Type: watch.Modified, Object: newWork})
+		if err := c.watcherStore.Update(newWork); err != nil {
+			return nil, err
+
+		}
 		return newWork, nil
 	}
 
@@ -137,13 +145,17 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 			return nil, err
 		}
 
-		// delete the manifestwork from the ManifestWorkInformer local cache.
-		c.watcher.Receive(watch.Event{Type: watch.Deleted, Object: newWork})
+		if err := c.watcherStore.Delete(newWork); err != nil {
+			return nil, err
+		}
+
 		return newWork, nil
 	}
 
-	// refresh the work in the ManifestWorkInformer local cache with patched work.
-	c.watcher.Receive(watch.Event{Type: watch.Modified, Object: newWork})
+	if err := c.watcherStore.Update(newWork); err != nil {
+		return nil, err
+	}
+
 	return newWork, nil
 }
 
