@@ -116,7 +116,7 @@ func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 	agentAddonOptions := agent.AgentAddonOptions{
 		AddonName: a.addonName,
 		HealthProber: &agent.HealthProber{
-			Type: agent.HealthProberTypeDeploymentAvailability,
+			Type: agent.HealthProberTypeWorkloadAvailability,
 		},
 		SupportedConfigGVRs: supportedConfigGVRs,
 		Registration: &agent.RegistrationOption{
@@ -189,6 +189,7 @@ func (a *CRDTemplateAgentAddon) decorateObject(
 	privateValues addonfactory.Values) (*unstructured.Unstructured, error) {
 	decorators := []decorator{
 		newDeploymentDecorator(a.addonName, template, orderedValues, privateValues),
+		newDaemonSetDecorator(a.addonName, template, orderedValues, privateValues),
 		newNamespaceDecorator(privateValues),
 	}
 

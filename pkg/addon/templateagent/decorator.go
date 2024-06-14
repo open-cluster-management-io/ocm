@@ -125,6 +125,48 @@ func (d *deploymentDecorator) decorate(obj *unstructured.Unstructured) (*unstruc
 	return &unstructured.Unstructured{Object: result}, nil
 }
 
+type daemonSetDecorator struct {
+	decorators []podTemplateSpecDecorator
+}
+
+func newDaemonSetDecorator(
+	addonName string,
+	template *addonapiv1alpha1.AddOnTemplate,
+	orderedValues orderedValues,
+	privateValues addonfactory.Values,
+) decorator {
+	return &daemonSetDecorator{
+		decorators: []podTemplateSpecDecorator{
+			newEnvironmentDecorator(orderedValues),
+			newVolumeDecorator(addonName, template),
+			newNodePlacementDecorator(privateValues),
+			newImageDecorator(privateValues),
+		},
+	}
+}
+
+func (d *daemonSetDecorator) decorate(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	daemonSet, err := utils.ConvertToDaemonSet(obj)
+	// not a deployment, directly return
+	if err != nil {
+		return obj, nil
+	}
+
+	for _, decorator := range d.decorators {
+		err = decorator.decorate(&daemonSet.Spec.Template)
+		if err != nil {
+			return obj, err
+		}
+	}
+
+	result, err := runtime.DefaultUnstructuredConverter.ToUnstructured(daemonSet)
+	if err != nil {
+		return obj, err
+	}
+
+	return &unstructured.Unstructured{Object: result}, nil
+}
+
 type podTemplateSpecDecorator interface {
 	// decorate modifies the deployment in place
 	decorate(pod *corev1.PodTemplateSpec) error

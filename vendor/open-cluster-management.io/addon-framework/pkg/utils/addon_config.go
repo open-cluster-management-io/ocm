@@ -120,7 +120,9 @@ func GetAddOnDeploymentConfigSpecHash(config *addonapiv1alpha1.AddOnDeploymentCo
 	})
 }
 
-// GetAddOnConfigRef returns the first addon config ref for the given config type
+// GetAddOnConfigRef returns the first addon config ref for the given config type. It is fine since the status will only
+// have one config for each GK.
+// (TODO) this needs to be reconcidered if we support multiple same GK in the config referencese.
 func GetAddOnConfigRef(
 	configReferences []addonapiv1alpha1.ConfigReference,
 	group, resource string) (bool, addonapiv1alpha1.ConfigReference) {
@@ -130,5 +132,6 @@ func GetAddOnConfigRef(
 			return true, config
 		}
 	}
+
 	return false, addonapiv1alpha1.ConfigReference{}
 }

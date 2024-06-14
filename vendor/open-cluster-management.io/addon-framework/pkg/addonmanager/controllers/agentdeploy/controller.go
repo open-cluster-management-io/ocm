@@ -391,9 +391,6 @@ func (c *addonDeployController) buildDeployManifestWorksFunc(addonWorkBuilder *a
 			})
 			return nil, nil, err
 		}
-		if len(objects) == 0 {
-			return nil, nil, nil
-		}
 
 		// this is to retrieve the intended mode of the addon.
 		var mode string
@@ -418,6 +415,14 @@ func (c *addonDeployController) buildDeployManifestWorksFunc(addonWorkBuilder *a
 				Message: fmt.Sprintf("failed to build manifestwork: %v", err),
 			})
 			return nil, nil, err
+		}
+		if len(appliedWorks) == 0 {
+			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+				Type:    appliedType,
+				Status:  metav1.ConditionTrue,
+				Reason:  addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied,
+				Message: "no manifest need to apply",
+			})
 		}
 		return appliedWorks, deleteWorks, nil
 	}
