@@ -15,6 +15,7 @@ on:
 env:
   GO_VERSION: '1.21'
   GO_REQUIRED_MIN_VERSION: ''
+  USE_EXISTING_CLUSTER: false # set to true to use an existing kind cluster for debugging with act
 
 permissions:
   contents: read
@@ -36,6 +37,12 @@ jobs:
         uses: engineerd/setup-kind@v0.5.0
         with:
           version: v0.22.0
+          skipClusterCreation: ${{ env.USE_EXISTING_CLUSTER }}
+      - name: Set KUBECONFIG
+        run: |
+          mkdir -p /home/runner/.kube
+          kind get kubeconfig > /home/runner/.kube/config
+        if: ${{ env.USE_EXISTING_CLUSTER }}
       - name: install imagebuilder
         run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
       - name: Build images
@@ -68,6 +75,12 @@ jobs:
         uses: engineerd/setup-kind@v0.5.0
         with:
           version: v0.22.0
+          skipClusterCreation: ${{ env.USE_EXISTING_CLUSTER }}
+      - name: Set KUBECONFIG
+        run: |
+          mkdir -p /home/runner/.kube
+          kind get kubeconfig > /home/runner/.kube/config
+        if: ${{ env.USE_EXISTING_CLUSTER }}
       - name: install imagebuilder
         run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
       - name: Build images
@@ -100,6 +113,12 @@ jobs:
         uses: engineerd/setup-kind@v0.5.0
         with:
           version: v0.22.0
+          skipClusterCreation: ${{ env.USE_EXISTING_CLUSTER }}
+      - name: Set KUBECONFIG
+        run: |
+          mkdir -p /home/runner/.kube
+          kind get kubeconfig > /home/runner/.kube/config
+        if: ${{ env.USE_EXISTING_CLUSTER }}
       - name: install imagebuilder
         run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
       - name: Build images
