@@ -123,6 +123,43 @@ const (
 			}
 		}
 	}`
+
+	daemonsetJson = `{
+        "apiVersion": "apps/v1",
+        "kind": "DaemonSet",
+        "metadata": {
+            "name": "nginx-daemonset",
+            "namespace": "default"
+        },
+        "spec": {
+            "selector": {
+                "matchLabels": {
+                    "app": "nginx"
+                }
+            },
+            "template": {
+                "metadata": {
+                    "labels": {
+                        "app": "nginx"
+                    }
+                },
+                "spec": {
+                    "containers": [
+                        {
+                            "image": "nginx:1.14.2",
+                            "name": "nginx",
+                            "ports": [
+                                {
+                                    "containerPort": 80,
+                                    "protocol": "TCP"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+    }`
 )
 
 var (
@@ -214,6 +251,19 @@ func NewDeployment(namespace, name, sa string) (u *unstructured.Unstructured, gv
 		return u, gvr, err
 	}
 	gvr = schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
+	return u, gvr, nil
+}
+
+func NewDaesonSet(namespace, name string) (u *unstructured.Unstructured, gvr schema.GroupVersionResource, err error) {
+	u, err = loadResourceFromJSON(daemonsetJson)
+	if err != nil {
+		return u, gvr, err
+	}
+
+	u.SetNamespace(namespace)
+	u.SetName(name)
+
+	gvr = schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "daemonsets"}
 	return u, gvr, nil
 }
 
