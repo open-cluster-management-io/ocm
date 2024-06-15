@@ -27,7 +27,7 @@ const (
 
 // AgentOptions is the common agent options
 type AgentOptions struct {
-	CommoOpts           *Options
+	CommonOpts          *Options
 	ComponentNamespace  string
 	SpokeKubeconfigFile string
 	SpokeClusterName    string
@@ -41,7 +41,7 @@ func NewAgentOptions() *AgentOptions {
 	opts := &AgentOptions{
 		HubKubeconfigDir:   "/spoke/hub-kubeconfig",
 		ComponentNamespace: defaultSpokeComponentNamespace,
-		CommoOpts:          NewOptions(),
+		CommonOpts:         NewOptions(),
 	}
 	// get component namespace of spoke agent
 	nsBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
@@ -52,7 +52,7 @@ func NewAgentOptions() *AgentOptions {
 }
 
 func (o *AgentOptions) AddFlags(flags *pflag.FlagSet) {
-	o.CommoOpts.AddFlags(flags)
+	o.CommonOpts.AddFlags(flags)
 	flags.StringVar(&o.SpokeKubeconfigFile, "spoke-kubeconfig", o.SpokeKubeconfigFile,
 		"Location of kubeconfig file to connect to spoke cluster. If this is not set, will use '--kubeconfig' to build client to connect to the managed cluster.")
 	flags.StringVar(&o.SpokeClusterName, "spoke-cluster-name", o.SpokeClusterName, "Name of the spoke cluster.")
@@ -68,8 +68,8 @@ func (o *AgentOptions) AddFlags(flags *pflag.FlagSet) {
 // SpokeKubeConfig builds kubeconfig for the spoke/managed cluster
 func (o *AgentOptions) SpokeKubeConfig(managedRestConfig *rest.Config) (*rest.Config, error) {
 	if o.SpokeKubeconfigFile == "" {
-		managedRestConfig.QPS = o.CommoOpts.QPS
-		managedRestConfig.Burst = o.CommoOpts.Burst
+		managedRestConfig.QPS = o.CommonOpts.QPS
+		managedRestConfig.Burst = o.CommonOpts.Burst
 		return managedRestConfig, nil
 	}
 
@@ -77,8 +77,8 @@ func (o *AgentOptions) SpokeKubeConfig(managedRestConfig *rest.Config) (*rest.Co
 	if err != nil {
 		return nil, fmt.Errorf("unable to load spoke kubeconfig from file %q: %w", o.SpokeKubeconfigFile, err)
 	}
-	spokeRestConfig.QPS = o.CommoOpts.QPS
-	spokeRestConfig.Burst = o.CommoOpts.Burst
+	spokeRestConfig.QPS = o.CommonOpts.QPS
+	spokeRestConfig.Burst = o.CommonOpts.Burst
 	return spokeRestConfig, nil
 }
 
