@@ -19,7 +19,7 @@ func NewWorkAgent() *cobra.Command {
 	commonOptions := commonoptions.NewAgentOptions()
 	agentOption := spoke.NewWorkloadAgentOptions()
 	cfg := spoke.NewWorkAgentConfig(commonOptions, agentOption)
-	cmdConfig := commonOptions.CommoOpts.
+	cmdConfig := commonOptions.CommonOpts.
 		NewControllerCommandConfig("work-agent", version.Get(), cfg.RunWorkloadAgent)
 	cmd := cmdConfig.NewCommandWithContext(context.TODO())
 	cmd.Use = agentCmdName
