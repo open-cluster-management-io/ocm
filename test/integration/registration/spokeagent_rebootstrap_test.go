@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	certutil "k8s.io/client-go/util/cert"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -518,10 +519,27 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 			ginkgo.By("stop the hub")
 			stopHub()
 
-			ginkgo.By("the hub kubeconfig secret should be deleted once client cert expired")
+			ginkgo.By("wait until the client cert expires")
 			gomega.Eventually(func() bool {
-				_, err := kubeClient.CoreV1().Secrets(testNamespace).Get(context.Background(), hubKubeconfigSecret, metav1.GetOptions{})
-				return apierrors.IsNotFound(err)
+				secret, err := kubeClient.CoreV1().Secrets(testNamespace).Get(context.Background(), hubKubeconfigSecret, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				data, ok := secret.Data[clientcert.TLSCertFile]
+				if !ok {
+					return false
+				}
+				certs, err := certutil.ParseCertsPEM(data)
+				if err != nil {
+					return false
+				}
+				now := time.Now()
+				for _, cert := range certs {
+					if now.After(cert.NotAfter) {
+						return true
+					}
+				}
+				return false
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			ginkgo.By("start the hub again")

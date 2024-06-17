@@ -79,11 +79,9 @@ type ClientCertOption struct {
 	// SecretName is the name of the secret containing client certificate. The secret will be created if
 	// it does not exist.
 	SecretName string
-	// AdditonalSecretData contains data that will be added into client certificate secret besides tls.key/tls.crt
+	// AdditionalSecretData contains data that will be added into client certificate secret besides tls.key/tls.crt
+	// Once AdditionalSecretData changes, the client cert will be recreated.
 	AdditionalSecretData map[string][]byte
-	// AdditonalSecretDataSensitive is true indicates the client cert is sensitive to the AdditonalSecretData.
-	// That means once AdditonalSecretData changes, the client cert will be recreated.
-	AdditionalSecretDataSensitive bool
 }
 
 type StatusUpdateFunc func(ctx context.Context, cond metav1.Condition) error
@@ -293,7 +291,6 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 		secret,
 		syncCtx.Recorder(),
 		c.Subject,
-		c.AdditionalSecretDataSensitive,
 		c.AdditionalSecretData)
 	if err != nil {
 		return err
@@ -375,14 +372,14 @@ func shouldCreateCSR(
 	secret *corev1.Secret,
 	recorder events.Recorder,
 	subject *pkix.Name,
-	additionalSecretDataSensitive bool,
 	additionalSecretData map[string][]byte) (bool, error) {
 	switch {
 	case !hasValidClientCertificate(logger, subject, secret):
 		recorder.Eventf("NoValidCertificateFound",
 			"No valid client certificate for %s is found. Bootstrap is required", controllerName)
-	case additionalSecretDataSensitive && !hasAdditionalSecretData(additionalSecretData, secret):
-		recorder.Eventf("AdditonalSecretDataChanged",
+	// return true to create a CSR for a new client cert once the additional secret data changes.
+	case !hasAdditionalSecretData(additionalSecretData, secret):
+		recorder.Eventf("AdditionalSecretDataChanged",
 			"The additional secret data is changed. Re-create the client certificate for %s", controllerName)
 	default:
 		notBefore, notAfter, err := getCertValidityPeriod(secret)
@@ -408,7 +405,7 @@ func shouldCreateCSR(
 	return true, nil
 }
 
-// hasAdditonalSecretData checks if the secret includes the expected additional secret data.
+// hasAdditionalSecretData checks if the secret includes the expected additional secret data.
 func hasAdditionalSecretData(additionalSecretData map[string][]byte, secret *corev1.Secret) bool {
 	for k, v := range additionalSecretData {
 		value, ok := secret.Data[k]

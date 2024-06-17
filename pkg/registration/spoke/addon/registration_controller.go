@@ -210,17 +210,16 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 	kubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(
 		kubeClient, 10*time.Minute, informers.WithNamespace(config.InstallationNamespace))
 
-	additonalSecretData := map[string][]byte{}
+	additionalSecretData := map[string][]byte{}
 	if config.registration.SignerName == certificatesv1.KubeAPIServerClientSignerName {
-		additonalSecretData[clientcert.KubeconfigFile] = c.kubeconfigData
+		additionalSecretData[clientcert.KubeconfigFile] = c.kubeconfigData
 	}
 
 	// build and start a client cert controller
 	clientCertOption := clientcert.ClientCertOption{
-		SecretNamespace:               config.InstallationNamespace,
-		SecretName:                    config.secretName,
-		AdditionalSecretData:          additonalSecretData,
-		AdditionalSecretDataSensitive: true,
+		SecretNamespace:      config.InstallationNamespace,
+		SecretName:           config.secretName,
+		AdditionalSecretData: additionalSecretData,
 	}
 
 	csrOption := clientcert.CSROption{

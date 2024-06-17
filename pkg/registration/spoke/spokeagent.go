@@ -11,7 +11,6 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -244,12 +243,6 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	// in scenario #2 and #3, which results in an error message in log: 'Observed a panic: timeout waiting for
 	// informer cache'
 	if !ok {
-		// delete the hub kubeconfig secret if exits
-		if err := managementKubeClient.CoreV1().Secrets(o.agentOptions.ComponentNamespace).Delete(ctx,
-			o.registrationOption.HubKubeconfigSecret, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-
 		// create a ClientCertForHubController for spoke agent bootstrap
 		// the bootstrap informers are supposed to be terminated after completing the bootstrap process.
 		bootstrapInformerFactory := informers.NewSharedInformerFactory(bootstrapKubeClient, 10*time.Minute)
@@ -294,12 +287,17 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 		go clientCertForHubController.Run(bootstrapCtx, 1)
 
-		// wait for the hub client config is ready.
-		logger.Info("Waiting for hub client config and managed cluster to be ready")
+		// wait until a valid hub kubeconfig is in place.
+		// If no hub kube kubeconfig exits, the controller will create the kubeconfig and the client cert; otherwise there
+		// exits an invalid hub kube kubeconfig, the controller will update both the kubeconfig and the referenced client
+		// cert with correct content.
+		// It's difficult to set a timeout for the waiting because a manual approval (approve the CSR) is required on the
+		// hub cluster to create a client cert with the bootstrap hub kubeconfig.
+		logger.Info("Waiting for hub client config for managed cluster to be ready")
 		if err := wait.PollUntilContextCancel(bootstrapCtx, 1*time.Second, true, o.HasValidHubClientConfig); err != nil {
 			// TODO need run the bootstrap CSR forever to re-establish the client-cert if it is ever lost.
 			stopBootstrap()
-			return fmt.Errorf("failed to wait for hub client config and managed cluster to be ready: %w", err)
+			return fmt.Errorf("failed to wait for hub client config for managed cluster to be ready: %w", err)
 		}
 
 		// stop the clientCertForHubController for bootstrap once the hub client config is ready
