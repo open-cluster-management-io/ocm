@@ -20,24 +20,24 @@ metadata:
                 "url": "https://localhost"
               }
             ],
-            "imagePullSpec": "quay.io/open-cluster-management/registration-operator:latest",
+            "imagePullSpec": "quay.io/open-cluster-management/registration-operator:v0.13.3",
             "namespace": "open-cluster-management-agent",
-            "registrationImagePullSpec": "quay.io/open-cluster-management/registration:latest",
-            "workImagePullSpec": "quay.io/open-cluster-management/work:latest"
+            "registrationImagePullSpec": "quay.io/open-cluster-management/registration:v0.13.3",
+            "workImagePullSpec": "quay.io/open-cluster-management/work:v0.13.3"
           }
         }
       ]
     capabilities: Basic Install
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
-    containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2024-06-19T00:22:24Z"
+    containerImage: quay.io/open-cluster-management/registration-operator:v0.13.3
+    createdAt: "2024-06-18T14:40:07Z"
     description: Manages the installation and upgrade of the Klusterlet.
     operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/open-cluster-management-io/ocm
     support: Open Cluster Management Community
-  name: klusterlet.v9.9.9
+  name: klusterlet.v0.13.3
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -310,7 +310,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.name
-                image: quay.io/open-cluster-management/registration-operator:latest
+                image: quay.io/open-cluster-management/registration-operator:v0.13.3
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -372,8 +372,8 @@ spec:
   maturity: alpha
   provider:
     name: Open Cluster Management Community
-  replaces: klusterlet.v0.13.3
+  replaces: klusterlet.v0.13.2
   selector:
     matchLabels:
       app: klusterlet
-  version: 9.9.9
+  version: 0.13.3
