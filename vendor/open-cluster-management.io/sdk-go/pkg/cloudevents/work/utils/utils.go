@@ -66,7 +66,7 @@ func UID(sourceID, namespace, name string) string {
 }
 
 // ListWorksWithOptions retrieves the manifestworks from store which matches the options.
-func ListWorksWithOptions(store cache.Store, opts metav1.ListOptions) ([]*workv1.ManifestWork, error) {
+func ListWorksWithOptions(store cache.Store, namespace string, opts metav1.ListOptions) ([]*workv1.ManifestWork, error) {
 	var err error
 
 	labelSelector := labels.Everything()
@@ -91,6 +91,10 @@ func ListWorksWithOptions(store cache.Store, opts metav1.ListOptions) ([]*workv1
 	if err := cache.ListAll(store, labelSelector, func(obj interface{}) {
 		work, ok := obj.(*workv1.ManifestWork)
 		if !ok {
+			return
+		}
+
+		if namespace != metav1.NamespaceAll && work.Namespace != namespace {
 			return
 		}
 

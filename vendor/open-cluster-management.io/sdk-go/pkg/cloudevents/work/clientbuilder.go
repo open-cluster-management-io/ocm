@@ -141,17 +141,18 @@ func (b *ClientHolderBuilder) NewSourceClientHolder(ctx context.Context) (*Clien
 	workClient := &internal.WorkV1ClientWrapper{ManifestWorkClient: manifestWorkClient}
 	workClientSet := &internal.WorkClientSetWrapper{WorkV1ClientWrapper: workClient}
 
-	if !b.resync {
-		return &ClientHolder{workClientSet: workClientSet}, nil
-	}
-
-	// start a go routine to resync the works when this client reconnected
+	// start a go routine to receive client reconnect signal
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-cloudEventsClient.ReconnectedChan():
+				if !b.resync {
+					klog.V(4).Infof("resync is disabled, do nothing")
+					continue
+				}
+
 				// when receiving a client reconnected signal, we resync all clusters for this source
 				if err := cloudEventsClient.Resync(ctx, types.ClusterAll); err != nil {
 					klog.Errorf("failed to send resync request, %v", err)
@@ -159,6 +160,10 @@ func (b *ClientHolderBuilder) NewSourceClientHolder(ctx context.Context) (*Clien
 			}
 		}
 	}()
+
+	if !b.resync {
+		return &ClientHolder{workClientSet: workClientSet}, nil
+	}
 
 	// start a go routine to resync the works after this client's store is initiated
 	go func() {
@@ -209,16 +214,18 @@ func (b *ClientHolderBuilder) NewAgentClientHolder(ctx context.Context) (*Client
 	workClient := &internal.WorkV1ClientWrapper{ManifestWorkClient: manifestWorkClient}
 	workClientSet := &internal.WorkClientSetWrapper{WorkV1ClientWrapper: workClient}
 
-	if !b.resync {
-		return &ClientHolder{workClientSet: workClientSet}, nil
-	}
-
+	// start a go routine to receive client reconnect signal
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-cloudEventsClient.ReconnectedChan():
+				if !b.resync {
+					klog.V(4).Infof("resync is disabled, do nothing")
+					continue
+				}
+
 				// when receiving a client reconnected signal, we resync all sources for this agent
 				// TODO after supporting multiple sources, we should only resync agent known sources
 				if err := cloudEventsClient.Resync(ctx, types.SourceAll); err != nil {
@@ -227,6 +234,10 @@ func (b *ClientHolderBuilder) NewAgentClientHolder(ctx context.Context) (*Client
 			}
 		}
 	}()
+
+	if !b.resync {
+		return &ClientHolder{workClientSet: workClientSet}, nil
+	}
 
 	// start a go routine to resync the works after this client's store is initiated
 	go func() {

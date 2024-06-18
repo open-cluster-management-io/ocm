@@ -26,7 +26,9 @@ import (
 type ManifestWorkAgentClient struct {
 	cloudEventsClient *generic.CloudEventAgentClient[*workv1.ManifestWork]
 	watcherStore      store.WorkClientWatcherStore
-	clusterName       string
+
+	// this namespace should be same with the cluster name to which this client subscribes
+	namespace string
 }
 
 var _ workv1client.ManifestWorkInterface = &ManifestWorkAgentClient{}
@@ -39,8 +41,11 @@ func NewManifestWorkAgentClient(
 	return &ManifestWorkAgentClient{
 		cloudEventsClient: cloudEventsClient,
 		watcherStore:      watcherStore,
-		clusterName:       clusterName,
 	}
+}
+
+func (c *ManifestWorkAgentClient) SetNamespace(namespace string) {
+	c.namespace = namespace
 }
 
 func (c *ManifestWorkAgentClient) Create(ctx context.Context, manifestWork *workv1.ManifestWork, opts metav1.CreateOptions) (*workv1.ManifestWork, error) {
@@ -64,13 +69,13 @@ func (c *ManifestWorkAgentClient) DeleteCollection(ctx context.Context, opts met
 }
 
 func (c *ManifestWorkAgentClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*workv1.ManifestWork, error) {
-	klog.V(4).Infof("getting manifestwork %s", name)
-	return c.watcherStore.Get(c.clusterName, name)
+	klog.V(4).Infof("getting manifestwork %s/%s", c.namespace, name)
+	return c.watcherStore.Get(c.namespace, name)
 }
 
 func (c *ManifestWorkAgentClient) List(ctx context.Context, opts metav1.ListOptions) (*workv1.ManifestWorkList, error) {
-	klog.V(4).Infof("list manifestworks")
-	works, err := c.watcherStore.List(opts)
+	klog.V(4).Infof("list manifestworks from cluster %s", c.namespace)
+	works, err := c.watcherStore.List(c.namespace, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -84,13 +89,13 @@ func (c *ManifestWorkAgentClient) List(ctx context.Context, opts metav1.ListOpti
 }
 
 func (c *ManifestWorkAgentClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.watcherStore, nil
+	klog.V(4).Infof("watch manifestworks from cluster %s", c.namespace)
+	return c.watcherStore.GetWatcher(c.namespace, opts)
 }
 
 func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kubetypes.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *workv1.ManifestWork, err error) {
-	klog.V(4).Infof("patching manifestwork %s", name)
-
-	lastWork, err := c.watcherStore.Get(c.clusterName, name)
+	klog.V(4).Infof("patching manifestwork %s/%s", c.namespace, name)
+	lastWork, err := c.watcherStore.Get(c.namespace, name)
 	if err != nil {
 		return nil, err
 	}
