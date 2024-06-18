@@ -31,5 +31,5 @@ func (l *WatcherStoreLister) List(options types.ListOptions) ([]*workv1.Manifest
 		opts.LabelSelector = fmt.Sprintf("%s=%s", common.CloudEventsOriginalSourceLabelKey, options.Source)
 	}
 
-	return l.store.List(opts)
+	return l.store.List(options.ClusterName, opts)
 }

@@ -13,12 +13,11 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/watcher"
 )
 
 const ManifestWorkFinalizer = "cluster.open-cluster-management.io/manifest-work-cleanup"
 
-func newManifestWorkStatusHandler(lister workv1lister.ManifestWorkLister, watcher *watcher.ManifestWorkWatcher) generic.ResourceHandler[*workv1.ManifestWork] {
+func newManifestWorkStatusHandler(lister workv1lister.ManifestWorkLister, watcher *ManifestWorkWatcher) generic.ResourceHandler[*workv1.ManifestWork] {
 	return func(action types.ResourceAction, work *workv1.ManifestWork) error {
 		switch action {
 		case types.StatusModified:

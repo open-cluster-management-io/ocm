@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -19,44 +20,52 @@ import (
 //
 // It is used for building ManifestWork source client.
 type SourceInformerWatcherStore struct {
-	baseStore
+	baseSourceStore
+	watcher *workWatcher
 }
 
-var _ watch.Interface = &SourceInformerWatcherStore{}
 var _ WorkClientWatcherStore = &SourceInformerWatcherStore{}
 
 func NewSourceInformerWatcherStore(ctx context.Context) *SourceInformerWatcherStore {
 	s := &SourceInformerWatcherStore{
-		baseStore: baseStore{
-			result:        make(chan watch.Event),
-			done:          make(chan struct{}),
+		baseSourceStore: baseSourceStore{
+			baseStore:     baseStore{},
 			receivedWorks: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "informer-watcher-store"),
 		},
+		watcher: newWorkWatcher(),
 	}
 
 	// start a goroutine to process the received work events from the work queue with current store.
-	go newWorkProcessor(s.baseStore.receivedWorks, s).run(ctx.Done())
+	go newWorkProcessor(s.receivedWorks, s).run(ctx.Done())
 
 	return s
 }
 
 func (s *SourceInformerWatcherStore) Add(work *workv1.ManifestWork) error {
-	s.result <- watch.Event{Type: watch.Added, Object: work}
+	s.watcher.Receive(watch.Event{Type: watch.Added, Object: work})
 	return nil
 }
 
 func (s *SourceInformerWatcherStore) Update(work *workv1.ManifestWork) error {
-	s.result <- watch.Event{Type: watch.Modified, Object: work}
+	s.watcher.Receive(watch.Event{Type: watch.Modified, Object: work})
 	return nil
 }
 
 func (s *SourceInformerWatcherStore) Delete(work *workv1.ManifestWork) error {
-	s.result <- watch.Event{Type: watch.Deleted, Object: work}
+	s.watcher.Receive(watch.Event{Type: watch.Deleted, Object: work})
 	return nil
 }
 
 func (s *SourceInformerWatcherStore) HasInitiated() bool {
 	return s.initiated
+}
+
+func (s *SourceInformerWatcherStore) GetWatcher(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+	if namespace != metav1.NamespaceAll {
+		return nil, fmt.Errorf("unsupported to watch from the namespace %s", namespace)
+	}
+
+	return s.watcher, nil
 }
 
 func (s *SourceInformerWatcherStore) SetStore(store cache.Store) {
@@ -71,32 +80,30 @@ func (s *SourceInformerWatcherStore) SetStore(store cache.Store) {
 // It is used for building ManifestWork agent client.
 type AgentInformerWatcherStore struct {
 	baseStore
+	watcher *workWatcher
 }
 
-var _ watch.Interface = &AgentInformerWatcherStore{}
 var _ WorkClientWatcherStore = &AgentInformerWatcherStore{}
 
 func NewAgentInformerWatcherStore() *AgentInformerWatcherStore {
 	return &AgentInformerWatcherStore{
-		baseStore: baseStore{
-			result: make(chan watch.Event),
-			done:   make(chan struct{}),
-		},
+		baseStore: baseStore{},
+		watcher:   newWorkWatcher(),
 	}
 }
 
 func (s *AgentInformerWatcherStore) Add(work *workv1.ManifestWork) error {
-	s.result <- watch.Event{Type: watch.Added, Object: work}
+	s.watcher.Receive(watch.Event{Type: watch.Added, Object: work})
 	return nil
 }
 
 func (s *AgentInformerWatcherStore) Update(work *workv1.ManifestWork) error {
-	s.result <- watch.Event{Type: watch.Modified, Object: work}
+	s.watcher.Receive(watch.Event{Type: watch.Modified, Object: work})
 	return nil
 }
 
 func (s *AgentInformerWatcherStore) Delete(work *workv1.ManifestWork) error {
-	s.result <- watch.Event{Type: watch.Deleted, Object: work}
+	s.watcher.Receive(watch.Event{Type: watch.Deleted, Object: work})
 	return nil
 }
 
@@ -136,6 +143,10 @@ func (s *AgentInformerWatcherStore) HandleReceivedWork(action types.ResourceActi
 	default:
 		return fmt.Errorf("unsupported resource action %s", action)
 	}
+}
+
+func (s *AgentInformerWatcherStore) GetWatcher(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+	return s.watcher, nil
 }
 
 func (s *AgentInformerWatcherStore) HasInitiated() bool {

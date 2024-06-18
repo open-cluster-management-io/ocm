@@ -29,43 +29,16 @@ const ManifestWorkFinalizer = "cloudevents.open-cluster-management.io/manifest-w
 type baseStore struct {
 	sync.RWMutex
 
-	result chan watch.Event
-	done   chan struct{}
-
-	store cache.Store
-
+	store     cache.Store
 	initiated bool
-
-	// a queue to save the received work events
-	receivedWorks workqueue.RateLimitingInterface
-}
-
-// ResultChan implements watch interface.
-func (b *baseStore) ResultChan() <-chan watch.Event {
-	return b.result
-}
-
-// Stop implements watch interface.
-func (b *baseStore) Stop() {
-	// Call Close() exactly once by locking and setting a flag.
-	b.Lock()
-	defer b.Unlock()
-
-	// closing a closed channel always panics, therefore check before closing
-	select {
-	case <-b.done:
-		close(b.result)
-	default:
-		close(b.done)
-	}
 }
 
 // List the works from the store with the list options
-func (b *baseStore) List(opts metav1.ListOptions) ([]*workv1.ManifestWork, error) {
+func (b *baseStore) List(namespace string, opts metav1.ListOptions) ([]*workv1.ManifestWork, error) {
 	b.RLock()
 	defer b.RUnlock()
 
-	return utils.ListWorksWithOptions(b.store, opts)
+	return utils.ListWorksWithOptions(b.store, namespace, opts)
 }
 
 // Get a works from the store
@@ -105,10 +78,17 @@ func (b *baseStore) ListAll() ([]*workv1.ManifestWork, error) {
 	return works, nil
 }
 
-func (b *baseStore) HandleReceivedWork(action types.ResourceAction, work *workv1.ManifestWork) error {
+type baseSourceStore struct {
+	baseStore
+
+	// a queue to save the received work events
+	receivedWorks workqueue.RateLimitingInterface
+}
+
+func (bs *baseSourceStore) HandleReceivedWork(action types.ResourceAction, work *workv1.ManifestWork) error {
 	switch action {
 	case types.StatusModified:
-		b.receivedWorks.Add(work)
+		bs.receivedWorks.Add(work)
 	default:
 		return fmt.Errorf("unsupported resource action %s", action)
 	}
@@ -237,6 +217,73 @@ func (b *workProcessor) getWork(uid kubetypes.UID) *workv1.ManifestWork {
 	}
 
 	return nil
+}
+
+// workWatcher implements the watch.Interface.
+type workWatcher struct {
+	sync.RWMutex
+
+	result  chan watch.Event
+	done    chan struct{}
+	stopped bool
+}
+
+var _ watch.Interface = &workWatcher{}
+
+func newWorkWatcher() *workWatcher {
+	return &workWatcher{
+		// It's easy for a consumer to add buffering via an extra
+		// goroutine/channel, but impossible for them to remove it,
+		// so nonbuffered is better.
+		result: make(chan watch.Event),
+		// If the watcher is externally stopped there is no receiver anymore
+		// and the send operations on the result channel, especially the
+		// error reporting might block forever.
+		// Therefore a dedicated stop channel is used to resolve this blocking.
+		done: make(chan struct{}),
+	}
+}
+
+// ResultChan implements Interface.
+func (w *workWatcher) ResultChan() <-chan watch.Event {
+	return w.result
+}
+
+// Stop implements Interface.
+func (w *workWatcher) Stop() {
+	// Call Close() exactly once by locking and setting a flag.
+	w.Lock()
+	defer w.Unlock()
+	// closing a closed channel always panics, therefore check before closing
+	select {
+	case <-w.done:
+		close(w.result)
+	default:
+		w.stopped = true
+		close(w.done)
+	}
+}
+
+// Receive a event from the work client and sends down the result channel.
+func (w *workWatcher) Receive(evt watch.Event) {
+	if w.isStopped() {
+		// this watcher is stopped, do nothing.
+		return
+	}
+
+	if klog.V(4).Enabled() {
+		obj, _ := meta.Accessor(evt.Object)
+		klog.V(4).Infof("Receive the event %v for %v", evt.Type, obj.GetName())
+	}
+
+	w.result <- evt
+}
+
+func (w *workWatcher) isStopped() bool {
+	w.RLock()
+	defer w.RUnlock()
+
+	return w.stopped
 }
 
 func ensureFinalizers(workFinalizers []string) []string {

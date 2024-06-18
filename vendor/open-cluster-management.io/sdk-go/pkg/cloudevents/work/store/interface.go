@@ -15,13 +15,13 @@ import (
 
 const syncedPollPeriod = 100 * time.Millisecond
 
-// StoreInitiated is a function that can be used to determine if an informer has synced.
-// This is useful for determining if caches have synced.
+// StoreInitiated is a function that can be used to determine if a store has initiated.
 type StoreInitiated func() bool
 
-// WorkClientWatcherStore extends the watch interface with a work store.
+// WorkClientWatcherStore provides a watcher with a work store.
 type WorkClientWatcherStore interface {
-	watch.Interface
+	// GetWatcher returns a watcher to receive work changes.
+	GetWatcher(namespace string, opts metav1.ListOptions) (watch.Interface, error)
 
 	// HandleReceivedWork handles the client received work events.
 	HandleReceivedWork(action types.ResourceAction, work *workv1.ManifestWork) error
@@ -38,8 +38,8 @@ type WorkClientWatcherStore interface {
 	// watcher store, in some case, it does not need to update a store, but just send a watch event.
 	Delete(work *workv1.ManifestWork) error
 
-	// List returns the works from store with list options
-	List(opts metav1.ListOptions) ([]*workv1.ManifestWork, error)
+	// List returns the works from store for a given namespace with list options
+	List(namespace string, opts metav1.ListOptions) ([]*workv1.ManifestWork, error)
 
 	// ListAll list all of the works from store
 	ListAll() ([]*workv1.ManifestWork, error)

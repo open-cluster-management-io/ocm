@@ -20,7 +20,6 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/watcher"
 )
 
 const ManifestsDeleted = "Deleted"
@@ -32,7 +31,7 @@ const (
 
 type manifestWorkSourceClient struct {
 	cloudEventsClient *generic.CloudEventSourceClient[*workv1.ManifestWork]
-	watcher           *watcher.ManifestWorkWatcher
+	watcher           *ManifestWorkWatcher
 	lister            workv1lister.ManifestWorkLister
 	namespace         string
 }
@@ -42,7 +41,7 @@ var manifestWorkGR = schema.GroupResource{Group: workv1.GroupName, Resource: "ma
 var _ workv1client.ManifestWorkInterface = &manifestWorkSourceClient{}
 
 func newManifestWorkSourceClient(cloudEventsClient *generic.CloudEventSourceClient[*workv1.ManifestWork],
-	watcher *watcher.ManifestWorkWatcher) *manifestWorkSourceClient {
+	watcher *ManifestWorkWatcher) *manifestWorkSourceClient {
 	return &manifestWorkSourceClient{
 		cloudEventsClient: cloudEventsClient,
 		watcher:           watcher,

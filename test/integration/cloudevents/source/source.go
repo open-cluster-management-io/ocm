@@ -19,7 +19,6 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/watcher"
 )
 
 const (
@@ -89,7 +88,7 @@ func (m *MQTTSource) Start(ctx context.Context) error {
 
 	// build a source client
 	workLister := &manifestWorkLister{}
-	watcher := watcher.NewManifestWorkWatcher()
+	watcher := NewManifestWorkWatcher()
 	mqttOptions, err := mqtt.BuildMQTTOptionsFromFlags(m.configFile)
 	if err != nil {
 		return err

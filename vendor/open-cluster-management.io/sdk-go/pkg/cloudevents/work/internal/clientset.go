@@ -7,6 +7,8 @@ import (
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	workv1alpha1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1alpha1"
+
+	agentclient "open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/client"
 	sourceclient "open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/client"
 )
 
@@ -42,7 +44,13 @@ func (c *WorkV1ClientWrapper) ManifestWorks(namespace string) workv1client.Manif
 		sourceManifestWorkClient.SetNamespace(namespace)
 		return sourceManifestWorkClient
 	}
-	return c.ManifestWorkClient
+
+	if agentManifestWorkClient, ok := c.ManifestWorkClient.(*agentclient.ManifestWorkAgentClient); ok {
+		agentManifestWorkClient.SetNamespace(namespace)
+		return agentManifestWorkClient
+	}
+
+	return nil
 }
 
 func (c *WorkV1ClientWrapper) AppliedManifestWorks() workv1client.AppliedManifestWorkInterface {

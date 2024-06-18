@@ -152,7 +152,7 @@ func (c *ManifestWorkSourceClient) Get(ctx context.Context, name string, opts me
 
 func (c *ManifestWorkSourceClient) List(ctx context.Context, opts metav1.ListOptions) (*workv1.ManifestWorkList, error) {
 	klog.V(4).Infof("list manifestworks")
-	works, err := c.watcherStore.List(opts)
+	works, err := c.watcherStore.List(c.namespace, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func (c *ManifestWorkSourceClient) List(ctx context.Context, opts metav1.ListOpt
 }
 
 func (c *ManifestWorkSourceClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.watcherStore, nil
+	return c.watcherStore.GetWatcher(c.namespace, opts)
 }
 
 func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt kubetypes.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *workv1.ManifestWork, err error) {
