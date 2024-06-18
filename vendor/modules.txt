@@ -1597,6 +1597,7 @@ open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta2
 open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier
 open-cluster-management.io/sdk-go/pkg/apis/work/v1/builder
 open-cluster-management.io/sdk-go/pkg/apis/work/v1/validator
+open-cluster-management.io/sdk-go/pkg/certrotation
 open-cluster-management.io/sdk-go/pkg/cloudevents/constants
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options
@@ -1620,6 +1621,7 @@ open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/codec
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/lister
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/store
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/utils
+open-cluster-management.io/sdk-go/pkg/helpers
 open-cluster-management.io/sdk-go/pkg/patcher
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.28.0
 ## explicit; go 1.20

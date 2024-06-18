@@ -4,11 +4,10 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
+	"open-cluster-management.io/sdk-go/pkg/helpers"
 	"reflect"
 
 	"github.com/openshift/library-go/pkg/crypto"
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -20,16 +19,15 @@ import (
 
 // CABundleRotation maintains a CA bundle config map, but adding new CA certs and removing expired old ones.
 type CABundleRotation struct {
-	Namespace     string
-	Name          string
-	Lister        corev1listers.ConfigMapLister
-	Client        corev1client.ConfigMapsGetter
-	EventRecorder events.Recorder
+	Namespace string
+	Name      string
+	Lister    corev1listers.ConfigMapLister
+	Client    corev1client.ConfigMapsGetter
 }
 
-func (c CABundleRotation) EnsureConfigMapCABundle(ctx context.Context, signingCertKeyPair *crypto.CA) ([]*x509.Certificate, error) {
-	// by this point we have current signing cert/key pair.  We now need to make sure that the ca-bundle configmap has this cert and
-	// doesn't have any expired certs
+func (c CABundleRotation) EnsureConfigMapCABundle(signingCertKeyPair *crypto.CA) ([]*x509.Certificate, error) {
+	// by this point we have current signing cert/key pair.  We now need to make sure that the
+	// ca-bundle configmap has this cert and doesn't have any expired certs
 	originalCABundleConfigMap, err := c.Lister.ConfigMaps(c.Namespace).Get(c.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
@@ -42,10 +40,10 @@ func (c CABundleRotation) EnsureConfigMapCABundle(ctx context.Context, signingCe
 	if _, err = manageCABundleConfigMap(caBundleConfigMap, signingCertKeyPair.Config.Certs[0]); err != nil {
 		return nil, err
 	}
-	if originalCABundleConfigMap == nil || originalCABundleConfigMap.Data == nil ||
+	if originalCABundleConfigMap == nil ||
+		originalCABundleConfigMap.Data == nil ||
 		!equality.Semantic.DeepEqual(originalCABundleConfigMap.Data, caBundleConfigMap.Data) {
-		c.EventRecorder.Eventf("CABundleUpdateRequired", "%q in %q requires update", c.Name, c.Namespace)
-		actualCABundleConfigMap, _, err := resourceapply.ApplyConfigMap(ctx, c.Client, c.EventRecorder, caBundleConfigMap)
+		actualCABundleConfigMap, _, err := helpers.ApplyConfigMap(context.TODO(), c.Client, caBundleConfigMap)
 		if err != nil {
 			return nil, err
 		}
@@ -54,7 +52,8 @@ func (c CABundleRotation) EnsureConfigMapCABundle(ctx context.Context, signingCe
 
 	caBundle := caBundleConfigMap.Data["ca-bundle.crt"]
 	if len(caBundle) == 0 {
-		return nil, fmt.Errorf("configmap/%s -n%s missing ca-bundle.crt", caBundleConfigMap.Name, caBundleConfigMap.Namespace)
+		return nil, fmt.Errorf("configmap/%s -n%s missing ca-bundle.crt",
+			caBundleConfigMap.Name, caBundleConfigMap.Namespace)
 	}
 	certificates, err := cert.ParseCertsPEM([]byte(caBundle))
 	if err != nil {
@@ -64,14 +63,15 @@ func (c CABundleRotation) EnsureConfigMapCABundle(ctx context.Context, signingCe
 	return certificates, nil
 }
 
-// manageCABundleConfigMap adds the new certificate to the list of cabundles, eliminates duplicates, and prunes the list of expired
-// certs to trust as signers
-func manageCABundleConfigMap(caBundleConfigMap *corev1.ConfigMap, currentSigner *x509.Certificate) ([]*x509.Certificate, error) {
+// manageCABundleConfigMap adds the new certificate to the list of cabundles, eliminates duplicates,
+// and prunes the list of expired certs to trust as signers
+func manageCABundleConfigMap(
+	caBundleConfigMap *corev1.ConfigMap, currentSigner *x509.Certificate) ([]*x509.Certificate, error) {
 	if caBundleConfigMap.Data == nil {
 		caBundleConfigMap.Data = map[string]string{}
 	}
 
-	var certificates []*x509.Certificate
+	certificates := []*x509.Certificate{}
 	caBundle := caBundleConfigMap.Data["ca-bundle.crt"]
 	if len(caBundle) > 0 {
 		var err error
@@ -83,7 +83,7 @@ func manageCABundleConfigMap(caBundleConfigMap *corev1.ConfigMap, currentSigner 
 	certificates = append([]*x509.Certificate{currentSigner}, certificates...)
 	certificates = crypto.FilterExpiredCerts(certificates...)
 
-	var finalCertificates []*x509.Certificate
+	finalCertificates := []*x509.Certificate{}
 	// now check for duplicates. n^2, but super simple
 	for i := range certificates {
 		found := false
