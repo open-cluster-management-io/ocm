@@ -600,7 +600,7 @@ func TestSyncDeploySingleton(t *testing.T) {
 
 	for _, c := range cases {
 		klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
-		klusterlet.SetLabels(map[string]string{"test": "test", "abc": "abc"})
+		klusterlet.SetLabels(map[string]string{"test": "123", "abc": "abc", "123": "213"})
 		klusterlet.Spec.DeployOption.Mode = operatorapiv1.InstallModeSingleton
 		bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
 		hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")

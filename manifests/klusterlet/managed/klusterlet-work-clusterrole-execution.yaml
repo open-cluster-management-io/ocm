@@ -8,7 +8,7 @@ metadata:
     open-cluster-management.io/aggregate-to-work: "true"
     {{ if gt (len .Labels) 0 }}
     {{ range $key, $value := .Labels }}
-    {{ $key }}: {{ $value }}
+    "{{ $key }}": "{{ $value }}"
     {{ end }}
     {{ end }}
 rules:
