@@ -1,4 +1,4 @@
-package clientcert
+package csr
 
 import (
 	"context"
@@ -21,70 +21,22 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog/v2"
-)
 
-const (
-	// KubeconfigFile is the name of the kubeconfig file in kubeconfigSecret
-	KubeconfigFile = "kubeconfig"
-	// TLSKeyFile is the name of tls key file in kubeconfigSecret
-	TLSKeyFile = "tls.key"
-	// TLSCertFile is the name of the tls cert file in kubeconfigSecret
-	TLSCertFile = "tls.crt"
-
-	ClusterNameFile = "cluster-name"
-	AgentNameFile   = "agent-name"
-
-	// ClusterCertificateRotatedCondition is a condition type that client certificate is rotated
-	ClusterCertificateRotatedCondition = "ClusterCertificateRotated"
+	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
 // ControllerResyncInterval is exposed so that integration tests can crank up the constroller sync speed.
 var ControllerResyncInterval = 5 * time.Minute
 
-// CSROption includes options that is used to create and monitor csrs
-type CSROption struct {
-	// ObjectMeta is the ObjectMeta shared by all created csrs. It should use GenerateName instead of Name
-	// to generate random csr names
-	ObjectMeta metav1.ObjectMeta
-	// Subject represents the subject of the client certificate used to create csrs
-	Subject *pkix.Name
-	// DNSNames represents DNS names used to create the client certificate
-	DNSNames []string
-	// SignerName is the name of the signer specified in the created csrs
-	SignerName string
-
-	// ExpirationSeconds is the requested duration of validity of the issued
-	// certificate.
-	// Certificate signers may not honor this field for various reasons:
-	//
-	//   1. Old signer that is unaware of the field (such as the in-tree
-	//      implementations prior to v1.22)
-	//   2. Signer whose configured maximum is shorter than the requested duration
-	//   3. Signer whose configured minimum is longer than the requested duration
-	//
-	// The minimum valid value for expirationSeconds is 3600, i.e. 1 hour.
-	ExpirationSeconds *int32
-
-	// EventFilterFunc matches csrs created with above options
-	EventFilterFunc factory.EventFilterFunc
-
-	// HaltCSRCreation halt the csr creation
-	HaltCSRCreation func() bool
-}
-
-// ClientCertOption includes options that is used to create client certificate
-type ClientCertOption struct {
+type secretOption struct {
 	// SecretNamespace is the namespace of the secret containing client certificate.
-	SecretNamespace string
+	secretNamespace string
 	// SecretName is the name of the secret containing client certificate. The secret will be created if
 	// it does not exist.
-	SecretName string
-	// AdditionalSecretData contains data that will be added into client certificate secret besides tls.key/tls.crt
-	// Once AdditionalSecretData changes, the client cert will be recreated.
-	AdditionalSecretData map[string][]byte
+	secretName string
+	// AdditonalSecretData contains data that will be added into the secret
+	additionalSecretData map[string][]byte
 }
-
-type StatusUpdateFunc func(ctx context.Context, cond metav1.Condition) error
 
 // clientCertificateController implements the common logic of hub client certification creation/rotation. It
 // creates a client certificate and rotates it before it becomes expired by using csrs. The client
@@ -92,12 +44,9 @@ type StatusUpdateFunc func(ctx context.Context, cond metav1.Condition) error
 // 1). tls.key: tls key file
 // 2). tls.crt: tls cert file
 type clientCertificateController struct {
-	ClientCertOption
+	secretOption
 	CSROption
-	csrControl CSRControl
-	// managementCoreClient is used to create/delete hub kubeconfig secret on the management cluster
-	managementCoreClient corev1client.CoreV1Interface
-	controllerName       string
+	controllerName string
 
 	// csrName is the name of csr created by controller and waiting for approval.
 	csrName string
@@ -111,27 +60,32 @@ type clientCertificateController struct {
 	//   4. csrName empty, keydata set: the CSR failed to create, this shouldn't happen, it's a bug.
 	keyData []byte
 
-	statusUpdater StatusUpdateFunc
+	managementCoreClient corev1client.CoreV1Interface
+	statusUpdater        register.StatusUpdateFunc
 }
 
 // NewClientCertificateController return an instance of clientCertificateController
 func NewClientCertificateController(
-	clientCertOption ClientCertOption,
+	secretNamespace string,
+	secretName string,
+	additionalSecretData map[string][]byte,
 	csrOption CSROption,
-	csrControl CSRControl,
+	statusUpdater register.StatusUpdateFunc,
 	managementSecretInformer corev1informers.SecretInformer,
 	managementCoreClient corev1client.CoreV1Interface,
-	statusUpdater StatusUpdateFunc,
 	recorder events.Recorder,
 	controllerName string,
 ) factory.Controller {
 	c := clientCertificateController{
-		ClientCertOption:     clientCertOption,
+		secretOption: secretOption{
+			secretName:           secretName,
+			secretNamespace:      secretNamespace,
+			additionalSecretData: additionalSecretData,
+		},
 		CSROption:            csrOption,
-		csrControl:           csrControl,
-		managementCoreClient: managementCoreClient,
 		controllerName:       controllerName,
 		statusUpdater:        statusUpdater,
+		managementCoreClient: managementCoreClient,
 	}
 
 	return factory.New().
@@ -143,14 +97,14 @@ func NewClientCertificateController(
 				return false
 			}
 			// only enqueue a specific secret
-			if accessor.GetNamespace() == c.SecretNamespace && accessor.GetName() == c.SecretName {
+			if accessor.GetNamespace() == c.secretNamespace && accessor.GetName() == c.secretName {
 				return true
 			}
 			return false
 		}, managementSecretInformer.Informer()).
 		WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
 			return factory.DefaultQueueKey
-		}, c.EventFilterFunc, csrControl.Informer()).
+		}, c.EventFilterFunc, csrOption.CSRControl.Informer()).
 		WithSync(c.sync).
 		ResyncEvery(ControllerResyncInterval).
 		ToController(controllerName, recorder)
@@ -159,17 +113,17 @@ func NewClientCertificateController(
 func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	logger := klog.FromContext(ctx)
 	// get secret containing client certificate
-	secret, err := c.managementCoreClient.Secrets(c.SecretNamespace).Get(ctx, c.SecretName, metav1.GetOptions{})
+	secret, err := c.managementCoreClient.Secrets(c.secretNamespace).Get(ctx, c.secretName, metav1.GetOptions{})
 	switch {
 	case apierrors.IsNotFound(err):
 		secret = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: c.SecretNamespace,
-				Name:      c.SecretName,
+				Namespace: c.secretNamespace,
+				Name:      c.secretName,
 			},
 		}
 	case err != nil:
-		return fmt.Errorf("unable to get secret %q: %w", c.SecretNamespace+"/"+c.SecretName, err)
+		return fmt.Errorf("unable to get secret %q: %w", c.secretNamespace+"/"+c.secretName, err)
 	}
 
 	// reconcile pending csr if exists
@@ -182,7 +136,7 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 			}
 
 			// skip if csr is not approved yet
-			isApproved, err := c.csrControl.isApproved(c.csrName)
+			isApproved, err := c.CSROption.CSRControl.isApproved(c.csrName)
 			if err != nil {
 				return nil, err
 			}
@@ -191,7 +145,7 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 			}
 
 			// skip if csr is not issued
-			certData, err := c.csrControl.getIssuedCertificate(c.csrName)
+			certData, err := c.CSROption.CSRControl.getIssuedCertificate(c.csrName)
 			if err != nil {
 				return nil, err
 			}
@@ -233,12 +187,12 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 			return nil
 		}
 		// append additional data into client certificate secret
-		for k, v := range c.AdditionalSecretData {
+		for k, v := range c.additionalSecretData {
 			newSecretConfig[k] = v
 		}
 		secret.Data = newSecretConfig
 		// save the changes into secret
-		if err := saveSecret(c.managementCoreClient, c.SecretNamespace, secret); err != nil {
+		if err := saveSecret(c.managementCoreClient, c.secretNamespace, secret); err != nil {
 			if updateErr := c.statusUpdater(ctx, metav1.Condition{
 				Type:    "ClusterCertificateRotated",
 				Status:  metav1.ConditionFalse,
@@ -291,7 +245,7 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 		secret,
 		syncCtx.Recorder(),
 		c.Subject,
-		c.AdditionalSecretData)
+		c.additionalSecretData)
 	if err != nil {
 		return err
 	}
@@ -328,7 +282,7 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 		if err != nil {
 			return keyData, "", fmt.Errorf("unable to generate certificate request: %w", err)
 		}
-		createdCSRName, err := c.csrControl.create(ctx, syncCtx.Recorder(), c.ObjectMeta, csrData, c.SignerName, c.ExpirationSeconds)
+		createdCSRName, err := c.CSROption.CSRControl.create(ctx, syncCtx.Recorder(), c.ObjectMeta, csrData, c.SignerName, c.ExpirationSeconds)
 		if err != nil {
 			return keyData, "", err
 		}
@@ -375,7 +329,7 @@ func shouldCreateCSR(
 	additionalSecretData map[string][]byte) (bool, error) {
 	// create a csr to request new client certificate if
 	// a.there is no valid client certificate issued for the current cluster/agent
-	valid, err := IsCertificateValid(logger, secret.Data[TLSCertFile], subject)
+	valid, err := isCertificateValid(logger, secret.Data[TLSCertFile], subject)
 	if err != nil {
 		recorder.Eventf("CertificateValidationFailed", "Failed to validate client certificate for %s: %v", controllerName, err)
 		return true, nil

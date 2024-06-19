@@ -12,10 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog/v2"
 
-	"open-cluster-management.io/ocm/pkg/registration/clientcert"
-	"open-cluster-management.io/ocm/pkg/registration/spoke/registration"
+	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
 const (
@@ -96,7 +94,7 @@ func (o *AgentOptions) Validate() error {
 // Complete fills in missing values.
 func (o *AgentOptions) Complete() error {
 	if len(o.HubKubeconfigFile) == 0 {
-		o.HubKubeconfigFile = path.Join(o.HubKubeconfigDir, clientcert.KubeconfigFile)
+		o.HubKubeconfigFile = path.Join(o.HubKubeconfigDir, register.KubeconfigFile)
 	}
 
 	// load or generate cluster/agent names
@@ -122,13 +120,6 @@ func (o *AgentOptions) getOrGenerateClusterAgentID() (string, string) {
 	if len(o.SpokeClusterName) > 0 && len(o.AgentID) > 0 {
 		return o.SpokeClusterName, o.AgentID
 	}
-	// try to load cluster/agent name from tls certification
-	var clusterNameInCert, agentNameInCert string
-	certPath := path.Join(o.HubKubeconfigDir, clientcert.TLSCertFile)
-	certData, certErr := os.ReadFile(path.Clean(certPath))
-	if certErr == nil {
-		clusterNameInCert, agentNameInCert, _ = registration.GetClusterAgentNamesFromCertificate(certData)
-	}
 
 	clusterName := o.SpokeClusterName
 	// if cluster name is not specified with input argument, try to load it from file
@@ -136,15 +127,9 @@ func (o *AgentOptions) getOrGenerateClusterAgentID() (string, string) {
 		// TODO, read cluster name from openshift struct if the spoke agent is running in an openshift cluster
 
 		// and then load the cluster name from the mounted secret
-		clusterNameFilePath := path.Join(o.HubKubeconfigDir, clientcert.ClusterNameFile)
+		clusterNameFilePath := path.Join(o.HubKubeconfigDir, register.ClusterNameFile)
 		clusterNameBytes, err := os.ReadFile(path.Clean(clusterNameFilePath))
 		switch {
-		case len(clusterNameInCert) > 0:
-			// use cluster name loaded from the tls certification
-			clusterName = clusterNameInCert
-			if clusterNameInCert != string(clusterNameBytes) {
-				klog.Warningf("Use cluster name %q in certification instead of %q in the mounted secret", clusterNameInCert, string(clusterNameBytes))
-			}
 		case err == nil:
 			// use cluster name load from the mounted secret
 			clusterName = string(clusterNameBytes)
@@ -157,17 +142,9 @@ func (o *AgentOptions) getOrGenerateClusterAgentID() (string, string) {
 	agentID := o.AgentID
 	// try to load agent name from the mounted secret
 	if len(agentID) == 0 {
-		agentIDFilePath := path.Join(o.HubKubeconfigDir, clientcert.AgentNameFile)
+		agentIDFilePath := path.Join(o.HubKubeconfigDir, register.AgentNameFile)
 		agentIDBytes, err := os.ReadFile(path.Clean(agentIDFilePath))
 		switch {
-		case len(agentNameInCert) > 0:
-			// use agent name loaded from the tls certification
-			agentID = agentNameInCert
-			if agentNameInCert != agentID {
-				klog.Warningf(
-					"Use agent name %q in certification instead of %q in the mounted secret",
-					agentNameInCert, agentID)
-			}
 		case err == nil:
 			// use agent name loaded from the mounted secret
 			agentID = string(agentIDBytes)

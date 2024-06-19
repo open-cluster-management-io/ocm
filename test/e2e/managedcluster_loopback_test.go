@@ -22,8 +22,9 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 
-	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
+	"open-cluster-management.io/ocm/pkg/registration/register"
+	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 )
 
 var _ = ginkgo.Describe("Loopback registration [development]", func() {
@@ -307,13 +308,13 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 			if err != nil {
 				return false
 			}
-			if _, ok := secret.Data[clientcert.TLSKeyFile]; !ok {
+			if _, ok := secret.Data[csr.TLSKeyFile]; !ok {
 				return false
 			}
-			if _, ok := secret.Data[clientcert.TLSCertFile]; !ok {
+			if _, ok := secret.Data[csr.TLSCertFile]; !ok {
 				return false
 			}
-			if _, ok := secret.Data[clientcert.KubeconfigFile]; !ok {
+			if _, ok := secret.Data[register.KubeconfigFile]; !ok {
 				return false
 			}
 			return true
@@ -326,7 +327,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 				return err
 			}
 
-			if !meta.IsStatusConditionTrue(found.Status.Conditions, clientcert.ClusterCertificateRotatedCondition) {
+			if !meta.IsStatusConditionTrue(found.Status.Conditions, csr.ClusterCertificateRotatedCondition) {
 				return fmt.Errorf("Client cert condition is not correct")
 			}
 

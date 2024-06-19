@@ -27,8 +27,8 @@ import (
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
-	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 	"open-cluster-management.io/ocm/pkg/registration/hub"
+	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/addon"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/registration"
@@ -111,7 +111,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	// crank up the sync speed
 	transport.CertCallbackRefreshDuration = 5 * time.Second
-	clientcert.ControllerResyncInterval = 5 * time.Second
+	csr.ControllerResyncInterval = 5 * time.Second
 	registration.CreatingControllerSyncInterval = 1 * time.Second
 
 	// crank up the addon lease sync and udpate speed
