@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -26,7 +27,8 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
-	"open-cluster-management.io/ocm/pkg/registration/clientcert"
+	"open-cluster-management.io/ocm/pkg/registration/register"
+	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 )
 
 const (
@@ -43,13 +45,13 @@ const (
 type addOnRegistrationController struct {
 	clusterName          string
 	agentName            string
-	kubeconfigData       []byte
+	kubeconfig           *clientcmdapi.Config
 	managementKubeClient kubernetes.Interface // in-cluster local management kubeClient
 	spokeKubeClient      kubernetes.Interface
 	hubAddOnLister       addonlisterv1alpha1.ManagedClusterAddOnLister
 	patcher              patcher.Patcher[
 		*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus]
-	csrControl clientcert.CSRControl
+	csrControl csr.CSRControl
 	recorder   events.Recorder
 	csrIndexer cache.Indexer
 
@@ -64,18 +66,18 @@ type addOnRegistrationController struct {
 func NewAddOnRegistrationController(
 	clusterName string,
 	agentName string,
-	kubeconfigData []byte,
+	kubeconfig *clientcmdapi.Config,
 	addOnClient addonclient.Interface,
 	managementKubeClient kubernetes.Interface,
 	managedKubeClient kubernetes.Interface,
-	csrControl clientcert.CSRControl,
+	csrControl csr.CSRControl,
 	hubAddOnInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	recorder events.Recorder,
 ) factory.Controller {
 	c := &addOnRegistrationController{
 		clusterName:          clusterName,
 		agentName:            agentName,
-		kubeconfigData:       kubeconfigData,
+		kubeconfig:           kubeconfig,
 		managementKubeClient: managementKubeClient,
 		spokeKubeClient:      managedKubeClient,
 		hubAddOnLister:       hubAddOnInformers.Lister(),
@@ -210,19 +212,20 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 	kubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(
 		kubeClient, 10*time.Minute, informers.WithNamespace(config.InstallationNamespace))
 
-	additionalSecretData := map[string][]byte{}
+	secretOption := register.SecretOption{
+		SecretNamespace:          config.InstallationNamespace,
+		SecretName:               config.secretName,
+		ManagementCoreClient:     kubeClient.CoreV1(),
+		ManagementSecretInformer: kubeInformerFactory.Core().V1().Secrets(),
+	}
+
 	if config.registration.SignerName == certificatesv1.KubeAPIServerClientSignerName {
-		additionalSecretData[clientcert.KubeconfigFile] = c.kubeconfigData
+		secretOption.BootStrapKubeConfig = c.kubeconfig
 	}
 
-	// build and start a client cert controller
-	clientCertOption := clientcert.ClientCertOption{
-		SecretNamespace:      config.InstallationNamespace,
-		SecretName:           config.secretName,
-		AdditionalSecretData: additionalSecretData,
-	}
-
-	csrOption := clientcert.CSROption{
+	driver := csr.NewCSRDriver()
+	registerImpl := register.NewRegister(driver)
+	csrOption := &csr.CSROption{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("addon-%s-%s-", c.clusterName, config.addOnName),
 			Labels: map[string]string{
@@ -236,25 +239,14 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 		SignerName:      config.registration.SignerName,
 		EventFilterFunc: createCSREventFilterFunc(c.clusterName, config.addOnName, config.registration.SignerName),
 		HaltCSRCreation: c.haltCSRCreationFunc(config.addOnName),
+		CSRControl:      c.csrControl,
 	}
 
 	controllerName := fmt.Sprintf("ClientCertController@addon:%s:signer:%s", config.addOnName, config.registration.SignerName)
-
 	statusUpdater := c.generateStatusUpdate(c.clusterName, config.addOnName)
 
-	clientCertController := clientcert.NewClientCertificateController(
-		clientCertOption,
-		csrOption,
-		c.csrControl,
-		kubeInformerFactory.Core().V1().Secrets(),
-		kubeClient.CoreV1(),
-		statusUpdater,
-		c.recorder,
-		controllerName,
-	)
-
+	go registerImpl.Start(ctx, controllerName, statusUpdater, c.recorder, secretOption, csrOption)
 	go kubeInformerFactory.Start(ctx.Done())
-	go clientCertController.Run(ctx, 1)
 
 	return stopFunc
 }
@@ -274,7 +266,7 @@ func (c *addOnRegistrationController) haltCSRCreationFunc(addonName string) func
 	}
 }
 
-func (c *addOnRegistrationController) generateStatusUpdate(clusterName, addonName string) clientcert.StatusUpdateFunc {
+func (c *addOnRegistrationController) generateStatusUpdate(clusterName, addonName string) register.StatusUpdateFunc {
 	return func(ctx context.Context, cond metav1.Condition) error {
 		addon, err := c.hubAddOnLister.ManagedClusterAddOns(clusterName).Get(addonName)
 		if errors.IsNotFound(err) {

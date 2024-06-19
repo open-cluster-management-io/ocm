@@ -1,4 +1,4 @@
-package clientcert
+package csr
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"crypto/x509/pkix"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -20,7 +21,6 @@ import (
 	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1"
 	certificatesv1listers "k8s.io/client-go/listers/certificates/v1"
 	"k8s.io/client-go/tools/cache"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
 
@@ -28,12 +28,13 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
+	"open-cluster-management.io/ocm/pkg/registration/hub/user"
 )
 
-// IsCertificateValid return true if
+// isCertificateValid return true if
 // 1) All certs in client certificate are not expired.
 // 2) At least one cert matches the given subject if specified
-func IsCertificateValid(logger klog.Logger, certData []byte, subject *pkix.Name) (bool, error) {
+func isCertificateValid(logger klog.Logger, certData []byte, subject *pkix.Name) (bool, error) {
 	certs, err := certutil.ParseCertsPEM(certData)
 	if err != nil {
 		return false, errors.New("unable to parse certificate")
@@ -126,34 +127,26 @@ func getCertValidityPeriod(secret *corev1.Secret) (*time.Time, *time.Time, error
 	return notBefore, notAfter, nil
 }
 
-// BuildKubeconfig builds a kubeconfig based on a rest config template with a cert/key pair
-func BuildKubeconfig(clusterName, server string, caData []byte,
-	proxyURL, clientCertPath, clientKeyPath string) clientcmdapi.Config {
-	// Build kubeconfig.
-	kubeconfig := clientcmdapi.Config{
-		// Define a cluster stanza based on the bootstrap kubeconfig.
-		Clusters: map[string]*clientcmdapi.Cluster{
-			clusterName: {
-				Server:                   server,
-				InsecureSkipTLSVerify:    false,
-				CertificateAuthorityData: caData,
-				ProxyURL:                 proxyURL,
-			}},
-		// Define auth based on the obtained client cert.
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{"default-auth": {
-			ClientCertificate: clientCertPath,
-			ClientKey:         clientKeyPath,
-		}},
-		// Define a context that connects the auth info and cluster, and set it as the default
-		Contexts: map[string]*clientcmdapi.Context{"default-context": {
-			Cluster:   clusterName,
-			AuthInfo:  "default-auth",
-			Namespace: "configuration",
-		}},
-		CurrentContext: "default-context",
+// GetClusterAgentNamesFromCertificate returns the cluster name and agent name by parsing
+// the common name of the certification
+func GetClusterAgentNamesFromCertificate(certData []byte) (clusterName, agentName string, err error) {
+	certs, err := certutil.ParseCertsPEM(certData)
+	if err != nil {
+		return "", "", fmt.Errorf("unable to parse certificate: %w", err)
 	}
 
-	return kubeconfig
+	for _, cert := range certs {
+		if ok := strings.HasPrefix(cert.Subject.CommonName, user.SubjectPrefix); !ok {
+			continue
+		}
+		names := strings.Split(strings.TrimPrefix(cert.Subject.CommonName, user.SubjectPrefix), ":")
+		if len(names) != 2 {
+			continue
+		}
+		return names[0], names[1], nil
+	}
+
+	return "", "", nil
 }
 
 type CSRControl interface {

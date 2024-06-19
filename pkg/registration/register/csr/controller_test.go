@@ -1,4 +1,4 @@
-package clientcert
+package csr
 
 import (
 	"context"
@@ -22,6 +22,7 @@ import (
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/hub/user"
+	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
 const (
@@ -68,8 +69,8 @@ func TestSync(t *testing.T) {
 			queueKey: testSecretName,
 			secrets: []runtime.Object{
 				testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "1", nil, map[string][]byte{
-					ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
-					AgentNameFile:   []byte(testAgentName),
+					register.ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
+					register.AgentNameFile:   []byte(testAgentName),
 				},
 				),
 			},
@@ -84,7 +85,7 @@ func TestSync(t *testing.T) {
 				testingcommon.AssertActions(t, agentActions, "get", "update")
 				actual := agentActions[1].(clienttesting.UpdateActionImpl).Object
 				secret := actual.(*corev1.Secret)
-				valid, err := IsCertificateValid(logger, secret.Data[TLSCertFile], testSubject)
+				valid, err := isCertificateValid(logger, secret.Data[TLSCertFile], testSubject)
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
@@ -98,9 +99,9 @@ func TestSync(t *testing.T) {
 			queueKey: testSecretName,
 			secrets: []runtime.Object{
 				testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "1", testinghelpers.NewTestCert(commonName, 10000*time.Second), map[string][]byte{
-					ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
-					AgentNameFile:   []byte(testAgentName),
-					KubeconfigFile:  testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil),
+					register.ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
+					register.AgentNameFile:   []byte(testAgentName),
+					register.KubeconfigFile:  testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil),
 				}),
 			},
 			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
@@ -113,9 +114,9 @@ func TestSync(t *testing.T) {
 			queueKey: testSecretName,
 			secrets: []runtime.Object{
 				testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "1", testinghelpers.NewTestCert(commonName, -3*time.Second), map[string][]byte{
-					ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
-					AgentNameFile:   []byte(testAgentName),
-					KubeconfigFile:  testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil),
+					register.ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
+					register.AgentNameFile:   []byte(testAgentName),
+					register.KubeconfigFile:  testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil),
 				}),
 			},
 			keyDataExpected: true,
@@ -134,8 +135,8 @@ func TestSync(t *testing.T) {
 			queueKey: testSecretName,
 			secrets: []runtime.Object{
 				testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "1", testinghelpers.NewTestCert(commonName, 10000*time.Second), map[string][]byte{
-					ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
-					AgentNameFile:   []byte("invalid-name"),
+					register.ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
+					register.AgentNameFile:   []byte("invalid-name"),
 				}),
 			},
 			keyDataExpected: true,
@@ -174,12 +175,12 @@ func TestSync(t *testing.T) {
 			)
 			agentKubeClient := kubefake.NewSimpleClientset(c.secrets...)
 
-			clientCertOption := ClientCertOption{
-				SecretNamespace: testNamespace,
-				SecretName:      testSecretName,
-				AdditionalSecretData: map[string][]byte{
-					ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
-					AgentNameFile:   []byte(testAgentName),
+			clientCertOption := secretOption{
+				secretNamespace: testNamespace,
+				secretName:      testSecretName,
+				additionalSecretData: map[string][]byte{
+					register.ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
+					register.AgentNameFile:   []byte(testAgentName),
 				},
 			}
 			csrOption := CSROption{
@@ -189,14 +190,14 @@ func TestSync(t *testing.T) {
 				Subject:         testSubject,
 				SignerName:      certificates.KubeAPIServerClientSignerName,
 				HaltCSRCreation: func() bool { return false },
+				CSRControl:      ctrl,
 			}
 
 			updater := &fakeStatusUpdater{}
 
 			controller := &clientCertificateController{
-				ClientCertOption:     clientCertOption,
+				secretOption:         clientCertOption,
 				CSROption:            csrOption,
-				csrControl:           ctrl,
 				managementCoreClient: agentKubeClient.CoreV1(),
 				controllerName:       "test-agent",
 				statusUpdater:        updater.update,

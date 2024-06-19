@@ -21,7 +21,8 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
-	"open-cluster-management.io/ocm/pkg/registration/clientcert"
+	"open-cluster-management.io/ocm/pkg/registration/register"
+	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
@@ -62,19 +63,19 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 	assertSuccessClusterBootstrap := func() {
 		// the spoke cluster and csr should be created after bootstrap
 		ginkgo.By("Check existence of ManagedCluster & CSR")
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			if _, err := util.GetManagedCluster(clusterClient, managedClusterName); err != nil {
-				return false
+				return err
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			if _, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName); err != nil {
-				return false
+				return err
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		// the spoke cluster should has finalizer that is added by hub controller
 		gomega.Eventually(func() bool {
@@ -157,13 +158,13 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			if err != nil {
 				return false
 			}
-			if _, ok := secret.Data[clientcert.TLSKeyFile]; !ok {
+			if _, ok := secret.Data[csr.TLSKeyFile]; !ok {
 				return false
 			}
-			if _, ok := secret.Data[clientcert.TLSCertFile]; !ok {
+			if _, ok := secret.Data[csr.TLSCertFile]; !ok {
 				return false
 			}
-			kubeconfigData, ok := secret.Data[clientcert.KubeconfigFile]
+			kubeconfigData, ok := secret.Data[register.KubeconfigFile]
 
 			if signerName == certificates.KubeAPIServerClientSignerName {
 				if !ok {
@@ -208,7 +209,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			if err != nil {
 				return false
 			}
-			return meta.IsStatusConditionTrue(addon.Status.Conditions, clientcert.ClusterCertificateRotatedCondition)
+			return meta.IsStatusConditionTrue(addon.Status.Conditions, csr.ClusterCertificateRotatedCondition)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	}
 

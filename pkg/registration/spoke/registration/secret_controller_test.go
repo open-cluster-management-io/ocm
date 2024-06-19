@@ -13,8 +13,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 
-	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
+	"open-cluster-management.io/ocm/pkg/registration/register"
+	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 )
 
 const (
@@ -64,42 +65,42 @@ func TestDumpSecret(t *testing.T) {
 				testNamespace, testSecretName, "",
 				testinghelpers.NewTestCert("test", 60*time.Second),
 				map[string][]byte{
-					clientcert.ClusterNameFile: []byte("test"),
-					clientcert.AgentNameFile:   []byte("test"),
-					clientcert.KubeconfigFile:  testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil),
+					register.ClusterNameFile: []byte("test"),
+					register.AgentNameFile:   []byte("test"),
+					register.KubeconfigFile:  testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil),
 				},
 			),
 			validateFiles: func(t *testing.T, hubKubeconfigDir string) {
-				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, clientcert.ClusterNameFile), []byte("test"))
-				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, clientcert.AgentNameFile), []byte("test"))
-				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, clientcert.KubeconfigFile), kubeConfigFile)
-				testinghelpers.AssertFileExist(t, path.Join(hubKubeconfigDir, clientcert.TLSKeyFile))
-				testinghelpers.AssertFileExist(t, path.Join(hubKubeconfigDir, clientcert.TLSCertFile))
+				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, register.ClusterNameFile), []byte("test"))
+				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, register.AgentNameFile), []byte("test"))
+				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, register.KubeconfigFile), kubeConfigFile)
+				testinghelpers.AssertFileExist(t, path.Join(hubKubeconfigDir, csr.TLSKeyFile))
+				testinghelpers.AssertFileExist(t, path.Join(hubKubeconfigDir, csr.TLSCertFile))
 			},
 		},
 		{
 			name:     "secret is updated",
 			queueKey: testSecretName,
 			oldConfigData: map[string][]byte{
-				clientcert.ClusterNameFile: []byte("test"),
-				clientcert.AgentNameFile:   []byte("test"),
-				clientcert.KubeconfigFile:  []byte("test"),
+				register.ClusterNameFile: []byte("test"),
+				register.AgentNameFile:   []byte("test"),
+				register.KubeconfigFile:  []byte("test"),
 			},
 			secret: testinghelpers.NewHubKubeconfigSecret(
 				testNamespace, testSecretName, "",
 				testinghelpers.NewTestCert("test", 60*time.Second),
 				map[string][]byte{
-					clientcert.ClusterNameFile: []byte("test1"),
-					clientcert.AgentNameFile:   []byte("test"),
-					clientcert.KubeconfigFile:  testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil),
+					register.ClusterNameFile: []byte("test1"),
+					register.AgentNameFile:   []byte("test"),
+					register.KubeconfigFile:  testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil),
 				},
 			),
 			validateFiles: func(t *testing.T, hubKubeconfigDir string) {
-				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, clientcert.ClusterNameFile), []byte("test1"))
-				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, clientcert.AgentNameFile), []byte("test"))
-				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, clientcert.KubeconfigFile), kubeConfigFile)
-				testinghelpers.AssertFileExist(t, path.Join(hubKubeconfigDir, clientcert.TLSKeyFile))
-				testinghelpers.AssertFileExist(t, path.Join(hubKubeconfigDir, clientcert.TLSCertFile))
+				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, register.ClusterNameFile), []byte("test1"))
+				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, register.AgentNameFile), []byte("test"))
+				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, register.KubeconfigFile), kubeConfigFile)
+				testinghelpers.AssertFileExist(t, path.Join(hubKubeconfigDir, csr.TLSKeyFile))
+				testinghelpers.AssertFileExist(t, path.Join(hubKubeconfigDir, csr.TLSCertFile))
 			},
 		},
 	}

@@ -29,8 +29,9 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
-	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 	"open-cluster-management.io/ocm/pkg/registration/hub"
+	"open-cluster-management.io/ocm/pkg/registration/register"
+	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
@@ -214,13 +215,13 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 			if err != nil {
 				return false
 			}
-			if _, ok := secret.Data[clientcert.TLSKeyFile]; !ok {
+			if _, ok := secret.Data[csr.TLSKeyFile]; !ok {
 				return false
 			}
-			if _, ok := secret.Data[clientcert.TLSCertFile]; !ok {
+			if _, ok := secret.Data[csr.TLSCertFile]; !ok {
 				return false
 			}
-			_, ok := secret.Data[clientcert.KubeconfigFile]
+			_, ok := secret.Data[register.KubeconfigFile]
 			if !ok && signerName == certificates.KubeAPIServerClientSignerName {
 				return false
 			}
@@ -525,7 +526,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 				if err != nil {
 					return false
 				}
-				data, ok := secret.Data[clientcert.TLSCertFile]
+				data, ok := secret.Data[csr.TLSCertFile]
 				if !ok {
 					return false
 				}
