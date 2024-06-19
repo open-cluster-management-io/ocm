@@ -96,12 +96,12 @@ func (a *CRDTemplateAgentAddon) getValues(
 			overrideValues = addonfactory.MergeValues(overrideValues, publicValues)
 		}
 	}
-	builtinSortedKeys, builtinValues, err := a.getBuiltinValues(cluster, addon)
+	builtinSortedKeys, builtinValues, err := a.getBuiltinValues(cluster, addon, privateValues)
 	if err != nil {
 		return presetValues, overrideValues, privateValues, nil
 	}
-	// builtinValues only contains CLUSTER_NAME, and it should override overrideValues if CLUSTER_NAME
-	// is also set in the overrideValues, since CLUSTER_NAME should not be set externally.
+	// builtinValues contains CLUSTER_NAME and INSTALL_NAMESPACE, and it should override overrideValues if
+	// the contained values are also set in the overrideValues, since these values should not be set externally.
 	overrideValues = addonfactory.MergeValues(overrideValues, builtinValues)
 
 	for k, v := range overrideValues {
@@ -124,9 +124,15 @@ func (a *CRDTemplateAgentAddon) getValues(
 
 func (a *CRDTemplateAgentAddon) getBuiltinValues(
 	cluster *clusterv1.ManagedCluster,
-	_ *addonapiv1alpha1.ManagedClusterAddOn) ([]string, addonfactory.Values, error) {
+	_ *addonapiv1alpha1.ManagedClusterAddOn,
+	privateValues map[string]interface{}) ([]string, addonfactory.Values, error) {
 	builtinValues := templateCRDBuiltinValues{}
 	builtinValues.ClusterName = cluster.GetName()
+
+	namespace, ok := privateValues[InstallNamespacePrivateValueKey]
+	if ok && namespace != nil {
+		builtinValues.InstallNamespace = namespace.(string)
+	}
 
 	value, err := addonfactory.JsonStructToValues(builtinValues)
 	if err != nil {

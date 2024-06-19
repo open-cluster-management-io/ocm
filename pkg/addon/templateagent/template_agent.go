@@ -36,7 +36,8 @@ const (
 // to convert it to Values by JsonStructToValues.
 // the built-in values can not be overridden by getValuesFuncs
 type templateCRDBuiltinValues struct {
-	ClusterName string `json:"CLUSTER_NAME,omitempty"`
+	ClusterName      string `json:"CLUSTER_NAME,omitempty"`
+	InstallNamespace string `json:"INSTALL_NAMESPACE,omitempty"`
 }
 
 // templateDefaultValues includes the default values for crd template agentAddon.

@@ -149,9 +149,14 @@ func TestGetValues(t *testing.T) {
 					name:  "CLUSTER_NAME",
 					value: "test-cluster",
 				},
+				{
+					name:  "INSTALL_NAMESPACE",
+					value: "default-ns",
+				},
 			},
 			expectedOverride: map[string]interface{}{
-				"CLUSTER_NAME": "test-cluster",
+				"CLUSTER_NAME":      "test-cluster",
+				"INSTALL_NAMESPACE": "default-ns",
 			},
 			expectedPrivate: map[string]interface{}{
 				InstallNamespacePrivateValueKey: "default-ns",
@@ -169,10 +174,15 @@ func TestGetValues(t *testing.T) {
 					name:  "CLUSTER_NAME",
 					value: "test-cluster",
 				},
+				{
+					name:  "INSTALL_NAMESPACE",
+					value: "default-ns",
+				},
 			},
 			expectedOverride: map[string]interface{}{
-				"CLUSTER_NAME": "test-cluster",
-				"key1":         "value1",
+				"CLUSTER_NAME":      "test-cluster",
+				"INSTALL_NAMESPACE": "default-ns",
+				"key1":              "value1",
 			},
 			expectedPrivate: map[string]interface{}{
 				InstallNamespacePrivateValueKey: "default-ns",
@@ -188,8 +198,7 @@ func TestGetValues(t *testing.T) {
 				},
 			},
 			values: addonfactory.Values{
-				InstallNamespacePrivateValueKey: "default-ns",
-				"HUB_KUBECONFIG":                "/managed/hub-kubeconfig/kubeconfig-test",
+				"HUB_KUBECONFIG": "/managed/hub-kubeconfig/kubeconfig-test",
 			},
 			expectedPreset: orderedValues{
 				{
@@ -205,9 +214,7 @@ func TestGetValues(t *testing.T) {
 				"HUB_KUBECONFIG": "/managed/hub-kubeconfig/kubeconfig-test",
 				"CLUSTER_NAME":   "test-cluster",
 			},
-			expectedPrivate: map[string]interface{}{
-				InstallNamespacePrivateValueKey: "default-ns",
-			},
+			expectedPrivate: map[string]interface{}{},
 		},
 		{
 			name: "builtIn value should not be overridden",
@@ -232,10 +239,15 @@ func TestGetValues(t *testing.T) {
 					name:  "CLUSTER_NAME",
 					value: "test-cluster",
 				},
+				{
+					name:  "INSTALL_NAMESPACE",
+					value: "default-ns",
+				},
 			},
 			expectedOverride: map[string]interface{}{
-				"HUB_KUBECONFIG": "/managed/hub-kubeconfig/kubeconfig-test",
-				"CLUSTER_NAME":   "test-cluster",
+				"HUB_KUBECONFIG":    "/managed/hub-kubeconfig/kubeconfig-test",
+				"CLUSTER_NAME":      "test-cluster",
+				"INSTALL_NAMESPACE": "default-ns",
 			},
 			expectedPrivate: map[string]interface{}{
 				InstallNamespacePrivateValueKey: "default-ns",
