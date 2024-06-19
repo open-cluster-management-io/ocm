@@ -180,6 +180,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 					{Name: "LOG_LEVEL", Value: "4"},
 					{Name: "HUB_KUBECONFIG", Value: "/managed/hub-kubeconfig/kubeconfig"},
 					{Name: "CLUSTER_NAME", Value: clusterName},
+					{Name: "INSTALL_NAMESPACE", Value: "test-install-namespace"},
 				}
 				if !equality.Semantic.DeepEqual(envs, expectedEnvs) {
 					t.Errorf("unexpected envs %v", envs)
