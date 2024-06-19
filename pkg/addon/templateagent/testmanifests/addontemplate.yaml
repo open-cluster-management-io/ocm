@@ -41,6 +41,39 @@ spec:
                       env:
                         - name: LOG_LEVEL
                           value: "{{LOG_LEVEL}}" # addonDeploymentConfig variables
+          - kind: DaemonSet
+            apiVersion: apps/v1
+            metadata:
+              name: hello-template-agent-ds
+              namespace: open-cluster-management-agent-addon
+              annotations:
+                "addon.open-cluster-management.io/deletion-orphan": ""
+              labels:
+                app: hello-template-agent
+            spec:
+              selector:
+                matchLabels:
+                  app: hello-template-agent
+              template:
+                metadata:
+                  labels:
+                    app: hello-template-agent
+                spec:
+                  serviceAccountName: hello-template-agent-sa
+                  containers:
+                    - name: helloworld-agent
+                      image: quay.io/open-cluster-management/addon-examples:v1
+                      imagePullPolicy: IfNotPresent
+                      args:
+                        - "/helloworld_helm"
+                        - "agent"
+                        - "--cluster-name={{CLUSTER_NAME}}"
+                        - "--addon-namespace=open-cluster-management-agent-addon"
+                        - "--addon-name=hello-template"
+                        - "--hub-kubeconfig={{HUB_KUBECONFIG}}"
+                      env:
+                        - name: LOG_LEVEL
+                          value: "{{LOG_LEVEL}}" # addonDeploymentConfig variables
           - kind: ServiceAccount
             apiVersion: v1
             metadata:

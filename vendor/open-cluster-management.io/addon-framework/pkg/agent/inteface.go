@@ -203,6 +203,11 @@ const (
 	// with the availability of the corresponding agent deployment resources on the managed cluster.
 	// It's a special case of HealthProberTypeWork.
 	HealthProberTypeDeploymentAvailability HealthProberType = "DeploymentAvailability"
+	// HealthProberTypeWorkloadAvailability indicates the healthiness of the addon is connected
+	// with the availability of all the corresponding agent workload resources(only Deployment and
+	// DaemonSet are supported for now) on the managed cluster.
+	// It's a special case of HealthProberTypeWork.
+	HealthProberTypeWorkloadAvailability HealthProberType = "WorkloadAvailability"
 )
 
 func KubeClientSignerConfigurations(addonName, agentName string) func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {

@@ -142,96 +142,112 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 			),
 			managedCluster: addonfactory.NewFakeManagedCluster(clusterName, "1.10.1"),
 			validateObjects: func(t *testing.T, objects []runtime.Object) {
-				if len(objects) != 4 {
-					t.Errorf("expected 4 objects, but got %v", len(objects))
+				if len(objects) != 5 {
+					t.Fatalf("expected 5 objects, but got %v", len(objects))
 				}
 
-				unstructObject, ok := objects[0].(*unstructured.Unstructured)
+				validatePodTemplate := func(t *testing.T, podTemplate corev1.PodTemplateSpec) {
+					image := podTemplate.Spec.Containers[0].Image
+					if image != "quay.io/ocm/addon-examples:v1" {
+						t.Errorf("unexpected image %v", image)
+					}
+
+					nodeSelector := podTemplate.Spec.NodeSelector
+					expectedNodeSelector := map[string]string{"host": "ssd"}
+					if !equality.Semantic.DeepEqual(nodeSelector, expectedNodeSelector) {
+						t.Errorf("unexpected nodeSelector %v", nodeSelector)
+					}
+
+					tolerations := podTemplate.Spec.Tolerations
+					expectedTolerations := []corev1.Toleration{{Key: "foo", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoExecute}}
+					if !equality.Semantic.DeepEqual(tolerations, expectedTolerations) {
+						t.Errorf("unexpected tolerations %v", tolerations)
+					}
+
+					envs := podTemplate.Spec.Containers[0].Env
+					expectedEnvs := []corev1.EnvVar{
+						{Name: "LOG_LEVEL", Value: "4"},
+						{Name: "HUB_KUBECONFIG", Value: "/managed/hub-kubeconfig/kubeconfig"},
+						{Name: "CLUSTER_NAME", Value: clusterName},
+						{Name: "INSTALL_NAMESPACE", Value: "test-install-namespace"},
+					}
+					if !equality.Semantic.DeepEqual(envs, expectedEnvs) {
+						t.Errorf("unexpected envs %v", envs)
+					}
+
+					volumes := podTemplate.Spec.Volumes
+					expectedVolumes := []corev1.Volume{
+						{
+							Name: "hub-kubeconfig",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: "hello-hub-kubeconfig",
+								},
+							},
+						},
+						{
+							Name: "cert-example-com-signer-name",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: "hello-example.com-signer-name-client-cert",
+								},
+							},
+						},
+					}
+
+					if !equality.Semantic.DeepEqual(volumes, expectedVolumes) {
+						t.Errorf("expected volumes %v, but got: %v", expectedVolumes, volumes)
+					}
+
+					volumeMounts := podTemplate.Spec.Containers[0].VolumeMounts
+					expectedVolumeMounts := []corev1.VolumeMount{
+						{
+							Name:      "hub-kubeconfig",
+							MountPath: "/managed/hub-kubeconfig",
+						},
+						{
+							Name:      "cert-example-com-signer-name",
+							MountPath: "/managed/example.com-signer-name",
+						},
+					}
+					if !equality.Semantic.DeepEqual(volumeMounts, expectedVolumeMounts) {
+						t.Errorf("expected volumeMounts %v, but got: %v", expectedVolumeMounts, volumeMounts)
+					}
+				}
+
+				unstructDeployment, ok := objects[0].(*unstructured.Unstructured)
 				if !ok {
 					t.Errorf("expected object to be *appsv1.Deployment, but got %T", objects[0])
 				}
-				object, err := utils.ConvertToDeployment(unstructObject)
+				deployment, err := utils.ConvertToDeployment(unstructDeployment)
 				if err != nil {
 					t.Fatal(err)
 				}
-				image := object.Spec.Template.Spec.Containers[0].Image
-				if image != "quay.io/ocm/addon-examples:v1" {
-					t.Errorf("unexpected image %v", image)
+				if deployment.Namespace != "test-install-namespace" {
+					t.Errorf("unexpected namespace %s", deployment.Namespace)
 				}
+				validatePodTemplate(t, deployment.Spec.Template)
 
-				if object.Namespace != "test-install-namespace" {
-					t.Errorf("unexpected namespace %s", object.Namespace)
+				unstructDaemonSet, ok := objects[1].(*unstructured.Unstructured)
+				if !ok {
+					t.Errorf("expected object to be *appsv1.DaemonSet, but got %T", objects[0])
 				}
-
-				nodeSelector := object.Spec.Template.Spec.NodeSelector
-				expectedNodeSelector := map[string]string{"host": "ssd"}
-				if !equality.Semantic.DeepEqual(nodeSelector, expectedNodeSelector) {
-					t.Errorf("unexpected nodeSelector %v", nodeSelector)
+				daemonSet, err := utils.ConvertToDaemonSet(unstructDaemonSet)
+				if err != nil {
+					t.Fatal(err)
 				}
-
-				tolerations := object.Spec.Template.Spec.Tolerations
-				expectedTolerations := []corev1.Toleration{{Key: "foo", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoExecute}}
-				if !equality.Semantic.DeepEqual(tolerations, expectedTolerations) {
-					t.Errorf("unexpected tolerations %v", tolerations)
+				if daemonSet.Namespace != "test-install-namespace" {
+					t.Errorf("unexpected namespace %s", daemonSet.Namespace)
 				}
-
-				envs := object.Spec.Template.Spec.Containers[0].Env
-				expectedEnvs := []corev1.EnvVar{
-					{Name: "LOG_LEVEL", Value: "4"},
-					{Name: "HUB_KUBECONFIG", Value: "/managed/hub-kubeconfig/kubeconfig"},
-					{Name: "CLUSTER_NAME", Value: clusterName},
-					{Name: "INSTALL_NAMESPACE", Value: "test-install-namespace"},
-				}
-				if !equality.Semantic.DeepEqual(envs, expectedEnvs) {
-					t.Errorf("unexpected envs %v", envs)
-				}
-
-				volumes := object.Spec.Template.Spec.Volumes
-				expectedVolumes := []corev1.Volume{
-					{
-						Name: "hub-kubeconfig",
-						VolumeSource: corev1.VolumeSource{
-							Secret: &corev1.SecretVolumeSource{
-								SecretName: "hello-hub-kubeconfig",
-							},
-						},
-					},
-					{
-						Name: "cert-example-com-signer-name",
-						VolumeSource: corev1.VolumeSource{
-							Secret: &corev1.SecretVolumeSource{
-								SecretName: "hello-example.com-signer-name-client-cert",
-							},
-						},
-					},
-				}
-
-				if !equality.Semantic.DeepEqual(volumes, expectedVolumes) {
-					t.Errorf("expected volumes %v, but got: %v", expectedVolumes, volumes)
-				}
-
-				volumeMounts := object.Spec.Template.Spec.Containers[0].VolumeMounts
-				expectedVolumeMounts := []corev1.VolumeMount{
-					{
-						Name:      "hub-kubeconfig",
-						MountPath: "/managed/hub-kubeconfig",
-					},
-					{
-						Name:      "cert-example-com-signer-name",
-						MountPath: "/managed/example.com-signer-name",
-					},
-				}
-				if !equality.Semantic.DeepEqual(volumeMounts, expectedVolumeMounts) {
-					t.Errorf("expected volumeMounts %v, but got: %v", expectedVolumeMounts, volumeMounts)
-				}
+				validatePodTemplate(t, daemonSet.Spec.Template)
 
 				// check clusterrole
-				unstructObject, ok = objects[2].(*unstructured.Unstructured)
+				unstructCRB, ok := objects[3].(*unstructured.Unstructured)
 				if !ok {
 					t.Errorf("expected object to be unstructured, but got %T", objects[0])
 				}
 				clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
-				err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructObject.Object, clusterRoleBinding)
+				err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructCRB.Object, clusterRoleBinding)
 				if err != nil {
 					t.Fatal(err)
 				}

@@ -216,21 +216,30 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		manifestWork, err := t.HubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(),
 			fmt.Sprintf("addon-%s-deploy-0", addOnName), metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		foundConfig := false
-		expectedResourceIdentifier := workapiv1.ResourceIdentifier{
+		foundDeploymentConfig := false
+		expectedDeploymentResourceIdentifier := workapiv1.ResourceIdentifier{
 			Group:     "apps",
 			Resource:  "deployments",
 			Name:      "hello-template-agent",
 			Namespace: addonInstallNamespace,
 		}
+		foundDaemonSetConfig := false
+		expectedDaemonSetResourceIdentifier := workapiv1.ResourceIdentifier{
+			Group:     "apps",
+			Resource:  "daemonsets",
+			Name:      "hello-template-agent-ds",
+			Namespace: addonInstallNamespace,
+		}
 		for _, mc := range manifestWork.Spec.ManifestConfigs {
-			if mc.ResourceIdentifier == expectedResourceIdentifier {
-				foundConfig = true
+			if mc.ResourceIdentifier == expectedDeploymentResourceIdentifier {
+				foundDeploymentConfig = true
 				gomega.Expect(mc.UpdateStrategy.Type).To(gomega.Equal(workapiv1.UpdateStrategyTypeServerSideApply))
-				break
+			}
+			if mc.ResourceIdentifier == expectedDaemonSetResourceIdentifier {
+				foundDaemonSetConfig = true
 			}
 		}
-		if !foundConfig {
+		if !foundDeploymentConfig || !foundDaemonSetConfig {
 			gomega.Expect(fmt.Errorf("expected manifestwork is not correct, %v",
 				manifestWork.Spec.ManifestConfigs)).ToNot(gomega.HaveOccurred())
 		}
@@ -282,7 +291,8 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
-	ginkgo.It("Template type addon should be configured by addon deployment config for image override even there are cluster annotation config", func() {
+	ginkgo.It("Template type addon should be configured by addon deployment config for image override"+
+		"even there are cluster annotation config", func() {
 		ginkgo.By("Prepare cluster annotation for addon image override config")
 		overrideRegistries := addonapiv1alpha1.AddOnDeploymentConfigSpec{
 			// should be different from the registries in the addonDeploymentConfig
