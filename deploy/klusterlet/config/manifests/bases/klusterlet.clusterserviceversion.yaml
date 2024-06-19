@@ -86,7 +86,7 @@ spec:
   maturity: alpha
   provider:
     name: Open Cluster Management Community
-  replaces: klusterlet.v0.13.2
+  replaces: klusterlet.v0.13.3
   selector:
     matchLabels:
       app: klusterlet
