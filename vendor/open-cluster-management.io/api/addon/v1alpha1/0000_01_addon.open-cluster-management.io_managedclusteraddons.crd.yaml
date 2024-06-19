@@ -314,6 +314,7 @@ spec:
                         will use to create csr.
                       maxLength: 571
                       minLength: 5
+                      pattern: ^([a-z0-9][a-z0-9-]*[a-z0-9]\.)+[a-z]+\/[a-z0-9-\.]+$
                       type: string
                     subject:
                       description: 'subject is the user subject of the addon agent

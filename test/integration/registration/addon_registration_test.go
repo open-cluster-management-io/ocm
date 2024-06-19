@@ -211,17 +211,6 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			return meta.IsStatusConditionTrue(addon.Status.Conditions, clientcert.ClusterCertificateRotatedCondition)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	}
-	assertClientCertConditionFalse := func(clusterName, addonName string) {
-		ginkgo.By("Check if clientcert addon status condition is false")
-		gomega.Eventually(func() bool {
-			addon, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).
-				Get(context.TODO(), addonName, metav1.GetOptions{})
-			if err != nil {
-				return false
-			}
-			return meta.IsStatusConditionFalse(addon.Status.Conditions, clientcert.ClusterCertificateRotatedCondition)
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-	}
 
 	assertHasNoAddonLabel := func(clusterName, addonName string) {
 		ginkgo.By("Check if addon status label on managed cluster deleted")
@@ -390,20 +379,6 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			assertSuccessClusterBootstrap()
 			signerName := "example.com/signer1"
 			assertSuccessAddOnBootstrap(signerName)
-		})
-
-		ginkgo.It("should register addon failed with invalid custom signer", func() {
-			assertSuccessClusterBootstrap()
-			assertSuccessAddOnEnabling()
-			assertAddOnSignerUpdate("addon-xxx")
-			assertClientCertConditionFalse(managedClusterName, addOnName)
-
-			signerName := "example.com/signer1"
-			assertAddOnSignerUpdate(signerName)
-			assertSuccessCSRApproval()
-			assertValidClientCertificate(addOnName, getSecretName(addOnName, signerName), signerName, expectedProxyURL)
-			assertAddonLabel(managedClusterName, addOnName, "unreachable")
-			assertClientCertCondition(managedClusterName, addOnName)
 		})
 
 		ginkgo.It("should addon registraton config updated successfully", func() {

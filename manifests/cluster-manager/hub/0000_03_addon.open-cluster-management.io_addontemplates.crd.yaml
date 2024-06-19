@@ -330,6 +330,7 @@ spec:
                             agent will use to create csr.
                           maxLength: 571
                           minLength: 5
+                          pattern: ^([a-z0-9][a-z0-9-]*[a-z0-9]\.)+[a-z]+\/[a-z0-9-\.]+$
                           type: string
                         signingCA:
                           description: 'SigningCA represents the reference of the

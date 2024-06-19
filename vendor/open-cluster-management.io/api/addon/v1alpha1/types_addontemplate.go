@@ -157,6 +157,7 @@ type CustomSignerRegistrationConfig struct {
 	// +required
 	// +kubebuilder:validation:MaxLength=571
 	// +kubebuilder:validation:MinLength=5
+	// +kubebuilder:validation:Pattern=^([a-z0-9][a-z0-9-]*[a-z0-9]\.)+[a-z]+\/[a-z0-9-\.]+$
 	SignerName string `json:"signerName"`
 
 	// Subject is the user subject of the addon agent to be registered to the hub.
