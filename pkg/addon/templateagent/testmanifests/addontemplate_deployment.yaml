@@ -1,0 +1,116 @@
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: AddOnTemplate
+metadata:
+  name: hello-template
+spec:
+  addonName: hello-template
+  agentSpec:
+      workload:
+        manifests:
+          - kind: Deployment
+            apiVersion: apps/v1
+            metadata:
+              name: hello-template-agent
+              namespace: open-cluster-management-agent-addon
+              annotations:
+                "addon.open-cluster-management.io/deletion-orphan": ""
+              labels:
+                app: hello-template-agent
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app: hello-template-agent
+              template:
+                metadata:
+                  labels:
+                    app: hello-template-agent
+                spec:
+                  serviceAccountName: hello-template-agent-sa
+                  containers:
+                    - name: helloworld-agent
+                      image: quay.io/open-cluster-management/addon-examples:v1
+                      imagePullPolicy: IfNotPresent
+                      args:
+                        - "/helloworld_helm"
+                        - "agent"
+                        - "--cluster-name={{CLUSTER_NAME}}"
+                        - "--addon-namespace=open-cluster-management-agent-addon"
+                        - "--addon-name=hello-template"
+                        - "--hub-kubeconfig={{HUB_KUBECONFIG}}"
+                      env:
+                        - name: LOG_LEVEL
+                          value: "{{LOG_LEVEL}}" # addonDeploymentConfig variables
+          - kind: ServiceAccount
+            apiVersion: v1
+            metadata:
+              name: hello-template-agent-sa
+              namespace: open-cluster-management-agent-addon
+              annotations:
+                "addon.open-cluster-management.io/deletion-orphan": ""
+          - kind: ClusterRoleBinding
+            apiVersion: rbac.authorization.k8s.io/v1
+            metadata:
+              name: hello-template-agent
+            roleRef:
+              apiGroup: rbac.authorization.k8s.io
+              kind: ClusterRole
+              name: cluster-admin
+            subjects:
+              - kind: ServiceAccount
+                name: hello-template-agent-sa
+                namespace: open-cluster-management-agent-addon
+          - kind: Job
+            apiVersion: batch/v1
+            metadata:
+              name: hello-template-cleanup-configmap
+              namespace: open-cluster-management-agent-addon
+              annotations:
+                "addon.open-cluster-management.io/addon-pre-delete": ""
+            spec:
+              manualSelector: true
+              selector:
+                matchLabels:
+                  job: hello-template-cleanup-configmap
+              template:
+                metadata:
+                  labels:
+                    job: hello-template-cleanup-configmap
+                spec:
+                  serviceAccountName: hello-template-agent-sa
+                  restartPolicy: Never
+                  containers:
+                  - name: hello-template-agent
+                    image: quay.io/open-cluster-management/addon-examples
+                    imagePullPolicy: IfNotPresent
+                    args:
+                      - "/helloworld_helm"
+                      - "cleanup"
+                      - "--addon-namespace=open-cluster-management-agent-addon"
+  registration:
+    # kubeClient or custom signer, if kubeClient, user and group is in a certain format.
+    # user is "system:open-cluster-management:cluster:{clusterName}:addon:{addonName}:agent:{agentName}"
+    # group is ["system:open-cluster-management:cluster:{clusterName}:addon:{addonName}",
+    #           "system:open-cluster-management:addon:{addonName}", "system:authenticated"]
+    - type: KubeClient
+      kubeClient:
+        hubPermissions:
+          - type: CurrentCluster
+            roleRef:
+              apiGroup: rbac.authorization.k8s.io
+              kind: ClusterRole
+              name: cm-admin
+    - customSigner:
+        signerName: example.com/signer-name
+        signingCA:
+          name: ca-secret
+          namespace: default
+        subject:
+          groups:
+          - g1
+          - g2
+          organizationUnit:
+          - o1
+          - o2
+          user: user1
+      type: CustomSigner

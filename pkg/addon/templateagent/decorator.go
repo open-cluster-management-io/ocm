@@ -147,7 +147,7 @@ func newDaemonSetDecorator(
 
 func (d *daemonSetDecorator) decorate(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	daemonSet, err := utils.ConvertToDaemonSet(obj)
-	// not a deployment, directly return
+	// not a daemonset, directly return
 	if err != nil {
 		return obj, nil
 	}
@@ -168,7 +168,7 @@ func (d *daemonSetDecorator) decorate(obj *unstructured.Unstructured) (*unstruct
 }
 
 type podTemplateSpecDecorator interface {
-	// decorate modifies the deployment in place
+	// decorate modifies the pod template in place
 	decorate(pod *corev1.PodTemplateSpec) error
 }
 
