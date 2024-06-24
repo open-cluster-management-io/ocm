@@ -59,7 +59,7 @@ metadata:
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
     containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2024-06-19T07:23:22Z"
+    createdAt: "2024-06-24T02:57:53Z"
     description: Manages the installation and upgrade of the ClusterManager.
     operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -612,7 +612,7 @@ spec:
   maturity: alpha
   provider:
     name: Open Cluster Management Community
-  replaces: cluster-manager.v0.13.3
+  replaces: cluster-manager.v0.14.0
   selector:
     matchLabels:
       app: cluster-manager

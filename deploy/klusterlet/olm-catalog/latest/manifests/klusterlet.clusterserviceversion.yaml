@@ -31,7 +31,7 @@ metadata:
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
     containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2024-06-19T07:23:23Z"
+    createdAt: "2024-06-24T02:57:53Z"
     description: Manages the installation and upgrade of the Klusterlet.
     operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -372,7 +372,7 @@ spec:
   maturity: alpha
   provider:
     name: Open Cluster Management Community
-  replaces: klusterlet.v0.13.3
+  replaces: klusterlet.v0.14.0
   selector:
     matchLabels:
       app: klusterlet
