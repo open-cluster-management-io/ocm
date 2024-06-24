@@ -9,7 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"sigs.k8s.io/controller-runtime/pkg/log"
+	"k8s.io/klog/v2"
 
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 
@@ -23,7 +23,7 @@ import (
 // If no suitable kubeconfig is found, it returns -1 and an error indicating that no bootstrap kubeconfig is available for the specified managed cluster.
 func selectBootstrapKubeConfigs(ctx context.Context,
 	managedCluster, hubKubeConfigFilePath string, bootstrapKubeConfigFilePaths []string) (int, error) {
-	logger := log.FromContext(ctx)
+	logger := klog.FromContext(ctx)
 
 	for index, fp := range bootstrapKubeConfigFilePaths {
 		equal, err := compareServerEndpoint(fp, hubKubeConfigFilePath)
@@ -52,7 +52,7 @@ func selectBootstrapKubeConfigs(ctx context.Context,
 	}
 
 	// TODO: return index because some legacy code depends on the file type. Change to return *rest.Config in the future. @xuezhaojun
-	return -1, fmt.Errorf("no bootstrap kubeconfig is available for managed cluster %s", managedCluster)
+	return -1, fmt.Errorf("no bootstrap kubeconfig in %v is available for managed cluster %s", bootstrapKubeConfigFilePaths, managedCluster)
 }
 
 func compareServerEndpoint(bootstrapKubeConfigFilePath, hubKubeConfigFilePath string) (bool, error) {
