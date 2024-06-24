@@ -19,9 +19,9 @@ import (
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/certrotation"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
-	"open-cluster-management.io/ocm/pkg/operator/certrotation"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
@@ -185,33 +185,29 @@ func (c certRotationController) syncOne(ctx context.Context, syncCtx factory.Syn
 			Validity:         SigningCertValidity,
 			Lister:           c.secretInformers[helpers.SignerSecret].Lister(),
 			Client:           c.kubeClient.CoreV1(),
-			EventRecorder:    c.recorder,
 		}
 		caBundleRotation := certrotation.CABundleRotation{
-			Namespace:     clustermanagerNamespace,
-			Name:          helpers.CaBundleConfigmap,
-			Lister:        c.configMapInformer.Lister(),
-			Client:        c.kubeClient.CoreV1(),
-			EventRecorder: c.recorder,
+			Namespace: clustermanagerNamespace,
+			Name:      helpers.CaBundleConfigmap,
+			Lister:    c.configMapInformer.Lister(),
+			Client:    c.kubeClient.CoreV1(),
 		}
 		targetRotations := []certrotation.TargetRotation{
 			{
-				Namespace:     clustermanagerNamespace,
-				Name:          helpers.RegistrationWebhookSecret,
-				Validity:      TargetCertValidity,
-				HostNames:     []string{fmt.Sprintf("%s.%s.svc", helpers.RegistrationWebhookService, clustermanagerNamespace)},
-				Lister:        c.secretInformers[helpers.RegistrationWebhookSecret].Lister(),
-				Client:        c.kubeClient.CoreV1(),
-				EventRecorder: c.recorder,
+				Namespace: clustermanagerNamespace,
+				Name:      helpers.RegistrationWebhookSecret,
+				Validity:  TargetCertValidity,
+				HostNames: []string{fmt.Sprintf("%s.%s.svc", helpers.RegistrationWebhookService, clustermanagerNamespace)},
+				Lister:    c.secretInformers[helpers.RegistrationWebhookSecret].Lister(),
+				Client:    c.kubeClient.CoreV1(),
 			},
 			{
-				Namespace:     clustermanagerNamespace,
-				Name:          helpers.WorkWebhookSecret,
-				Validity:      TargetCertValidity,
-				HostNames:     []string{fmt.Sprintf("%s.%s.svc", helpers.WorkWebhookService, clustermanagerNamespace)},
-				Lister:        c.secretInformers[helpers.WorkWebhookSecret].Lister(),
-				Client:        c.kubeClient.CoreV1(),
-				EventRecorder: c.recorder,
+				Namespace: clustermanagerNamespace,
+				Name:      helpers.WorkWebhookSecret,
+				Validity:  TargetCertValidity,
+				HostNames: []string{fmt.Sprintf("%s.%s.svc", helpers.WorkWebhookService, clustermanagerNamespace)},
+				Lister:    c.secretInformers[helpers.WorkWebhookSecret].Lister(),
+				Client:    c.kubeClient.CoreV1(),
 			},
 		}
 		c.rotationMap[clustermanagerName] = rotations{
@@ -223,13 +219,13 @@ func (c certRotationController) syncOne(ctx context.Context, syncCtx factory.Syn
 
 	// Ensure certificates are exists
 	rotations := c.rotationMap[clustermanagerName] // reconcile cert/key pair for signer
-	signingCertKeyPair, err := rotations.signingRotation.EnsureSigningCertKeyPair(ctx)
+	signingCertKeyPair, err := rotations.signingRotation.EnsureSigningCertKeyPair()
 	if err != nil {
 		return err
 	}
 
 	// reconcile ca bundle
-	cabundleCerts, err := rotations.caBundleRotation.EnsureConfigMapCABundle(ctx, signingCertKeyPair)
+	cabundleCerts, err := rotations.caBundleRotation.EnsureConfigMapCABundle(signingCertKeyPair)
 	if err != nil {
 		return err
 	}
@@ -237,7 +233,7 @@ func (c certRotationController) syncOne(ctx context.Context, syncCtx factory.Syn
 	// reconcile target cert/key pairs
 	var errs []error
 	for _, targetRotation := range rotations.targetRotations {
-		if err := targetRotation.EnsureTargetCertKeyPair(ctx, signingCertKeyPair, cabundleCerts); err != nil {
+		if err := targetRotation.EnsureTargetCertKeyPair(signingCertKeyPair, cabundleCerts); err != nil {
 			errs = append(errs, err)
 		}
 	}
