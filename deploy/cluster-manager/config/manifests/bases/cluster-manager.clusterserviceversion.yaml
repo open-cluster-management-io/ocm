@@ -81,7 +81,7 @@ spec:
   maturity: alpha
   provider:
     name: Open Cluster Management Community
-  replaces: cluster-manager.v0.13.3
+  replaces: cluster-manager.v0.14.0
   selector:
     matchLabels:
       app: cluster-manager
