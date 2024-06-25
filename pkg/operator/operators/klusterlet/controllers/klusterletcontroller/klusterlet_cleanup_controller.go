@@ -108,17 +108,16 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 	}
 	// Klusterlet is deleting, we remove its related resources on managed and management cluster
 	config := klusterletConfig{
-		KlusterletName:            klusterlet.Name,
-		KlusterletNamespace:       helpers.KlusterletNamespace(klusterlet),
-		AgentNamespace:            helpers.AgentNamespace(klusterlet),
-		RegistrationImage:         klusterlet.Spec.RegistrationImagePullSpec,
-		WorkImage:                 klusterlet.Spec.WorkImagePullSpec,
-		ClusterName:               klusterlet.Spec.ClusterName,
-		BootStrapKubeConfigSecret: helpers.BootstrapHubKubeConfig,
-		HubKubeConfigSecret:       helpers.HubKubeConfig,
-		ExternalServerURL:         getServersFromKlusterlet(klusterlet),
-		OperatorNamespace:         n.operatorNamespace,
-		Replica:                   replica,
+		KlusterletName:      klusterlet.Name,
+		KlusterletNamespace: helpers.KlusterletNamespace(klusterlet),
+		AgentNamespace:      helpers.AgentNamespace(klusterlet),
+		RegistrationImage:   klusterlet.Spec.RegistrationImagePullSpec,
+		WorkImage:           klusterlet.Spec.WorkImagePullSpec,
+		ClusterName:         klusterlet.Spec.ClusterName,
+		HubKubeConfigSecret: helpers.HubKubeConfig,
+		ExternalServerURL:   getServersFromKlusterlet(klusterlet),
+		OperatorNamespace:   n.operatorNamespace,
+		Replica:             replica,
 
 		ExternalManagedKubeConfigSecret:             helpers.ExternalManagedKubeConfig,
 		ExternalManagedKubeConfigRegistrationSecret: helpers.ExternalManagedKubeConfigRegistration,
@@ -130,6 +129,8 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 		RegistrationServiceAccount: serviceAccountName("registration-sa", klusterlet),
 		WorkServiceAccount:         serviceAccountName("work-sa", klusterlet),
 	}
+
+	config.populateBootstrap(klusterlet)
 
 	reconcilers := []klusterletReconcile{
 		&runtimeReconcile{

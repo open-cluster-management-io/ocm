@@ -62,7 +62,14 @@ spec:
           - "/registration-operator"
           - "agent"
           - "--spoke-cluster-name={{ .ClusterName }}"
+          {{if .MultipleHubs}}
+          {{range .BootStrapKubeConfigSecrets}}
+          - "--bootstrap-kubeconfigs=/spoke/{{.}}/kubeconfig"
+          {{end}}
+          - "--hub-connection-timeout-seconds={{ .HubConnectionTimeoutSeconds }}"
+          {{else}}
           - "--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig"
+          {{end}}
           - "--agent-id={{ .AgentID }}"
           - "--workload-source-driver=kube"
           - "--workload-source-config=/spoke/hub-kubeconfig/kubeconfig"
@@ -116,9 +123,17 @@ spec:
           runAsNonRoot: true
           readOnlyRootFilesystem: true
         volumeMounts:
+        {{if .MultipleHubs}}
+        {{range .BootStrapKubeConfigSecrets}}
+        - name: {{.}}
+          mountPath: "/spoke/{{.}}"
+          readOnly: true
+        {{end}}
+        {{else}}
         - name: bootstrap-secret
           mountPath: "/spoke/bootstrap"
           readOnly: true
+        {{end}}
         - name: hub-kubeconfig
           mountPath: "/spoke/hub-kubeconfig"
         - name: tmpdir
@@ -158,9 +173,17 @@ spec:
       priorityClassName: "{{ .PriorityClassName }}"
       {{- end }}
       volumes:
+      {{if .MultipleHubs}}
+      {{range .BootStrapKubeConfigSecrets}}
+      - name: {{.}}
+        secret:
+          secretName: {{.}}
+      {{end}}
+      {{else}}
       - name: bootstrap-secret
         secret:
           secretName: {{ .BootStrapKubeConfigSecret }}
+      {{end}}
       - name: hub-kubeconfig
         emptyDir:
           medium: Memory
