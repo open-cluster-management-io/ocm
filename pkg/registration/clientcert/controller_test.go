@@ -39,15 +39,14 @@ func TestSync(t *testing.T) {
 	}
 
 	cases := []struct {
-		name                         string
-		queueKey                     string
-		secrets                      []runtime.Object
-		approvedCSRCert              *testinghelpers.TestCert
-		keyDataExpected              bool
-		csrNameExpected              bool
-		additonalSecretDataSensitive bool
-		expectedCondition            *metav1.Condition
-		validateActions              func(t *testing.T, hubActions, agentActions []clienttesting.Action)
+		name              string
+		queueKey          string
+		secrets           []runtime.Object
+		approvedCSRCert   *testinghelpers.TestCert
+		keyDataExpected   bool
+		csrNameExpected   bool
+		expectedCondition *metav1.Condition
+		validateActions   func(t *testing.T, hubActions, agentActions []clienttesting.Action)
 	}{
 		{
 			name:            "agent bootstrap",
@@ -139,9 +138,8 @@ func TestSync(t *testing.T) {
 					AgentNameFile:   []byte("invalid-name"),
 				}),
 			},
-			keyDataExpected:              true,
-			csrNameExpected:              true,
-			additonalSecretDataSensitive: true,
+			keyDataExpected: true,
+			csrNameExpected: true,
 			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
 				testingcommon.AssertActions(t, hubActions, "create")
 				actual := hubActions[0].(clienttesting.CreateActionImpl).Object
@@ -183,7 +181,6 @@ func TestSync(t *testing.T) {
 					ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
 					AgentNameFile:   []byte(testAgentName),
 				},
-				AdditionalSecretDataSensitive: c.additonalSecretDataSensitive,
 			}
 			csrOption := CSROption{
 				ObjectMeta: metav1.ObjectMeta{
