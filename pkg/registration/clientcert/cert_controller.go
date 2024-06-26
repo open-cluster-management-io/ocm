@@ -373,51 +373,60 @@ func shouldCreateCSR(
 	recorder events.Recorder,
 	subject *pkix.Name,
 	additionalSecretData map[string][]byte) (bool, error) {
-	switch {
-	case !hasValidClientCertificate(logger, subject, secret):
-		recorder.Eventf("NoValidCertificateFound",
-			"No valid client certificate for %s is found. Bootstrap is required", controllerName)
-	// return true to create a CSR for a new client cert once the additional secret data changes.
-	case !hasAdditionalSecretData(additionalSecretData, secret):
-		recorder.Eventf("AdditionalSecretDataChanged",
-			"The additional secret data is changed. Re-create the client certificate for %s", controllerName)
-	default:
-		notBefore, notAfter, err := getCertValidityPeriod(secret)
-		if err != nil {
-			return false, err
-		}
+	// create a csr to request new client certificate if
+	// a.there is no valid client certificate issued for the current cluster/agent
+	valid, err := IsCertificateValid(logger, secret.Data[TLSCertFile], subject)
+	if err != nil {
+		recorder.Eventf("CertificateValidationFailed", "Failed to validate client certificate for %s: %v", controllerName, err)
+		return true, nil
+	}
+	if !valid {
+		recorder.Eventf("NoValidCertificateFound", "No valid client certificate for %s is found. Bootstrap is required", controllerName)
+		return true, nil
+	}
 
-		total := notAfter.Sub(*notBefore)
-		remaining := time.Until(*notAfter)
+	// b.client certificate is sensitive to the additional secret data and the data changes
+	if err := hasAdditionalSecretData(additionalSecretData, secret); err != nil {
+		recorder.Eventf("AdditonalSecretDataChanged", "The additional secret data is changed for %v. Re-create the client certificate for %s", err, controllerName)
+		return true, nil
+	}
+
+	// c.client certificate exists and has less than a random percentage range from 20% to 25% of its life remaining
+	notBefore, notAfter, err := getCertValidityPeriod(secret)
+	if err != nil {
+		return false, err
+	}
+	total := notAfter.Sub(*notBefore)
+	remaining := time.Until(*notAfter)
+	logger.V(4).Info("Client certificate for:", "name", controllerName, "time total", total,
+		"remaining", remaining, "remaining/total", remaining.Seconds()/total.Seconds())
+	threshold := jitter(0.2, 0.25)
+	if remaining.Seconds()/total.Seconds() > threshold {
+		// Do nothing if the client certificate is valid and has more than a random percentage range from 20% to 25% of its life remaining
 		logger.V(4).Info("Client certificate for:", "name", controllerName, "time total", total,
 			"remaining", remaining, "remaining/total", remaining.Seconds()/total.Seconds())
-		threshold := jitter(0.2, 0.25)
-		if remaining.Seconds()/total.Seconds() > threshold {
-			// Do nothing if the client certificate is valid and has more than a random percentage range from 20% to 25% of its life remaining
-			logger.V(4).Info("Client certificate for:", "name", controllerName, "time total", total,
-				"remaining", remaining, "remaining/total", remaining.Seconds()/total.Seconds())
-			return false, nil
-		}
-		recorder.Eventf("CertificateRotationStarted",
-			"The current client certificate for %s expires in %v. Start certificate rotation",
-			controllerName, remaining.Round(time.Second))
+		return false, nil
 	}
+	recorder.Eventf("CertificateRotationStarted",
+		"The current client certificate for %s expires in %v. Start certificate rotation",
+		controllerName, remaining.Round(time.Second))
 	return true, nil
 }
 
-// hasAdditionalSecretData checks if the secret includes the expected additional secret data.
-func hasAdditionalSecretData(additionalSecretData map[string][]byte, secret *corev1.Secret) bool {
+// hasAdditonalSecretData checks if the secret includes the expected additional secret data.
+func hasAdditionalSecretData(additionalSecretData map[string][]byte, secret *corev1.Secret) error {
 	for k, v := range additionalSecretData {
 		value, ok := secret.Data[k]
 		if !ok {
-			return false
+			return fmt.Errorf("key %q not found in secret %q", k, secret.Namespace+"/"+secret.Name)
 		}
 
 		if !reflect.DeepEqual(v, value) {
-			return false
+			return fmt.Errorf("key %q in secret %q does not match the expected value",
+				k, secret.Namespace+"/"+secret.Name)
 		}
 	}
-	return true
+	return nil
 }
 
 func jitter(percentage float64, maxFactor float64) float64 {
@@ -426,11 +435,4 @@ func jitter(percentage float64, maxFactor float64) float64 {
 	}
 	newPercentage := percentage + percentage*rand.Float64()*maxFactor //#nosec G404
 	return newPercentage
-}
-
-func hasValidClientCertificate(logger klog.Logger, subject *pkix.Name, secret *corev1.Secret) bool {
-	if valid, err := IsCertificateValid(logger, secret.Data[TLSCertFile], subject); err == nil {
-		return valid
-	}
-	return false
 }

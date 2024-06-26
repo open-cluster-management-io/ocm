@@ -30,43 +30,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 )
 
-// HasValidHubKubeconfig checks if there exists a valid client certificate in the given secret
-// Returns true if all the conditions below are met:
-//  1. KubeconfigFile exists when hasKubeconfig is true
-//  2. TLSKeyFile exists
-//  3. TLSCertFile exists and the certificate is not expired
-//  4. If subject is specified, it matches the subject in the certificate stored in TLSCertFile
-func HasValidHubKubeconfig(logger klog.Logger, secret *corev1.Secret, subject *pkix.Name) bool {
-	if len(secret.Data) == 0 {
-		logger.V(4).Info("No data found in secret", "secret", klog.KObj(secret))
-		return false
-	}
-
-	if _, ok := secret.Data[KubeconfigFile]; !ok {
-		logger.V(4).Info("No specific file found in secret", "file", KubeconfigFile, "secret", klog.KObj(secret))
-		return false
-	}
-
-	if _, ok := secret.Data[TLSKeyFile]; !ok {
-		logger.V(4).Info("No specific key file found in secret", "keyFile", TLSKeyFile, "secret", klog.KObj(secret))
-		return false
-	}
-
-	certData, ok := secret.Data[TLSCertFile]
-	if !ok {
-		logger.V(4).Info("No specific cert file found in secret", "certFile", TLSCertFile, "secret", klog.KObj(secret))
-		return false
-	}
-
-	valid, err := IsCertificateValid(logger, certData, subject)
-	if err != nil {
-		logger.V(4).Error(err, "Unable to validate certificate in secret", "secret", klog.KObj(secret))
-		return false
-	}
-
-	return valid
-}
-
 // IsCertificateValid return true if
 // 1) All certs in client certificate are not expired.
 // 2) At least one cert matches the given subject if specified
