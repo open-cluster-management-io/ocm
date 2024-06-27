@@ -19,6 +19,7 @@ import (
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
+	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
@@ -143,30 +144,37 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 			return
 		}
 
-		bootstrapDegradedCondition := checkAgentDegradedCondition(
-			ctx, c.kubeClient,
-			operatorapiv1.ConditionHubConnectionDegraded,
-			klusterletAgent{
-				clusterName: klusterlet.Spec.ClusterName,
-				namespace:   agentNamespace,
-			},
-			klusterlet.Generation,
-			checkBootstrapSecret,
-		)
+		// If the MultipleHubs feature is enabled, there is no need to check the bootstrap kubeconfig secret.
+		// The ssar check to bootstrapkubeconfigs is done at the start of the registration agent.
+		// TODO: @xuezhaojun Need to find a way to reflect the connectivity status of the bootstrapkubeconfig secrets to the klusterlet status.
+		multiplehubsEnabled := klusterlet.Spec.RegistrationConfiguration != nil &&
+			helpers.FeatureGateEnabled(klusterlet.Spec.RegistrationConfiguration.FeatureGates, ocmfeature.DefaultSpokeRegistrationFeatureGates, ocmfeature.MultipleHubs)
+		if !multiplehubsEnabled {
+			bootstrapDegradedCondition := checkAgentDegradedCondition(
+				ctx, c.kubeClient,
+				operatorapiv1.ConditionHubConnectionDegraded,
+				klusterletAgent{
+					clusterName: klusterlet.Spec.ClusterName,
+					namespace:   agentNamespace,
+				},
+				klusterlet.Generation,
+				checkBootstrapSecret,
+			)
 
-		// The status is always true here since the hub kubeconfig check fails. Need to add the additional
-		// message relating to bootstrap kubeconfig check here.
-		meta.SetStatusCondition(&newKlusterlet.Status.Conditions, metav1.Condition{
-			Type:               operatorapiv1.ConditionHubConnectionDegraded,
-			Status:             metav1.ConditionTrue,
-			ObservedGeneration: klusterlet.Generation,
-			Reason:             bootstrapDegradedCondition.Reason + "," + hubConfigDegradedCondition.Reason,
-			Message:            bootstrapDegradedCondition.Message + "\n" + hubConfigDegradedCondition.Message,
-		})
-		_, err := c.patcher.PatchStatus(ctx, newKlusterlet, newKlusterlet.Status, klusterlet.Status)
-		if err != nil {
-			klog.Errorf("Update Klusterlet Status Failed: %v", err)
-			controllerContext.Queue().AddAfter(klusterletName, SSARReSyncTime)
+			// The status is always true here since the hub kubeconfig check fails. Need to add the additional
+			// message relating to bootstrap kubeconfig check here.
+			meta.SetStatusCondition(&newKlusterlet.Status.Conditions, metav1.Condition{
+				Type:               operatorapiv1.ConditionHubConnectionDegraded,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: klusterlet.Generation,
+				Reason:             bootstrapDegradedCondition.Reason + "," + hubConfigDegradedCondition.Reason,
+				Message:            bootstrapDegradedCondition.Message + "\n" + hubConfigDegradedCondition.Message,
+			})
+			_, err := c.patcher.PatchStatus(ctx, newKlusterlet, newKlusterlet.Status, klusterlet.Status)
+			if err != nil {
+				klog.Errorf("Update Klusterlet Status Failed: %v", err)
+				controllerContext.Queue().AddAfter(klusterletName, SSARReSyncTime)
+			}
 		}
 	}(klusterlet)
 
