@@ -241,14 +241,15 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		return err
 	}
 	secretOption := register.SecretOption{
-		SecretNamespace:      o.agentOptions.ComponentNamespace,
-		SecretName:           o.registrationOption.HubKubeconfigSecret,
-		ClusterName:          o.agentOptions.SpokeClusterName,
-		AgentName:            o.agentOptions.AgentID,
-		ManagementCoreClient: managementKubeClient.CoreV1(),
-		HubKubeconfigFile:    o.agentOptions.HubKubeconfigFile,
-		HubKubeconfigDir:     o.agentOptions.HubKubeconfigDir,
-		BootStrapKubeConfig:  kubeconfig,
+		SecretNamespace:          o.agentOptions.ComponentNamespace,
+		SecretName:               o.registrationOption.HubKubeconfigSecret,
+		ClusterName:              o.agentOptions.SpokeClusterName,
+		AgentName:                o.agentOptions.AgentID,
+		ManagementSecretInformer: namespacedManagementKubeInformerFactory.Core().V1().Secrets().Informer(),
+		ManagementCoreClient:     managementKubeClient.CoreV1(),
+		HubKubeconfigFile:        o.agentOptions.HubKubeconfigFile,
+		HubKubeconfigDir:         o.agentOptions.HubKubeconfigDir,
+		BootStrapKubeConfig:      kubeconfig,
 	}
 	hasValidHubClientConfig := o.RegisterImpl.IsHubKubeConfigValidFunc(secretOption)
 
@@ -266,10 +267,6 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		// create a ClientCertForHubController for spoke agent bootstrap
 		// the bootstrap informers are supposed to be terminated after completing the bootstrap process.
 		bootstrapInformerFactory := informers.NewSharedInformerFactory(bootstrapKubeClient, 10*time.Minute)
-		bootstrapNamespacedManagementKubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(
-			managementKubeClient, 10*time.Minute, informers.WithNamespace(o.agentOptions.ComponentNamespace))
-
-		secretOption.ManagementSecretInformer = bootstrapNamespacedManagementKubeInformerFactory.Core().V1().Secrets()
 
 		csrOption, err := registration.NewCSROption(logger,
 			secretOption,
@@ -287,7 +284,6 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 			controllerName, registration.GenerateBootstrapStatusUpdater(), recorder, secretOption, csrOption)
 
 		go bootstrapInformerFactory.Start(bootstrapCtx.Done())
-		go bootstrapNamespacedManagementKubeInformerFactory.Start(bootstrapCtx.Done())
 
 		// wait for the hub client config is ready.
 		logger.Info("Waiting for hub client config and managed cluster to be ready")
@@ -344,8 +340,6 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	)
 
 	recorder.Event("HubClientConfigReady", "Client config for hub is ready.")
-
-	secretOption.ManagementSecretInformer = namespacedManagementKubeInformerFactory.Core().V1().Secrets()
 
 	csrOption, err := registration.NewCSROption(logger,
 		secretOption,
@@ -404,11 +398,6 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 			recorder,
 		)
 
-		csrControl, err := csr.NewCSRControl(logger, hubKubeInformerFactory.Certificates(), hubKubeClient)
-		if err != nil {
-			return err
-		}
-
 		addOnRegistrationController = addon.NewAddOnRegistrationController(
 			o.agentOptions.SpokeClusterName,
 			o.agentOptions.AgentID,
@@ -416,7 +405,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 			addOnClient,
 			managementKubeClient,
 			spokeKubeClient,
-			csrControl,
+			csrOption.CSRControl,
 			addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
 			recorder,
 		)

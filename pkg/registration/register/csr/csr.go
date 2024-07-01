@@ -10,6 +10,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
 
@@ -69,11 +70,9 @@ func (c *CSRDriver) Start(
 	secretOption register.SecretOption,
 	option any,
 	addtionalData map[string][]byte) {
-	logger := klog.FromContext(ctx)
 	csrOption, ok := option.(*CSROption)
 	if !ok {
-		logger.Error(fmt.Errorf("option type is not correct"), "option type is not correct")
-		return
+		utilruntime.Must(fmt.Errorf("option type is not correct"))
 	}
 	ctrl := NewClientCertificateController(
 		secretOption.SecretNamespace, secretOption.SecretName, addtionalData, *csrOption, updater,

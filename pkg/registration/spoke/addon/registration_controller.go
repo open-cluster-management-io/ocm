@@ -216,7 +216,7 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 		SecretNamespace:          config.InstallationNamespace,
 		SecretName:               config.secretName,
 		ManagementCoreClient:     kubeClient.CoreV1(),
-		ManagementSecretInformer: kubeInformerFactory.Core().V1().Secrets(),
+		ManagementSecretInformer: kubeInformerFactory.Core().V1().Secrets().Informer(),
 	}
 
 	if config.registration.SignerName == certificatesv1.KubeAPIServerClientSignerName {
@@ -245,8 +245,8 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 	controllerName := fmt.Sprintf("ClientCertController@addon:%s:signer:%s", config.addOnName, config.registration.SignerName)
 	statusUpdater := c.generateStatusUpdate(c.clusterName, config.addOnName)
 
-	go registerImpl.Start(ctx, controllerName, statusUpdater, c.recorder, secretOption, csrOption)
 	go kubeInformerFactory.Start(ctx.Done())
+	go registerImpl.Start(ctx, controllerName, statusUpdater, c.recorder, secretOption, csrOption)
 
 	return stopFunc
 }
