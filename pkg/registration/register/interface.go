@@ -6,9 +6,10 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	corev1informers "k8s.io/client-go/informers/core/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
@@ -43,7 +44,7 @@ type SecretOption struct {
 	HubKubeconfigFile string
 	HubKubeconfigDir  string
 
-	ManagementSecretInformer corev1informers.SecretInformer
+	ManagementSecretInformer cache.SharedIndexInformer
 	ManagementCoreClient     corev1client.CoreV1Interface
 }
 
@@ -115,19 +116,16 @@ func (r *registerImpl) Start(
 	statusUpdater StatusUpdateFunc,
 	recorder events.Recorder,
 	secretOption SecretOption, option any) {
-	logger := klog.FromContext(ctx)
 	additionalSercretData := map[string][]byte{}
 	if secretOption.BootStrapKubeConfig != nil {
 		kubeConfig, err := r.driver.BuildKubeConfigFromBootstrap(secretOption.BootStrapKubeConfig)
 		if err != nil {
-			logger.Error(err, "failed to build kubeconfig from bootstrap kubeconfig")
-			return
+			utilruntime.Must(err)
 		}
 		if kubeConfig != nil {
 			kubeconfigData, err := clientcmd.Write(*kubeConfig)
 			if err != nil {
-				logger.Error(err, "failed to write kubeconfig data")
-				return
+				utilruntime.Must(err)
 			}
 			additionalSercretData[KubeconfigFile] = kubeconfigData
 		}

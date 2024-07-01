@@ -16,8 +16,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	corev1informers "k8s.io/client-go/informers/core/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/cache"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog/v2"
@@ -71,7 +71,7 @@ func NewClientCertificateController(
 	additionalSecretData map[string][]byte,
 	csrOption CSROption,
 	statusUpdater register.StatusUpdateFunc,
-	managementSecretInformer corev1informers.SecretInformer,
+	managementSecretInformer cache.SharedIndexInformer,
 	managementCoreClient corev1client.CoreV1Interface,
 	recorder events.Recorder,
 	controllerName string,
@@ -101,7 +101,7 @@ func NewClientCertificateController(
 				return true
 			}
 			return false
-		}, managementSecretInformer.Informer()).
+		}, managementSecretInformer).
 		WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
 			return factory.DefaultQueueKey
 		}, c.EventFilterFunc, csrOption.CSRControl.Informer()).

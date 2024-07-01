@@ -16,7 +16,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	certificatesinformers "k8s.io/client-go/informers/certificates"
-	certificatesv1informers "k8s.io/client-go/informers/certificates/v1"
 	"k8s.io/client-go/kubernetes"
 	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1"
 	certificatesv1listers "k8s.io/client-go/listers/certificates/v1"
@@ -161,7 +160,7 @@ type CSRControl interface {
 var _ CSRControl = &v1CSRControl{}
 
 type v1CSRControl struct {
-	hubCSRInformer certificatesv1informers.CertificateSigningRequestInformer
+	hubCSRInformer cache.SharedIndexInformer
 	hubCSRLister   certificatesv1listers.CertificateSigningRequestLister
 	hubCSRClient   csrclient.CertificateSigningRequestInterface
 }
@@ -217,7 +216,7 @@ func (v *v1CSRControl) create(ctx context.Context, recorder events.Recorder, obj
 }
 
 func (v *v1CSRControl) Informer() cache.SharedIndexInformer {
-	return v.hubCSRInformer.Informer()
+	return v.hubCSRInformer
 }
 
 func (v *v1CSRControl) get(name string) (metav1.Object, error) {
@@ -243,7 +242,7 @@ func NewCSRControl(logger klog.Logger, hubCSRInformer certificatesinformers.Inte
 		}
 		if !v1CSRSupported && v1beta1CSRSupported {
 			csrCtrl := &v1beta1CSRControl{
-				hubCSRInformer: hubCSRInformer.V1beta1().CertificateSigningRequests(),
+				hubCSRInformer: hubCSRInformer.V1beta1().CertificateSigningRequests().Informer(),
 				hubCSRLister:   hubCSRInformer.V1beta1().CertificateSigningRequests().Lister(),
 				hubCSRClient:   hubKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
 			}
@@ -253,7 +252,7 @@ func NewCSRControl(logger klog.Logger, hubCSRInformer certificatesinformers.Inte
 	}
 
 	return &v1CSRControl{
-		hubCSRInformer: hubCSRInformer.V1().CertificateSigningRequests(),
+		hubCSRInformer: hubCSRInformer.V1().CertificateSigningRequests().Informer(),
 		hubCSRLister:   hubCSRInformer.V1().CertificateSigningRequests().Lister(),
 		hubCSRClient:   hubKubeClient.CertificatesV1().CertificateSigningRequests(),
 	}, nil
