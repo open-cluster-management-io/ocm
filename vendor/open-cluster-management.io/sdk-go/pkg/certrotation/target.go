@@ -5,11 +5,12 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
-	"open-cluster-management.io/sdk-go/pkg/helpers"
 	"os"
 	"path"
 	"path/filepath"
 	"time"
+
+	"open-cluster-management.io/sdk-go/pkg/helpers"
 
 	"github.com/openshift/library-go/pkg/certs"
 	"github.com/openshift/library-go/pkg/crypto"
@@ -178,7 +179,7 @@ func (c TargetRotation) NewCertificate(signer *crypto.CA, validity time.Duration
 	if len(c.HostNames) == 0 {
 		return nil, fmt.Errorf("no hostnames set")
 	}
-	return signer.MakeServerCertForDuration(sets.NewString(c.HostNames...), validity, fns...)
+	return signer.MakeServerCertForDuration(sets.New[string](c.HostNames...), validity, fns...)
 }
 
 func (c TargetRotation) loadTargetSecret(certKeySecret *corev1.Secret) error {

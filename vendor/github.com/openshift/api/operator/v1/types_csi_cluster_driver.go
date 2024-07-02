@@ -16,6 +16,11 @@ import (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=clustercsidrivers,scope=Cluster
+// +kubebuilder:subresource:status
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/701
+// +openshift:file-pattern=cvoRunLevel=0000_90,operatorName=csi-driver,operatorOrdering=01
 
 // ClusterCSIDriver object allows management and configuration of a CSI driver operator
 // installed by default in OpenShift. Name of the object must be name of the CSI driver
@@ -84,6 +89,7 @@ const (
 	IBMVPCBlockCSIDriver     CSIDriverName = "vpc.block.csi.ibm.io"
 	IBMPowerVSBlockCSIDriver CSIDriverName = "powervs.csi.ibm.com"
 	SecretsStoreCSIDriver    CSIDriverName = "secrets-store.csi.k8s.io"
+	SambaCSIDriver           CSIDriverName = "smb.csi.k8s.io"
 )
 
 // ClusterCSIDriverSpec is the desired behavior of CSI driver operator
@@ -159,7 +165,7 @@ type AWSCSIDriverConfigSpec struct {
 	// kmsKeyARN sets the cluster default storage class to encrypt volumes with a user-defined KMS key,
 	// rather than the default KMS key used by AWS.
 	// The value may be either the ARN or Alias ARN of a KMS key.
-	// +kubebuilder:validation:Pattern:=`^arn:(aws|aws-cn|aws-us-gov):kms:[a-z0-9-]+:[0-9]{12}:(key|alias)\/.*$`
+	// +kubebuilder:validation:Pattern:=`^arn:(aws|aws-cn|aws-us-gov|aws-iso|aws-iso-b|aws-iso-e|aws-iso-f):kms:[a-z0-9-]+:[0-9]{12}:(key|alias)\/.*$`
 	// +optional
 	KMSKeyARN string `json:"kmsKeyARN,omitempty"`
 }
@@ -273,8 +279,38 @@ type VSphereCSIDriverConfigSpec struct {
 	// If cluster Infrastructure object has a topology, values specified in
 	// Infrastructure object will be used and modifications to topologyCategories
 	// will be rejected.
+	// +listType=atomic
 	// +optional
 	TopologyCategories []string `json:"topologyCategories,omitempty"`
+
+	// globalMaxSnapshotsPerBlockVolume is a global configuration parameter that applies to volumes on all kinds of
+	// datastores. If omitted, the platform chooses a default, which is subject to change over time, currently that default is 3.
+	// Snapshots can not be disabled using this parameter.
+	// Increasing number of snapshots above 3 can have negative impact on performance, for more details see: https://kb.vmware.com/s/article/1025279
+	// Volume snapshot documentation: https://docs.vmware.com/en/VMware-vSphere-Container-Storage-Plug-in/3.0/vmware-vsphere-csp-getting-started/GUID-E0B41C69-7EEB-450F-A73D-5FD2FF39E891.html
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=32
+	// +openshift:enable:FeatureGate=VSphereDriverConfiguration
+	// +optional
+	GlobalMaxSnapshotsPerBlockVolume *uint32 `json:"globalMaxSnapshotsPerBlockVolume,omitempty"`
+
+	// granularMaxSnapshotsPerBlockVolumeInVSAN is a granular configuration parameter on vSAN datastore only. It
+	// overrides GlobalMaxSnapshotsPerBlockVolume if set, while it falls back to the global constraint if unset.
+	// Snapshots for VSAN can not be disabled using this parameter.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=32
+	// +openshift:enable:FeatureGate=VSphereDriverConfiguration
+	// +optional
+	GranularMaxSnapshotsPerBlockVolumeInVSAN *uint32 `json:"granularMaxSnapshotsPerBlockVolumeInVSAN,omitempty"`
+
+	// granularMaxSnapshotsPerBlockVolumeInVVOL is a granular configuration parameter on Virtual Volumes datastore only.
+	// It overrides GlobalMaxSnapshotsPerBlockVolume if set, while it falls back to the global constraint if unset.
+	// Snapshots for VVOL can not be disabled using this parameter.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=32
+	// +openshift:enable:FeatureGate=VSphereDriverConfiguration
+	// +optional
+	GranularMaxSnapshotsPerBlockVolumeInVVOL *uint32 `json:"granularMaxSnapshotsPerBlockVolumeInVVOL,omitempty"`
 }
 
 // ClusterCSIDriverStatus is the observed status of CSI driver operator
@@ -283,7 +319,6 @@ type ClusterCSIDriverStatus struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:object:root=true
 
 // ClusterCSIDriverList contains a list of ClusterCSIDriver
 //

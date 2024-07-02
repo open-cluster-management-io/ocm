@@ -19,8 +19,8 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	"open-cluster-management.io/addon-framework/pkg/utils"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 // addonRegistrationController reconciles instances of ManagedClusterAddon on the hub.

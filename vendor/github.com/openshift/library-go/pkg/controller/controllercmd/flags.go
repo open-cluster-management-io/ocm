@@ -3,7 +3,7 @@ package controllercmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -62,7 +62,7 @@ func (f *ControllerFlags) ToConfigObj() ([]byte, *unstructured.Unstructured, err
 		return nil, nil, nil
 	}
 
-	content, err := ioutil.ReadFile(f.ConfigFile)
+	content, err := os.ReadFile(f.ConfigFile)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -105,7 +105,7 @@ func ReadYAML(data []byte, configScheme *runtime.Scheme, versions ...schema.Grou
 
 // ReadYAMLFile read a file and decodes a runtime.Object from the provided scheme
 func ReadYAMLFile(filename string, configScheme *runtime.Scheme, versions ...schema.GroupVersion) (runtime.Object, error) {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}

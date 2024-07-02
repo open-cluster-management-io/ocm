@@ -213,7 +213,7 @@ message RouteIngress {
 // router.
 message RouteIngressCondition {
   // Type is the type of the condition.
-  // Currently only Admitted.
+  // Currently only Admitted or UnservableInFutureVersions.
   optional string type = 1;
 
   // Status is the status of the condition.
@@ -404,7 +404,7 @@ message RouterShard {
 // TLSConfig defines config used to secure a route and provide termination
 //
 // +kubebuilder:validation:XValidation:rule="has(self.termination) && has(self.insecureEdgeTerminationPolicy) ? !((self.termination=='passthrough') && (self.insecureEdgeTerminationPolicy=='Allow')) : true", message="cannot have both spec.tls.termination: passthrough and spec.tls.insecureEdgeTerminationPolicy: Allow"
-// +openshift:validation:FeatureSetAwareXValidation:featureSet=TechPreviewNoUpgrade;CustomNoUpgrade,rule="!(has(self.certificate) && has(self.externalCertificate))", message="cannot have both spec.tls.certificate and spec.tls.externalCertificate"
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=ExternalRouteCertificate,rule="!(has(self.certificate) && has(self.externalCertificate))", message="cannot have both spec.tls.certificate and spec.tls.externalCertificate"
 message TLSConfig {
   // termination indicates termination type.
   //
@@ -436,8 +436,12 @@ message TLSConfig {
   // insecureEdgeTerminationPolicy indicates the desired behavior for insecure connections to a route. While
   // each router may make its own decisions on which ports to expose, this is normally port 80.
   //
-  // * Allow - traffic is sent to the server on the insecure port (edge/reencrypt terminations only) (default).
-  // * None - no traffic is allowed on the insecure port.
+  // If a route does not specify insecureEdgeTerminationPolicy, then the default behavior is "None".
+  //
+  // * Allow - traffic is sent to the server on the insecure port (edge/reencrypt terminations only).
+  //
+  // * None - no traffic is allowed on the insecure port (default).
+  //
   // * Redirect - clients are redirected to the secure port.
   //
   // +kubebuilder:validation:Enum=Allow;None;Redirect;""
@@ -449,7 +453,7 @@ message TLSConfig {
   // be present in the same namespace as that of the Route.
   // Forbidden when `certificate` is set.
   //
-  // +openshift:enable:FeatureSets=CustomNoUpgrade;TechPreviewNoUpgrade
+  // +openshift:enable:FeatureGate=ExternalRouteCertificate
   // +optional
   optional LocalObjectReference externalCertificate = 7;
 }

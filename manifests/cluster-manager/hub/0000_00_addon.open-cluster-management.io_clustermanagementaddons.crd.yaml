@@ -25,22 +25,27 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ClusterManagementAddOn represents the registration of an add-on
-          to the cluster manager. This resource allows you to discover which add-ons
-          are available for the cluster manager and provides metadata information
-          about the add-ons. The ClusterManagementAddOn name is used for the namespace-scoped
-          ManagedClusterAddOn resource. ClusterManagementAddOn is a cluster-scoped
-          resource.
+        description: |-
+          ClusterManagementAddOn represents the registration of an add-on to the cluster manager.
+          This resource allows you to discover which add-ons are available for the cluster manager
+          and provides metadata information about the add-ons. The ClusterManagementAddOn name is used
+          for the namespace-scoped ManagedClusterAddOn resource.
+          ClusterManagementAddOn is a cluster-scoped resource.
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -49,22 +54,21 @@ spec:
               the cluster management add-on.
             properties:
               addOnConfiguration:
-                description: 'Deprecated: Use supportedConfigs filed instead addOnConfiguration
-                  is a reference to configuration information for the add-on. In scenario
-                  where a multiple add-ons share the same add-on CRD, multiple ClusterManagementAddOn
-                  resources need to be created and reference the same AddOnConfiguration.'
+                description: |-
+                  Deprecated: Use supportedConfigs filed instead
+                  addOnConfiguration is a reference to configuration information for the add-on.
+                  In scenario where a multiple add-ons share the same add-on CRD, multiple ClusterManagementAddOn
+                  resources need to be created and reference the same AddOnConfiguration.
                 properties:
                   crName:
-                    description: crName is the name of the CR used to configure instances
-                      of the managed add-on. This field should be configured if add-on
-                      CR have a consistent name across the all of the ManagedCluster
-                      instaces.
+                    description: |-
+                      crName is the name of the CR used to configure instances of the managed add-on.
+                      This field should be configured if add-on CR have a consistent name across the all of the ManagedCluster instaces.
                     type: string
                   crdName:
-                    description: crdName is the name of the CRD used to configure
-                      instances of the managed add-on. This field should be configured
-                      if the add-on have a CRD that controls the configuration of
-                      the add-on.
+                    description: |-
+                      crdName is the name of the CRD used to configure instances of the managed add-on.
+                      This field should be configured if the add-on have a CRD that controls the configuration of the add-on.
                     type: string
                   lastObservedGeneration:
                     description: lastObservedGeneration is the observed generation
@@ -88,22 +92,22 @@ spec:
               installStrategy:
                 default:
                   type: Manual
-                description: InstallStrategy represents that related ManagedClusterAddOns
-                  should be installed on certain clusters.
+                description: |-
+                  InstallStrategy represents that related ManagedClusterAddOns should be installed
+                  on certain clusters.
                 properties:
                   placements:
-                    description: Placements is a list of placement references honored
-                      when install strategy type is Placements. All clusters selected
-                      by these placements will install the addon If one cluster belongs
-                      to multiple placements, it will only apply the strategy defined
-                      later in the order. That is to say, The latter strategy overrides
-                      the previous one.
+                    description: |-
+                      Placements is a list of placement references honored when install strategy type is
+                      Placements. All clusters selected by these placements will install the addon
+                      If one cluster belongs to multiple placements, it will only apply the strategy defined
+                      later in the order. That is to say, The latter strategy overrides the previous one.
                     items:
                       properties:
                         configs:
-                          description: Configs is the configuration of managedClusterAddon
-                            during installation. User can override the configuration
-                            by updating the managedClusterAddon directly.
+                          description: |-
+                            Configs is the configuration of managedClusterAddon during installation.
+                            User can override the configuration by updating the managedClusterAddon directly.
                           items:
                             properties:
                               group:
@@ -115,9 +119,9 @@ spec:
                                 minLength: 1
                                 type: string
                               namespace:
-                                description: namespace of the add-on configuration.
-                                  If this field is not set, the configuration is in
-                                  the cluster scope.
+                                description: |-
+                                  namespace of the add-on configuration.
+                                  If this field is not set, the configuration is in the cluster scope.
                                 type: string
                               resource:
                                 description: resource of the add-on configuration.
@@ -139,9 +143,9 @@ spec:
                         rolloutStrategy:
                           default:
                             type: All
-                          description: The rollout strategy to apply addon configurations
-                            change. The rollout strategy only watches the addon configurations
-                            defined in ClusterManagementAddOn.
+                          description: |-
+                            The rollout strategy to apply addon configurations change.
+                            The rollout strategy only watches the addon configurations defined in ClusterManagementAddOn.
                           properties:
                             all:
                               description: All defines required fields for RolloutStrategy
@@ -152,52 +156,41 @@ spec:
                                   - type: integer
                                   - type: string
                                   default: 0
-                                  description: MaxFailures is a percentage or number
-                                    of clusters in the current rollout that can fail
-                                    before proceeding to the next rollout. Fail means
-                                    the cluster has a failed status or timeout status
+                                  description: |-
+                                    MaxFailures is a percentage or number of clusters in the current rollout that can fail before
+                                    proceeding to the next rollout. Fail means the cluster has a failed status or timeout status
                                     (does not reach successful status after ProgressDeadline).
-                                    Once the MaxFailures is breached, the rollout
-                                    will stop. MaxFailures is only considered for
-                                    rollout types Progressive and ProgressivePerGroup.
-                                    For Progressive, this is considered over the total
-                                    number of clusters. For ProgressivePerGroup, this
-                                    is considered according to the size of the current
-                                    group. For both Progressive and ProgressivePerGroup,
-                                    the MaxFailures does not apply for MandatoryDecisionGroups,
-                                    which tolerate no failures. Default is that no
-                                    failures are tolerated.
+                                    Once the MaxFailures is breached, the rollout will stop.
+                                    MaxFailures is only considered for rollout types Progressive and ProgressivePerGroup. For
+                                    Progressive, this is considered over the total number of clusters. For ProgressivePerGroup,
+                                    this is considered according to the size of the current group. For both Progressive and
+                                    ProgressivePerGroup, the MaxFailures does not apply for MandatoryDecisionGroups, which tolerate
+                                    no failures.
+                                    Default is that no failures are tolerated.
                                   pattern: ^((100|[0-9]{1,2})%|[0-9]+)$
                                   x-kubernetes-int-or-string: true
                                 minSuccessTime:
                                   default: "0"
-                                  description: MinSuccessTime is a "soak" time. In
-                                    other words, the minimum amount of time the workload
-                                    applier controller will wait from the start of
-                                    each rollout before proceeding (assuming a successful
-                                    state has been reached and MaxFailures wasn't
-                                    breached). MinSuccessTime is only considered for
-                                    rollout types Progressive and ProgressivePerGroup.
-                                    The default value is 0 meaning the workload applier
-                                    proceeds immediately after a successful state
-                                    is reached. MinSuccessTime must be defined in
-                                    [0-9h]|[0-9m]|[0-9s] format examples; 2h , 90m
-                                    , 360s
+                                  description: |-
+                                    MinSuccessTime is a "soak" time. In other words, the minimum amount of time the workload
+                                    applier controller will wait from the start of each rollout before proceeding (assuming a
+                                    successful state has been reached and MaxFailures wasn't breached).
+                                    MinSuccessTime is only considered for rollout types Progressive and ProgressivePerGroup.
+                                    The default value is 0 meaning the workload applier proceeds immediately after a successful
+                                    state is reached.
+                                    MinSuccessTime must be defined in [0-9h]|[0-9m]|[0-9s] format examples; 2h , 90m , 360s
                                   type: string
                                 progressDeadline:
                                   default: None
-                                  description: ProgressDeadline defines how long workload
-                                    applier controller will wait for the workload
-                                    to reach a successful state in the cluster. If
-                                    the workload does not reach a successful state
-                                    after ProgressDeadline, will stop waiting and
-                                    workload will be treated as "timeout" and be counted
-                                    into MaxFailures. Once the MaxFailures is breached,
-                                    the rollout will stop. ProgressDeadline default
-                                    value is "None", meaning the workload applier
-                                    will wait for a successful state indefinitely.
-                                    ProgressDeadline must be defined in [0-9h]|[0-9m]|[0-9s]
-                                    format examples; 2h , 90m , 360s
+                                  description: |-
+                                    ProgressDeadline defines how long workload applier controller will wait for the workload to
+                                    reach a successful state in the cluster.
+                                    If the workload does not reach a successful state after ProgressDeadline, will stop waiting
+                                    and workload will be treated as "timeout" and be counted into MaxFailures. Once the MaxFailures
+                                    is breached, the rollout will stop.
+                                    ProgressDeadline default value is "None", meaning the workload applier will wait for a
+                                    successful state indefinitely.
+                                    ProgressDeadline must be defined in [0-9h]|[0-9m]|[0-9s] format examples; 2h , 90m , 360s
                                   pattern: ^(([0-9])+[h|m|s])|None$
                                   type: string
                               type: object
@@ -206,26 +199,26 @@ spec:
                                 RolloutStrategy type Progressive
                               properties:
                                 mandatoryDecisionGroups:
-                                  description: List of the decision groups names or
-                                    indexes to apply the workload first and fail if
-                                    workload did not reach successful state. GroupName
-                                    or GroupIndex must match with the decisionGroups
-                                    defined in the placement's decisionStrategy
+                                  description: |-
+                                    List of the decision groups names or indexes to apply the workload first and fail if workload
+                                    did not reach successful state.
+                                    GroupName or GroupIndex must match with the decisionGroups defined in the placement's
+                                    decisionStrategy
                                   items:
-                                    description: MandatoryDecisionGroup set the decision
-                                      group name or group index. GroupName is considered
-                                      first to select the decisionGroups then GroupIndex.
+                                    description: |-
+                                      MandatoryDecisionGroup set the decision group name or group index.
+                                      GroupName is considered first to select the decisionGroups then GroupIndex.
                                     properties:
                                       groupIndex:
-                                        description: GroupIndex of the decision group
-                                          should match the placementDecisions label
-                                          value with label key cluster.open-cluster-management.io/decision-group-index
+                                        description: |-
+                                          GroupIndex of the decision group should match the placementDecisions label value with label key
+                                          cluster.open-cluster-management.io/decision-group-index
                                         format: int32
                                         type: integer
                                       groupName:
-                                        description: GroupName of the decision group
-                                          should match the placementDecisions label
-                                          value with label key cluster.open-cluster-management.io/decision-group-name
+                                        description: |-
+                                          GroupName of the decision group should match the placementDecisions label value with label key
+                                          cluster.open-cluster-management.io/decision-group-name
                                         type: string
                                     type: object
                                   type: array
@@ -233,10 +226,9 @@ spec:
                                   anyOf:
                                   - type: integer
                                   - type: string
-                                  description: MaxConcurrency is the max number of
-                                    clusters to deploy workload concurrently. The
-                                    default value for MaxConcurrency is determined
-                                    from the clustersPerDecisionGroup defined in the
+                                  description: |-
+                                    MaxConcurrency is the max number of clusters to deploy workload concurrently. The default value
+                                    for MaxConcurrency is determined from the clustersPerDecisionGroup defined in the
                                     placement->DecisionStrategy.
                                   pattern: ^((100|[0-9]{1,2})%|[0-9]+)$
                                   x-kubernetes-int-or-string: true
@@ -245,52 +237,41 @@ spec:
                                   - type: integer
                                   - type: string
                                   default: 0
-                                  description: MaxFailures is a percentage or number
-                                    of clusters in the current rollout that can fail
-                                    before proceeding to the next rollout. Fail means
-                                    the cluster has a failed status or timeout status
+                                  description: |-
+                                    MaxFailures is a percentage or number of clusters in the current rollout that can fail before
+                                    proceeding to the next rollout. Fail means the cluster has a failed status or timeout status
                                     (does not reach successful status after ProgressDeadline).
-                                    Once the MaxFailures is breached, the rollout
-                                    will stop. MaxFailures is only considered for
-                                    rollout types Progressive and ProgressivePerGroup.
-                                    For Progressive, this is considered over the total
-                                    number of clusters. For ProgressivePerGroup, this
-                                    is considered according to the size of the current
-                                    group. For both Progressive and ProgressivePerGroup,
-                                    the MaxFailures does not apply for MandatoryDecisionGroups,
-                                    which tolerate no failures. Default is that no
-                                    failures are tolerated.
+                                    Once the MaxFailures is breached, the rollout will stop.
+                                    MaxFailures is only considered for rollout types Progressive and ProgressivePerGroup. For
+                                    Progressive, this is considered over the total number of clusters. For ProgressivePerGroup,
+                                    this is considered according to the size of the current group. For both Progressive and
+                                    ProgressivePerGroup, the MaxFailures does not apply for MandatoryDecisionGroups, which tolerate
+                                    no failures.
+                                    Default is that no failures are tolerated.
                                   pattern: ^((100|[0-9]{1,2})%|[0-9]+)$
                                   x-kubernetes-int-or-string: true
                                 minSuccessTime:
                                   default: "0"
-                                  description: MinSuccessTime is a "soak" time. In
-                                    other words, the minimum amount of time the workload
-                                    applier controller will wait from the start of
-                                    each rollout before proceeding (assuming a successful
-                                    state has been reached and MaxFailures wasn't
-                                    breached). MinSuccessTime is only considered for
-                                    rollout types Progressive and ProgressivePerGroup.
-                                    The default value is 0 meaning the workload applier
-                                    proceeds immediately after a successful state
-                                    is reached. MinSuccessTime must be defined in
-                                    [0-9h]|[0-9m]|[0-9s] format examples; 2h , 90m
-                                    , 360s
+                                  description: |-
+                                    MinSuccessTime is a "soak" time. In other words, the minimum amount of time the workload
+                                    applier controller will wait from the start of each rollout before proceeding (assuming a
+                                    successful state has been reached and MaxFailures wasn't breached).
+                                    MinSuccessTime is only considered for rollout types Progressive and ProgressivePerGroup.
+                                    The default value is 0 meaning the workload applier proceeds immediately after a successful
+                                    state is reached.
+                                    MinSuccessTime must be defined in [0-9h]|[0-9m]|[0-9s] format examples; 2h , 90m , 360s
                                   type: string
                                 progressDeadline:
                                   default: None
-                                  description: ProgressDeadline defines how long workload
-                                    applier controller will wait for the workload
-                                    to reach a successful state in the cluster. If
-                                    the workload does not reach a successful state
-                                    after ProgressDeadline, will stop waiting and
-                                    workload will be treated as "timeout" and be counted
-                                    into MaxFailures. Once the MaxFailures is breached,
-                                    the rollout will stop. ProgressDeadline default
-                                    value is "None", meaning the workload applier
-                                    will wait for a successful state indefinitely.
-                                    ProgressDeadline must be defined in [0-9h]|[0-9m]|[0-9s]
-                                    format examples; 2h , 90m , 360s
+                                  description: |-
+                                    ProgressDeadline defines how long workload applier controller will wait for the workload to
+                                    reach a successful state in the cluster.
+                                    If the workload does not reach a successful state after ProgressDeadline, will stop waiting
+                                    and workload will be treated as "timeout" and be counted into MaxFailures. Once the MaxFailures
+                                    is breached, the rollout will stop.
+                                    ProgressDeadline default value is "None", meaning the workload applier will wait for a
+                                    successful state indefinitely.
+                                    ProgressDeadline must be defined in [0-9h]|[0-9m]|[0-9s] format examples; 2h , 90m , 360s
                                   pattern: ^(([0-9])+[h|m|s])|None$
                                   type: string
                               type: object
@@ -299,26 +280,26 @@ spec:
                                 for RolloutStrategy type ProgressivePerGroup
                               properties:
                                 mandatoryDecisionGroups:
-                                  description: List of the decision groups names or
-                                    indexes to apply the workload first and fail if
-                                    workload did not reach successful state. GroupName
-                                    or GroupIndex must match with the decisionGroups
-                                    defined in the placement's decisionStrategy
+                                  description: |-
+                                    List of the decision groups names or indexes to apply the workload first and fail if workload
+                                    did not reach successful state.
+                                    GroupName or GroupIndex must match with the decisionGroups defined in the placement's
+                                    decisionStrategy
                                   items:
-                                    description: MandatoryDecisionGroup set the decision
-                                      group name or group index. GroupName is considered
-                                      first to select the decisionGroups then GroupIndex.
+                                    description: |-
+                                      MandatoryDecisionGroup set the decision group name or group index.
+                                      GroupName is considered first to select the decisionGroups then GroupIndex.
                                     properties:
                                       groupIndex:
-                                        description: GroupIndex of the decision group
-                                          should match the placementDecisions label
-                                          value with label key cluster.open-cluster-management.io/decision-group-index
+                                        description: |-
+                                          GroupIndex of the decision group should match the placementDecisions label value with label key
+                                          cluster.open-cluster-management.io/decision-group-index
                                         format: int32
                                         type: integer
                                       groupName:
-                                        description: GroupName of the decision group
-                                          should match the placementDecisions label
-                                          value with label key cluster.open-cluster-management.io/decision-group-name
+                                        description: |-
+                                          GroupName of the decision group should match the placementDecisions label value with label key
+                                          cluster.open-cluster-management.io/decision-group-name
                                         type: string
                                     type: object
                                   type: array
@@ -327,52 +308,41 @@ spec:
                                   - type: integer
                                   - type: string
                                   default: 0
-                                  description: MaxFailures is a percentage or number
-                                    of clusters in the current rollout that can fail
-                                    before proceeding to the next rollout. Fail means
-                                    the cluster has a failed status or timeout status
+                                  description: |-
+                                    MaxFailures is a percentage or number of clusters in the current rollout that can fail before
+                                    proceeding to the next rollout. Fail means the cluster has a failed status or timeout status
                                     (does not reach successful status after ProgressDeadline).
-                                    Once the MaxFailures is breached, the rollout
-                                    will stop. MaxFailures is only considered for
-                                    rollout types Progressive and ProgressivePerGroup.
-                                    For Progressive, this is considered over the total
-                                    number of clusters. For ProgressivePerGroup, this
-                                    is considered according to the size of the current
-                                    group. For both Progressive and ProgressivePerGroup,
-                                    the MaxFailures does not apply for MandatoryDecisionGroups,
-                                    which tolerate no failures. Default is that no
-                                    failures are tolerated.
+                                    Once the MaxFailures is breached, the rollout will stop.
+                                    MaxFailures is only considered for rollout types Progressive and ProgressivePerGroup. For
+                                    Progressive, this is considered over the total number of clusters. For ProgressivePerGroup,
+                                    this is considered according to the size of the current group. For both Progressive and
+                                    ProgressivePerGroup, the MaxFailures does not apply for MandatoryDecisionGroups, which tolerate
+                                    no failures.
+                                    Default is that no failures are tolerated.
                                   pattern: ^((100|[0-9]{1,2})%|[0-9]+)$
                                   x-kubernetes-int-or-string: true
                                 minSuccessTime:
                                   default: "0"
-                                  description: MinSuccessTime is a "soak" time. In
-                                    other words, the minimum amount of time the workload
-                                    applier controller will wait from the start of
-                                    each rollout before proceeding (assuming a successful
-                                    state has been reached and MaxFailures wasn't
-                                    breached). MinSuccessTime is only considered for
-                                    rollout types Progressive and ProgressivePerGroup.
-                                    The default value is 0 meaning the workload applier
-                                    proceeds immediately after a successful state
-                                    is reached. MinSuccessTime must be defined in
-                                    [0-9h]|[0-9m]|[0-9s] format examples; 2h , 90m
-                                    , 360s
+                                  description: |-
+                                    MinSuccessTime is a "soak" time. In other words, the minimum amount of time the workload
+                                    applier controller will wait from the start of each rollout before proceeding (assuming a
+                                    successful state has been reached and MaxFailures wasn't breached).
+                                    MinSuccessTime is only considered for rollout types Progressive and ProgressivePerGroup.
+                                    The default value is 0 meaning the workload applier proceeds immediately after a successful
+                                    state is reached.
+                                    MinSuccessTime must be defined in [0-9h]|[0-9m]|[0-9s] format examples; 2h , 90m , 360s
                                   type: string
                                 progressDeadline:
                                   default: None
-                                  description: ProgressDeadline defines how long workload
-                                    applier controller will wait for the workload
-                                    to reach a successful state in the cluster. If
-                                    the workload does not reach a successful state
-                                    after ProgressDeadline, will stop waiting and
-                                    workload will be treated as "timeout" and be counted
-                                    into MaxFailures. Once the MaxFailures is breached,
-                                    the rollout will stop. ProgressDeadline default
-                                    value is "None", meaning the workload applier
-                                    will wait for a successful state indefinitely.
-                                    ProgressDeadline must be defined in [0-9h]|[0-9m]|[0-9s]
-                                    format examples; 2h , 90m , 360s
+                                  description: |-
+                                    ProgressDeadline defines how long workload applier controller will wait for the workload to
+                                    reach a successful state in the cluster.
+                                    If the workload does not reach a successful state after ProgressDeadline, will stop waiting
+                                    and workload will be treated as "timeout" and be counted into MaxFailures. Once the MaxFailures
+                                    is breached, the rollout will stop.
+                                    ProgressDeadline default value is "None", meaning the workload applier will wait for a
+                                    successful state indefinitely.
+                                    ProgressDeadline must be defined in [0-9h]|[0-9m]|[0-9s] format examples; 2h , 90m , 360s
                                   pattern: ^(([0-9])+[h|m|s])|None$
                                   type: string
                               type: object
@@ -395,35 +365,37 @@ spec:
                     x-kubernetes-list-type: map
                   type:
                     default: Manual
-                    description: 'Type is the type of the install strategy, it can
-                      be: - Manual: no automatic install - Placements: install to
-                      clusters selected by placements.'
+                    description: |-
+                      Type is the type of the install strategy, it can be:
+                      - Manual: no automatic install
+                      - Placements: install to clusters selected by placements.
                     enum:
                     - Manual
                     - Placements
                     type: string
                 type: object
               supportedConfigs:
-                description: supportedConfigs is a list of configuration types supported
-                  by add-on. An empty list means the add-on does not require configurations.
+                description: |-
+                  supportedConfigs is a list of configuration types supported by add-on.
+                  An empty list means the add-on does not require configurations.
                   The default is an empty list
                 items:
                   description: ConfigMeta represents a collection of metadata information
                     for add-on configuration.
                   properties:
                     defaultConfig:
-                      description: defaultConfig represents the namespace and name
-                        of the default add-on configuration. In scenario where all
-                        add-ons have a same configuration.
+                      description: |-
+                        defaultConfig represents the namespace and name of the default add-on configuration.
+                        In scenario where all add-ons have a same configuration.
                       properties:
                         name:
                           description: name of the add-on configuration.
                           minLength: 1
                           type: string
                         namespace:
-                          description: namespace of the add-on configuration. If this
-                            field is not set, the configuration is in the cluster
-                            scope.
+                          description: |-
+                            namespace of the add-on configuration.
+                            If this field is not set, the configuration is in the cluster scope.
                           type: string
                       required:
                       - name
@@ -453,9 +425,9 @@ spec:
                 description: defaultconfigReferences is a list of current add-on default
                   configuration references.
                 items:
-                  description: DefaultConfigReference is a reference to the current
-                    add-on configuration. This resource is used to record the configuration
-                    resource for the current add-on.
+                  description: |-
+                    DefaultConfigReference is a reference to the current add-on configuration.
+                    This resource is used to record the configuration resource for the current add-on.
                   properties:
                     desiredConfig:
                       description: desiredConfig record the desired config spec hash.
@@ -465,9 +437,9 @@ spec:
                           minLength: 1
                           type: string
                         namespace:
-                          description: namespace of the add-on configuration. If this
-                            field is not set, the configuration is in the cluster
-                            scope.
+                          description: |-
+                            namespace of the add-on configuration.
+                            If this field is not set, the configuration is in the cluster scope.
                           type: string
                         specHash:
                           description: spec hash for an add-on configuration.
@@ -497,46 +469,45 @@ spec:
                         monitored components for the operator.
                       items:
                         description: "Condition contains details for one aspect of
-                          the current state of this API Resource. --- This struct
+                          the current state of this API Resource.\n---\nThis struct
                           is intended for direct use as an array at the field path
-                          .status.conditions.  For example, \n type FooStatus struct{
-                          // Represents the observations of a foo's current state.
-                          // Known .status.conditions.type are: \"Available\", \"Progressing\",
-                          and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
-                          // +listType=map // +listMapKey=type Conditions []metav1.Condition
-                          `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"
-                          protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields
-                          }"
+                          .status.conditions.  For example,\n\n\n\ttype FooStatus
+                          struct{\n\t    // Represents the observations of a foo's
+                          current state.\n\t    // Known .status.conditions.type are:
+                          \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
+                          +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    //
+                          +listType=map\n\t    // +listMapKey=type\n\t    Conditions
+                          []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\"
+                          patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
+                          \   // other fields\n\t}"
                         properties:
                           lastTransitionTime:
-                            description: lastTransitionTime is the last time the condition
-                              transitioned from one status to another. This should
-                              be when the underlying condition changed.  If that is
-                              not known, then using the time when the API field changed
-                              is acceptable.
+                            description: |-
+                              lastTransitionTime is the last time the condition transitioned from one status to another.
+                              This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
                             format: date-time
                             type: string
                           message:
-                            description: message is a human readable message indicating
-                              details about the transition. This may be an empty string.
+                            description: |-
+                              message is a human readable message indicating details about the transition.
+                              This may be an empty string.
                             maxLength: 32768
                             type: string
                           observedGeneration:
-                            description: observedGeneration represents the .metadata.generation
-                              that the condition was set based upon. For instance,
-                              if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration
-                              is 9, the condition is out of date with respect to the
-                              current state of the instance.
+                            description: |-
+                              observedGeneration represents the .metadata.generation that the condition was set based upon.
+                              For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                              with respect to the current state of the instance.
                             format: int64
                             minimum: 0
                             type: integer
                           reason:
-                            description: reason contains a programmatic identifier
-                              indicating the reason for the condition's last transition.
-                              Producers of specific condition types may define expected
-                              values and meanings for this field, and whether the
-                              values are considered a guaranteed API. The value should
-                              be a CamelCase string. This field may not be empty.
+                            description: |-
+                              reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                              Producers of specific condition types may define expected values and meanings for this field,
+                              and whether the values are considered a guaranteed API.
+                              The value should be a CamelCase string.
+                              This field may not be empty.
                             maxLength: 1024
                             minLength: 1
                             pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
@@ -550,12 +521,12 @@ spec:
                             - Unknown
                             type: string
                           type:
-                            description: type of condition in CamelCase or in foo.example.com/CamelCase.
-                              --- Many .condition.type values are consistent across
-                              resources like Available, but because arbitrary conditions
-                              can be useful (see .node.status.conditions), the ability
-                              to deconflict is important. The regex it matches is
-                              (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                            description: |-
+                              type of condition in CamelCase or in foo.example.com/CamelCase.
+                              ---
+                              Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
+                              useful (see .node.status.conditions), the ability to deconflict is important.
+                              The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
                             maxLength: 316
                             pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                             type: string
@@ -571,9 +542,9 @@ spec:
                       description: configReferences is a list of current add-on configuration
                         references.
                       items:
-                        description: InstallConfigReference is a reference to the
-                          current add-on configuration. This resource is used to record
-                          the configuration resource for the current add-on.
+                        description: |-
+                          InstallConfigReference is a reference to the current add-on configuration.
+                          This resource is used to record the configuration resource for the current add-on.
                         properties:
                           desiredConfig:
                             description: desiredConfig record the desired config name
@@ -584,9 +555,9 @@ spec:
                                 minLength: 1
                                 type: string
                               namespace:
-                                description: namespace of the add-on configuration.
-                                  If this field is not set, the configuration is in
-                                  the cluster scope.
+                                description: |-
+                                  namespace of the add-on configuration.
+                                  If this field is not set, the configuration is in the cluster scope.
                                 type: string
                               specHash:
                                 description: spec hash for an add-on configuration.
@@ -599,18 +570,18 @@ spec:
                             description: group of the add-on configuration.
                             type: string
                           lastAppliedConfig:
-                            description: lastAppliedConfig records the config spec
-                              hash when the all the corresponding ManagedClusterAddOn
-                              are applied successfully.
+                            description: |-
+                              lastAppliedConfig records the config spec hash when the all the corresponding
+                              ManagedClusterAddOn are applied successfully.
                             properties:
                               name:
                                 description: name of the add-on configuration.
                                 minLength: 1
                                 type: string
                               namespace:
-                                description: namespace of the add-on configuration.
-                                  If this field is not set, the configuration is in
-                                  the cluster scope.
+                                description: |-
+                                  namespace of the add-on configuration.
+                                  If this field is not set, the configuration is in the cluster scope.
                                 type: string
                               specHash:
                                 description: spec hash for an add-on configuration.
@@ -619,22 +590,21 @@ spec:
                             - name
                             type: object
                           lastKnownGoodConfig:
-                            description: lastKnownGoodConfig records the last known
-                              good config spec hash. For fresh install or rollout
-                              with type UpdateAll or RollingUpdate, the lastKnownGoodConfig
-                              is the same as lastAppliedConfig. For rollout with type
-                              RollingUpdateWithCanary, the lastKnownGoodConfig is
-                              the last successfully applied config spec hash of the
-                              canary placement.
+                            description: |-
+                              lastKnownGoodConfig records the last known good config spec hash.
+                              For fresh install or rollout with type UpdateAll or RollingUpdate, the
+                              lastKnownGoodConfig is the same as lastAppliedConfig.
+                              For rollout with type RollingUpdateWithCanary, the lastKnownGoodConfig
+                              is the last successfully applied config spec hash of the canary placement.
                             properties:
                               name:
                                 description: name of the add-on configuration.
                                 minLength: 1
                                 type: string
                               namespace:
-                                description: namespace of the add-on configuration.
-                                  If this field is not set, the configuration is in
-                                  the cluster scope.
+                                description: |-
+                                  namespace of the add-on configuration.
+                                  If this field is not set, the configuration is in the cluster scope.
                                 type: string
                               specHash:
                                 description: spec hash for an add-on configuration.

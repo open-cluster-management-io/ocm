@@ -22,7 +22,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 // csrApprovingController auto approve the renewal CertificateSigningRequests for an accepted spoke cluster on the hub.

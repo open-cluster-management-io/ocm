@@ -14,7 +14,7 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 type hostedHookSyncer struct {

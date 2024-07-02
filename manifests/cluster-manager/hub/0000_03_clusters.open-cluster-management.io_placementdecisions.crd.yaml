@@ -15,24 +15,33 @@ spec:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: "PlacementDecision indicates a decision from a placement. PlacementDecision
-          must have a cluster.open-cluster-management.io/placement={placement name}
-          label to reference a certain placement. \n If a placement has spec.numberOfClusters
-          specified, the total number of decisions contained in the status.decisions
-          of PlacementDecisions must be the same as NumberOfClusters. Otherwise, the
+        description: |-
+          PlacementDecision indicates a decision from a placement.
+          PlacementDecision must have a cluster.open-cluster-management.io/placement={placement name} label to reference a certain placement.
+
+
+          If a placement has spec.numberOfClusters specified, the total number of decisions contained in
+          the status.decisions of PlacementDecisions must be the same as NumberOfClusters. Otherwise, the
           total number of decisions must equal the number of ManagedClusters that
-          match the placement requirements. \n Some of the decisions might be empty
-          when there are not enough ManagedClusters to meet the placement requirements."
+          match the placement requirements.
+
+
+          Some of the decisions might be empty when there are not enough ManagedClusters to meet the placement requirements.
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -40,16 +49,18 @@ spec:
             description: Status represents the current status of the PlacementDecision
             properties:
               decisions:
-                description: Decisions is a slice of decisions according to a placement
+                description: |-
+                  Decisions is a slice of decisions according to a placement
                   The number of decisions should not be larger than 100
                 items:
-                  description: ClusterDecision represents a decision from a placement
+                  description: |-
+                    ClusterDecision represents a decision from a placement
                     An empty ClusterDecision indicates it is not scheduled yet.
                   properties:
                     clusterName:
-                      description: ClusterName is the name of the ManagedCluster.
-                        If it is not empty, its value should be unique cross all placement
-                        decisions for the Placement.
+                      description: |-
+                        ClusterName is the name of the ManagedCluster. If it is not empty, its value should be unique cross all
+                        placement decisions for the Placement.
                       type: string
                     reason:
                       description: Reason represents the reason why the ManagedCluster

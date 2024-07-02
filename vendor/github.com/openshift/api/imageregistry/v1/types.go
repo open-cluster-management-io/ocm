@@ -39,6 +39,11 @@ const (
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=1
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:path=configs,scope=Cluster
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/519
+// +openshift:file-pattern=operatorOrdering=00
 type Config struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -77,6 +82,7 @@ type ImageRegistrySpec struct {
 	// requests controls how many parallel requests a given registry instance
 	// will handle before queuing additional requests.
 	// +optional
+	// +structType=atomic
 	Requests ImageRegistryConfigRequests `json:"requests,omitempty"`
 	// defaultRoute indicates whether an external facing route for the registry
 	// should be created using the default generated hostname.
@@ -85,6 +91,7 @@ type ImageRegistrySpec struct {
 	// routes defines additional external facing routes which should be
 	// created for the registry.
 	// +optional
+	// +listType=atomic
 	Routes []ImageRegistryConfigRoute `json:"routes,omitempty"`
 	// replicas determines the number of registry instances to run.
 	Replicas int32 `json:"replicas"`
@@ -93,6 +100,7 @@ type ImageRegistrySpec struct {
 	Logging int64 `json:"logging,omitempty"`
 	// resources defines the resource requests+limits for the registry pod.
 	// +optional
+	// +structType=atomic
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 	// nodeSelector defines the node selection constraints for the registry
 	// pod.
@@ -100,6 +108,7 @@ type ImageRegistrySpec struct {
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 	// tolerations defines the tolerations for the registry pod.
 	// +optional
+	// +listType=atomic
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 	// rolloutStrategy defines rollout strategy for the image registry
 	// deployment.
@@ -111,6 +120,7 @@ type ImageRegistrySpec struct {
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 	// topologySpreadConstraints specify how to spread matching pods among the given topology.
 	// +optional
+	// +listType=atomic
 	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 }
 
@@ -195,6 +205,17 @@ type ImageRegistryConfigStorageS3 struct {
 	// Optional, defaults based on the Region that is provided.
 	// +optional
 	RegionEndpoint string `json:"regionEndpoint,omitempty"`
+	// chunkSizeMiB defines the size of the multipart upload chunks of the S3 API.
+	// The S3 API requires multipart upload chunks to be at least 5MiB.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.
+	// The current default value is 10 MiB.
+	// The value is an integer number of MiB.
+	// The minimum value is 5 and the maximum value is 5120 (5 GiB).
+	// +kubebuilder:validation:Minimum=5
+	// +kubebuilder:validation:Maximum=5120
+	// +openshift:enable:FeatureGate=ChunkSizeMiB
+	// +optional
+	ChunkSizeMiB int32 `json:"chunkSizeMiB,omitempty"`
 	// encrypt specifies whether the registry stores the image in encrypted
 	// format or not.
 	// Optional, defaults to false.

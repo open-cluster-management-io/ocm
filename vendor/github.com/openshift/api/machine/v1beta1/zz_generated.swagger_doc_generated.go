@@ -179,34 +179,35 @@ func (AzureDiagnostics) SwaggerDoc() map[string]string {
 }
 
 var map_AzureMachineProviderSpec = map[string]string{
-	"":                          "AzureMachineProviderSpec is the type that will be embedded in a Machine.Spec.ProviderSpec field for an Azure virtual machine. It is used by the Azure machine actuator to create a single Machine. Required parameters such as location that are not specified by this configuration, will be defaulted by the actuator. Compatibility level 2: Stable within a major release for a minimum of 9 months or 3 minor releases (whichever is longer).",
-	"userDataSecret":            "UserDataSecret contains a local reference to a secret that contains the UserData to apply to the instance",
-	"credentialsSecret":         "CredentialsSecret is a reference to the secret with Azure credentials.",
-	"location":                  "Location is the region to use to create the instance",
-	"vmSize":                    "VMSize is the size of the VM to create.",
-	"image":                     "Image is the OS image to use to create the instance.",
-	"osDisk":                    "OSDisk represents the parameters for creating the OS disk.",
-	"dataDisks":                 "DataDisk specifies the parameters that are used to add one or more data disks to the machine.",
-	"sshPublicKey":              "SSHPublicKey is the public key to use to SSH to the virtual machine.",
-	"publicIP":                  "PublicIP if true a public IP will be used",
-	"tags":                      "Tags is a list of tags to apply to the machine.",
-	"securityGroup":             "Network Security Group that needs to be attached to the machine's interface. No security group will be attached if empty.",
-	"applicationSecurityGroups": "Application Security Groups that need to be attached to the machine's interface. No application security groups will be attached if zero-length.",
-	"subnet":                    "Subnet to use for this instance",
-	"publicLoadBalancer":        "PublicLoadBalancer to use for this instance",
-	"internalLoadBalancer":      "InternalLoadBalancerName to use for this instance",
-	"natRule":                   "NatRule to set inbound NAT rule of the load balancer",
-	"managedIdentity":           "ManagedIdentity to set managed identity name",
-	"vnet":                      "Vnet to set virtual network name",
-	"zone":                      "Availability Zone for the virtual machine. If nil, the virtual machine should be deployed to no zone",
-	"networkResourceGroup":      "NetworkResourceGroup is the resource group for the virtual machine's network",
-	"resourceGroup":             "ResourceGroup is the resource group for the virtual machine",
-	"spotVMOptions":             "SpotVMOptions allows the ability to specify the Machine should use a Spot VM",
-	"securityProfile":           "SecurityProfile specifies the Security profile settings for a virtual machine.",
-	"ultraSSDCapability":        "UltraSSDCapability enables or disables Azure UltraSSD capability for a virtual machine. This can be used to allow/disallow binding of Azure UltraSSD to the Machine both as Data Disks or via Persistent Volumes. This Azure feature is subject to a specific scope and certain limitations. More informations on this can be found in the official Azure documentation for Ultra Disks: (https://docs.microsoft.com/en-us/azure/virtual-machines/disks-enable-ultra-ssd?tabs=azure-portal#ga-scope-and-limitations).\n\nWhen omitted, if at least one Data Disk of type UltraSSD is specified, the platform will automatically enable the capability. If a Perisistent Volume backed by an UltraSSD is bound to a Pod on the Machine, when this field is ommitted, the platform will *not* automatically enable the capability (unless already enabled by the presence of an UltraSSD as Data Disk). This may manifest in the Pod being stuck in `ContainerCreating` phase. This defaulting behaviour may be subject to change in future.\n\nWhen set to \"Enabled\", if the capability is available for the Machine based on the scope and limitations described above, the capability will be set on the Machine. This will thus allow UltraSSD both as Data Disks and Persistent Volumes. If set to \"Enabled\" when the capability can't be available due to scope and limitations, the Machine will go into \"Failed\" state.\n\nWhen set to \"Disabled\", UltraSSDs will not be allowed either as Data Disks nor as Persistent Volumes. In this case if any UltraSSDs are specified as Data Disks on a Machine, the Machine will go into a \"Failed\" state. If instead any UltraSSDs are backing the volumes (via Persistent Volumes) of any Pods scheduled on a Node which is backed by the Machine, the Pod may get stuck in `ContainerCreating` phase.",
-	"acceleratedNetworking":     "AcceleratedNetworking enables or disables Azure accelerated networking feature. Set to false by default. If true, then this will depend on whether the requested VMSize is supported. If set to true with an unsupported VMSize, Azure will return an error.",
-	"availabilitySet":           "AvailabilitySet specifies the availability set to use for this instance. Availability set should be precreated, before using this field.",
-	"diagnostics":               "Diagnostics configures the diagnostics settings for the virtual machine. This allows you to configure boot diagnostics such as capturing serial output from the virtual machine on boot. This is useful for debugging software based launch issues.",
+	"":                           "AzureMachineProviderSpec is the type that will be embedded in a Machine.Spec.ProviderSpec field for an Azure virtual machine. It is used by the Azure machine actuator to create a single Machine. Required parameters such as location that are not specified by this configuration, will be defaulted by the actuator. Compatibility level 2: Stable within a major release for a minimum of 9 months or 3 minor releases (whichever is longer).",
+	"userDataSecret":             "UserDataSecret contains a local reference to a secret that contains the UserData to apply to the instance",
+	"credentialsSecret":          "CredentialsSecret is a reference to the secret with Azure credentials.",
+	"location":                   "Location is the region to use to create the instance",
+	"vmSize":                     "VMSize is the size of the VM to create.",
+	"image":                      "Image is the OS image to use to create the instance.",
+	"osDisk":                     "OSDisk represents the parameters for creating the OS disk.",
+	"dataDisks":                  "DataDisk specifies the parameters that are used to add one or more data disks to the machine.",
+	"sshPublicKey":               "SSHPublicKey is the public key to use to SSH to the virtual machine.",
+	"publicIP":                   "PublicIP if true a public IP will be used",
+	"tags":                       "Tags is a list of tags to apply to the machine.",
+	"securityGroup":              "Network Security Group that needs to be attached to the machine's interface. No security group will be attached if empty.",
+	"applicationSecurityGroups":  "Application Security Groups that need to be attached to the machine's interface. No application security groups will be attached if zero-length.",
+	"subnet":                     "Subnet to use for this instance",
+	"publicLoadBalancer":         "PublicLoadBalancer to use for this instance",
+	"internalLoadBalancer":       "InternalLoadBalancerName to use for this instance",
+	"natRule":                    "NatRule to set inbound NAT rule of the load balancer",
+	"managedIdentity":            "ManagedIdentity to set managed identity name",
+	"vnet":                       "Vnet to set virtual network name",
+	"zone":                       "Availability Zone for the virtual machine. If nil, the virtual machine should be deployed to no zone",
+	"networkResourceGroup":       "NetworkResourceGroup is the resource group for the virtual machine's network",
+	"resourceGroup":              "ResourceGroup is the resource group for the virtual machine",
+	"spotVMOptions":              "SpotVMOptions allows the ability to specify the Machine should use a Spot VM",
+	"securityProfile":            "SecurityProfile specifies the Security profile settings for a virtual machine.",
+	"ultraSSDCapability":         "UltraSSDCapability enables or disables Azure UltraSSD capability for a virtual machine. This can be used to allow/disallow binding of Azure UltraSSD to the Machine both as Data Disks or via Persistent Volumes. This Azure feature is subject to a specific scope and certain limitations. More informations on this can be found in the official Azure documentation for Ultra Disks: (https://docs.microsoft.com/en-us/azure/virtual-machines/disks-enable-ultra-ssd?tabs=azure-portal#ga-scope-and-limitations).\n\nWhen omitted, if at least one Data Disk of type UltraSSD is specified, the platform will automatically enable the capability. If a Perisistent Volume backed by an UltraSSD is bound to a Pod on the Machine, when this field is ommitted, the platform will *not* automatically enable the capability (unless already enabled by the presence of an UltraSSD as Data Disk). This may manifest in the Pod being stuck in `ContainerCreating` phase. This defaulting behaviour may be subject to change in future.\n\nWhen set to \"Enabled\", if the capability is available for the Machine based on the scope and limitations described above, the capability will be set on the Machine. This will thus allow UltraSSD both as Data Disks and Persistent Volumes. If set to \"Enabled\" when the capability can't be available due to scope and limitations, the Machine will go into \"Failed\" state.\n\nWhen set to \"Disabled\", UltraSSDs will not be allowed either as Data Disks nor as Persistent Volumes. In this case if any UltraSSDs are specified as Data Disks on a Machine, the Machine will go into a \"Failed\" state. If instead any UltraSSDs are backing the volumes (via Persistent Volumes) of any Pods scheduled on a Node which is backed by the Machine, the Pod may get stuck in `ContainerCreating` phase.",
+	"acceleratedNetworking":      "AcceleratedNetworking enables or disables Azure accelerated networking feature. Set to false by default. If true, then this will depend on whether the requested VMSize is supported. If set to true with an unsupported VMSize, Azure will return an error.",
+	"availabilitySet":            "AvailabilitySet specifies the availability set to use for this instance. Availability set should be precreated, before using this field.",
+	"diagnostics":                "Diagnostics configures the diagnostics settings for the virtual machine. This allows you to configure boot diagnostics such as capturing serial output from the virtual machine on boot. This is useful for debugging software based launch issues.",
+	"capacityReservationGroupID": "capacityReservationGroupID specifies the capacity reservation group resource id that should be used for allocating the virtual machine. The field size should be greater than 0 and the field input must start with '/'. The input for capacityReservationGroupID must be similar to '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Compute/capacityReservationGroups/{capacityReservationGroupName}'. The keys which are used should be among 'subscriptions', 'providers' and 'resourcegroups' followed by valid ID or names respectively.",
 }
 
 func (AzureMachineProviderSpec) SwaggerDoc() map[string]string {
@@ -430,7 +431,7 @@ var map_GCPMachineProviderSpec = map[string]string{
 	"gcpMetadata":            "Metadata key/value pairs to apply to the VM.",
 	"networkInterfaces":      "NetworkInterfaces is a list of network interfaces to be attached to the VM.",
 	"serviceAccounts":        "ServiceAccounts is a list of GCP service accounts to be used by the VM.",
-	"tags":                   "Tags list of tags to apply to the VM.",
+	"tags":                   "Tags list of network tags to apply to the VM.",
 	"targetPools":            "TargetPools are used for network TCP/UDP load balancing. A target pool references member instances, an associated legacy HttpHealthCheck resource, and, optionally, a backup target pool",
 	"machineType":            "MachineType is the machine type to use for the VM.",
 	"region":                 "Region is the region in which the GCP machine provider will create the VM.",
@@ -442,6 +443,7 @@ var map_GCPMachineProviderSpec = map[string]string{
 	"restartPolicy":          "RestartPolicy determines the behavior when an instance crashes or the underlying infrastructure provider stops the instance as part of a maintenance event (default \"Always\"). Cannot be \"Always\" with preemptible instances. Otherwise, allowed values are \"Always\" and \"Never\". If omitted, the platform chooses a default, which is subject to change over time, currently that default is \"Always\". RestartPolicy represents AutomaticRestart in GCP compute api",
 	"shieldedInstanceConfig": "ShieldedInstanceConfig is the Shielded VM configuration for the VM",
 	"confidentialCompute":    "confidentialCompute Defines whether the instance should have confidential compute enabled. If enabled OnHostMaintenance is required to be set to \"Terminate\". If omitted, the platform chooses a default, which is subject to change over time, currently that default is false.",
+	"resourceManagerTags":    "resourceManagerTags is an optional list of tags to apply to the GCP resources created for the cluster. See https://cloud.google.com/resource-manager/docs/tags/tags-overview for information on tagging GCP resources. GCP supports a maximum of 50 tags per resource.",
 }
 
 func (GCPMachineProviderSpec) SwaggerDoc() map[string]string {
@@ -502,6 +504,17 @@ func (GCPShieldedInstanceConfig) SwaggerDoc() map[string]string {
 	return map_GCPShieldedInstanceConfig
 }
 
+var map_ResourceManagerTag = map[string]string{
+	"":         "ResourceManagerTag is a tag to apply to GCP resources created for the cluster.",
+	"parentID": "parentID is the ID of the hierarchical resource where the tags are defined e.g. at the Organization or the Project level. To find the Organization or Project ID ref https://cloud.google.com/resource-manager/docs/creating-managing-organization#retrieving_your_organization_id https://cloud.google.com/resource-manager/docs/creating-managing-projects#identifying_projects An OrganizationID can have a maximum of 32 characters and must consist of decimal numbers, and cannot have leading zeroes. A ProjectID must be 6 to 30 characters in length, can only contain lowercase letters, numbers, and hyphens, and must start with a letter, and cannot end with a hyphen.",
+	"key":      "key is the key part of the tag. A tag key can have a maximum of 63 characters and cannot be empty. Tag key must begin and end with an alphanumeric character, and must contain only uppercase, lowercase alphanumeric characters, and the following special characters `._-`.",
+	"value":    "value is the value part of the tag. A tag value can have a maximum of 63 characters and cannot be empty. Tag value must begin and end with an alphanumeric character, and must contain only uppercase, lowercase alphanumeric characters, and the following special characters `_-.@%=+:,*#&(){}[]` and spaces.",
+}
+
+func (ResourceManagerTag) SwaggerDoc() map[string]string {
+	return map_ResourceManagerTag
+}
+
 var map_LastOperation = map[string]string{
 	"":            "LastOperation represents the detail of the last performed operation on the MachineObject.",
 	"description": "Description is the human-readable description of the last operation.",
@@ -553,12 +566,13 @@ func (MachineList) SwaggerDoc() map[string]string {
 }
 
 var map_MachineSpec = map[string]string{
-	"":               "MachineSpec defines the desired state of Machine",
-	"metadata":       "ObjectMeta will autopopulate the Node created. Use this to indicate what labels, annotations, name prefix, etc., should be used when creating the Node.",
-	"lifecycleHooks": "LifecycleHooks allow users to pause operations on the machine at certain predefined points within the machine lifecycle.",
-	"taints":         "The list of the taints to be applied to the corresponding Node in additive manner. This list will not overwrite any other taints added to the Node on an ongoing basis by other entities. These taints should be actively reconciled e.g. if you ask the machine controller to apply a taint and then manually remove the taint the machine controller will put it back) but not have the machine controller remove any taints",
-	"providerSpec":   "ProviderSpec details Provider-specific configuration to use during node creation.",
-	"providerID":     "ProviderID is the identification ID of the machine provided by the provider. This field must match the provider ID as seen on the node object corresponding to this machine. This field is required by higher level consumers of cluster-api. Example use case is cluster autoscaler with cluster-api as provider. Clean-up logic in the autoscaler compares machines to nodes to find out machines at provider which could not get registered as Kubernetes nodes. With cluster-api as a generic out-of-tree provider for autoscaler, this field is required by autoscaler to be able to have a provider view of the list of machines. Another list of nodes is queried from the k8s apiserver and then a comparison is done to find out unregistered machines and are marked for delete. This field will be set by the actuators and consumed by higher level entities like autoscaler that will be interfacing with cluster-api as generic provider.",
+	"":                 "MachineSpec defines the desired state of Machine",
+	"metadata":         "ObjectMeta will autopopulate the Node created. Use this to indicate what labels, annotations, name prefix, etc., should be used when creating the Node.",
+	"lifecycleHooks":   "LifecycleHooks allow users to pause operations on the machine at certain predefined points within the machine lifecycle.",
+	"taints":           "The list of the taints to be applied to the corresponding Node in additive manner. This list will not overwrite any other taints added to the Node on an ongoing basis by other entities. These taints should be actively reconciled e.g. if you ask the machine controller to apply a taint and then manually remove the taint the machine controller will put it back) but not have the machine controller remove any taints",
+	"providerSpec":     "ProviderSpec details Provider-specific configuration to use during node creation.",
+	"providerID":       "ProviderID is the identification ID of the machine provided by the provider. This field must match the provider ID as seen on the node object corresponding to this machine. This field is required by higher level consumers of cluster-api. Example use case is cluster autoscaler with cluster-api as provider. Clean-up logic in the autoscaler compares machines to nodes to find out machines at provider which could not get registered as Kubernetes nodes. With cluster-api as a generic out-of-tree provider for autoscaler, this field is required by autoscaler to be able to have a provider view of the list of machines. Another list of nodes is queried from the k8s apiserver and then a comparison is done to find out unregistered machines and are marked for delete. This field will be set by the actuators and consumed by higher level entities like autoscaler that will be interfacing with cluster-api as generic provider.",
+	"authoritativeAPI": "authoritativeAPI is the API that is authoritative for this resource. Valid values are MachineAPI and ClusterAPI. When set to MachineAPI, writes to the spec of the machine.openshift.io copy of this resource will be reflected into the cluster.x-k8s.io copy. When set to ClusterAPI, writes to the spec of the cluster.x-k8s.io copy of this resource will be reflected into the machine.openshift.io copy. Updates to the status will be reflected in both copies of the resource, based on the controller implementing the functionality of the API. Currently the authoritative API determines which controller will manage the resource, this will change in a future release. To ensure the change has been accepted, please verify that the `status.authoritativeAPI` field has been updated to the desired value and that the `Synchronized` condition is present and set to `True`.",
 }
 
 func (MachineSpec) SwaggerDoc() map[string]string {
@@ -566,16 +580,18 @@ func (MachineSpec) SwaggerDoc() map[string]string {
 }
 
 var map_MachineStatus = map[string]string{
-	"":               "MachineStatus defines the observed state of Machine",
-	"nodeRef":        "NodeRef will point to the corresponding Node if it exists.",
-	"lastUpdated":    "LastUpdated identifies when this status was last observed.",
-	"errorReason":    "ErrorReason will be set in the event that there is a terminal problem reconciling the Machine and will contain a succinct value suitable for machine interpretation.\n\nThis field should not be set for transitive errors that a controller faces that are expected to be fixed automatically over time (like service outages), but instead indicate that something is fundamentally wrong with the Machine's spec or the configuration of the controller, and that manual intervention is required. Examples of terminal errors would be invalid combinations of settings in the spec, values that are unsupported by the controller, or the responsible controller itself being critically misconfigured.\n\nAny transient errors that occur during the reconciliation of Machines can be added as events to the Machine object and/or logged in the controller's output.",
-	"errorMessage":   "ErrorMessage will be set in the event that there is a terminal problem reconciling the Machine and will contain a more verbose string suitable for logging and human consumption.\n\nThis field should not be set for transitive errors that a controller faces that are expected to be fixed automatically over time (like service outages), but instead indicate that something is fundamentally wrong with the Machine's spec or the configuration of the controller, and that manual intervention is required. Examples of terminal errors would be invalid combinations of settings in the spec, values that are unsupported by the controller, or the responsible controller itself being critically misconfigured.\n\nAny transient errors that occur during the reconciliation of Machines can be added as events to the Machine object and/or logged in the controller's output.",
-	"providerStatus": "ProviderStatus details a Provider-specific status. It is recommended that providers maintain their own versioned API types that should be serialized/deserialized from this field.",
-	"addresses":      "Addresses is a list of addresses assigned to the machine. Queried from cloud provider, if available.",
-	"lastOperation":  "LastOperation describes the last-operation performed by the machine-controller. This API should be useful as a history in terms of the latest operation performed on the specific machine. It should also convey the state of the latest-operation for example if it is still on-going, failed or completed successfully.",
-	"phase":          "Phase represents the current phase of machine actuation. One of: Failed, Provisioning, Provisioned, Running, Deleting",
-	"conditions":     "Conditions defines the current state of the Machine",
+	"":                       "MachineStatus defines the observed state of Machine",
+	"nodeRef":                "NodeRef will point to the corresponding Node if it exists.",
+	"lastUpdated":            "LastUpdated identifies when this status was last observed.",
+	"errorReason":            "ErrorReason will be set in the event that there is a terminal problem reconciling the Machine and will contain a succinct value suitable for machine interpretation.\n\nThis field should not be set for transitive errors that a controller faces that are expected to be fixed automatically over time (like service outages), but instead indicate that something is fundamentally wrong with the Machine's spec or the configuration of the controller, and that manual intervention is required. Examples of terminal errors would be invalid combinations of settings in the spec, values that are unsupported by the controller, or the responsible controller itself being critically misconfigured.\n\nAny transient errors that occur during the reconciliation of Machines can be added as events to the Machine object and/or logged in the controller's output.",
+	"errorMessage":           "ErrorMessage will be set in the event that there is a terminal problem reconciling the Machine and will contain a more verbose string suitable for logging and human consumption.\n\nThis field should not be set for transitive errors that a controller faces that are expected to be fixed automatically over time (like service outages), but instead indicate that something is fundamentally wrong with the Machine's spec or the configuration of the controller, and that manual intervention is required. Examples of terminal errors would be invalid combinations of settings in the spec, values that are unsupported by the controller, or the responsible controller itself being critically misconfigured.\n\nAny transient errors that occur during the reconciliation of Machines can be added as events to the Machine object and/or logged in the controller's output.",
+	"providerStatus":         "ProviderStatus details a Provider-specific status. It is recommended that providers maintain their own versioned API types that should be serialized/deserialized from this field.",
+	"addresses":              "Addresses is a list of addresses assigned to the machine. Queried from cloud provider, if available.",
+	"lastOperation":          "LastOperation describes the last-operation performed by the machine-controller. This API should be useful as a history in terms of the latest operation performed on the specific machine. It should also convey the state of the latest-operation for example if it is still on-going, failed or completed successfully.",
+	"phase":                  "Phase represents the current phase of machine actuation. One of: Failed, Provisioning, Provisioned, Running, Deleting",
+	"conditions":             "Conditions defines the current state of the Machine",
+	"authoritativeAPI":       "authoritativeAPI is the API that is authoritative for this resource. Valid values are MachineAPI, ClusterAPI and Migrating. This value is updated by the migration controller to reflect the authoritative API. Machine API and Cluster API controllers use this value to determine whether or not to reconcile the resource. When set to Migrating, the migration controller is currently performing the handover of authority from one API to the other.",
+	"synchronizedGeneration": "synchronizedGeneration is the generation of the authoritative resource that the non-authoritative resource is synchronised with. This field is set when the authoritative resource is updated and the sync controller has updated the non-authoritative resource to match.",
 }
 
 func (MachineStatus) SwaggerDoc() map[string]string {
@@ -655,12 +671,13 @@ func (MachineSetList) SwaggerDoc() map[string]string {
 }
 
 var map_MachineSetSpec = map[string]string{
-	"":                "MachineSetSpec defines the desired state of MachineSet",
-	"replicas":        "Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified. Defaults to 1.",
-	"minReadySeconds": "MinReadySeconds is the minimum number of seconds for which a newly created machine should be ready. Defaults to 0 (machine will be considered available as soon as it is ready)",
-	"deletePolicy":    "DeletePolicy defines the policy used to identify nodes to delete when downscaling. Defaults to \"Random\".  Valid values are \"Random, \"Newest\", \"Oldest\"",
-	"selector":        "Selector is a label query over machines that should match the replica count. Label keys and values that must match in order to be controlled by this MachineSet. It must match the machine template's labels. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
-	"template":        "Template is the object that describes the machine that will be created if insufficient replicas are detected.",
+	"":                 "MachineSetSpec defines the desired state of MachineSet",
+	"replicas":         "Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified. Defaults to 1.",
+	"minReadySeconds":  "MinReadySeconds is the minimum number of seconds for which a newly created machine should be ready. Defaults to 0 (machine will be considered available as soon as it is ready)",
+	"deletePolicy":     "DeletePolicy defines the policy used to identify nodes to delete when downscaling. Defaults to \"Random\".  Valid values are \"Random, \"Newest\", \"Oldest\"",
+	"selector":         "Selector is a label query over machines that should match the replica count. Label keys and values that must match in order to be controlled by this MachineSet. It must match the machine template's labels. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+	"template":         "Template is the object that describes the machine that will be created if insufficient replicas are detected.",
+	"authoritativeAPI": "authoritativeAPI is the API that is authoritative for this resource. Valid values are MachineAPI and ClusterAPI. When set to MachineAPI, writes to the spec of the machine.openshift.io copy of this resource will be reflected into the cluster.x-k8s.io copy. When set to ClusterAPI, writes to the spec of the cluster.x-k8s.io copy of this resource will be reflected into the machine.openshift.io copy. Updates to the status will be reflected in both copies of the resource, based on the controller implementing the functionality of the API. Currently the authoritative API determines which controller will manage the resource, this will change in a future release. To ensure the change has been accepted, please verify that the `status.authoritativeAPI` field has been updated to the desired value and that the `Synchronized` condition is present and set to `True`.",
 }
 
 func (MachineSetSpec) SwaggerDoc() map[string]string {
@@ -668,13 +685,15 @@ func (MachineSetSpec) SwaggerDoc() map[string]string {
 }
 
 var map_MachineSetStatus = map[string]string{
-	"":                     "MachineSetStatus defines the observed state of MachineSet",
-	"replicas":             "Replicas is the most recently observed number of replicas.",
-	"fullyLabeledReplicas": "The number of replicas that have labels matching the labels of the machine template of the MachineSet.",
-	"readyReplicas":        "The number of ready replicas for this MachineSet. A machine is considered ready when the node has been created and is \"Ready\".",
-	"availableReplicas":    "The number of available replicas (ready for at least minReadySeconds) for this MachineSet.",
-	"observedGeneration":   "ObservedGeneration reflects the generation of the most recently observed MachineSet.",
-	"errorReason":          "In the event that there is a terminal problem reconciling the replicas, both ErrorReason and ErrorMessage will be set. ErrorReason will be populated with a succinct value suitable for machine interpretation, while ErrorMessage will contain a more verbose string suitable for logging and human consumption.\n\nThese fields should not be set for transitive errors that a controller faces that are expected to be fixed automatically over time (like service outages), but instead indicate that something is fundamentally wrong with the MachineTemplate's spec or the configuration of the machine controller, and that manual intervention is required. Examples of terminal errors would be invalid combinations of settings in the spec, values that are unsupported by the machine controller, or the responsible machine controller itself being critically misconfigured.\n\nAny transient errors that occur during the reconciliation of Machines can be added as events to the MachineSet object and/or logged in the controller's output.",
+	"":                       "MachineSetStatus defines the observed state of MachineSet",
+	"replicas":               "Replicas is the most recently observed number of replicas.",
+	"fullyLabeledReplicas":   "The number of replicas that have labels matching the labels of the machine template of the MachineSet.",
+	"readyReplicas":          "The number of ready replicas for this MachineSet. A machine is considered ready when the node has been created and is \"Ready\".",
+	"availableReplicas":      "The number of available replicas (ready for at least minReadySeconds) for this MachineSet.",
+	"observedGeneration":     "ObservedGeneration reflects the generation of the most recently observed MachineSet.",
+	"errorReason":            "In the event that there is a terminal problem reconciling the replicas, both ErrorReason and ErrorMessage will be set. ErrorReason will be populated with a succinct value suitable for machine interpretation, while ErrorMessage will contain a more verbose string suitable for logging and human consumption.\n\nThese fields should not be set for transitive errors that a controller faces that are expected to be fixed automatically over time (like service outages), but instead indicate that something is fundamentally wrong with the MachineTemplate's spec or the configuration of the machine controller, and that manual intervention is required. Examples of terminal errors would be invalid combinations of settings in the spec, values that are unsupported by the machine controller, or the responsible machine controller itself being critically misconfigured.\n\nAny transient errors that occur during the reconciliation of Machines can be added as events to the MachineSet object and/or logged in the controller's output.",
+	"authoritativeAPI":       "authoritativeAPI is the API that is authoritative for this resource. Valid values are MachineAPI, ClusterAPI and Migrating. This value is updated by the migration controller to reflect the authoritative API. Machine API and Cluster API controllers use this value to determine whether or not to reconcile the resource. When set to Migrating, the migration controller is currently performing the handover of authority from one API to the other.",
+	"synchronizedGeneration": "synchronizedGeneration is the generation of the authoritative resource that the non-authoritative resource is synchronised with. This field is set when the authoritative resource is updated and the sync controller has updated the non-authoritative resource to match.",
 }
 
 func (MachineSetStatus) SwaggerDoc() map[string]string {
@@ -772,6 +791,7 @@ var map_VSphereMachineProviderSpec = map[string]string{
 	"numCoresPerSocket": "NumCPUs is the number of cores among which to distribute CPUs in this virtual machine. Defaults to the analogue property value in the template from which this machine is cloned.",
 	"memoryMiB":         "MemoryMiB is the size of a virtual machine's memory, in MiB. Defaults to the analogue property value in the template from which this machine is cloned.",
 	"diskGiB":           "DiskGiB is the size of a virtual machine's disk, in GiB. Defaults to the analogue property value in the template from which this machine is cloned. This parameter will be ignored if 'LinkedClone' CloneMode is set.",
+	"tagIDs":            "tagIDs is an optional set of tags to add to an instance. Specified tagIDs must use URN-notation instead of display names. A maximum of 10 tag IDs may be specified.",
 	"snapshot":          "Snapshot is the name of the snapshot from which the VM was cloned",
 	"cloneMode":         "CloneMode specifies the type of clone operation. The LinkedClone mode is only support for templates that have at least one snapshot. If the template has no snapshots, then CloneMode defaults to FullClone. When LinkedClone mode is enabled the DiskGiB field is ignored as it is not possible to expand disks of linked clones. Defaults to FullClone. When using LinkedClone, if no snapshots exist for the source template, falls back to FullClone.",
 }
