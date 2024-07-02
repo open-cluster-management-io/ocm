@@ -41,7 +41,7 @@ func (a *AgentConfig) RunSpokeAgent(ctx context.Context, controllerContext *cont
 
 	// wait for the hub client config ready.
 	klog.Info("Waiting for hub client config and managed cluster to be ready")
-	if err := wait.PollUntilContextCancel(ctx, 1*time.Second, true, registrationCfg.HasValidHubClientConfig); err != nil {
+	if err := wait.PollUntilContextCancel(ctx, 1*time.Second, true, registrationCfg.IsHubKubeConfigValid); err != nil {
 		return err
 	}
 

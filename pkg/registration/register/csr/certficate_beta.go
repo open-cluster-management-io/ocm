@@ -1,4 +1,4 @@
-package clientcert
+package csr
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	certificates "k8s.io/api/certificates/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
 	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	certificateslisters "k8s.io/client-go/listers/certificates/v1beta1"
 	"k8s.io/client-go/tools/cache"
@@ -17,7 +16,7 @@ import (
 var _ CSRControl = &v1beta1CSRControl{}
 
 type v1beta1CSRControl struct {
-	hubCSRInformer certificatesinformers.CertificateSigningRequestInformer
+	hubCSRInformer cache.SharedIndexInformer
 	hubCSRLister   certificateslisters.CertificateSigningRequestLister
 	hubCSRClient   csrclient.CertificateSigningRequestInterface
 }
@@ -77,7 +76,7 @@ func (v *v1beta1CSRControl) create(ctx context.Context, recorder events.Recorder
 }
 
 func (v *v1beta1CSRControl) Informer() cache.SharedIndexInformer {
-	return v.hubCSRInformer.Informer()
+	return v.hubCSRInformer
 }
 
 func (v *v1beta1CSRControl) get(name string) (metav1.Object, error) {

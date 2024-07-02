@@ -5,18 +5,15 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"golang.org/x/net/context"
 	certificates "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	corev1informers "k8s.io/client-go/informers/core/v1"
+	certificatesinformers "k8s.io/client-go/informers/certificates"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/klog/v2"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
@@ -24,8 +21,9 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
-	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 	"open-cluster-management.io/ocm/pkg/registration/hub/user"
+	"open-cluster-management.io/ocm/pkg/registration/register"
+	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 )
 
 const (
@@ -35,57 +33,40 @@ const (
 	clusterCSRThreshold = 10
 )
 
-// NewClientCertForHubController returns a controller to
-// 1). Create a new client certificate and build a hub kubeconfig for the registration agent;
-// 2). Or rotate the client certificate referenced by the hub kubeconfig before it become expired;
-func NewClientCertForHubController(
-	clusterName string,
-	agentName string,
-	clientCertSecretNamespace string,
-	clientCertSecretName string,
-	kubeconfigData []byte,
-	spokeSecretInformer corev1informers.SecretInformer,
-	csrControl clientcert.CSRControl,
+func NewCSROption(
+	logger klog.Logger,
+	secretOption register.SecretOption,
 	csrExpirationSeconds int32,
-	spokeKubeClient kubernetes.Interface,
-	statusUpdater clientcert.StatusUpdateFunc,
-	recorder events.Recorder,
-	controllerName string,
-) factory.Controller {
-	err := csrControl.Informer().AddIndexers(cache.Indexers{
-		indexByCluster: indexByClusterFunc,
-	})
+	hubCSRInformer certificatesinformers.Interface,
+	hubKubeClient kubernetes.Interface) (*csr.CSROption, error) {
+	csrControl, err := csr.NewCSRControl(logger, hubCSRInformer, hubKubeClient)
 	if err != nil {
-		utilruntime.HandleError(err)
+		return nil, fmt.Errorf("failed to create CSR control: %w", err)
 	}
-	clientCertOption := clientcert.ClientCertOption{
-		SecretNamespace: clientCertSecretNamespace,
-		SecretName:      clientCertSecretName,
-		AdditionalSecretData: map[string][]byte{
-			clientcert.ClusterNameFile: []byte(clusterName),
-			clientcert.AgentNameFile:   []byte(agentName),
-			clientcert.KubeconfigFile:  kubeconfigData,
-		},
-	}
-
 	var csrExpirationSecondsInCSROption *int32
 	if csrExpirationSeconds != 0 {
 		csrExpirationSecondsInCSROption = &csrExpirationSeconds
 	}
-	csrOption := clientcert.CSROption{
+	err = csrControl.Informer().AddIndexers(cache.Indexers{
+		indexByCluster: indexByClusterFunc,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &csr.CSROption{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: fmt.Sprintf("%s-", clusterName),
+			GenerateName: fmt.Sprintf("%s-", secretOption.ClusterName),
 			Labels: map[string]string{
 				// the label is only an hint for cluster name. Anyone could set/modify it.
-				clusterv1.ClusterNameLabelKey: clusterName,
+				clusterv1.ClusterNameLabelKey: secretOption.ClusterName,
 			},
 		},
 		Subject: &pkix.Name{
 			Organization: []string{
-				fmt.Sprintf("%s%s", user.SubjectPrefix, clusterName),
+				fmt.Sprintf("%s%s", user.SubjectPrefix, secretOption.ClusterName),
 				user.ManagedClustersGroup,
 			},
-			CommonName: fmt.Sprintf("%s%s:%s", user.SubjectPrefix, clusterName, agentName),
+			CommonName: fmt.Sprintf("%s%s:%s", user.SubjectPrefix, secretOption.ClusterName, secretOption.AgentName),
 		},
 		SignerName: certificates.KubeAPIServerClientSignerName,
 		EventFilterFunc: func(obj interface{}) bool {
@@ -95,7 +76,7 @@ func NewClientCertForHubController(
 			}
 			labels := accessor.GetLabels()
 			// only enqueue csr from a specific managed cluster
-			if labels[clusterv1.ClusterNameLabelKey] != clusterName {
+			if labels[clusterv1.ClusterNameLabelKey] != secretOption.ClusterName {
 				return false
 			}
 
@@ -106,22 +87,12 @@ func NewClientCertForHubController(
 			}
 
 			// only enqueue csr whose name starts with the cluster name
-			return strings.HasPrefix(accessor.GetName(), fmt.Sprintf("%s-", clusterName))
+			return strings.HasPrefix(accessor.GetName(), fmt.Sprintf("%s-", secretOption.ClusterName))
 		},
-		HaltCSRCreation:   haltCSRCreationFunc(csrControl.Informer().GetIndexer(), clusterName),
+		HaltCSRCreation:   haltCSRCreationFunc(csrControl.Informer().GetIndexer(), secretOption.ClusterName),
 		ExpirationSeconds: csrExpirationSecondsInCSROption,
-	}
-
-	return clientcert.NewClientCertificateController(
-		clientCertOption,
-		csrOption,
-		csrControl,
-		spokeSecretInformer,
-		spokeKubeClient.CoreV1(),
-		statusUpdater,
-		recorder,
-		controllerName,
-	)
+		CSRControl:        csrControl,
+	}, nil
 }
 
 func haltCSRCreationFunc(indexer cache.Indexer, clusterName string) func() bool {
@@ -138,7 +109,7 @@ func haltCSRCreationFunc(indexer cache.Indexer, clusterName string) func() bool 
 	}
 }
 
-func GenerateBootstrapStatusUpdater() clientcert.StatusUpdateFunc {
+func GenerateBootstrapStatusUpdater() register.StatusUpdateFunc {
 	return func(ctx context.Context, cond metav1.Condition) error {
 		return nil
 	}
@@ -146,7 +117,7 @@ func GenerateBootstrapStatusUpdater() clientcert.StatusUpdateFunc {
 
 // GenerateStatusUpdater generates status update func for the certificate management
 func GenerateStatusUpdater(hubClusterClient clientset.Interface,
-	hubClusterLister clusterv1listers.ManagedClusterLister, clusterName string) clientcert.StatusUpdateFunc {
+	hubClusterLister clusterv1listers.ManagedClusterLister, clusterName string) register.StatusUpdateFunc {
 	return func(ctx context.Context, cond metav1.Condition) error {
 		cluster, err := hubClusterLister.Get(clusterName)
 		if errors.IsNotFound(err) {
@@ -163,28 +134,6 @@ func GenerateStatusUpdater(hubClusterClient clientset.Interface,
 		_, err = patcher.PatchStatus(ctx, newCluster, newCluster.Status, cluster.Status)
 		return err
 	}
-}
-
-// GetClusterAgentNamesFromCertificate returns the cluster name and agent name by parsing
-// the common name of the certification
-func GetClusterAgentNamesFromCertificate(certData []byte) (clusterName, agentName string, err error) {
-	certs, err := certutil.ParseCertsPEM(certData)
-	if err != nil {
-		return "", "", fmt.Errorf("unable to parse certificate: %w", err)
-	}
-
-	for _, cert := range certs {
-		if ok := strings.HasPrefix(cert.Subject.CommonName, user.SubjectPrefix); !ok {
-			continue
-		}
-		names := strings.Split(strings.TrimPrefix(cert.Subject.CommonName, user.SubjectPrefix), ":")
-		if len(names) != 2 {
-			continue
-		}
-		return names[0], names[1], nil
-	}
-
-	return "", "", nil
 }
 
 func indexByClusterFunc(obj interface{}) ([]string, error) {
