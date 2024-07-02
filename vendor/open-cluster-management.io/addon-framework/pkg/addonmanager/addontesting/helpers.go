@@ -17,7 +17,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
-	"open-cluster-management.io/addon-framework/pkg/basecontroller/events"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 )
 
 type FakeSyncContext struct {

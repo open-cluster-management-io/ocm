@@ -212,15 +212,20 @@ func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt ku
 	return newWork.DeepCopy(), nil
 }
 
-// getWorkResourceVersion retrieves the work generation from the annotation with the key
-// "cloudevents.open-cluster-management.io/resourceversion".
-// If no value is set in this annotation, then "0" is returned, which means the version of the work will not be
-// maintained on source, the message broker guarantees the work update order.
+// getWorkResourceVersion returns the resource version from a work. We will get the resource
+// version from the the annotation with the key "cloudevents.open-cluster-management.io/resourceversion"
+// firstly, if no annotation is set, we will get the the resource version from work itself,
+// if the wok does not have it, "0" will be returned, which means the version of the work
+// will not be maintained on source, the message broker guarantees the work update order.
 func getWorkResourceVersion(work *workv1.ManifestWork) string {
 	resourceVersion, ok := work.Annotations[common.CloudEventsResourceVersionAnnotationKey]
-	if !ok {
-		return "0"
+	if ok {
+		return resourceVersion
 	}
 
-	return resourceVersion
+	if work.ResourceVersion != "" {
+		return work.ResourceVersion
+	}
+
+	return "0"
 }

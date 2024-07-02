@@ -9,7 +9,7 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 type defaultSyncer struct {

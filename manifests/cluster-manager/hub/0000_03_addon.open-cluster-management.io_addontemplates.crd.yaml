@@ -20,25 +20,35 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: "AddOnTemplate is the Custom Resource object, it is used to describe
-          how to deploy the addon agent and how to register the addon. \n AddOnTemplate
-          is a cluster-scoped resource, and will only be used on the hub cluster."
+        description: |-
+          AddOnTemplate is the Custom Resource object, it is used to describe
+          how to deploy the addon agent and how to register the addon.
+
+
+          AddOnTemplate is a cluster-scoped resource, and will only be used
+          on the hub cluster.
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
           spec:
-            description: spec holds the registration configuration for the addon and
-              the addon agent resources yaml description.
+            description: |-
+              spec holds the registration configuration for the addon and the
+              addon agent resources yaml description.
             properties:
               addonName:
                 description: AddonName represents the name of the addon which the
@@ -49,21 +59,20 @@ spec:
                   of the addon agent to be deployed on a managed cluster.
                 properties:
                   deleteOption:
-                    description: DeleteOption represents deletion strategy when the
-                      manifestwork is deleted. Foreground deletion strategy is applied
-                      to all the resource in this manifestwork if it is not set.
+                    description: |-
+                      DeleteOption represents deletion strategy when the manifestwork is deleted.
+                      Foreground deletion strategy is applied to all the resource in this manifestwork if it is not set.
                     properties:
                       propagationPolicy:
                         default: Foreground
-                        description: propagationPolicy can be Foreground, Orphan or
-                          SelectivelyOrphan SelectivelyOrphan should be rarely used.  It
-                          is provided for cases where particular resources is transfering
-                          ownership from one ManifestWork to another or another management
-                          unit. Setting this value will allow a flow like 1. create
-                          manifestwork/2 to manage foo 2. update manifestwork/1 to
-                          selectively orphan foo 3. remove foo from manifestwork/1
-                          without impacting continuity because manifestwork/2 adopts
-                          it.
+                        description: |-
+                          propagationPolicy can be Foreground, Orphan or SelectivelyOrphan
+                          SelectivelyOrphan should be rarely used.  It is provided for cases where particular resources is transfering
+                          ownership from one ManifestWork to another or another management unit.
+                          Setting this value will allow a flow like
+                          1. create manifestwork/2 to manage foo
+                          2. update manifestwork/1 to selectively orphan foo
+                          3. remove foo from manifestwork/1 without impacting continuity because manifestwork/2 adopts it.
                         enum:
                         - Foreground
                         - Orphan
@@ -74,26 +83,26 @@ spec:
                           following orphan deletion stratecy
                         properties:
                           orphaningRules:
-                            description: orphaningRules defines a slice of orphaningrule.
-                              Each orphaningrule identifies a single resource included
-                              in this manifestwork
+                            description: |-
+                              orphaningRules defines a slice of orphaningrule.
+                              Each orphaningrule identifies a single resource included in this manifestwork
                             items:
                               description: OrphaningRule identifies a single resource
                                 included in this manifestwork to be orphaned
                               properties:
                                 group:
-                                  description: Group is the API Group of the Kubernetes
-                                    resource, empty string indicates it is in core
-                                    group.
+                                  description: |-
+                                    Group is the API Group of the Kubernetes resource,
+                                    empty string indicates it is in core group.
                                   type: string
                                 name:
                                   description: Name is the name of the Kubernetes
                                     resource.
                                   type: string
                                 namespace:
-                                  description: Name is the namespace of the Kubernetes
-                                    resource, empty string indicates it is a cluster
-                                    scoped resource.
+                                  description: |-
+                                    Name is the namespace of the Kubernetes resource, empty string indicates
+                                    it is a cluster scoped resource.
                                   type: string
                                 resource:
                                   description: Resource is the resource name of the
@@ -107,23 +116,22 @@ spec:
                         type: object
                     type: object
                   executor:
-                    description: Executor is the configuration that makes the work
-                      agent to perform some pre-request processing/checking. e.g.
-                      the executor identity tells the work agent to check the executor
-                      has sufficient permission to write the workloads to the local
-                      managed cluster. Note that nil executor is still supported for
-                      backward-compatibility which indicates that the work agent will
-                      not perform any additional actions before applying resources.
+                    description: |-
+                      Executor is the configuration that makes the work agent to perform some pre-request processing/checking.
+                      e.g. the executor identity tells the work agent to check the executor has sufficient permission to write
+                      the workloads to the local managed cluster.
+                      Note that nil executor is still supported for backward-compatibility which indicates that the work agent
+                      will not perform any additional actions before applying resources.
                     properties:
                       subject:
-                        description: Subject is the subject identity which the work
-                          agent uses to talk to the local cluster when applying the
-                          resources.
+                        description: |-
+                          Subject is the subject identity which the work agent uses to talk to the
+                          local cluster when applying the resources.
                         properties:
                           serviceAccount:
-                            description: ServiceAccount is for identifying which service
-                              account to use by the work agent. Only required if the
-                              type is "ServiceAccount".
+                            description: |-
+                              ServiceAccount is for identifying which service account to use by the work agent.
+                              Only required if the type is "ServiceAccount".
                             properties:
                               name:
                                 description: Name is the name of the service account.
@@ -143,8 +151,9 @@ spec:
                             - namespace
                             type: object
                           type:
-                            description: 'Type is the type of the subject identity.
-                              Supported types are: "ServiceAccount".'
+                            description: |-
+                              Type is the type of the subject identity.
+                              Supported types are: "ServiceAccount".
                             enum:
                             - ServiceAccount
                             type: string
@@ -160,9 +169,9 @@ spec:
                         of a manifest defined in workload field.
                       properties:
                         feedbackRules:
-                          description: FeedbackRules defines what resource status
-                            field should be returned. If it is not set or empty, no
-                            feedback rules will be honored.
+                          description: |-
+                            FeedbackRules defines what resource status field should be returned. If it is not set or empty,
+                            no feedback rules will be honored.
                           items:
                             properties:
                               jsonPaths:
@@ -175,22 +184,19 @@ spec:
                                         for this field
                                       type: string
                                     path:
-                                      description: Path represents the json path of
-                                        the field under status. The path must point
-                                        to a field with single value in the type of
-                                        integer, bool or string. If the path points
-                                        to a non-existing field, no value will be
-                                        returned. If the path points to a structure,
-                                        map or slice, no value will be returned and
-                                        the status conddition of StatusFeedBackSynced
-                                        will be set as false. Ref to https://kubernetes.io/docs/reference/kubectl/jsonpath/
-                                        on how to write a jsonPath.
+                                      description: |-
+                                        Path represents the json path of the field under status.
+                                        The path must point to a field with single value in the type of integer, bool or string.
+                                        If the path points to a non-existing field, no value will be returned.
+                                        If the path points to a structure, map or slice, no value will be returned and the status conddition
+                                        of StatusFeedBackSynced will be set as false.
+                                        Ref to https://kubernetes.io/docs/reference/kubectl/jsonpath/ on how to write a jsonPath.
                                       type: string
                                     version:
-                                      description: Version is the version of the Kubernetes
-                                        resource. If it is not specified, the resource
-                                        with the semantically latest version is used
-                                        to resolve the path.
+                                      description: |-
+                                        Version is the version of the Kubernetes resource.
+                                        If it is not specified, the resource with the semantically latest version is
+                                        used to resolve the path.
                                       type: string
                                   required:
                                   - name
@@ -198,14 +204,13 @@ spec:
                                   type: object
                                 type: array
                               type:
-                                description: Type defines the option of how status
-                                  can be returned. It can be jsonPaths or wellKnownStatus.
-                                  If the type is JSONPaths, user should specify the
-                                  jsonPaths field If the type is WellKnownStatus,
-                                  certain common fields of status defined by a rule
-                                  only for types in in k8s.io/api and open-cluster-management/api
-                                  will be reported, If these status fields do not
-                                  exist, no values will be reported.
+                                description: |-
+                                  Type defines the option of how status can be returned.
+                                  It can be jsonPaths or wellKnownStatus.
+                                  If the type is JSONPaths, user should specify the jsonPaths field
+                                  If the type is WellKnownStatus, certain common fields of status defined by a rule only
+                                  for types in in k8s.io/api and open-cluster-management/api will be reported,
+                                  If these status fields do not exist, no values will be reported.
                                 enum:
                                 - WellKnownStatus
                                 - JSONPaths
@@ -215,22 +220,22 @@ spec:
                             type: object
                           type: array
                         resourceIdentifier:
-                          description: ResourceIdentifier represents the group, resource,
-                            name and namespace of a resoure. iff this refers to a
-                            resource not created by this manifest work, the related
-                            rules will not be executed.
+                          description: |-
+                            ResourceIdentifier represents the group, resource, name and namespace of a resoure.
+                            iff this refers to a resource not created by this manifest work, the related rules will not be executed.
                           properties:
                             group:
-                              description: Group is the API Group of the Kubernetes
-                                resource, empty string indicates it is in core group.
+                              description: |-
+                                Group is the API Group of the Kubernetes resource,
+                                empty string indicates it is in core group.
                               type: string
                             name:
                               description: Name is the name of the Kubernetes resource.
                               type: string
                             namespace:
-                              description: Name is the namespace of the Kubernetes
-                                resource, empty string indicates it is a cluster scoped
-                                resource.
+                              description: |-
+                                Name is the namespace of the Kubernetes resource, empty string indicates
+                                it is a cluster scoped resource.
                               type: string
                             resource:
                               description: Resource is the resource name of the Kubernetes
@@ -241,19 +246,20 @@ spec:
                           - resource
                           type: object
                         updateStrategy:
-                          description: UpdateStrategy defines the strategy to update
-                            this manifest. UpdateStrategy is Update if it is not set.
+                          description: |-
+                            UpdateStrategy defines the strategy to update this manifest. UpdateStrategy is Update
+                            if it is not set.
                           properties:
                             serverSideApply:
-                              description: serverSideApply defines the configuration
-                                for server side apply. It is honored only when type
-                                of updateStrategy is ServerSideApply
+                              description: |-
+                                serverSideApply defines the configuration for server side apply. It is honored only when
+                                type of updateStrategy is ServerSideApply
                               properties:
                                 fieldManager:
                                   default: work-agent
-                                  description: FieldManager is the manager to apply
-                                    the resource. It is work-agent by default, but
-                                    can be other name with work-agent as the prefix.
+                                  description: |-
+                                    FieldManager is the manager to apply the resource. It is work-agent by default, but can be other name with work-agent
+                                    as the prefix.
                                   pattern: ^work-agent
                                   type: string
                                 force:
@@ -263,17 +269,15 @@ spec:
                               type: object
                             type:
                               default: Update
-                              description: type defines the strategy to update this
-                                manifest, default value is Update. Update type means
-                                to update resource by an update call. CreateOnly type
-                                means do not update resource based on current manifest.
-                                ServerSideApply type means to update resource using
-                                server side apply with work-controller as the field
-                                manager. If there is conflict, the related Applied
-                                condition of manifest will be in the status of False
-                                with the reason of ApplyConflict. ReadOnly type means
-                                the agent will only check the existence of the resource
-                                based on its metadata.
+                              description: |-
+                                type defines the strategy to update this manifest, default value is Update.
+                                Update type means to update resource by an update call.
+                                CreateOnly type means do not update resource based on current manifest.
+                                ServerSideApply type means to update resource using server side apply with work-controller as the field manager.
+                                If there is conflict, the related Applied condition of manifest will be in the status of False with the
+                                reason of ApplyConflict.
+                                ReadOnly type means the agent will only check the existence of the resource based on its metadata,
+                                statusFeedBackRules can still be used to get feedbackResults.
                               enum:
                               - Update
                               - CreateOnly
@@ -307,23 +311,22 @@ spec:
                 description: Registration holds the registration configuration for
                   the addon
                 items:
-                  description: RegistrationSpec describes how to register an addon
-                    agent to the hub cluster. With the registration defined, The addon
-                    agent can access to kube apiserver with kube style API or other
-                    endpoints on hub cluster with client certificate authentication.
-                    During the addon registration process, a csr will be created for
-                    each Registration on the hub cluster. The CSR will be approved
-                    automatically, After the csr is approved on the hub cluster, the
-                    klusterlet agent will create a secret in the installNamespace
-                    for the addon agent. If the RegistrationType type is KubeClient,
-                    the secret name will be "{addon name}-hub-kubeconfig" whose content
-                    includes key/cert and kubeconfig. Otherwise, If the RegistrationType
-                    type is CustomSigner the secret name will be "{addon name}-{signer
-                    name}-client-cert" whose content includes key/cert.
+                  description: |-
+                    RegistrationSpec describes how to register an addon agent to the hub cluster.
+                    With the registration defined, The addon agent can access to kube apiserver with kube style API
+                    or other endpoints on hub cluster with client certificate authentication. During the addon
+                    registration process, a csr will be created for each Registration on the hub cluster. The
+                    CSR will be approved automatically, After the csr is approved on the hub cluster, the klusterlet
+                    agent will create a secret in the installNamespace for the addon agent.
+                    If the RegistrationType type is KubeClient, the secret name will be "{addon name}-hub-kubeconfig"
+                    whose content includes key/cert and kubeconfig. Otherwise, If the RegistrationType type is
+                    CustomSigner the secret name will be "{addon name}-{signer name}-client-cert" whose content
+                    includes key/cert.
                   properties:
                     customSigner:
-                      description: CustomSigner holds the configuration of the CustomSigner
-                        type registration required when the Type is CustomSigner
+                      description: |-
+                        CustomSigner holds the configuration of the CustomSigner type registration
+                        required when the Type is CustomSigner
                       properties:
                         signerName:
                           description: signerName is the name of signer that addon
@@ -333,14 +336,13 @@ spec:
                           pattern: ^([a-z0-9][a-z0-9-]*[a-z0-9]\.)+[a-z]+\/[a-z0-9-\.]+$
                           type: string
                         signingCA:
-                          description: 'SigningCA represents the reference of the
-                            secret on the hub cluster to sign the CSR the secret must
-                            be in the namespace where the addon-manager is located,
-                            and the secret type must be "kubernetes.io/tls" Note:
-                            The addon manager will not have permission to access the
-                            secret by default, so the user must grant the permission
-                            to the addon manager(by creating rolebinding for the addon-manager
-                            serviceaccount "addon-manager-controller-sa").'
+                          description: |-
+                            SigningCA represents the reference of the secret on the hub cluster to sign the CSR
+                            the secret must be in the namespace where the addon-manager is located, and the secret
+                            type must be "kubernetes.io/tls"
+                            Note: The addon manager will not have permission to access the secret by default, so
+                            the user must grant the permission to the addon manager(by creating rolebinding for
+                            the addon-manager serviceaccount "addon-manager-controller-sa").
                           properties:
                             name:
                               description: Name of the signing CA secret
@@ -349,13 +351,14 @@ spec:
                           - name
                           type: object
                         subject:
-                          description: 'Subject is the user subject of the addon agent
-                            to be registered to the hub. If it is not set, the addon
-                            agent will have the default subject "subject": { "user":
-                            "system:open-cluster-management:cluster:{clusterName}:addon:{addonName}:agent:{agentName}",
-                            "groups: ["system:open-cluster-management:cluster:{clusterName}:addon:{addonName}",
-                            "system:open-cluster-management:addon:{addonName}", "system:authenticated"]
-                            }'
+                          description: |-
+                            Subject is the user subject of the addon agent to be registered to the hub.
+                            If it is not set, the addon agent will have the default subject
+                            "subject": {
+                              "user": "system:open-cluster-management:cluster:{clusterName}:addon:{addonName}:agent:{agentName}",
+                              "groups: ["system:open-cluster-management:cluster:{clusterName}:addon:{addonName}",
+                                        "system:open-cluster-management:addon:{addonName}", "system:authenticated"]
+                            }
                           properties:
                             groups:
                               description: groups is the user group of the addon agent.
@@ -383,43 +386,40 @@ spec:
                           description: HubPermissions represent the permission configurations
                             of the addon agent to access the hub cluster
                           items:
-                            description: HubPermissionConfig configures the permission
-                              of the addon agent to access the hub cluster. Will create
-                              a RoleBinding in the same namespace as the managedClusterAddon
-                              to bind the user provided ClusterRole/Role to the "system:open-cluster-management:cluster:<cluster-name>:addon:<addon-name>"
+                            description: |-
+                              HubPermissionConfig configures the permission of the addon agent to access the hub cluster.
+                              Will create a RoleBinding in the same namespace as the managedClusterAddon to bind the user
+                              provided ClusterRole/Role to the "system:open-cluster-management:cluster:<cluster-name>:addon:<addon-name>"
                               Group.
                             properties:
                               currentCluster:
-                                description: CurrentCluster contains the configuration
-                                  of CurrentCluster type binding. It is required when
-                                  the type is CurrentCluster.
+                                description: |-
+                                  CurrentCluster contains the configuration of CurrentCluster type binding.
+                                  It is required when the type is CurrentCluster.
                                 properties:
                                   clusterRoleName:
-                                    description: ClusterRoleName is the name of the
-                                      clusterrole the addon agent is bound. A rolebinding
-                                      will be created referring to this cluster role
-                                      in each cluster namespace. The user must make
-                                      sure the clusterrole exists on the hub cluster.
+                                    description: |-
+                                      ClusterRoleName is the name of the clusterrole the addon agent is bound. A rolebinding
+                                      will be created referring to this cluster role in each cluster namespace.
+                                      The user must make sure the clusterrole exists on the hub cluster.
                                     type: string
                                 required:
                                 - clusterRoleName
                                 type: object
                               singleNamespace:
-                                description: SingleNamespace contains the configuration
-                                  of SingleNamespace type binding. It is required
-                                  when the type is SingleNamespace
+                                description: |-
+                                  SingleNamespace contains the configuration of SingleNamespace type binding.
+                                  It is required when the type is SingleNamespace
                                 properties:
                                   namespace:
-                                    description: Namespace is the namespace the addon
-                                      agent has permissions to bind to. A rolebinding
-                                      will be created in this namespace referring
-                                      to the RoleRef.
+                                    description: |-
+                                      Namespace is the namespace the addon agent has permissions to bind to. A rolebinding
+                                      will be created in this namespace referring to the RoleRef.
                                     type: string
                                   roleRef:
-                                    description: RoleRef is an reference to the permission
-                                      resource. it could be a role or a cluster role,
-                                      the user must make sure it exist on the hub
-                                      cluster.
+                                    description: |-
+                                      RoleRef is an reference to the permission resource. it could be a role or a cluster role,
+                                      the user must make sure it exist on the hub cluster.
                                     properties:
                                       apiGroup:
                                         description: APIGroup is the group for the
@@ -444,12 +444,10 @@ spec:
                                 - roleRef
                                 type: object
                               type:
-                                description: 'Type of the permissions setting. It
-                                  defines how to bind the roleRef on the hub cluster.
-                                  It can be: - CurrentCluster: Bind the roleRef to
-                                  the namespace with the same name as the managedCluster.
-                                  - SingleNamespace: Bind the roleRef to the namespace
-                                  specified by SingleNamespaceBindingConfig.'
+                                description: |-
+                                  Type of the permissions setting. It defines how to bind the roleRef on the hub cluster. It can be:
+                                  - CurrentCluster: Bind the roleRef to the namespace with the same name as the managedCluster.
+                                  - SingleNamespace: Bind the roleRef to the namespace specified by SingleNamespaceBindingConfig.
                                 enum:
                                 - CurrentCluster
                                 - SingleNamespace
@@ -460,16 +458,15 @@ spec:
                           type: array
                       type: object
                     type:
-                      description: 'Type of the registration configuration, it supports:
-                        - KubeClient: the addon agent can access the hub kube apiserver
-                        with kube style API. the signer name should be "kubernetes.io/kube-apiserver-client".
-                        When this type is used, the KubeClientRegistrationConfig can
-                        be used to define the permission of the addon agent to access
-                        the hub cluster - CustomSigner: the addon agent can access
-                        the hub cluster through user-defined endpoints. When this
-                        type is used, the CustomSignerRegistrationConfig can be used
-                        to define how to issue the client certificate for the addon
-                        agent.'
+                      description: |-
+                        Type of the registration configuration, it supports:
+                        - KubeClient: the addon agent can access the hub kube apiserver with kube style API.
+                          the signer name should be "kubernetes.io/kube-apiserver-client". When this type is
+                          used, the KubeClientRegistrationConfig can be used to define the permission of the
+                          addon agent to access the hub cluster
+                        - CustomSigner: the addon agent can access the hub cluster through user-defined endpoints.
+                          When this type is used, the CustomSignerRegistrationConfig can be used to define how
+                          to issue the client certificate for the addon agent.
                       enum:
                       - KubeClient
                       - CustomSigner

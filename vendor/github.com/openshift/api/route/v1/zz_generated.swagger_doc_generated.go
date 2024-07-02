@@ -85,7 +85,7 @@ func (RouteIngress) SwaggerDoc() map[string]string {
 
 var map_RouteIngressCondition = map[string]string{
 	"":                   "RouteIngressCondition contains details for the current condition of this route on a particular router.",
-	"type":               "Type is the type of the condition. Currently only Admitted.",
+	"type":               "Type is the type of the condition. Currently only Admitted or UnservableInFutureVersions.",
 	"status":             "Status is the status of the condition. Can be True, False, Unknown.",
 	"reason":             "(brief) reason for the condition's last transition, and is usually a machine and human readable constant",
 	"message":            "Human readable message indicating details about last transition.",
@@ -178,7 +178,7 @@ var map_TLSConfig = map[string]string{
 	"key":                           "key provides key file contents",
 	"caCertificate":                 "caCertificate provides the cert authority certificate contents",
 	"destinationCACertificate":      "destinationCACertificate provides the contents of the ca certificate of the final destination.  When using reencrypt termination this file should be provided in order to have routers use it for health checks on the secure connection. If this field is not specified, the router may provide its own destination CA and perform hostname validation using the short service name (service.namespace.svc), which allows infrastructure generated certificates to automatically verify.",
-	"insecureEdgeTerminationPolicy": "insecureEdgeTerminationPolicy indicates the desired behavior for insecure connections to a route. While each router may make its own decisions on which ports to expose, this is normally port 80.\n\n* Allow - traffic is sent to the server on the insecure port (edge/reencrypt terminations only) (default). * None - no traffic is allowed on the insecure port. * Redirect - clients are redirected to the secure port.",
+	"insecureEdgeTerminationPolicy": "insecureEdgeTerminationPolicy indicates the desired behavior for insecure connections to a route. While each router may make its own decisions on which ports to expose, this is normally port 80.\n\nIf a route does not specify insecureEdgeTerminationPolicy, then the default behavior is \"None\".\n\n* Allow - traffic is sent to the server on the insecure port (edge/reencrypt terminations only).\n\n* None - no traffic is allowed on the insecure port (default).\n\n* Redirect - clients are redirected to the secure port.",
 	"externalCertificate":           "externalCertificate provides certificate contents as a secret reference. This should be a single serving certificate, not a certificate chain. Do not include a CA certificate. The secret referenced should be present in the same namespace as that of the Route. Forbidden when `certificate` is set.",
 }
 

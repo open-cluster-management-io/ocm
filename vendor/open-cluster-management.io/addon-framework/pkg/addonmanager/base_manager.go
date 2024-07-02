@@ -22,8 +22,8 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/cmamanagedby"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/registration"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	"open-cluster-management.io/addon-framework/pkg/utils"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 // BaseAddonManagerImpl is the base implementation of BaseAddonManager

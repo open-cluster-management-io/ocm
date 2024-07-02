@@ -12,6 +12,11 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	lib/tmp.mk\
 )
 
+# Include the integration/e2e setup makefile.
+include ./test/integration-test.mk
+include ./test/e2e-test.mk
+include ./test/olm-test.mk
+
 OPERATOR_SDK?=$(PERMANENT_TMP_GOPATH)/bin/operator-sdk
 OPERATOR_SDK_VERSION?=v1.32.0
 operatorsdk_gen_dir:=$(dir $(OPERATOR_SDK))
@@ -62,6 +67,8 @@ copy-crd:
 
 update: copy-crd update-csv
 
+test-unit: ensure-kubebuilder-tools
+
 update-csv: ensure-operator-sdk
 	# update the replaces to released version in csv
 	$(SED_CMD) -i 's/cluster-manager\.v[0-9]\+\.[0-9]\+\.[0-9]\+/cluster-manager\.v$(RELEASED_CSV_VERSION)/g' deploy/cluster-manager/config/manifests/bases/cluster-manager.clusterserviceversion.yaml
@@ -109,8 +116,3 @@ ifeq "" "$(wildcard $(OPERATOR_SDK))"
 else
 	$(info Using existing operator-sdk from "$(OPERATOR_SDK)")
 endif
-
-# Include the integration/e2e setup makefile.
-include ./test/integration-test.mk
-include ./test/e2e-test.mk
-include ./test/olm-test.mk

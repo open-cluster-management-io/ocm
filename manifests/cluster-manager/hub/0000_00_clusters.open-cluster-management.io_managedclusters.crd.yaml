@@ -34,29 +34,39 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
-        description: "ManagedCluster represents the desired state and current status
+        description: |-
+          ManagedCluster represents the desired state and current status
           of a managed cluster. ManagedCluster is a cluster-scoped resource. The name
-          is the cluster UID. \n The cluster join process is a double opt-in process.
-          See the following join process steps: \n 1. The agent on the managed cluster
-          creates a CSR on the hub with the cluster UID and agent name. 2. The agent
-          on the managed cluster creates a ManagedCluster on the hub. 3. The cluster
-          admin on the hub cluster approves the CSR for the UID and agent name of
-          the ManagedCluster. 4. The cluster admin sets the spec.acceptClient of the
-          ManagedCluster to true. 5. The cluster admin on the managed cluster creates
-          a credential of the kubeconfig for the hub cluster. \n After the hub cluster
-          creates the cluster namespace, the klusterlet agent on the ManagedCluster
-          pushes the credential to the hub cluster to use against the kube-apiserver
-          of the ManagedCluster."
+          is the cluster UID.
+
+
+          The cluster join process is a double opt-in process. See the following join process steps:
+
+
+          1. The agent on the managed cluster creates a CSR on the hub with the cluster UID and agent name.
+          2. The agent on the managed cluster creates a ManagedCluster on the hub.
+          3. The cluster admin on the hub cluster approves the CSR for the UID and agent name of the ManagedCluster.
+          4. The cluster admin sets the spec.acceptClient of the ManagedCluster to true.
+          5. The cluster admin on the managed cluster creates a credential of the kubeconfig for the hub cluster.
+
+
+          After the hub cluster creates the cluster namespace, the klusterlet agent on the ManagedCluster pushes
+          the credential to the hub cluster to use against the kube-apiserver of the ManagedCluster.
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -65,38 +75,37 @@ spec:
               the managed cluster.
             properties:
               hubAcceptsClient:
-                description: hubAcceptsClient represents that hub accepts the joining
-                  of Klusterlet agent on the managed cluster with the hub. The default
-                  value is false, and can only be set true when the user on hub has
-                  an RBAC rule to UPDATE on the virtual subresource of managedclusters/accept.
-                  When the value is set true, a namespace whose name is the same as
-                  the name of ManagedCluster is created on the hub. This namespace
-                  represents the managed cluster, also role/rolebinding is created
-                  on the namespace to grant the permision of access from the agent
-                  on the managed cluster. When the value is set to false, the namespace
-                  representing the managed cluster is deleted.
+                description: |-
+                  hubAcceptsClient represents that hub accepts the joining of Klusterlet agent on
+                  the managed cluster with the hub. The default value is false, and can only be set
+                  true when the user on hub has an RBAC rule to UPDATE on the virtual subresource
+                  of managedclusters/accept.
+                  When the value is set true, a namespace whose name is the same as the name of ManagedCluster
+                  is created on the hub. This namespace represents the managed cluster, also role/rolebinding is created on
+                  the namespace to grant the permision of access from the agent on the managed cluster.
+                  When the value is set to false, the namespace representing the managed cluster is
+                  deleted.
                 type: boolean
               leaseDurationSeconds:
                 default: 60
-                description: LeaseDurationSeconds is used to coordinate the lease
-                  update time of Klusterlet agents on the managed cluster. If its
-                  value is zero, the Klusterlet agent will update its lease every
-                  60 seconds by default
+                description: |-
+                  LeaseDurationSeconds is used to coordinate the lease update time of Klusterlet agents on the managed cluster.
+                  If its value is zero, the Klusterlet agent will update its lease every 60 seconds by default
                 format: int32
                 type: integer
               managedClusterClientConfigs:
-                description: ManagedClusterClientConfigs represents a list of the
-                  apiserver address of the managed cluster. If it is empty, the managed
-                  cluster has no accessible address for the hub to connect with it.
+                description: |-
+                  ManagedClusterClientConfigs represents a list of the apiserver address of the managed cluster.
+                  If it is empty, the managed cluster has no accessible address for the hub to connect with it.
                 items:
-                  description: ClientConfig represents the apiserver address of the
-                    managed cluster. TODO include credential to connect to managed
-                    cluster kube-apiserver
+                  description: |-
+                    ClientConfig represents the apiserver address of the managed cluster.
+                    TODO include credential to connect to managed cluster kube-apiserver
                   properties:
                     caBundle:
-                      description: CABundle is the ca bundle to connect to apiserver
-                        of the managed cluster. System certs are used if it is not
-                        set.
+                      description: |-
+                        CABundle is the ca bundle to connect to apiserver of the managed cluster.
+                        System certs are used if it is not set.
                       format: byte
                       type: string
                     url:
@@ -106,27 +115,28 @@ spec:
                   type: object
                 type: array
               taints:
-                description: Taints is a property of managed cluster that allow the
-                  cluster to be repelled when scheduling. Taints, including 'ManagedClusterUnavailable'
-                  and 'ManagedClusterUnreachable', can not be added/removed by agent
-                  running on the managed cluster; while it's fine to add/remove other
-                  taints from either hub cluser or managed cluster.
+                description: |-
+                  Taints is a property of managed cluster that allow the cluster to be repelled when scheduling.
+                  Taints, including 'ManagedClusterUnavailable' and 'ManagedClusterUnreachable', can not be added/removed by agent
+                  running on the managed cluster; while it's fine to add/remove other taints from either hub cluser or managed cluster.
                 items:
-                  description: The managed cluster this Taint is attached to has the
-                    "effect" on any placement that does not tolerate the Taint.
+                  description: |-
+                    The managed cluster this Taint is attached to has the "effect" on
+                    any placement that does not tolerate the Taint.
                   properties:
                     effect:
-                      description: Effect indicates the effect of the taint on placements
-                        that do not tolerate the taint. Valid effects are NoSelect,
-                        PreferNoSelect and NoSelectIfNew.
+                      description: |-
+                        Effect indicates the effect of the taint on placements that do not tolerate the taint.
+                        Valid effects are NoSelect, PreferNoSelect and NoSelectIfNew.
                       enum:
                       - NoSelect
                       - PreferNoSelect
                       - NoSelectIfNew
                       type: string
                     key:
-                      description: Key is the taint key applied to a cluster. e.g.
-                        bar or foo.example.com/bar. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: |-
+                        Key is the taint key applied to a cluster. e.g. bar or foo.example.com/bar.
+                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string
@@ -167,24 +177,25 @@ spec:
                   - type: string
                   pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                   x-kubernetes-int-or-string: true
-                description: Capacity represents the total resource capacity from
-                  all nodeStatuses on the managed cluster.
+                description: |-
+                  Capacity represents the total resource capacity from all nodeStatuses
+                  on the managed cluster.
                 type: object
               clusterClaims:
-                description: ClusterClaims represents cluster information that a managed
-                  cluster claims, for example a unique cluster identifier (id.k8s.io)
-                  and kubernetes version (kubeversion.open-cluster-management.io).
-                  They are written from the managed cluster. The set of claims is
-                  not uniform across a fleet, some claims can be vendor or version
-                  specific and may not be included from all managed clusters.
+                description: |-
+                  ClusterClaims represents cluster information that a managed cluster claims,
+                  for example a unique cluster identifier (id.k8s.io) and kubernetes version
+                  (kubeversion.open-cluster-management.io). They are written from the managed
+                  cluster. The set of claims is not uniform across a fleet, some claims can be
+                  vendor or version specific and may not be included from all managed clusters.
                 items:
                   description: ManagedClusterClaim represents a ClusterClaim collected
                     from a managed cluster.
                   properties:
                     name:
-                      description: Name is the name of a ClusterClaim resource on
-                        managed cluster. It's a well known or customized name to identify
-                        the claim.
+                      description: |-
+                        Name is the name of a ClusterClaim resource on managed cluster. It's a well known
+                        or customized name to identify the claim.
                       maxLength: 253
                       minLength: 1
                       type: string
@@ -200,42 +211,42 @@ spec:
                   for this managed cluster.
                 items:
                   description: "Condition contains details for one aspect of the current
-                    state of this API Resource. --- This struct is intended for direct
-                    use as an array at the field path .status.conditions.  For example,
-                    \n type FooStatus struct{ // Represents the observations of a
-                    foo's current state. // Known .status.conditions.type are: \"Available\",
-                    \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
-                    // +listType=map // +listMapKey=type Conditions []metav1.Condition
-                    `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"
-                    protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+                    state of this API Resource.\n---\nThis struct is intended for
+                    direct use as an array at the field path .status.conditions.  For
+                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
+                    observations of a foo's current state.\n\t    // Known .status.conditions.type
+                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
+                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
+                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
+                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
+                    \   // other fields\n\t}"
                   properties:
                     lastTransitionTime:
-                      description: lastTransitionTime is the last time the condition
-                        transitioned from one status to another. This should be when
-                        the underlying condition changed.  If that is not known, then
-                        using the time when the API field changed is acceptable.
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
                       format: date-time
                       type: string
                     message:
-                      description: message is a human readable message indicating
-                        details about the transition. This may be an empty string.
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
                       maxLength: 32768
                       type: string
                     observedGeneration:
-                      description: observedGeneration represents the .metadata.generation
-                        that the condition was set based upon. For instance, if .metadata.generation
-                        is currently 12, but the .status.conditions[x].observedGeneration
-                        is 9, the condition is out of date with respect to the current
-                        state of the instance.
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
                       format: int64
                       minimum: 0
                       type: integer
                     reason:
-                      description: reason contains a programmatic identifier indicating
-                        the reason for the condition's last transition. Producers
-                        of specific condition types may define expected values and
-                        meanings for this field, and whether the values are considered
-                        a guaranteed API. The value should be a CamelCase string.
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
                         This field may not be empty.
                       maxLength: 1024
                       minLength: 1
@@ -249,11 +260,12 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
-                        --- Many .condition.type values are consistent across resources
-                        like Available, but because arbitrary conditions can be useful
-                        (see .node.status.conditions), the ability to deconflict is
-                        important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: |-
+                        type of condition in CamelCase or in foo.example.com/CamelCase.
+                        ---
+                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
+                        useful (see .node.status.conditions), the ability to deconflict is important.
+                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string

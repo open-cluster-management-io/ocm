@@ -133,8 +133,14 @@ func (o *GRPCOptions) GetCloudEventsProtocol(ctx context.Context, errorHandler f
 				ticker.Stop()
 				conn.Close()
 			case <-ticker.C:
-				if conn.GetState() == connectivity.TransientFailure {
-					errorHandler(fmt.Errorf("grpc connection is disconnected"))
+				connState := conn.GetState()
+				// If any failure in any of the steps needed to establish connection, or any failure encountered while
+				// expecting successful communication on established channel, the grpc client connection state will be
+				// TransientFailure.
+				// For a connected grpc client, if the connections is down, the grpc client connection state will be
+				// changed from Ready to Idle.
+				if connState == connectivity.TransientFailure || connState == connectivity.Idle {
+					errorHandler(fmt.Errorf("grpc connection is disconnected (state=%s)", connState))
 					ticker.Stop()
 					conn.Close()
 					return // exit the goroutine as the error handler function will handle the reconnection.

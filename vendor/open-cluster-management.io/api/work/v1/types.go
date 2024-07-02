@@ -162,7 +162,8 @@ type UpdateStrategy struct {
 	// ServerSideApply type means to update resource using server side apply with work-controller as the field manager.
 	// If there is conflict, the related Applied condition of manifest will be in the status of False with the
 	// reason of ApplyConflict.
-	// ReadOnly type means the agent will only check the existence of the resource based on its metadata.
+	// ReadOnly type means the agent will only check the existence of the resource based on its metadata,
+	// statusFeedBackRules can still be used to get feedbackResults.
 	// +kubebuilder:default=Update
 	// +kubebuilder:validation:Enum=Update;CreateOnly;ServerSideApply;ReadOnly
 	// +kubebuilder:validation:Required

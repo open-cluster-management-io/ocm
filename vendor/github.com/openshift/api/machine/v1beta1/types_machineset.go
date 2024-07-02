@@ -9,7 +9,14 @@ import (
 
 // MachineSet ensures that a specified number of machines replicas are running at any given time.
 // +k8s:openapi-gen=true
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=machinesets,scope=Namespaced
 // +kubebuilder:subresource:status
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/1032
+// +openshift:file-pattern=cvoRunLevel=0000_10,operatorName=machine-api,operatorOrdering=01
+// +openshift:capability=MachineAPI
+// +kubebuilder:metadata:annotations="exclude.release.openshift.io/internal-openshift-hosted=true"
+// +kubebuilder:metadata:annotations="include.release.openshift.io/self-managed-high-availability=true"
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.labelSelector
 // +kubebuilder:printcolumn:name="Desired",type="integer",JSONPath=".spec.replicas",description="Desired Replicas"
 // +kubebuilder:printcolumn:name="Current",type="integer",JSONPath=".status.replicas",description="Current Replicas"
@@ -53,6 +60,20 @@ type MachineSetSpec struct {
 	// insufficient replicas are detected.
 	// +optional
 	Template MachineTemplateSpec `json:"template,omitempty"`
+
+	// authoritativeAPI is the API that is authoritative for this resource.
+	// Valid values are MachineAPI and ClusterAPI.
+	// When set to MachineAPI, writes to the spec of the machine.openshift.io copy of this resource will be reflected into the cluster.x-k8s.io copy.
+	// When set to ClusterAPI, writes to the spec of the cluster.x-k8s.io copy of this resource will be reflected into the machine.openshift.io copy.
+	// Updates to the status will be reflected in both copies of the resource, based on the controller implementing the functionality of the API.
+	// Currently the authoritative API determines which controller will manage the resource, this will change in a future release.
+	// To ensure the change has been accepted, please verify that the `status.authoritativeAPI` field has been updated to the desired value and that the `Synchronized` condition is present and set to `True`.
+	// +kubebuilder:validation:Enum=MachineAPI;ClusterAPI
+	// +kubebuilder:validation:Default:=MachineAPI
+	// +default:=MachineAPI
+	// +openshift:enable:FeatureGate=MachineAPIMigration
+	// +optional
+	AuthoritativeAPI MachineAuthority `json:"authoritativeAPI,omitempty"`
 }
 
 // MachineSetDeletePolicy defines how priority is assigned to nodes to delete when
@@ -90,6 +111,7 @@ type MachineTemplateSpec struct {
 }
 
 // MachineSetStatus defines the observed state of MachineSet
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=MachineAPIMigration,rule="!has(oldSelf.synchronizedGeneration) || (has(self.synchronizedGeneration) && self.synchronizedGeneration >= oldSelf.synchronizedGeneration) || (oldSelf.authoritativeAPI == 'Migrating' && self.authoritativeAPI != 'Migrating')",message="synchronizedGeneration must not decrease unless authoritativeAPI is transitioning from Migrating to another value"
 type MachineSetStatus struct {
 	// Replicas is the most recently observed number of replicas.
 	Replicas int32 `json:"replicas"`
@@ -127,6 +149,24 @@ type MachineSetStatus struct {
 	ErrorReason *MachineSetStatusError `json:"errorReason,omitempty"`
 	// +optional
 	ErrorMessage *string `json:"errorMessage,omitempty"`
+
+	// authoritativeAPI is the API that is authoritative for this resource.
+	// Valid values are MachineAPI, ClusterAPI and Migrating.
+	// This value is updated by the migration controller to reflect the authoritative API.
+	// Machine API and Cluster API controllers use this value to determine whether or not to reconcile the resource.
+	// When set to Migrating, the migration controller is currently performing the handover of authority from one API to the other.
+	// +kubebuilder:validation:Enum=MachineAPI;ClusterAPI;Migrating
+	// +kubebuilder:validation:XValidation:rule="self == 'Migrating' || self == oldSelf || oldSelf == 'Migrating'",message="The authoritativeAPI field must not transition directly from MachineAPI to ClusterAPI or vice versa. It must transition through Migrating."
+	// +openshift:enable:FeatureGate=MachineAPIMigration
+	// +optional
+	AuthoritativeAPI MachineAuthority `json:"authoritativeAPI,omitempty"`
+
+	// synchronizedGeneration is the generation of the authoritative resource that the non-authoritative resource is synchronised with.
+	// This field is set when the authoritative resource is updated and the sync controller has updated the non-authoritative resource to match.
+	// +kubebuilder:validation:Minimum=0
+	// +openshift:enable:FeatureGate=MachineAPIMigration
+	// +optional
+	SynchronizedGeneration int64 `json:"synchronizedGeneration,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
