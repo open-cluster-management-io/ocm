@@ -48,7 +48,7 @@ type addonNode struct {
 	status         *clustersdkv1alpha1.ClusterRolloutStatus
 }
 
-type addonConfigMap map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference
+type addonConfigMap map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReference
 
 // set addon rollout status
 func (n *addonNode) setRolloutStatus() {
@@ -69,24 +69,26 @@ func (n *addonNode) setRolloutStatus() {
 	}
 
 	for _, actual := range n.mca.Status.ConfigReferences {
-		if desired, ok := n.desiredConfigs[actual.ConfigGroupResource]; ok {
-			// desired config spec hash doesn't match actual, set to ToApply
-			if !equality.Semantic.DeepEqual(desired.DesiredConfig, actual.DesiredConfig) {
-				n.status.Status = clustersdkv1alpha1.ToApply
-				return
-				// desired config spec hash matches actual, but last applied config spec hash doesn't match actual
-			} else if !equality.Semantic.DeepEqual(actual.LastAppliedConfig, actual.DesiredConfig) {
-				switch progressingCond.Reason {
-				case addonv1alpha1.ProgressingReasonFailed:
-					n.status.Status = clustersdkv1alpha1.Failed
-					n.status.LastTransitionTime = &progressingCond.LastTransitionTime
-				case addonv1alpha1.ProgressingReasonProgressing:
-					n.status.Status = clustersdkv1alpha1.Progressing
-					n.status.LastTransitionTime = &progressingCond.LastTransitionTime
-				default:
-					n.status.Status = clustersdkv1alpha1.Progressing
+		if desiredArray, ok := n.desiredConfigs[actual.ConfigGroupResource]; ok {
+			for _, desired := range desiredArray {
+				// desired config spec hash doesn't match actual, set to ToApply
+				if !equality.Semantic.DeepEqual(desired.DesiredConfig, actual.DesiredConfig) {
+					n.status.Status = clustersdkv1alpha1.ToApply
+					return
+					// desired config spec hash matches actual, but last applied config spec hash doesn't match actual
+				} else if !equality.Semantic.DeepEqual(actual.LastAppliedConfig, actual.DesiredConfig) {
+					switch progressingCond.Reason {
+					case addonv1alpha1.ProgressingReasonFailed:
+						n.status.Status = clustersdkv1alpha1.Failed
+						n.status.LastTransitionTime = &progressingCond.LastTransitionTime
+					case addonv1alpha1.ProgressingReasonProgressing:
+						n.status.Status = clustersdkv1alpha1.Progressing
+						n.status.LastTransitionTime = &progressingCond.LastTransitionTime
+					default:
+						n.status.Status = clustersdkv1alpha1.Progressing
+					}
+					return
 				}
-				return
 			}
 		} else {
 			n.status.Status = clustersdkv1alpha1.ToApply
@@ -113,7 +115,7 @@ func newGraph(supportedConfigs []addonv1alpha1.ConfigMeta, defaultConfigReferenc
 	graph := &configurationGraph{
 		nodes: []*installStrategyNode{},
 		defaults: &installStrategyNode{
-			desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{},
+			desiredConfigs: map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReference{},
 			children:       map[string]*addonNode{},
 		},
 	}
@@ -121,11 +123,13 @@ func newGraph(supportedConfigs []addonv1alpha1.ConfigMeta, defaultConfigReferenc
 	// init graph.defaults.desiredConfigs with supportedConfigs
 	for _, config := range supportedConfigs {
 		if config.DefaultConfig != nil {
-			graph.defaults.desiredConfigs[config.ConfigGroupResource] = addonv1alpha1.ConfigReference{
-				ConfigGroupResource: config.ConfigGroupResource,
-				ConfigReferent:      *config.DefaultConfig,
-				DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-					ConfigReferent: *config.DefaultConfig,
+			graph.defaults.desiredConfigs[config.ConfigGroupResource] = []addonv1alpha1.ConfigReference{
+				{
+					ConfigGroupResource: config.ConfigGroupResource,
+					ConfigReferent:      *config.DefaultConfig,
+					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+						ConfigReferent: *config.DefaultConfig,
+					},
 				},
 			}
 		}
@@ -135,9 +139,11 @@ func newGraph(supportedConfigs []addonv1alpha1.ConfigMeta, defaultConfigReferenc
 		if configRef.DesiredConfig == nil {
 			continue
 		}
-		defaultsDesiredConfig, ok := graph.defaults.desiredConfigs[configRef.ConfigGroupResource]
-		if ok && (defaultsDesiredConfig.DesiredConfig.ConfigReferent == configRef.DesiredConfig.ConfigReferent) {
-			defaultsDesiredConfig.DesiredConfig.SpecHash = configRef.DesiredConfig.SpecHash
+		defaultsDesiredConfigArray, ok := graph.defaults.desiredConfigs[configRef.ConfigGroupResource]
+		for _, defaultsDesiredConfig := range defaultsDesiredConfigArray {
+			if ok && (defaultsDesiredConfig.DesiredConfig.ConfigReferent == configRef.DesiredConfig.ConfigReferent) {
+				defaultsDesiredConfig.DesiredConfig.SpecHash = configRef.DesiredConfig.SpecHash
+			}
 		}
 	}
 
@@ -212,15 +218,20 @@ func (g *configurationGraph) addPlacementNode(
 	// overrides configuration by install strategy
 	if len(installConfigReference) > 0 {
 		node.desiredConfigs = node.desiredConfigs.copy()
+		gvkOverwriten := map[addonv1alpha1.ConfigGroupResource]bool{}
 		for _, configRef := range installConfigReference {
 			if configRef.DesiredConfig == nil {
 				continue
 			}
-			node.desiredConfigs[configRef.ConfigGroupResource] = addonv1alpha1.ConfigReference{
+			if !gvkOverwriten[configRef.ConfigGroupResource] {
+				node.desiredConfigs[configRef.ConfigGroupResource] = []addonv1alpha1.ConfigReference{}
+				gvkOverwriten[configRef.ConfigGroupResource] = true
+			}
+			node.desiredConfigs[configRef.ConfigGroupResource] = append(node.desiredConfigs[configRef.ConfigGroupResource], addonv1alpha1.ConfigReference{
 				ConfigGroupResource: configRef.ConfigGroupResource,
 				ConfigReferent:      configRef.DesiredConfig.ConfigReferent,
 				DesiredConfig:       configRef.DesiredConfig.DeepCopy(),
-			}
+			})
 		}
 	}
 
@@ -296,22 +307,30 @@ func (n *installStrategyNode) addNode(addon *addonv1alpha1.ManagedClusterAddOn) 
 	if len(addon.Spec.Configs) > 0 {
 		n.children[addon.Namespace].desiredConfigs = n.children[addon.Namespace].desiredConfigs.copy()
 		// TODO we should also filter out the configs which are not supported configs.
+		gvkOverwriten := map[addonv1alpha1.ConfigGroupResource]bool{}
 		for _, config := range addon.Spec.Configs {
-			n.children[addon.Namespace].desiredConfigs[config.ConfigGroupResource] = addonv1alpha1.ConfigReference{
+			if !gvkOverwriten[config.ConfigGroupResource] {
+				n.children[addon.Namespace].desiredConfigs[config.ConfigGroupResource] = []addonv1alpha1.ConfigReference{}
+				gvkOverwriten[config.ConfigGroupResource] = true
+			}
+
+			n.children[addon.Namespace].desiredConfigs[config.ConfigGroupResource] = append(n.children[addon.Namespace].desiredConfigs[config.ConfigGroupResource], addonv1alpha1.ConfigReference{
 				ConfigGroupResource: config.ConfigGroupResource,
 				ConfigReferent:      config.ConfigReferent,
 				DesiredConfig: &addonv1alpha1.ConfigSpecHash{
 					ConfigReferent: config.ConfigReferent,
 				},
-			}
+			})
 			// copy the spechash from mca status
 			for _, configRef := range addon.Status.ConfigReferences {
 				if configRef.DesiredConfig == nil {
 					continue
 				}
-				nodeDesiredConfig, ok := n.children[addon.Namespace].desiredConfigs[configRef.ConfigGroupResource]
-				if ok && (nodeDesiredConfig.DesiredConfig.ConfigReferent == configRef.DesiredConfig.ConfigReferent) {
-					nodeDesiredConfig.DesiredConfig.SpecHash = configRef.DesiredConfig.SpecHash
+				nodeDesiredConfigArray, ok := n.children[addon.Namespace].desiredConfigs[configRef.ConfigGroupResource]
+				for _, nodeDesiredConfig := range nodeDesiredConfigArray {
+					if ok && (nodeDesiredConfig.DesiredConfig.ConfigReferent == configRef.DesiredConfig.ConfigReferent) {
+						nodeDesiredConfig.DesiredConfig.SpecHash = configRef.DesiredConfig.SpecHash
+					}
 				}
 			}
 		}
@@ -445,8 +464,13 @@ func desiredConfigsEqual(a, b addonConfigMap) bool {
 	}
 
 	for configgrA := range a {
-		if a[configgrA] != b[configgrA] {
+		if len(a[configgrA]) != len(b[configgrA]) {
 			return false
+		}
+		for i := range a[configgrA] {
+			if a[configgrA][i] != b[configgrA][i] {
+				return false
+			}
 		}
 	}
 

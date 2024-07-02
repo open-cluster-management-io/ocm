@@ -55,24 +55,32 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 	}
 
 	// append or update configs
-	for _, config := range desiredConfigMap {
-		var match bool
-		for i := range mergedConfigs {
-			if mergedConfigs[i].ConfigGroupResource != config.ConfigGroupResource {
-				continue
+	for _, configArray := range desiredConfigMap {
+		newConfig := map[addonv1alpha1.ConfigReferent]bool{}
+		for _, config := range configArray {
+			var match bool
+			for i := range mergedConfigs {
+				if mergedConfigs[i].ConfigGroupResource != config.ConfigGroupResource {
+					continue
+				}
+				if newConfig[mergedConfigs[i].DesiredConfig.ConfigReferent] {
+					continue
+				}
+
+				match = true
+				// set LastObservedGeneration to 0 when config name/namespace changes
+				if mergedConfigs[i].DesiredConfig != nil && (mergedConfigs[i].DesiredConfig.ConfigReferent != config.DesiredConfig.ConfigReferent) {
+					mergedConfigs[i].LastObservedGeneration = 0
+				}
+				mergedConfigs[i].ConfigReferent = config.ConfigReferent
+				mergedConfigs[i].DesiredConfig = config.DesiredConfig.DeepCopy()
+				newConfig[mergedConfigs[i].DesiredConfig.ConfigReferent] = true
 			}
 
-			match = true
-			// set LastObservedGeneration to 0 when config name/namespace changes
-			if mergedConfigs[i].DesiredConfig != nil && (mergedConfigs[i].DesiredConfig.ConfigReferent != config.DesiredConfig.ConfigReferent) {
-				mergedConfigs[i].LastObservedGeneration = 0
+			if !match {
+				mergedConfigs = append(mergedConfigs, config)
+				newConfig[config.ConfigReferent] = true
 			}
-			mergedConfigs[i].ConfigReferent = config.ConfigReferent
-			mergedConfigs[i].DesiredConfig = config.DesiredConfig.DeepCopy()
-		}
-
-		if !match {
-			mergedConfigs = append(mergedConfigs, config)
 		}
 	}
 
