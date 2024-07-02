@@ -56,13 +56,15 @@ func TestConfigurationGraph(t *testing.T) {
 			},
 			expected: []*addonNode{
 				{
-					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
+					desiredConfigs: map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReference{
 						{Group: "core", Resource: "Foo"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
-								SpecHash:       "<core-foo-test-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
+									SpecHash:       "<core-foo-test-hash>",
+								},
 							},
 						},
 					},
@@ -72,13 +74,15 @@ func TestConfigurationGraph(t *testing.T) {
 						Status:      clustersdkv1alpha1.ToApply},
 				},
 				{
-					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
+					desiredConfigs: map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReference{
 						{Group: "core", Resource: "Foo"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
-								SpecHash:       "<core-foo-test-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
+									SpecHash:       "<core-foo-test-hash>",
+								},
 							},
 						},
 					},
@@ -135,21 +139,25 @@ func TestConfigurationGraph(t *testing.T) {
 			},
 			expected: []*addonNode{
 				{
-					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
+					desiredConfigs: map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReference{
 						{Group: "core", Resource: "Bar"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
-								SpecHash:       "<core-bar-test1-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+									SpecHash:       "<core-bar-test1-hash>",
+								},
 							},
 						},
 						{Group: "core", Resource: "Foo"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
-								SpecHash:       "<core-foo-test-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
+									SpecHash:       "<core-foo-test-hash>",
+								},
 							},
 						},
 					},
@@ -159,21 +167,25 @@ func TestConfigurationGraph(t *testing.T) {
 						Status:      clustersdkv1alpha1.ToApply},
 				},
 				{
-					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
+					desiredConfigs: map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReference{
 						{Group: "core", Resource: "Bar"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
-								SpecHash:       "<core-bar-test2-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+									SpecHash:       "<core-bar-test2-hash>",
+								},
 							},
 						},
 						{Group: "core", Resource: "Foo"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
-								SpecHash:       "<core-foo-test2-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+									SpecHash:       "<core-foo-test2-hash>",
+								},
 							},
 						},
 					},
@@ -184,21 +196,25 @@ func TestConfigurationGraph(t *testing.T) {
 					},
 				},
 				{
-					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
+					desiredConfigs: map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReference{
 						{Group: "core", Resource: "Bar"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
-								SpecHash:       "<core-bar-test-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
+									SpecHash:       "<core-bar-test-hash>",
+								},
 							},
 						},
 						{Group: "core", Resource: "Foo"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
-								SpecHash:       "<core-foo-test-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
+									SpecHash:       "<core-foo-test-hash>",
+								},
 							},
 						},
 					},
@@ -311,13 +327,15 @@ func TestConfigurationGraph(t *testing.T) {
 			},
 			expected: []*addonNode{
 				{
-					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
+					desiredConfigs: map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReference{
 						{Group: "core", Resource: "Bar"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
-								SpecHash:       "<core-bar-test1-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+									SpecHash:       "<core-bar-test1-hash>",
+								},
 							},
 						},
 					},
@@ -329,13 +347,15 @@ func TestConfigurationGraph(t *testing.T) {
 					},
 				},
 				{
-					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
+					desiredConfigs: map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReference{
 						{Group: "core", Resource: "Bar"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
-								SpecHash:       "<core-bar-test1-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+									SpecHash:       "<core-bar-test1-hash>",
+								},
 							},
 						},
 					},
@@ -347,13 +367,15 @@ func TestConfigurationGraph(t *testing.T) {
 					},
 				},
 				{
-					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
+					desiredConfigs: map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReference{
 						{Group: "core", Resource: "Bar"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
-								SpecHash:       "<core-bar-test1-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+									SpecHash:       "<core-bar-test1-hash>",
+								},
 							},
 						},
 					},
@@ -411,21 +433,25 @@ func TestConfigurationGraph(t *testing.T) {
 			},
 			expected: []*addonNode{
 				{
-					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
+					desiredConfigs: map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReference{
 						{Group: "core", Resource: "Bar"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
-								SpecHash:       "<core-bar-test1-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+									SpecHash:       "<core-bar-test1-hash>",
+								},
 							},
 						},
 						{Group: "core", Resource: "Foo"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
-								SpecHash:       "<core-foo-test-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
+									SpecHash:       "<core-foo-test-hash>",
+								},
 							},
 						},
 					},
@@ -435,21 +461,25 @@ func TestConfigurationGraph(t *testing.T) {
 						Status:      clustersdkv1alpha1.ToApply},
 				},
 				{
-					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
+					desiredConfigs: map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReference{
 						{Group: "core", Resource: "Bar"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
-								SpecHash:       "<core-bar-test2-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+									SpecHash:       "<core-bar-test2-hash>",
+								},
 							},
 						},
 						{Group: "core", Resource: "Foo"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
-								SpecHash:       "<core-foo-test2-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+									SpecHash:       "<core-foo-test2-hash>",
+								},
 							},
 						},
 					},
@@ -459,21 +489,25 @@ func TestConfigurationGraph(t *testing.T) {
 						Status:      clustersdkv1alpha1.ToApply},
 				},
 				{
-					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
+					desiredConfigs: map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReference{
 						{Group: "core", Resource: "Bar"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
-								SpecHash:       "<core-bar-test2-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+									SpecHash:       "<core-bar-test2-hash>",
+								},
 							},
 						},
 						{Group: "core", Resource: "Foo"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
-								SpecHash:       "<core-foo-test2-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+									SpecHash:       "<core-foo-test2-hash>",
+								},
 							},
 						},
 					},
@@ -533,21 +567,25 @@ func TestConfigurationGraph(t *testing.T) {
 			},
 			expected: []*addonNode{
 				{
-					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
+					desiredConfigs: map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReference{
 						{Group: "core", Resource: "Bar"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
-								SpecHash:       "",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+									SpecHash:       "",
+								},
 							},
 						},
 						{Group: "core", Resource: "Foo"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
-								SpecHash:       "<core-foo-test1-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+									SpecHash:       "<core-foo-test1-hash>",
+								},
 							},
 						},
 					},
@@ -560,21 +598,25 @@ func TestConfigurationGraph(t *testing.T) {
 						Status:      clustersdkv1alpha1.ToApply},
 				},
 				{
-					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
+					desiredConfigs: map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReference{
 						{Group: "core", Resource: "Bar"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
-								SpecHash:       "<core-bar-test2-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+									SpecHash:       "<core-bar-test2-hash>",
+								},
 							},
 						},
 						{Group: "core", Resource: "Foo"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
-								SpecHash:       "<core-foo-test2-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+									SpecHash:       "<core-foo-test2-hash>",
+								},
 							},
 						},
 					},
@@ -584,21 +626,25 @@ func TestConfigurationGraph(t *testing.T) {
 						Status:      clustersdkv1alpha1.ToApply},
 				},
 				{
-					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
+					desiredConfigs: map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReference{
 						{Group: "core", Resource: "Bar"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
-								SpecHash:       "<core-bar-test-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
+									SpecHash:       "<core-bar-test-hash>",
+								},
 							},
 						},
 						{Group: "core", Resource: "Foo"}: {
-							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
-								SpecHash:       "<core-foo-test-hash>",
+							{
+								ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+								ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
+								DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+									ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
+									SpecHash:       "<core-foo-test-hash>",
+								},
 							},
 						},
 					},
