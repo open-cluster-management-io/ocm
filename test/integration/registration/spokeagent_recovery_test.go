@@ -95,12 +95,12 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// the hub kubeconfig secret should be filled after the csr is approved
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			if _, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret); err != nil {
-				return false
+				return err
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		// the spoke cluster should have joined condition finally
 		gomega.Eventually(func() error {

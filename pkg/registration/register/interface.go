@@ -4,9 +4,10 @@ import (
 	"context"
 	"os"
 
+	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -67,15 +68,19 @@ type RegisterDriver interface {
 	// and after bootstrap to confirm if the bootstrap is finished.
 	IsHubKubeConfigValid(ctx context.Context, secretOption SecretOption) (bool, error)
 
+	// BuildKubeConfigFromBootstrap builds the kubeconfig from the bootstrap kubeconfig
 	BuildKubeConfigFromBootstrap(config *clientcmdapi.Config) (*clientcmdapi.Config, error)
 
-	Start(ctx context.Context,
+	// Process update secret with credentials
+	Process(
+		ctx context.Context,
 		name string,
-		statusUpdater StatusUpdateFunc,
-		recorder events.Recorder,
-		secretOpt SecretOption,
-		opt any,
-		additionalData map[string][]byte)
+		secret *corev1.Secret,
+		additionalSecretData map[string][]byte,
+		recorder events.Recorder, opt any) (*corev1.Secret, *metav1.Condition, error)
+
+	// InformerHandler returns informer related object
+	InformerHandler(option any) (cache.SharedIndexInformer, factory.EventFilterFunc)
 }
 
 type registerImpl struct {
@@ -116,28 +121,6 @@ func (r *registerImpl) Start(
 	statusUpdater StatusUpdateFunc,
 	recorder events.Recorder,
 	secretOption SecretOption, option any) {
-	additionalSercretData := map[string][]byte{}
-	if secretOption.BootStrapKubeConfig != nil {
-		kubeConfig, err := r.driver.BuildKubeConfigFromBootstrap(secretOption.BootStrapKubeConfig)
-		if err != nil {
-			utilruntime.Must(err)
-		}
-		if kubeConfig != nil {
-			kubeconfigData, err := clientcmd.Write(*kubeConfig)
-			if err != nil {
-				utilruntime.Must(err)
-			}
-			additionalSercretData[KubeconfigFile] = kubeconfigData
-		}
-	}
-
-	if len(secretOption.ClusterName) > 0 {
-		additionalSercretData[ClusterNameFile] = []byte(secretOption.ClusterName)
-	}
-
-	if len(secretOption.AgentName) > 0 {
-		additionalSercretData[AgentNameFile] = []byte(secretOption.AgentName)
-	}
-
-	r.driver.Start(ctx, name, statusUpdater, recorder, secretOption, option, additionalSercretData)
+	secretController := newSecretController(secretOption, option, r.driver, statusUpdater, recorder, name)
+	secretController.Run(ctx, 1)
 }

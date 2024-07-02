@@ -51,6 +51,8 @@ type SpokeAgentConfig struct {
 	// currentBootstrapKubeConfig is the selected bootstrap kubeconfig file path.
 	// Only used in MultipleHubs feature.
 	currentBootstrapKubeConfig string
+
+	internalHubConfigValidFunc wait.ConditionWithContextFunc
 }
 
 // NewSpokeAgentConfig returns a SpokeAgentConfig
@@ -251,9 +253,8 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		HubKubeconfigDir:         o.agentOptions.HubKubeconfigDir,
 		BootStrapKubeConfig:      kubeconfig,
 	}
-	hasValidHubClientConfig := o.RegisterImpl.IsHubKubeConfigValidFunc(secretOption)
-
-	ok, err := hasValidHubClientConfig(ctx)
+	o.internalHubConfigValidFunc = o.RegisterImpl.IsHubKubeConfigValidFunc(secretOption)
+	ok, err := o.internalHubConfigValidFunc(ctx)
 	if err != nil {
 		return err
 	}
@@ -287,7 +288,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 		// wait for the hub client config is ready.
 		logger.Info("Waiting for hub client config and managed cluster to be ready")
-		if err := wait.PollUntilContextCancel(bootstrapCtx, 1*time.Second, true, hasValidHubClientConfig); err != nil {
+		if err := wait.PollUntilContextCancel(bootstrapCtx, 1*time.Second, true, o.internalHubConfigValidFunc); err != nil {
 			// TODO need run the bootstrap CSR forever to re-establish the client-cert if it is ever lost.
 			stopBootstrap()
 			return fmt.Errorf("failed to wait for hub client config for managed cluster to be ready: %w", err)
@@ -467,6 +468,13 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 	<-ctx.Done()
 	return nil
+}
+
+func (o *SpokeAgentConfig) IsHubKubeConfigValid(ctx context.Context) (bool, error) {
+	if o.internalHubConfigValidFunc == nil {
+		return false, nil
+	}
+	return o.internalHubConfigValidFunc(ctx)
 }
 
 // getSpokeClusterCABundle returns the spoke cluster Kubernetes client CA data when SpokeExternalServerURLs is specified
