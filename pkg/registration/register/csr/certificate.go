@@ -36,7 +36,7 @@ import (
 func isCertificateValid(logger klog.Logger, certData []byte, subject *pkix.Name) (bool, error) {
 	certs, err := certutil.ParseCertsPEM(certData)
 	if err != nil {
-		return false, errors.New("unable to parse certificate")
+		return false, fmt.Errorf("unable to parse certificate: %v", err)
 	}
 
 	if len(certs) == 0 {

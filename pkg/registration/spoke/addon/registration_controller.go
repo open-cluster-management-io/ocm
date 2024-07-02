@@ -224,7 +224,6 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 	}
 
 	driver := csr.NewCSRDriver()
-	registerImpl := register.NewRegister(driver)
 	csrOption := &csr.CSROption{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("addon-%s-%s-", c.clusterName, config.addOnName),
@@ -244,9 +243,11 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 
 	controllerName := fmt.Sprintf("ClientCertController@addon:%s:signer:%s", config.addOnName, config.registration.SignerName)
 	statusUpdater := c.generateStatusUpdate(c.clusterName, config.addOnName)
+	secretController := register.NewSecretController(
+		secretOption, csrOption, driver, statusUpdater, c.recorder, controllerName)
 
 	go kubeInformerFactory.Start(ctx.Done())
-	go registerImpl.Start(ctx, controllerName, statusUpdater, c.recorder, secretOption, csrOption)
+	go secretController.Run(ctx, 1)
 
 	return stopFunc
 }

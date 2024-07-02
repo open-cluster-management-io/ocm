@@ -265,10 +265,7 @@ func TestBuildKubeconfig(t *testing.T) {
 			}
 
 			registerImpl := &CSRDriver{}
-			kubeconfig, err := registerImpl.BuildKubeConfigFromBootstrap(bootstrapKubeconfig)
-			if err != nil {
-				t.Fatal(err)
-			}
+			kubeconfig := registerImpl.BuildKubeConfigFromTemplate(bootstrapKubeconfig)
 			currentContext, ok := kubeconfig.Contexts[kubeconfig.CurrentContext]
 			if !ok {
 				t.Errorf("current context %q not found: %v", kubeconfig.CurrentContext, kubeconfig)

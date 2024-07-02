@@ -350,13 +350,17 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			assertSuccessCSRApproval()
 
 			ginkgo.By("Wait for addon namespace")
-			gomega.Consistently(func() bool {
+			gomega.Consistently(func() error {
 				csrs, err := util.FindAddOnCSRs(kubeClient, managedClusterName, addOnName)
 				if err != nil {
-					return false
+					return err
 				}
-				return len(csrs) == 1
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+				if len(csrs) != 1 {
+					return fmt.Errorf("the number of CSRs is not correct, got %d", len(csrs))
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 			ginkgo.By("Create addon namespace")
 			// create addon namespace

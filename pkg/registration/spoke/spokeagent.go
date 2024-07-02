@@ -46,11 +46,13 @@ type SpokeAgentConfig struct {
 	agentOptions       *commonoptions.AgentOptions
 	registrationOption *SpokeAgentOptions
 
-	RegisterImpl register.Register
+	driver register.RegisterDriver
 
 	// currentBootstrapKubeConfig is the selected bootstrap kubeconfig file path.
 	// Only used in MultipleHubs feature.
 	currentBootstrapKubeConfig string
+
+	internalHubConfigValidFunc wait.ConditionWithContextFunc
 }
 
 // NewSpokeAgentConfig returns a SpokeAgentConfig
@@ -59,7 +61,7 @@ func NewSpokeAgentConfig(commonOpts *commonoptions.AgentOptions, opts *SpokeAgen
 	return &SpokeAgentConfig{
 		agentOptions:       commonOpts,
 		registrationOption: opts,
-		RegisterImpl:       register.NewRegister(registerDriver),
+		driver:             registerDriver,
 	}
 }
 
@@ -251,9 +253,8 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		HubKubeconfigDir:         o.agentOptions.HubKubeconfigDir,
 		BootStrapKubeConfig:      kubeconfig,
 	}
-	hasValidHubClientConfig := o.RegisterImpl.IsHubKubeConfigValidFunc(secretOption)
-
-	ok, err := hasValidHubClientConfig(ctx)
+	o.internalHubConfigValidFunc = register.IsHubKubeConfigValidFunc(o.driver, secretOption)
+	ok, err := o.internalHubConfigValidFunc(ctx)
 	if err != nil {
 		return err
 	}
@@ -279,15 +280,15 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 		controllerName := fmt.Sprintf("BootstrapClientCertController@cluster:%s", o.agentOptions.SpokeClusterName)
 		bootstrapCtx, stopBootstrap := context.WithCancel(ctx)
-
-		go o.RegisterImpl.Start(bootstrapCtx,
-			controllerName, registration.GenerateBootstrapStatusUpdater(), recorder, secretOption, csrOption)
+		secretController := register.NewSecretController(
+			secretOption, csrOption, o.driver, registration.GenerateBootstrapStatusUpdater(), recorder, controllerName)
 
 		go bootstrapInformerFactory.Start(bootstrapCtx.Done())
+		go secretController.Run(bootstrapCtx, 1)
 
 		// wait for the hub client config is ready.
 		logger.Info("Waiting for hub client config and managed cluster to be ready")
-		if err := wait.PollUntilContextCancel(bootstrapCtx, 1*time.Second, true, hasValidHubClientConfig); err != nil {
+		if err := wait.PollUntilContextCancel(bootstrapCtx, 1*time.Second, true, o.internalHubConfigValidFunc); err != nil {
 			// TODO need run the bootstrap CSR forever to re-establish the client-cert if it is ever lost.
 			stopBootstrap()
 			return fmt.Errorf("failed to wait for hub client config for managed cluster to be ready: %w", err)
@@ -352,11 +353,11 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 	// create another ClientCertForHubController for client certificate rotation
 	controllerName := fmt.Sprintf("ClientCertController@cluster:%s", o.agentOptions.SpokeClusterName)
-	go o.RegisterImpl.Start(ctx,
-		controllerName, registration.GenerateStatusUpdater(
+	secretController := register.NewSecretController(
+		secretOption, csrOption, o.driver, registration.GenerateStatusUpdater(
 			hubClusterClient,
 			hubClusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-			o.agentOptions.SpokeClusterName), recorder, secretOption, csrOption)
+			o.agentOptions.SpokeClusterName), recorder, controllerName)
 
 	// create ManagedClusterLeaseController to keep the spoke cluster heartbeat
 	managedClusterLeaseController := lease.NewManagedClusterLeaseController(
@@ -447,6 +448,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		go spokeClusterInformerFactory.Start(ctx.Done())
 	}
 
+	go secretController.Run(ctx, 1)
 	go managedClusterLeaseController.Run(ctx, 1)
 	go managedClusterHealthCheckController.Run(ctx, 1)
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.AddonManagement) {
@@ -467,6 +469,13 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 	<-ctx.Done()
 	return nil
+}
+
+func (o *SpokeAgentConfig) IsHubKubeConfigValid(ctx context.Context) (bool, error) {
+	if o.internalHubConfigValidFunc == nil {
+		return false, nil
+	}
+	return o.internalHubConfigValidFunc(ctx)
 }
 
 // getSpokeClusterCABundle returns the spoke cluster Kubernetes client CA data when SpokeExternalServerURLs is specified

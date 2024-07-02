@@ -9,7 +9,6 @@ import (
 	"k8s.io/klog/v2"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
-	"open-cluster-management.io/ocm/pkg/registration/register"
 	registration "open-cluster-management.io/ocm/pkg/registration/spoke"
 	work "open-cluster-management.io/ocm/pkg/work/spoke"
 )
@@ -40,19 +39,9 @@ func (a *AgentConfig) RunSpokeAgent(ctx context.Context, controllerContext *cont
 		}
 	}()
 
-	secretOption := register.SecretOption{
-		SecretNamespace:   a.agentOption.ComponentNamespace,
-		SecretName:        a.registrationOption.HubKubeconfigSecret,
-		ClusterName:       a.agentOption.SpokeClusterName,
-		AgentName:         a.agentOption.AgentID,
-		HubKubeconfigFile: a.agentOption.HubKubeconfigFile,
-		HubKubeconfigDir:  a.agentOption.HubKubeconfigDir,
-	}
-	hasValidClientConfig := registrationCfg.RegisterImpl.IsHubKubeConfigValidFunc(secretOption)
-
 	// wait for the hub client config ready.
 	klog.Info("Waiting for hub client config and managed cluster to be ready")
-	if err := wait.PollUntilContextCancel(ctx, 1*time.Second, true, hasValidClientConfig); err != nil {
+	if err := wait.PollUntilContextCancel(ctx, 1*time.Second, true, registrationCfg.IsHubKubeConfigValid); err != nil {
 		return err
 	}
 
