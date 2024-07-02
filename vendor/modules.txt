@@ -244,7 +244,7 @@ github.com/mitchellh/reflectwalk
 ## explicit; go 1.19
 # github.com/moby/sys/sequential v0.5.0
 ## explicit; go 1.17
-# github.com/mochi-mqtt/server/v2 v2.4.6
+# github.com/mochi-mqtt/server/v2 v2.6.4
 ## explicit; go 1.21
 github.com/mochi-mqtt/server/v2
 github.com/mochi-mqtt/server/v2/hooks/auth
@@ -587,7 +587,7 @@ golang.org/x/crypto/nacl/secretbox
 golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/salsa20/salsa
 golang.org/x/crypto/scrypt
-# golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
+# golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df
 ## explicit; go 1.20
 golang.org/x/exp/constraints
 golang.org/x/exp/maps
