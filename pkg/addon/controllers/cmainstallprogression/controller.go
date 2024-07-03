@@ -135,16 +135,16 @@ func setInstallProgression(supportedConfigs []addonv1alpha1.ConfigMeta, placemen
 		installConfigReferencesMap := map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReferent{}
 		for _, config := range supportedConfigs {
 			if config.DefaultConfig != nil {
-				installConfigReferencesMap[config.ConfigGroupResource] = append(installConfigReferencesMap[config.ConfigGroupResource], *config.DefaultConfig)
+				installConfigReferencesMap[config.ConfigGroupResource] = []addonv1alpha1.ConfigReferent{*config.DefaultConfig}
 			}
 		}
 
-		installConfigReferencesResetArray := map[addonv1alpha1.ConfigGroupResource]bool{}
+		installConfigReferencesResetArray := map[addonv1alpha1.ConfigGroupResource]struct{}{}
 		// override the default configuration for each placement
 		for _, config := range placementStrategy.Configs {
-			if len(installConfigReferencesMap[config.ConfigGroupResource]) > 0 && !installConfigReferencesResetArray[config.ConfigGroupResource] {
+			if _, ok := installConfigReferencesResetArray[config.ConfigGroupResource]; len(installConfigReferencesMap[config.ConfigGroupResource]) >= 0 && !ok {
 				installConfigReferencesMap[config.ConfigGroupResource] = []addonv1alpha1.ConfigReferent{}
-				installConfigReferencesResetArray[config.ConfigGroupResource] = true
+				installConfigReferencesResetArray[config.ConfigGroupResource] = struct{}{}
 			}
 			installConfigReferencesMap[config.ConfigGroupResource] = append(installConfigReferencesMap[config.ConfigGroupResource], config.ConfigReferent)
 		}
