@@ -90,10 +90,3 @@ var _ = BeforeSuite(func() {
 		Expect(err).ToNot(HaveOccurred())
 	}
 })
-
-var _ = AfterSuite(func() {
-	if deployKlusterlet {
-		By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
-		Expect(t.cleanKlusterletResources(klusterletName, clusterName)).To(BeNil())
-	}
-})

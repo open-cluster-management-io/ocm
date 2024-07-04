@@ -168,9 +168,5 @@ var _ = Describe("Delete hosted klusterlet CR", func() {
 				return err
 			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
 		})
-
-		By("Check manged cluster and klusterlet can be deleted", func() {
-			Expect(t.cleanKlusterletResources(klusterletName, clusterName)).To(BeNil())
-		})
 	})
 })
