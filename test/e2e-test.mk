@@ -33,7 +33,7 @@ test-e2e: deploy-hub deploy-spoke-operator bootstrap-secret run-e2e
 
 run-e2e:
 	go test -c ./test/e2e
-	./e2e.test -test.v -ginkgo.v -deploy-klusterlet=true -nil-executor-validating=true -registration-image=$(REGISTRATION_IMAGE) -work-image=$(WORK_IMAGE) -singleton-image=$(OPERATOR_IMAGE_NAME) -klusterlet-deploy-mode=$(KLUSTERLET_DEPLOY_MODE)
+	./e2e.test -test.v -ginkgo.v -deploy-klusterlet=true -registration-image=$(REGISTRATION_IMAGE) -work-image=$(WORK_IMAGE) -singleton-image=$(OPERATOR_IMAGE_NAME) -klusterlet-deploy-mode=$(KLUSTERLET_DEPLOY_MODE)
 
 clean-hub: clean-hub-cr clean-hub-operator
 

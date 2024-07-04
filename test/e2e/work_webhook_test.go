@@ -50,17 +50,20 @@ var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validati
 			gomega.Expect(errors.IsBadRequest(err)).Should(gomega.BeTrue())
 		})
 
-		ginkgo.Context("executor", func() {
+		ginkgo.Context("executor", ginkgo.Ordered, ginkgo.Label("NilExecutorValidating"), func() {
 			var hubUser string
 			var roleName string
+
+			ginkgo.BeforeAll(func() {
+				gomega.Eventually(func() error {
+					return t.EnableWorkFeature("NilExecutorValidating")
+				}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+				gomega.Eventually(t.CheckHubReady, t.EventuallyTimeout, t.EventuallyInterval).Should(gomega.Succeed())
+			})
 
 			ginkgo.BeforeEach(func() {
 				hubUser = fmt.Sprintf("sa-%s", nameSuffix)
 				roleName = fmt.Sprintf("role-%s", nameSuffix)
-
-				if !nilExecutorValidating {
-					ginkgo.Skip(fmt.Sprintf("feature gate %q is disabled", "NilExecutorValidating"))
-				}
 
 				// create a temporary role
 				_, err := t.HubKubeClient.RbacV1().Roles(clusterName).Create(
