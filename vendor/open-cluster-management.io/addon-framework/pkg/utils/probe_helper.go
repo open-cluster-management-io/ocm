@@ -134,6 +134,11 @@ func FilterDeployments(objects []runtime.Object) []*appsv1.Deployment {
 type WorkloadMetadata struct {
 	schema.GroupResource
 	types.NamespacedName
+	DeploymentSpec *DeploymentSpec
+}
+
+type DeploymentSpec struct {
+	Replicas int32
 }
 
 func FilterWorkloads(objects []runtime.Object) []WorkloadMetadata {
@@ -149,6 +154,9 @@ func FilterWorkloads(objects []runtime.Object) []WorkloadMetadata {
 				NamespacedName: types.NamespacedName{
 					Namespace: deployment.Namespace,
 					Name:      deployment.Name,
+				},
+				DeploymentSpec: &DeploymentSpec{
+					Replicas: *deployment.Spec.Replicas,
 				},
 			})
 		}
