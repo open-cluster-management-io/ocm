@@ -32,8 +32,14 @@ do
     kind load docker-image --name=e2e quay.io/open-cluster-management/placement:$IMAGE_TAG
     kind load docker-image --name=e2e quay.io/open-cluster-management/addon-manager:$IMAGE_TAG
 
+    # This is for addon-manager test: /workspaces/OCM/test/e2e/manifests/addon/addon_template.yaml
+    docker pull quay.io/open-cluster-management/addon-examples:latest
+    kind load docker-image --name=e2e quay.io/open-cluster-management/addon-examples:latest
+
+    kind get kubeconfig --name=e2e > .kubeconfig
+
     echo "Running e2e test iteration $((i+1))/$RUN_TIMES with KlusterletDeployMode=$KLUSTERLET_DEPLOY_MODE"
-    test_output=$(IMAGE_TAG=$IMAGE_TAG KLUSTERLET_DEPLOY_MODE=$KLUSTERLET_DEPLOY_MODE make test-e2e 2>&1)
+    test_output=$(IMAGE_TAG=$IMAGE_TAG KLUSTERLET_DEPLOY_MODE=$KLUSTERLET_DEPLOY_MODE KUBECONFIG=.kubeconfig make test-e2e 2>&1)
     test_exit_code=$?
 
     # Determine test result and update the respective list
