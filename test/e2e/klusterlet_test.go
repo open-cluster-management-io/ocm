@@ -26,11 +26,6 @@ var _ = Describe("Create klusterlet CR", func() {
 		klusterletNamespace = fmt.Sprintf("open-cluster-management-agent-%s", rand.String(6))
 	})
 
-	AfterEach(func() {
-		By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
-		Expect(t.cleanKlusterletResources(klusterletName, clusterName)).To(BeNil())
-	})
-
 	// This test case is helpful for the Backward compatibility
 	It("Create klusterlet CR with install mode empty", func() {
 		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v", klusterletName, clusterName))
@@ -226,5 +221,9 @@ var _ = Describe("Create klusterlet CR", func() {
 			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
 			return err
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+
+		By("Check manged cluster and klusterlet can be deleted", func() {
+			Expect(t.cleanKlusterletResources(klusterletName, clusterName)).To(BeNil())
+		})
 	})
 })

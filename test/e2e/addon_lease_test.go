@@ -253,8 +253,6 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 			ginkgo.By(fmt.Sprintf("Cleaning managed cluster addon installation namespace %q", addOnName))
 			err := t.HubKubeClient.CoreV1().Namespaces().Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			ginkgo.By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
-			gomega.Expect(t.cleanKlusterletResources(klusterletName, clusterName)).To(gomega.BeNil())
 		})
 
 		ginkgo.It("Should update addon status to unknown if managed cluster stops to update its lease", func() {
