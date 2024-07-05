@@ -334,7 +334,7 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("sanity-check"), func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
-	//update this case when version upgrade
+	// update this case when version upgrade
 	ginkgo.It("Should support v1beta1 placement", func() {
 		ginkgo.By("Create v1beta1 placement with v1beta1 client")
 		placement := &clusterapiv1beta1.Placement{

@@ -72,7 +72,7 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", func() {
 					Name:      "default",
 				},
 				Spec: clusterapiv1beta2.ManagedClusterSetBindingSpec{
-					ClusterSet: "default",
+					ClusterSet: UNIVERSAL_CLUSTERSET,
 				},
 			}
 			_, err = t.ClusterClient.ClusterV1beta2().ManagedClusterSetBindings(metav1.NamespaceDefault).Create(
@@ -83,6 +83,9 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      placementRef.Name,
 					Namespace: metav1.NamespaceDefault,
+				},
+				Spec: clusterv1beta1.PlacementSpec{
+					ClusterSets: []string{UNIVERSAL_CLUSTERSET},
 				},
 			}
 
