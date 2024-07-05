@@ -124,14 +124,15 @@ var _ = ginkgo.Describe("Cluster Auto Approval", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		// we can deny the cluster after it is accepted
-		cluster, err := util.GetManagedCluster(clusterClient, clusterName)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Eventually(func() error {
+			cluster, err := util.GetManagedCluster(clusterClient, clusterName)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		updatedCluster := cluster.DeepCopy()
-		updatedCluster.Spec.HubAcceptsClient = false
-
-		_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), updatedCluster, v1.UpdateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			updatedCluster := cluster.DeepCopy()
+			updatedCluster.Spec.HubAcceptsClient = false
+			_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), updatedCluster, v1.UpdateOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		gomega.Consistently(func() error {
 			cluster, err := util.GetManagedCluster(clusterClient, clusterName)
