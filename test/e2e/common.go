@@ -784,6 +784,12 @@ func (t *Tester) OutputDebugLogs() {
 		klog.Infof("klusterlet %v : %#v \n", klusterlet.Name, klusterlet)
 	}
 
+	agentAddonNs, err := t.HubKubeClient.CoreV1().Namespaces().Get(context.TODO(), helpers.DefaultAddonNamespace, metav1.GetOptions{})
+	if err != nil {
+		klog.Errorf("failed to get default agent addon ns. error: %v", err)
+	}
+	klog.Infof("agent addon ns: %#v \n", agentAddonNs)
+
 	managedClusters, err := t.ClusterClient.ClusterV1().ManagedClusters().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		klog.Errorf("failed to list managedClusters. error: %v", err)
