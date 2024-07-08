@@ -1503,7 +1503,7 @@ k8s.io/utils/pointer
 k8s.io/utils/ptr
 k8s.io/utils/strings/slices
 k8s.io/utils/trace
-# open-cluster-management.io/addon-framework v0.10.1-0.20240701065245-fa77e9b77a3b
+# open-cluster-management.io/addon-framework v0.10.1-0.20240703130731-ba7fd000a03a
 ## explicit; go 1.22.0
 open-cluster-management.io/addon-framework/pkg/addonfactory
 open-cluster-management.io/addon-framework/pkg/addonmanager
