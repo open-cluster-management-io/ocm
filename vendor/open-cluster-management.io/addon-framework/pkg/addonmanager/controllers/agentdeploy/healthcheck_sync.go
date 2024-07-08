@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -178,10 +179,12 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 		// mark condition to unknown
 		if result == nil {
 			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
-				Status:  metav1.ConditionUnknown,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonNoProbeResult,
-				Message: "Probe results are not returned",
+				Type:   addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Status: metav1.ConditionUnknown,
+				Reason: addonapiv1alpha1.AddonAvailableReasonNoProbeResult,
+				Message: fmt.Sprintf("Probe results are not returned for %s/%s: %s/%s",
+					field.ResourceIdentifier.Group, field.ResourceIdentifier.Resource,
+					field.ResourceIdentifier.Namespace, field.ResourceIdentifier.Name),
 			})
 			return nil
 		}
@@ -271,8 +274,17 @@ func (s *healthCheckSyncer) analyzeWorkloadsWorkProber(
 
 	workloads := utils.FilterWorkloads(manifests)
 	for _, workload := range workloads {
+		// Not probe the deployment with zero replicas
+		if workload.GroupResource.Group == appsv1.GroupName &&
+			workload.GroupResource.Resource == "deployments" &&
+			workload.DeploymentSpec != nil &&
+			workload.DeploymentSpec.Replicas == 0 {
+			continue
+		}
+
 		manifestConfig := utils.WellKnowManifestConfig(workload.Group, workload.Resource,
 			workload.Namespace, workload.Name)
+
 		probeFields = append(probeFields, agent.ProbeField{
 			ResourceIdentifier: manifestConfig.ResourceIdentifier,
 			ProbeRules:         manifestConfig.FeedbackRules,
