@@ -71,25 +71,23 @@ func (n *addonNode) setRolloutStatus() {
 	for _, actual := range n.mca.Status.ConfigReferences {
 		if desiredArray, ok := n.desiredConfigs[actual.ConfigGroupResource]; ok {
 			for _, desired := range desiredArray {
-				if desired.DesiredConfig.ConfigReferent == actual.DesiredConfig.ConfigReferent {
-					// desired config spec hash doesn't match actual, set to ToApply
-					if !equality.Semantic.DeepEqual(desired.DesiredConfig, actual.DesiredConfig) {
-						n.status.Status = clustersdkv1alpha1.ToApply
-						return
-						// desired config spec hash matches actual, but last applied config spec hash doesn't match actual
-					} else if !equality.Semantic.DeepEqual(actual.LastAppliedConfig, actual.DesiredConfig) {
-						switch progressingCond.Reason {
-						case addonv1alpha1.ProgressingReasonFailed:
-							n.status.Status = clustersdkv1alpha1.Failed
-							n.status.LastTransitionTime = &progressingCond.LastTransitionTime
-						case addonv1alpha1.ProgressingReasonProgressing:
-							n.status.Status = clustersdkv1alpha1.Progressing
-							n.status.LastTransitionTime = &progressingCond.LastTransitionTime
-						default:
-							n.status.Status = clustersdkv1alpha1.Progressing
-						}
-						return
+				// desired config spec hash doesn't match actual, set to ToApply
+				if !equality.Semantic.DeepEqual(desired.DesiredConfig, actual.DesiredConfig) {
+					n.status.Status = clustersdkv1alpha1.ToApply
+					return
+					// desired config spec hash matches actual, but last applied config spec hash doesn't match actual
+				} else if !equality.Semantic.DeepEqual(actual.LastAppliedConfig, actual.DesiredConfig) {
+					switch progressingCond.Reason {
+					case addonv1alpha1.ProgressingReasonFailed:
+						n.status.Status = clustersdkv1alpha1.Failed
+						n.status.LastTransitionTime = &progressingCond.LastTransitionTime
+					case addonv1alpha1.ProgressingReasonProgressing:
+						n.status.Status = clustersdkv1alpha1.Progressing
+						n.status.LastTransitionTime = &progressingCond.LastTransitionTime
+					default:
+						n.status.Status = clustersdkv1alpha1.Progressing
 					}
+					return
 				}
 			}
 		} else {
