@@ -22,7 +22,6 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/ocm/pkg/addon/templateagent"
-	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/test/e2e/manifests"
 )
 
@@ -50,7 +49,7 @@ var (
 
 var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, ginkgo.Label("addon-manager"), func() {
 	addOnName := "hello-template"
-	var addonInstallNamespace string
+	addonInstallNamespace := "test-addon-template"
 
 	s := runtime.NewScheme()
 	_ = scheme.AddToScheme(s)
@@ -73,8 +72,6 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 		// the addon manager deployment should be running
 		gomega.Eventually(t.CheckHubReady, t.EventuallyTimeout, t.EventuallyInterval).Should(gomega.Succeed())
-
-		addonInstallNamespace = helpers.DefaultAddonNamespace
 
 		ginkgo.By(fmt.Sprintf("create addon template resources for cluster %v", clusterName))
 		err = createResourcesFromYamlFiles(context.Background(), t.HubDynamicClient, t.hubRestMapper, s,

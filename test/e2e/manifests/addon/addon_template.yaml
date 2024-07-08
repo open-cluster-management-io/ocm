@@ -15,6 +15,10 @@ spec:
             type: ServerSideApply
       workload:
         manifests:
+          - kind: Namespace
+            apiVersion: v1
+            metadata:
+              name: << AddonInstallNamespace >>
           - kind: Deployment
             apiVersion: apps/v1
             metadata:
