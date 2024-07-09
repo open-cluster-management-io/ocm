@@ -31,7 +31,7 @@ require (
 	k8s.io/apiserver v0.30.2
 	k8s.io/client-go v0.30.2
 	k8s.io/component-base v0.30.2
-	k8s.io/klog/v2 v2.120.1
+	k8s.io/klog/v2 v2.130.1
 	k8s.io/kube-aggregator v0.30.2
 	k8s.io/utils v0.0.0-20240310230437-4693a0247e57
 	open-cluster-management.io/addon-framework v0.10.1-0.20240703130731-ba7fd000a03a
