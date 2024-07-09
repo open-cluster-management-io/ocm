@@ -16,7 +16,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
-var _ = Describe("Delete hosted klusterlet CR", func() {
+var _ = Describe("Delete hosted klusterlet CR", Label("klusterlet-hosted"), func() {
 	var klusterletName string
 	var clusterName string
 	var klusterletNamespace string
@@ -39,7 +39,7 @@ var _ = Describe("Delete hosted klusterlet CR", func() {
 		Eventually(func() error {
 			err := t.checkKlusterletStatus(klusterletName, "ReadyToApply", "KlusterletPrepareFailed", metav1.ConditionFalse)
 			return err
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("delete the klusterlet %s", klusterletName))
 		err = t.OperatorClient.OperatorV1().Klusterlets().Delete(context.TODO(),
@@ -54,7 +54,7 @@ var _ = Describe("Delete hosted klusterlet CR", func() {
 				return nil
 			}
 			return fmt.Errorf("klusterlet still exists")
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("check the agent namespace %s on the management cluster was deleted", klusterletName))
 		Eventually(func() error {
@@ -64,7 +64,7 @@ var _ = Describe("Delete hosted klusterlet CR", func() {
 				return nil
 			}
 			return fmt.Errorf("klusterlet namespace still exists")
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+		}).Should(Succeed())
 	})
 
 	It("Delete klusterlet CR in Hosted mode when the managed cluster was destroyed", func() {
@@ -76,36 +76,36 @@ var _ = Describe("Delete hosted klusterlet CR", func() {
 		Eventually(func() error {
 			_, err := t.GetCreatedManagedCluster(clusterName)
 			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}, 5*time.Minute, 5*time.Second).Should(Succeed())
 
 		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
 		Eventually(func() error {
 			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded",
 				"BootstrapSecretFunctional,HubKubeConfigSecretMissing", metav1.ConditionTrue)
 			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}, 5*time.Minute, 5*time.Second).Should(Succeed())
 
 		By(fmt.Sprintf("approve the created managed cluster %v", clusterName))
 		Eventually(func() error {
 			return t.ApproveCSR(clusterName)
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("accept the created managed cluster %v", clusterName))
 		Eventually(func() error {
 			return t.AcceptsClient(clusterName)
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("waiting for the managed cluster %v to be ready", clusterName))
 		Eventually(func() error {
 			return t.CheckManagedClusterStatus(clusterName)
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}, 5*time.Minute, 5*time.Second).Should(Succeed())
 
 		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
 		Eventually(func() error {
 			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded",
 				"HubConnectionFunctional", metav1.ConditionFalse)
 			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 
 		// change the kubeconfig host of external managed kubeconfig secret to a wrong value
 		// to simulate the managed cluster was destroyed
@@ -136,6 +136,7 @@ var _ = Describe("Delete hosted klusterlet CR", func() {
 		// in the future, if the eviction can be configured, we can set a short timeout period and
 		// remove the wait and update parts
 		evictionTimestampAnno := "operator.open-cluster-management.io/managed-resources-eviction-timestamp"
+
 		By("Wait for the eviction timestamp annotation", func() {
 			Eventually(func() error {
 				k, err := t.OperatorClient.OperatorV1().Klusterlets().Get(context.TODO(),
@@ -148,7 +149,7 @@ var _ = Describe("Delete hosted klusterlet CR", func() {
 					return fmt.Errorf("expected annotation %s does not exist", evictionTimestampAnno)
 				}
 				return nil
-			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+			}, 5*time.Minute, 5*time.Second).Should(Succeed())
 		})
 
 		time.Sleep(3 * time.Second) // after the eviction timestamp exists, wait 3 seconds for cache syncing
@@ -166,7 +167,7 @@ var _ = Describe("Delete hosted klusterlet CR", func() {
 				_, err = t.OperatorClient.OperatorV1().Klusterlets().Update(context.TODO(),
 					k, metav1.UpdateOptions{})
 				return err
-			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+			}, 5*time.Minute, 5*time.Second).Should(Succeed())
 		})
 
 		By("Check manged cluster and klusterlet can be deleted", func() {

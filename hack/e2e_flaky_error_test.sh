@@ -7,13 +7,14 @@ if [ "$#" -lt 1 ]; then
 fi
 
 # Read command line arguments
+# Example usage: IMAGE_TAG=e2e sh hack/e2e_flaky_error_test.sh 10 no
 RUN_TIMES=$1
 BUILD_IMAGES=${2:-yes} # Default to 'yes' if the third argument is not provided
 KLUSTERLET_DEPLOY_MODE=${3:-Default} # Use Default if the second argument is not provided
 
 # Conditionally build images for testing
 if [ "$BUILD_IMAGES" = "yes" ]; then
-  make images build
+    IMAGE_TAG=$IMAGE_TAG make images
 fi
 
 # Create the directory to store test results with timestamp
@@ -41,6 +42,8 @@ do
     echo "Running e2e test iteration $((i+1))/$RUN_TIMES with KlusterletDeployMode=$KLUSTERLET_DEPLOY_MODE"
     test_output=$(IMAGE_TAG=$IMAGE_TAG KLUSTERLET_DEPLOY_MODE=$KLUSTERLET_DEPLOY_MODE KUBECONFIG=.kubeconfig make test-e2e 2>&1)
     test_exit_code=$?
+
+    echo "$test_output"
 
     # Determine test result and update the respective list
     if [ $test_exit_code -eq 0 ]; then

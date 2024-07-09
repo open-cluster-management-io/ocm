@@ -15,7 +15,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
-var _ = Describe("Create klusterlet CR", func() {
+var _ = Describe("Create klusterlet CR", Label("klusterlet"), func() {
 	var klusterletName string
 	var clusterName string
 	var klusterletNamespace string
@@ -42,34 +42,34 @@ var _ = Describe("Create klusterlet CR", func() {
 		Eventually(func() error {
 			_, err := t.GetCreatedManagedCluster(clusterName)
 			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
 		Eventually(func() error {
 			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded", "BootstrapSecretFunctional,HubKubeConfigSecretMissing", metav1.ConditionTrue)
 			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("approve the created managed cluster %v", clusterName))
 		Eventually(func() error {
 			return t.ApproveCSR(clusterName)
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("accept the created managed cluster %v", clusterName))
 		Eventually(func() error {
 			return t.AcceptsClient(clusterName)
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("waiting for the managed cluster %v to be ready", clusterName))
 		Eventually(func() error {
 			return t.CheckManagedClusterStatus(clusterName)
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
 		Eventually(func() error {
 			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
 			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 	})
 
 	It("Create klusterlet CR with managed cluster name", func() {
@@ -81,34 +81,34 @@ var _ = Describe("Create klusterlet CR", func() {
 		Eventually(func() error {
 			_, err := t.GetCreatedManagedCluster(clusterName)
 			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
 		Eventually(func() error {
 			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded", "BootstrapSecretFunctional,HubKubeConfigSecretMissing", metav1.ConditionTrue)
 			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("approve the created managed cluster %v", clusterName))
 		Eventually(func() error {
 			return t.ApproveCSR(clusterName)
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("accept the created managed cluster %v", clusterName))
 		Eventually(func() error {
 			return t.AcceptsClient(clusterName)
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("waiting for the managed cluster %v to be ready", clusterName))
 		Eventually(func() error {
 			return t.CheckManagedClusterStatus(clusterName)
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
 		Eventually(func() error {
 			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
 			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 	})
 
 	It("Created klusterlet without managed cluster name", func() {
@@ -123,34 +123,34 @@ var _ = Describe("Create klusterlet CR", func() {
 		Eventually(func() error {
 			clusterName, err = t.GetRandomClusterName()
 			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
 		Eventually(func() error {
 			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded", "BootstrapSecretFunctional,HubKubeConfigSecretMissing", metav1.ConditionTrue)
 			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("approve the created managed cluster %v", clusterName))
 		Eventually(func() error {
 			return t.ApproveCSR(clusterName)
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("accept the created managed cluster %v", clusterName))
 		Eventually(func() error {
 			return t.AcceptsClient(clusterName)
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("waiting for the managed cluster %v to be ready", clusterName))
 		Eventually(func() error {
 			return t.CheckManagedClusterStatus(clusterName)
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
 		Eventually(func() error {
 			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
 			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 	})
 
 	It("Update klusterlet CR namespace", func() {
@@ -162,22 +162,22 @@ var _ = Describe("Create klusterlet CR", func() {
 		Eventually(func() error {
 			_, err := t.GetCreatedManagedCluster(clusterName)
 			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("approve the created managed cluster %v", clusterName))
 		Eventually(func() error {
 			return t.ApproveCSR(clusterName)
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("accept the created managed cluster %v", clusterName))
 		Eventually(func() error {
 			return t.AcceptsClient(clusterName)
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("waiting for the managed cluster %v to be ready", clusterName))
 		Eventually(func() error {
 			return t.CheckManagedClusterStatus(clusterName)
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 
 		By("update klusterlet namespace")
 		newNamespace := "open-cluster-management-agent-another"
@@ -189,7 +189,7 @@ var _ = Describe("Create klusterlet CR", func() {
 			klusterlet.Spec.Namespace = newNamespace
 			_, err = t.OperatorClient.OperatorV1().Klusterlets().Update(context.TODO(), klusterlet, metav1.UpdateOptions{})
 			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 
 		By("copy bootstrap secret to the new namespace")
 		Eventually(func() error {
@@ -199,7 +199,7 @@ var _ = Describe("Create klusterlet CR", func() {
 				return nil
 			}
 			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 
 		By("old namespace should be removed")
 		Eventually(func() error {
@@ -208,23 +208,23 @@ var _ = Describe("Create klusterlet CR", func() {
 				return nil
 			}
 			return fmt.Errorf("namespace still exists")
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 
 		By("addon namespace should be kept")
 		Eventually(func() error {
 			_, err := t.SpokeKubeClient.CoreV1().Namespaces().Get(context.TODO(), helpers.DefaultAddonNamespace, metav1.GetOptions{})
 			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 
 		By(fmt.Sprintf("approve the managed cluster %v since it is registered in the new namespace", clusterName))
 		Eventually(func() error {
 			return t.ApproveCSR(clusterName)
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+		}).Should(Succeed())
 
 		By("klusterlet status should be ok")
 		Eventually(func() error {
 			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
 			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 	})
 })

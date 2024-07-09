@@ -21,7 +21,7 @@ import (
 
 const availableLabelValue = "available"
 
-var _ = ginkgo.Describe("Addon Health Check", func() {
+var _ = ginkgo.Describe("Addon Health Check", ginkgo.Label("addon-lease"), func() {
 	ginkgo.Context("Checking addon lease on managed cluster to update addon status", func() {
 		var addOnName string
 		ginkgo.BeforeEach(func() {
@@ -69,7 +69,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 					return fmt.Errorf("condition should be available")
 				}
 				return nil
-			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+			}).Should(gomega.Succeed())
 
 			// check if the cluster has a label for addon with expected value
 			gomega.Eventually(func() bool {
@@ -82,7 +82,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 				}
 				key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addOnName)
 				return cluster.Labels[key] == availableLabelValue
-			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeTrue())
+			}).Should(gomega.BeTrue())
 		})
 
 		ginkgo.It("Should update addon status to unavailable if addon stops to update its lease", func() {
@@ -107,7 +107,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 					return fmt.Errorf("condition should be available")
 				}
 				return nil
-			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+			}).Should(gomega.Succeed())
 
 			// check if the cluster has a label for addon with expected value
 			gomega.Eventually(func() bool {
@@ -120,7 +120,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 				}
 				key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addOnName)
 				return cluster.Labels[key] == availableLabelValue
-			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeTrue())
+			}).Should(gomega.BeTrue())
 
 			ginkgo.By(fmt.Sprintf("Updating lease %q with a past time", addOnName))
 			lease, err := t.SpokeKubeClient.CoordinationV1().Leases(addOnName).Get(context.TODO(), addOnName, metav1.GetOptions{})
@@ -138,7 +138,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 					return fmt.Errorf("condition should be available")
 				}
 				return nil
-			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+			}).Should(gomega.Succeed())
 
 			// check if the cluster has a label for addon with expected value
 			gomega.Eventually(func() bool {
@@ -151,7 +151,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 				}
 				key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addOnName)
 				return cluster.Labels[key] == "unhealthy"
-			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeTrue())
+			}).Should(gomega.BeTrue())
 		})
 
 		ginkgo.It("Should update addon status to unknown if there is no lease for this addon", func() {
@@ -176,7 +176,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 					return fmt.Errorf("condition should be available")
 				}
 				return nil
-			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+			}).Should(gomega.Succeed())
 
 			// check if the cluster has a label for addon with expected value
 			gomega.Eventually(func() bool {
@@ -189,7 +189,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 				}
 				key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addOnName)
 				return cluster.Labels[key] == availableLabelValue
-			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeTrue())
+			}).Should(gomega.BeTrue())
 
 			ginkgo.By(fmt.Sprintf("Deleting lease %q", addOnName))
 			err = t.SpokeKubeClient.CoordinationV1().Leases(addOnName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
@@ -204,7 +204,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 					return fmt.Errorf("condition should be available")
 				}
 				return nil
-			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+			}).Should(gomega.Succeed())
 
 			// check if the cluster has a label for addon with expected value
 			gomega.Eventually(func() bool {
@@ -217,7 +217,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 				}
 				key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addOnName)
 				return cluster.Labels[key] == "unreachable"
-			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeTrue())
+			}).Should(gomega.BeTrue())
 		})
 	})
 
@@ -283,7 +283,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 					return fmt.Errorf("available status should be true")
 				}
 				return nil
-			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+			}).Should(gomega.Succeed())
 
 			// delete registration agent to stop agent update its status
 			ginkgo.By("Stoping klusterlet")
@@ -301,7 +301,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 					return err
 				}
 				return fmt.Errorf("klusterlet is still deleting")
-			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+			}).Should(gomega.Succeed())
 
 			// for speeding up test, update managed cluster status to unknown manually
 			ginkgo.By(fmt.Sprintf("Updating managed cluster %s status to unknown", clusterName))
@@ -334,7 +334,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 					return fmt.Errorf("available status should be unknown")
 				}
 				return nil
-			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+			}).Should(gomega.Succeed())
 		})
 	})
 })

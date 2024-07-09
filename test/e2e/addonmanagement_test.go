@@ -71,7 +71,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		// the addon manager deployment should be running
-		gomega.Eventually(t.CheckHubReady, t.EventuallyTimeout, t.EventuallyInterval).Should(gomega.Succeed())
+		gomega.Eventually(t.CheckHubReady).Should(gomega.Succeed())
 
 		ginkgo.By(fmt.Sprintf("create addon template resources for cluster %v", clusterName))
 		err = createResourcesFromYamlFiles(context.Background(), t.HubDynamicClient, t.hubRestMapper, s,
@@ -96,7 +96,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		ginkgo.By(fmt.Sprintf("wait the addon %v/%v available condition to be true", clusterName, addOnName))
 		gomega.Eventually(func() error {
 			return t.CheckManagedClusterAddOnStatus(clusterName, addOnName)
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+		}).Should(gomega.Succeed())
 	})
 
 	ginkgo.AfterEach(func() {
@@ -118,7 +118,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			}
 
 			return fmt.Errorf("the managedClusterAddon should be deleted")
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By(fmt.Sprintf("delete addon template resources for cluster %v", clusterName))
 		err = deleteResourcesFromYamlFiles(context.Background(), t.HubDynamicClient, t.hubRestMapper, s,
@@ -162,7 +162,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			}
 
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("Template type addon should be functioning", func() {
@@ -171,14 +171,14 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			_, err := t.HubKubeClient.CoreV1().Secrets(addonInstallNamespace).Get(context.TODO(),
 				templateagent.HubKubeconfigSecretName(addOnName), metav1.GetOptions{})
 			return err
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(gomega.Succeed())
+		}).Should(gomega.Succeed())
 
 		ginkgo.By("Check custom signer secret is created")
 		gomega.Eventually(func() error {
 			_, err := t.HubKubeClient.CoreV1().Secrets(addonInstallNamespace).Get(context.TODO(),
 				templateagent.CustomSignedSecretName(addOnName, customSignerName), metav1.GetOptions{})
 			return err
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(gomega.Succeed())
+		}).Should(gomega.Succeed())
 
 		ginkgo.By("Make sure addon is functioning")
 		configmap := &corev1.ConfigMap{
@@ -207,7 +207,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 				return fmt.Errorf("expected configmap is not correct, %v", copyiedConfig.Data)
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Make sure manifestwork config is configured")
 		manifestWork, err := t.HubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(),
@@ -258,7 +258,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			}
 
 			return fmt.Errorf("the configmap should be deleted")
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
 			_, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(
@@ -271,7 +271,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			}
 
 			return fmt.Errorf("the managedClusterAddon should be deleted")
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("The pre-delete job should be deleted ")
 		gomega.Eventually(func() error {
@@ -285,7 +285,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			}
 
 			return fmt.Errorf("the job should be deleted")
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("Template type addon should be configured by addon deployment config for image override"+
@@ -321,12 +321,12 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			_, err = t.ClusterClient.ClusterV1().ManagedClusters().Update(
 				context.Background(), newCluster, metav1.UpdateOptions{})
 			return err
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Prepare a AddOnDeploymentConfig for addon image override config")
 		gomega.Eventually(func() error {
 			return prepareImageOverrideAddOnDeploymentConfig(clusterName, addonInstallNamespace)
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
@@ -354,7 +354,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 				return err
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Make sure addon is configured")
 		gomega.Eventually(func() error {
@@ -374,7 +374,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			}
 
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Restore the managed cluster annotation")
 		gomega.Eventually(func() error {
@@ -389,7 +389,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			_, err = t.ClusterClient.ClusterV1().ManagedClusters().Update(
 				context.Background(), newCluster, metav1.UpdateOptions{})
 			return err
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 
 		// restore the image override config, because the override image is not available
 		// but it is needed by the pre-delete job
@@ -408,7 +408,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 				return err
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Make sure addon config is restored")
 		gomega.Eventually(func() error {
@@ -428,14 +428,14 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			}
 
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("Template type addon should be configured by addon deployment config for node placement", func() {
 		ginkgo.By("Prepare a AddOnDeploymentConfig for addon image override config")
 		gomega.Eventually(func() error {
 			return prepareNodePlacementAddOnDeploymentConfig(clusterName, addonInstallNamespace)
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
@@ -463,7 +463,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 				return err
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Make sure addon is configured")
 		gomega.Eventually(func() error {
@@ -482,7 +482,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			}
 
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 
 	})
 
@@ -497,7 +497,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		gomega.Eventually(func() error {
 			return prepareInstallNamespace(clusterName, overrideNamespace.Name)
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
@@ -525,14 +525,14 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 				return err
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Make sure addon is configured")
 		gomega.Eventually(func() error {
 			_, err := t.SpokeKubeClient.AppsV1().Deployments(overrideNamespace.Name).Get(
 				context.Background(), "hello-template-agent", metav1.GetOptions{})
 			return err
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("Template type addon's image should be overrode by cluster annotation", func() {
@@ -561,7 +561,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			_, err = t.ClusterClient.ClusterV1().ManagedClusters().Update(
 				context.Background(), newCluster, metav1.UpdateOptions{})
 			return err
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Make sure addon is configured")
 		gomega.Eventually(func() error {
@@ -581,7 +581,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			}
 
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 
 		// restore the image override config, because the override image is not available
 		// but it is needed by the pre-delete job
@@ -598,7 +598,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			_, err = t.ClusterClient.ClusterV1().ManagedClusters().Update(
 				context.Background(), newCluster, metav1.UpdateOptions{})
 			return err
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Make sure addon config is restored")
 		gomega.Eventually(func() error {
@@ -618,7 +618,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			}
 
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}).ShouldNot(gomega.HaveOccurred())
 	})
 
 })

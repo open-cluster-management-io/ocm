@@ -67,8 +67,6 @@ type Tester struct {
 	HubDynamicClient        dynamic.Interface
 	SpokeDynamicClient      dynamic.Interface
 	bootstrapHubSecret      *corev1.Secret
-	EventuallyTimeout       time.Duration
-	EventuallyInterval      time.Duration
 	clusterManagerName      string
 	clusterManagerNamespace string
 	operatorNamespace       string
@@ -81,12 +79,10 @@ type Tester struct {
 // kubeconfigPath is the path of kubeconfig file, will be get from env "KUBECONFIG" by default.
 // bootstrapHubSecret is the bootstrap hub kubeconfig secret, and the format is "namespace/secretName".
 // Default of bootstrapHubSecret is helpers.KlusterletDefaultNamespace/helpers.BootstrapHubKubeConfig.
-func NewTester(hubKubeConfigPath, spokeKubeConfigPath, registrationImage, workImage, singletonImage string, timeout time.Duration) *Tester {
+func NewTester(hubKubeConfigPath, spokeKubeConfigPath, registrationImage, workImage, singletonImage string) *Tester {
 	var tester = Tester{
 		hubKubeConfigPath:       hubKubeConfigPath,
 		spokeKubeConfigPath:     spokeKubeConfigPath,
-		EventuallyTimeout:       timeout,           // seconds
-		EventuallyInterval:      1 * time.Second,   // seconds
 		clusterManagerName:      "cluster-manager", // same name as deploy/cluster-manager/config/samples
 		clusterManagerNamespace: helpers.ClusterManagerDefaultNamespace,
 		operatorNamespace:       "open-cluster-management",
@@ -172,16 +168,6 @@ func (t *Tester) Init() error {
 	}
 
 	return nil
-}
-
-func (t *Tester) SetEventuallyTimeout(timeout time.Duration) *Tester {
-	t.EventuallyInterval = timeout
-	return t
-}
-
-func (t *Tester) SetEventuallyInterval(timeout time.Duration) *Tester {
-	t.EventuallyTimeout = timeout
-	return t
 }
 
 func (t *Tester) SetOperatorNamespace(ns string) *Tester {
@@ -314,19 +300,19 @@ func (t *Tester) CreateApprovedKlusterlet(name, clusterName, klusterletNamespace
 	gomega.Eventually(func() error {
 		_, err = t.GetCreatedManagedCluster(clusterName)
 		return err
-	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+	}).Should(gomega.Succeed())
 
 	gomega.Eventually(func() error {
 		return t.ApproveCSR(clusterName)
-	}, t.EventuallyTimeout, t.EventuallyInterval).Should(gomega.Succeed())
+	}).Should(gomega.Succeed())
 
 	gomega.Eventually(func() error {
 		return t.AcceptsClient(clusterName)
-	}, t.EventuallyTimeout, t.EventuallyInterval).Should(gomega.Succeed())
+	}).Should(gomega.Succeed())
 
 	gomega.Eventually(func() error {
 		return t.CheckManagedClusterStatus(clusterName)
-	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+	}).Should(gomega.Succeed())
 
 	return klusterlet, nil
 }
@@ -520,7 +506,7 @@ func (t *Tester) cleanManifestWorks(clusterName, workName string) error {
 	gomega.Eventually(func() bool {
 		_, err := t.HubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
 		return errors.IsNotFound(err)
-	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeTrue())
+	}).Should(gomega.BeTrue())
 
 	return nil
 }
@@ -549,7 +535,7 @@ func (t *Tester) cleanKlusterletResources(klusterletName, clusterName string) er
 			klog.Infof("get klusterlet %s error: %v", klusterletName, err)
 		}
 		return false
-	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeTrue())
+	}).Should(gomega.BeTrue())
 
 	// clean the managed clusters
 	err = t.ClusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
@@ -570,7 +556,7 @@ func (t *Tester) cleanKlusterletResources(klusterletName, clusterName string) er
 			klog.Infof("get managed cluster %s error: %v", klusterletName, err)
 		}
 		return false
-	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeTrue())
+	}).Should(gomega.BeTrue())
 
 	return nil
 }
@@ -609,7 +595,7 @@ func (t *Tester) CheckHubReady() error {
 			return fmt.Errorf("deployment %s should have %d but got %d ready replicas", hubRegistrationWebhookDeployment, replicas, readyReplicas)
 		}
 		return nil
-	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeNil())
+	}).Should(gomega.BeNil())
 
 	gomega.Eventually(func() error {
 		workWebhookDeployment, err := t.HubKubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
@@ -623,7 +609,7 @@ func (t *Tester) CheckHubReady() error {
 			return fmt.Errorf("deployment %s should have %d but got %d ready replicas", hubWorkWebhookDeployment, replicas, readyReplicas)
 		}
 		return nil
-	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeNil())
+	}).Should(gomega.BeNil())
 
 	var hubWorkControllerEnabled, addonManagerControllerEnabled bool
 	if cm.Spec.WorkConfiguration != nil {
@@ -649,7 +635,7 @@ func (t *Tester) CheckHubReady() error {
 				return fmt.Errorf("deployment %s should have %d but got %d ready replicas", hubWorkControllerDeployment, replicas, readyReplicas)
 			}
 			return nil
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeNil())
+		}).Should(gomega.BeNil())
 	}
 
 	if _, err := t.HubKubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
@@ -670,7 +656,7 @@ func (t *Tester) CheckHubReady() error {
 				return fmt.Errorf("deployment %s should have %d but got %d ready replicas", addonManagerDeployment, replicas, readyReplicas)
 			}
 			return nil
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeNil())
+		}).Should(gomega.BeNil())
 	}
 	return nil
 }
