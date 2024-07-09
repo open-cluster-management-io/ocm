@@ -1,5 +1,4 @@
----
-# Source: klusterlet/templates/cluster_role_binding.yaml
+{{- if not .Values.noOperator }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -11,4 +10,5 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: klusterlet
-  namespace: open-cluster-management
+  namespace: {{ .Release.Namespace }}
+{{- end }}

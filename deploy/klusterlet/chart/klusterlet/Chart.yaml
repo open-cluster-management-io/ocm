@@ -1,0 +1,15 @@
+apiVersion: v2
+name: klusterlet
+version: 1.0.0
+
+# appVersion will be replaced with the release version after released, and is the default image tag, for example v0.14.0.
+appVersion: latest
+
+description: The Klusterlet provides the registration to the Hub clusters as a managed cluster. This operator supports the installation and upgrade of Klusterlet.
+type: application
+keywords:
+  - open-cluster-management
+  - klusterlet
+home: https://open-cluster-management.io/
+sources:
+  - https://github.com/open-cluster-management-io/ocm

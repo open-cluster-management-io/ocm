@@ -1,3 +1,5 @@
+---
+# Source: cluster-manager/templates/operator.yaml
 kind: Deployment
 apiVersion: apps/v1
 metadata:
@@ -18,28 +20,31 @@ spec:
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 70
-            podAffinityTerm:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - cluster-manager
               topologyKey: failure-domain.beta.kubernetes.io/zone
+            weight: 70
+          - podAffinityTerm:
               labelSelector:
                 matchExpressions:
                 - key: app
                   operator: In
                   values:
                   - cluster-manager
-          - weight: 30
-            podAffinityTerm:
               topologyKey: kubernetes.io/hostname
-              labelSelector:
-                matchExpressions:
-                - key: app
-                  operator: In
-                  values:
-                  - cluster-manager
+            weight: 30
+      securityContext:
+        runAsNonRoot: true
       serviceAccountName: cluster-manager
       containers:
       - name: registration-operator
-        image: quay.io/open-cluster-management/registration-operator:latest
+        image: "quay.io/open-cluster-management/registration-operator:latest"
+        imagePullPolicy: IfNotPresent
         args:
           - "/registration-operator"
           - "hub"
@@ -52,10 +57,10 @@ spec:
           allowPrivilegeEscalation: false
           capabilities:
             drop:
-              - ALL
+            - ALL
           privileged: false
-          runAsNonRoot: true
           readOnlyRootFilesystem: true
+          runAsNonRoot: true
         livenessProbe:
           httpGet:
             path: /healthz
@@ -70,6 +75,8 @@ spec:
             port: 8443
           initialDelaySeconds: 2
         resources:
+          limits:
+            memory: 2Gi
           requests:
             cpu: 2m
             memory: 16Mi

@@ -31,7 +31,7 @@ metadata:
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
     containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2024-06-25T00:11:29Z"
+    createdAt: "2024-07-07T17:13:44Z"
     description: Manages the installation and upgrade of the Klusterlet.
     operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -50,7 +50,7 @@ spec:
       name: klusterlets.operator.open-cluster-management.io
       version: v1
   description: |
-    The Klusterlet proivdes the registation to the Hub clusters as a managed cluster. This operator supports the installation and upgrade of Klusterlet.
+    The Klusterlet provides the registration to the Hub clusters as a managed cluster. This operator supports the installation and upgrade of Klusterlet.
 
     ## Prerequisites
     You need a Hub cluster which has installed ClusterManager.
@@ -311,6 +311,7 @@ spec:
                     fieldRef:
                       fieldPath: metadata.name
                 image: quay.io/open-cluster-management/registration-operator:latest
+                imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -326,6 +327,8 @@ spec:
                     scheme: HTTPS
                   initialDelaySeconds: 2
                 resources:
+                  limits:
+                    memory: 2Gi
                   requests:
                     cpu: 2m
                     memory: 16Mi

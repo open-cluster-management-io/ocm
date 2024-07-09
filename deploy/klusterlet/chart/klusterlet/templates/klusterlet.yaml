@@ -1,0 +1,43 @@
+apiVersion: operator.open-cluster-management.io/v1
+kind: Klusterlet
+metadata:
+  {{- if or ( eq .Values.klusterlet.mode "Hosted") (eq .Values.klusterlet.mode "SingletonHosted") }}
+  name: "klusterlet-{{ .Values.klusterlet.clusterName }}"
+  {{- else }}
+  name: {{ .Values.klusterlet.name | default "klusterlet" }}
+  {{- end }}
+spec:
+  deployOption:
+    mode: {{ .Values.klusterlet.mode | default "Singleton" }}
+  registrationImagePullSpec: "{{ .Values.images.registry }}/registration:{{ template "imageTag" . }}"
+  workImagePullSpec: "{{ .Values.images.registry }}/work:{{ template "imageTag" . }}"
+  imagePullSpec: "{{ .Values.images.registry }}/registration-operator:{{ template "imageTag" . }}"
+  clusterName: {{ .Values.klusterlet.clusterName }}
+  {{- if or ( eq .Values.klusterlet.mode "Hosted") (eq .Values.klusterlet.mode "SingletonHosted") }}
+  namespace: "open-cluster-management-{{ .Values.klusterlet.clusterName }}"
+  {{- else }}
+  namespace: {{ .Values.klusterlet.namespace | default "open-cluster-management-agent" }}
+  {{- end }}
+  {{- with .Values.klusterlet.externalServerURLs }}
+  externalServerURLs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.klusterlet.resourceRequirement }}
+  resourceRequirement:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.klusterlet.nodePlacement }}
+  nodePlacement:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.klusterlet.registrationConfiguration }}
+  registrationConfiguration:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.klusterlet.workConfiguration }}
+  workConfiguration:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if .Values.priorityClassName }}
+  priorityClassName: "{{ .Values.priorityClassName }}"
+  {{- end }}

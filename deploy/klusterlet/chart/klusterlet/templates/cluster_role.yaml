@@ -1,5 +1,4 @@
----
-# Source: klusterlet/templates/cluster_role.yaml
+{{- if not .Values.noOperator }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -69,3 +68,4 @@ rules:
 - apiGroups: ["work.open-cluster-management.io"]
   resources: ["appliedmanifestworks"]
   verbs: ["list", "update", "patch"]
+{{- end }}
