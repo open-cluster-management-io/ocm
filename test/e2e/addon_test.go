@@ -17,13 +17,13 @@ var _ = Describe("Manage the managed cluster addons", Label("addon"), func() {
 	})
 
 	AfterEach(func() {
-		err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
+		err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("Create one managed cluster addon and make sure it is available", func() {
-		By(fmt.Sprintf("create the addon %v on the managed cluster namespace %v", addOnName, clusterName))
-		err := t.CreateManagedClusterAddOn(clusterName, addOnName, addOnName)
+		By(fmt.Sprintf("create the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
+		err := t.CreateManagedClusterAddOn(universalClusterName, addOnName, addOnName)
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("create the addon lease %v on addon install namespace %v", addOnName, addOnName))
@@ -32,13 +32,13 @@ var _ = Describe("Manage the managed cluster addons", Label("addon"), func() {
 
 		By(fmt.Sprintf("wait the addon %v available condition to be true", addOnName))
 		Eventually(func() error {
-			return t.CheckManagedClusterAddOnStatus(clusterName, addOnName)
+			return t.CheckManagedClusterAddOnStatus(universalClusterName, addOnName)
 		}).Should(Succeed())
 	})
 
 	It("Create one managed cluster addon and make sure it is available in Hosted mode", func() {
-		By(fmt.Sprintf("create the addon %v on the managed cluster namespace %v", addOnName, clusterName))
-		err := t.CreateManagedClusterAddOn(clusterName, addOnName, addOnName)
+		By(fmt.Sprintf("create the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
+		err := t.CreateManagedClusterAddOn(universalClusterName, addOnName, addOnName)
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("create the addon lease %v on addon install namespace %v", addOnName, addOnName))
@@ -47,7 +47,7 @@ var _ = Describe("Manage the managed cluster addons", Label("addon"), func() {
 
 		By(fmt.Sprintf("wait the addon %v available condition to be true", addOnName))
 		Eventually(func() error {
-			return t.CheckManagedClusterAddOnStatus(clusterName, addOnName)
+			return t.CheckManagedClusterAddOnStatus(universalClusterName, addOnName)
 		}).Should(Succeed())
 	})
 })

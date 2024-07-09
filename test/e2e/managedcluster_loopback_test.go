@@ -71,10 +71,10 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 			managedClusters = t.ClusterClient.ClusterV1().ManagedClusters()
 		)
 
-		ginkgo.By(fmt.Sprintf("Waiting for ManagedCluster %q to exist", clusterName))
+		ginkgo.By(fmt.Sprintf("Waiting for ManagedCluster %q to exist", universalClusterName))
 		err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
 			var err error
-			managedCluster, err = managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
+			managedCluster, err = managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 			if errors.IsNotFound(err) {
 				return false, nil
 			}
@@ -88,7 +88,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		ginkgo.By("Waiting for ManagedCluster to have HubAccepted=true")
 		err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
 			var err error
-			managedCluster, err := managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
+			managedCluster, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -104,7 +104,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		ginkgo.By("Waiting for ManagedCluster to join the hub cluser")
 		err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
 			var err error
-			managedCluster, err := managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
+			managedCluster, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -115,7 +115,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 
 		ginkgo.By("Waiting for ManagedCluster available")
 		err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
-			managedCluster, err := managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
+			managedCluster, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -128,7 +128,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		ginkgo.By(fmt.Sprintf("Make sure ManagedCluster lease %q exists", leaseName))
 		var lastRenewTime *metav1.MicroTime
 		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
-			lease, err := t.HubKubeClient.CoordinationV1().Leases(clusterName).Get(context.TODO(), leaseName, metav1.GetOptions{})
+			lease, err := t.HubKubeClient.CoordinationV1().Leases(universalClusterName).Get(context.TODO(), leaseName, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -139,7 +139,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 
 		ginkgo.By(fmt.Sprintf("Make sure ManagedCluster lease %q is updated", leaseName))
 		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
-			lease, err := t.HubKubeClient.CoordinationV1().Leases(clusterName).Get(context.TODO(), leaseName, metav1.GetOptions{})
+			lease, err := t.HubKubeClient.CoordinationV1().Leases(universalClusterName).Get(context.TODO(), leaseName, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -153,7 +153,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 
 		ginkgo.By(fmt.Sprintf("Make sure ManagedCluster lease %q is updated again", leaseName))
 		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
-			lease, err := t.HubKubeClient.CoordinationV1().Leases(clusterName).Get(context.TODO(), leaseName, metav1.GetOptions{})
+			lease, err := t.HubKubeClient.CoordinationV1().Leases(universalClusterName).Get(context.TODO(), leaseName, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -163,7 +163,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 
 		ginkgo.By("Make sure ManagedCluster is still available")
 		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
-			managedCluster, err := managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
+			managedCluster, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -175,7 +175,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		// make sure the cpu and memory are still in the status, for compatibility
 		ginkgo.By("Make sure cpu and memory exist in status")
 		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
-			managedCluster, err := managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
+			managedCluster, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -208,7 +208,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 			},
 		}
 		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
-			managedCluster, err := managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
+			managedCluster, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -232,16 +232,16 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		addOn := &addonv1alpha1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      addOnName,
-				Namespace: clusterName,
+				Namespace: universalClusterName,
 			},
 			Spec: addonv1alpha1.ManagedClusterAddOnSpec{
 				InstallNamespace: addOnName,
 			},
 		}
-		_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
+		_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		created, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+		created, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		created.Status = addonv1alpha1.ManagedClusterAddOnStatus{
 			Registrations: []addonv1alpha1.RegistrationConfig{
@@ -250,7 +250,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 				},
 			},
 		}
-		_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).UpdateStatus(context.TODO(), created, metav1.UpdateOptions{})
+		_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).UpdateStatus(context.TODO(), created, metav1.UpdateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		var (
@@ -262,7 +262,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
 			var err error
 			csrs, err = csrClient.List(context.TODO(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("open-cluster-management.io/cluster-name=%s,open-cluster-management.io/addon-name=%s", clusterName, addOnName),
+				LabelSelector: fmt.Sprintf("open-cluster-management.io/cluster-name=%s,open-cluster-management.io/addon-name=%s", universalClusterName, addOnName),
 			})
 			if err != nil {
 				return false, err
@@ -334,7 +334,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		}).Should(gomega.Succeed())
 
 		ginkgo.By("Delete the addon and check if secret is gone")
-		err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
+		err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		gomega.Eventually(func() bool {

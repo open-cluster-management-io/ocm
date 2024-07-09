@@ -69,10 +69,10 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 			csb := &clusterapiv1beta2.ManagedClusterSetBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: metav1.NamespaceDefault,
-					Name:      "default",
+					Name:      universalClusterSetName,
 				},
 				Spec: clusterapiv1beta2.ManagedClusterSetBindingSpec{
-					ClusterSet: "default",
+					ClusterSet: universalClusterSetName,
 				},
 			}
 			_, err = t.ClusterClient.ClusterV1beta2().ManagedClusterSetBindings(metav1.NamespaceDefault).Create(
@@ -83,6 +83,9 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      placementRef.Name,
 					Namespace: metav1.NamespaceDefault,
+				},
+				Spec: clusterv1beta1.PlacementSpec{
+					ClusterSets: []string{universalClusterSetName},
 				},
 			}
 

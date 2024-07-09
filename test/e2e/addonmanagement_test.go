@@ -73,10 +73,10 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		// the addon manager deployment should be running
 		gomega.Eventually(t.CheckHubReady).Should(gomega.Succeed())
 
-		ginkgo.By(fmt.Sprintf("create addon template resources for cluster %v", clusterName))
+		ginkgo.By(fmt.Sprintf("create addon template resources for cluster %v", universalClusterName))
 		err = createResourcesFromYamlFiles(context.Background(), t.HubDynamicClient, t.hubRestMapper, s,
 			defaultAddonTemplateReaderManifestsFunc(manifests.AddonManifestFiles, map[string]interface{}{
-				"Namespace":              clusterName,
+				"Namespace":              universalClusterName,
 				"AddonInstallNamespace":  addonInstallNamespace,
 				"CustomSignerName":       customSignerName,
 				"AddonManagerNamespace":  templateagent.AddonManagerNamespace(),
@@ -86,29 +86,29 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		ginkgo.By(fmt.Sprintf("create the addon %v on the managed cluster namespace %v", addOnName, clusterName))
-		err = t.CreateManagedClusterAddOn(clusterName, addOnName, "test-ns") // the install namespace will be ignored
+		ginkgo.By(fmt.Sprintf("create the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
+		err = t.CreateManagedClusterAddOn(universalClusterName, addOnName, "test-ns") // the install namespace will be ignored
 		if err != nil {
-			klog.Errorf("failed to create managed cluster addon %v on the managed cluster namespace %v: %v", addOnName, clusterName, err)
+			klog.Errorf("failed to create managed cluster addon %v on the managed cluster namespace %v: %v", addOnName, universalClusterName, err)
 			gomega.Expect(errors.IsAlreadyExists(err)).To(gomega.BeTrue())
 		}
 
-		ginkgo.By(fmt.Sprintf("wait the addon %v/%v available condition to be true", clusterName, addOnName))
+		ginkgo.By(fmt.Sprintf("wait the addon %v/%v available condition to be true", universalClusterName, addOnName))
 		gomega.Eventually(func() error {
-			return t.CheckManagedClusterAddOnStatus(clusterName, addOnName)
+			return t.CheckManagedClusterAddOnStatus(universalClusterName, addOnName)
 		}).Should(gomega.Succeed())
 	})
 
 	ginkgo.AfterEach(func() {
-		ginkgo.By(fmt.Sprintf("delete the addon %v on the managed cluster namespace %v", addOnName, clusterName))
-		err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Delete(
+		ginkgo.By(fmt.Sprintf("delete the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
+		err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Delete(
 			context.TODO(), addOnName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
-			ginkgo.Fail(fmt.Sprintf("failed to delete managed cluster addon %v on cluster %v: %v", addOnName, clusterName, err))
+			ginkgo.Fail(fmt.Sprintf("failed to delete managed cluster addon %v on cluster %v: %v", addOnName, universalClusterName, err))
 		}
 
 		gomega.Eventually(func() error {
-			_, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(
+			_, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
@@ -120,10 +120,10 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			return fmt.Errorf("the managedClusterAddon should be deleted")
 		}).ShouldNot(gomega.HaveOccurred())
 
-		ginkgo.By(fmt.Sprintf("delete addon template resources for cluster %v", clusterName))
+		ginkgo.By(fmt.Sprintf("delete addon template resources for cluster %v", universalClusterName))
 		err = deleteResourcesFromYamlFiles(context.Background(), t.HubDynamicClient, t.hubRestMapper, s,
 			defaultAddonTemplateReaderManifestsFunc(manifests.AddonManifestFiles, map[string]interface{}{
-				"Namespace":              clusterName,
+				"Namespace":              universalClusterName,
 				"AddonInstallNamespace":  addonInstallNamespace,
 				"CustomSignerName":       customSignerName,
 				"AddonManagerNamespace":  templateagent.AddonManagerNamespace(),
@@ -147,7 +147,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			csrs, err := t.HubKubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(),
 				metav1.ListOptions{
 					LabelSelector: fmt.Sprintf("%s=%s,%s=%s", addonapiv1alpha1.AddonLabelKey, addOnName,
-						clusterv1.ClusterNameLabelKey, clusterName),
+						clusterv1.ClusterNameLabelKey, universalClusterName),
 				})
 			if err != nil {
 				return err
@@ -184,7 +184,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		configmap := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("config-%s", rand.String(6)),
-				Namespace: clusterName,
+				Namespace: universalClusterName,
 			},
 			Data: map[string]string{
 				"key1": rand.String(6),
@@ -192,7 +192,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			},
 		}
 
-		_, err := t.HubKubeClient.CoreV1().ConfigMaps(clusterName).Create(
+		_, err := t.HubKubeClient.CoreV1().ConfigMaps(universalClusterName).Create(
 			context.Background(), configmap, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -210,7 +210,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Make sure manifestwork config is configured")
-		manifestWork, err := t.HubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(),
+		manifestWork, err := t.HubWorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(),
 			fmt.Sprintf("addon-%s-deploy-0", addOnName), metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		foundDeploymentConfig := false
@@ -241,8 +241,8 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 				manifestWork.Spec.ManifestConfigs)).ToNot(gomega.HaveOccurred())
 		}
 
-		ginkgo.By(fmt.Sprintf("delete the addon %v on the managed cluster namespace %v", addOnName, clusterName))
-		err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Delete(
+		ginkgo.By(fmt.Sprintf("delete the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
+		err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Delete(
 			context.TODO(), addOnName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -261,7 +261,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		}).ShouldNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			_, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(
+			_, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
@@ -304,7 +304,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		gomega.Eventually(func() error {
 			cluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(
-				context.Background(), clusterName, metav1.GetOptions{})
+				context.Background(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -325,12 +325,12 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 		ginkgo.By("Prepare a AddOnDeploymentConfig for addon image override config")
 		gomega.Eventually(func() error {
-			return prepareImageOverrideAddOnDeploymentConfig(clusterName, addonInstallNamespace)
+			return prepareImageOverrideAddOnDeploymentConfig(universalClusterName, addonInstallNamespace)
 		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(
+			addon, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -343,12 +343,12 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 						Resource: "addondeploymentconfigs",
 					},
 					ConfigReferent: addonapiv1alpha1.ConfigReferent{
-						Namespace: clusterName,
+						Namespace: universalClusterName,
 						Name:      imageOverrideDeploymentConfigName,
 					},
 				},
 			}
-			_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Update(
+			_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
 				context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
@@ -379,7 +379,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		ginkgo.By("Restore the managed cluster annotation")
 		gomega.Eventually(func() error {
 			cluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(
-				context.Background(), clusterName, metav1.GetOptions{})
+				context.Background(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -395,14 +395,14 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		// but it is needed by the pre-delete job
 		ginkgo.By("Restore the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(
+			addon, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			newAddon := addon.DeepCopy()
 			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{}
-			_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Update(
+			_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
 				context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
@@ -434,12 +434,12 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 	ginkgo.It("Template type addon should be configured by addon deployment config for node placement", func() {
 		ginkgo.By("Prepare a AddOnDeploymentConfig for addon image override config")
 		gomega.Eventually(func() error {
-			return prepareNodePlacementAddOnDeploymentConfig(clusterName, addonInstallNamespace)
+			return prepareNodePlacementAddOnDeploymentConfig(universalClusterName, addonInstallNamespace)
 		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(
+			addon, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -452,12 +452,12 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 						Resource: "addondeploymentconfigs",
 					},
 					ConfigReferent: addonapiv1alpha1.ConfigReferent{
-						Namespace: clusterName,
+						Namespace: universalClusterName,
 						Name:      nodePlacementDeploymentConfigName,
 					},
 				},
 			}
-			_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Update(
+			_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
 				context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
@@ -496,12 +496,12 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		_, err := t.SpokeKubeClient.CoreV1().Namespaces().Create(context.TODO(), overrideNamespace, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		gomega.Eventually(func() error {
-			return prepareInstallNamespace(clusterName, overrideNamespace.Name)
+			return prepareInstallNamespace(universalClusterName, overrideNamespace.Name)
 		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(
+			addon, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -514,12 +514,12 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 						Resource: "addondeploymentconfigs",
 					},
 					ConfigReferent: addonapiv1alpha1.ConfigReferent{
-						Namespace: clusterName,
+						Namespace: universalClusterName,
 						Name:      namespaceOverrideConfigName,
 					},
 				},
 			}
-			_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Update(
+			_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
 				context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
@@ -544,7 +544,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		gomega.Eventually(func() error {
 			cluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(
-				context.Background(), clusterName, metav1.GetOptions{})
+				context.Background(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -588,7 +588,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		ginkgo.By("Restore the managed cluster annotation")
 		gomega.Eventually(func() error {
 			cluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(
-				context.Background(), clusterName, metav1.GetOptions{})
+				context.Background(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}

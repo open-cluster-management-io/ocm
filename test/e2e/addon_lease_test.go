@@ -28,7 +28,7 @@ var _ = ginkgo.Describe("Addon Health Check", ginkgo.Label("addon-lease"), func(
 			// create an addon on created managed cluster
 			addOnName = fmt.Sprintf("addon-%s", rand.String(6))
 			ginkgo.By(fmt.Sprintf("Creating managed cluster addon %q", addOnName))
-			err := t.CreateManagedClusterAddOn(clusterName, addOnName, addOnName)
+			err := t.CreateManagedClusterAddOn(universalClusterName, addOnName, addOnName)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// create addon installation namespace
@@ -61,7 +61,7 @@ var _ = ginkgo.Describe("Addon Health Check", ginkgo.Label("addon-lease"), func(
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			gomega.Eventually(func() error {
-				found, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+				found, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -73,7 +73,7 @@ var _ = ginkgo.Describe("Addon Health Check", ginkgo.Label("addon-lease"), func(
 
 			// check if the cluster has a label for addon with expected value
 			gomega.Eventually(func() bool {
-				cluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+				cluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -99,7 +99,7 @@ var _ = ginkgo.Describe("Addon Health Check", ginkgo.Label("addon-lease"), func(
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			gomega.Eventually(func() error {
-				found, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+				found, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -111,7 +111,7 @@ var _ = ginkgo.Describe("Addon Health Check", ginkgo.Label("addon-lease"), func(
 
 			// check if the cluster has a label for addon with expected value
 			gomega.Eventually(func() bool {
-				cluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+				cluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -130,7 +130,7 @@ var _ = ginkgo.Describe("Addon Health Check", ginkgo.Label("addon-lease"), func(
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			gomega.Eventually(func() error {
-				found, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+				found, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -142,7 +142,7 @@ var _ = ginkgo.Describe("Addon Health Check", ginkgo.Label("addon-lease"), func(
 
 			// check if the cluster has a label for addon with expected value
 			gomega.Eventually(func() bool {
-				cluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+				cluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -168,7 +168,7 @@ var _ = ginkgo.Describe("Addon Health Check", ginkgo.Label("addon-lease"), func(
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			gomega.Eventually(func() error {
-				found, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+				found, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -180,7 +180,7 @@ var _ = ginkgo.Describe("Addon Health Check", ginkgo.Label("addon-lease"), func(
 
 			// check if the cluster has a label for addon with expected value
 			gomega.Eventually(func() bool {
-				cluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+				cluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -196,7 +196,7 @@ var _ = ginkgo.Describe("Addon Health Check", ginkgo.Label("addon-lease"), func(
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			gomega.Eventually(func() error {
-				found, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+				found, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -208,7 +208,7 @@ var _ = ginkgo.Describe("Addon Health Check", ginkgo.Label("addon-lease"), func(
 
 			// check if the cluster has a label for addon with expected value
 			gomega.Eventually(func() bool {
-				cluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+				cluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -224,9 +224,6 @@ var _ = ginkgo.Describe("Addon Health Check", ginkgo.Label("addon-lease"), func(
 	ginkgo.Context("Checking managed cluster status to update addon status", func() {
 		var klusterletName, clusterName, addOnName string
 		ginkgo.BeforeEach(func() {
-			if !deployKlusterlet {
-				ginkgo.Skip("skip if disabling deploy klusterlet")
-			}
 			klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
 			clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
 			agentNamespace := fmt.Sprintf("open-cluster-management-agent-%s", rand.String(6))
