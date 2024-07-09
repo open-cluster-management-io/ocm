@@ -16,7 +16,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/hub/taint"
 )
 
-var _ = ginkgo.Describe("Taints update check", func() {
+var _ = ginkgo.Describe("Taints update check", ginkgo.Label("registration-taint"), func() {
 	ginkgo.Context("Check the taint to update according to the condition status", func() {
 		var (
 			err            error
@@ -57,7 +57,7 @@ var _ = ginkgo.Describe("Taints update check", func() {
 					return fmt.Errorf("the %+v is not equal to UnreachableTaint", managedCluster.Spec.Taints[0])
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}).Should(gomega.BeNil())
 
 			ginkgo.By("Change the LeaseDurationSeconds to 60")
 			gomega.Eventually(func() error {
@@ -69,7 +69,7 @@ var _ = ginkgo.Describe("Taints update check", func() {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}).Should(gomega.BeNil())
 
 			ginkgo.By("Add a ManagedClusterConditionAvailable condition")
 			gomega.Eventually(func() error {
@@ -85,7 +85,7 @@ var _ = ginkgo.Describe("Taints update check", func() {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}).Should(gomega.BeNil())
 
 			ginkgo.By("The taints len should be 0")
 			gomega.Eventually(func() error {
@@ -96,7 +96,7 @@ var _ = ginkgo.Describe("Taints update check", func() {
 					return fmt.Errorf("managedCluster taints len is not 0")
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}).Should(gomega.BeNil())
 
 			ginkgo.By("Set the ManagedClusterConditionAvailable status to false")
 			gomega.Eventually(func() error {
@@ -112,7 +112,7 @@ var _ = ginkgo.Describe("Taints update check", func() {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}).Should(gomega.BeNil())
 
 			ginkgo.By("Should only be one UnavailableTaint")
 			gomega.Eventually(func() error {
@@ -126,7 +126,7 @@ var _ = ginkgo.Describe("Taints update check", func() {
 					return fmt.Errorf("the %+v is not equal to UnavailableTaint\n", managedCluster.Spec.Taints[0])
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}).Should(gomega.BeNil())
 
 			ginkgo.By("Set the ManagedClusterConditionAvailable status to unknown")
 			gomega.Eventually(func() error {
@@ -142,7 +142,7 @@ var _ = ginkgo.Describe("Taints update check", func() {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}).Should(gomega.BeNil())
 
 			ginkgo.By("Should only be one UnreachableTaint")
 			gomega.Eventually(func() error {
@@ -156,7 +156,7 @@ var _ = ginkgo.Describe("Taints update check", func() {
 					return fmt.Errorf("the %+v is not equal to UnreachableTaint", managedCluster.Spec.Taints[0])
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}).Should(gomega.BeNil())
 		})
 	})
 })

@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 )
 
-var _ = Describe("Manage the managed cluster addons", func() {
+var _ = Describe("Manage the managed cluster addons", Label("addon"), func() {
 	var addOnName string
 	BeforeEach(func() {
 		addOnName = fmt.Sprintf("e2e-addon-%s", rand.String(6))
@@ -33,7 +33,7 @@ var _ = Describe("Manage the managed cluster addons", func() {
 		By(fmt.Sprintf("wait the addon %v available condition to be true", addOnName))
 		Eventually(func() error {
 			return t.CheckManagedClusterAddOnStatus(clusterName, addOnName)
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 	})
 
 	It("Create one managed cluster addon and make sure it is available in Hosted mode", func() {
@@ -48,6 +48,6 @@ var _ = Describe("Manage the managed cluster addons", func() {
 		By(fmt.Sprintf("wait the addon %v available condition to be true", addOnName))
 		Eventually(func() error {
 			return t.CheckManagedClusterAddOnStatus(clusterName, addOnName)
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 	})
 })

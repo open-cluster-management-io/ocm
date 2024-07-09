@@ -25,7 +25,7 @@ const (
 	mwrSetLabel = "work.open-cluster-management.io/manifestworkreplicaset"
 )
 
-var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", func() {
+var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestworkreplicaset"), func() {
 	var err error
 	var nameSuffix string
 
@@ -103,7 +103,7 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", func() {
 
 				_, err = t.SpokeKubeClient.CoreV1().Namespaces().Get(context.Background(), ns1, metav1.GetOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(gomega.HaveOccurred())
 
 			ginkgo.By("check if manifestworkreplicaset status")
 			gomega.Eventually(func() error {
@@ -128,7 +128,7 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", func() {
 				}
 
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(gomega.HaveOccurred())
 
 			// TODO we should also update manifestwork replicaset and test
 
@@ -304,7 +304,7 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", func() {
 					return fmt.Errorf("total number of clusters is not correct, expect %d, got %d", numOfClusters, mwReplicaSet.Status.Summary.Total)
 				}
 				return nil
-			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+			}).Should(gomega.Succeed())
 
 			ginkgo.By("Check manifestWorks are created")
 			gomega.Eventually(func() error {
@@ -319,7 +319,7 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", func() {
 					return fmt.Errorf("manifestworks are not created, expect %d, got %d", numOfClusters, len(manifestWorkList.Items))
 				}
 				return nil
-			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+			}).Should(gomega.Succeed())
 
 			ginkgo.By("Delete manifestWorkReplicaSet")
 			err = t.HubWorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Delete(context.TODO(), mwReplicaSetName, metav1.DeleteOptions{})
@@ -338,7 +338,7 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", func() {
 					return fmt.Errorf("manifestworks are not deleted, expect %d, got %d", 0, len(manifestWorkList.Items))
 				}
 				return nil
-			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+			}).Should(gomega.Succeed())
 		})
 	})
 })

@@ -140,7 +140,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					}
 					_, err = t.ClusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
 					return err
-				}, 60*time.Second, 1*time.Second).Should(gomega.Succeed())
+				}).Should(gomega.Succeed())
 
 				ginkgo.By("check if timeAdded of the taint is reset")
 				managedCluster, err = t.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
@@ -687,7 +687,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					return err
 				}
 				return t.ClusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Delete(context.TODO(), clusterSetName, metav1.DeleteOptions{})
-			}, 60*time.Second, 1*time.Second).Should(gomega.Succeed())
+			}).Should(gomega.Succeed())
 		})
 
 		ginkgo.AfterEach(func() {
@@ -803,7 +803,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					binding.Labels = map[string]string{"owner": "user"}
 					_, err = unauthorizedClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Update(context.TODO(), binding, metav1.UpdateOptions{})
 					return err
-				}, 60*time.Second, 1*time.Second).Should(gomega.Succeed())
+				}).Should(gomega.Succeed())
 			})
 		})
 
@@ -912,7 +912,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					binding.Labels = map[string]string{"owner": "user"}
 					_, err = unauthorizedClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Update(context.TODO(), binding, metav1.UpdateOptions{})
 					return err
-				}, 60*time.Second, 1*time.Second).Should(gomega.Succeed())
+				}).Should(gomega.Succeed())
 			})
 		})
 

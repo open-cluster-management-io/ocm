@@ -3,7 +3,6 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"time"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 	gomega "github.com/onsi/gomega"
@@ -40,7 +39,7 @@ var _ = ginkgo.Describe("ManagedClusterSetBinding", func() {
 					return err
 				}
 				return t.ClusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Delete(context.TODO(), clusterSetName, metav1.DeleteOptions{})
-			}, 60*time.Second, 1*time.Second).Should(gomega.Succeed())
+			}).Should(gomega.Succeed())
 		})
 
 		ginkgo.AfterEach(func() {
@@ -68,7 +67,7 @@ var _ = ginkgo.Describe("ManagedClusterSetBinding", func() {
 					return fmt.Errorf("binding %s/%s condition should be false", namespace, clusterSetName)
 				}
 				return nil
-			}, 60*time.Second, 1*time.Second).Should(gomega.Succeed())
+			}).Should(gomega.Succeed())
 
 			managedClusterSet := &clusterv1beta2.ManagedClusterSet{
 				ObjectMeta: metav1.ObjectMeta{
@@ -90,7 +89,7 @@ var _ = ginkgo.Describe("ManagedClusterSetBinding", func() {
 					return fmt.Errorf("binding %s/%s condition should be true", namespace, clusterSetName)
 				}
 				return nil
-			}, 60*time.Second, 1*time.Second).Should(gomega.Succeed())
+			}).Should(gomega.Succeed())
 
 			err = t.ClusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.TODO(), clusterSetName, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -106,7 +105,7 @@ var _ = ginkgo.Describe("ManagedClusterSetBinding", func() {
 					return fmt.Errorf("binding %s/%s condition should be false", namespace, clusterSetName)
 				}
 				return nil
-			}, 60*time.Second, 1*time.Second).Should(gomega.Succeed())
+			}).Should(gomega.Succeed())
 		})
 	})
 })

@@ -23,7 +23,6 @@ var (
 	nilExecutorValidating bool
 	deployKlusterlet      bool
 	managedKubeconfig     string
-	eventuallyTimeout     time.Duration
 	registrationImage     string
 	workImage             string
 	singletonImage        string
@@ -36,7 +35,6 @@ func init() {
 	flag.BoolVar(&nilExecutorValidating, "nil-executor-validating", false, "Whether validate the nil executor or not (default false)")
 	flag.BoolVar(&deployKlusterlet, "deploy-klusterlet", false, "Whether deploy the klusterlet on the managed cluster or not (default false)")
 	flag.StringVar(&managedKubeconfig, "managed-kubeconfig", "", "The kubeconfig of the managed cluster")
-	flag.DurationVar(&eventuallyTimeout, "eventually-timeout", 60*time.Second, "The timeout of Gomega's Eventually (default 60 seconds)")
 	flag.StringVar(&registrationImage, "registration-image", "", "The image of the registration")
 	flag.StringVar(&workImage, "work-image", "", "The image of the work")
 	flag.StringVar(&singletonImage, "singleton-image", "", "The image of the klusterlet agent")
@@ -44,7 +42,7 @@ func init() {
 }
 
 func TestE2E(tt *testing.T) {
-	t = NewTester(hubKubeconfig, managedKubeconfig, registrationImage, workImage, singletonImage, eventuallyTimeout)
+	t = NewTester(hubKubeconfig, managedKubeconfig, registrationImage, workImage, singletonImage)
 
 	OutputFail := func(message string, callerSkip ...int) {
 		t.OutputDebugLogs()
@@ -61,25 +59,30 @@ func TestE2E(tt *testing.T) {
 var _ = BeforeSuite(func() {
 	var err error
 
+	// In most OCM cases, we expect user should see the result in 90 seconds.
+	// For cases that need more than 90 seconds, please set the timeout in the test case EXPLICITLY.
+	SetDefaultEventuallyTimeout(90 * time.Second)
+	SetDefaultEventuallyPollingInterval(5 * time.Second)
+
 	Expect(t.Init()).ToNot(HaveOccurred())
 
-	Eventually(t.CheckHubReady, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+	Eventually(t.CheckHubReady).Should(Succeed())
 
-	Eventually(t.CheckKlusterletOperatorReady, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+	Eventually(t.CheckKlusterletOperatorReady).Should(Succeed())
 
 	err = t.SetBootstrapHubSecret("")
 
 	if nilExecutorValidating {
 		Eventually(func() error {
 			return t.EnableWorkFeature("NilExecutorValidating")
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+		}).Should(Succeed())
 	}
 	Expect(err).ToNot(HaveOccurred())
 
 	Eventually(func() error {
 		return t.EnableWorkFeature("ManifestWorkReplicaSet")
-	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
-	Eventually(t.CheckHubReady, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+	}).Should(Succeed())
+	Eventually(t.CheckHubReady).Should(Succeed())
 
 	if deployKlusterlet {
 		klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))

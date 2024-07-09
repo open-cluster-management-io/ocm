@@ -317,7 +317,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 				return false
 			}
 			return true
-		}, 90*time.Second, 1*time.Second).Should(gomega.BeTrue())
+		}).Should(gomega.BeTrue())
 
 		ginkgo.By("Check addon status")
 		gomega.Eventually(func() error {
@@ -331,7 +331,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 			}
 
 			return nil
-		}, 90*time.Second, 1*time.Second).Should(gomega.Succeed())
+		}).Should(gomega.Succeed())
 
 		ginkgo.By("Delete the addon and check if secret is gone")
 		err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
@@ -340,7 +340,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		gomega.Eventually(func() bool {
 			_, err = t.SpokeKubeClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
 			return errors.IsNotFound(err)
-		}, 90*time.Second, 1*time.Second).Should(gomega.BeTrue())
+		}).Should(gomega.BeTrue())
 
 		ginkgo.By(fmt.Sprintf("Cleaning managed cluster addon installation namespace %q", addOnName))
 		err = t.SpokeKubeClient.CoreV1().Namespaces().Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
