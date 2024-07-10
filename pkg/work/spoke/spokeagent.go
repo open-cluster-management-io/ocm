@@ -197,7 +197,7 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 }
 
 func buildCodecs(codecNames []string, restMapper meta.RESTMapper) []generic.Codec[*workv1.ManifestWork] {
-	codecs := []generic.Codec[*workv1.ManifestWork]{}
+	var codecs []generic.Codec[*workv1.ManifestWork]
 	for _, name := range codecNames {
 		if name == manifestBundleCodecName {
 			codecs = append(codecs, codec.NewManifestBundleCodec())

@@ -20,6 +20,7 @@ import (
 // ControllerResyncInterval is exposed so that integration tests can crank up the constroller sync speed.
 var ControllerResyncInterval = 5 * time.Minute
 
+// secretController run process in driver to get credential and keeps the defeined secret in secretOption update-to-date
 type secretController struct {
 	SecretOption
 	option               any

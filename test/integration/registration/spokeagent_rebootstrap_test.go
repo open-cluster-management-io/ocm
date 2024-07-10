@@ -298,20 +298,22 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 	}
 
 	startAgent := func(ctx context.Context, managedClusterName, hubKubeconfigDir string,
-		agentOptions *spoke.SpokeAgentOptions) (context.Context, context.CancelFunc) {
+		agentOptions *spoke.SpokeAgentOptions) (context.Context, context.CancelFunc, *spoke.SpokeAgentConfig) {
 		ginkgo.By("run registration agent")
 		commOptions := commonoptions.NewAgentOptions()
 		commOptions.HubKubeconfigDir = hubKubeconfigDir
 		commOptions.SpokeClusterName = managedClusterName
 
 		agentCtx, stopAgent := context.WithCancel(ctx)
-		runAgentWithContext(agentCtx, "rebootstrap-test", agentOptions, commOptions, spokeCfg)
+		agentConfig := spoke.NewSpokeAgentConfig(commOptions, agentOptions)
+		runAgentWithContext(agentCtx, "rebootstrap-test", agentConfig, spokeCfg)
 
-		return agentCtx, stopAgent
+		return agentCtx, stopAgent, agentConfig
 	}
 
 	ginkgo.JustBeforeEach(func() {
 		var spokeCtx, agentCtx context.Context
+		var agentConfig *spoke.SpokeAgentConfig
 		var stopAgent context.CancelFunc
 
 		// ensure there is no remaining bootstrap-hub-kubeconfig secret
@@ -335,7 +337,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 		agentOptions.HubKubeconfigSecret = hubKubeconfigSecret
 
 		spokeCtx, stopSpoke = context.WithCancel(context.Background())
-		agentCtx, stopAgent = startAgent(spokeCtx, managedClusterName, hubKubeconfigDir, agentOptions)
+		agentCtx, stopAgent, agentConfig = startAgent(spokeCtx, managedClusterName, hubKubeconfigDir, agentOptions)
 
 		// simulate k8s scheduler to perform heath check and restart the agent if it is down/unhealth
 		go func() {
@@ -346,7 +348,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 				case <-ticker.C:
 					// health check
 					fmt.Println("[agent-scheduler] - start health checking...")
-					for _, healthchecker := range agentOptions.GetHealthCheckers() {
+					for _, healthchecker := range agentConfig.HealthCheckers() {
 						if err := healthchecker.Check(nil); err != nil {
 							fmt.Printf("[agent-scheduler] - stop agent because it is not health: %v\n", err)
 							stopAgent()
@@ -361,7 +363,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 				case <-agentCtx.Done():
 					// restart agent
 					fmt.Println("[agent-scheduler] - restart agent...")
-					agentCtx, stopAgent = startAgent(spokeCtx, managedClusterName, hubKubeconfigDir, agentOptions)
+					agentCtx, stopAgent, _ = startAgent(spokeCtx, managedClusterName, hubKubeconfigDir, agentOptions)
 				case <-spokeCtx.Done():
 					// exit
 					fmt.Println("[agent-scheduler] - shutting down...")

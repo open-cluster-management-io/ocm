@@ -78,15 +78,15 @@ var CRDPaths = []string{
 }
 
 func runAgent(name string, opt *spoke.SpokeAgentOptions, commOption *commonoptions.AgentOptions, cfg *rest.Config) context.CancelFunc {
+	agentConfig := spoke.NewSpokeAgentConfig(commOption, opt)
 	ctx, cancel := context.WithCancel(context.Background())
-	runAgentWithContext(ctx, name, opt, commOption, cfg)
+	runAgentWithContext(ctx, name, agentConfig, cfg)
 	return cancel
 }
 
-func runAgentWithContext(ctx context.Context, name string, opt *spoke.SpokeAgentOptions, commOption *commonoptions.AgentOptions, cfg *rest.Config) {
+func runAgentWithContext(ctx context.Context, name string, agentConfig *spoke.SpokeAgentConfig, cfg *rest.Config) {
 	go func() {
-		config := spoke.NewSpokeAgentConfig(commOption, opt)
-		err := config.RunSpokeAgent(ctx, &controllercmd.ControllerContext{
+		err := agentConfig.RunSpokeAgent(ctx, &controllercmd.ControllerContext{
 			KubeConfig:    cfg,
 			EventRecorder: util.NewIntegrationTestEventRecorder(name),
 		})

@@ -59,7 +59,7 @@ type RegisterDriver interface {
 	IsHubKubeConfigValid(ctx context.Context, secretOption SecretOption) (bool, error)
 
 	// BuildKubeConfigFromTemplate builds the kubeconfig from the template kubeconfig
-	BuildKubeConfigFromTemplate(config *clientcmdapi.Config) *clientcmdapi.Config
+	BuildKubeConfigFromTemplate(template *clientcmdapi.Config) *clientcmdapi.Config
 
 	// Process update secret with credentials
 	Process(
@@ -69,7 +69,8 @@ type RegisterDriver interface {
 		additionalSecretData map[string][]byte,
 		recorder events.Recorder, opt any) (*corev1.Secret, *metav1.Condition, error)
 
-	// InformerHandler returns informer related object
+	// InformerHandler returns informer of the related object. If no object needs to be watched, the func could
+	// return nil, nil.
 	InformerHandler(option any) (cache.SharedIndexInformer, factory.EventFilterFunc)
 }
 
@@ -87,8 +88,10 @@ func IsHubKubeConfigValidFunc(driver RegisterDriver, secretOption SecretOption) 
 			return false, err
 		}
 
-		if valid, err := IsHubKubeconfigValid(secretOption.BootStrapKubeConfig, hubKubeconfig); !valid || err != nil {
-			return valid, err
+		if secretOption.BootStrapKubeConfig != nil {
+			if valid, err := IsHubKubeconfigValid(secretOption.BootStrapKubeConfig, hubKubeconfig); !valid || err != nil {
+				return valid, err
+			}
 		}
 
 		return driver.IsHubKubeConfigValid(ctx, secretOption)

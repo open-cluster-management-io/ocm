@@ -6,7 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
-	"k8s.io/apiserver/pkg/server/healthz"
 
 	ocmfeature "open-cluster-management.io/api/feature"
 
@@ -38,28 +37,15 @@ type SpokeAgentOptions struct {
 	MaxCustomClusterClaims      int
 	ClientCertExpirationSeconds int32
 	ClusterAnnotations          map[string]string
-
-	clientCertHealthChecker          *clientCertHealthChecker
-	bootstrapKubeconfigHealthChecker *bootstrapKubeconfigHealthChecker
-	reSelectChecker                  *reSelectChecker
 }
 
 func NewSpokeAgentOptions() *SpokeAgentOptions {
 	options := &SpokeAgentOptions{
-		BootstrapKubeconfigSecret: "bootstrap-hub-kubeconfig",
-		HubKubeconfigSecret:       "hub-kubeconfig-secret",
-		ClusterHealthCheckPeriod:  1 * time.Minute,
-		MaxCustomClusterClaims:    20,
-
-		clientCertHealthChecker: &clientCertHealthChecker{
-			interval: ClientCertHealthCheckInterval,
-		},
+		BootstrapKubeconfigSecret:   "bootstrap-hub-kubeconfig",
+		HubKubeconfigSecret:         "hub-kubeconfig-secret",
+		ClusterHealthCheckPeriod:    1 * time.Minute,
+		MaxCustomClusterClaims:      20,
 		HubConnectionTimeoutSeconds: 600, // by default, the timeout is 10 minutes
-		reSelectChecker:             &reSelectChecker{shouldReSelect: false},
-	}
-
-	options.bootstrapKubeconfigHealthChecker = &bootstrapKubeconfigHealthChecker{
-		bootstrapKubeconfigSecretName: &options.BootstrapKubeconfigSecret,
 	}
 
 	return options
@@ -121,12 +107,4 @@ func (o *SpokeAgentOptions) Validate() error {
 	}
 
 	return nil
-}
-
-func (o *SpokeAgentOptions) GetHealthCheckers() []healthz.HealthChecker {
-	return []healthz.HealthChecker{
-		o.bootstrapKubeconfigHealthChecker,
-		o.clientCertHealthChecker,
-		o.reSelectChecker,
-	}
 }
