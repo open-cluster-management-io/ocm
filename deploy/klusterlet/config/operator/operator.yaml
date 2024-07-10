@@ -1,3 +1,5 @@
+---
+# Source: klusterlet/templates/operator.yaml
 kind: Deployment
 apiVersion: apps/v1
 metadata:
@@ -20,30 +22,31 @@ spec:
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 70
-            podAffinityTerm:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - klusterlet
               topologyKey: failure-domain.beta.kubernetes.io/zone
+            weight: 70
+          - podAffinityTerm:
               labelSelector:
                 matchExpressions:
                 - key: app
                   operator: In
                   values:
                   - klusterlet
-          - weight: 30
-            podAffinityTerm:
               topologyKey: kubernetes.io/hostname
-              labelSelector:
-                matchExpressions:
-                - key: app
-                  operator: In
-                  values:
-                  - klusterlet
+            weight: 30
       serviceAccountName: klusterlet
       securityContext:
         runAsNonRoot: true
       containers:
       - name: klusterlet
-        image: quay.io/open-cluster-management/registration-operator:latest
+        image:  "quay.io/open-cluster-management/registration-operator:latest"
+        imagePullPolicy: IfNotPresent
         args:
           - "/registration-operator"
           - "klusterlet"
@@ -56,10 +59,10 @@ spec:
           allowPrivilegeEscalation: false
           capabilities:
             drop:
-              - ALL
+            - ALL
           privileged: false
-          runAsNonRoot: true
           readOnlyRootFilesystem: true
+          runAsNonRoot: true
         livenessProbe:
           httpGet:
             path: /healthz
@@ -74,6 +77,8 @@ spec:
             port: 8443
           initialDelaySeconds: 2
         resources:
+          limits:
+            memory: 2Gi
           requests:
             cpu: 2m
             memory: 16Mi
@@ -83,13 +88,3 @@ spec:
       volumes:
       - name: tmpdir
         emptyDir: { }
-
-      # Uncomment the following configuration lines to add hostAliases for hub api server, 
-      # if the server field in your hub cluster kubeconfig is a domain name instead of an ipv4 address.
-      # For example, https://xxx.yyy.zzz.
-      # hostAliases:
-      # - hostnames:
-        # set the target hostname
-        # - xxx.yyy.zzz 
-        # set the target ipv4 address
-        # ip: 1.2.3.4

@@ -1,14 +1,12 @@
----
-# Source: klusterlet/templates/cluster_role_binding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: klusterlet
+  name: cluster-manager
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: klusterlet
+  name: cluster-manager
 subjects:
 - kind: ServiceAccount
-  name: klusterlet
-  namespace: open-cluster-management
+  name: cluster-manager
+  namespace: {{ .Release.Namespace }}

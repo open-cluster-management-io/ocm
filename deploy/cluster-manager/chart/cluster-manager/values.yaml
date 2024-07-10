@@ -1,0 +1,89 @@
+
+# the replicas for the clusterManager operator deployment.
+replicaCount: 3
+
+# image configurations for all images used in operator deployment and clusterManager CR.
+images:
+  # The registry name must NOT contain a trailing slash.
+  registry: quay.io/open-cluster-management
+  # The image tag is the appVersion by default, can be replaced by this version.
+  tag: ""
+  imagePullPolicy: IfNotPresent
+  # The image pull secret name is open-cluster-management-image-pull-credentials.
+  # Please set the userName and password if you use a private image registry.
+  # The image pull secret is fixed into the serviceAccount, you can also set
+  # `createImageCredentials` to `false` and create the pull secret manually.
+  imageCredentials:
+    createImageCredentials: false
+    userName: ""
+    password: ""
+
+# podSecurityContext for clusterManager operator deployment.
+podSecurityContext:
+  runAsNonRoot: true
+
+# securityContext for clusterManager operator deployment.
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  privileged: false
+  runAsNonRoot: true
+  readOnlyRootFilesystem: true
+
+# resources for clusterManager operator deployment.
+resources:
+  requests:
+    cpu: 2m
+    memory: 16Mi
+  limits:
+    memory: 2Gi
+
+# nodeSelector for clusterManager operator deployment.
+nodeSelector: {}
+
+# tolerations for clusterManager operator deployment.
+tolerations: []
+
+# affinity for clusterManager operator deployment.
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 70
+        podAffinityTerm:
+          topologyKey: failure-domain.beta.kubernetes.io/zone
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - cluster-manager
+      - weight: 30
+        podAffinityTerm:
+          topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - cluster-manager
+
+# if true, will create a bootstrap secret for auto approve.
+createBootstrapToken: false
+
+# configurations for clusterManager CR.
+clusterManager:
+  mode: Default
+  resourceRequirement:
+    type: Default
+  registrationConfiguration:
+    featureGates:
+    - feature: DefaultClusterSet
+      mode: Enable
+  workConfiguration:
+    workDriver: kube
+  addOnManagerConfiguration: {}
+#   featureGates:
+#     - feature: ""
+#       mode: ""

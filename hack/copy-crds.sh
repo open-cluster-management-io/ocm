@@ -20,4 +20,6 @@ do
 done
 
 cp $CLUSTER_MANAGER_CRD_FILE ./deploy/cluster-manager/config/crds/
+cp $CLUSTER_MANAGER_CRD_FILE ./deploy/cluster-manager/chart/cluster-manager/crds/
 cp $KLUSTERLET_CRD_FILE ./deploy/klusterlet/config/crds/
+cp $KLUSTERLET_CRD_FILE ./deploy/klusterlet/chart/klusterlet/crds/

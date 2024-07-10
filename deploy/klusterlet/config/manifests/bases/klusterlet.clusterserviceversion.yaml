@@ -23,7 +23,7 @@ spec:
       name: klusterlets.operator.open-cluster-management.io
       version: v1
   description: |
-    The Klusterlet proivdes the registation to the Hub clusters as a managed cluster. This operator supports the installation and upgrade of Klusterlet.
+    The Klusterlet provides the registration to the Hub clusters as a managed cluster. This operator supports the installation and upgrade of Klusterlet.
 
     ## Prerequisites
     You need a Hub cluster which has installed ClusterManager.
