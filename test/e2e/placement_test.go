@@ -51,14 +51,14 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 				},
 			},
 		}
-		_, err := t.HubKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err := hub.KubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.AfterEach(func() {
 		var errs []error
 		ginkgo.By("Delete managedclustersets")
-		err := t.ClusterClient.ClusterV1beta2().ManagedClusterSets().DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{
+		err := hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: e2eTestLabel + "=" + e2eTestLabelValue,
 		})
 		if err != nil {
@@ -66,7 +66,7 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 		}
 
 		ginkgo.By("Delete managedclusters")
-		err = t.ClusterClient.ClusterV1().ManagedClusters().DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{
+		err = hub.ClusterClient.ClusterV1().ManagedClusters().DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: e2eTestLabel + "=" + e2eTestLabelValue,
 		})
 		if err != nil {
@@ -74,7 +74,7 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 		}
 
 		ginkgo.By("Delete namespace")
-		err = t.HubKubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
+		err = hub.KubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -85,7 +85,7 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 	assertPlacementDecisionCreated := func(placement *clusterapiv1beta1.Placement) {
 		ginkgo.By("Check if placementdecision is created")
 		gomega.Eventually(func() bool {
-			pdl, err := t.ClusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
+			pdl, err := hub.ClusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
 				LabelSelector: clusterapiv1beta1.PlacementLabel + "=" + placement.Name,
 			})
 			if err != nil {
@@ -108,7 +108,7 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 		ginkgo.By("Check the number of decisions in placementdecisions")
 		desiredNOPD := desiredNOD/maxNumOfClusterDecisions + 1
 		gomega.Eventually(func() bool {
-			pdl, err := t.ClusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
+			pdl, err := hub.ClusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
 				LabelSelector: clusterapiv1beta1.PlacementLabel + "=" + placementName,
 			})
 			if err != nil {
@@ -128,7 +128,7 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 	assertPlacementStatus := func(placementName string, numOfSelectedClusters int, satisfied bool) {
 		ginkgo.By("Check the status of placement")
 		gomega.Eventually(func() bool {
-			placement, err := t.ClusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
+			placement, err := hub.ClusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
@@ -176,7 +176,7 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 				},
 			}
 		}
-		_, err = t.ClusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
+		_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 
@@ -194,7 +194,7 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 				ClusterSet: clusterSetName,
 			},
 		}
-		_, err = t.ClusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
+		_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 
@@ -219,7 +219,7 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 					Labels:       labels,
 				},
 			}
-			_, err = t.ClusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
+			_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		}
 	}
@@ -244,7 +244,7 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 			},
 		}
 
-		placement, err = t.ClusterClient.ClusterV1beta1().Placements(namespace).Create(context.Background(), placement, metav1.CreateOptions{})
+		placement, err = hub.ClusterClient.ClusterV1beta1().Placements(namespace).Create(context.Background(), placement, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		assertPlacementDecisionCreated(placement)
@@ -261,13 +261,13 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 
 		ginkgo.By("Reduce NOC of the placement")
 		gomega.Eventually(func() error {
-			placement, err := t.ClusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
+			placement, err := hub.ClusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			noc := int32(6)
 			placement.Spec.NumberOfClusters = &noc
-			_, err = t.ClusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
+			_, err = hub.ClusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
 			return err
 		}).ShouldNot(gomega.HaveOccurred())
 
@@ -283,12 +283,12 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 		assertPlacementStatus(placementName, 6, true)
 
 		ginkgo.By("Delete placement")
-		err = t.ClusterClient.ClusterV1beta1().Placements(namespace).Delete(context.TODO(), placementName, metav1.DeleteOptions{})
+		err = hub.ClusterClient.ClusterV1beta1().Placements(namespace).Delete(context.TODO(), placementName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By("Check if placementdecisions are deleted as well")
 		gomega.Eventually(func() bool {
-			placementDecisions, err := t.ClusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.TODO(), metav1.ListOptions{
+			placementDecisions, err := hub.ClusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: fmt.Sprintf("%s=%s", clusterapiv1beta1.PlacementLabel, placementName),
 			})
 			if err != nil {
@@ -306,7 +306,7 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 
 		ginkgo.By("Add cluster predicate")
 		gomega.Eventually(func() error {
-			placement, err := t.ClusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
+			placement, err := hub.ClusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -321,7 +321,7 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 					},
 				},
 			}
-			_, err = t.ClusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
+			_, err = hub.ClusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
 			return err
 		}).ShouldNot(gomega.HaveOccurred())
 
@@ -330,7 +330,7 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 		assertPlacementStatus(placementName, 0, false)
 
 		ginkgo.By("Delete placement")
-		err = t.ClusterClient.ClusterV1beta1().Placements(namespace).Delete(context.TODO(), placementName, metav1.DeleteOptions{})
+		err = hub.ClusterClient.ClusterV1beta1().Placements(namespace).Delete(context.TODO(), placementName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
@@ -351,7 +351,7 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 			},
 		}
 
-		_, err = t.ClusterClient.ClusterV1beta1().Placements(namespace).Create(context.Background(), placement, metav1.CreateOptions{})
+		_, err = hub.ClusterClient.ClusterV1beta1().Placements(namespace).Create(context.Background(), placement, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 })

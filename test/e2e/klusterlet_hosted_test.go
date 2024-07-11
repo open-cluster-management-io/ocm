@@ -14,6 +14,7 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
+	"open-cluster-management.io/ocm/test/framework"
 )
 
 var _ = Describe("Delete hosted klusterlet CR", Label("klusterlet-hosted"), func() {
@@ -32,23 +33,23 @@ var _ = Describe("Delete hosted klusterlet CR", Label("klusterlet-hosted"), func
 
 	It("Delete klusterlet CR in Hosted mode without external managed kubeconfig", func() {
 		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v in Hosted mode", klusterletName, clusterName))
-		_, err := t.CreatePureHostedKlusterlet(klusterletName, clusterName)
+		_, err := spoke.CreatePureHostedKlusterlet(klusterletName, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
 		Eventually(func() error {
-			err := t.checkKlusterletStatus(klusterletName, "ReadyToApply", "KlusterletPrepareFailed", metav1.ConditionFalse)
+			err := spoke.CheckKlusterletStatus(klusterletName, "ReadyToApply", "KlusterletPrepareFailed", metav1.ConditionFalse)
 			return err
 		}).Should(Succeed())
 
 		By(fmt.Sprintf("delete the klusterlet %s", klusterletName))
-		err = t.OperatorClient.OperatorV1().Klusterlets().Delete(context.TODO(),
+		err = spoke.OperatorClient.OperatorV1().Klusterlets().Delete(context.TODO(),
 			klusterletName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("check klusterlet %s was deleted", klusterletName))
 		Eventually(func() error {
-			_, err := t.OperatorClient.OperatorV1().Klusterlets().Get(context.TODO(),
+			_, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(context.TODO(),
 				klusterletName, metav1.GetOptions{})
 			if errors.IsNotFound(err) {
 				return nil
@@ -58,7 +59,7 @@ var _ = Describe("Delete hosted klusterlet CR", Label("klusterlet-hosted"), func
 
 		By(fmt.Sprintf("check the agent namespace %s on the management cluster was deleted", klusterletName))
 		Eventually(func() error {
-			_, err := t.HubKubeClient.CoreV1().Namespaces().Get(context.TODO(),
+			_, err := hub.KubeClient.CoreV1().Namespaces().Get(context.TODO(),
 				klusterletName, metav1.GetOptions{})
 			if errors.IsNotFound(err) {
 				return nil
@@ -69,40 +70,41 @@ var _ = Describe("Delete hosted klusterlet CR", Label("klusterlet-hosted"), func
 
 	It("Delete klusterlet CR in Hosted mode when the managed cluster was destroyed", func() {
 		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v", klusterletName, clusterName))
-		klusterlet, err := t.CreateKlusterlet(klusterletName, clusterName, klusterletNamespace, operatorapiv1.InstallModeHosted)
+		klusterlet, err := spoke.CreateKlusterlet(klusterletName, clusterName, klusterletNamespace,
+			operatorapiv1.InstallModeHosted, bootstrapHubKubeConfigSecret, images)
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("waiting for the managed cluster %v to be created", clusterName))
 		Eventually(func() error {
-			_, err := t.GetCreatedManagedCluster(clusterName)
+			_, err := hub.GetManagedCluster(clusterName)
 			return err
 		}).Should(Succeed())
 
 		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
 		Eventually(func() error {
-			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded",
+			err := spoke.CheckKlusterletStatus(klusterletName, "HubConnectionDegraded",
 				"BootstrapSecretFunctional,HubKubeConfigSecretMissing", metav1.ConditionTrue)
 			return err
 		}).Should(Succeed())
 
 		By(fmt.Sprintf("approve the created managed cluster %v", clusterName))
 		Eventually(func() error {
-			return t.ApproveCSR(clusterName)
+			return hub.ApproveManagedClusterCSR(clusterName)
 		}).Should(Succeed())
 
 		By(fmt.Sprintf("accept the created managed cluster %v", clusterName))
 		Eventually(func() error {
-			return t.AcceptsClient(clusterName)
+			return hub.AcceptManageCluster(clusterName)
 		}).Should(Succeed())
 
 		By(fmt.Sprintf("waiting for the managed cluster %v to be ready", clusterName))
 		Eventually(func() error {
-			return t.CheckManagedClusterStatus(clusterName)
+			return hub.CheckManagedClusterStatus(clusterName)
 		}).Should(Succeed())
 
 		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
 		Eventually(func() error {
-			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded",
+			err := spoke.CheckKlusterletStatus(klusterletName, "HubConnectionDegraded",
 				"HubConnectionFunctional", metav1.ConditionFalse)
 			return err
 		}).Should(Succeed())
@@ -110,26 +112,26 @@ var _ = Describe("Delete hosted klusterlet CR", Label("klusterlet-hosted"), func
 		// change the kubeconfig host of external managed kubeconfig secret to a wrong value
 		// to simulate the managed cluster was destroyed
 		By("Delete external managed kubeconfig", func() {
-			err = t.DeleteExternalKubeconfigSecret(klusterlet)
+			err = spoke.DeleteExternalKubeconfigSecret(klusterlet)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		By("Delete managed cluster", func() {
 			// clean the managed clusters
-			err = t.ClusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(),
+			err = hub.ClusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(),
 				clusterName, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		By("Delete klusterlet", func() {
 			// clean the klusterlets
-			err = t.OperatorClient.OperatorV1().Klusterlets().Delete(context.TODO(),
+			err = spoke.OperatorClient.OperatorV1().Klusterlets().Delete(context.TODO(),
 				klusterletName, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		By("Create a fake external managed kubeconfig", func() {
-			err = t.CreateFakeExternalKubeconfigSecret(klusterlet)
+			err = spoke.CreateFakeExternalKubeconfigSecret(klusterlet)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -139,7 +141,7 @@ var _ = Describe("Delete hosted klusterlet CR", Label("klusterlet-hosted"), func
 
 		By("Wait for the eviction timestamp annotation", func() {
 			Eventually(func() error {
-				k, err := t.OperatorClient.OperatorV1().Klusterlets().Get(context.TODO(),
+				k, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(context.TODO(),
 					klusterletName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -155,7 +157,7 @@ var _ = Describe("Delete hosted klusterlet CR", Label("klusterlet-hosted"), func
 		time.Sleep(3 * time.Second) // after the eviction timestamp exists, wait 3 seconds for cache syncing
 		By("Update the eviction timestamp annotation", func() {
 			Eventually(func() error {
-				k, err := t.OperatorClient.OperatorV1().Klusterlets().Get(context.TODO(),
+				k, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(context.TODO(),
 					klusterletName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -164,14 +166,14 @@ var _ = Describe("Delete hosted klusterlet CR", Label("klusterlet-hosted"), func
 				ta := time.Now().Add(-6 * time.Minute).Format(time.RFC3339)
 				By(fmt.Sprintf("add time %v anno for klusterlet %s", ta, klusterletName))
 				k.Annotations[evictionTimestampAnno] = ta
-				_, err = t.OperatorClient.OperatorV1().Klusterlets().Update(context.TODO(),
+				_, err = spoke.OperatorClient.OperatorV1().Klusterlets().Update(context.TODO(),
 					k, metav1.UpdateOptions{})
 				return err
 			}).Should(Succeed())
 		})
 
 		By("Check manged cluster and klusterlet can be deleted", func() {
-			Expect(t.cleanKlusterletResources(klusterletName, clusterName)).To(BeNil())
+			framework.CleanKlusterletRelatedResources(hub, spoke, klusterletName, clusterName)
 		})
 	})
 })

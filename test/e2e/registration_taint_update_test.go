@@ -33,17 +33,17 @@ var _ = ginkgo.Describe("Taints update check", ginkgo.Label("registration-taint"
 					HubAcceptsClient: true,
 				},
 			}
-			managedCluster, err = t.ClusterClient.ClusterV1().ManagedClusters().Create(context.Background(), managedCluster, metav1.CreateOptions{})
+			managedCluster, err = hub.ClusterClient.ClusterV1().ManagedClusters().Create(context.Background(), managedCluster, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 
 		ginkgo.AfterEach(func() {
-			err := t.ClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), clusterName, metav1.DeleteOptions{})
+			err := hub.ClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), clusterName, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 
 		ginkgo.It("Should update taints automatically", func() {
-			managedClusters := t.ClusterClient.ClusterV1().ManagedClusters()
+			managedClusters := hub.ClusterClient.ClusterV1().ManagedClusters()
 
 			ginkgo.By("Should only be one UnreachableTaint")
 			gomega.Eventually(func() error {
