@@ -62,7 +62,7 @@ func NewKlusterletAgentCmd() *cobra.Command {
 	agentConfig := singletonspoke.NewAgentConfig(commonOptions, registrationOption, workOptions)
 	cmdConfig := commonOptions.CommonOpts.
 		NewControllerCommandConfig("klusterlet", version.Get(), agentConfig.RunSpokeAgent).
-		WithHealthChecks(registrationOption.GetHealthCheckers()...)
+		WithHealthChecks(agentConfig.HealthCheckers()...)
 	cmd := cmdConfig.NewCommandWithContext(context.TODO())
 	cmd.Use = agentCmdName
 	cmd.Short = "Start the klusterlet agent"

@@ -78,8 +78,8 @@ var _ = Describe("switch-hub", Ordered, func() {
 				agentOptions.HubConnectionTimeoutSeconds = 10
 				return agentOptions
 			},
-			func(ctx context.Context, stopAgent context.CancelFunc, agentOptions *spoke.SpokeAgentOptions) {
-				startAgentHealthChecker(ctx, stopAgent, agentOptions.GetHealthCheckers())
+			func(ctx context.Context, stopAgent context.CancelFunc, agentConfig *spoke.SpokeAgentConfig) {
+				startAgentHealthChecker(ctx, stopAgent, agentConfig.HealthCheckers())
 			})
 
 		approveAndAcceptManagedCluster(managedClusterName, hub1.kubeClient, hub1.clusterClient, hub1.authn, 10*time.Minute)
@@ -217,16 +217,17 @@ func startNewHub(ctx context.Context, hubName string) *mockHub {
 }
 
 func startAgent(ctx context.Context, managedClusterName, hubKubeconfigDir string,
-	agentOptions *spoke.SpokeAgentOptions) (context.Context, context.CancelFunc) {
+	agentOptions *spoke.SpokeAgentOptions) (context.Context, context.CancelFunc, *spoke.SpokeAgentConfig) {
 	ginkgo.By("run registration agent")
 	commOptions := commonoptions.NewAgentOptions()
 	commOptions.HubKubeconfigDir = hubKubeconfigDir
 	commOptions.SpokeClusterName = managedClusterName
 
 	agentCtx, stopAgent := context.WithCancel(ctx)
-	runAgentWithContext(agentCtx, "switch-hub", agentOptions, commOptions, spokeCfg)
+	agentConfig := spoke.NewSpokeAgentConfig(commOptions, agentOptions)
+	runAgentWithContext(agentCtx, "switch-hub", agentConfig, spokeCfg)
 
-	return agentCtx, stopAgent
+	return agentCtx, stopAgent, agentConfig
 }
 
 func approveAndAcceptManagedCluster(managedClusterName string,
@@ -324,12 +325,12 @@ func assertManagedClusterSuccessfullyJoined(testNamespace, managedClusterName, h
 func startAutoRestartAgent(ctx context.Context,
 	managedClusterName, hubKubeconfigDir string,
 	getNewAgentOptions func() *spoke.SpokeAgentOptions,
-	watchStop func(ctx context.Context, stopAgent context.CancelFunc, agentOptions *spoke.SpokeAgentOptions),
+	watchStop func(ctx context.Context, stopAgent context.CancelFunc, agentConfig *spoke.SpokeAgentConfig),
 ) {
 	fmt.Println("[auto-restart-agent] - start agent...")
 	newAgentOptions := getNewAgentOptions()
-	agentCtx, stopAgent := startAgent(ctx, managedClusterName, hubKubeconfigDir, newAgentOptions)
-	go watchStop(ctx, stopAgent, newAgentOptions)
+	agentCtx, stopAgent, agentConfig := startAgent(ctx, managedClusterName, hubKubeconfigDir, newAgentOptions)
+	go watchStop(ctx, stopAgent, agentConfig)
 	for {
 		select {
 		case <-agentCtx.Done():
@@ -338,8 +339,8 @@ func startAutoRestartAgent(ctx context.Context,
 
 			fmt.Println("[auto-restart-agent] - restart agent...")
 			newAgentOptions := getNewAgentOptions()
-			agentCtx, stopAgent = startAgent(ctx, managedClusterName, hubKubeconfigDir, newAgentOptions)
-			go watchStop(ctx, stopAgent, newAgentOptions)
+			agentCtx, stopAgent, agentConfig = startAgent(ctx, managedClusterName, hubKubeconfigDir, newAgentOptions)
+			go watchStop(ctx, stopAgent, agentConfig)
 		case <-ctx.Done():
 			// exit
 			fmt.Println("[auto-restart-agent] - shutting down...")

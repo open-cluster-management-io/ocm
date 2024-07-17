@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,19 +57,23 @@ func selectBootstrapKubeConfigs(ctx context.Context,
 }
 
 func compareServerEndpoint(bootstrapKubeConfigFilePath, hubKubeConfigFilePath string) (bool, error) {
-	_, bootstrapServer, _, _, err := parseKubeconfig(
-		bootstrapKubeConfigFilePath)
+	bootstrapKubeConfig, err := clientcmd.BuildConfigFromFlags("", bootstrapKubeConfigFilePath)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
 	if err != nil {
 		return false, err
 	}
 
-	_, hubServer, _, _, err := parseKubeconfig(
-		hubKubeConfigFilePath)
+	hubKubeConfig, err := clientcmd.BuildConfigFromFlags("", hubKubeConfigFilePath)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
 	if err != nil {
 		return false, err
 	}
 
-	return bootstrapServer == hubServer, nil
+	return bootstrapKubeConfig.Host == hubKubeConfig.Host, nil
 }
 
 // An "valid" bootstrap kubeconfig means:

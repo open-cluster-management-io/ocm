@@ -1,4 +1,4 @@
-package clientcert
+package csr
 
 import (
 	"crypto/x509/pkix"
@@ -12,11 +12,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/client-go/listers/certificates/v1"
 	"k8s.io/client-go/tools/cache"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2/ktesting"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
+	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
 func TestIsCSRApproved(t *testing.T) {
@@ -145,7 +147,7 @@ func TestIsCertificateValid(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			isValid, _ := IsCertificateValid(logger, c.testCert.Cert, c.subject)
+			isValid, _ := isCertificateValid(logger, c.testCert.Cert, c.subject)
 			if isValid != c.isValid {
 				t.Errorf("expected %t, but got %t", c.isValid, isValid)
 			}
@@ -239,8 +241,31 @@ func TestBuildKubeconfig(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			kubeconfig := BuildKubeconfig("default-cluster",
-				c.server, c.caData, c.proxyURL, c.clientCertFile, c.clientKeyFile)
+			bootstrapKubeconfig := &clientcmdapi.Config{
+				Clusters: map[string]*clientcmdapi.Cluster{
+					"default-cluster": {
+						Server:                   c.server,
+						InsecureSkipTLSVerify:    false,
+						CertificateAuthorityData: c.caData,
+						ProxyURL:                 c.proxyURL,
+					}},
+				// Define a context that connects the auth info and cluster, and set it as the default
+				Contexts: map[string]*clientcmdapi.Context{register.DefaultKubeConfigContext: {
+					Cluster:   "default-cluster",
+					AuthInfo:  register.DefaultKubeConfigAuth,
+					Namespace: "configuration",
+				}},
+				CurrentContext: register.DefaultKubeConfigContext,
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					register.DefaultKubeConfigAuth: {
+						ClientCertificate: c.clientCertFile,
+						ClientKey:         c.clientKeyFile,
+					},
+				},
+			}
+
+			registerImpl := &CSRDriver{}
+			kubeconfig := registerImpl.BuildKubeConfigFromTemplate(bootstrapKubeconfig)
 			currentContext, ok := kubeconfig.Contexts[kubeconfig.CurrentContext]
 			if !ok {
 				t.Errorf("current context %q not found: %v", kubeconfig.CurrentContext, kubeconfig)

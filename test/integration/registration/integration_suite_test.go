@@ -27,8 +27,8 @@ import (
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
-	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 	"open-cluster-management.io/ocm/pkg/registration/hub"
+	"open-cluster-management.io/ocm/pkg/registration/register"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/addon"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/registration"
@@ -78,15 +78,15 @@ var CRDPaths = []string{
 }
 
 func runAgent(name string, opt *spoke.SpokeAgentOptions, commOption *commonoptions.AgentOptions, cfg *rest.Config) context.CancelFunc {
+	agentConfig := spoke.NewSpokeAgentConfig(commOption, opt)
 	ctx, cancel := context.WithCancel(context.Background())
-	runAgentWithContext(ctx, name, opt, commOption, cfg)
+	runAgentWithContext(ctx, name, agentConfig, cfg)
 	return cancel
 }
 
-func runAgentWithContext(ctx context.Context, name string, opt *spoke.SpokeAgentOptions, commOption *commonoptions.AgentOptions, cfg *rest.Config) {
+func runAgentWithContext(ctx context.Context, name string, agentConfig *spoke.SpokeAgentConfig, cfg *rest.Config) {
 	go func() {
-		config := spoke.NewSpokeAgentConfig(commOption, opt)
-		err := config.RunSpokeAgent(ctx, &controllercmd.ControllerContext{
+		err := agentConfig.RunSpokeAgent(ctx, &controllercmd.ControllerContext{
 			KubeConfig:    cfg,
 			EventRecorder: util.NewIntegrationTestEventRecorder(name),
 		})
@@ -111,7 +111,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	// crank up the sync speed
 	transport.CertCallbackRefreshDuration = 5 * time.Second
-	clientcert.ControllerResyncInterval = 5 * time.Second
+	register.ControllerResyncInterval = 5 * time.Second
 	registration.CreatingControllerSyncInterval = 1 * time.Second
 
 	// crank up the addon lease sync and udpate speed

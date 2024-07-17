@@ -4,61 +4,48 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"reflect"
-	"time"
+	"sync"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
-	certutil "k8s.io/client-go/util/cert"
 )
 
-type clientCertHealthChecker struct {
-	interval time.Duration
-	expired  bool
+type hubKubeConfigHealthChecker struct {
+	checkFunc    wait.ConditionWithContextFunc
+	bootstrapped bool
+	lock         sync.RWMutex
 }
 
-func (hc *clientCertHealthChecker) Name() string {
-	return "hub-client-certificate"
+func (hc *hubKubeConfigHealthChecker) Name() string {
+	return "hub-kube-config"
 }
 
 // clientCertHealthChecker returns an error when the client certificate created for the
 // hub kubeconfig exists and expires.
-func (hc *clientCertHealthChecker) Check(_ *http.Request) error {
-	if hc.expired {
+func (hc *hubKubeConfigHealthChecker) Check(_ *http.Request) error {
+	hc.lock.RLock()
+	defer hc.lock.RUnlock()
+	if !hc.bootstrapped {
+		return nil
+	}
+	valid, err := hc.checkFunc(context.Background())
+	if err != nil {
+		return err
+	}
+	if !valid {
 		return errors.New("the client certificate expires and rebootstrap is required.")
 	}
 	return nil
 }
 
-func (hc *clientCertHealthChecker) start(ctx context.Context, tlsCertFile string) {
-	if err := wait.PollUntilContextCancel(ctx, hc.interval, false, func(ctx context.Context) (bool, error) {
-		data, err := os.ReadFile(tlsCertFile)
-		if err != nil {
-			// no work because the client certificate file may not exist yet.
-			return false, nil
-		}
-
-		certs, err := certutil.ParseCertsPEM(data)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unable to parse client certificates %q: %w", tlsCertFile, err))
-			return false, nil
-		}
-
-		now := time.Now()
-		for _, cert := range certs {
-			if now.After(cert.NotAfter) {
-				hc.expired = true
-			}
-		}
-
-		return false, nil
-	}); err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to check the health of the client certificate %q: %w", tlsCertFile, err))
-	}
+func (hc *hubKubeConfigHealthChecker) setBootstrapped() {
+	hc.lock.Lock()
+	defer hc.lock.Unlock()
+	hc.bootstrapped = true
 }
 
 type bootstrapKubeconfigHealthChecker struct {
