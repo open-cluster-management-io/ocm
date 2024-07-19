@@ -183,6 +183,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	}
 	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration",
 		registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates)
+	config.ClusterProfileEnabled = helpers.FeatureGateEnabled(registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates, ocmfeature.ClusterProfile)
 
 	var workFeatureGates []operatorapiv1.FeatureGate
 	if clusterManager.Spec.WorkConfiguration != nil {
