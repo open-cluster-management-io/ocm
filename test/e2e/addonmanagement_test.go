@@ -2,17 +2,24 @@ package e2e
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/valyala/fasttemplate"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
@@ -66,15 +73,17 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 	ginkgo.BeforeEach(func() {
 		ginkgo.By("create addon custom sign secret")
-		err := copySignerSecret(context.TODO(), t.HubKubeClient, "open-cluster-management-hub",
+		err := copySignerSecret(context.TODO(), hub.KubeClient, "open-cluster-management-hub",
 			"signer-secret", templateagent.AddonManagerNamespace(), customSignerSecretName)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		// the addon manager deployment should be running
-		gomega.Eventually(t.CheckHubReady).Should(gomega.Succeed())
+		gomega.Eventually(func() error {
+			return hub.CheckHubReady()
+		}).Should(gomega.Succeed())
 
 		ginkgo.By(fmt.Sprintf("create addon template resources for cluster %v", universalClusterName))
-		err = createResourcesFromYamlFiles(context.Background(), t.HubDynamicClient, t.hubRestMapper, s,
+		err = createResourcesFromYamlFiles(context.Background(), hub.DynamicClient, hub.RestMapper, s,
 			defaultAddonTemplateReaderManifestsFunc(manifests.AddonManifestFiles, map[string]interface{}{
 				"Namespace":              universalClusterName,
 				"AddonInstallNamespace":  addonInstallNamespace,
@@ -87,7 +96,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By(fmt.Sprintf("create the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
-		err = t.CreateManagedClusterAddOn(universalClusterName, addOnName, "test-ns") // the install namespace will be ignored
+		err = hub.CreateManagedClusterAddOn(universalClusterName, addOnName, "test-ns") // the install namespace will be ignored
 		if err != nil {
 			klog.Errorf("failed to create managed cluster addon %v on the managed cluster namespace %v: %v", addOnName, universalClusterName, err)
 			gomega.Expect(errors.IsAlreadyExists(err)).To(gomega.BeTrue())
@@ -95,20 +104,20 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 		ginkgo.By(fmt.Sprintf("wait the addon %v/%v available condition to be true", universalClusterName, addOnName))
 		gomega.Eventually(func() error {
-			return t.CheckManagedClusterAddOnStatus(universalClusterName, addOnName)
+			return hub.CheckManagedClusterAddOnStatus(universalClusterName, addOnName)
 		}).Should(gomega.Succeed())
 	})
 
 	ginkgo.AfterEach(func() {
 		ginkgo.By(fmt.Sprintf("delete the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
-		err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Delete(
+		err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Delete(
 			context.TODO(), addOnName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			ginkgo.Fail(fmt.Sprintf("failed to delete managed cluster addon %v on cluster %v: %v", addOnName, universalClusterName, err))
 		}
 
 		gomega.Eventually(func() error {
-			_, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
+			_, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
@@ -121,7 +130,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By(fmt.Sprintf("delete addon template resources for cluster %v", universalClusterName))
-		err = deleteResourcesFromYamlFiles(context.Background(), t.HubDynamicClient, t.hubRestMapper, s,
+		err = deleteResourcesFromYamlFiles(context.Background(), hub.DynamicClient, hub.RestMapper, s,
 			defaultAddonTemplateReaderManifestsFunc(manifests.AddonManifestFiles, map[string]interface{}{
 				"Namespace":              universalClusterName,
 				"AddonInstallNamespace":  addonInstallNamespace,
@@ -134,7 +143,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By("delete addon custom sign secret")
-		err = t.HubKubeClient.CoreV1().Secrets(templateagent.AddonManagerNamespace()).Delete(context.TODO(),
+		err = hub.KubeClient.CoreV1().Secrets(templateagent.AddonManagerNamespace()).Delete(context.TODO(),
 			customSignerSecretName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			ginkgo.Fail(fmt.Sprintf("failed to delete custom signer secret %v/%v: %v",
@@ -144,7 +153,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		// delete all CSR created for the addon on the hub cluster, otherwise if it reches the limit number 10, the
 		// other tests will fail
 		gomega.Eventually(func() error {
-			csrs, err := t.HubKubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(),
+			csrs, err := hub.KubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(),
 				metav1.ListOptions{
 					LabelSelector: fmt.Sprintf("%s=%s,%s=%s", addonapiv1alpha1.AddonLabelKey, addOnName,
 						clusterv1.ClusterNameLabelKey, universalClusterName),
@@ -154,7 +163,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			}
 
 			for _, csr := range csrs.Items {
-				err = t.HubKubeClient.CertificatesV1().CertificateSigningRequests().Delete(context.TODO(),
+				err = hub.KubeClient.CertificatesV1().CertificateSigningRequests().Delete(context.TODO(),
 					csr.Name, metav1.DeleteOptions{})
 				if err != nil {
 					return err
@@ -168,14 +177,14 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 	ginkgo.It("Template type addon should be functioning", func() {
 		ginkgo.By("Check hub kubeconfig secret is created")
 		gomega.Eventually(func() error {
-			_, err := t.HubKubeClient.CoreV1().Secrets(addonInstallNamespace).Get(context.TODO(),
+			_, err := hub.KubeClient.CoreV1().Secrets(addonInstallNamespace).Get(context.TODO(),
 				templateagent.HubKubeconfigSecretName(addOnName), metav1.GetOptions{})
 			return err
 		}).Should(gomega.Succeed())
 
 		ginkgo.By("Check custom signer secret is created")
 		gomega.Eventually(func() error {
-			_, err := t.HubKubeClient.CoreV1().Secrets(addonInstallNamespace).Get(context.TODO(),
+			_, err := hub.KubeClient.CoreV1().Secrets(addonInstallNamespace).Get(context.TODO(),
 				templateagent.CustomSignedSecretName(addOnName, customSignerName), metav1.GetOptions{})
 			return err
 		}).Should(gomega.Succeed())
@@ -192,12 +201,12 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			},
 		}
 
-		_, err := t.HubKubeClient.CoreV1().ConfigMaps(universalClusterName).Create(
+		_, err := hub.KubeClient.CoreV1().ConfigMaps(universalClusterName).Create(
 			context.Background(), configmap, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			copyiedConfig, err := t.SpokeKubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
+			copyiedConfig, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
 				context.Background(), configmap.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -210,7 +219,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Make sure manifestwork config is configured")
-		manifestWork, err := t.HubWorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(),
+		manifestWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(),
 			fmt.Sprintf("addon-%s-deploy-0", addOnName), metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		foundDeploymentConfig := false
@@ -242,13 +251,13 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		}
 
 		ginkgo.By(fmt.Sprintf("delete the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
-		err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Delete(
+		err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Delete(
 			context.TODO(), addOnName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By("The pre-delete job should clean up the configmap after the addon is deleted")
 		gomega.Eventually(func() error {
-			_, err := t.SpokeKubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
+			_, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
 				context.Background(), configmap.Name, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
@@ -261,7 +270,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		}).ShouldNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			_, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
+			_, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
@@ -275,7 +284,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 		ginkgo.By("The pre-delete job should be deleted ")
 		gomega.Eventually(func() error {
-			_, err := t.SpokeKubeClient.BatchV1().Jobs(addonInstallNamespace).Get(
+			_, err := spoke.KubeClient.BatchV1().Jobs(addonInstallNamespace).Get(
 				context.Background(), "hello-template-cleanup-configmap", metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
@@ -303,7 +312,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		registriesJson, err := json.Marshal(overrideRegistries)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		gomega.Eventually(func() error {
-			cluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(
+			cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
 				context.Background(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -318,7 +327,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			annotations[clusterv1.ClusterImageRegistriesAnnotationKey] = string(registriesJson)
 
 			newCluster.Annotations = annotations
-			_, err = t.ClusterClient.ClusterV1().ManagedClusters().Update(
+			_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Update(
 				context.Background(), newCluster, metav1.UpdateOptions{})
 			return err
 		}).ShouldNot(gomega.HaveOccurred())
@@ -330,7 +339,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
+			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -348,7 +357,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 					},
 				},
 			}
-			_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
+			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
 				context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
@@ -358,7 +367,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 		ginkgo.By("Make sure addon is configured")
 		gomega.Eventually(func() error {
-			agentDeploy, err := t.SpokeKubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
+			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
 				context.Background(), "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -378,7 +387,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 		ginkgo.By("Restore the managed cluster annotation")
 		gomega.Eventually(func() error {
-			cluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(
+			cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
 				context.Background(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -386,7 +395,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 			newCluster := cluster.DeepCopy()
 			delete(newCluster.Annotations, clusterv1.ClusterImageRegistriesAnnotationKey)
-			_, err = t.ClusterClient.ClusterV1().ManagedClusters().Update(
+			_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Update(
 				context.Background(), newCluster, metav1.UpdateOptions{})
 			return err
 		}).ShouldNot(gomega.HaveOccurred())
@@ -395,14 +404,14 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		// but it is needed by the pre-delete job
 		ginkgo.By("Restore the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
+			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			newAddon := addon.DeepCopy()
 			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{}
-			_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
+			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
 				context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
@@ -412,7 +421,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 		ginkgo.By("Make sure addon config is restored")
 		gomega.Eventually(func() error {
-			agentDeploy, err := t.SpokeKubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
+			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
 				context.Background(), "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -439,7 +448,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
+			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -457,7 +466,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 					},
 				},
 			}
-			_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
+			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
 				context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
@@ -467,7 +476,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 		ginkgo.By("Make sure addon is configured")
 		gomega.Eventually(func() error {
-			agentDeploy, err := t.SpokeKubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
+			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
 				context.Background(), "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -493,7 +502,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 				Name: "another-addon-namespace",
 			},
 		}
-		_, err := t.SpokeKubeClient.CoreV1().Namespaces().Create(context.TODO(), overrideNamespace, metav1.CreateOptions{})
+		_, err := spoke.KubeClient.CoreV1().Namespaces().Create(context.TODO(), overrideNamespace, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		gomega.Eventually(func() error {
 			return prepareInstallNamespace(universalClusterName, overrideNamespace.Name)
@@ -501,7 +510,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
+			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -519,7 +528,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 					},
 				},
 			}
-			_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
+			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
 				context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
@@ -529,7 +538,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 		ginkgo.By("Make sure addon is configured")
 		gomega.Eventually(func() error {
-			_, err := t.SpokeKubeClient.AppsV1().Deployments(overrideNamespace.Name).Get(
+			_, err := spoke.KubeClient.AppsV1().Deployments(overrideNamespace.Name).Get(
 				context.Background(), "hello-template-agent", metav1.GetOptions{})
 			return err
 		}).ShouldNot(gomega.HaveOccurred())
@@ -543,7 +552,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		registriesJson, err := json.Marshal(overrideRegistries)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		gomega.Eventually(func() error {
-			cluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(
+			cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
 				context.Background(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -558,14 +567,14 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			annotations[clusterv1.ClusterImageRegistriesAnnotationKey] = string(registriesJson)
 
 			newCluster.Annotations = annotations
-			_, err = t.ClusterClient.ClusterV1().ManagedClusters().Update(
+			_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Update(
 				context.Background(), newCluster, metav1.UpdateOptions{})
 			return err
 		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Make sure addon is configured")
 		gomega.Eventually(func() error {
-			agentDeploy, err := t.SpokeKubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
+			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
 				context.Background(), "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -587,7 +596,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		// but it is needed by the pre-delete job
 		ginkgo.By("Restore the managed cluster annotation")
 		gomega.Eventually(func() error {
-			cluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(
+			cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
 				context.Background(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -595,14 +604,14 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 			newCluster := cluster.DeepCopy()
 			delete(newCluster.Annotations, clusterv1.ClusterImageRegistriesAnnotationKey)
-			_, err = t.ClusterClient.ClusterV1().ManagedClusters().Update(
+			_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Update(
 				context.Background(), newCluster, metav1.UpdateOptions{})
 			return err
 		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Make sure addon config is restored")
 		gomega.Eventually(func() error {
-			agentDeploy, err := t.SpokeKubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
+			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
 				context.Background(), "hello-template-agent", metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -624,10 +633,10 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 })
 
 func prepareInstallNamespace(namespace, installNamespace string) error {
-	_, err := t.AddOnClinet.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
+	_, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
 		context.Background(), namespaceOverrideConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		if _, err := t.AddOnClinet.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Create(
+		if _, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Create(
 			context.Background(),
 			&addonapiv1alpha1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
@@ -650,10 +659,10 @@ func prepareInstallNamespace(namespace, installNamespace string) error {
 }
 
 func prepareImageOverrideAddOnDeploymentConfig(namespace, installNamespace string) error {
-	_, err := t.AddOnClinet.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
+	_, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
 		context.Background(), imageOverrideDeploymentConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		if _, err := t.AddOnClinet.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Create(
+		if _, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Create(
 			context.Background(),
 			&addonapiv1alpha1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
@@ -677,10 +686,10 @@ func prepareImageOverrideAddOnDeploymentConfig(namespace, installNamespace strin
 }
 
 func prepareNodePlacementAddOnDeploymentConfig(namespace, installNamespace string) error {
-	_, err := t.AddOnClinet.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
+	_, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
 		context.Background(), nodePlacementDeploymentConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		if _, err := t.AddOnClinet.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Create(
+		if _, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Create(
 			context.Background(),
 			&addonapiv1alpha1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
@@ -726,4 +735,105 @@ func copySignerSecret(ctx context.Context, kubeClient kubernetes.Interface, srcN
 		return err
 	}
 	return nil
+}
+
+func createResourcesFromYamlFiles(
+	ctx context.Context,
+	dynamicClient dynamic.Interface,
+	restMapper meta.RESTMapper,
+	scheme *runtime.Scheme,
+	manifests func(name string) ([]byte, error),
+	resourceFiles []string) error {
+
+	var appliedErrs []error
+
+	decoder := serializer.NewCodecFactory(scheme).UniversalDeserializer()
+	for _, fileName := range resourceFiles {
+		objData, err := manifests(fileName)
+		if err != nil {
+			return err
+		}
+		required := unstructured.Unstructured{}
+		_, gvk, err := decoder.Decode(objData, nil, &required)
+		if err != nil {
+			return err
+		}
+
+		mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return err
+		}
+
+		_, err = dynamicClient.Resource(mapping.Resource).Namespace(required.GetNamespace()).Create(
+			ctx, &required, metav1.CreateOptions{})
+		if errors.IsAlreadyExists(err) {
+			continue
+		}
+		if err != nil {
+			fmt.Printf("Error creating %q (%T): %v\n", fileName, mapping.Resource, err)
+			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", fileName, mapping.Resource, err))
+		}
+	}
+
+	return utilerrors.NewAggregate(appliedErrs)
+}
+
+func deleteResourcesFromYamlFiles(
+	ctx context.Context,
+	dynamicClient dynamic.Interface,
+	restMapper meta.RESTMapper,
+	scheme *runtime.Scheme,
+	manifests func(name string) ([]byte, error),
+	resourceFiles []string) error {
+
+	var appliedErrs []error
+
+	decoder := serializer.NewCodecFactory(scheme).UniversalDeserializer()
+	for _, fileName := range resourceFiles {
+		objData, err := manifests(fileName)
+		if err != nil {
+			return err
+		}
+		required := unstructured.Unstructured{}
+		_, gvk, err := decoder.Decode(objData, nil, &required)
+		if err != nil {
+			return err
+		}
+
+		mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return err
+		}
+
+		err = dynamicClient.Resource(mapping.Resource).Namespace(required.GetNamespace()).Delete(
+			ctx, required.GetName(), metav1.DeleteOptions{})
+		if errors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			fmt.Printf("Error deleting %q (%T): %v\n", fileName, mapping.Resource, err)
+			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", fileName, mapping.Resource, err))
+		}
+	}
+
+	return utilerrors.NewAggregate(appliedErrs)
+}
+
+// defaultAddonTemplateReaderManifestsFunc returns a function that reads the addon template from the embed.FS,
+// and replaces the placeholder in format of "<< placeholder >>" with the value in configValues.
+func defaultAddonTemplateReaderManifestsFunc(
+	fs embed.FS,
+	configValues map[string]interface{},
+) func(string) ([]byte, error) {
+
+	return func(fileName string) ([]byte, error) {
+		template, err := fs.ReadFile(fileName)
+		if err != nil {
+			return nil, err
+		}
+
+		t := fasttemplate.New(string(template), "<< ", " >>")
+		objData := t.ExecuteString(configValues)
+		return []byte(objData), nil
+	}
 }

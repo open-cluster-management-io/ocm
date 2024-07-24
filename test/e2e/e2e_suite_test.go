@@ -4,18 +4,21 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
-)
 
-var t *Tester
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
+	"open-cluster-management.io/ocm/test/framework"
+)
 
 var (
 	// kubeconfigs
@@ -30,6 +33,16 @@ var (
 	registrationImage string
 	workImage         string
 	singletonImage    string
+	images            framework.Images
+
+	// bootstrap-hub-kubeconfig
+	// It's a secret named 'bootstrap-hub-kubeconfig' under the namespace 'open-cluster-management-agent',
+	// the content of the secret is a kubeconfig file.
+	//
+	// The secret is used when:
+	// 1. klusterlet is created not in the namespace 'open-cluster-management-agent', but a customized namespace.
+	// 2. in hosted,bootstrap-hub-kubeconfig secret under the ns "open-cluster-management-agent".
+	bootstrapHubKubeConfigSecret *corev1.Secret
 )
 
 func init() {
@@ -44,6 +57,9 @@ func init() {
 	flag.StringVar(&singletonImage, "singleton-image", "", "The image of the klusterlet agent")
 }
 
+var hub *framework.Hub
+var spoke *framework.Spoke
+
 // The e2e will always create one universal klusterlet, the developers can reuse this klusterlet in their case
 // but also pay attention, because the klusterlet is shared, so the developers should not delete the klusterlet.
 // And there might be some side effects on other cases if the developers change the klusterlet's spec for their cases.
@@ -55,10 +71,7 @@ const (
 )
 
 func TestE2E(tt *testing.T) {
-	t = NewTester(hubKubeconfig, managedKubeconfig, registrationImage, workImage, singletonImage)
-
 	OutputFail := func(message string, callerSkip ...int) {
-		t.OutputDebugLogs()
 		Fail(message, callerSkip...)
 	}
 
@@ -72,38 +85,76 @@ func TestE2E(tt *testing.T) {
 var _ = BeforeSuite(func() {
 	var err error
 
+	// Setup kubeconfigs
+	if hubKubeconfig == "" {
+		hubKubeconfig = os.Getenv("KUBECONFIG")
+	}
+	if managedKubeconfig == "" {
+		managedKubeconfig = os.Getenv("KUBECONFIG")
+	}
+
+	// Setup images
+	images = framework.Images{
+		RegistrationImage: registrationImage,
+		WorkImage:         workImage,
+		SingletonImage:    singletonImage,
+	}
+
 	// In most OCM cases, we expect user should see the result in 90 seconds.
 	// For cases that need more than 90 seconds, please set the timeout in the test case EXPLICITLY.
 	SetDefaultEventuallyTimeout(90 * time.Second)
 	SetDefaultEventuallyPollingInterval(5 * time.Second)
 
-	Expect(t.Init()).ToNot(HaveOccurred())
+	By("Setup hub")
+	hub, err = framework.NewHub(hubKubeconfig)
+	Expect(err).ToNot(HaveOccurred())
 
-	Eventually(t.CheckHubReady).Should(Succeed())
+	By("Setup spokeTestHelper")
+	spoke, err = framework.NewSpoke(managedKubeconfig)
+	Expect(err).ToNot(HaveOccurred())
 
-	Eventually(t.CheckKlusterletOperatorReady).Should(Succeed())
+	By("Setup default bootstrap-hub-kubeconfig")
+	bootstrapHubKubeConfigSecret, err = spoke.KubeClient.CoreV1().Secrets(helpers.KlusterletDefaultNamespace).
+		Get(context.TODO(), helpers.BootstrapHubKubeConfig, metav1.GetOptions{})
+	Expect(err).ToNot(HaveOccurred())
+	// The secret will used via copy and create another secret in other ns, so we need to clean the resourceVersion and namespace
+	bootstrapHubKubeConfigSecret.ObjectMeta.ResourceVersion = ""
+	bootstrapHubKubeConfigSecret.ObjectMeta.Namespace = ""
 
-	err = t.SetBootstrapHubSecret("")
+	By("Check Hub Ready")
+	Eventually(func() error {
+		return hub.CheckHubReady()
+	}).Should(Succeed())
 
+	By("Check Klusterlet Operator Ready")
+	Eventually(func() error {
+		return framework.CheckDeploymentReady(context.TODO(), spoke.KubeClient, spoke.KlusterletOperatorNamespace, spoke.KlusterletOperator)
+	}).Should(Succeed())
+
+	By("Enable Work Feature")
 	if nilExecutorValidating {
 		Eventually(func() error {
-			return t.EnableWorkFeature("NilExecutorValidating")
+			return hub.EnableHubWorkFeature("NilExecutorValidating")
 		}).Should(Succeed())
 	}
-	Expect(err).ToNot(HaveOccurred())
 
+	By("Enable ManifestWorkReplicaSet Feature")
 	Eventually(func() error {
-		return t.EnableWorkFeature("ManifestWorkReplicaSet")
+		return hub.EnableHubWorkFeature("ManifestWorkReplicaSet")
 	}).Should(Succeed())
-	Eventually(t.CheckHubReady).Should(Succeed())
+	Eventually(func() error {
+		return hub.CheckHubReady()
+	}).Should(Succeed())
 
 	By("Create a universal Klusterlet/managedcluster")
-	_, err = t.CreateApprovedKlusterlet(
-		universalKlusterletName, universalClusterName, universalAgentNamespace, operatorapiv1.InstallMode(klusterletDeployMode))
-	Expect(err).ToNot(HaveOccurred())
+	framework.CreateAndApproveKlusterlet(
+		hub, spoke,
+		universalKlusterletName, universalClusterName, universalAgentNamespace, operatorapiv1.InstallMode(klusterletDeployMode),
+		bootstrapHubKubeConfigSecret, images,
+	)
 
 	By("Create a universal ClusterSet and bind it with the universal managedcluster")
-	_, err = t.ClusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.TODO(), &clusterv1beta2.ManagedClusterSet{
+	_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.TODO(), &clusterv1beta2.ManagedClusterSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: universalClusterSetName,
 		},
@@ -116,7 +167,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	Eventually(func() error {
-		umc, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})
+		umc, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -126,12 +177,12 @@ var _ = BeforeSuite(func() {
 		}
 		labels[clusterv1beta2.ClusterSetLabel] = universalClusterSetName
 		umc.SetLabels(labels)
-		_, err = t.ClusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), umc, metav1.UpdateOptions{})
+		_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), umc, metav1.UpdateOptions{})
 		return err
 	}).Should(Succeed())
 })
 
 var _ = AfterSuite(func() {
 	By(fmt.Sprintf("clean klusterlet %v resources after the test case", universalKlusterletName))
-	Expect(t.cleanKlusterletResources(universalKlusterletName, universalClusterName)).To(BeNil())
+	framework.CleanKlusterletRelatedResources(hub, spoke, universalKlusterletName, universalClusterName)
 })
