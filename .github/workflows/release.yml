@@ -62,6 +62,15 @@ jobs:
         run: |
           python hack/changelog.py ${{ secrets.GITHUB_TOKEN }} ${{ needs.env.outputs.RELEASE_VERSION }} > /home/runner/work/changelog.txt
           cat /home/runner/work/changelog.txt
+      - name: setup helm
+        uses: azure/setup-helm@v1
+      - name: chart package
+        run: |
+          mkdir -p release
+          pushd release
+          helm package ../deploy/cluster-manager/chart/cluster-manager --app-version ${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}
+          helm package ../deploy/klusterlet/chart/klusterlet --app-version ${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}
+          popd
       - name: publish release
         if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
@@ -71,3 +80,49 @@ jobs:
           body_path: /home/runner/work/changelog.txt
           draft: true
           generate_release_notes: true
+          files: |
+            release/*.tgz
+      - name: submit cluster-manager chart to OCM chart repo
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.OCM_BOT_PAT }}
+          script: |
+            try {
+              const result = await github.rest.actions.createWorkflowDispatch({
+                owner:          'open-cluster-management-io',
+                repo:           'helm-charts',
+                workflow_id:    'download-chart.yml',
+                ref: 'main',
+                inputs: {
+                  repo:         "${{ github.repository }}",
+                  version:      "${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}",
+                  "chart-name": "cluster-manager",
+                },
+              })
+              console.log(result);
+            } catch(error) {
+              console.error(error);
+              core.setFailed(error);
+            }
+      - name: submit klusterlet chart to OCM chart repo
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.OCM_BOT_PAT }}
+          script: |
+            try {
+              const result = await github.rest.actions.createWorkflowDispatch({
+                owner:          'open-cluster-management-io',
+                repo:           'helm-charts',
+                workflow_id:    'download-chart.yml',
+                ref: 'main',
+                inputs: {
+                  repo:         "${{ github.repository }}",
+                  version:      "${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}",
+                  "chart-name": "klusterlet",
+                },
+              })
+              console.log(result);
+            } catch(error) {
+              console.error(error);
+              core.setFailed(error);
+            }
