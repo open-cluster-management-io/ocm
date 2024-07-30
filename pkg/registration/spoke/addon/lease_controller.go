@@ -160,7 +160,7 @@ func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
 			Type:    addonv1alpha1.ManagedClusterAddOnConditionAvailable,
 			Status:  metav1.ConditionUnknown,
 			Reason:  "ManagedClusterAddOnLeaseNotFound",
-			Message: fmt.Sprintf("The status of %s add-on is unknown.", addOn.Name),
+			Message: fmt.Sprintf("The status of %s add-on is unknown because get lease from hub failed: %v", addOn.Name, err),
 		}
 	case err != nil:
 		return err
