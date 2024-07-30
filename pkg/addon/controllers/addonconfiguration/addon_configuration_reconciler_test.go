@@ -154,12 +154,264 @@ func TestAddonConfigReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "mca override",
+			name: "cma install strategy override with multiple same-GVK",
 			managedClusteraddon: []runtime.Object{
-				newManagedClusterAddon("test", "cluster1", []addonv1alpha1.AddOnConfig{{
+				addontesting.NewAddon("test", "cluster1"),
+				addontesting.NewAddon("test", "cluster2"),
+			},
+			placements: []runtime.Object{
+				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
+			},
+			placementDecisions: []runtime.Object{
+				&clusterv1beta1.PlacementDecision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-placement",
+						Namespace: "default",
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "test-placement",
+							clusterv1beta1.DecisionGroupIndexLabel: "0",
+						},
+					},
+					Status: clusterv1beta1.PlacementDecisionStatus{
+						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster2"}},
+					},
+				},
+			},
+			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", "").WithSupportedConfigs(
+				addonv1alpha1.ConfigMeta{
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
-				}}, nil, nil),
+					DefaultConfig:       &addonv1alpha1.ConfigReferent{Name: "test"},
+				},
+				addonv1alpha1.ConfigMeta{
+					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+					DefaultConfig:       &addonv1alpha1.ConfigReferent{Name: "test"},
+				},
+			).WithDefaultConfigReferences(
+				addonv1alpha1.DefaultConfigReference{
+					ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+					DesiredConfig: &v1alpha1.ConfigSpecHash{
+						ConfigReferent: v1alpha1.ConfigReferent{Name: "test"},
+						SpecHash:       "hash",
+					},
+				},
+				addonv1alpha1.DefaultConfigReference{
+					ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+					DesiredConfig: &v1alpha1.ConfigSpecHash{
+						ConfigReferent: v1alpha1.ConfigReferent{Name: "test"},
+						SpecHash:       "hash",
+					},
+				},
+			).WithPlacementStrategy(addonv1alpha1.PlacementStrategy{
+				PlacementRef:    addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All},
+			}).WithInstallProgression(addonv1alpha1.InstallProgression{
+				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				ConfigReferences: []addonv1alpha1.InstallConfigReference{
+					{
+						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1"},
+							SpecHash:       "hash1",
+						},
+					},
+					{
+						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test2"},
+							SpecHash:       "hash2",
+						},
+					},
+				},
+			}).Build(),
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch", "patch")
+				sort.Sort(byPatchName(actions))
+				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
+							SpecHash:       "hash",
+						},
+						LastObservedGeneration: 0,
+					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
+							SpecHash:       "hash",
+						},
+						LastObservedGeneration: 0,
+					},
+				})
+				expectPatchConfigurationAction(t, actions[1], []addonv1alpha1.ConfigReference{
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
+							SpecHash:       "hash",
+						},
+						LastObservedGeneration: 0,
+					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+							SpecHash:       "hash1",
+						},
+						LastObservedGeneration: 0,
+					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+							SpecHash:       "hash2",
+						},
+						LastObservedGeneration: 0,
+					},
+				})
+			},
+		},
+		{
+			name: "mca override with multiple same-GVK",
+			managedClusteraddon: []runtime.Object{
+				newManagedClusterAddon("test", "cluster1", []addonv1alpha1.AddOnConfig{
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test3"},
+					},
+				}, nil, nil),
+				addontesting.NewAddon("test", "cluster2"),
+			},
+			placements: []runtime.Object{
+				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
+			},
+			placementDecisions: []runtime.Object{
+				&clusterv1beta1.PlacementDecision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-placement",
+						Namespace: "default",
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "test-placement",
+							clusterv1beta1.DecisionGroupIndexLabel: "0",
+						},
+					},
+					Status: clusterv1beta1.PlacementDecisionStatus{
+						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}, {ClusterName: "cluster2"}},
+					},
+				},
+			},
+			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", "").WithSupportedConfigs(
+				addonv1alpha1.ConfigMeta{
+					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+					DefaultConfig:       &addonv1alpha1.ConfigReferent{Name: "test"},
+				},
+				addonv1alpha1.ConfigMeta{
+					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+				},
+			).WithDefaultConfigReferences(addonv1alpha1.DefaultConfigReference{
+				ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+				DesiredConfig: &v1alpha1.ConfigSpecHash{
+					ConfigReferent: v1alpha1.ConfigReferent{Name: "test"},
+					SpecHash:       "hash",
+				},
+			}).WithPlacementStrategy(addonv1alpha1.PlacementStrategy{
+				PlacementRef:    addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All},
+			}).WithInstallProgression(addonv1alpha1.InstallProgression{
+				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				ConfigReferences: []addonv1alpha1.InstallConfigReference{
+					{
+						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+						DesiredConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1"},
+							SpecHash:       "hash1",
+						},
+					},
+					{
+						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1"},
+							SpecHash:       "hash1",
+						},
+					},
+				},
+			}).Build(),
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch", "patch")
+				sort.Sort(byPatchName(actions))
+				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+							SpecHash:       "hash1",
+						},
+						LastObservedGeneration: 0,
+					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+							SpecHash:       "",
+						},
+						LastObservedGeneration: 0,
+					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test3"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test3"},
+							SpecHash:       "",
+						},
+						LastObservedGeneration: 0,
+					},
+				})
+				expectPatchConfigurationAction(t, actions[1], []addonv1alpha1.ConfigReference{
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+							SpecHash:       "hash1",
+						},
+						LastObservedGeneration: 0,
+					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+							SpecHash:       "hash1",
+						},
+						LastObservedGeneration: 0,
+					}})
+			},
+		},
+		{
+			name: "duplicate configs",
+			managedClusteraddon: []runtime.Object{
+				newManagedClusterAddon("test", "cluster1", []addonv1alpha1.AddOnConfig{
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+					},
+				}, nil, nil),
 				addontesting.NewAddon("test", "cluster2"),
 			},
 			placements: []runtime.Object{
@@ -183,12 +435,6 @@ func TestAddonConfigReconcile(t *testing.T) {
 			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", "").WithSupportedConfigs(addonv1alpha1.ConfigMeta{
 				ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 				DefaultConfig:       &addonv1alpha1.ConfigReferent{Name: "test"},
-			}).WithDefaultConfigReferences(addonv1alpha1.DefaultConfigReference{
-				ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-				DesiredConfig: &v1alpha1.ConfigSpecHash{
-					ConfigReferent: v1alpha1.ConfigReferent{Name: "test"},
-					SpecHash:       "hash",
-				},
 			}).WithPlacementStrategy(addonv1alpha1.PlacementStrategy{
 				PlacementRef:    addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
 				RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All},
@@ -202,11 +448,17 @@ func TestAddonConfigReconcile(t *testing.T) {
 							SpecHash:       "hash1",
 						},
 					},
+					{
+						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1"},
+							SpecHash:       "hash1",
+						},
+					},
 				},
 			}).Build(),
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch", "patch")
-				sort.Sort(byPatchName(actions))
 				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{{
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
@@ -234,6 +486,10 @@ func TestAddonConfigReconcile(t *testing.T) {
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
 					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+						SpecHash:       "hash1",
+					},
+					LastAppliedConfig: &addonv1alpha1.ConfigSpecHash{
 						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
 						SpecHash:       "hash1",
 					},
@@ -299,6 +555,10 @@ func TestAddonConfigReconcile(t *testing.T) {
 						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
 						SpecHash:       "hash1",
 					},
+					LastAppliedConfig: &addonv1alpha1.ConfigSpecHash{
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+						SpecHash:       "hash1",
+					},
 					LastObservedGeneration: 1,
 				}}, nil),
 			},
@@ -349,6 +609,10 @@ func TestAddonConfigReconcile(t *testing.T) {
 					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
 						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
 						SpecHash:       "hash1new",
+					},
+					LastAppliedConfig: &addonv1alpha1.ConfigSpecHash{
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+						SpecHash:       "hash1",
 					},
 					LastObservedGeneration: 1,
 				}})
@@ -833,211 +1097,6 @@ func TestAddonConfigReconcile(t *testing.T) {
 					},
 					LastObservedGeneration: 0,
 				}})
-			},
-		},
-		{
-			name: "placement installStrategy multiple same-GVK",
-			managedClusteraddon: []runtime.Object{
-				addontesting.NewAddon("test", "cluster1"),
-				addontesting.NewAddon("test", "cluster2"),
-			},
-			placements: []runtime.Object{
-				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
-			},
-			placementDecisions: []runtime.Object{
-				&clusterv1beta1.PlacementDecision{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-placement",
-						Namespace: "default",
-						Labels: map[string]string{
-							clusterv1beta1.PlacementLabel:          "test-placement",
-							clusterv1beta1.DecisionGroupIndexLabel: "0",
-						},
-					},
-					Status: clusterv1beta1.PlacementDecisionStatus{
-						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster2"}},
-					},
-				},
-			},
-			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", "").WithSupportedConfigs(addonv1alpha1.ConfigMeta{
-				ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-				DefaultConfig:       &addonv1alpha1.ConfigReferent{Name: "test"},
-			}).WithDefaultConfigReferences(addonv1alpha1.DefaultConfigReference{
-				ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-				DesiredConfig: &v1alpha1.ConfigSpecHash{
-					ConfigReferent: v1alpha1.ConfigReferent{Name: "test"},
-					SpecHash:       "hash",
-				},
-			}).WithPlacementStrategy(addonv1alpha1.PlacementStrategy{
-				PlacementRef:    addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
-				RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All},
-			}).WithInstallProgression(addonv1alpha1.InstallProgression{
-				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
-				ConfigReferences: []addonv1alpha1.InstallConfigReference{
-					{
-						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-						DesiredConfig: &v1alpha1.ConfigSpecHash{
-							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1"},
-							SpecHash:       "hash1",
-						},
-					},
-					{
-						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-						DesiredConfig: &v1alpha1.ConfigSpecHash{
-							ConfigReferent: v1alpha1.ConfigReferent{Name: "test2"},
-							SpecHash:       "hash2",
-						},
-					},
-				},
-			}).Build(),
-			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch", "patch")
-				sort.Sort(byPatchName(actions))
-				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{{
-					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
-					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
-						SpecHash:       "hash",
-					},
-					LastObservedGeneration: 0,
-				}})
-				expectPatchConfigurationAction(t, actions[1], []addonv1alpha1.ConfigReference{
-					{
-						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
-						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
-							SpecHash:       "hash1",
-						},
-						LastObservedGeneration: 0,
-					},
-					{
-						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
-						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
-							SpecHash:       "hash2",
-						},
-						LastObservedGeneration: 0,
-					},
-				})
-			},
-		},
-		{
-			name: "placement installStrategy multiple same-GVK",
-			managedClusteraddon: []runtime.Object{
-				addontesting.NewManagedClusterAddon("test", "cluster1").WithStatusConfigReferences([]addonv1alpha1.ConfigReference{
-					{
-						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
-						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
-							SpecHash:       "hash1",
-						},
-						LastObservedGeneration: 0,
-					},
-					{
-						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
-						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
-							SpecHash:       "hash1",
-						},
-						LastObservedGeneration: 0,
-					},
-				}...).Build(),
-			},
-			placements: []runtime.Object{
-				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
-			},
-			placementDecisions: []runtime.Object{
-				&clusterv1beta1.PlacementDecision{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-placement",
-						Namespace: "default",
-						Labels: map[string]string{
-							clusterv1beta1.PlacementLabel:          "test-placement",
-							clusterv1beta1.DecisionGroupIndexLabel: "0",
-						},
-					},
-					Status: clusterv1beta1.PlacementDecisionStatus{
-						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}},
-					},
-				},
-			},
-			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", "").WithSupportedConfigs(addonv1alpha1.ConfigMeta{
-				ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-			}, addonv1alpha1.ConfigMeta{
-				ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-			}).WithPlacementStrategy(addonv1alpha1.PlacementStrategy{
-				PlacementRef:    addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
-				RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All},
-			}).WithInstallProgression(addonv1alpha1.InstallProgression{
-				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
-				ConfigReferences: []addonv1alpha1.InstallConfigReference{
-					{
-						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-						DesiredConfig: &v1alpha1.ConfigSpecHash{
-							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1"},
-							SpecHash:       "hash1",
-						},
-					},
-					{
-						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-						DesiredConfig: &v1alpha1.ConfigSpecHash{
-							ConfigReferent: v1alpha1.ConfigReferent{Name: "test2"},
-							SpecHash:       "hash2",
-						},
-					},
-					{
-						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-						DesiredConfig: &v1alpha1.ConfigSpecHash{
-							ConfigReferent: v1alpha1.ConfigReferent{Name: "test2"},
-							SpecHash:       "hash2",
-						},
-					},
-					{
-						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-						DesiredConfig: &v1alpha1.ConfigSpecHash{
-							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1"},
-							SpecHash:       "hash1",
-						},
-					},
-				},
-			}).Build(),
-			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch")
-				sort.Sort(byPatchName(actions))
-				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{
-					{
-						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
-						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
-							SpecHash:       "hash1",
-						},
-						LastObservedGeneration: 0,
-					},
-					{
-						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
-						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
-							SpecHash:       "hash2",
-						},
-						LastObservedGeneration: 0,
-					},
-					{
-						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
-						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
-							SpecHash:       "hash1",
-						},
-						LastObservedGeneration: 0,
-					},
-				})
 			},
 		},
 	}

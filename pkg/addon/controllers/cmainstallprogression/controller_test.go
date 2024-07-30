@@ -87,7 +87,7 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: addontesting.AssertNoActions,
 		},
 		{
-			name:                "update clustermanagementaddon status with type placements",
+			name:                "update clustermanagementaddon status with type placements with multiple same-GVK",
 			syncKey:             "test",
 			managedClusteraddon: []runtime.Object{},
 			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").WithPlacementStrategy(
@@ -103,6 +103,62 @@ func TestReconcile(t *testing.T) {
 						Namespace: "test",
 					},
 					Configs: []addonapiv1alpha1.AddOnConfig{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "addon.open-cluster-management.io",
+								Resource: "addondeploymentconfigs",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Name:      "test",
+								Namespace: "test",
+							},
+						},
+					},
+				},
+				addonapiv1alpha1.PlacementStrategy{
+					PlacementRef: addonapiv1alpha1.PlacementRef{
+						Name:      "placement3",
+						Namespace: "test",
+					},
+					Configs: []addonapiv1alpha1.AddOnConfig{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "addon.open-cluster-management.io",
+								Resource: "addondeploymentconfigs",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Name:      "test",
+								Namespace: "test",
+							},
+						},
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "addon.open-cluster-management.io",
+								Resource: "addondeploymentconfigs",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Name:      "test",
+								Namespace: "test1",
+							},
+						},
+					},
+				},
+				addonapiv1alpha1.PlacementStrategy{
+					PlacementRef: addonapiv1alpha1.PlacementRef{
+						Name:      "placement4",
+						Namespace: "test",
+					},
+					Configs: []addonapiv1alpha1.AddOnConfig{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "addon.open-cluster-management.io",
+								Resource: "addondeploymentconfigs",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Name:      "test",
+								Namespace: "test",
+							},
+						},
 						{
 							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
@@ -128,7 +184,7 @@ func TestReconcile(t *testing.T) {
 				if len(cma.Status.DefaultConfigReferences) != 0 {
 					t.Errorf("DefaultConfigReferences object is not correct: %v", cma.Status.DefaultConfigReferences)
 				}
-				if len(cma.Status.InstallProgressions) != 2 {
+				if len(cma.Status.InstallProgressions) != 4 {
 					t.Errorf("InstallProgressions object is not correct: %v", cma.Status.InstallProgressions)
 				}
 				if len(cma.Status.InstallProgressions[0].ConfigReferences) != 0 {
@@ -137,11 +193,16 @@ func TestReconcile(t *testing.T) {
 				if len(cma.Status.InstallProgressions[1].ConfigReferences) != 1 {
 					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
 				}
-
+				if len(cma.Status.InstallProgressions[2].ConfigReferences) != 2 {
+					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
+				}
+				if len(cma.Status.InstallProgressions[3].ConfigReferences) != 1 {
+					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
+				}
 			},
 		},
 		{
-			name:                "update clustermanagementaddon status with type placements and default configs",
+			name:                "update clustermanagementaddon status with type placements with multiple same-GVK and default configs",
 			syncKey:             "test",
 			managedClusteraddon: []runtime.Object{},
 			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").WithPlacementStrategy(
@@ -172,66 +233,6 @@ func TestReconcile(t *testing.T) {
 						{
 							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
-								Resource: "addondeploymentconfigs",
-							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Name:      "test",
-								Namespace: "test",
-							},
-						},
-					},
-				},
-			).WithSupportedConfigs(
-				addonapiv1alpha1.ConfigMeta{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-						Group:    "addon.open-cluster-management.io",
-						Resource: "addonhubconfigs",
-					},
-					DefaultConfig: &addonapiv1alpha1.ConfigReferent{
-						Name:      "test",
-						Namespace: "test",
-					},
-				}).Build()},
-			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch")
-				actual := actions[0].(clienttesting.PatchActionImpl).Patch
-				cma := &addonapiv1alpha1.ClusterManagementAddOn{}
-				err := json.Unmarshal(actual, cma)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				if len(cma.Status.DefaultConfigReferences) != 1 {
-					t.Errorf("DefaultConfigReferences object is not correct: %v", cma.Status.DefaultConfigReferences)
-				}
-				if len(cma.Status.InstallProgressions) != 2 {
-					t.Errorf("InstallProgressions object is not correct: %v", cma.Status.InstallProgressions)
-				}
-				if len(cma.Status.InstallProgressions[0].ConfigReferences) != 1 {
-					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
-				}
-				if cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig.Name != "test1" {
-					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig.Name)
-				}
-				if len(cma.Status.InstallProgressions[1].ConfigReferences) != 2 {
-					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
-				}
-			},
-		},
-		{
-			name:                "update clustermanagementaddon status with type placements and multiple same-GVK configs",
-			syncKey:             "test",
-			managedClusteraddon: []runtime.Object{},
-			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").WithPlacementStrategy(
-				addonapiv1alpha1.PlacementStrategy{
-					PlacementRef: addonapiv1alpha1.PlacementRef{
-						Name:      "placement1",
-						Namespace: "test",
-					},
-					Configs: []addonapiv1alpha1.AddOnConfig{
-						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-								Group:    "addon.open-cluster-management.io",
 								Resource: "addonhubconfigs",
 							},
 							ConfigReferent: addonapiv1alpha1.ConfigReferent{
@@ -251,6 +252,34 @@ func TestReconcile(t *testing.T) {
 						},
 					},
 				},
+				addonapiv1alpha1.PlacementStrategy{
+					PlacementRef: addonapiv1alpha1.PlacementRef{
+						Name:      "placement3",
+						Namespace: "test",
+					},
+					Configs: []addonapiv1alpha1.AddOnConfig{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "addon.open-cluster-management.io",
+								Resource: "addondeploymentconfigs",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Name:      "test3",
+								Namespace: "test",
+							},
+						},
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "addon.open-cluster-management.io",
+								Resource: "addondeploymentconfigs",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Name:      "test4",
+								Namespace: "test",
+							},
+						},
+					},
+				},
 			).WithSupportedConfigs(
 				addonapiv1alpha1.ConfigMeta{
 					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
@@ -274,17 +303,20 @@ func TestReconcile(t *testing.T) {
 				if len(cma.Status.DefaultConfigReferences) != 1 {
 					t.Errorf("DefaultConfigReferences object is not correct: %v", cma.Status.DefaultConfigReferences)
 				}
-				if len(cma.Status.InstallProgressions) != 1 {
+				if len(cma.Status.InstallProgressions) != 3 {
 					t.Errorf("InstallProgressions object is not correct: %v", cma.Status.InstallProgressions)
 				}
-				if len(cma.Status.InstallProgressions[0].ConfigReferences) != 2 {
+				if len(cma.Status.InstallProgressions[0].ConfigReferences) != 1 {
 					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
 				}
 				if cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig.Name != "test1" {
 					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig.Name)
 				}
-				if cma.Status.InstallProgressions[0].ConfigReferences[1].DesiredConfig.Name != "test2" {
-					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[1].DesiredConfig.Name)
+				if len(cma.Status.InstallProgressions[1].ConfigReferences) != 2 {
+					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
+				}
+				if len(cma.Status.InstallProgressions[2].ConfigReferences) != 3 {
+					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
 				}
 			},
 		},

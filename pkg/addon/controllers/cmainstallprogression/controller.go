@@ -2,6 +2,7 @@ package cmainstallprogression
 
 import (
 	"context"
+	"sort"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -131,7 +132,6 @@ func setInstallProgression(supportedConfigs []addonv1alpha1.ConfigMeta, placemen
 		}
 
 		// set config references as default configuration
-		installConfigReferences := []addonv1alpha1.InstallConfigReference{}
 		installConfigReferencesMap := map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReferent{}
 		for _, config := range supportedConfigs {
 			if config.DefaultConfig != nil {
@@ -139,29 +139,38 @@ func setInstallProgression(supportedConfigs []addonv1alpha1.ConfigMeta, placemen
 			}
 		}
 
-		installConfigReferencesResetArray := map[addonv1alpha1.ConfigGroupResource]struct{}{}
 		// override the default configuration for each placement
-		for _, config := range placementStrategy.Configs {
-			if _, ok := installConfigReferencesResetArray[config.ConfigGroupResource]; len(installConfigReferencesMap[config.ConfigGroupResource]) >= 0 && !ok {
-				installConfigReferencesMap[config.ConfigGroupResource] = []addonv1alpha1.ConfigReferent{}
-				installConfigReferencesResetArray[config.ConfigGroupResource] = struct{}{}
-			}
-			installConfigReferencesMap[config.ConfigGroupResource] = append(installConfigReferencesMap[config.ConfigGroupResource], config.ConfigReferent)
+		overrideConfigMapByAddOnConfigs(placementStrategy.Configs, installConfigReferencesMap)
+
+		// sort gvk
+		gvks := []addonv1alpha1.ConfigGroupResource{}
+		for gvk := range installConfigReferencesMap {
+			gvks = append(gvks, gvk)
 		}
+		sort.Slice(gvks, func(i, j int) bool {
+			if gvks[i].Group == gvks[j].Group {
+				return gvks[i].Resource < gvks[j].Resource
+			}
+			return gvks[i].Group < gvks[j].Group
+		})
 
 		// set the config references for each install progression
-		for k, vArry := range installConfigReferencesMap {
-			for _, v := range vArry {
-				installConfigReferences = append(installConfigReferences,
-					addonv1alpha1.InstallConfigReference{
-						ConfigGroupResource: k,
-						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-							ConfigReferent: v,
+		installConfigReferences := []addonv1alpha1.InstallConfigReference{}
+		for _, gvk := range gvks {
+			if configRefs, ok := installConfigReferencesMap[gvk]; ok {
+				for _, configRef := range configRefs {
+					installConfigReferences = append(installConfigReferences,
+						addonv1alpha1.InstallConfigReference{
+							ConfigGroupResource: gvk,
+							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+								ConfigReferent: configRef,
+							},
 						},
-					},
-				)
+					)
+				}
 			}
 		}
+
 		installProgression.ConfigReferences = installConfigReferences
 
 		// if the config group resource already exists in status, merge the install progression
@@ -196,7 +205,8 @@ func mergeInstallProgression(newobj, oldobj *addonv1alpha1.InstallProgression) {
 	// merge config reference
 	for i := range newobj.ConfigReferences {
 		for _, oldconfig := range oldobj.ConfigReferences {
-			if newobj.ConfigReferences[i].ConfigGroupResource == oldconfig.ConfigGroupResource && newobj.ConfigReferences[i].DesiredConfig.ConfigReferent == oldconfig.DesiredConfig.ConfigReferent {
+			if newobj.ConfigReferences[i].ConfigGroupResource == oldconfig.ConfigGroupResource &&
+				newobj.ConfigReferences[i].DesiredConfig.ConfigReferent == oldconfig.DesiredConfig.ConfigReferent {
 				if oldconfig.DesiredConfig.SpecHash != "" {
 					newobj.ConfigReferences[i].DesiredConfig.SpecHash = oldconfig.DesiredConfig.SpecHash
 				}
@@ -206,4 +216,29 @@ func mergeInstallProgression(newobj, oldobj *addonv1alpha1.InstallProgression) {
 		}
 	}
 	newobj.Conditions = oldobj.Conditions
+}
+
+func overrideConfigMapByAddOnConfigs(
+	addOnConfigs []addonv1alpha1.AddOnConfig,
+	desiredConfigs map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReferent,
+) {
+	gvkOverwritten := make(map[addonv1alpha1.ConfigGroupResource]struct{})
+	for _, config := range addOnConfigs {
+		gr := config.ConfigGroupResource
+		if _, exists := gvkOverwritten[gr]; !exists {
+			desiredConfigs[gr] = []addonv1alpha1.ConfigReferent{}
+			gvkOverwritten[gr] = struct{}{}
+		}
+		// check and avoid adding duplicate configs
+		var exist bool
+		for _, configReferent := range desiredConfigs[gr] {
+			if configReferent == config.ConfigReferent {
+				exist = true
+				break
+			}
+		}
+		if !exist {
+			desiredConfigs[gr] = append(desiredConfigs[gr], config.ConfigReferent)
+		}
+	}
 }
