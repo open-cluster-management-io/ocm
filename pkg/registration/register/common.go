@@ -1,10 +1,18 @@
 package register
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog/v2"
+
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 // BaseKubeConfigFromBootStrap builds kubeconfig from bootstrap without authInfo configurations
@@ -86,4 +94,72 @@ func IsHubKubeconfigValid(bootstrapKubeConfig, hubeKubeConfig *clientcmdapi.Conf
 	default:
 		return true, nil
 	}
+}
+
+func IsHubKubeConfigValidFunc(driver RegisterDriver, secretOption SecretOption) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (bool, error) {
+		logger := klog.FromContext(ctx)
+		if _, err := os.Stat(secretOption.HubKubeconfigFile); os.IsNotExist(err) {
+			logger.V(4).Info("Kubeconfig file not found", "kubeconfigPath", secretOption.HubKubeconfigFile)
+			return false, nil
+		}
+
+		// create a kubeconfig with references to the key/cert files in the same secret
+		hubKubeconfig, err := clientcmd.LoadFromFile(secretOption.HubKubeconfigFile)
+		if err != nil {
+			return false, err
+		}
+
+		if secretOption.BootStrapKubeConfig != nil {
+			if valid, err := IsHubKubeconfigValid(secretOption.BootStrapKubeConfig, hubKubeconfig); !valid || err != nil {
+				return valid, err
+			}
+		}
+
+		return driver.IsHubKubeConfigValid(ctx, secretOption)
+	}
+}
+
+// AggregatedApprover is a list of approver that hub controller will run at the same time
+type AggregatedApprover struct {
+	approvers []Approver
+}
+
+func NewAggregatedApprover(approvers ...Approver) Approver {
+	return &AggregatedApprover{
+		approvers: approvers,
+	}
+}
+
+func (a *AggregatedApprover) Run(ctx context.Context, workers int) {
+	for _, approver := range a.approvers {
+		go approver.Run(ctx, workers)
+	}
+
+	<-ctx.Done()
+}
+
+func (a *AggregatedApprover) Cleanup(ctx context.Context, cluster *clusterv1.ManagedCluster) error {
+	var errs []error
+	for _, approver := range a.approvers {
+		if err := approver.Cleanup(ctx, cluster); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.NewAggregate(errs)
+}
+
+// NoopApprover is an approver with no operation, for testing
+type NoopApprover struct{}
+
+func NewNoopApprover() Approver {
+	return &NoopApprover{}
+}
+
+func (a *NoopApprover) Run(ctx context.Context, _ int) {
+	<-ctx.Done()
+}
+
+func (a *NoopApprover) Cleanup(_ context.Context, _ *clusterv1.ManagedCluster) error {
+	return nil
 }
