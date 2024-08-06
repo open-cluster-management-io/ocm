@@ -77,7 +77,7 @@ type RegisterDriver interface {
 // to check the registration request from the agent and cleanup.
 type Approver interface {
 	// Run starts a reconciler on the hub side to monitor the registration request and approve the request
-	// if necessary.
+	// if necessary. This is a blocking call.
 	Run(ctx context.Context, workers int)
 
 	// Cleanup is executed when hubAcceptClient in ManagedCluster is set false or cluster is deleting. The hub controller
