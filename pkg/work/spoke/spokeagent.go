@@ -68,6 +68,10 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		return err
 	}
 
+	// copy the config for work and set specific userAgent
+	spokeRestConfig = rest.CopyConfig(spokeRestConfig)
+	spokeRestConfig.UserAgent = o.workOptions.DefaultUserAgent
+
 	spokeDynamicClient, err := dynamic.NewForConfig(spokeRestConfig)
 	if err != nil {
 		return err
@@ -95,7 +99,7 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		return err
 	}
 
-	hubHost, hubWorkClient, hubWorkInformer, err := o.newHubWorkClientAndInformer(ctx, restMapper)
+	hubHost, hubWorkClient, hubWorkInformer, err := o.newWorkClientAndInformer(ctx, restMapper)
 	if err != nil {
 		return err
 	}
@@ -210,7 +214,7 @@ func buildCodecs(codecNames []string, restMapper meta.RESTMapper) []generic.Code
 	return codecs
 }
 
-func (o *WorkAgentConfig) newHubWorkClientAndInformer(
+func (o *WorkAgentConfig) newWorkClientAndInformer(
 	ctx context.Context,
 	restMapper meta.RESTMapper,
 ) (string, workv1client.ManifestWorkInterface, workv1informers.ManifestWorkInformer, error) {

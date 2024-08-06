@@ -9,6 +9,8 @@ import (
 const (
 	manifestBundleCodecName = "manifestbundle"
 	manifestCodecName       = "manifest"
+
+	defaultUserAgent = "work-agent"
 )
 
 // WorkloadAgentOptions defines the flags for workload agent
@@ -20,6 +22,7 @@ type WorkloadAgentOptions struct {
 	WorkloadSourceConfig                   string
 	CloudEventsClientID                    string
 	CloudEventsClientCodecs                []string
+	DefaultUserAgent                       string
 }
 
 // NewWorkloadAgentOptions returns the flags with default value set
@@ -30,6 +33,7 @@ func NewWorkloadAgentOptions() *WorkloadAgentOptions {
 		AppliedManifestWorkEvictionGracePeriod: 60 * time.Minute,
 		WorkloadSourceDriver:                   "kube",
 		WorkloadSourceConfig:                   "/spoke/hub-kubeconfig/kubeconfig",
+		DefaultUserAgent:                       defaultUserAgent,
 	}
 }
 
