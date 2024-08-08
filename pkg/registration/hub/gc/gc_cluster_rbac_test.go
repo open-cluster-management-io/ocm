@@ -22,6 +22,7 @@ import (
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
+	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
 func TestGCClusterRbacController(t *testing.T) {
@@ -134,6 +135,7 @@ func TestGCClusterRbacController(t *testing.T) {
 				kubeInformerFactory.Rbac().V1().ClusterRoleBindings().Lister(),
 				kubeInformerFactory.Rbac().V1().RoleBindings().Lister(),
 				workInformerFactory.Work().V1().ManifestWorks().Lister(),
+				register.NewNoopApprover(),
 				events.NewInMemoryRecorder(""),
 				true,
 			)
@@ -146,6 +148,7 @@ func TestGCClusterRbacController(t *testing.T) {
 				roleBindingLister:                kubeInformerFactory.Rbac().V1().RoleBindings().Lister(),
 				manifestWorkLister:               workInformerFactory.Work().V1().ManifestWorks().Lister(),
 				clusterPatcher:                   clusterPatcher,
+				approver:                         register.NewNoopApprover(),
 				eventRecorder:                    events.NewInMemoryRecorder(""),
 				resourceCleanupFeatureGateEnable: true,
 			}

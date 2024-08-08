@@ -26,6 +26,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
+	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
 type gcReconcileOp int
@@ -65,6 +66,7 @@ func NewGCController(
 	clusterClient clientset.Interface,
 	kubeClient kubernetes.Interface,
 	metadataClient metadata.Interface,
+	approver register.Approver,
 	eventRecorder events.Recorder,
 	gcResourceList []string,
 	resourceCleanupFeatureGateEnable bool,
@@ -97,7 +99,7 @@ func NewGCController(
 
 	controller.gcReconcilers = append(controller.gcReconcilers,
 		newGCClusterRbacController(kubeClient, clusterPatcher, clusterInformer, clusterRoleLister,
-			clusterRoleBindingLister, roleBindingLister, manifestWorkLister, eventRecorder,
+			clusterRoleBindingLister, roleBindingLister, manifestWorkLister, approver, eventRecorder,
 			resourceCleanupFeatureGateEnable))
 
 	return factory.New().

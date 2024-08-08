@@ -22,6 +22,7 @@ import (
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
+	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
 func TestGController(t *testing.T) {
@@ -72,6 +73,7 @@ func TestGController(t *testing.T) {
 				clusterClient,
 				kubeClient,
 				metadataClient,
+				register.NewNoopApprover(),
 				events.NewInMemoryRecorder(""),
 				[]string{"addon.open-cluster-management.io/v1alpha1/managedclusteraddons",
 					"work.open-cluster-management.io/v1/manifestworks"},
@@ -94,6 +96,7 @@ func TestGController(t *testing.T) {
 						kubeInformerFactory.Rbac().V1().ClusterRoleBindings().Lister(),
 						kubeInformerFactory.Rbac().V1().RoleBindings().Lister(),
 						workInformerFactory.Work().V1().ManifestWorks().Lister(),
+						register.NewNoopApprover(),
 						events.NewInMemoryRecorder(""),
 						true),
 				},

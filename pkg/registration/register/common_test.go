@@ -1,10 +1,16 @@
 package register
 
 import (
+	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
 func TestBaseKubeConfigFromBootStrap(t *testing.T) {
@@ -99,6 +105,51 @@ func TestBaseKubeConfigFromBootStrap(t *testing.T) {
 
 			if !reflect.DeepEqual(c.expectedCAData, kubeConfig.Clusters[cluster].CertificateAuthorityData) {
 				t.Errorf("expect ca data %v, but %v", c.expectedCAData, kubeConfig.Clusters[cluster].CertificateAuthorityData)
+			}
+		})
+	}
+}
+
+type testApprover struct {
+	cleanupErr error
+}
+
+func newTestApprover(err error) Approver {
+	return &testApprover{cleanupErr: err}
+}
+
+func (t *testApprover) Run(_ context.Context, _ int) {}
+
+func (t *testApprover) Cleanup(_ context.Context, _ *clusterv1.ManagedCluster) error {
+	return t.cleanupErr
+}
+
+func TestAggregateApprover(t *testing.T) {
+	cases := []struct {
+		name      string
+		approvers []Approver
+		expectErr bool
+	}{
+		{
+			name:      "noop",
+			approvers: []Approver{NewNoopApprover()},
+		},
+		{
+			name:      "two approvers, one with err",
+			approvers: []Approver{NewNoopApprover(), newTestApprover(fmt.Errorf("error test"))},
+			expectErr: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			aggregated := NewAggregatedApprover(c.approvers...)
+			err := aggregated.Cleanup(context.Background(), testinghelpers.NewManagedCluster())
+			if err != nil && !c.expectErr {
+				t.Errorf("should have no err but got %v", err)
+			}
+			if err == nil && c.expectErr {
+				t.Errorf("should have err")
 			}
 		})
 	}

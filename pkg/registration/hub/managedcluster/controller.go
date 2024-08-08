@@ -30,6 +30,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/manifests"
+	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
 // this is an internal annotation to indicate a managed cluster is already accepted automatically, it is not
@@ -50,6 +51,7 @@ type managedClusterController struct {
 	clusterLister listerv1.ManagedClusterLister
 	applier       *apply.PermissionApplier
 	patcher       patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
+	approver      register.Approver
 	eventRecorder events.Recorder
 }
 
@@ -62,11 +64,13 @@ func NewManagedClusterController(
 	clusterRoleInformer rbacv1informers.ClusterRoleInformer,
 	rolebindingInformer rbacv1informers.RoleBindingInformer,
 	clusterRoleBindingInformer rbacv1informers.ClusterRoleBindingInformer,
+	approver register.Approver,
 	recorder events.Recorder) factory.Controller {
 	c := &managedClusterController{
 		kubeClient:    kubeClient,
 		clusterClient: clusterClient,
 		clusterLister: clusterInformer.Lister(),
+		approver:      approver,
 		applier: apply.NewPermissionApplier(
 			kubeClient,
 			roleInformer.Lister(),
@@ -130,6 +134,10 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		c.eventRecorder.Eventf("ManagedClusterDenied", "managed cluster %s is denied by hub cluster admin", managedClusterName)
 
 		if err := c.removeManagedClusterResources(ctx, managedClusterName); err != nil {
+			return err
+		}
+
+		if err = c.approver.Cleanup(ctx, managedCluster); err != nil {
 			return err
 		}
 

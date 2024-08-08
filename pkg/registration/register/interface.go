@@ -2,18 +2,16 @@ package register
 
 import (
 	"context"
-	"os"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/klog/v2"
+
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 const (
@@ -52,7 +50,8 @@ type SecretOption struct {
 // StatusUpdateFunc is A function to update the condition of the corresponding object.
 type StatusUpdateFunc func(ctx context.Context, cond metav1.Condition) error
 
-// RegisterDriver is the interface that each driver should implement
+// RegisterDriver is the interface that each driver should implement for the agent. The agent
+// uses the driver to build the kubeconfig or other crendential to connect to the hub cluster.
 type RegisterDriver interface {
 	// IsHubKubeConfigValid is to check if the current hube-kubeconfig is valid. It is called before
 	// and after bootstrap to confirm if the bootstrap is finished.
@@ -74,26 +73,14 @@ type RegisterDriver interface {
 	InformerHandler(option any) (cache.SharedIndexInformer, factory.EventFilterFunc)
 }
 
-func IsHubKubeConfigValidFunc(driver RegisterDriver, secretOption SecretOption) wait.ConditionWithContextFunc {
-	return func(ctx context.Context) (bool, error) {
-		logger := klog.FromContext(ctx)
-		if _, err := os.Stat(secretOption.HubKubeconfigFile); os.IsNotExist(err) {
-			logger.V(4).Info("Kubeconfig file not found", "kubeconfigPath", secretOption.HubKubeconfigFile)
-			return false, nil
-		}
+// Approvers is the inteface that each driver should implement on hub side. The hub controller will use this driver
+// to check the registration request from the agent and cleanup.
+type Approver interface {
+	// Run starts a reconciler on the hub side to monitor the registration request and approve the request
+	// if necessary.
+	Run(ctx context.Context, workers int)
 
-		// create a kubeconfig with references to the key/cert files in the same secret
-		hubKubeconfig, err := clientcmd.LoadFromFile(secretOption.HubKubeconfigFile)
-		if err != nil {
-			return false, err
-		}
-
-		if secretOption.BootStrapKubeConfig != nil {
-			if valid, err := IsHubKubeconfigValid(secretOption.BootStrapKubeConfig, hubKubeconfig); !valid || err != nil {
-				return valid, err
-			}
-		}
-
-		return driver.IsHubKubeConfigValid(ctx, secretOption)
-	}
+	// Cleanup is executed when hubAcceptClient in ManagedCluster is set false or cluster is deleting. The hub controller
+	// deletes rolebindings for the agent, and then this is the additional operation a driver should process.
+	Cleanup(ctx context.Context, cluster *clusterv1.ManagedCluster) error
 }

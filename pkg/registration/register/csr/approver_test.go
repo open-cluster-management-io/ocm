@@ -2,6 +2,7 @@ package csr
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
@@ -20,8 +22,10 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	ocmfeature "open-cluster-management.io/api/feature"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	"open-cluster-management.io/ocm/pkg/features"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/hub/user"
 )
@@ -202,7 +206,7 @@ func TestSync(t *testing.T) {
 			recorder := eventstesting.NewTestingEventRecorder(t)
 			ctrl := &csrApprovingController[*certificatesv1.CertificateSigningRequest]{
 				lister:   informerFactory.Certificates().V1().CertificateSigningRequests().Lister(),
-				approver: NewCSRV1Approver(kubeClient),
+				approver: newCSRV1Approver(kubeClient),
 				reconcilers: []Reconciler{
 					&csrBootstrapReconciler{
 						kubeClient:    kubeClient,
@@ -324,5 +328,22 @@ func TestIsSpokeClusterClientCertRenewal(t *testing.T) {
 				t.Errorf("expected %s, but failed", commonName)
 			}
 		})
+	}
+}
+
+func TestNewApprover(t *testing.T) {
+	kubeClient := kubefake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 3*time.Minute)
+	recorder := eventstesting.NewTestingEventRecorder(t)
+	utilruntime.Must(features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates))
+	_, err := NewCSRApprover(kubeClient, informerFactory, []string{}, recorder)
+	if err != nil {
+		t.Error(err)
+	}
+
+	features.HubMutableFeatureGate.Set(fmt.Sprintf("%s=true", ocmfeature.ManagedClusterAutoApproval))
+	_, err = NewCSRApprover(kubeClient, informerFactory, []string{}, recorder)
+	if err != nil {
+		t.Error(err)
 	}
 }

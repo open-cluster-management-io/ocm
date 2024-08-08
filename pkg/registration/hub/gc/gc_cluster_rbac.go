@@ -22,6 +22,7 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/manifests"
+	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
 var clusterRbacFiles = []string{
@@ -58,6 +59,7 @@ type gcClusterRbacController struct {
 	roleBindingLister                rbacv1listers.RoleBindingLister
 	manifestWorkLister               worklister.ManifestWorkLister
 	clusterPatcher                   patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus]
+	approver                         register.Approver
 	eventRecorder                    events.Recorder
 	resourceCleanupFeatureGateEnable bool
 }
@@ -71,6 +73,7 @@ func newGCClusterRbacController(
 	clusterRoleBindingLister rbacv1listers.ClusterRoleBindingLister,
 	roleBindingLister rbacv1listers.RoleBindingLister,
 	manifestWorkLister worklister.ManifestWorkLister,
+	approver register.Approver,
 	eventRecorder events.Recorder,
 	resourceCleanupFeatureGateEnable bool,
 ) gcReconciler {
@@ -83,6 +86,7 @@ func newGCClusterRbacController(
 		roleBindingLister:                roleBindingLister,
 		manifestWorkLister:               manifestWorkLister,
 		clusterPatcher:                   clusterPatcher,
+		approver:                         approver,
 		eventRecorder:                    eventRecorder.WithComponentSuffix("gc-cluster-rbac"),
 		resourceCleanupFeatureGateEnable: resourceCleanupFeatureGateEnable,
 	}
@@ -95,6 +99,10 @@ func (r *gcClusterRbacController) reconcile(ctx context.Context, cluster *cluste
 	}
 
 	if err := r.removeClusterRbac(ctx, cluster.Name); err != nil {
+		return gcReconcileContinue, err
+	}
+
+	if err := r.approver.Cleanup(ctx, cluster); err != nil {
 		return gcReconcileContinue, err
 	}
 
