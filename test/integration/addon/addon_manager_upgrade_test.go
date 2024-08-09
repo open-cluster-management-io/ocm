@@ -396,13 +396,6 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 						},
 						SpecHash: addOnTest2ConfigSpecHash,
 					},
-					LastAppliedConfig: &addonapiv1alpha1.ConfigSpecHash{
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
-							Namespace: configDefaultNamespace,
-							Name:      configDefaultName,
-						},
-						SpecHash: addOnTest1ConfigSpecHash,
-					},
 				})
 				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
@@ -460,20 +453,6 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 								Name:      configUpdateName,
 							},
 							SpecHash: addOnTest2ConfigSpecHash,
-						},
-						LastAppliedConfig: &addonapiv1alpha1.ConfigSpecHash{
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Namespace: configDefaultNamespace,
-								Name:      configDefaultName,
-							},
-							SpecHash: addOnTest1ConfigSpecHash,
-						},
-						LastKnownGoodConfig: &addonapiv1alpha1.ConfigSpecHash{
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Namespace: configDefaultNamespace,
-								Name:      configDefaultName,
-							},
-							SpecHash: addOnTest1ConfigSpecHash,
 						},
 					},
 				},

@@ -2,10 +2,12 @@ package cmainstallprogression
 
 import (
 	"context"
+	"sort"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -131,30 +133,45 @@ func setInstallProgression(supportedConfigs []addonv1alpha1.ConfigMeta, placemen
 		}
 
 		// set config references as default configuration
-		installConfigReferences := []addonv1alpha1.InstallConfigReference{}
-		installConfigReferencesMap := map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReferent{}
+		installConfigReferencesMap := map[addonv1alpha1.ConfigGroupResource]sets.Set[addonv1alpha1.ConfigReferent]{}
 		for _, config := range supportedConfigs {
 			if config.DefaultConfig != nil {
-				installConfigReferencesMap[config.ConfigGroupResource] = *config.DefaultConfig
+				installConfigReferencesMap[config.ConfigGroupResource] = sets.New[addonv1alpha1.ConfigReferent](*config.DefaultConfig)
 			}
 		}
 
 		// override the default configuration for each placement
-		for _, config := range placementStrategy.Configs {
-			installConfigReferencesMap[config.ConfigGroupResource] = config.ConfigReferent
+		overrideConfigMapByAddOnConfigs(installConfigReferencesMap, placementStrategy.Configs)
+
+		// sort gvk
+		gvks := []addonv1alpha1.ConfigGroupResource{}
+		for gvk := range installConfigReferencesMap {
+			gvks = append(gvks, gvk)
 		}
+		sort.Slice(gvks, func(i, j int) bool {
+			if gvks[i].Group == gvks[j].Group {
+				return gvks[i].Resource < gvks[j].Resource
+			}
+			return gvks[i].Group < gvks[j].Group
+		})
 
 		// set the config references for each install progression
-		for k, v := range installConfigReferencesMap {
-			installConfigReferences = append(installConfigReferences,
-				addonv1alpha1.InstallConfigReference{
-					ConfigGroupResource: k,
-					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-						ConfigReferent: v,
-					},
-				},
-			)
+		installConfigReferences := []addonv1alpha1.InstallConfigReference{}
+		for _, gvk := range gvks {
+			if configRefs, ok := installConfigReferencesMap[gvk]; ok {
+				for configRef := range configRefs {
+					installConfigReferences = append(installConfigReferences,
+						addonv1alpha1.InstallConfigReference{
+							ConfigGroupResource: gvk,
+							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+								ConfigReferent: configRef,
+							},
+						},
+					)
+				}
+			}
 		}
+
 		installProgression.ConfigReferences = installConfigReferences
 
 		// if the config group resource already exists in status, merge the install progression
@@ -172,7 +189,7 @@ func findInstallProgression(newobj *addonv1alpha1.InstallProgression, oldobjs []
 			count := 0
 			for _, oldconfig := range oldobj.ConfigReferences {
 				for _, newconfig := range newobj.ConfigReferences {
-					if oldconfig.ConfigGroupResource == newconfig.ConfigGroupResource {
+					if oldconfig.ConfigGroupResource == newconfig.ConfigGroupResource && oldconfig.DesiredConfig.ConfigReferent == newconfig.DesiredConfig.ConfigReferent {
 						count += 1
 					}
 				}
@@ -189,8 +206,9 @@ func mergeInstallProgression(newobj, oldobj *addonv1alpha1.InstallProgression) {
 	// merge config reference
 	for i := range newobj.ConfigReferences {
 		for _, oldconfig := range oldobj.ConfigReferences {
-			if newobj.ConfigReferences[i].ConfigGroupResource == oldconfig.ConfigGroupResource {
-				if newobj.ConfigReferences[i].DesiredConfig.ConfigReferent == oldconfig.DesiredConfig.ConfigReferent {
+			if newobj.ConfigReferences[i].ConfigGroupResource == oldconfig.ConfigGroupResource &&
+				newobj.ConfigReferences[i].DesiredConfig.ConfigReferent == oldconfig.DesiredConfig.ConfigReferent {
+				if oldconfig.DesiredConfig.SpecHash != "" {
 					newobj.ConfigReferences[i].DesiredConfig.SpecHash = oldconfig.DesiredConfig.SpecHash
 				}
 				newobj.ConfigReferences[i].LastAppliedConfig = oldconfig.LastAppliedConfig.DeepCopy()
@@ -199,4 +217,26 @@ func mergeInstallProgression(newobj, oldobj *addonv1alpha1.InstallProgression) {
 		}
 	}
 	newobj.Conditions = oldobj.Conditions
+}
+
+// Override the desired configs by a slice of AddOnConfig (from cma install strategy),
+func overrideConfigMapByAddOnConfigs(
+	desiredConfigs map[addonv1alpha1.ConfigGroupResource]sets.Set[addonv1alpha1.ConfigReferent],
+	addOnConfigs []addonv1alpha1.AddOnConfig,
+) {
+	gvkOverwritten := sets.New[addonv1alpha1.ConfigGroupResource]()
+	// Go through the cma install strategy configs,
+	// for a group of configs with same gvk, install strategy configs override the desiredConfigs.
+	for _, config := range addOnConfigs {
+		gr := config.ConfigGroupResource
+		if !gvkOverwritten.Has(gr) {
+			desiredConfigs[gr] = sets.New[addonv1alpha1.ConfigReferent]()
+			gvkOverwritten.Insert(gr)
+		}
+		// If a config not exist in the desiredConfigs, append it.
+		// This is to avoid adding duplicate configs (name + namespace).
+		if !desiredConfigs[gr].Has(config.ConfigReferent) {
+			desiredConfigs[gr].Insert(config.ConfigReferent)
+		}
+	}
 }

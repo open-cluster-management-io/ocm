@@ -115,11 +115,22 @@ func TestReconcile(t *testing.T) {
 					{
 						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "foo"},
 						DesiredConfig: &v1alpha1.ConfigSpecHash{
-							ConfigReferent: v1alpha1.ConfigReferent{Name: "test", Namespace: "open-cluster-management"},
-							SpecHash:       "hashnew",
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1", Namespace: "open-cluster-management"},
+							SpecHash:       "hash1new",
 						},
 						LastAppliedConfig: &v1alpha1.ConfigSpecHash{
-							ConfigReferent: v1alpha1.ConfigReferent{Name: "test", Namespace: "open-cluster-management"},
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1", Namespace: "open-cluster-management"},
+							SpecHash:       "",
+						},
+					},
+					{
+						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "foo"},
+						DesiredConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test2", Namespace: "open-cluster-management"},
+							SpecHash:       "hash2new",
+						},
+						LastAppliedConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test2", Namespace: "open-cluster-management"},
 							SpecHash:       "",
 						},
 					},
@@ -255,11 +266,22 @@ func TestReconcile(t *testing.T) {
 					{
 						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "foo"},
 						DesiredConfig: &v1alpha1.ConfigSpecHash{
-							ConfigReferent: v1alpha1.ConfigReferent{Name: "test", Namespace: "open-cluster-management"},
-							SpecHash:       "hashnew",
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1", Namespace: "open-cluster-management"},
+							SpecHash:       "hash1new",
 						},
 						LastAppliedConfig: &v1alpha1.ConfigSpecHash{
-							ConfigReferent: v1alpha1.ConfigReferent{Name: "test", Namespace: "open-cluster-management"},
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1", Namespace: "open-cluster-management"},
+							SpecHash:       "hash",
+						},
+					},
+					{
+						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "foo"},
+						DesiredConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test2", Namespace: "open-cluster-management"},
+							SpecHash:       "hash2new",
+						},
+						LastAppliedConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test2", Namespace: "open-cluster-management"},
 							SpecHash:       "hash",
 						},
 					},
@@ -395,11 +417,22 @@ func TestReconcile(t *testing.T) {
 					{
 						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "foo"},
 						DesiredConfig: &v1alpha1.ConfigSpecHash{
-							ConfigReferent: v1alpha1.ConfigReferent{Name: "test", Namespace: "open-cluster-management"},
-							SpecHash:       "hashnew",
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1", Namespace: "open-cluster-management"},
+							SpecHash:       "hash1new",
 						},
 						LastAppliedConfig: &v1alpha1.ConfigSpecHash{
-							ConfigReferent: v1alpha1.ConfigReferent{Name: "test", Namespace: "open-cluster-management"},
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1", Namespace: "open-cluster-management"},
+							SpecHash:       "",
+						},
+					},
+					{
+						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "foo"},
+						DesiredConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test2", Namespace: "open-cluster-management"},
+							SpecHash:       "hash2new",
+						},
+						LastAppliedConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test2", Namespace: "open-cluster-management"},
 							SpecHash:       "",
 						},
 					},
@@ -424,7 +457,8 @@ func TestReconcile(t *testing.T) {
 					addonapiv1alpha1.AddonLabelKey: "test",
 				})
 				work.SetAnnotations(map[string]string{
-					workapiv1.ManifestConfigSpecHashAnnotationKey: "{\"foo.core/open-cluster-management/test\":\"hashnew\"}",
+					workapiv1.ManifestConfigSpecHashAnnotationKey: "{\"foo.core/open-cluster-management/test1\":\"hash1new\"," +
+						"\"foo.core/open-cluster-management/test2\":\"hash2new\"}",
 				})
 				work.Status.Conditions = []metav1.Condition{
 					{
@@ -451,7 +485,7 @@ func TestReconcile(t *testing.T) {
 				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonCompleted && configCond.Status == metav1.ConditionFalse) {
 					t.Errorf("Condition Progressing is incorrect")
 				}
-				if len(addOn.Status.ConfigReferences) != 1 {
+				if len(addOn.Status.ConfigReferences) != 2 {
 					t.Errorf("ConfigReferences object is not correct: %v", addOn.Status.ConfigReferences)
 				}
 				if addOn.Status.ConfigReferences[0].LastAppliedConfig.SpecHash != addOn.Status.ConfigReferences[0].DesiredConfig.SpecHash {
@@ -468,11 +502,22 @@ func TestReconcile(t *testing.T) {
 					{
 						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "foo"},
 						DesiredConfig: &v1alpha1.ConfigSpecHash{
-							ConfigReferent: v1alpha1.ConfigReferent{Name: "test", Namespace: "open-cluster-management"},
-							SpecHash:       "hashnew",
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1", Namespace: "open-cluster-management"},
+							SpecHash:       "hash1new",
 						},
 						LastAppliedConfig: &v1alpha1.ConfigSpecHash{
-							ConfigReferent: v1alpha1.ConfigReferent{Name: "test", Namespace: "open-cluster-management"},
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1", Namespace: "open-cluster-management"},
+							SpecHash:       "hash",
+						},
+					},
+					{
+						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "foo"},
+						DesiredConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test2", Namespace: "open-cluster-management"},
+							SpecHash:       "hash2new",
+						},
+						LastAppliedConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test2", Namespace: "open-cluster-management"},
 							SpecHash:       "hash",
 						},
 					},
@@ -497,7 +542,8 @@ func TestReconcile(t *testing.T) {
 					addonapiv1alpha1.AddonLabelKey: "test",
 				})
 				work.SetAnnotations(map[string]string{
-					workapiv1.ManifestConfigSpecHashAnnotationKey: "{\"foo.core/open-cluster-management/test\":\"hashnew\"}",
+					workapiv1.ManifestConfigSpecHashAnnotationKey: "{\"foo.core/open-cluster-management/test1\":\"hash1new\"," +
+						"\"foo.core/open-cluster-management/test2\":\"hash2new\"}",
 				})
 				work.Status.Conditions = []metav1.Condition{
 					{
@@ -524,7 +570,7 @@ func TestReconcile(t *testing.T) {
 				if !(configCond != nil && configCond.Reason == addonapiv1alpha1.ProgressingReasonCompleted && configCond.Status == metav1.ConditionFalse) {
 					t.Errorf("Condition Progressing is incorrect")
 				}
-				if len(addOn.Status.ConfigReferences) != 1 {
+				if len(addOn.Status.ConfigReferences) != 2 {
 					t.Errorf("ConfigReferences object is not correct: %v", addOn.Status.ConfigReferences)
 				}
 				if addOn.Status.ConfigReferences[0].LastAppliedConfig.SpecHash != addOn.Status.ConfigReferences[0].DesiredConfig.SpecHash {

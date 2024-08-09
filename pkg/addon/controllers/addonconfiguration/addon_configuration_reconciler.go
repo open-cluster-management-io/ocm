@@ -46,36 +46,45 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 	mca *addonv1alpha1.ManagedClusterAddOn, desiredConfigMap addonConfigMap) *addonv1alpha1.ManagedClusterAddOn {
 	mcaCopy := mca.DeepCopy()
 
-	var mergedConfigs []addonv1alpha1.ConfigReference
-	// remove configs that are not desired
-	for _, config := range mcaCopy.Status.ConfigReferences {
-		if _, ok := desiredConfigMap[config.ConfigGroupResource]; ok {
-			mergedConfigs = append(mergedConfigs, config)
+	mergedConfigs := make(addonConfigMap)
+	// First go through the configReferences listed in mca status,
+	// if the existing config (gvk + namespace + name) is also in the desiredConfigMap, append it to mergedConfigs,
+	// this will save the LastAppliedConfig and LastObservedGeneration from mca status.
+	for _, configRef := range mcaCopy.Status.ConfigReferences {
+		gr := configRef.ConfigGroupResource
+		if _, ok := mergedConfigs[gr]; !ok {
+			mergedConfigs[gr] = []addonv1alpha1.ConfigReference{}
+		}
+		if _, ok := desiredConfigMap.containsConfig(gr, configRef.DesiredConfig.ConfigReferent); ok {
+			mergedConfigs[gr] = append(mergedConfigs[gr], configRef)
 		}
 	}
 
-	// append or update configs
-	for _, config := range desiredConfigMap {
-		var match bool
-		for i := range mergedConfigs {
-			if mergedConfigs[i].ConfigGroupResource != config.ConfigGroupResource {
-				continue
+	// Then go through the desiredConfigMap, for each configReference,
+	// if the desired config (gvk + namespace + name) is aleady in the mergedConfigs,
+	// update the ConfigReferent and DesiredConfig (including desired spechash) to mergedConfigs.
+	// else just append it to the mergedConfigs.
+	for gr, configReferences := range desiredConfigMap {
+		for _, configRef := range configReferences {
+			if _, ok := mergedConfigs[gr]; !ok {
+				mergedConfigs[gr] = []addonv1alpha1.ConfigReference{}
 			}
 
-			match = true
-			// set LastObservedGeneration to 0 when config name/namespace changes
-			if mergedConfigs[i].DesiredConfig != nil && (mergedConfigs[i].DesiredConfig.ConfigReferent != config.DesiredConfig.ConfigReferent) {
-				mergedConfigs[i].LastObservedGeneration = 0
+			referent := configRef.DesiredConfig.ConfigReferent
+			if i, exist := mergedConfigs.containsConfig(gr, referent); exist {
+				mergedConfigs[gr][i].ConfigReferent = configRef.ConfigReferent
+				mergedConfigs[gr][i].DesiredConfig = configRef.DesiredConfig.DeepCopy()
+			} else {
+				mergedConfigs[gr] = append(mergedConfigs[gr], configRef)
 			}
-			mergedConfigs[i].ConfigReferent = config.ConfigReferent
-			mergedConfigs[i].DesiredConfig = config.DesiredConfig.DeepCopy()
-		}
-
-		if !match {
-			mergedConfigs = append(mergedConfigs, config)
 		}
 	}
 
-	mcaCopy.Status.ConfigReferences = mergedConfigs
+	// sort by gvk and set the final config references
+	configRefs := []addonv1alpha1.ConfigReference{}
+	for _, gvk := range mergedConfigs.orderedKeys() {
+		configRefs = append(configRefs, mergedConfigs[gvk]...)
+	}
+	mcaCopy.Status.ConfigReferences = configRefs
 	return mcaCopy
 }

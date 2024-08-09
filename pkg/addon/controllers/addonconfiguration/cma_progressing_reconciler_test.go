@@ -130,6 +130,13 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 							SpecHash:       "hash1",
 						},
 					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+							SpecHash:       "hash2",
+						},
+					},
 				}
 				return addon
 			}()},
@@ -145,6 +152,13 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
 							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
 							SpecHash:       "hash1",
+						},
+					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+							SpecHash:       "hash2",
 						},
 					},
 				},
@@ -209,6 +223,17 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 							SpecHash:       "hash1",
 						},
 					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+							SpecHash:       "hash2",
+						},
+						LastAppliedConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+							SpecHash:       "hash2",
+						},
+					},
 				}
 				return addon
 			}()},
@@ -224,6 +249,13 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
 							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
 							SpecHash:       "hash1",
+						},
+					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+							SpecHash:       "hash2",
 						},
 					},
 				},
@@ -288,6 +320,13 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 							SpecHash:       "hash1",
 						},
 					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+							SpecHash:       "hash2",
+						},
+					},
 				}
 				return addon
 			}()},
@@ -306,6 +345,17 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 						},
 						LastAppliedConfig: &addonv1alpha1.ConfigSpecHash{
 							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+							SpecHash:       "hash",
+						},
+					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+							SpecHash:       "hash2",
+						},
+						LastAppliedConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
 							SpecHash:       "hash",
 						},
 					},
@@ -368,6 +418,17 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 							SpecHash:       "hash1",
 						},
 					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+							SpecHash:       "hash2",
+						},
+						LastAppliedConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+							SpecHash:       "hash2",
+						},
+					},
 				}
 				return addon
 			}()},
@@ -386,6 +447,17 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 						},
 						LastAppliedConfig: &addonv1alpha1.ConfigSpecHash{
 							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+							SpecHash:       "hash",
+						},
+					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+							SpecHash:       "hash2",
+						},
+						LastAppliedConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
 							SpecHash:       "hash",
 						},
 					},
