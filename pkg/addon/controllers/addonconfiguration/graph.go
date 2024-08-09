@@ -103,10 +103,16 @@ func (n *addonNode) setRolloutStatus() {
 }
 
 func (m addonConfigMap) copy() addonConfigMap {
-	output := make(addonConfigMap)
+	output := make(addonConfigMap, len(m))
 	for k, v := range m {
-		output[k] = make([]addonv1alpha1.ConfigReference, len(v))
-		copy(output[k], v)
+		// copy the key ConfigGroupResource
+		newk := k.DeepCopy()
+		// copy the slice of ConfigReference
+		newv := make([]addonv1alpha1.ConfigReference, len(v))
+		for i, cr := range v {
+			newv[i] = *cr.DeepCopy()
+		}
+		output[*newk] = newv
 	}
 	return output
 }
@@ -254,7 +260,7 @@ func (g *configurationGraph) addPlacementNode(
 	// overrides configuration by install strategy
 	if len(installConfigReference) > 0 {
 		node.desiredConfigs = node.desiredConfigs.copy()
-		overrideConfigMapByInstallConfigRef(installConfigReference, node.desiredConfigs)
+		overrideConfigMapByInstallConfigRef(node.desiredConfigs, installConfigReference)
 	}
 
 	// remove addon in defaults and other placements.
@@ -329,7 +335,7 @@ func (n *installStrategyNode) addNode(addon *addonv1alpha1.ManagedClusterAddOn) 
 	if len(addon.Spec.Configs) > 0 {
 		n.children[addon.Namespace].desiredConfigs = n.children[addon.Namespace].desiredConfigs.copy()
 		// TODO we should also filter out the configs which are not supported configs.
-		overrideConfigMapByAddOnConfigs(addon.Spec.Configs, n.children[addon.Namespace].desiredConfigs)
+		overrideConfigMapByAddOnConfigs(n.children[addon.Namespace].desiredConfigs, addon.Spec.Configs)
 
 		// copy the spechash from mca status
 		for _, configRef := range addon.Status.ConfigReferences {
@@ -496,21 +502,26 @@ func rolloutStatusHasCluster(clusterRolloutStatus []clustersdkv1alpha1.ClusterRo
 	return false
 }
 
+// Override the desired addonConfigMap by a slice of InstallConfigReference (from cma status),
 func overrideConfigMapByInstallConfigRef(
-	installConfigRefs []addonv1alpha1.InstallConfigReference,
 	desiredConfigs addonConfigMap,
+	installConfigRefs []addonv1alpha1.InstallConfigReference,
 ) {
-	gvkOverwritten := make(map[addonv1alpha1.ConfigGroupResource]struct{})
+	gvkOverwritten := sets.New[addonv1alpha1.ConfigGroupResource]()
+	// Go through the cma installConfigReferences,
+	// for a group of configs with same gvk, cma installConfigReferences override the desiredConfigs.
 	for _, configRef := range installConfigRefs {
 		if configRef.DesiredConfig == nil {
 			continue
 		}
 		gr := configRef.ConfigGroupResource
 		referent := configRef.DesiredConfig.ConfigReferent
-		if _, exist := gvkOverwritten[gr]; !exist {
+		if !gvkOverwritten.Has(gr) {
 			desiredConfigs[gr] = []addonv1alpha1.ConfigReference{}
-			gvkOverwritten[gr] = struct{}{}
+			gvkOverwritten.Insert(gr)
 		}
+		// If a config not exist in the desiredConfigs, append it.
+		// This is to avoid adding duplicate configs (name + namespace).
 		if _, exist := desiredConfigs.containsConfig(gr, referent); !exist {
 			desiredConfigs[gr] = append(desiredConfigs[gr], addonv1alpha1.ConfigReference{
 				ConfigGroupResource: gr,
@@ -521,18 +532,23 @@ func overrideConfigMapByInstallConfigRef(
 	}
 }
 
+// Override the desired addonConfigMap by a slice of InstallConfigReference (from mca spec),
 func overrideConfigMapByAddOnConfigs(
-	addOnConfigs []addonv1alpha1.AddOnConfig,
 	desiredConfigs addonConfigMap,
+	addOnConfigs []addonv1alpha1.AddOnConfig,
 ) {
-	gvkOverwritten := make(map[addonv1alpha1.ConfigGroupResource]struct{})
+	gvkOverwritten := sets.New[addonv1alpha1.ConfigGroupResource]()
+	// Go through the mca addOnConfigs,
+	// for a group of configs with same gvk, mca addOnConfigs override the desiredConfigs.
 	for _, config := range addOnConfigs {
 		gr := config.ConfigGroupResource
 		referent := config.ConfigReferent
-		if _, exist := gvkOverwritten[gr]; !exist {
+		if !gvkOverwritten.Has(gr) {
 			desiredConfigs[gr] = []addonv1alpha1.ConfigReference{}
-			gvkOverwritten[gr] = struct{}{}
+			gvkOverwritten.Insert(gr)
 		}
+		// If a config not exist in the desiredConfigs, append it.
+		// This is to avoid adding duplicate configs (name + namespace).
 		if _, exist := desiredConfigs.containsConfig(gr, referent); !exist {
 			desiredConfigs[gr] = append(desiredConfigs[gr], addonv1alpha1.ConfigReference{
 				ConfigGroupResource: gr,

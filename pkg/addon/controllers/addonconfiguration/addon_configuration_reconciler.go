@@ -47,7 +47,9 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 	mcaCopy := mca.DeepCopy()
 
 	mergedConfigs := make(addonConfigMap)
-	// remove configs that are not desired
+	// First go through the configReferences listed in mca status,
+	// if the existing config (gvk + namespace + name) is also in the desiredConfigMap, append it to mergedConfigs,
+	// this will save the LastAppliedConfig and LastObservedGeneration from mca status.
 	for _, configRef := range mcaCopy.Status.ConfigReferences {
 		gr := configRef.ConfigGroupResource
 		if _, ok := mergedConfigs[gr]; !ok {
@@ -58,7 +60,10 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 		}
 	}
 
-	// append or update configs
+	// Then go through the desiredConfigMap, for each configReference,
+	// if the desired config (gvk + namespace + name) is aleady in the mergedConfigs,
+	// update the ConfigReferent and DesiredConfig (including desired spechash) to mergedConfigs.
+	// else just append it to the mergedConfigs.
 	for gr, configReferences := range desiredConfigMap {
 		for _, configRef := range configReferences {
 			if _, ok := mergedConfigs[gr]; !ok {
