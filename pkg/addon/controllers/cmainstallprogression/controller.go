@@ -132,28 +132,35 @@ func setInstallProgression(supportedConfigs []addonv1alpha1.ConfigMeta, placemen
 
 		// set config references as default configuration
 		installConfigReferences := []addonv1alpha1.InstallConfigReference{}
-		installConfigReferencesMap := map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReferent{}
+		installConfigReferencesMap := map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReferent{}
 		for _, config := range supportedConfigs {
 			if config.DefaultConfig != nil {
-				installConfigReferencesMap[config.ConfigGroupResource] = *config.DefaultConfig
+				installConfigReferencesMap[config.ConfigGroupResource] = []addonv1alpha1.ConfigReferent{*config.DefaultConfig}
 			}
 		}
 
+		installConfigReferencesResetArray := map[addonv1alpha1.ConfigGroupResource]struct{}{}
 		// override the default configuration for each placement
 		for _, config := range placementStrategy.Configs {
-			installConfigReferencesMap[config.ConfigGroupResource] = config.ConfigReferent
+			if _, ok := installConfigReferencesResetArray[config.ConfigGroupResource]; len(installConfigReferencesMap[config.ConfigGroupResource]) >= 0 && !ok {
+				installConfigReferencesMap[config.ConfigGroupResource] = []addonv1alpha1.ConfigReferent{}
+				installConfigReferencesResetArray[config.ConfigGroupResource] = struct{}{}
+			}
+			installConfigReferencesMap[config.ConfigGroupResource] = append(installConfigReferencesMap[config.ConfigGroupResource], config.ConfigReferent)
 		}
 
 		// set the config references for each install progression
-		for k, v := range installConfigReferencesMap {
-			installConfigReferences = append(installConfigReferences,
-				addonv1alpha1.InstallConfigReference{
-					ConfigGroupResource: k,
-					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-						ConfigReferent: v,
+		for k, vArry := range installConfigReferencesMap {
+			for _, v := range vArry {
+				installConfigReferences = append(installConfigReferences,
+					addonv1alpha1.InstallConfigReference{
+						ConfigGroupResource: k,
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: v,
+						},
 					},
-				},
-			)
+				)
+			}
 		}
 		installProgression.ConfigReferences = installConfigReferences
 
@@ -172,7 +179,7 @@ func findInstallProgression(newobj *addonv1alpha1.InstallProgression, oldobjs []
 			count := 0
 			for _, oldconfig := range oldobj.ConfigReferences {
 				for _, newconfig := range newobj.ConfigReferences {
-					if oldconfig.ConfigGroupResource == newconfig.ConfigGroupResource {
+					if oldconfig.ConfigGroupResource == newconfig.ConfigGroupResource && oldconfig.DesiredConfig.ConfigReferent == newconfig.DesiredConfig.ConfigReferent {
 						count += 1
 					}
 				}
@@ -189,8 +196,8 @@ func mergeInstallProgression(newobj, oldobj *addonv1alpha1.InstallProgression) {
 	// merge config reference
 	for i := range newobj.ConfigReferences {
 		for _, oldconfig := range oldobj.ConfigReferences {
-			if newobj.ConfigReferences[i].ConfigGroupResource == oldconfig.ConfigGroupResource {
-				if newobj.ConfigReferences[i].DesiredConfig.ConfigReferent == oldconfig.DesiredConfig.ConfigReferent {
+			if newobj.ConfigReferences[i].ConfigGroupResource == oldconfig.ConfigGroupResource && newobj.ConfigReferences[i].DesiredConfig.ConfigReferent == oldconfig.DesiredConfig.ConfigReferent {
+				if oldconfig.DesiredConfig.SpecHash != "" {
 					newobj.ConfigReferences[i].DesiredConfig.SpecHash = oldconfig.DesiredConfig.SpecHash
 				}
 				newobj.ConfigReferences[i].LastAppliedConfig = oldconfig.LastAppliedConfig.DeepCopy()

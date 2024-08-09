@@ -46,36 +46,59 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 	mca *addonv1alpha1.ManagedClusterAddOn, desiredConfigMap addonConfigMap) *addonv1alpha1.ManagedClusterAddOn {
 	mcaCopy := mca.DeepCopy()
 
-	var mergedConfigs []addonv1alpha1.ConfigReference
+	mergedConfigs := make(map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReference)
 	// remove configs that are not desired
 	for _, config := range mcaCopy.Status.ConfigReferences {
 		if _, ok := desiredConfigMap[config.ConfigGroupResource]; ok {
-			mergedConfigs = append(mergedConfigs, config)
+			if _, ok := mergedConfigs[config.ConfigGroupResource]; !ok {
+				mergedConfigs[config.ConfigGroupResource] = []addonv1alpha1.ConfigReference{}
+			}
+			mergedConfigs[config.ConfigGroupResource] = append(mergedConfigs[config.ConfigGroupResource], config)
 		}
+	}
+
+	mergedConfigsCopy := make(map[addonv1alpha1.ConfigGroupResource][]addonv1alpha1.ConfigReference)
+	for gvk := range mergedConfigs {
+		mergedConfigsCopy[gvk] = append(mergedConfigsCopy[gvk], mergedConfigs[gvk]...)
 	}
 
 	// append or update configs
-	for _, config := range desiredConfigMap {
-		var match bool
-		for i := range mergedConfigs {
-			if mergedConfigs[i].ConfigGroupResource != config.ConfigGroupResource {
+	for _, configArray := range desiredConfigMap {
+		seenConfigs := map[addonv1alpha1.ConfigReferent]struct{}{}
+		for _, config := range configArray {
+			// Initialize GVK
+			if len(seenConfigs) == 0 {
+				mergedConfigs[config.ConfigGroupResource] = []addonv1alpha1.ConfigReference{}
+			}
+			// Skip duplicates
+			if _, ok := seenConfigs[config.DesiredConfig.ConfigReferent]; ok {
 				continue
 			}
 
-			match = true
-			// set LastObservedGeneration to 0 when config name/namespace changes
-			if mergedConfigs[i].DesiredConfig != nil && (mergedConfigs[i].DesiredConfig.ConfigReferent != config.DesiredConfig.ConfigReferent) {
-				mergedConfigs[i].LastObservedGeneration = 0
+			newConfig := addonv1alpha1.ConfigReference{
+				ConfigGroupResource:    config.ConfigGroupResource,
+				DesiredConfig:          config.DesiredConfig.DeepCopy(),
+				ConfigReferent:         config.ConfigReferent,
+				LastObservedGeneration: 0,
 			}
-			mergedConfigs[i].ConfigReferent = config.ConfigReferent
-			mergedConfigs[i].DesiredConfig = config.DesiredConfig.DeepCopy()
-		}
 
-		if !match {
-			mergedConfigs = append(mergedConfigs, config)
+			// Only reset observed generation if the config was previously observed
+			for _, exConfig := range mergedConfigsCopy[config.ConfigGroupResource] {
+				if exConfig.DesiredConfig != nil && (exConfig.DesiredConfig.ConfigReferent == config.DesiredConfig.ConfigReferent) {
+					newConfig.LastObservedGeneration = exConfig.LastObservedGeneration
+				}
+			}
+
+			mergedConfigs[config.ConfigGroupResource] = append(mergedConfigs[config.ConfigGroupResource], newConfig)
+			seenConfigs[config.DesiredConfig.ConfigReferent] = struct{}{}
 		}
 	}
 
-	mcaCopy.Status.ConfigReferences = mergedConfigs
+	configRefs := []addonv1alpha1.ConfigReference{}
+	for gvk := range mergedConfigs {
+		configRefs = append(configRefs, mergedConfigs[gvk]...)
+	}
+
+	mcaCopy.Status.ConfigReferences = configRefs
 	return mcaCopy
 }

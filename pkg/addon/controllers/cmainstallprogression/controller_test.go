@@ -218,6 +218,76 @@ func TestReconcile(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:                "update clustermanagementaddon status with type placements and multiple same-GVK configs",
+			syncKey:             "test",
+			managedClusteraddon: []runtime.Object{},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").WithPlacementStrategy(
+				addonapiv1alpha1.PlacementStrategy{
+					PlacementRef: addonapiv1alpha1.PlacementRef{
+						Name:      "placement1",
+						Namespace: "test",
+					},
+					Configs: []addonapiv1alpha1.AddOnConfig{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "addon.open-cluster-management.io",
+								Resource: "addonhubconfigs",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Name:      "test1",
+								Namespace: "test",
+							},
+						},
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "addon.open-cluster-management.io",
+								Resource: "addonhubconfigs",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Name:      "test2",
+								Namespace: "test",
+							},
+						},
+					},
+				},
+			).WithSupportedConfigs(
+				addonapiv1alpha1.ConfigMeta{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						Group:    "addon.open-cluster-management.io",
+						Resource: "addonhubconfigs",
+					},
+					DefaultConfig: &addonapiv1alpha1.ConfigReferent{
+						Name:      "test",
+						Namespace: "test",
+					},
+				}).Build()},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				actual := actions[0].(clienttesting.PatchActionImpl).Patch
+				cma := &addonapiv1alpha1.ClusterManagementAddOn{}
+				err := json.Unmarshal(actual, cma)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if len(cma.Status.DefaultConfigReferences) != 1 {
+					t.Errorf("DefaultConfigReferences object is not correct: %v", cma.Status.DefaultConfigReferences)
+				}
+				if len(cma.Status.InstallProgressions) != 1 {
+					t.Errorf("InstallProgressions object is not correct: %v", cma.Status.InstallProgressions)
+				}
+				if len(cma.Status.InstallProgressions[0].ConfigReferences) != 2 {
+					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
+				}
+				if cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig.Name != "test1" {
+					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig.Name)
+				}
+				if cma.Status.InstallProgressions[0].ConfigReferences[1].DesiredConfig.Name != "test2" {
+					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[1].DesiredConfig.Name)
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {
