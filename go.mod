@@ -38,7 +38,7 @@ require (
 	open-cluster-management.io/addon-framework v0.10.1-0.20240703130731-ba7fd000a03a
 	open-cluster-management.io/api v0.14.1-0.20240627145512-bd6f2229b53c
 	open-cluster-management.io/sdk-go v0.14.1-0.20240628095929-9ffb1b19e566
-	sigs.k8s.io/controller-runtime v0.18.4
+	sigs.k8s.io/controller-runtime v0.18.5
 	sigs.k8s.io/kube-storage-version-migrator v0.0.6-0.20230721195810-5c8923c5ff96
 	sigs.k8s.io/yaml v1.4.0
 )
