@@ -1,4 +1,4 @@
-package chartrender
+package chart
 
 import (
 	"fmt"
@@ -8,7 +8,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/yaml"
 
 	operatorv1 "open-cluster-management.io/api/operator/v1"
@@ -23,6 +26,18 @@ const (
 )
 
 var outputDebug = false
+
+var decoder runtime.Decoder
+var chartScheme = runtime.NewScheme()
+
+func init() {
+	_ = scheme.AddToScheme(chartScheme)
+	_ = apiextensionsv1.AddToScheme(chartScheme)
+	_ = apiextensionsv1beta1.AddToScheme(chartScheme)
+	_ = operatorv1.AddToScheme(chartScheme)
+
+	decoder = serializer.NewCodecFactory(chartScheme).UniversalDeserializer()
+}
 
 func TestClusterManagerConfig(t *testing.T) {
 	cases := []struct {
@@ -70,6 +85,7 @@ func TestClusterManagerConfig(t *testing.T) {
 			expectedObjCnt: 7,
 		},
 	}
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			registry := defaultRegistry
@@ -91,8 +107,14 @@ func TestClusterManagerConfig(t *testing.T) {
 				t.Errorf("expected %d objects, got %d", c.expectedObjCnt, len(objects))
 			}
 
+			outputObjs := make([]runtime.Object, 0, len(objects))
 			for _, o := range objects {
-				switch object := o.(type) {
+				obj, _, err := decoder.Decode(o, nil, nil)
+				if err != nil {
+					t.Errorf("error decoding object: %v", err)
+				}
+				outputObjs = append(outputObjs, obj)
+				switch object := obj.(type) {
 				case *appsv1.Deployment:
 					if object.Namespace != c.namespace {
 						t.Errorf("expected namespace is %s, but got %s", c.namespace, object.Namespace)
@@ -117,7 +139,9 @@ func TestClusterManagerConfig(t *testing.T) {
 			}
 
 			// output is for debug
-			// output(t, c.name, objects...)
+			if outputDebug {
+				output(t, c.name, outputObjs...)
+			}
 		})
 	}
 }
@@ -190,6 +214,7 @@ func TestKlusterletConfig(t *testing.T) {
 			expectedObjCnt: 2,
 		},
 	}
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			registry := defaultRegistry
@@ -210,8 +235,14 @@ func TestKlusterletConfig(t *testing.T) {
 				t.Errorf("expected %d objects, got %d", c.expectedObjCnt, len(objects))
 			}
 
+			outputObjs := make([]runtime.Object, 0, len(objects))
 			for _, o := range objects {
-				switch object := o.(type) {
+				obj, _, err := decoder.Decode(o, nil, nil)
+				if err != nil {
+					t.Errorf("error decoding object: %v", err)
+				}
+				outputObjs = append(outputObjs, obj)
+				switch object := obj.(type) {
 				case *appsv1.Deployment:
 					if object.Namespace != c.namespace {
 						t.Errorf("expected namespace is %s, but got %s", c.namespace, object.Namespace)
@@ -277,12 +308,11 @@ func TestKlusterletConfig(t *testing.T) {
 					}
 
 				}
-
 			}
 
 			// output is for debug
 			if outputDebug {
-				output(t, c.name, objects...)
+				output(t, c.name, outputObjs...)
 			}
 		})
 	}

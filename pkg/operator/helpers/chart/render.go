@@ -1,10 +1,8 @@
-package chartrender
+package chart
 
 import (
-	"bufio"
 	"embed"
 	"fmt"
-	"io"
 	"io/fs"
 	"path/filepath"
 	"strings"
@@ -13,32 +11,14 @@ import (
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/engine"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
-
-	operatorv1 "open-cluster-management.io/api/operator/v1"
 
 	clustermanagerchart "open-cluster-management.io/ocm/deploy/cluster-manager/chart"
 	klusterletchart "open-cluster-management.io/ocm/deploy/klusterlet/chart"
 )
-
-var chartScheme = runtime.NewScheme()
-var decoder runtime.Decoder
-
-func init() {
-	_ = scheme.AddToScheme(chartScheme)
-	_ = apiextensionsv1.AddToScheme(chartScheme)
-	_ = apiextensionsv1beta1.AddToScheme(chartScheme)
-	_ = operatorv1.AddToScheme(chartScheme)
-
-	decoder = serializer.NewCodecFactory(chartScheme).UniversalDeserializer()
-}
 
 func NewDefaultClusterManagerChartConfig() *clustermanagerchart.ChartConfig {
 	return &clustermanagerchart.ChartConfig{
@@ -54,7 +34,7 @@ func NewDefaultKlusterletChartConfig() *klusterletchart.ChartConfig {
 }
 
 func RenderChart[T *clustermanagerchart.ChartConfig | *klusterletchart.ChartConfig](config T,
-	namespace string, chartName string, fs embed.FS) ([]runtime.Object, error) {
+	namespace string, chartName string, fs embed.FS) ([][]byte, error) {
 	// chartName is the prefix of chart path here
 	operatorChart, err := LoadChart(fs, chartName)
 	if err != nil {
@@ -78,12 +58,12 @@ func RenderChart[T *clustermanagerchart.ChartConfig | *klusterletchart.ChartConf
 		return nil, err
 	}
 
-	objects, err := renderManifests(operatorChart, values)
+	rawObjects, err := renderManifests(operatorChart, values)
 	if err != nil {
 		return nil, fmt.Errorf("error rendering cluster manager chart: %v", err)
 	}
 
-	return objects, nil
+	return rawObjects, nil
 }
 
 func getFiles(manifestFS embed.FS) ([]string, error) {
@@ -151,20 +131,16 @@ func JsonStructToValues(a interface{}) (chartutil.Values, error) {
 		return nil, err
 	}
 	return vals, nil
-
 }
 
-func renderManifests(chart *chart.Chart, values chartutil.Values) ([]runtime.Object, error) {
-	var objects []runtime.Object
+func renderManifests(chart *chart.Chart, values chartutil.Values) ([][]byte, error) {
+	var rawObjects [][]byte
+
+	// make sure the CRDs are at the top.
 	crds := chart.CRDObjects()
 	for _, crd := range crds {
 		klog.V(4).Infof("%v/n", crd.File.Data)
-
-		object, _, err := decoder.Decode(crd.File.Data, nil, nil)
-		if err != nil {
-			return nil, err
-		}
-		objects = append(objects, object)
+		rawObjects = append(rawObjects, crd.File.Data)
 	}
 
 	helmEngine := engine.Engine{
@@ -174,37 +150,25 @@ func renderManifests(chart *chart.Chart, values chartutil.Values) ([]runtime.Obj
 
 	templates, err := helmEngine.Render(chart, values)
 	if err != nil {
-		return objects, err
+		return rawObjects, err
 	}
 
-	for k, data := range templates {
+	for _, data := range templates {
 		if len(data) == 0 {
 			continue
 		}
-		klog.V(4).Infof("rendered template: %v", data)
 
-		yamlReader := yaml.NewYAMLReader(bufio.NewReader(strings.NewReader(data)))
-		for {
-			b, err := yamlReader.Read()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				return nil, err
-			}
-			if len(b) != 0 {
-				object, _, err := decoder.Decode(b, nil, nil)
-				if err != nil {
-					// In some conditions, resources will not be rendered
-					if runtime.IsMissingKind(err) {
-						klog.V(4).Infof("Skipping template %v, reason: %v", k, err)
-						continue
-					}
-					return nil, err
-				}
-				objects = append(objects, object)
-			}
+		// remove invalid template
+		unstructuredObj := &unstructured.Unstructured{}
+		if err = yaml.Unmarshal([]byte(data), unstructuredObj); err != nil {
+			return nil, fmt.Errorf("error unmarshalling template: %v", err)
 		}
+		kind := unstructuredObj.GetKind()
+		if kind == "" {
+			continue
+		}
+
+		rawObjects = append(rawObjects, []byte(data))
 	}
-	return objects, nil
+	return rawObjects, nil
 }
