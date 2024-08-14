@@ -220,6 +220,10 @@ func (n *klusterletCleanupController) checkConnectivity(ctx context.Context,
 	if err == nil {
 		return true, nil
 	}
+	if errors.IsNotFound(err) {
+		klog.Infof("AppliedManifestWork not found, klusterlet %s", klusterlet.Name)
+		return true, nil
+	}
 
 	// if the managed cluster is destroyed, the returned err is TCP timeout or TCP no such host,
 	// the k8s.io/apimachinery/pkg/api/errors.IsTimeout,IsServerTimeout can not match this error
