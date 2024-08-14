@@ -59,9 +59,9 @@ metadata:
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
     containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2024-06-06T06:12:51Z"
+    createdAt: "2024-07-14T00:10:06Z"
     description: Manages the installation and upgrade of the ClusterManager.
-    operators.operatorframework.io/builder: operator-sdk-v1.28.0
+    operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/open-cluster-management-io/ocm
     support: Open Cluster Management Community
@@ -553,6 +553,7 @@ spec:
                     fieldRef:
                       fieldPath: metadata.name
                 image: quay.io/open-cluster-management/registration-operator:latest
+                imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -568,6 +569,8 @@ spec:
                     scheme: HTTPS
                   initialDelaySeconds: 2
                 resources:
+                  limits:
+                    memory: 2Gi
                   requests:
                     cpu: 2m
                     memory: 16Mi
@@ -582,6 +585,8 @@ spec:
                 volumeMounts:
                 - mountPath: /tmp
                   name: tmpdir
+              securityContext:
+                runAsNonRoot: true
               serviceAccountName: cluster-manager
               volumes:
               - emptyDir: {}
@@ -612,7 +617,7 @@ spec:
   maturity: alpha
   provider:
     name: Open Cluster Management Community
-  replaces: cluster-manager.v0.13.2
+  replaces: cluster-manager.v0.14.0
   selector:
     matchLabels:
       app: cluster-manager

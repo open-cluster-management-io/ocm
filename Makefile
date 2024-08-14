@@ -12,12 +12,21 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	lib/tmp.mk\
 )
 
+# Include the integration/e2e setup makefile.
+include ./test/integration-test.mk
+include ./test/e2e-test.mk
+include ./test/olm-test.mk
+
 OPERATOR_SDK?=$(PERMANENT_TMP_GOPATH)/bin/operator-sdk
 OPERATOR_SDK_VERSION?=v1.32.0
 operatorsdk_gen_dir:=$(dir $(OPERATOR_SDK))
 
+HELM?=$(PERMANENT_TMP_GOPATH)/bin/helm
+HELM_VERSION?=v3.14.0
+helm_gen_dir:=$(dir $(HELM))
+
 # RELEASED_CSV_VERSION is used to generate a released CSV manifests
-RELEASED_CSV_VERSION?=0.13.2
+RELEASED_CSV_VERSION?=0.14.0
 export RELEASED_CSV_VERSION
 
 # CSV_VERSION is used to generate latest CSV manifests
@@ -25,12 +34,15 @@ CSV_VERSION?=9.9.9
 export CSV_VERSION
 
 OPERATOR_SDK_ARCHOS:=linux_amd64
+HELM_ARCHOS:=linux-amd64
 ifeq ($(GOHOSTOS),darwin)
 	ifeq ($(GOHOSTARCH),amd64)
 		OPERATOR_SDK_ARCHOS:=darwin_amd64
+		HELM_ARCHOS:=darwin-amd64
 	endif
 	ifeq ($(GOHOSTARCH),arm64)
 		OPERATOR_SDK_ARCHOS:=darwin_arm64
+		HELM_ARCHOS:=darwin-arm64
 	endif
 endif
 
@@ -62,7 +74,11 @@ copy-crd:
 
 update: copy-crd update-csv
 
-update-csv: ensure-operator-sdk
+test-unit: ensure-kubebuilder-tools
+
+update-csv: ensure-operator-sdk ensure-operator-helm
+	bash -x hack/update-csv.sh
+
 	# update the replaces to released version in csv
 	$(SED_CMD) -i 's/cluster-manager\.v[0-9]\+\.[0-9]\+\.[0-9]\+/cluster-manager\.v$(RELEASED_CSV_VERSION)/g' deploy/cluster-manager/config/manifests/bases/cluster-manager.clusterserviceversion.yaml
 	$(SED_CMD) -i 's/klusterlet\.v[0-9]\+\.[0-9]\+\.[0-9]\+/klusterlet\.v$(RELEASED_CSV_VERSION)/g' deploy/klusterlet/config/manifests/bases/klusterlet.clusterserviceversion.yaml
@@ -110,7 +126,15 @@ else
 	$(info Using existing operator-sdk from "$(OPERATOR_SDK)")
 endif
 
-# Include the integration/e2e setup makefile.
-include ./test/integration-test.mk
-include ./test/e2e-test.mk
-include ./test/olm-test.mk
+ensure-operator-helm:
+ifeq "" "$(wildcard $(HELM))"
+	$(info Installing helm into '$(HELM)')
+	mkdir -p '$(helm_gen_dir)'
+	curl -s -f -L https://get.helm.sh/helm-$(HELM_VERSION)-$(HELM_ARCHOS).tar.gz -o '$(helm_gen_dir)$(HELM_VERSION)-$(HELM_ARCHOS).tar.gz'
+	tar -zvxf '$(helm_gen_dir)/$(HELM_VERSION)-$(HELM_ARCHOS).tar.gz' -C $(helm_gen_dir)
+	mv $(helm_gen_dir)/$(HELM_ARCHOS)/helm $(HELM)
+	rm -rf $(helm_gen_dir)/$(HELM_ARCHOS)
+	chmod +x '$(HELM)';
+else
+	$(info Using existing helm from "$(HELM)")
+endif

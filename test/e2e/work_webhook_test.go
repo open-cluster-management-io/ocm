@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
 
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
@@ -31,21 +32,21 @@ var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validati
 	})
 
 	ginkgo.AfterEach(func() {
-		ginkgo.By(fmt.Sprintf("delete manifestwork %v/%v", clusterName, workName))
-		gomega.Expect(t.cleanManifestWorks(clusterName, workName)).To(gomega.BeNil())
+		ginkgo.By(fmt.Sprintf("delete manifestwork %v/%v", universalClusterName, workName))
+		gomega.Expect(hub.CleanManifestWorks(universalClusterName, workName)).To(gomega.BeNil())
 	})
 
 	ginkgo.Context("Creating a manifestwork", func() {
 		ginkgo.It("Should respond bad request when creating a manifestwork with no manifests", func() {
-			work := newManifestWork(clusterName, workName)
-			_, err := t.HubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work := newManifestWork(universalClusterName, workName)
+			_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(errors.IsBadRequest(err)).Should(gomega.BeTrue())
 		})
 
 		ginkgo.It("Should respond bad request when creating a manifest with no name", func() {
-			work := newManifestWork(clusterName, workName, []runtime.Object{util.NewConfigmap("default", "", nil, nil)}...)
-			_, err := t.HubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work := newManifestWork(universalClusterName, workName, []runtime.Object{util.NewConfigmap("default", "", nil, nil)}...)
+			_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(errors.IsBadRequest(err)).Should(gomega.BeTrue())
 		})
@@ -63,10 +64,10 @@ var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validati
 				}
 
 				// create a temporary role
-				_, err := t.HubKubeClient.RbacV1().Roles(clusterName).Create(
+				_, err := hub.KubeClient.RbacV1().Roles(universalClusterName).Create(
 					context.TODO(), &rbacv1.Role{
 						ObjectMeta: metav1.ObjectMeta{
-							Namespace: clusterName,
+							Namespace: universalClusterName,
 							Name:      roleName,
 						},
 						Rules: []rbacv1.PolicyRule{
@@ -80,16 +81,16 @@ var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validati
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				// create a temporary rolebinding
-				_, err = t.HubKubeClient.RbacV1().RoleBindings(clusterName).Create(
+				_, err = hub.KubeClient.RbacV1().RoleBindings(universalClusterName).Create(
 					context.TODO(), &rbacv1.RoleBinding{
 						ObjectMeta: metav1.ObjectMeta{
-							Namespace: clusterName,
+							Namespace: universalClusterName,
 							Name:      roleName,
 						},
 						Subjects: []rbacv1.Subject{
 							{
 								Kind:      "ServiceAccount",
-								Namespace: clusterName,
+								Namespace: universalClusterName,
 								Name:      hubUser,
 							},
 						},
@@ -104,27 +105,29 @@ var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validati
 
 			ginkgo.AfterEach(func() {
 				// delete the temporary role
-				err := t.HubKubeClient.RbacV1().Roles(clusterName).Delete(context.TODO(), roleName, metav1.DeleteOptions{})
+				err := hub.KubeClient.RbacV1().Roles(universalClusterName).Delete(context.TODO(), roleName, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
 					gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				}
 
 				// delete the temporary rolebinding
-				err = t.HubKubeClient.RbacV1().RoleBindings(clusterName).Delete(context.TODO(), roleName, metav1.DeleteOptions{})
+				err = hub.KubeClient.RbacV1().RoleBindings(universalClusterName).Delete(context.TODO(), roleName, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
 					gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				}
 			})
 
 			ginkgo.It("Should respond bad request when no permission for nil executor", func() {
-				work := newManifestWork(clusterName, workName, []runtime.Object{util.NewConfigmap("default", "cm1", nil, nil)}...)
+				work := newManifestWork(universalClusterName, workName, []runtime.Object{util.NewConfigmap("default", "cm1", nil, nil)}...)
 
 				// impersonate as a hub user without execute-as permission
-				impersonatedConfig := *t.HubClusterCfg
-				impersonatedConfig.Impersonate.UserName = fmt.Sprintf("system:serviceaccount:%s:%s", clusterName, hubUser)
+				hubClusterCfg, err := clientcmd.BuildConfigFromFlags("", hubKubeconfig)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				impersonatedConfig := *hubClusterCfg
+				impersonatedConfig.Impersonate.UserName = fmt.Sprintf("system:serviceaccount:%s:%s", universalClusterName, hubUser)
 				impersonatedHubWorkClient, err := workclientset.NewForConfig(&impersonatedConfig)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-				_, err = impersonatedHubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
+				_, err = impersonatedHubWorkClient.WorkV1().ManifestWorks(universalClusterName).Create(
 					context.Background(), work, metav1.CreateOptions{})
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				if !errors.IsBadRequest(err) {
@@ -139,8 +142,8 @@ var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validati
 		var err error
 
 		ginkgo.BeforeEach(func() {
-			work := newManifestWork(clusterName, workName, []runtime.Object{util.NewConfigmap("default", "cm1", nil, nil)}...)
-			_, err = t.HubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work := newManifestWork(universalClusterName, workName, []runtime.Object{util.NewConfigmap("default", "cm1", nil, nil)}...)
+			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
@@ -148,11 +151,11 @@ var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validati
 			manifest := workapiv1.Manifest{}
 			manifest.Object = util.NewConfigmap("default", "", nil, nil)
 			err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				work, err := t.HubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				work, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 				work.Spec.Workload.Manifests = append(work.Spec.Workload.Manifests, manifest)
-				_, err = t.HubWorkClient.WorkV1().ManifestWorks(clusterName).Update(context.Background(), work, metav1.UpdateOptions{})
+				_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
 				return err
 			})
 
@@ -190,11 +193,11 @@ var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validati
 			}
 
 			err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				work, err := t.HubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				work, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 				work.Spec.Workload.Manifests = append(work.Spec.Workload.Manifests, manifests...)
-				_, err = t.HubWorkClient.WorkV1().ManifestWorks(clusterName).Update(context.Background(), work, metav1.UpdateOptions{})
+				_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
 				return err
 			})
 

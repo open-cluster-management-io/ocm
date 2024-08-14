@@ -1,0 +1,10 @@
+{{- if .Values.priorityClassName }}
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ .Values.priorityClassName }}
+value: 1000000
+globalDefault: false
+description: "This priority class should be used for klusterlet agents only."
+preemptionPolicy: PreemptLowerPriority
+{{- end }}

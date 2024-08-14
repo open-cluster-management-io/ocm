@@ -13,8 +13,14 @@ type RemediationStrategyType string
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // MachineHealthCheck is the Schema for the machinehealthchecks API
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=machinehealthchecks,scope=Namespaced,shortName=mhc;mhcs
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:shortName=mhc;mhcs
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/1032
+// +openshift:file-pattern=cvoRunLevel=0000_10,operatorName=machine-api,operatorOrdering=01
+// +openshift:capability=MachineAPI
+// +kubebuilder:metadata:annotations="exclude.release.openshift.io/internal-openshift-hosted=true"
+// +kubebuilder:metadata:annotations="include.release.openshift.io/self-managed-high-availability=true"
 // +k8s:openapi-gen=true
 // +kubebuilder:printcolumn:name="MaxUnhealthy",type="string",JSONPath=".spec.maxUnhealthy",description="Maximum number of unhealthy machines allowed"
 // +kubebuilder:printcolumn:name="ExpectedMachines",type="integer",JSONPath=".status.expectedMachines",description="Number of machines currently monitored"
@@ -138,5 +144,7 @@ type MachineHealthCheckStatus struct {
 
 	// Conditions defines the current state of the MachineHealthCheck
 	// +optional
-	Conditions Conditions `json:"conditions,omitempty"`
+	// +listType=map
+	// +listMapKey=type
+	Conditions []Condition `json:"conditions,omitempty"`
 }

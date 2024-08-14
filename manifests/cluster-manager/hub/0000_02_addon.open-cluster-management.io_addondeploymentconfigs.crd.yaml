@@ -15,19 +15,24 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: AddOnDeploymentConfig represents a configuration to customize
-          the deployments of an add-on. For example, you can specify the NodePlacement
-          to control the scheduling of the add-on agents.
+        description: |-
+          AddOnDeploymentConfig represents a configuration to customize the deployments of an add-on.
+          For example, you can specify the NodePlacement to control the scheduling of the add-on agents.
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -42,10 +47,10 @@ spec:
                 pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                 type: string
               customizedVariables:
-                description: CustomizedVariables is a list of name-value variables
-                  for the current add-on deployment. The add-on implementation can
-                  use these variables to render its add-on deployment. The default
-                  is an empty list.
+                description: |-
+                  CustomizedVariables is a list of name-value variables for the current add-on deployment.
+                  The add-on implementation can use these variables to render its add-on deployment.
+                  The default is an empty list.
                 items:
                   description: CustomizedVariable represents a customized variable
                     for add-on deployment.
@@ -67,73 +72,74 @@ spec:
                 - name
                 x-kubernetes-list-type: map
               nodePlacement:
-                description: NodePlacement enables explicit control over the scheduling
-                  of the add-on agents on the managed cluster. All add-on agent pods
-                  are expected to comply with this node placement. If the placement
-                  is nil, the placement is not specified, it will be omitted. If the
-                  placement is an empty object, the placement will match all nodes
-                  and tolerate nothing.
+                description: |-
+                  NodePlacement enables explicit control over the scheduling of the add-on agents on the
+                  managed cluster.
+                  All add-on agent pods are expected to comply with this node placement.
+                  If the placement is nil, the placement is not specified, it will be omitted.
+                  If the placement is an empty object, the placement will match all nodes and tolerate nothing.
                 properties:
                   nodeSelector:
                     additionalProperties:
                       type: string
-                    description: NodeSelector defines which Nodes the Pods are scheduled
-                      on. If the selector is an empty list, it will match all nodes.
+                    description: |-
+                      NodeSelector defines which Nodes the Pods are scheduled on.
+                      If the selector is an empty list, it will match all nodes.
                       The default is an empty list.
                     type: object
                   tolerations:
-                    description: Tolerations is attached by pods to tolerate any taint
-                      that matches the triple <key,value,effect> using the matching
-                      operator <operator>. If the tolerations is an empty list, it
-                      will tolerate nothing. The default is an empty list.
+                    description: |-
+                      Tolerations is attached by pods to tolerate any taint that matches
+                      the triple <key,value,effect> using the matching operator <operator>.
+                      If the tolerations is an empty list, it will tolerate nothing.
+                      The default is an empty list.
                     items:
-                      description: The pod this Toleration is attached to tolerates
-                        any taint that matches the triple <key,value,effect> using
-                        the matching operator <operator>.
+                      description: |-
+                        The pod this Toleration is attached to tolerates any taint that matches
+                        the triple <key,value,effect> using the matching operator <operator>.
                       properties:
                         effect:
-                          description: Effect indicates the taint effect to match.
-                            Empty means match all taint effects. When specified, allowed
-                            values are NoSchedule, PreferNoSchedule and NoExecute.
+                          description: |-
+                            Effect indicates the taint effect to match. Empty means match all taint effects.
+                            When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
                           type: string
                         key:
-                          description: Key is the taint key that the toleration applies
-                            to. Empty means match all taint keys. If the key is empty,
-                            operator must be Exists; this combination means to match
-                            all values and all keys.
+                          description: |-
+                            Key is the taint key that the toleration applies to. Empty means match all taint keys.
+                            If the key is empty, operator must be Exists; this combination means to match all values and all keys.
                           type: string
                         operator:
-                          description: Operator represents a key's relationship to
-                            the value. Valid operators are Exists and Equal. Defaults
-                            to Equal. Exists is equivalent to wildcard for value,
-                            so that a pod can tolerate all taints of a particular
-                            category.
+                          description: |-
+                            Operator represents a key's relationship to the value.
+                            Valid operators are Exists and Equal. Defaults to Equal.
+                            Exists is equivalent to wildcard for value, so that a pod can
+                            tolerate all taints of a particular category.
                           type: string
                         tolerationSeconds:
-                          description: TolerationSeconds represents the period of
-                            time the toleration (which must be of effect NoExecute,
-                            otherwise this field is ignored) tolerates the taint.
-                            By default, it is not set, which means tolerate the taint
-                            forever (do not evict). Zero and negative values will
-                            be treated as 0 (evict immediately) by the system.
+                          description: |-
+                            TolerationSeconds represents the period of time the toleration (which must be
+                            of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+                            it is not set, which means tolerate the taint forever (do not evict). Zero and
+                            negative values will be treated as 0 (evict immediately) by the system.
                           format: int64
                           type: integer
                         value:
-                          description: Value is the taint value the toleration matches
-                            to. If the operator is Exists, the value should be empty,
-                            otherwise just a regular string.
+                          description: |-
+                            Value is the taint value the toleration matches to.
+                            If the operator is Exists, the value should be empty, otherwise just a regular string.
                           type: string
                       type: object
                     type: array
                 type: object
               proxyConfig:
-                description: ProxyConfig holds proxy settings for add-on agent on
-                  the managed cluster. Empty means no proxy settings is available.
+                description: |-
+                  ProxyConfig holds proxy settings for add-on agent on the managed cluster.
+                  Empty means no proxy settings is available.
                 properties:
                   caBundle:
-                    description: CABundle is a CA certificate bundle to verify the
-                      proxy server. And it's only useful when HTTPSProxy is set and
-                      a HTTPS proxy server is specified.
+                    description: |-
+                      CABundle is a CA certificate bundle to verify the proxy server.
+                      And it's only useful when HTTPSProxy is set and a HTTPS proxy server is specified.
                     format: byte
                     type: string
                   httpProxy:
@@ -143,16 +149,21 @@ spec:
                     description: HTTPSProxy is the URL of the proxy for HTTPS requests
                     type: string
                   noProxy:
-                    description: NoProxy is a comma-separated list of hostnames and/or
-                      CIDRs and/or IPs for which the proxy should not be used.
+                    description: |-
+                      NoProxy is a comma-separated list of hostnames and/or CIDRs and/or IPs for which the proxy
+                      should not be used.
                     type: string
                 type: object
               registries:
-                description: "Registries describes how to override images used by
-                  the addon agent on the managed cluster. the following example will
-                  override image \"quay.io/open-cluster-management/addon-agent\" to
-                  \"quay.io/ocm/addon-agent\" when deploying the addon agent \n registries:
-                  - source: quay.io/open-cluster-management/addon-agent mirror: quay.io/ocm/addon-agent"
+                description: |-
+                  Registries describes how to override images used by the addon agent on the managed cluster.
+                  the following example will override image "quay.io/open-cluster-management/addon-agent" to
+                  "quay.io/ocm/addon-agent" when deploying the addon agent
+
+
+                  registries:
+                    - source: quay.io/open-cluster-management/addon-agent
+                      mirror: quay.io/ocm/addon-agent
                 items:
                   description: ImageMirror describes how to mirror images from a source
                   properties:

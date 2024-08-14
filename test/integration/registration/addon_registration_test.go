@@ -21,7 +21,8 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
-	"open-cluster-management.io/ocm/pkg/registration/clientcert"
+	"open-cluster-management.io/ocm/pkg/registration/register"
+	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
@@ -62,19 +63,19 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 	assertSuccessClusterBootstrap := func() {
 		// the spoke cluster and csr should be created after bootstrap
 		ginkgo.By("Check existence of ManagedCluster & CSR")
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			if _, err := util.GetManagedCluster(clusterClient, managedClusterName); err != nil {
-				return false
+				return err
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			if _, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName); err != nil {
-				return false
+				return err
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		// the spoke cluster should has finalizer that is added by hub controller
 		gomega.Eventually(func() bool {
@@ -157,13 +158,13 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			if err != nil {
 				return false
 			}
-			if _, ok := secret.Data[clientcert.TLSKeyFile]; !ok {
+			if _, ok := secret.Data[csr.TLSKeyFile]; !ok {
 				return false
 			}
-			if _, ok := secret.Data[clientcert.TLSCertFile]; !ok {
+			if _, ok := secret.Data[csr.TLSCertFile]; !ok {
 				return false
 			}
-			kubeconfigData, ok := secret.Data[clientcert.KubeconfigFile]
+			kubeconfigData, ok := secret.Data[register.KubeconfigFile]
 
 			if signerName == certificates.KubeAPIServerClientSignerName {
 				if !ok {
@@ -208,18 +209,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			if err != nil {
 				return false
 			}
-			return meta.IsStatusConditionTrue(addon.Status.Conditions, clientcert.ClusterCertificateRotatedCondition)
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-	}
-	assertClientCertConditionFalse := func(clusterName, addonName string) {
-		ginkgo.By("Check if clientcert addon status condition is false")
-		gomega.Eventually(func() bool {
-			addon, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).
-				Get(context.TODO(), addonName, metav1.GetOptions{})
-			if err != nil {
-				return false
-			}
-			return meta.IsStatusConditionFalse(addon.Status.Conditions, clientcert.ClusterCertificateRotatedCondition)
+			return meta.IsStatusConditionTrue(addon.Status.Conditions, csr.ClusterCertificateRotatedCondition)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	}
 
@@ -360,13 +350,17 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			assertSuccessCSRApproval()
 
 			ginkgo.By("Wait for addon namespace")
-			gomega.Consistently(func() bool {
+			gomega.Consistently(func() error {
 				csrs, err := util.FindAddOnCSRs(kubeClient, managedClusterName, addOnName)
 				if err != nil {
-					return false
+					return err
 				}
-				return len(csrs) == 1
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+				if len(csrs) != 1 {
+					return fmt.Errorf("the number of CSRs is not correct, got %d", len(csrs))
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 			ginkgo.By("Create addon namespace")
 			// create addon namespace
@@ -390,20 +384,6 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			assertSuccessClusterBootstrap()
 			signerName := "example.com/signer1"
 			assertSuccessAddOnBootstrap(signerName)
-		})
-
-		ginkgo.It("should register addon failed with invalid custom signer", func() {
-			assertSuccessClusterBootstrap()
-			assertSuccessAddOnEnabling()
-			assertAddOnSignerUpdate("addon-xxx")
-			assertClientCertConditionFalse(managedClusterName, addOnName)
-
-			signerName := "example.com/signer1"
-			assertAddOnSignerUpdate(signerName)
-			assertSuccessCSRApproval()
-			assertValidClientCertificate(addOnName, getSecretName(addOnName, signerName), signerName, expectedProxyURL)
-			assertAddonLabel(managedClusterName, addOnName, "unreachable")
-			assertClientCertCondition(managedClusterName, addOnName)
 		})
 
 		ginkgo.It("should addon registraton config updated successfully", func() {

@@ -1,8 +1,6 @@
 package spoke
 
 import (
-	"context"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -12,10 +10,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
+	"open-cluster-management.io/ocm/pkg/registration/register"
+	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 )
 
-func TestClientCertHealthChecker(t *testing.T) {
-	testDir, err := os.MkdirTemp("", "ClientCertHealthChecker")
+func TestHubKubeConfigHealthChecker(t *testing.T) {
+	testDir, err := os.MkdirTemp("", "HubKubeConfigHealthChecker")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -26,44 +26,52 @@ func TestClientCertHealthChecker(t *testing.T) {
 		}
 	}()
 
-	validCertFile := path.Join(testDir, "cert1.crt")
-	cert1 := testinghelpers.NewTestCert("cert1", 10*time.Minute)
-	err = ioutil.WriteFile(validCertFile, cert1.Cert, 0600)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	kubeconfig := testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil)
+	testinghelpers.WriteFile(path.Join(testDir, "kubeconfig"), kubeconfig)
 
-	expiredCertFile := path.Join(testDir, "cert2.crt")
-	cert2 := testinghelpers.NewTestCert("cert2", -1*time.Minute)
-	err = ioutil.WriteFile(expiredCertFile, cert2.Cert, 0600)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	validCert := testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 10*time.Minute)
+
+	expiredCert := testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", -1*time.Minute)
 
 	cases := []struct {
-		name        string
-		tlsCertFile string
-		unhealthy   bool
+		name      string
+		tlsCert   []byte
+		tlsKey    []byte
+		unhealthy bool
 	}{
 		{
-			name:        "valid client cert",
-			tlsCertFile: validCertFile,
+			name:    "valid client cert",
+			tlsKey:  validCert.Key,
+			tlsCert: validCert.Cert,
 		},
 		{
-			name:        "expired client cert",
-			tlsCertFile: expiredCertFile,
-			unhealthy:   true,
+			name:      "expired client cert",
+			tlsKey:    expiredCert.Key,
+			tlsCert:   expiredCert.Cert,
+			unhealthy: true,
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			hc := &clientCertHealthChecker{
-				interval: 1 * time.Second,
+			if c.tlsKey != nil {
+				testinghelpers.WriteFile(path.Join(testDir, "tls.key"), c.tlsKey)
+			}
+			if c.tlsCert != nil {
+				testinghelpers.WriteFile(path.Join(testDir, "tls.crt"), c.tlsCert)
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-			defer cancel()
-			hc.start(ctx, c.tlsCertFile)
+			driver := csr.NewCSRDriver()
+			secretOption := register.SecretOption{
+				ClusterName:       "cluster1",
+				AgentName:         "agent1",
+				HubKubeconfigDir:  testDir,
+				HubKubeconfigFile: path.Join(testDir, "kubeconfig"),
+			}
+
+			hc := &hubKubeConfigHealthChecker{
+				checkFunc:    register.IsHubKubeConfigValidFunc(driver, secretOption),
+				bootstrapped: true,
+			}
 
 			err := hc.Check(nil)
 			if c.unhealthy && err == nil {

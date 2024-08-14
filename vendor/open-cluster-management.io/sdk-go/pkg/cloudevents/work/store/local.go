@@ -25,17 +25,19 @@ type watchEvent struct {
 	Type watch.EventType
 }
 
-var _ watch.Interface = &LocalWatcherStore{}
-var _ WorkClientWatcherStore = &LocalWatcherStore{}
+var _ WorkClientWatcherStore = &SourceLocalWatcherStore{}
 
-// LocalWatcherStore caches the works in this local store and provide the watch ability by watch event channel.
-type LocalWatcherStore struct {
-	baseStore
+// SourceLocalWatcherStore caches the works in this local store and provide the watch ability by watch event channel.
+//
+// It is used for building ManifestWork source client.
+type SourceLocalWatcherStore struct {
+	baseSourceStore
+	watcher    *workWatcher
 	eventQueue cache.Queue
 }
 
-// NewLocalWatcherStore returns a LocalWatcherStore with works that list by ListLocalWorksFunc
-func NewLocalWatcherStore(ctx context.Context, listFunc ListLocalWorksFunc) (*LocalWatcherStore, error) {
+// NewSourceLocalWatcherStore returns a LocalWatcherStore with works that list by ListLocalWorksFunc
+func NewSourceLocalWatcherStore(ctx context.Context, listFunc ListLocalWorksFunc) (*SourceLocalWatcherStore, error) {
 	works, err := listFunc(ctx)
 	if err != nil {
 		return nil, err
@@ -53,24 +55,19 @@ func NewLocalWatcherStore(ctx context.Context, listFunc ListLocalWorksFunc) (*Lo
 		}
 	}
 
-	s := &LocalWatcherStore{
-		baseStore: baseStore{
-			// A channel for watcher, it's easy for a consumer to add buffering via an extra
-			// goroutine/channel, but impossible for them to remove it, so nonbuffered is better.
-			result: make(chan watch.Event),
-			// If the watcher is externally stopped there is no receiver anymore
-			// and the send operations on the result channel, especially the
-			// error reporting might block forever.
-			// Therefore a dedicated stop channel is used to resolve this blocking.
-			done: make(chan struct{}),
-
-			store:     store,
-			initiated: true,
+	s := &SourceLocalWatcherStore{
+		baseSourceStore: baseSourceStore{
+			baseStore: baseStore{
+				store:     store,
+				initiated: true,
+			},
 
 			// A queue to save the received work events, it helps us retry events
 			// where errors occurred while processing
 			receivedWorks: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "local-watcher-store"),
 		},
+
+		watcher: newWorkWatcher(),
 
 		// A queue to save the work client send events, if run a client without a watcher,
 		// it will block the client, this queue helps to resolve this blocking.
@@ -86,7 +83,7 @@ func NewLocalWatcherStore(ctx context.Context, listFunc ListLocalWorksFunc) (*Lo
 	}
 
 	// start a goroutine to process the received work events from the work queue with current store.
-	go newWorkProcessor(s.baseStore.receivedWorks, s).run(ctx.Done())
+	go newWorkProcessor(s.receivedWorks, s).run(ctx.Done())
 
 	// start a goroutine to handle the events that are produced by work client
 	go wait.Until(s.processLoop, time.Second, ctx.Done())
@@ -95,7 +92,7 @@ func NewLocalWatcherStore(ctx context.Context, listFunc ListLocalWorksFunc) (*Lo
 }
 
 // Add a work to the cache and send an event to the event queue
-func (s *LocalWatcherStore) Add(work *workv1.ManifestWork) error {
+func (s *SourceLocalWatcherStore) Add(work *workv1.ManifestWork) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -107,7 +104,7 @@ func (s *LocalWatcherStore) Add(work *workv1.ManifestWork) error {
 }
 
 // Update a work in the cache and send an event to the event queue
-func (s *LocalWatcherStore) Update(work *workv1.ManifestWork) error {
+func (s *SourceLocalWatcherStore) Update(work *workv1.ManifestWork) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -119,7 +116,7 @@ func (s *LocalWatcherStore) Update(work *workv1.ManifestWork) error {
 }
 
 // Delete a work from the cache and send an event to the event queue
-func (s *LocalWatcherStore) Delete(work *workv1.ManifestWork) error {
+func (s *SourceLocalWatcherStore) Delete(work *workv1.ManifestWork) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -130,8 +127,21 @@ func (s *LocalWatcherStore) Delete(work *workv1.ManifestWork) error {
 	return s.eventQueue.Update(&watchEvent{Key: key(work), Type: watch.Deleted})
 }
 
+func (s *SourceLocalWatcherStore) HasInitiated() bool {
+	return s.initiated
+}
+
+func (s *SourceLocalWatcherStore) GetWatcher(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+	// TODO may consider to support watch with namespace
+	if namespace != metav1.NamespaceAll {
+		return nil, fmt.Errorf("unsupported to watch from the namespace %s", namespace)
+	}
+
+	return s.watcher, nil
+}
+
 // processLoop drains the work event queue and send the event to the watch channel.
-func (s *LocalWatcherStore) processLoop() {
+func (s *SourceLocalWatcherStore) processLoop() {
 	for {
 		// this will be blocked until the event queue has events
 		obj, err := s.eventQueue.Pop(func(interface{}, bool) error {
@@ -173,7 +183,7 @@ func (s *LocalWatcherStore) processLoop() {
 
 				// the work has been deleted, return a work only with its namespace and name
 				// this will be blocked until this event is consumed
-				s.result <- watch.Event{
+				s.watcher.Receive(watch.Event{
 					Type: watch.Deleted,
 					Object: &workv1.ManifestWork{
 						ObjectMeta: metav1.ObjectMeta{
@@ -181,7 +191,7 @@ func (s *LocalWatcherStore) processLoop() {
 							Namespace: namespace,
 						},
 					},
-				}
+				})
 				return
 			}
 
@@ -196,12 +206,8 @@ func (s *LocalWatcherStore) processLoop() {
 		}
 
 		// this will be blocked until this event is consumed
-		s.result <- watch.Event{Type: evt.Type, Object: work}
+		s.watcher.Receive(watch.Event{Type: evt.Type, Object: work})
 	}
-}
-
-func (c *LocalWatcherStore) HasInitiated() bool {
-	return c.initiated
 }
 
 func key(work *workv1.ManifestWork) string {

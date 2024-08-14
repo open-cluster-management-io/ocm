@@ -1,0 +1,33 @@
+apiVersion: operator.open-cluster-management.io/v1
+kind: ClusterManager
+metadata:
+  name: cluster-manager
+spec:
+  registrationImagePullSpec: {{ .Values.images.registry }}/registration:{{ template "imageTag" . }}
+  workImagePullSpec: {{ .Values.images.registry }}/work:{{ template "imageTag" . }}
+  placementImagePullSpec: {{ .Values.images.registry }}/placement:{{ template "imageTag" . }}
+  addOnManagerImagePullSpec: {{ .Values.images.registry }}/addon-manager:{{ template "imageTag" . }}
+  deployOption:
+    mode: {{ .Values.clusterManager.mode }}
+  {{- with .Values.clusterManager.resourceRequirement }}
+  resourceRequirement:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  registrationConfiguration:
+    {{- if .Values.createBootstrapToken }}
+    autoApproveUsers:
+      - system:bootstrap:bootstrap-token-{{ template "tokenID" .}}
+      - system:serviceaccount:open-cluster-management:cluster-bootstrap
+    {{- end }}
+    {{- with .Values.clusterManager.registrationConfiguration.featureGates }}
+    featureGates:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- with .Values.clusterManager.workConfiguration }}
+  workConfiguration:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{if .Values.clusterManager.addOnManagerConfiguration }}
+  addOnManagerConfiguration:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}

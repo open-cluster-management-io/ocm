@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	certutil "k8s.io/client-go/util/cert"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -28,8 +29,9 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
-	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 	"open-cluster-management.io/ocm/pkg/registration/hub"
+	"open-cluster-management.io/ocm/pkg/registration/register"
+	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
@@ -213,13 +215,13 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 			if err != nil {
 				return false
 			}
-			if _, ok := secret.Data[clientcert.TLSKeyFile]; !ok {
+			if _, ok := secret.Data[csr.TLSKeyFile]; !ok {
 				return false
 			}
-			if _, ok := secret.Data[clientcert.TLSCertFile]; !ok {
+			if _, ok := secret.Data[csr.TLSCertFile]; !ok {
 				return false
 			}
-			_, ok := secret.Data[clientcert.KubeconfigFile]
+			_, ok := secret.Data[register.KubeconfigFile]
 			if !ok && signerName == certificates.KubeAPIServerClientSignerName {
 				return false
 			}
@@ -296,20 +298,22 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 	}
 
 	startAgent := func(ctx context.Context, managedClusterName, hubKubeconfigDir string,
-		agentOptions *spoke.SpokeAgentOptions) (context.Context, context.CancelFunc) {
+		agentOptions *spoke.SpokeAgentOptions) (context.Context, context.CancelFunc, *spoke.SpokeAgentConfig) {
 		ginkgo.By("run registration agent")
 		commOptions := commonoptions.NewAgentOptions()
 		commOptions.HubKubeconfigDir = hubKubeconfigDir
 		commOptions.SpokeClusterName = managedClusterName
 
 		agentCtx, stopAgent := context.WithCancel(ctx)
-		runAgentWithContext(agentCtx, "rebootstrap-test", agentOptions, commOptions, spokeCfg)
+		agentConfig := spoke.NewSpokeAgentConfig(commOptions, agentOptions)
+		runAgentWithContext(agentCtx, "rebootstrap-test", agentConfig, spokeCfg)
 
-		return agentCtx, stopAgent
+		return agentCtx, stopAgent, agentConfig
 	}
 
 	ginkgo.JustBeforeEach(func() {
 		var spokeCtx, agentCtx context.Context
+		var agentConfig *spoke.SpokeAgentConfig
 		var stopAgent context.CancelFunc
 
 		// ensure there is no remaining bootstrap-hub-kubeconfig secret
@@ -333,7 +337,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 		agentOptions.HubKubeconfigSecret = hubKubeconfigSecret
 
 		spokeCtx, stopSpoke = context.WithCancel(context.Background())
-		agentCtx, stopAgent = startAgent(spokeCtx, managedClusterName, hubKubeconfigDir, agentOptions)
+		agentCtx, stopAgent, agentConfig = startAgent(spokeCtx, managedClusterName, hubKubeconfigDir, agentOptions)
 
 		// simulate k8s scheduler to perform heath check and restart the agent if it is down/unhealth
 		go func() {
@@ -344,7 +348,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 				case <-ticker.C:
 					// health check
 					fmt.Println("[agent-scheduler] - start health checking...")
-					for _, healthchecker := range agentOptions.GetHealthCheckers() {
+					for _, healthchecker := range agentConfig.HealthCheckers() {
 						if err := healthchecker.Check(nil); err != nil {
 							fmt.Printf("[agent-scheduler] - stop agent because it is not health: %v\n", err)
 							stopAgent()
@@ -359,7 +363,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 				case <-agentCtx.Done():
 					// restart agent
 					fmt.Println("[agent-scheduler] - restart agent...")
-					agentCtx, stopAgent = startAgent(spokeCtx, managedClusterName, hubKubeconfigDir, agentOptions)
+					agentCtx, stopAgent, _ = startAgent(spokeCtx, managedClusterName, hubKubeconfigDir, agentOptions)
 				case <-spokeCtx.Done():
 					// exit
 					fmt.Println("[agent-scheduler] - shutting down...")
@@ -518,10 +522,27 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 			ginkgo.By("stop the hub")
 			stopHub()
 
-			ginkgo.By("the hub kubeconfig secret should be deleted once client cert expired")
+			ginkgo.By("wait until the client cert expires")
 			gomega.Eventually(func() bool {
-				_, err := kubeClient.CoreV1().Secrets(testNamespace).Get(context.Background(), hubKubeconfigSecret, metav1.GetOptions{})
-				return apierrors.IsNotFound(err)
+				secret, err := kubeClient.CoreV1().Secrets(testNamespace).Get(context.Background(), hubKubeconfigSecret, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				data, ok := secret.Data[csr.TLSCertFile]
+				if !ok {
+					return false
+				}
+				certs, err := certutil.ParseCertsPEM(data)
+				if err != nil {
+					return false
+				}
+				now := time.Now()
+				for _, cert := range certs {
+					if now.After(cert.NotAfter) {
+						return true
+					}
+				}
+				return false
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			ginkgo.By("start the hub again")

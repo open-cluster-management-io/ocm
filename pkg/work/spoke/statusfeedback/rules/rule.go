@@ -29,6 +29,21 @@ var deploymentRule = []workapiv1.JsonPath{
 	},
 }
 
+var daemonsetRule = []workapiv1.JsonPath{
+	{
+		Name: "NumberReady",
+		Path: ".status.numberReady",
+	},
+	{
+		Name: "DesiredNumberScheduled",
+		Path: ".status.desiredNumberScheduled",
+	},
+	{
+		Name: "NumberAvailable",
+		Path: ".status.numberAvailable",
+	},
+}
+
 var jobRule = []workapiv1.JsonPath{
 	{
 		Name: "JobComplete",
@@ -57,6 +72,7 @@ func DefaultWellKnownStatusRule() WellKnownStatusRuleResolver {
 			{Group: "apps", Version: "v1", Kind: "Deployment"}: deploymentRule,
 			{Group: "batch", Version: "v1", Kind: "Job"}:       jobRule,
 			{Group: "", Version: "v1", Kind: "Pod"}:            podRule,
+			{Group: "apps", Version: "v1", Kind: "DaemonSet"}:  daemonsetRule,
 		},
 	}
 }

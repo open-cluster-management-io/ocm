@@ -501,6 +501,21 @@ func getManifestConfigOption(agentAddon agent.AgentAddon,
 		}
 	}
 
+	if agentAddon.GetAgentAddonOptions().HealthProber != nil &&
+		agentAddon.GetAgentAddonOptions().HealthProber.Type == agent.HealthProberTypeWorkloadAvailability {
+
+		manifests, err := agentAddon.Manifests(cluster, addon)
+		if err != nil {
+			return manifestConfigs
+		}
+		workloads := utils.FilterWorkloads(manifests)
+		for _, workload := range workloads {
+			manifestConfig := utils.WellKnowManifestConfig(workload.Group, workload.Resource,
+				workload.Namespace, workload.Name)
+			manifestConfigs = append(manifestConfigs, manifestConfig)
+		}
+	}
+
 	if updaters := agentAddon.GetAgentAddonOptions().Updaters; updaters != nil {
 		for _, updater := range updaters {
 			strategy := updater.UpdateStrategy

@@ -36,7 +36,8 @@ const (
 // to convert it to Values by JsonStructToValues.
 // the built-in values can not be overridden by getValuesFuncs
 type templateCRDBuiltinValues struct {
-	ClusterName string `json:"CLUSTER_NAME,omitempty"`
+	ClusterName      string `json:"CLUSTER_NAME,omitempty"`
+	InstallNamespace string `json:"INSTALL_NAMESPACE,omitempty"`
 }
 
 // templateDefaultValues includes the default values for crd template agentAddon.
@@ -115,7 +116,7 @@ func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 	agentAddonOptions := agent.AgentAddonOptions{
 		AddonName: a.addonName,
 		HealthProber: &agent.HealthProber{
-			Type: agent.HealthProberTypeDeploymentAvailability,
+			Type: agent.HealthProberTypeWorkloadAvailability,
 		},
 		SupportedConfigGVRs: supportedConfigGVRs,
 		Registration: &agent.RegistrationOption{
@@ -188,6 +189,7 @@ func (a *CRDTemplateAgentAddon) decorateObject(
 	privateValues addonfactory.Values) (*unstructured.Unstructured, error) {
 	decorators := []decorator{
 		newDeploymentDecorator(a.addonName, template, orderedValues, privateValues),
+		newDaemonSetDecorator(a.addonName, template, orderedValues, privateValues),
 		newNamespaceDecorator(privateValues),
 	}
 
@@ -228,7 +230,7 @@ func (a *CRDTemplateAgentAddon) getDesiredAddOnTemplateInner(
 	return template.DeepCopy(), nil
 }
 
-// TemplateAgentRegistrationNamespaceFunc reads deployment resource in the manifests and use that namespace
+// TemplateAgentRegistrationNamespaceFunc reads deployment/daemonset resources in the manifests and use that namespace
 // as the default registration namespace. If addonDeploymentConfig is set, uses the namespace in it.
 func (a *CRDTemplateAgentAddon) TemplateAgentRegistrationNamespaceFunc(
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
@@ -240,8 +242,9 @@ func (a *CRDTemplateAgentAddon) TemplateAgentRegistrationNamespaceFunc(
 		return "", fmt.Errorf("addon %s template not found in status", addon.Name)
 	}
 
-	// pick the namespace of the first deployment
+	// pick the namespace of the first deployment, if there is no deployment, pick the namespace of the first daemonset
 	var desiredNS = "open-cluster-management-agent-addon"
+	var firstDeploymentNamespace, firstDaemonSetNamespace string
 	for _, manifest := range template.Spec.AgentSpec.Workload.Manifests {
 		object := &unstructured.Unstructured{}
 		if err := object.UnmarshalJSON(manifest.Raw); err != nil {
@@ -249,12 +252,23 @@ func (a *CRDTemplateAgentAddon) TemplateAgentRegistrationNamespaceFunc(
 			continue
 		}
 
-		if _, err = utils.ConvertToDeployment(object); err != nil {
-			continue
+		if firstDeploymentNamespace == "" {
+			if _, err = utils.ConvertToDeployment(object); err == nil {
+				firstDeploymentNamespace = object.GetNamespace()
+				break
+			}
 		}
+		if firstDaemonSetNamespace == "" {
+			if _, err = utils.ConvertToDaemonSet(object); err == nil {
+				firstDaemonSetNamespace = object.GetNamespace()
+			}
+		}
+	}
 
-		desiredNS = object.GetNamespace()
-		break
+	if firstDeploymentNamespace != "" {
+		desiredNS = firstDeploymentNamespace
+	} else if firstDaemonSetNamespace != "" {
+		desiredNS = firstDaemonSetNamespace
 	}
 
 	overrideNs, err := utils.AgentInstallNamespaceFromDeploymentConfigFunc(

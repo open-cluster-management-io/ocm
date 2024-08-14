@@ -65,7 +65,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 		klusterlet = &operatorapiv1.Klusterlet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   fmt.Sprintf("klusterlet-%s", rand.String(6)),
-				Labels: map[string]string{"test": "test", "component": "klusterlet"},
+				Labels: map[string]string{"test": "123", "component": "klusterlet", "123": "312"},
 			},
 			Spec: operatorapiv1.KlusterletSpec{
 				RegistrationImagePullSpec: "quay.io/open-cluster-management/registration",

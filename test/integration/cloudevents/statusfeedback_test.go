@@ -541,4 +541,186 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 		})
 	})
+
+	ginkgo.Context("DaemonSet Status feedback", func() {
+		ginkgo.BeforeEach(func() {
+			u, _, err := util.NewDaesonSet(commOptions.SpokeClusterName, "ds1")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			manifests = append(manifests, util.ToManifest(u))
+
+			var ctx context.Context
+			ctx, cancel = context.WithCancel(context.Background())
+			go runWorkAgent(ctx, o, commOptions)
+		})
+
+		ginkgo.AfterEach(func() {
+			if cancel != nil {
+				cancel()
+			}
+		})
+
+		ginkgo.It("should return well known statuses", func() {
+			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "daemonsets",
+						Namespace: commOptions.SpokeClusterName,
+						Name:      "ds1",
+					},
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.WellKnownStatusType,
+						},
+					},
+				},
+			}
+
+			work, err = workSourceWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).
+				Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, workSourceWorkClient,
+				workapiv1.WorkApplied, metav1.ConditionTrue, []metav1.ConditionStatus{metav1.ConditionTrue},
+				eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, workSourceWorkClient,
+				workapiv1.WorkAvailable, metav1.ConditionTrue, []metav1.ConditionStatus{metav1.ConditionTrue},
+				eventuallyTimeout, eventuallyInterval)
+
+			// Update DaemonSet status on spoke
+			gomega.Eventually(func() error {
+				ds, err := spokeKubeClient.AppsV1().DaemonSets(commOptions.SpokeClusterName).
+					Get(context.Background(), "ds1", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				ds.Status.NumberAvailable = 2
+				ds.Status.DesiredNumberScheduled = 3
+				ds.Status.NumberReady = 2
+
+				_, err = spokeKubeClient.AppsV1().DaemonSets(commOptions.SpokeClusterName).
+					UpdateStatus(context.Background(), ds, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			// Check if we get status of daemonset on work api
+			gomega.Eventually(func() error {
+				work, err = workSourceWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).
+					Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if len(work.Status.ResourceStatus.Manifests) != 1 {
+					return fmt.Errorf("the size of resource status is not correct, expect to be 1 but got %d",
+						len(work.Status.ResourceStatus.Manifests))
+				}
+
+				values := work.Status.ResourceStatus.Manifests[0].StatusFeedbacks.Values
+
+				expectedValues := []workapiv1.FeedbackValue{
+					{
+						Name: "NumberReady",
+						Value: workapiv1.FieldValue{
+							Type:    workapiv1.Integer,
+							Integer: ptr.To[int64](2),
+						},
+					},
+					{
+						Name: "DesiredNumberScheduled",
+						Value: workapiv1.FieldValue{
+							Type:    workapiv1.Integer,
+							Integer: ptr.To[int64](3),
+						},
+					},
+					{
+						Name: "NumberAvailable",
+						Value: workapiv1.FieldValue{
+							Type:    workapiv1.Integer,
+							Integer: ptr.To[int64](2),
+						},
+					},
+				}
+				if !apiequality.Semantic.DeepEqual(values, expectedValues) {
+					return fmt.Errorf("status feedback values are not correct, we got %v", values)
+				}
+
+				if !util.HaveManifestCondition(work.Status.ResourceStatus.Manifests,
+					"StatusFeedbackSynced", []metav1.ConditionStatus{metav1.ConditionTrue}) {
+					return fmt.Errorf("status sync condition should be True")
+				}
+
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			// Update replica of deployment
+			gomega.Eventually(func() error {
+				ds, err := spokeKubeClient.AppsV1().DaemonSets(commOptions.SpokeClusterName).
+					Get(context.Background(), "ds1", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				ds.Status.NumberAvailable = 3
+				ds.Status.DesiredNumberScheduled = 3
+				ds.Status.NumberReady = 3
+
+				_, err = spokeKubeClient.AppsV1().DaemonSets(commOptions.SpokeClusterName).
+					UpdateStatus(context.Background(), ds, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			// Check if the status of the daemonset is synced on work api
+			gomega.Eventually(func() error {
+				work, err = workSourceWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).
+					Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if len(work.Status.ResourceStatus.Manifests) != 1 {
+					return fmt.Errorf("the size of resource status is not correct, expect to be 1 but got %d",
+						len(work.Status.ResourceStatus.Manifests))
+				}
+
+				values := work.Status.ResourceStatus.Manifests[0].StatusFeedbacks.Values
+
+				expectedValues := []workapiv1.FeedbackValue{
+					{
+						Name: "NumberReady",
+						Value: workapiv1.FieldValue{
+							Type:    workapiv1.Integer,
+							Integer: ptr.To[int64](3),
+						},
+					},
+					{
+						Name: "DesiredNumberScheduled",
+						Value: workapiv1.FieldValue{
+							Type:    workapiv1.Integer,
+							Integer: ptr.To[int64](3),
+						},
+					},
+					{
+						Name: "NumberAvailable",
+						Value: workapiv1.FieldValue{
+							Type:    workapiv1.Integer,
+							Integer: ptr.To[int64](3),
+						},
+					},
+				}
+				if !apiequality.Semantic.DeepEqual(values, expectedValues) {
+					return fmt.Errorf("status feedback values are not correct, we got %v", values)
+				}
+
+				if !util.HaveManifestCondition(work.Status.ResourceStatus.Manifests,
+					"StatusFeedbackSynced", []metav1.ConditionStatus{metav1.ConditionTrue}) {
+					return fmt.Errorf("status sync condition should be True")
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+	})
+
 })

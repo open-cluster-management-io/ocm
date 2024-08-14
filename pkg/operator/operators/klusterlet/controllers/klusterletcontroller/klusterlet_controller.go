@@ -135,7 +135,10 @@ type klusterletConfig struct {
 	ClusterName                                 string
 	ExternalServerURL                           string
 	HubKubeConfigSecret                         string
+	MultipleHubs                                bool
 	BootStrapKubeConfigSecret                   string
+	BootStrapKubeConfigSecrets                  []string
+	HubConnectionTimeoutSeconds                 int32
 	OperatorNamespace                           string
 	Replica                                     int32
 	ClientCertExpirationSeconds                 int32
@@ -174,6 +177,26 @@ type klusterletConfig struct {
 	Labels map[string]string
 }
 
+// If multiplehubs feature gate is enabled, using the bootstrapkubeconfigs from klusterlet CR.
+// Otherwise, using the default bootstrapkubeconfig.
+func (config *klusterletConfig) populateBootstrap(klusterlet *operatorapiv1.Klusterlet) {
+	config.MultipleHubs = klusterlet.Spec.RegistrationConfiguration != nil &&
+		helpers.FeatureGateEnabled(klusterlet.Spec.RegistrationConfiguration.FeatureGates, ocmfeature.DefaultSpokeRegistrationFeatureGates, ocmfeature.MultipleHubs)
+
+	if config.MultipleHubs {
+		var bootstapKubeconfigSecrets []string
+		if klusterlet.Spec.RegistrationConfiguration.BootstrapKubeConfigs.Type == operatorapiv1.LocalSecrets {
+			for _, secret := range klusterlet.Spec.RegistrationConfiguration.BootstrapKubeConfigs.LocalSecrets.KubeConfigSecrets {
+				bootstapKubeconfigSecrets = append(bootstapKubeconfigSecrets, secret.Name)
+			}
+		}
+		config.BootStrapKubeConfigSecrets = bootstapKubeconfigSecrets
+		config.HubConnectionTimeoutSeconds = klusterlet.Spec.RegistrationConfiguration.BootstrapKubeConfigs.LocalSecrets.HubConnectionTimeoutSeconds
+	} else {
+		config.BootStrapKubeConfigSecret = helpers.BootstrapHubKubeConfig
+	}
+}
+
 func (n *klusterletController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	klusterletName := controllerContext.QueueKey()
 	klog.V(4).Infof("Reconciling Klusterlet %q", klusterletName)
@@ -207,7 +230,6 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		WorkImage:                              klusterlet.Spec.WorkImagePullSpec,
 		ClusterName:                            klusterlet.Spec.ClusterName,
 		SingletonImage:                         klusterlet.Spec.ImagePullSpec,
-		BootStrapKubeConfigSecret:              helpers.BootstrapHubKubeConfig,
 		HubKubeConfigSecret:                    helpers.HubKubeConfig,
 		ExternalServerURL:                      getServersFromKlusterlet(klusterlet),
 		OperatorNamespace:                      n.operatorNamespace,
@@ -228,6 +250,8 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		ResourceRequirements:            resourceRequirements,
 		DisableAddonNamespace:           n.disableAddonNamespace,
 	}
+
+	config.populateBootstrap(klusterlet)
 
 	if n.enableSyncLabels {
 		config.Labels = helpers.GetKlusterletAgentLabels(klusterlet)

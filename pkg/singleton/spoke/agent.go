@@ -6,6 +6,7 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/klog/v2"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
@@ -14,9 +15,8 @@ import (
 )
 
 type AgentConfig struct {
-	agentOption        *commonoptions.AgentOptions
-	registrationOption *registration.SpokeAgentOptions
-	workOption         *work.WorkloadAgentOptions
+	registrationConfig *registration.SpokeAgentConfig
+	workConfig         *work.WorkAgentConfig
 }
 
 func NewAgentConfig(
@@ -24,35 +24,36 @@ func NewAgentConfig(
 	registrationOption *registration.SpokeAgentOptions,
 	workOption *work.WorkloadAgentOptions) *AgentConfig {
 	return &AgentConfig{
-		agentOption:        agentOption,
-		registrationOption: registrationOption,
-		workOption:         workOption,
+		registrationConfig: registration.NewSpokeAgentConfig(agentOption, registrationOption),
+		workConfig:         work.NewWorkAgentConfig(agentOption, workOption),
 	}
 }
 
 func (a *AgentConfig) RunSpokeAgent(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
-	registrationCfg := registration.NewSpokeAgentConfig(a.agentOption, a.registrationOption)
 	// start registration agent at first
 	go func() {
-		if err := registrationCfg.RunSpokeAgent(ctx, controllerContext); err != nil {
+		if err := a.registrationConfig.RunSpokeAgent(ctx, controllerContext); err != nil {
 			klog.Fatal(err)
 		}
 	}()
 
 	// wait for the hub client config ready.
 	klog.Info("Waiting for hub client config and managed cluster to be ready")
-	if err := wait.PollUntilContextCancel(ctx, 1*time.Second, true, registrationCfg.HasValidHubClientConfig); err != nil {
+	if err := wait.PollUntilContextCancel(ctx, 1*time.Second, true, a.registrationConfig.IsHubKubeConfigValid); err != nil {
 		return err
 	}
 
-	workCfg := work.NewWorkAgentConfig(a.agentOption, a.workOption)
 	// start work agent
 	go func() {
-		if err := workCfg.RunWorkloadAgent(ctx, controllerContext); err != nil {
+		if err := a.workConfig.RunWorkloadAgent(ctx, controllerContext); err != nil {
 			klog.Fatal(err)
 		}
 	}()
 
 	<-ctx.Done()
 	return nil
+}
+
+func (o *AgentConfig) HealthCheckers() []healthz.HealthChecker {
+	return o.registrationConfig.HealthCheckers()
 }

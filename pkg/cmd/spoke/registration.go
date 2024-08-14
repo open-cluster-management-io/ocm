@@ -18,9 +18,9 @@ func NewRegistrationAgent() *cobra.Command {
 	agentOptions := spoke.NewSpokeAgentOptions()
 	commonOptions := commonoptions.NewAgentOptions()
 	cfg := spoke.NewSpokeAgentConfig(commonOptions, agentOptions)
-	cmdConfig := commonOptions.CommoOpts.
+	cmdConfig := commonOptions.CommonOpts.
 		NewControllerCommandConfig("registration-agent", version.Get(), cfg.RunSpokeAgent).
-		WithHealthChecks(agentOptions.GetHealthCheckers()...)
+		WithHealthChecks(cfg.HealthCheckers()...)
 
 	cmd := cmdConfig.NewCommandWithContext(context.TODO())
 	cmd.Use = agentCmdName

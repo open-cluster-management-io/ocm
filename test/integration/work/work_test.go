@@ -109,6 +109,13 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		ginkgo.It("should create work and then apply it successfully", func() {
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
+			ginkgo.By("field manager should be work-agent")
+			cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			for _, entry := range cm.ManagedFields {
+				gomega.Expect(entry.Manager).To(gomega.Equal("work-agent"))
+			}
+
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,

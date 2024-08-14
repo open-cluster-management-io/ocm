@@ -15,7 +15,7 @@ func ObjectNameToKey(obj runtime.Object) string {
 }
 
 func NamesFilter(names ...string) EventFilterFunc {
-	nameSet := sets.NewString(names...)
+	nameSet := sets.New(names...)
 	return func(obj interface{}) bool {
 		metaObj, ok := obj.(metav1.ObjectMetaAccessor)
 		if !ok {

@@ -1,8 +1,6 @@
 package lister
 
 import (
-	"fmt"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	workv1 "open-cluster-management.io/api/work/v1"
@@ -23,10 +21,5 @@ func NewWatcherStoreLister(store store.WorkClientWatcherStore) *WatcherStoreList
 
 // List returns the ManifestWorks from the WorkClientWatcherCache with list options.
 func (l *WatcherStoreLister) List(options types.ListOptions) ([]*workv1.ManifestWork, error) {
-	opts := metav1.ListOptions{}
-	if options.ClusterName != types.ClusterAll {
-		opts.FieldSelector = fmt.Sprintf("metadata.namespace=%s", options.ClusterName)
-	}
-
-	return l.store.List(opts)
+	return l.store.List(options.ClusterName, metav1.ListOptions{})
 }

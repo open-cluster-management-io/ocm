@@ -18,7 +18,7 @@ endif
 hub-kubeconfig:
 	$(KUBECTL) config view --minify --flatten > $(HUB_KUBECONFIG)
 
-deploy-hub: deploy-hub-operator apply-hub-cr hub-kubeconfig
+deploy-hub: deploy-hub-operator apply-hub-cr hub-kubeconfig cluster-ip
 
 deploy-hub-operator: ensure-kustomize
 	cp deploy/cluster-manager/config/kustomization.yaml deploy/cluster-manager/config/kustomization.yaml.tmp
@@ -29,11 +29,11 @@ deploy-hub-operator: ensure-kustomize
 apply-hub-cr:
 	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration:latest,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work:latest,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/placement:latest,$(PLACEMENT_IMAGE)," -e "s,quay.io/open-cluster-management/addon-manager:latest,$(ADDON_MANAGER_IMAGE)," deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers.cr.yaml | $(KUBECTL) apply -f -
 
-test-e2e: deploy-hub deploy-spoke-operator run-e2e
+test-e2e: deploy-hub deploy-spoke-operator bootstrap-secret run-e2e
 
-run-e2e: cluster-ip bootstrap-secret
+run-e2e:
 	go test -c ./test/e2e
-	./e2e.test -test.v -ginkgo.v -deploy-klusterlet=true -nil-executor-validating=true -registration-image=$(REGISTRATION_IMAGE) -work-image=$(WORK_IMAGE) -singleton-image=$(OPERATOR_IMAGE_NAME) -klusterlet-deploy-mode=$(KLUSTERLET_DEPLOY_MODE)
+	./e2e.test -test.v -ginkgo.v -nil-executor-validating=true -registration-image=$(REGISTRATION_IMAGE) -work-image=$(WORK_IMAGE) -singleton-image=$(OPERATOR_IMAGE_NAME) -klusterlet-deploy-mode=$(KLUSTERLET_DEPLOY_MODE)
 
 clean-hub: clean-hub-cr clean-hub-operator
 
