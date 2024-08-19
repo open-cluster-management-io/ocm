@@ -6,15 +6,11 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
-	certv1 "k8s.io/api/certificates/v1"
-	certv1beta1 "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
-	"k8s.io/klog/v2"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -29,16 +25,16 @@ import (
 
 	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/features"
-	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/addon"
 	"open-cluster-management.io/ocm/pkg/registration/hub/clusterrole"
-	"open-cluster-management.io/ocm/pkg/registration/hub/csr"
 	"open-cluster-management.io/ocm/pkg/registration/hub/gc"
 	"open-cluster-management.io/ocm/pkg/registration/hub/lease"
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedcluster"
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedclusterset"
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedclustersetbinding"
 	"open-cluster-management.io/ocm/pkg/registration/hub/taint"
+	"open-cluster-management.io/ocm/pkg/registration/register"
+	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 )
 
 // HubManagerOptions holds configuration for hub manager controller
@@ -133,7 +129,13 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	workInformers workv1informers.SharedInformerFactory,
 	addOnInformers addoninformers.SharedInformerFactory,
 ) error {
-	logger := klog.FromContext(ctx)
+	csrApprover, err := csr.NewCSRApprover(kubeClient, kubeInformers, m.ClusterAutoApprovalUsers, controllerContext.EventRecorder)
+	if err != nil {
+		return err
+	}
+
+	approver := register.NewAggregatedApprover(csrApprover)
+
 	managedClusterController := managedcluster.NewManagedClusterController(
 		kubeClient,
 		clusterClient,
@@ -142,6 +144,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		kubeInformers.Rbac().V1().ClusterRoles(),
 		kubeInformers.Rbac().V1().RoleBindings(),
 		kubeInformers.Rbac().V1().ClusterRoleBindings(),
+		approver,
 		controllerContext.EventRecorder,
 	)
 
@@ -150,43 +153,6 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		controllerContext.EventRecorder,
 	)
-
-	csrReconciles := []csr.Reconciler{csr.NewCSRRenewalReconciler(kubeClient, controllerContext.EventRecorder)}
-	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
-		csrReconciles = append(csrReconciles, csr.NewCSRBootstrapReconciler(
-			kubeClient,
-			m.ClusterAutoApprovalUsers,
-			controllerContext.EventRecorder,
-		))
-	}
-
-	var csrController factory.Controller
-	if features.HubMutableFeatureGate.Enabled(ocmfeature.V1beta1CSRAPICompatibility) {
-		v1CSRSupported, v1beta1CSRSupported, err := helpers.IsCSRSupported(kubeClient)
-		if err != nil {
-			return errors.Wrapf(err, "failed CSR api discovery")
-		}
-
-		if !v1CSRSupported && v1beta1CSRSupported {
-			csrController = csr.NewCSRApprovingController[*certv1beta1.CertificateSigningRequest](
-				kubeInformers.Certificates().V1beta1().CertificateSigningRequests().Informer(),
-				kubeInformers.Certificates().V1beta1().CertificateSigningRequests().Lister(),
-				csr.NewCSRV1beta1Approver(kubeClient),
-				csrReconciles,
-				controllerContext.EventRecorder,
-			)
-			logger.Info("Using v1beta1 CSR api to manage managed cluster client certificate")
-		}
-	}
-	if csrController == nil {
-		csrController = csr.NewCSRApprovingController[*certv1.CertificateSigningRequest](
-			kubeInformers.Certificates().V1().CertificateSigningRequests().Informer(),
-			kubeInformers.Certificates().V1().CertificateSigningRequests().Lister(),
-			csr.NewCSRV1Approver(kubeClient),
-			csrReconciles,
-			controllerContext.EventRecorder,
-		)
-	}
 
 	mcRecorder, err := commonhelpers.NewEventRecorder(ctx, clusterscheme.Scheme, kubeClient, "registration-controller")
 	if err != nil {
@@ -266,6 +232,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		clusterClient,
 		kubeClient,
 		metadataClient,
+		approver,
 		controllerContext.EventRecorder,
 		m.GCResourceList,
 		features.HubMutableFeatureGate.Enabled(ocmfeature.ResourceCleanup),
@@ -278,7 +245,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 
 	go managedClusterController.Run(ctx, 1)
 	go taintController.Run(ctx, 1)
-	go csrController.Run(ctx, 1)
+	go approver.Run(ctx, 1)
 	go leaseController.Run(ctx, 1)
 	go clockSyncController.Run(ctx, 1)
 	go managedClusterSetController.Run(ctx, 1)
