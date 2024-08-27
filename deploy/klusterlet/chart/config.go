@@ -17,6 +17,8 @@ var ChartFiles embed.FS
 const ChartName = "klusterlet"
 
 type ChartConfig struct {
+	// CreateNamespace is used in the render function to append the release ns in the objects.
+	CreateNamespace bool `json:"createNamespace,omitempty"`
 	// ReplicaCount is the replicas for the klusterlet operator deployment.
 	ReplicaCount int `json:"replicaCount,omitempty"`
 	// Images is the configurations for all images used in operator deployment and klusterlet CR.

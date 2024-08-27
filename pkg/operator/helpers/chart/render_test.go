@@ -84,6 +84,17 @@ func TestClusterManagerConfig(t *testing.T) {
 			},
 			expectedObjCnt: 7,
 		},
+		{
+			name:      "create namespace",
+			namespace: "multicluster-engine",
+			chartConfig: func() *clustermanagerchart.ChartConfig {
+				config := NewDefaultClusterManagerChartConfig()
+				config.CreateBootstrapToken = true
+				config.CreateNamespace = true
+				return config
+			},
+			expectedObjCnt: 10,
+		},
 	}
 
 	for _, c := range cases {
@@ -99,7 +110,7 @@ func TestClusterManagerConfig(t *testing.T) {
 				version = config.Images.Tag
 			}
 
-			objects, err := RenderChart(config, c.namespace, clustermanagerchart.ChartName, clustermanagerchart.ChartFiles)
+			objects, err := RenderClusterManagerChart(config, c.namespace)
 			if err != nil {
 				t.Errorf("error rendering chart: %v", err)
 			}
@@ -115,6 +126,10 @@ func TestClusterManagerConfig(t *testing.T) {
 				}
 				outputObjs = append(outputObjs, obj)
 				switch object := obj.(type) {
+				case *corev1.Namespace:
+					if object.Name != c.namespace {
+						t.Errorf("expected namespace %s, got %s", c.namespace, object.Name)
+					}
 				case *appsv1.Deployment:
 					if object.Namespace != c.namespace {
 						t.Errorf("expected namespace is %s, but got %s", c.namespace, object.Namespace)
@@ -135,7 +150,6 @@ func TestClusterManagerConfig(t *testing.T) {
 						t.Errorf("failed to render images")
 					}
 				}
-
 			}
 
 			// output is for debug
@@ -147,7 +161,6 @@ func TestClusterManagerConfig(t *testing.T) {
 }
 
 func TestKlusterletConfig(t *testing.T) {
-
 	cases := []struct {
 		name           string
 		namespace      string
@@ -213,6 +226,18 @@ func TestKlusterletConfig(t *testing.T) {
 			},
 			expectedObjCnt: 2,
 		},
+		{
+			name:      "create namespace",
+			namespace: "open-cluster-management",
+			chartConfig: func() *klusterletchart.ChartConfig {
+				config := NewDefaultKlusterletChartConfig()
+				config.Klusterlet.ClusterName = "testCluster"
+				config.Klusterlet.Mode = operatorv1.InstallModeSingleton
+				config.CreateNamespace = true
+				return config
+			},
+			expectedObjCnt: 7,
+		},
 	}
 
 	for _, c := range cases {
@@ -227,7 +252,7 @@ func TestKlusterletConfig(t *testing.T) {
 				version = config.Images.Tag
 			}
 
-			objects, err := RenderChart(config, c.namespace, klusterletchart.ChartName, klusterletchart.ChartFiles)
+			objects, err := RenderKlusterletChart(config, c.namespace)
 			if err != nil {
 				t.Errorf("error rendering chart: %v", err)
 			}
@@ -243,6 +268,10 @@ func TestKlusterletConfig(t *testing.T) {
 				}
 				outputObjs = append(outputObjs, obj)
 				switch object := obj.(type) {
+				case *corev1.Namespace:
+					if object.Name != c.namespace {
+						t.Errorf("expected namespace %s, got %s", c.namespace, object.Name)
+					}
 				case *appsv1.Deployment:
 					if object.Namespace != c.namespace {
 						t.Errorf("expected namespace is %s, but got %s", c.namespace, object.Namespace)
@@ -306,7 +335,6 @@ func TestKlusterletConfig(t *testing.T) {
 								fmt.Sprintf("open-cluster-management-%s", object.Spec.ClusterName), object.Spec.Namespace)
 						}
 					}
-
 				}
 			}
 
