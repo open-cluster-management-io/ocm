@@ -72,6 +72,9 @@ affinity:
 # if true, will create a bootstrap secret for auto approve.
 createBootstrapToken: false
 
+# if true, will create a serviceAccount to generate token
+createBootstrapSA: false
+
 # configurations for clusterManager CR.
 clusterManager:
   mode: Default

@@ -12,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/yaml"
 
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 
@@ -56,11 +55,21 @@ func TestClusterManagerConfig(t *testing.T) {
 			expectedObjCnt: 6,
 		},
 		{
-			name:      "enable bootstrap config",
+			name:      "enable bootstrap token",
 			namespace: "multicluster-engine",
 			chartConfig: func() *clustermanagerchart.ChartConfig {
 				config := NewDefaultClusterManagerChartConfig()
 				config.CreateBootstrapToken = true
+				return config
+			},
+			expectedObjCnt: 9,
+		},
+		{
+			name:      "enable bootstrap sa",
+			namespace: "multicluster-engine",
+			chartConfig: func() *clustermanagerchart.ChartConfig {
+				config := NewDefaultClusterManagerChartConfig()
+				config.CreateBootstrapSA = true
 				return config
 			},
 			expectedObjCnt: 9,
@@ -118,15 +127,20 @@ func TestClusterManagerConfig(t *testing.T) {
 				t.Errorf("expected %d objects, got %d", c.expectedObjCnt, len(objects))
 			}
 
-			outputObjs := make([]runtime.Object, 0, len(objects))
-			for _, o := range objects {
+			// output is for debug
+			if outputDebug {
+				output(t, c.name, objects)
+			}
+			for i, o := range objects {
 				obj, _, err := decoder.Decode(o, nil, nil)
 				if err != nil {
 					t.Errorf("error decoding object: %v", err)
 				}
-				outputObjs = append(outputObjs, obj)
 				switch object := obj.(type) {
 				case *corev1.Namespace:
+					if i != 0 {
+						t.Errorf("the first object is not namespace")
+					}
 					if object.Name != c.namespace {
 						t.Errorf("expected namespace %s, got %s", c.namespace, object.Name)
 					}
@@ -151,11 +165,6 @@ func TestClusterManagerConfig(t *testing.T) {
 					}
 				}
 			}
-
-			// output is for debug
-			if outputDebug {
-				output(t, c.name, outputObjs...)
-			}
 		})
 	}
 }
@@ -177,6 +186,18 @@ func TestKlusterletConfig(t *testing.T) {
 				return config
 			},
 			expectedObjCnt: 6,
+		},
+		{
+			name:      "use bootstrapHubKubeConfig",
+			namespace: "open-cluster-management",
+			chartConfig: func() *klusterletchart.ChartConfig {
+				config := NewDefaultKlusterletChartConfig()
+				config.Klusterlet.ClusterName = "testCluster"
+				config.Klusterlet.Mode = operatorv1.InstallModeSingleton
+				config.BootstrapHubKubeConfig = "kubeconfig"
+				return config
+			},
+			expectedObjCnt: 8,
 		},
 
 		{
@@ -260,16 +281,19 @@ func TestKlusterletConfig(t *testing.T) {
 				t.Errorf("expected %d objects, got %d", c.expectedObjCnt, len(objects))
 			}
 
-			outputObjs := make([]runtime.Object, 0, len(objects))
+			// output is for debug
+			if outputDebug {
+				output(t, c.name, objects)
+			}
+
 			for _, o := range objects {
 				obj, _, err := decoder.Decode(o, nil, nil)
 				if err != nil {
 					t.Errorf("error decoding object: %v", err)
 				}
-				outputObjs = append(outputObjs, obj)
 				switch object := obj.(type) {
 				case *corev1.Namespace:
-					if object.Name != c.namespace {
+					if object.Name != c.namespace && object.Name != "open-cluster-management-agent" {
 						t.Errorf("expected namespace %s, got %s", c.namespace, object.Name)
 					}
 				case *appsv1.Deployment:
@@ -337,31 +361,20 @@ func TestKlusterletConfig(t *testing.T) {
 					}
 				}
 			}
-
-			// output is for debug
-			if outputDebug {
-				output(t, c.name, outputObjs...)
-			}
 		})
 	}
 }
 
-func output(t *testing.T, name string, objects ...runtime.Object) {
-	tmpDir, err := os.MkdirTemp("./", "tmp-"+name)
+func output(t *testing.T, name string, objects [][]byte) {
+	tmpDir, err := os.MkdirTemp("./", "tmp-"+name+"-")
 	if err != nil {
 		t.Fatalf("failed to create temp %v", err)
 	}
 
 	for i, o := range objects {
-		data, err := yaml.Marshal(o)
-		if err != nil {
-			t.Fatalf("failed yaml marshal %v", err)
-		}
-
-		err = os.WriteFile(fmt.Sprintf("%v/%v-%v.yaml", tmpDir, i, o.GetObjectKind().GroupVersionKind().Kind), data, 0600)
+		err = os.WriteFile(fmt.Sprintf("%v/%v.yaml", tmpDir, i), o, 0600)
 		if err != nil {
 			t.Fatalf("failed to Marshal object.%v", err)
 		}
-
 	}
 }

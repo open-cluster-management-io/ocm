@@ -37,6 +37,8 @@ type ChartConfig struct {
 	Affinity corev1.Affinity `json:"affinity,omitempty"`
 	// CreateBootstrapToken is to enable/disable the bootstrap token secret for auto approve.
 	CreateBootstrapToken bool `json:"createBootstrapToken,omitempty"`
+	// CreateBootstrapSA is to create a serviceAccount to generate token.
+	CreateBootstrapSA bool `json:"createBootstrapSA,omitempty"`
 	// ClusterManager is the configuration of clusterManager CR
 	ClusterManager ClusterManagerConfig `json:"clusterManager,omitempty"`
 }
