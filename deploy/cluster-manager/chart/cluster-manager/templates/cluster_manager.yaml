@@ -27,7 +27,7 @@ spec:
   workConfiguration:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  {{if .Values.clusterManager.addOnManagerConfiguration }}
+  {{- with .Values.clusterManager.addOnManagerConfiguration }}
   addOnManagerConfiguration:
     {{- toYaml . | nindent 4 }}
   {{- end }}

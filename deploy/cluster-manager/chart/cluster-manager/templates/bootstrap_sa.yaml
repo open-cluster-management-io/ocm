@@ -1,0 +1,7 @@
+{{- if .Values.createBootstrapSA }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cluster-bootstrap
+  namespace: {{ .Release.Namespace }}
+{{- end }}

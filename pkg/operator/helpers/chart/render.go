@@ -182,6 +182,7 @@ func renderManifests(chart *chart.Chart, values chartutil.Values) ([][]byte, err
 		return rawObjects, err
 	}
 
+	namespaceObjects := [][]byte{}
 	for _, data := range templates {
 		if len(data) == 0 {
 			continue
@@ -197,7 +198,18 @@ func renderManifests(chart *chart.Chart, values chartutil.Values) ([][]byte, err
 			continue
 		}
 
+		if kind == "Namespace" {
+			namespaceObjects = append(namespaceObjects, []byte(data))
+			continue
+		}
+
 		rawObjects = append(rawObjects, []byte(data))
+	}
+	// will create open-cluster-management-agent ns in klusterlet operator,
+	// so need make sure namespaces are at the top of slice.
+	if len(namespaceObjects) != 0 {
+		result := append(namespaceObjects, rawObjects...)
+		return result, nil
 	}
 	return rawObjects, nil
 }
