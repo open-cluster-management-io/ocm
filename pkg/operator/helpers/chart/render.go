@@ -22,20 +22,26 @@ import (
 	klusterletchart "open-cluster-management.io/ocm/deploy/klusterlet/chart"
 )
 
-func NewDefaultClusterManagerChartConfig() *clustermanagerchart.ChartConfig {
-	return &clustermanagerchart.ChartConfig{
+func NewDefaultClusterManagerChartConfig() *ClusterManagerChartConfig {
+	return &ClusterManagerChartConfig{
 		ReplicaCount:         3,
 		CreateBootstrapToken: false,
+		ClusterManager: ClusterManagerConfig{
+			Create: true,
+		},
 	}
 }
 
-func NewDefaultKlusterletChartConfig() *klusterletchart.ChartConfig {
-	return &klusterletchart.ChartConfig{
+func NewDefaultKlusterletChartConfig() *KlusterletChartConfig {
+	return &KlusterletChartConfig{
 		ReplicaCount: 3,
+		Klusterlet: KlusterletConfig{
+			Create: true,
+		},
 	}
 }
 
-func RenderClusterManagerChart(config *clustermanagerchart.ChartConfig, namespace string) ([][]byte, error) {
+func RenderClusterManagerChart(config *ClusterManagerChartConfig, namespace string) ([][]byte, error) {
 	if namespace == "" {
 		return nil, fmt.Errorf("cluster manager chart namespace is required")
 	}
@@ -43,7 +49,7 @@ func RenderClusterManagerChart(config *clustermanagerchart.ChartConfig, namespac
 		clustermanagerchart.ChartName, clustermanagerchart.ChartFiles)
 }
 
-func RenderKlusterletChart(config *klusterletchart.ChartConfig, namespace string) ([][]byte, error) {
+func RenderKlusterletChart(config *KlusterletChartConfig, namespace string) ([][]byte, error) {
 	if namespace == "" {
 		return nil, fmt.Errorf("klusterlet chart namespace is required")
 	}
@@ -51,7 +57,7 @@ func RenderKlusterletChart(config *klusterletchart.ChartConfig, namespace string
 		klusterletchart.ChartName, klusterletchart.ChartFiles)
 }
 
-func renderChart[T *clustermanagerchart.ChartConfig | *klusterletchart.ChartConfig](config T,
+func renderChart[T *ClusterManagerChartConfig | *KlusterletChartConfig](config T,
 	namespace string, createNamespace bool, chartName string, fs embed.FS) ([][]byte, error) {
 	// chartName is the prefix of chart path here
 	operatorChart, err := LoadChart(fs, chartName)

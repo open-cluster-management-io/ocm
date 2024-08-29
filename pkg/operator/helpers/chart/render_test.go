@@ -1,6 +1,7 @@
 package chart
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"testing"
@@ -14,9 +15,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 
 	operatorv1 "open-cluster-management.io/api/operator/v1"
-
-	clustermanagerchart "open-cluster-management.io/ocm/deploy/cluster-manager/chart"
-	klusterletchart "open-cluster-management.io/ocm/deploy/klusterlet/chart"
 )
 
 const (
@@ -42,13 +40,13 @@ func TestClusterManagerConfig(t *testing.T) {
 	cases := []struct {
 		name           string
 		namespace      string
-		chartConfig    func() *clustermanagerchart.ChartConfig
+		chartConfig    func() *ClusterManagerChartConfig
 		expectedObjCnt int
 	}{
 		{
 			name:      "default config",
 			namespace: "open-cluster-management",
-			chartConfig: func() *clustermanagerchart.ChartConfig {
+			chartConfig: func() *ClusterManagerChartConfig {
 				config := NewDefaultClusterManagerChartConfig()
 				return config
 			},
@@ -57,7 +55,7 @@ func TestClusterManagerConfig(t *testing.T) {
 		{
 			name:      "enable bootstrap token",
 			namespace: "multicluster-engine",
-			chartConfig: func() *clustermanagerchart.ChartConfig {
+			chartConfig: func() *ClusterManagerChartConfig {
 				config := NewDefaultClusterManagerChartConfig()
 				config.CreateBootstrapToken = true
 				return config
@@ -67,7 +65,7 @@ func TestClusterManagerConfig(t *testing.T) {
 		{
 			name:      "enable bootstrap sa",
 			namespace: "multicluster-engine",
-			chartConfig: func() *clustermanagerchart.ChartConfig {
+			chartConfig: func() *ClusterManagerChartConfig {
 				config := NewDefaultClusterManagerChartConfig()
 				config.CreateBootstrapSA = true
 				return config
@@ -77,13 +75,13 @@ func TestClusterManagerConfig(t *testing.T) {
 		{
 			name:      "change images config",
 			namespace: "ocm",
-			chartConfig: func() *clustermanagerchart.ChartConfig {
+			chartConfig: func() *ClusterManagerChartConfig {
 				config := NewDefaultClusterManagerChartConfig()
-				config.Images = clustermanagerchart.ImagesConfig{
+				config.Images = ImagesConfig{
 					Registry:        "myrepo",
 					Tag:             "v9.9.9",
 					ImagePullPolicy: corev1.PullAlways,
-					ImageCredentials: clustermanagerchart.ImageCredentials{
+					ImageCredentials: ImageCredentials{
 						CreateImageCredentials: true,
 						UserName:               "test",
 						Password:               "test",
@@ -94,9 +92,27 @@ func TestClusterManagerConfig(t *testing.T) {
 			expectedObjCnt: 7,
 		},
 		{
+			name:      "change images config dockerConfigJson",
+			namespace: "ocm",
+			chartConfig: func() *ClusterManagerChartConfig {
+				config := NewDefaultClusterManagerChartConfig()
+				config.Images = ImagesConfig{
+					Registry:        "myrepo",
+					Tag:             "v9.9.9",
+					ImagePullPolicy: corev1.PullAlways,
+					ImageCredentials: ImageCredentials{
+						CreateImageCredentials: true,
+						DockerConfigJson:       `{"auths":{"quay.io":{"auth":"YWJjCg=="}}}`,
+					},
+				}
+				return config
+			},
+			expectedObjCnt: 7,
+		},
+		{
 			name:      "create namespace",
 			namespace: "multicluster-engine",
-			chartConfig: func() *clustermanagerchart.ChartConfig {
+			chartConfig: func() *ClusterManagerChartConfig {
 				config := NewDefaultClusterManagerChartConfig()
 				config.CreateBootstrapToken = true
 				config.CreateNamespace = true
@@ -163,6 +179,22 @@ func TestClusterManagerConfig(t *testing.T) {
 						object.Spec.AddOnManagerImagePullSpec != fmt.Sprintf("%s/addon-manager:%s", registry, version) {
 						t.Errorf("failed to render images")
 					}
+				case *corev1.Secret:
+					switch object.Name {
+					case "open-cluster-management-image-pull-credentials":
+						data := object.Data[corev1.DockerConfigJsonKey]
+						if len(data) == 0 {
+							t.Errorf("failed to get image pull secret")
+						}
+						if base64.StdEncoding.EncodeToString(data) == "" {
+							t.Errorf("failed to render image pull secret")
+						}
+					case "bootstrap-token-ocmhub":
+						data := object.StringData["token-secret"]
+						if len(data) != 16 {
+							t.Errorf("failed to get token secret")
+						}
+					}
 				}
 			}
 		})
@@ -173,13 +205,13 @@ func TestKlusterletConfig(t *testing.T) {
 	cases := []struct {
 		name           string
 		namespace      string
-		chartConfig    func() *klusterletchart.ChartConfig
+		chartConfig    func() *KlusterletChartConfig
 		expectedObjCnt int
 	}{
 		{
 			name:      "default config",
 			namespace: "open-cluster-management",
-			chartConfig: func() *klusterletchart.ChartConfig {
+			chartConfig: func() *KlusterletChartConfig {
 				config := NewDefaultKlusterletChartConfig()
 				config.Klusterlet.ClusterName = "testCluster"
 				config.Klusterlet.Mode = operatorv1.InstallModeSingleton
@@ -190,7 +222,7 @@ func TestKlusterletConfig(t *testing.T) {
 		{
 			name:      "use bootstrapHubKubeConfig",
 			namespace: "open-cluster-management",
-			chartConfig: func() *klusterletchart.ChartConfig {
+			chartConfig: func() *KlusterletChartConfig {
 				config := NewDefaultKlusterletChartConfig()
 				config.Klusterlet.ClusterName = "testCluster"
 				config.Klusterlet.Mode = operatorv1.InstallModeSingleton
@@ -203,13 +235,13 @@ func TestKlusterletConfig(t *testing.T) {
 		{
 			name:      "change images config",
 			namespace: "ocm",
-			chartConfig: func() *klusterletchart.ChartConfig {
+			chartConfig: func() *KlusterletChartConfig {
 				config := NewDefaultKlusterletChartConfig()
-				config.Images = klusterletchart.ImagesConfig{
+				config.Images = ImagesConfig{
 					Registry:        "myrepo",
 					Tag:             "v9.9.9",
 					ImagePullPolicy: corev1.PullAlways,
-					ImageCredentials: klusterletchart.ImageCredentials{
+					ImageCredentials: ImageCredentials{
 						CreateImageCredentials: true,
 						UserName:               "test",
 						Password:               "test",
@@ -224,7 +256,7 @@ func TestKlusterletConfig(t *testing.T) {
 		{
 			name:      "hosted mode",
 			namespace: "ocm",
-			chartConfig: func() *klusterletchart.ChartConfig {
+			chartConfig: func() *KlusterletChartConfig {
 				config := NewDefaultKlusterletChartConfig()
 				config.NoOperator = true
 				config.Klusterlet.Name = "klusterlet2"
@@ -237,7 +269,7 @@ func TestKlusterletConfig(t *testing.T) {
 		{
 			name:      "noOperator",
 			namespace: "ocm",
-			chartConfig: func() *klusterletchart.ChartConfig {
+			chartConfig: func() *KlusterletChartConfig {
 				config := NewDefaultKlusterletChartConfig()
 				config.NoOperator = true
 				config.Klusterlet.Name = "klusterlet2"
@@ -250,7 +282,7 @@ func TestKlusterletConfig(t *testing.T) {
 		{
 			name:      "create namespace",
 			namespace: "open-cluster-management",
-			chartConfig: func() *klusterletchart.ChartConfig {
+			chartConfig: func() *KlusterletChartConfig {
 				config := NewDefaultKlusterletChartConfig()
 				config.Klusterlet.ClusterName = "testCluster"
 				config.Klusterlet.Mode = operatorv1.InstallModeSingleton
@@ -357,6 +389,22 @@ func TestKlusterletConfig(t *testing.T) {
 						if object.Spec.Namespace != fmt.Sprintf("open-cluster-management-%s", object.Spec.ClusterName) {
 							t.Errorf(" expected %s, got %s",
 								fmt.Sprintf("open-cluster-management-%s", object.Spec.ClusterName), object.Spec.Namespace)
+						}
+					}
+				case *corev1.Secret:
+					switch object.Name {
+					case "open-cluster-management-image-pull-credentials":
+						data := object.Data[corev1.DockerConfigJsonKey]
+						if len(data) == 0 {
+							t.Errorf("failed to get image pull secret")
+						}
+						if base64.StdEncoding.EncodeToString(data) == "" {
+							t.Errorf("failed to render image pull secret")
+						}
+					case "bootstrap-hub-kubeconfig", "external-managed-kubeconfig":
+						data := object.Data["kubeconfig"]
+						if base64.StdEncoding.EncodeToString(data) == "" {
+							t.Errorf("failed to render kubeconfig")
 						}
 					}
 				}

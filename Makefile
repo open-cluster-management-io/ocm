@@ -76,7 +76,7 @@ update: copy-crd update-csv
 
 test-unit: ensure-kubebuilder-tools
 
-update-csv: ensure-operator-sdk ensure-operator-helm
+update-csv: ensure-operator-sdk ensure-helm
 	bash -x hack/update-csv.sh
 
 	# update the replaces to released version in csv
@@ -126,7 +126,7 @@ else
 	$(info Using existing operator-sdk from "$(OPERATOR_SDK)")
 endif
 
-ensure-operator-helm:
+ensure-helm:
 ifeq "" "$(wildcard $(HELM))"
 	$(info Installing helm into '$(HELM)')
 	mkdir -p '$(helm_gen_dir)'

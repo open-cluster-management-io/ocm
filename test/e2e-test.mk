@@ -18,7 +18,10 @@ endif
 hub-kubeconfig:
 	$(KUBECTL) config view --minify --flatten > $(HUB_KUBECONFIG)
 
-deploy-hub: deploy-hub-operator apply-hub-cr hub-kubeconfig cluster-ip
+deploy-hub: deploy-hub-helm hub-kubeconfig cluster-ip
+
+deploy-hub-helm: ensure-helm
+	$(HELM) install cluster-manager deploy/cluster-manager/chart/cluster-manager --namespace=open-cluster-management --create-namespace --set images.registry=$(IMAGE_REGISTRY),image.tag=$(IMAGE_TAG)
 
 deploy-hub-operator: ensure-kustomize
 	cp deploy/cluster-manager/config/kustomization.yaml deploy/cluster-manager/config/kustomization.yaml.tmp
@@ -29,7 +32,7 @@ deploy-hub-operator: ensure-kustomize
 apply-hub-cr:
 	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration:latest,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work:latest,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/placement:latest,$(PLACEMENT_IMAGE)," -e "s,quay.io/open-cluster-management/addon-manager:latest,$(ADDON_MANAGER_IMAGE)," deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers.cr.yaml | $(KUBECTL) apply -f -
 
-test-e2e: deploy-hub deploy-spoke-operator bootstrap-secret run-e2e
+test-e2e: deploy-hub deploy-spoke-operator-helm run-e2e
 
 run-e2e:
 	go test -c ./test/e2e
@@ -51,6 +54,9 @@ bootstrap-secret:
 	cp $(HUB_KUBECONFIG) deploy/klusterlet/config/samples/bootstrap/hub-kubeconfig
 	$(KUBECTL) get ns open-cluster-management-agent; if [ $$? -ne 0 ] ; then $(KUBECTL) create ns open-cluster-management-agent; fi
 	$(KUSTOMIZE) build deploy/klusterlet/config/samples/bootstrap | $(KUBECTL) apply -f -
+
+deploy-spoke-operator-helm: ensure-helm
+	$(HELM) install klusterlet deploy/klusterlet/chart/klusterlet --namespace=open-cluster-management --set klusterlet.create=false,images.registry=$(IMAGE_REGISTRY),image.tag=$(IMAGE_TAG) --set-file bootstrapHubKubeConfig=$(HUB_KUBECONFIG)
 
 deploy-spoke-operator: ensure-kustomize
 	cp deploy/klusterlet/config/kustomization.yaml deploy/klusterlet/config/kustomization.yaml.tmp
