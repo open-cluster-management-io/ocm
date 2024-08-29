@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -179,6 +180,21 @@ func TestClusterManagerConfig(t *testing.T) {
 						object.Spec.AddOnManagerImagePullSpec != fmt.Sprintf("%s/addon-manager:%s", registry, version) {
 						t.Errorf("failed to render images")
 					}
+					if config.CreateBootstrapToken {
+						if len(object.Spec.RegistrationConfiguration.AutoApproveUsers) == 0 {
+							t.Errorf("failed to render auto approve users for bootstrap token")
+						}
+					}
+					if config.CreateBootstrapSA {
+						if len(object.Spec.RegistrationConfiguration.AutoApproveUsers) == 0 {
+							t.Errorf("failed to render auto approve users for bootstrap sa")
+						}
+					}
+					if !config.CreateBootstrapSA && !config.CreateBootstrapToken {
+						if len(object.Spec.RegistrationConfiguration.AutoApproveUsers) != 0 {
+							t.Errorf("failed to render auto approve users")
+						}
+					}
 				case *corev1.Secret:
 					switch object.Name {
 					case "open-cluster-management-image-pull-credentials":
@@ -193,6 +209,11 @@ func TestClusterManagerConfig(t *testing.T) {
 						data := object.StringData["token-secret"]
 						if len(data) != 16 {
 							t.Errorf("failed to get token secret")
+						}
+						re := regexp.MustCompile("^([a-z0-9]{16})$")
+
+						if string(re.Find([]byte(data))) != data {
+							t.Errorf("the token secret is invalid")
 						}
 					}
 				}

@@ -12,13 +12,6 @@
 {{- end }}
 
 
-{{/* Create random bootstrap token secret. */}}
-{{- define "tokenID" }}
-{{- printf "ocmhub" }}
-{{- end }}
-{{- define "tokenSecret" }}
-{{- printf "%s" (randAlphaNum 16) }}
-{{- end }}
 
 {{/* Define the image tag. */}}
 {{- define "imageTag" }}

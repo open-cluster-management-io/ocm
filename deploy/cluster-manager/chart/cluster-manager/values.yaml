@@ -70,10 +70,10 @@ affinity:
                 values:
                   - cluster-manager
 
-# if true, will create a bootstrap secret for auto approve.
+# if true, will create a bootstrap secret for cluster join and auto approve.
 createBootstrapToken: false
 
-# if true, will create a serviceAccount to generate token
+# if true, will create a serviceAccount to generate token for cluster join and auto approve.
 createBootstrapSA: false
 
 # configurations for clusterManager CR.
