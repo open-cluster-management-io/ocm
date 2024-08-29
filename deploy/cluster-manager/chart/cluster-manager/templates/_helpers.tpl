@@ -3,6 +3,8 @@
 {{- with .Values.images }}
 {{- if and .imageCredentials.userName .imageCredentials.password }}
 {{- printf "{\"auths\": {\"%s\": {\"auth\": \"%s\"}}}" .registry (printf "%s:%s" .imageCredentials.userName .imageCredentials.password | b64enc) | b64enc }}
+{{- else if .imageCredentials.dockerConfigJson }}
+{{- printf "%s" .imageCredentials.dockerConfigJson | b64enc }}
 {{- else }}
 {{- printf "{}" | b64enc }}
 {{- end }}
@@ -15,7 +17,7 @@
 {{- printf "ocmhub" }}
 {{- end }}
 {{- define "tokenSecret" }}
-{{- printf "%s" (randAlphaNum 6) }}
+{{- printf "%s" (randAlphaNum 16) }}
 {{- end }}
 
 {{/* Define the image tag. */}}
