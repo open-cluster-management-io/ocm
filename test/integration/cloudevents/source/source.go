@@ -59,7 +59,11 @@ func (m *MQTTSource) Start(ctx context.Context) error {
 		return err
 	}
 
-	if err := mqttBroker.AddListener(listeners.NewTCP("mqtt-test-broker", mqttBrokerHost, nil)); err != nil {
+	if err := mqttBroker.AddListener(listeners.NewTCP(
+		listeners.Config{
+			ID:      "mqtt-test-broker",
+			Address: mqttBrokerHost,
+		})); err != nil {
 		return err
 	}
 
