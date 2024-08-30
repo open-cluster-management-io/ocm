@@ -1,3 +1,4 @@
+{{- if .Values.clusterManager.create }}
 apiVersion: operator.open-cluster-management.io/v1
 kind: ClusterManager
 metadata:
@@ -14,10 +15,15 @@ spec:
     {{- toYaml . | nindent 4 }}
   {{- end }}
   registrationConfiguration:
-    {{- if .Values.createBootstrapToken }}
+    {{- if or .Values.createBootstrapToken .Values.createBootstrapSA }}
     autoApproveUsers:
-      - system:bootstrap:bootstrap-token-{{ template "tokenID" .}}
+      {{- if .Values.createBootstrapToken }}
+      # token-id is fixed in bootstrap-token-ocmhub secret
+      - system:bootstrap:bootstrap-token-ocmhub
+      {{- end }}
+      {{- if .Values.createBootstrapSA }}
       - system:serviceaccount:open-cluster-management:cluster-bootstrap
+      {{- end }}
     {{- end }}
     {{- with .Values.clusterManager.registrationConfiguration.featureGates }}
     featureGates:
@@ -27,7 +33,8 @@ spec:
   workConfiguration:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  {{if .Values.clusterManager.addOnManagerConfiguration }}
+  {{- with .Values.clusterManager.addOnManagerConfiguration }}
   addOnManagerConfiguration:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+{{- end }}

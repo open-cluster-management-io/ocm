@@ -1,10 +1,19 @@
 package register
 
 import (
+	"context"
+	"fmt"
+	"os"
 	"reflect"
 	"testing"
+	"time"
 
+	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
 func TestBaseKubeConfigFromBootStrap(t *testing.T) {
@@ -99,6 +108,155 @@ func TestBaseKubeConfigFromBootStrap(t *testing.T) {
 
 			if !reflect.DeepEqual(c.expectedCAData, kubeConfig.Clusters[cluster].CertificateAuthorityData) {
 				t.Errorf("expect ca data %v, but %v", c.expectedCAData, kubeConfig.Clusters[cluster].CertificateAuthorityData)
+			}
+		})
+	}
+}
+
+type testApprover struct {
+	cleanupErr error
+}
+
+func newTestApprover(err error) Approver {
+	return &testApprover{cleanupErr: err}
+}
+
+func (t *testApprover) Run(_ context.Context, _ int) {}
+
+func (t *testApprover) Cleanup(_ context.Context, _ *clusterv1.ManagedCluster) error {
+	return t.cleanupErr
+}
+
+func TestAggregateApprover(t *testing.T) {
+	cases := []struct {
+		name      string
+		approvers []Approver
+		expectErr bool
+	}{
+		{
+			name:      "noop",
+			approvers: []Approver{NewNoopApprover()},
+		},
+		{
+			name:      "two approvers, one with err",
+			approvers: []Approver{NewNoopApprover(), newTestApprover(fmt.Errorf("error test"))},
+			expectErr: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			aggregated := NewAggregatedApprover(c.approvers...)
+			err := aggregated.Cleanup(context.Background(), testinghelpers.NewManagedCluster())
+			if err != nil && !c.expectErr {
+				t.Errorf("should have no err but got %v", err)
+			}
+			if err == nil && c.expectErr {
+				t.Errorf("should have err")
+			}
+		})
+	}
+}
+
+func TestIsHubKubeConfigValidFunc(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "testvalidhubclientconfig")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	cert1 := testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second)
+
+	kubeconfig := testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil)
+
+	cases := []struct {
+		name               string
+		clusterName        string
+		agentName          string
+		kubeconfig         []byte
+		bootstapKubeconfig []byte
+		tlsCert            []byte
+		tlsKey             []byte
+		isValid            bool
+	}{
+		{
+			name:    "no kubeconfig",
+			isValid: false,
+		},
+		{
+			name:               "context cluster changes",
+			clusterName:        "cluster1",
+			agentName:          "agent1",
+			kubeconfig:         kubeconfig,
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c2", "https://127.0.0.1:6001", "", nil, nil, nil),
+			tlsKey:             cert1.Key,
+			tlsCert:            cert1.Cert,
+			isValid:            false,
+		},
+		{
+			name:               "hub server url changes",
+			clusterName:        "cluster1",
+			agentName:          "agent1",
+			kubeconfig:         kubeconfig,
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.2:6001", "", nil, nil, nil),
+			tlsKey:             cert1.Key,
+			tlsCert:            cert1.Cert,
+			isValid:            false,
+		},
+		{
+			name:               "proxy url changes",
+			clusterName:        "cluster1",
+			agentName:          "agent1",
+			kubeconfig:         kubeconfig,
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "https://127.0.0.1:3129", nil, nil, nil),
+			tlsKey:             cert1.Key,
+			tlsCert:            cert1.Cert,
+			isValid:            false,
+		},
+		{
+			name:               "ca bundle changes",
+			clusterName:        "cluster1",
+			agentName:          "agent1",
+			kubeconfig:         kubeconfig,
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", []byte("test"), nil, nil),
+			tlsKey:             cert1.Key,
+			tlsCert:            cert1.Cert,
+			isValid:            false,
+		},
+		{
+			name:               "valid hub client config",
+			clusterName:        "cluster1",
+			agentName:          "agent1",
+			kubeconfig:         kubeconfig,
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil),
+			tlsKey:             cert1.Key,
+			tlsCert:            cert1.Cert,
+			isValid:            true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var bootstrapKubeconfig, kubeConfig *clientcmdapi.Config
+			if c.bootstapKubeconfig != nil {
+				bootstrapKubeconfig, err = clientcmd.Load(c.bootstapKubeconfig)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			if c.kubeconfig != nil {
+				kubeConfig, err = clientcmd.Load(c.kubeconfig)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			valid, err := IsHubKubeconfigValid(bootstrapKubeconfig, kubeConfig)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if c.isValid != valid {
+				t.Errorf("expect %t, but %t", c.isValid, valid)
 			}
 		})
 	}

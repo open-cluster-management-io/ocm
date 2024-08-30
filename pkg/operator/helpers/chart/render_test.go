@@ -1,20 +1,21 @@
-package chartrender
+package chart
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/yaml"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/client-go/kubernetes/scheme"
 
 	operatorv1 "open-cluster-management.io/api/operator/v1"
-
-	clustermanagerchart "open-cluster-management.io/ocm/deploy/cluster-manager/chart"
-	klusterletchart "open-cluster-management.io/ocm/deploy/klusterlet/chart"
 )
 
 const (
@@ -24,26 +25,38 @@ const (
 
 var outputDebug = false
 
+var decoder runtime.Decoder
+var chartScheme = runtime.NewScheme()
+
+func init() {
+	_ = scheme.AddToScheme(chartScheme)
+	_ = apiextensionsv1.AddToScheme(chartScheme)
+	_ = apiextensionsv1beta1.AddToScheme(chartScheme)
+	_ = operatorv1.AddToScheme(chartScheme)
+
+	decoder = serializer.NewCodecFactory(chartScheme).UniversalDeserializer()
+}
+
 func TestClusterManagerConfig(t *testing.T) {
 	cases := []struct {
 		name           string
 		namespace      string
-		chartConfig    func() *clustermanagerchart.ChartConfig
+		chartConfig    func() *ClusterManagerChartConfig
 		expectedObjCnt int
 	}{
 		{
 			name:      "default config",
 			namespace: "open-cluster-management",
-			chartConfig: func() *clustermanagerchart.ChartConfig {
+			chartConfig: func() *ClusterManagerChartConfig {
 				config := NewDefaultClusterManagerChartConfig()
 				return config
 			},
 			expectedObjCnt: 6,
 		},
 		{
-			name:      "enable bootstrap config",
+			name:      "enable bootstrap token",
 			namespace: "multicluster-engine",
-			chartConfig: func() *clustermanagerchart.ChartConfig {
+			chartConfig: func() *ClusterManagerChartConfig {
 				config := NewDefaultClusterManagerChartConfig()
 				config.CreateBootstrapToken = true
 				return config
@@ -51,15 +64,25 @@ func TestClusterManagerConfig(t *testing.T) {
 			expectedObjCnt: 9,
 		},
 		{
+			name:      "enable bootstrap sa",
+			namespace: "multicluster-engine",
+			chartConfig: func() *ClusterManagerChartConfig {
+				config := NewDefaultClusterManagerChartConfig()
+				config.CreateBootstrapSA = true
+				return config
+			},
+			expectedObjCnt: 9,
+		},
+		{
 			name:      "change images config",
 			namespace: "ocm",
-			chartConfig: func() *clustermanagerchart.ChartConfig {
+			chartConfig: func() *ClusterManagerChartConfig {
 				config := NewDefaultClusterManagerChartConfig()
-				config.Images = clustermanagerchart.ImagesConfig{
+				config.Images = ImagesConfig{
 					Registry:        "myrepo",
 					Tag:             "v9.9.9",
 					ImagePullPolicy: corev1.PullAlways,
-					ImageCredentials: clustermanagerchart.ImageCredentials{
+					ImageCredentials: ImageCredentials{
 						CreateImageCredentials: true,
 						UserName:               "test",
 						Password:               "test",
@@ -69,7 +92,37 @@ func TestClusterManagerConfig(t *testing.T) {
 			},
 			expectedObjCnt: 7,
 		},
+		{
+			name:      "change images config dockerConfigJson",
+			namespace: "ocm",
+			chartConfig: func() *ClusterManagerChartConfig {
+				config := NewDefaultClusterManagerChartConfig()
+				config.Images = ImagesConfig{
+					Registry:        "myrepo",
+					Tag:             "v9.9.9",
+					ImagePullPolicy: corev1.PullAlways,
+					ImageCredentials: ImageCredentials{
+						CreateImageCredentials: true,
+						DockerConfigJson:       `{"auths":{"quay.io":{"auth":"YWJjCg=="}}}`,
+					},
+				}
+				return config
+			},
+			expectedObjCnt: 7,
+		},
+		{
+			name:      "create namespace",
+			namespace: "multicluster-engine",
+			chartConfig: func() *ClusterManagerChartConfig {
+				config := NewDefaultClusterManagerChartConfig()
+				config.CreateBootstrapToken = true
+				config.CreateNamespace = true
+				return config
+			},
+			expectedObjCnt: 10,
+		},
 	}
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			registry := defaultRegistry
@@ -83,7 +136,7 @@ func TestClusterManagerConfig(t *testing.T) {
 				version = config.Images.Tag
 			}
 
-			objects, err := RenderChart(config, c.namespace, clustermanagerchart.ChartName, clustermanagerchart.ChartFiles)
+			objects, err := RenderClusterManagerChart(config, c.namespace)
 			if err != nil {
 				t.Errorf("error rendering chart: %v", err)
 			}
@@ -91,8 +144,23 @@ func TestClusterManagerConfig(t *testing.T) {
 				t.Errorf("expected %d objects, got %d", c.expectedObjCnt, len(objects))
 			}
 
-			for _, o := range objects {
-				switch object := o.(type) {
+			// output is for debug
+			if outputDebug {
+				output(t, c.name, objects)
+			}
+			for i, o := range objects {
+				obj, _, err := decoder.Decode(o, nil, nil)
+				if err != nil {
+					t.Errorf("error decoding object: %v", err)
+				}
+				switch object := obj.(type) {
+				case *corev1.Namespace:
+					if i != 0 {
+						t.Errorf("the first object is not namespace")
+					}
+					if object.Name != c.namespace {
+						t.Errorf("expected namespace %s, got %s", c.namespace, object.Name)
+					}
 				case *appsv1.Deployment:
 					if object.Namespace != c.namespace {
 						t.Errorf("expected namespace is %s, but got %s", c.namespace, object.Namespace)
@@ -112,28 +180,59 @@ func TestClusterManagerConfig(t *testing.T) {
 						object.Spec.AddOnManagerImagePullSpec != fmt.Sprintf("%s/addon-manager:%s", registry, version) {
 						t.Errorf("failed to render images")
 					}
+					if config.CreateBootstrapToken {
+						if len(object.Spec.RegistrationConfiguration.AutoApproveUsers) == 0 {
+							t.Errorf("failed to render auto approve users for bootstrap token")
+						}
+					}
+					if config.CreateBootstrapSA {
+						if len(object.Spec.RegistrationConfiguration.AutoApproveUsers) == 0 {
+							t.Errorf("failed to render auto approve users for bootstrap sa")
+						}
+					}
+					if !config.CreateBootstrapSA && !config.CreateBootstrapToken {
+						if len(object.Spec.RegistrationConfiguration.AutoApproveUsers) != 0 {
+							t.Errorf("failed to render auto approve users")
+						}
+					}
+				case *corev1.Secret:
+					switch object.Name {
+					case "open-cluster-management-image-pull-credentials":
+						data := object.Data[corev1.DockerConfigJsonKey]
+						if len(data) == 0 {
+							t.Errorf("failed to get image pull secret")
+						}
+						if base64.StdEncoding.EncodeToString(data) == "" {
+							t.Errorf("failed to render image pull secret")
+						}
+					case "bootstrap-token-ocmhub":
+						data := object.StringData["token-secret"]
+						if len(data) != 16 {
+							t.Errorf("failed to get token secret")
+						}
+						re := regexp.MustCompile("^([a-z0-9]{16})$")
+
+						if string(re.Find([]byte(data))) != data {
+							t.Errorf("the token secret is invalid")
+						}
+					}
 				}
-
 			}
-
-			// output is for debug
-			// output(t, c.name, objects...)
 		})
 	}
 }
 
 func TestKlusterletConfig(t *testing.T) {
-
 	cases := []struct {
 		name           string
 		namespace      string
-		chartConfig    func() *klusterletchart.ChartConfig
+		chartConfig    func() *KlusterletChartConfig
 		expectedObjCnt int
 	}{
 		{
 			name:      "default config",
 			namespace: "open-cluster-management",
-			chartConfig: func() *klusterletchart.ChartConfig {
+			chartConfig: func() *KlusterletChartConfig {
 				config := NewDefaultKlusterletChartConfig()
 				config.Klusterlet.ClusterName = "testCluster"
 				config.Klusterlet.Mode = operatorv1.InstallModeSingleton
@@ -141,17 +240,29 @@ func TestKlusterletConfig(t *testing.T) {
 			},
 			expectedObjCnt: 6,
 		},
+		{
+			name:      "use bootstrapHubKubeConfig",
+			namespace: "open-cluster-management",
+			chartConfig: func() *KlusterletChartConfig {
+				config := NewDefaultKlusterletChartConfig()
+				config.Klusterlet.ClusterName = "testCluster"
+				config.Klusterlet.Mode = operatorv1.InstallModeSingleton
+				config.BootstrapHubKubeConfig = "kubeconfig"
+				return config
+			},
+			expectedObjCnt: 8,
+		},
 
 		{
 			name:      "change images config",
 			namespace: "ocm",
-			chartConfig: func() *klusterletchart.ChartConfig {
+			chartConfig: func() *KlusterletChartConfig {
 				config := NewDefaultKlusterletChartConfig()
-				config.Images = klusterletchart.ImagesConfig{
+				config.Images = ImagesConfig{
 					Registry:        "myrepo",
 					Tag:             "v9.9.9",
 					ImagePullPolicy: corev1.PullAlways,
-					ImageCredentials: klusterletchart.ImageCredentials{
+					ImageCredentials: ImageCredentials{
 						CreateImageCredentials: true,
 						UserName:               "test",
 						Password:               "test",
@@ -166,7 +277,7 @@ func TestKlusterletConfig(t *testing.T) {
 		{
 			name:      "hosted mode",
 			namespace: "ocm",
-			chartConfig: func() *klusterletchart.ChartConfig {
+			chartConfig: func() *KlusterletChartConfig {
 				config := NewDefaultKlusterletChartConfig()
 				config.NoOperator = true
 				config.Klusterlet.Name = "klusterlet2"
@@ -179,7 +290,7 @@ func TestKlusterletConfig(t *testing.T) {
 		{
 			name:      "noOperator",
 			namespace: "ocm",
-			chartConfig: func() *klusterletchart.ChartConfig {
+			chartConfig: func() *KlusterletChartConfig {
 				config := NewDefaultKlusterletChartConfig()
 				config.NoOperator = true
 				config.Klusterlet.Name = "klusterlet2"
@@ -189,7 +300,20 @@ func TestKlusterletConfig(t *testing.T) {
 			},
 			expectedObjCnt: 2,
 		},
+		{
+			name:      "create namespace",
+			namespace: "open-cluster-management",
+			chartConfig: func() *KlusterletChartConfig {
+				config := NewDefaultKlusterletChartConfig()
+				config.Klusterlet.ClusterName = "testCluster"
+				config.Klusterlet.Mode = operatorv1.InstallModeSingleton
+				config.CreateNamespace = true
+				return config
+			},
+			expectedObjCnt: 7,
+		},
 	}
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			registry := defaultRegistry
@@ -202,7 +326,7 @@ func TestKlusterletConfig(t *testing.T) {
 				version = config.Images.Tag
 			}
 
-			objects, err := RenderChart(config, c.namespace, klusterletchart.ChartName, klusterletchart.ChartFiles)
+			objects, err := RenderKlusterletChart(config, c.namespace)
 			if err != nil {
 				t.Errorf("error rendering chart: %v", err)
 			}
@@ -210,8 +334,21 @@ func TestKlusterletConfig(t *testing.T) {
 				t.Errorf("expected %d objects, got %d", c.expectedObjCnt, len(objects))
 			}
 
+			// output is for debug
+			if outputDebug {
+				output(t, c.name, objects)
+			}
+
 			for _, o := range objects {
-				switch object := o.(type) {
+				obj, _, err := decoder.Decode(o, nil, nil)
+				if err != nil {
+					t.Errorf("error decoding object: %v", err)
+				}
+				switch object := obj.(type) {
+				case *corev1.Namespace:
+					if object.Name != c.namespace && object.Name != "open-cluster-management-agent" {
+						t.Errorf("expected namespace %s, got %s", c.namespace, object.Name)
+					}
 				case *appsv1.Deployment:
 					if object.Namespace != c.namespace {
 						t.Errorf("expected namespace is %s, but got %s", c.namespace, object.Namespace)
@@ -275,35 +412,38 @@ func TestKlusterletConfig(t *testing.T) {
 								fmt.Sprintf("open-cluster-management-%s", object.Spec.ClusterName), object.Spec.Namespace)
 						}
 					}
-
+				case *corev1.Secret:
+					switch object.Name {
+					case "open-cluster-management-image-pull-credentials":
+						data := object.Data[corev1.DockerConfigJsonKey]
+						if len(data) == 0 {
+							t.Errorf("failed to get image pull secret")
+						}
+						if base64.StdEncoding.EncodeToString(data) == "" {
+							t.Errorf("failed to render image pull secret")
+						}
+					case "bootstrap-hub-kubeconfig", "external-managed-kubeconfig":
+						data := object.Data["kubeconfig"]
+						if base64.StdEncoding.EncodeToString(data) == "" {
+							t.Errorf("failed to render kubeconfig")
+						}
+					}
 				}
-
-			}
-
-			// output is for debug
-			if outputDebug {
-				output(t, c.name, objects...)
 			}
 		})
 	}
 }
 
-func output(t *testing.T, name string, objects ...runtime.Object) {
-	tmpDir, err := os.MkdirTemp("./", "tmp-"+name)
+func output(t *testing.T, name string, objects [][]byte) {
+	tmpDir, err := os.MkdirTemp("./", "tmp-"+name+"-")
 	if err != nil {
 		t.Fatalf("failed to create temp %v", err)
 	}
 
 	for i, o := range objects {
-		data, err := yaml.Marshal(o)
-		if err != nil {
-			t.Fatalf("failed yaml marshal %v", err)
-		}
-
-		err = os.WriteFile(fmt.Sprintf("%v/%v-%v.yaml", tmpDir, i, o.GetObjectKind().GroupVersionKind().Kind), data, 0600)
+		err = os.WriteFile(fmt.Sprintf("%v/%v.yaml", tmpDir, i), o, 0600)
 		if err != nil {
 			t.Fatalf("failed to Marshal object.%v", err)
 		}
-
 	}
 }

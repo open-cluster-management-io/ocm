@@ -1,4 +1,4 @@
-{{- if .Values.createBootstrapToken }}
+{{- if or .Values.createBootstrapToken .Values.createBootstrapSA }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:

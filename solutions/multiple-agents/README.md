@@ -1,6 +1,6 @@
-# Manage a cluster with multiple hubs
+# Manage a spoke installed with multiple agents connected to different hubs
 
-The scripts provided in this doc help you to setup an Open Cluster Management (OCM) environment with Kind clusters where a single cluster is managed by two hubs. The agents of thoes two hubs are all running in the default mode on the managed cluster under different namespaces.
+The scripts provided in this document help you set up an Open Cluster Management (OCM) environment with Kind clusters, where a single cluster is managed by two hubs. The agents of the two hubs are all running in the default mode on the managed cluster under different namespaces.
 
 ## Prerequisite
 
