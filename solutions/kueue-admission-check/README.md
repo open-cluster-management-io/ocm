@@ -45,9 +45,9 @@ After that, you can verify your setup.
 ```bash
 kubectl get mcl
 NAME       HUB ACCEPTED   MANAGED CLUSTER URLS                  JOINED   AVAILABLE   AGE
-cluster1   true           https://cluster1-control-plane:6443   True     True        72s
-cluster2   true           https://cluster2-control-plane:6443   True     True        72s
-cluster3   true           https://cluster3-control-plane:6443   True     True        72s
+cluster1   true           https://cluster1-control-plane:6443   True     True        116s
+cluster2   true           https://cluster2-control-plane:6443   True     True        94s
+cluster3   true           https://cluster3-control-plane:6443   True     True        73s
 ```
 - Verify the installed addons.
 ```bash
@@ -63,17 +63,17 @@ cluster3    resource-usage-collect   True                   False
 - Confirm Kueue is running on the clusters.
 ```bash
 kubectl get pods -n kueue-system --context kind-hub   # Same for managed clusters.
-NAME                                       READY   STATUS    RESTARTS       AGE
-kueue-controller-manager-87bd7888b-f65rc   2/2     Running   11 (14m ago)   2d
+NAME                                       READY   STATUS    RESTARTS   AGE
+kueue-controller-manager-87bd7888b-gqk4g   2/2     Running   0          69s
 ```
 
 - On the hub cluster, check `ClusterProfiles`.
 ```bash
 kubectl get clusterprofile -A
 NAMESPACE                 NAME       AGE
-open-cluster-management   cluster1   2d
-open-cluster-management   cluster2   2d
-open-cluster-management   cluster3   2d
+open-cluster-management   cluster1   23s
+open-cluster-management   cluster2   23s
+open-cluster-management   cluster3   23s
 ```
 - The `ClusterProfile` status contains credentials that Kueue can use.
 ```bash
@@ -89,7 +89,7 @@ kubectl get clusterprofile -A -ojson | jq '.items[] | .metadata.name, .status.cr
 }
 "cluster2"
 {
-    "accessRef": {
+  "accessRef": {
     "kind": "Secret",
     "name": "kueue-admin-cluster2-kubeconfig",
     "namespace": "kueue-system"
@@ -98,17 +98,23 @@ kubectl get clusterprofile -A -ojson | jq '.items[] | .metadata.name, .status.cr
 }
 "cluster3"
 {
-  ..
+  "accessRef": {
+    "kind": "Secret",
+    "name": "kueue-admin-cluster3-kubeconfig",
+    "namespace": "kueue-system"
+  },
+  "consumer": "kueue-admin"
+
 }
 ```
 - On hub cluster, Check secrets with `kubeconfig` for the managed cluster created under `kueue-system` namespace.
 ```bash
 kubectl get secret -n kueue-system
 NAME                              TYPE     DATA   AGE
-kueue-admin-cluster1-kubeconfig   Opaque   1      2d
-kueue-admin-cluster2-kubeconfig   Opaque   1      2d
-kueue-admin-cluster3-kubeconfig   Opaque   1      2d
-kueue-webhook-server-cert         Opaque   4      2d
+kueue-admin-cluster1-kubeconfig   Opaque   1      4m4s
+kueue-admin-cluster2-kubeconfig   Opaque   1      4m4s
+kueue-admin-cluster3-kubeconfig   Opaque   1      4m4s
+kueue-webhook-server-cert         Opaque   4      5m27s
 ```
 
 ## User Stories
@@ -122,19 +128,90 @@ As an admin, I want to automate [MultiKueue](https://kueue.sigs.k8s.io/docs/conc
 kubectl apply -f ./multikueue-setup-demo1.yaml
 ```
 - After that, check the status of `MultiKueueCluster`, `AdmissionChecks` and `Clusterqueues`
+
 ```bash
 kubectl get multikueuecluster -A -ojson | jq '.items[] | .metadata.name, .status.conditions'
 kubectl get admissionchecks -ojson | jq '.items[] | .metadata.name, .status.conditions'
 kubectl get clusterqueues -ojson | jq '.items[] | .metadata.name, .status.conditions'
 ```
+Success is indicated when "status": "True" and reasons like "Active" or "Ready" are present in the conditions.
+
+```bash
+"multikueue-demo1-cluster1"
+[
+  {
+    "lastTransitionTime": "2024-08-31T20:41:41Z",
+    "message": "Connected",
+    "observedGeneration": 1,
+    "reason": "Active",
+    "status": "True",
+    "type": "Active"
+  }
+]
+"multikueue-demo1-cluster2"
+[
+  {
+    "lastTransitionTime": "2024-08-31T20:41:41Z",
+    "message": "Connected",
+    "observedGeneration": 1,
+    "reason": "Active",
+    "status": "True",
+    "type": "Active"
+  }
+]
+"multikueue-demo1"
+[
+  {
+    "lastTransitionTime": "2024-08-31T20:41:41Z",
+    "message": "The admission check is active",
+    "observedGeneration": 1,
+    "reason": "Active",
+    "status": "True",
+    "type": "Active"
+  },
+  {
+    "lastTransitionTime": "2024-08-31T20:41:41Z",
+    "message": "only one multikueue managed admission check can be used in one ClusterQueue",
+    "observedGeneration": 1,
+    "reason": "MultiKueue",
+    "status": "True",
+    "type": "SingleInstanceInClusterQueue"
+  },
+  {
+    "lastTransitionTime": "2024-08-31T20:41:41Z",
+    "message": "admission check cannot be applied at ResourceFlavor level",
+    "observedGeneration": 1,
+    "reason": "MultiKueue",
+    "status": "True",
+    "type": "FlavorIndependent"
+  }
+]
+"cluster-queue-demo1"
+[
+  {
+    "lastTransitionTime": "2024-08-31T20:41:41Z",
+    "message": "Can admit new workloads",
+    "observedGeneration": 1,
+    "reason": "Ready",
+    "status": "True",
+    "type": "Active"
+  }
+]
+```
 - Deploy a job to the MultiKueue.
+
 ```bash
 kubectl create -f ./job-demo1.yaml
 ```
-- Check the workload on the managed clusters.
+- Check the workload on the managed clusters. Here when the job’s Workload receives a QuotaReservation in the manager cluster, a copy of the Workload is created in all configured worker clusters. 
+Once `kind-cluster1` admitted the workload, the manager removed the corresponding workloads from the other clusters(`kind-cluster2`).
 ```bash
 kubectl get workload --context kind-cluster1
+NAME                       QUEUE              RESERVED IN           ADMITTED   AGE
+job-demo1-jobnktc6-6c5f3   user-queue-demo1   cluster-queue-demo1   True       5s
+
 kubectl get workload --context kind-cluster2
+No resources found in default namespace.   # After cluster1 admitted the workload, no workload should show up here.
 ```
 #### Story 2
 
@@ -167,22 +244,40 @@ spec:
             accelerator: nvidia-tesla-t4
 ```
 - Bind the cluster set to the Kueue namespace and verify the bindings.
+
 ```bash
 clusteradm clusterset bind spoke --namespace kueue-system
 clusteradm get clustersets
+<ManagedClusterSet> 
+└── <spoke> 
+    └── <BoundNamespace> default,kueue-system
+    └── <Status> 3 ManagedClusters selected
+    └── <Clusters> [cluster1 cluster2 cluster3]
 ```
+
 - Apply the placement policy.
+
 ```bash
 kubectl apply -f placement-demo2-1.yaml
 ```
+
 - Apply the MultiKueue setup configuration.
+
 ```bash
 kubectl apply -f ./multikueue-setup-demo2.yaml
 ```
+
 - Check the `MultikueueKonfig` and `MultikueueClusters`.
+
 ```bash
 kubectl get multikueueconfig
+NAME                      AGE
+placement-demo2           60s
+
 kubectl get multikueuecluster
+NAME                        AGE
+placement-demo2-cluster2    60s
+placement-demo2-cluster3    60s
 ```
 - After that, check the status of `MultiKueueCluster`, `AdmissionChecks` and `Clusterqueues`
 ```bash
@@ -190,14 +285,91 @@ kubectl get multikueuecluster -A -ojson | jq '.items[] | .metadata.name, .status
 kubectl get admissionchecks -ojson | jq '.items[] | .metadata.name, .status.conditions'
 kubectl get clusterqueues -ojson | jq '.items[] | .metadata.name, .status.conditions'
 ```
+If success, there should be "status": "True" and reasons like "Active" or "Ready" presented in the conditions.
+```bash
+"placement-demo2-cluster2"
+[
+  {
+    "lastTransitionTime": "2024-08-31T22:03:16Z",
+    "message": "Connected",
+    "observedGeneration": 1,
+    "reason": "Active",
+    "status": "True",
+    "type": "Active"
+  }
+]
+"placement-demo2-cluster3"
+[
+  {
+    "lastTransitionTime": "2024-08-31T22:03:16Z",
+    "message": "Connected",
+    "observedGeneration": 1,
+    "reason": "Active",
+    "status": "True",
+    "type": "Active"
+  }
+]
+"multikueue-demo2"   # The status of the admissioncheck `multikueue-demo2`
+[
+  {
+    "lastTransitionTime": "2024-08-31T22:03:16Z",
+    "message": "The admission check is active",
+    "observedGeneration": 1,
+    "reason": "Active",
+    "status": "True",
+    "type": "Active"
+  },
+  {
+    "lastTransitionTime": "2024-08-31T22:03:16Z",
+    "message": "only one multikueue managed admission check can be used in one ClusterQueue",
+    "observedGeneration": 1,
+    "reason": "MultiKueue",
+    "status": "True",
+    "type": "SingleInstanceInClusterQueue"
+  },
+  {
+    "lastTransitionTime": "2024-08-31T22:03:16Z",
+    "message": "admission check cannot be applied at ResourceFlavor level",
+    "observedGeneration": 1,
+    "reason": "MultiKueue",
+    "status": "True",
+    "type": "FlavorIndependent"
+  }
+]
+"placement-demo2"   # The status of the admissioncheck `placement-demo2`
+[
+  {
+    "lastTransitionTime": "2024-08-31T22:03:16Z",
+    "message": "MultiKueueConfig and MultiKueueCluster generated",
+    "reason": "Active",
+    "status": "True",
+    "type": "Active"
+  }
+]
+"cluster-queue-demo2"
+[
+  {
+    "lastTransitionTime": "2024-08-31T22:03:16Z",
+    "message": "Can admit new workloads",
+    "observedGeneration": 1,
+    "reason": "Ready",
+    "status": "True",
+    "type": "Active"
+  }
+]
+```
 - Create a job requesting GPU resources to the MultiKueue.
 ```bash
 kubectl create -f ./job-demo2.yaml
 ```
-- Check the workload on managed clusters.
+- Check the workload on managed clusters. Like we explained in the case in story 1, once one cluster(here `kind-cluster3`) has admitted the workload, the manager removed the corresponding workloads from the other clusters(here `kind-cluster2`).
 ```bash
 kubectl get workload --context kind-cluster2
+No resources found in default namespace.
+
 kubectl get workload --context kind-cluster3
+NAME                       QUEUE              RESERVED IN           ADMITTED   AGE
+job-demo2-jobl2t6d-a8cdd   user-queue-demo2   cluster-queue-demo2   True       3s
 ```
 #### Story 3
 
@@ -262,20 +434,63 @@ kubectl edit-status node cluster2-control-plane --context kind-cluster2  # Same 
    nvidia.com/gpu: "3"  # Add 3 fake GPUs in capacity
    pods: "110"
 ```
+
+- Here in this environment, cluster1 has no GPUs, while cluster2 and cluster3 each have 3 GPUs.
+Check `AddonPlacementScore`, the range of the score is from -100 to 100, clusters with more resources available have higher scores. 
+Here cluster1, which has no GPUs, should have a score of -100, and the cluster running the workload(here from story 2 we have one workload running on `kind-cluster3`) will have a lower score.
+```bash
+kubectl get addonplacementscore -A -ojson | jq '.items[] | .metadata.name, .status.scores[5]'
+"resource-usage-score"
+{
+  "name": "gpuClusterAvailable",
+  "value": -100
+}
+"resource-usage-score"  # kind-cluster2 has no workload.
+{
+  "name": "gpuClusterAvailable",
+  "value": -70
+}
+"resource-usage-score"  # kind-cluster3 has a workload from story 2, so it has fewer GPU available, thus lower score.
+{
+  "name": "gpuClusterAvailable",
+  "value": -80
+}
+```
+
 - Apply the changes in the `Placement` to update MultiKueue dynamically.
 ```bash
 kubectl apply -f ./placement-demo2-2.yaml
 ```
-- Review the update in `MultikueueKonfig` and `MultikueueClusters`
+
+- Review the update in `MultikueueKonfig`. 
 ```bash
 kubectl get multikueueconfig
-kubectl get multikueuecluster
+NAME                      AGE
+placement-demo2           22m
+
+kubectl get multikueueconfig placement-demo2 -oyaml
+apiVersion: kueue.x-k8s.io/v1alpha1
+kind: MultiKueueConfig
+metadata:
+  creationTimestamp: "2024-08-31T22:03:16Z"
+  generation: 5
+  name: placement-demo2
+  resourceVersion: "18109"
+  uid: 3c16af72-94bf-4444-bf79-7e896165aabc
+spec:
+  clusters:
+  - placement-demo2-cluster2   # cluster2 has a higher GPU score, so it got selected by the placement decision.
 ```
-- Create a job for the updated MultiKueue and check the workload.
+- Create a job for the updated MultiKueue and check the workload, this time the workload is admitted by `kind-cluster2`, in `kind-cluster3` can only find the old workload from Story 2.
 ```bash
 kubectl create -f ./job-demo2.yaml
 kubectl get workload --context kind-cluster2
+NAME                       QUEUE              RESERVED IN           ADMITTED   AGE
+job-demo2-jobxn888-4b91e   user-queue-demo2   cluster-queue-demo2   True       6s
+
 kubectl get workload --context kind-cluster3
+NAME                       QUEUE              RESERVED IN           ADMITTED   AGE
+job-demo2-jobl2t6d-a8cdd   user-queue-demo2   cluster-queue-demo2   True       9m13s
 ```
 
 ## Design Details
@@ -349,8 +564,7 @@ spec:
 #### After Using OCM Admission Check Controller
 
 With the OCM Admission Check Controller, the need for manual configuration of `MultiKueueConfig` and `MultiKueueCluster` is eliminated. Instead, the administrator only needs to configure two additional admission checks in the ClusterQueue resource:
-
-- Admin configures two admission check controllers in the `ClusterQueue`, for example in `multikueue-setup-demo2`:
+`multikueue-demo2` and `placement-demo2` (see in `multikueue-setup-demo2.yaml`) which leverage OCM's placement mechanism to select clusters based on specific criteria and automate the process of setting up `MultiKueueConfig` and `MultiKueueCluster`.
 
 ```yaml
 apiVersion: kueue.x-k8s.io/v1beta1
@@ -371,8 +585,30 @@ spec:
       - name: "nvidia.com/gpu"
         nominalQuota: 3
   admissionChecks:
-  - multikueue-demo2
-  - placement-demo2
+  - multikueue-demo2  
+  - placement-demo2   
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: AdmissionCheck
+metadata:
+  name: multikueue-demo2
+spec:
+  controllerName: kueue.x-k8s.io/multikueue
+  parameters:
+    apiGroup: kueue.x-k8s.io
+    kind: MultiKueueConfig
+    name: placement-demo2
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: AdmissionCheck
+metadata:
+  name: placement-demo2
+spec:
+  controllerName: open-cluster-management.io/placement
+  parameters:
+    apiGroup: cluster.open-cluster-management.io
+    kind: Placement
+    name: placement-demo2
 ```
 
 #### OCM Admission Check Controller Workflow
