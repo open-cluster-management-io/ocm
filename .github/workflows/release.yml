@@ -65,6 +65,7 @@ jobs:
       - name: setup helm
         uses: azure/setup-helm@v1
       - name: chart package
+        if: github.event_name != 'pull_request'
         run: |
           mkdir -p release
           pushd release
@@ -82,47 +83,3 @@ jobs:
           generate_release_notes: true
           files: |
             release/*.tgz
-      - name: submit cluster-manager chart to OCM chart repo
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.OCM_BOT_PAT }}
-          script: |
-            try {
-              const result = await github.rest.actions.createWorkflowDispatch({
-                owner:          'open-cluster-management-io',
-                repo:           'helm-charts',
-                workflow_id:    'download-chart.yml',
-                ref: 'main',
-                inputs: {
-                  repo:         "${{ github.repository }}",
-                  version:      "${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}",
-                  "chart-name": "cluster-manager",
-                },
-              })
-              console.log(result);
-            } catch(error) {
-              console.error(error);
-              core.setFailed(error);
-            }
-      - name: submit klusterlet chart to OCM chart repo
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.OCM_BOT_PAT }}
-          script: |
-            try {
-              const result = await github.rest.actions.createWorkflowDispatch({
-                owner:          'open-cluster-management-io',
-                repo:           'helm-charts',
-                workflow_id:    'download-chart.yml',
-                ref: 'main',
-                inputs: {
-                  repo:         "${{ github.repository }}",
-                  version:      "${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}",
-                  "chart-name": "klusterlet",
-                },
-              })
-              console.log(result);
-            } catch(error) {
-              console.error(error);
-              core.setFailed(error);
-            }
