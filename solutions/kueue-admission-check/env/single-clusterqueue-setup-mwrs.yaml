@@ -1,0 +1,90 @@
+apiVersion: work.open-cluster-management.io/v1alpha1
+kind: ManifestWorkReplicaSet
+metadata:
+  name: single-clusterqueue
+  namespace: default
+spec:
+  placementRefs:
+  - name: placement-spoke
+  manifestWorkTemplate:
+    workload:
+      manifests:
+        - apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: kueue-manager-ocm-rolebinding
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: kueue-manager-role
+          subjects:
+          - kind: ServiceAccount
+            name: klusterlet-work-sa
+            namespace: open-cluster-management-agent
+        - apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: kueue-batch-admin-ocm-rolebinding
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: kueue-batch-admin-role
+          subjects:
+          - kind: ServiceAccount
+            name: klusterlet-work-sa
+            namespace: open-cluster-management-agent
+        - apiVersion: kueue.x-k8s.io/v1beta1
+          kind: ResourceFlavor
+          metadata:
+            name: "default-flavor-demo1"
+        - apiVersion: kueue.x-k8s.io/v1beta1
+          kind: ClusterQueue
+          metadata:
+            name: "cluster-queue-demo1"
+          spec:
+            namespaceSelector: {} # match all.
+            resourceGroups:
+            - coveredResources: ["cpu", "memory"]
+              flavors:
+              - name: "default-flavor-demo1"
+                resources:
+                - name: "cpu"
+                  nominalQuota: 9
+                - name: "memory"
+                  nominalQuota: 36Gi
+        - apiVersion: kueue.x-k8s.io/v1beta1
+          kind: LocalQueue
+          metadata:
+            namespace: "default"
+            name: "user-queue-demo1"
+          spec:
+            clusterQueue: "cluster-queue-demo1"
+        - apiVersion: kueue.x-k8s.io/v1beta1
+          kind: ResourceFlavor
+          metadata:
+            name: "default-flavor-demo2"
+        - apiVersion: kueue.x-k8s.io/v1beta1
+          kind: ClusterQueue
+          metadata:
+            name: "cluster-queue-demo2"
+          spec:
+            namespaceSelector: {} # match all.
+            resourceGroups:
+            - coveredResources: ["cpu", "memory","nvidia.com/gpu"]
+              flavors:
+              - name: "default-flavor-demo2"
+                resources:
+                - name: "cpu"
+                  nominalQuota: 9
+                - name: "memory"
+                  nominalQuota: 36Gi
+                - name: "nvidia.com/gpu"
+                  nominalQuota: 3
+        - apiVersion: kueue.x-k8s.io/v1beta1
+          kind: LocalQueue
+          metadata:
+            namespace: "default"
+            name: "user-queue-demo2"
+          spec:
+            clusterQueue: "cluster-queue-demo2"
+

@@ -1,0 +1,14 @@
+#  clusteradm clusterset bind global --namespace default
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: placement-spoke
+  namespace: default
+spec:
+  clusterSets:
+  - spoke
+  tolerations:
+  - key: cluster.open-cluster-management.io/unreachable
+    operator: Exists
+  - key: cluster.open-cluster-management.io/unavailable
+    operator: Exists

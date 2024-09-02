@@ -1,0 +1,18 @@
+[
+  {
+    "op": "replace",
+    "path": "/spec/installStrategy",
+    "value": {
+      "placements": [
+        {
+          "name": "placement-spoke",
+          "namespace": "default",
+          "rolloutStrategy": {
+            "type": "All"
+          }
+        }
+      ],
+      "type": "Placements"
+    }
+  }
+]
