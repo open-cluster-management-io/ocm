@@ -34,10 +34,15 @@ REF: [Setup a MultiKueue environment](https://kueue.sigs.k8s.io/docs/tasks/manag
 2. [Kueue](https://kueue.sigs.k8s.io/docs/installation/) deployed across all clusters.
 3. [Managed-serviceaccount](https://github.com/open-cluster-management-io/managed-serviceaccount), [cluster-permission](https://github.com/open-cluster-management-io/cluster-permission) and [resource-usage-collect-addon](https://github.com/open-cluster-management-io/addon-contrib/tree/main/resource-usage-collect-addon) installed on managed clusters.
 
-You can set up these above by running the command:
+
+
+- You can set up these above by running the command:
 ```bash
 ./setup-env.sh
 ```
+**Notice**: Currently, this functionality relies on the support of `ClusterProfile` and the user's manual installation of the Admission Check Controller. 
+OCM achieves this by replacing some OCM images in this `setup-env.sh`. In the future, we plan to address the items listed in the [TODO section](#todo).
+
 After that, you can verify your setup.
 
 - Check the managed clusters.
@@ -617,3 +622,20 @@ spec:
 - It uses a `PlacementDecisionTracker` to gather the selected clusters and retrieves their `ClusterProfile` for `credentials`.
 - The controller creates or updates `MultiKueueCluster` resources with the kubeconfig details for each cluster, and then lists these clusters in a `MultiKueueConfig` resource.
 - Finally, it updates the AdmissionCheck condition to true, indicating successful generation of the `MultiKueueConfig` and `MultiKueueCluster`, readying the [MultiKueue](https://kueue.sigs.k8s.io/docs/concepts/multikueue/) environment for job scheduling.
+
+## TODO
+- In the future, the `AdmissionCheckcontroller` may be added to `featureGates` as a user-enabled feature or possibly developed into an individual component running as a pod on the `hub`.
+- Users may also need to enable the `ClusterProfile` feature in the `featureGates` to utilize the OCM Admission Check. This can be done by configuring the `ClusterManager` in `hub`.
+```yaml
+apiVersion: operator.open-cluster-management.io/v1
+kind: ClusterManager
+metadata:
+  name: cluster-manager
+spec:
+  registrationConfiguration:
+    featureGates:
+    - feature: ClusterProfile
+      mode: Enable
+...
+```
+
