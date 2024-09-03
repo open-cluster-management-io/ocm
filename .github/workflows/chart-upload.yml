@@ -1,0 +1,83 @@
+name: ChartUpload
+
+permissions:
+  contents: read
+
+on:
+  release:
+    types: [published]
+
+
+jobs:
+  env:
+    name: prepare release env
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          path: go/src/open-cluster-management.io/ocm
+      - name: get release version
+        run: |
+          echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+      - name: get major release version
+        run: |
+          echo "MAJOR_RELEASE_VERSION=${RELEASE_VERSION%.*}" >> $GITHUB_ENV
+          echo "TRIMED_RELEASE_VERSION=${RELEASE_VERSION#v}" >> $GITHUB_ENV
+    outputs:
+      MAJOR_RELEASE_VERSION: ${{ env.MAJOR_RELEASE_VERSION }}
+      RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
+  upload:
+    name: upload
+    runs-on: ubuntu-latest
+    needs: [ env ]
+    permissions:
+      contents: write
+    steps:
+      - name: submit cluster-manager chart to OCM chart repo
+        if: github.event_name != 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.OCM_BOT_PAT }}
+          script: |
+            try {
+              const result = await github.rest.actions.createWorkflowDispatch({
+                owner:          'open-cluster-management-io',
+                repo:           'helm-charts',
+                workflow_id:    'download-chart.yml',
+                ref: 'main',
+                inputs: {
+                  repo:         "${{ github.repository }}",
+                  version:      "${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}",
+                  "chart-name": "cluster-manager",
+                },
+              })
+              console.log(result);
+            } catch(error) {
+              console.error(error);
+              core.setFailed(error);
+            }
+      - name: submit klusterlet chart to OCM chart repo
+        if: github.event_name != 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.OCM_BOT_PAT }}
+          script: |
+            try {
+              const result = await github.rest.actions.createWorkflowDispatch({
+                owner:          'open-cluster-management-io',
+                repo:           'helm-charts',
+                workflow_id:    'download-chart.yml',
+                ref: 'main',
+                inputs: {
+                  repo:         "${{ github.repository }}",
+                  version:      "${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}",
+                  "chart-name": "klusterlet",
+                },
+              })
+              console.log(result);
+            } catch(error) {
+              console.error(error);
+              core.setFailed(error);
+            }

@@ -1,4 +1,4 @@
-name: GoRelease
+name: ImageRelease
 
 on:
   push:
