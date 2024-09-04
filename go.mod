@@ -1,6 +1,6 @@
 module open-cluster-management.io/ocm
 
-go 1.22.6
+go 1.22.5
 
 require (
 	github.com/cloudevents/sdk-go/v2 v2.15.3-0.20240329120647-e6a74efbacbf
