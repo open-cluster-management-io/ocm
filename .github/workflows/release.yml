@@ -62,6 +62,16 @@ jobs:
         run: |
           python hack/changelog.py ${{ secrets.GITHUB_TOKEN }} ${{ needs.env.outputs.RELEASE_VERSION }} > /home/runner/work/changelog.txt
           cat /home/runner/work/changelog.txt
+      - name: setup helm
+        uses: azure/setup-helm@v1
+      - name: chart package
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p release
+          pushd release
+          helm package ../deploy/cluster-manager/chart/cluster-manager --app-version ${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}
+          helm package ../deploy/klusterlet/chart/klusterlet --app-version ${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}
+          popd
       - name: publish release
         if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
@@ -71,3 +81,5 @@ jobs:
           body_path: /home/runner/work/changelog.txt
           draft: true
           generate_release_notes: true
+          files: |
+            release/*.tgz

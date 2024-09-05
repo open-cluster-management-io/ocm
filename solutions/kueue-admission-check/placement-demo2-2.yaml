@@ -1,0 +1,28 @@
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: placement-demo2
+  namespace: kueue-system
+spec:
+  clusterSets:
+  - spoke
+  tolerations:
+  - key: cluster.open-cluster-management.io/unreachable
+    operator: Exists
+  - key: cluster.open-cluster-management.io/unavailable
+    operator: Exists
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchLabels:
+            accelerator: nvidia-tesla-t4
+  numberOfClusters: 1
+  prioritizerPolicy:
+    mode: Exact
+    configurations:
+      - scoreCoordinate:
+          type: AddOn
+          addOn:
+            resourceName: resource-usage-score
+            scoreName: gpuClusterAvailable
+        weight: 1

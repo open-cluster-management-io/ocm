@@ -1,6 +1,6 @@
 module open-cluster-management.io/ocm
 
-go 1.22.6
+go 1.22.5
 
 require (
 	github.com/cloudevents/sdk-go/v2 v2.15.3-0.20240329120647-e6a74efbacbf
@@ -9,7 +9,7 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
-	github.com/mochi-mqtt/server/v2 v2.4.6
+	github.com/mochi-mqtt/server/v2 v2.6.5
 	github.com/onsi/ginkgo/v2 v2.20.0
 	github.com/onsi/gomega v1.34.1
 	github.com/openshift/api v0.0.0-20240527133614-ba11c1587003
