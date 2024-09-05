@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
@@ -52,6 +53,13 @@ func (c *ServerSideApply) Apply(
 		}
 	}
 
+	// Currently, if the required object has zero creationTime in metadata, it will cause
+	// kube-apiserver to increment generation even if nothing else changes. more details see:
+	// https://github.com/kubernetes/kubernetes/issues/67610
+	//
+	// TODO Remove this after the above issue fixed in Kubernetes
+	removeCreationTimeFromMetadata(required.Object)
+
 	obj, err := c.client.
 		Resource(gvr).
 		Namespace(required.GetNamespace()).
@@ -71,4 +79,31 @@ func (c *ServerSideApply) Apply(
 	}
 
 	return obj, err
+}
+
+func removeCreationTimeFromMetadata(obj map[string]interface{}) {
+	if metadata, found := obj["metadata"]; found {
+		if metaObj, ok := metadata.(map[string]interface{}); ok {
+			klog.V(4).Infof("remove `metadata.creationTimestamp`")
+			creationTimestamp, ok := metaObj["creationTimestamp"]
+			if ok && creationTimestamp == nil {
+				unstructured.RemoveNestedField(metaObj, "creationTimestamp")
+			}
+		}
+	}
+
+	for k, v := range obj {
+		switch val := v.(type) {
+		case map[string]interface{}:
+			klog.V(4).Infof("remove `metadata.creationTimestamp` from %s", k)
+			removeCreationTimeFromMetadata(val)
+		case []interface{}:
+			for index, item := range val {
+				klog.V(4).Infof("remove `metadata.creationTimestamp` from %s[%d]", k, index)
+				if itemObj, ok := item.(map[string]interface{}); ok {
+					removeCreationTimeFromMetadata(itemObj)
+				}
+			}
+		}
+	}
 }
