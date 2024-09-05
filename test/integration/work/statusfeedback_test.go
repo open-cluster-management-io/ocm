@@ -11,7 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/utils/ptr"
 
 	ocmfeature "open-cluster-management.io/api/feature"
@@ -28,19 +28,27 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 	var commOptions *commonoptions.AgentOptions
 	var cancel context.CancelFunc
 
+	var workName string
 	var work *workapiv1.ManifestWork
 	var manifests []workapiv1.Manifest
 
 	var err error
 
 	ginkgo.BeforeEach(func() {
+		workName = fmt.Sprintf("status-feedback-work-%s", rand.String(5))
+		clusterName := rand.String(5)
+
 		o = spoke.NewWorkloadAgentOptions()
 		o.StatusSyncInterval = 3 * time.Second
 		o.WorkloadSourceDriver = sourceDriver
 		o.WorkloadSourceConfig = sourceConfigFileName
+		if sourceDriver != util.KubeDriver {
+			o.CloudEventsClientID = fmt.Sprintf("%s-work-agent", clusterName)
+			o.CloudEventsClientCodecs = []string{"manifestbundle"}
+		}
 
 		commOptions = commonoptions.NewAgentOptions()
-		commOptions.SpokeClusterName = utilrand.String(5)
+		commOptions.SpokeClusterName = clusterName
 
 		ns := &corev1.Namespace{}
 		ns.Name = commOptions.SpokeClusterName
@@ -52,7 +60,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 	})
 
 	ginkgo.JustBeforeEach(func() {
-		work = util.NewManifestWork(commOptions.SpokeClusterName, "", manifests)
+		work = util.NewManifestWork(commOptions.SpokeClusterName, workName, manifests)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 

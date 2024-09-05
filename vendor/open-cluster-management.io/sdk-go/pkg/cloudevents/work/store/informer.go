@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
 
 	workv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
@@ -112,9 +112,17 @@ func (s *AgentInformerWatcherStore) HandleReceivedWork(action types.ResourceActi
 	case types.Added:
 		return s.Add(work.DeepCopy())
 	case types.Modified:
-		lastWork, err := s.Get(work.Namespace, work.Name)
+		lastWork, exists, err := s.Get(work.Namespace, work.Name)
 		if err != nil {
 			return err
+		}
+		if !exists {
+			return fmt.Errorf("the work %s/%s does not exist", work.Namespace, work.Name)
+		}
+		// prevent the work from being updated if it is deleting
+		if !lastWork.GetDeletionTimestamp().IsZero() {
+			klog.Warningf("the work %s/%s is deleting, ignore the update", work.Namespace, work.Name)
+			return nil
 		}
 
 		updatedWork := work.DeepCopy()
@@ -128,13 +136,12 @@ func (s *AgentInformerWatcherStore) HandleReceivedWork(action types.ResourceActi
 		return s.Update(updatedWork)
 	case types.Deleted:
 		// the manifestwork is deleting on the source, we just update its deletion timestamp.
-		lastWork, err := s.Get(work.Namespace, work.Name)
-		if errors.IsNotFound(err) {
-			return nil
-		}
-
+		lastWork, exists, err := s.Get(work.Namespace, work.Name)
 		if err != nil {
 			return err
+		}
+		if !exists {
+			return nil
 		}
 
 		updatedWork := lastWork.DeepCopy()

@@ -84,17 +84,22 @@ func (o *mqttAgentOptions) WithContext(ctx context.Context, evtCtx cloudevents.E
 
 func (o *mqttAgentOptions) Protocol(ctx context.Context) (options.CloudEventsProtocol, error) {
 	subscribe := &paho.Subscribe{
-		Subscriptions: map[string]paho.SubscribeOptions{
-			// TODO support multiple sources, currently the client require the source events topic has a sourceID, in
-			// the future, client may need a source list, it will subscribe to each source
-			// receiving the sources events
-			replaceLast(o.Topics.SourceEvents, "+", o.clusterName): {QoS: byte(o.SubQoS)},
+		Subscriptions: []paho.SubscribeOptions{
+			{
+				// TODO support multiple sources, currently the client require the source events topic has a sourceID, in
+				// the future, client may need a source list, it will subscribe to each source
+				// receiving the sources events
+				Topic: replaceLast(o.Topics.SourceEvents, "+", o.clusterName), QoS: byte(o.SubQoS),
+			},
 		},
 	}
 
+	// receiving status resync events from all sources
 	if len(o.Topics.SourceBroadcast) != 0 {
-		// receiving status resync events from all sources
-		subscribe.Subscriptions[o.Topics.SourceBroadcast] = paho.SubscribeOptions{QoS: byte(o.SubQoS)}
+		subscribe.Subscriptions = append(subscribe.Subscriptions, paho.SubscribeOptions{
+			Topic: o.Topics.SourceBroadcast,
+			QoS:   byte(o.SubQoS),
+		})
 	}
 
 	return o.GetCloudEventsProtocol(

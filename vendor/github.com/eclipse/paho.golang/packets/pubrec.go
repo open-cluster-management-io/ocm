@@ -41,7 +41,7 @@ func (p *Pubrec) String() string {
 	return b.String()
 }
 
-//Unpack is the implementation of the interface required function for a packet
+// Unpack is the implementation of the interface required function for a packet
 func (p *Pubrec) Unpack(r *bytes.Buffer) error {
 	var err error
 	success := r.Len() == 2
@@ -84,10 +84,12 @@ func (p *Pubrec) Buffers() net.Buffers {
 
 // WriteTo is the implementation of the interface required function for a packet
 func (p *Pubrec) WriteTo(w io.Writer) (int64, error) {
-	cp := &ControlPacket{FixedHeader: FixedHeader{Type: PUBREC}}
-	cp.Content = p
+	return p.ToControlPacket().WriteTo(w)
+}
 
-	return cp.WriteTo(w)
+// ToControlPacket returns the packet as a ControlPacket
+func (p *Pubrec) ToControlPacket() *ControlPacket {
+	return &ControlPacket{FixedHeader: FixedHeader{Type: PUBREC}, Content: p}
 }
 
 // Reason returns a string representation of the meaning of the ReasonCode

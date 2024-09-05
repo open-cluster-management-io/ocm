@@ -9,7 +9,8 @@ type Option func(*Protocol) error
 
 // SubscribeOption
 type SubscribeOption struct {
-	Source string
+	Source      string
+	ClusterName string
 }
 
 // WithSubscribeOption sets the Subscribe configuration for the client.

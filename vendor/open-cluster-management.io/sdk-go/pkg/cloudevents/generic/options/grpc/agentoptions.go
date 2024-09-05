@@ -43,7 +43,8 @@ func (o *grpcAgentOptions) Protocol(ctx context.Context) (options.CloudEventsPro
 			// TODO: Update this code to determine the subscription source for the agent client.
 			// Currently, the grpc agent client is not utilized, and the 'Source' field serves
 			// as a placeholder with all the sources.
-			Source: types.SourceAll,
+			Source:      types.SourceAll,
+			ClusterName: o.clusterName,
 		}),
 	)
 	if err != nil {

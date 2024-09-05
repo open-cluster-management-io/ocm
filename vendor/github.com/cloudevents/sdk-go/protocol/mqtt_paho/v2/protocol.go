@@ -20,7 +20,6 @@ import (
 
 type Protocol struct {
 	client          *paho.Client
-	config          *paho.ClientConfig
 	connOption      *paho.Connect
 	publishOption   *paho.Publish
 	subscribeOption *paho.Subscribe
@@ -89,7 +88,7 @@ func (p *Protocol) Send(ctx context.Context, m binding.Message, transformers ...
 	var err error
 	defer m.Finish(err)
 
-	msg := p.publishOption
+	msg := p.publishMsg()
 	if cecontext.TopicFrom(ctx) != "" {
 		msg.Topic = cecontext.TopicFrom(ctx)
 		cecontext.WithTopic(ctx, "")
@@ -105,6 +104,16 @@ func (p *Protocol) Send(ctx context.Context, m binding.Message, transformers ...
 		return err
 	}
 	return err
+}
+
+// publishMsg generate a new paho.Publish message from the p.publishOption
+func (p *Protocol) publishMsg() *paho.Publish {
+	return &paho.Publish{
+		QoS:        p.publishOption.QoS,
+		Retain:     p.publishOption.Retain,
+		Topic:      p.publishOption.Topic,
+		Properties: p.publishOption.Properties,
+	}
 }
 
 func (p *Protocol) OpenInbound(ctx context.Context) error {
