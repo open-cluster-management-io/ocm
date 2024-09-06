@@ -557,4 +557,60 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 		})
 	})
+
+	ginkgo.It("should not increase the workload generation when nothing changes", func() {
+		nestedWorkNamespace := "default"
+		nestedWorkName := fmt.Sprintf("nested-work-%s", utilrand.String(5))
+
+		cm := util.NewConfigmap(nestedWorkNamespace, "cm-test", map[string]string{"a": "b"}, []string{})
+		nestedWork := util.NewManifestWork(nestedWorkNamespace, nestedWorkName, []workapiv1.Manifest{util.ToManifest(cm)})
+		nestedWork.TypeMeta = metav1.TypeMeta{
+			APIVersion: "work.open-cluster-management.io/v1",
+			Kind:       "ManifestWork",
+		}
+
+		work := util.NewManifestWork(commOptions.SpokeClusterName, "", []workapiv1.Manifest{util.ToManifest(nestedWork)})
+		work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+			{
+				ResourceIdentifier: workapiv1.ResourceIdentifier{
+					Group:     "work.open-cluster-management.io",
+					Resource:  "manifestworks",
+					Namespace: nestedWorkNamespace,
+					Name:      nestedWorkName,
+				},
+				UpdateStrategy: &workapiv1.UpdateStrategy{
+					Type: workapiv1.UpdateStrategyTypeServerSideApply,
+					ServerSideApply: &workapiv1.ServerSideApplyConfig{
+						Force: true,
+					},
+				},
+			},
+		}
+		_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		// make sure the nested work is created
+		gomega.Eventually(func() error {
+			_, err := spokeWorkClient.WorkV1().ManifestWorks(nestedWorkNamespace).Get(context.Background(), nestedWorkName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		// make sure the nested work is not updated
+		gomega.Consistently(func() error {
+			nestedWork, err := spokeWorkClient.WorkV1().ManifestWorks(nestedWorkNamespace).Get(context.Background(), nestedWorkName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			if nestedWork.Generation != 1 {
+				return fmt.Errorf("nested work generation is changed to %d", nestedWork.Generation)
+			}
+
+			return nil
+		}, eventuallyTimeout*3, eventuallyInterval*3).Should(gomega.BeNil())
+	})
 })
