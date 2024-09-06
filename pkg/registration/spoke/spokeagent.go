@@ -61,11 +61,9 @@ type SpokeAgentConfig struct {
 
 // NewSpokeAgentConfig returns a SpokeAgentConfig
 func NewSpokeAgentConfig(commonOpts *commonoptions.AgentOptions, opts *SpokeAgentOptions) *SpokeAgentConfig {
-	registerDriver := csr.NewCSRDriver()
 	cfg := &SpokeAgentConfig{
 		agentOptions:       commonOpts,
 		registrationOption: opts,
-		driver:             registerDriver,
 
 		reSelectChecker: &reSelectChecker{shouldReSelect: false},
 		bootstrapKubeconfigHealthChecker: &bootstrapKubeconfigHealthChecker{
@@ -189,6 +187,9 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		logger.Error(err, "Error during Validating")
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
+
+	// initiate registration driver
+	o.driver = csr.NewCSRDriver()
 
 	// get spoke cluster CA bundle
 	spokeClusterCABundle, err := o.getSpokeClusterCABundle(spokeClientConfig)
