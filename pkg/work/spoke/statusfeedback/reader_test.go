@@ -76,6 +76,10 @@ const (
 				{
 					"type":"Available",
 					"status":"true"
+				},
+                {
+					"type":"Ready",
+					"status":"true"
 				}
 			]
 		}
@@ -216,7 +220,7 @@ func TestStatusReader(t *testing.T) {
 			expectedValue: []workapiv1.FeedbackValue{},
 		},
 		{
-			name:   "wrog version set for jsonpaths",
+			name:   "wrong version set for jsonpaths",
 			object: unstrctureObject(deploymentJson),
 			rule: workapiv1.FeedbackRule{
 				Type: workapiv1.JSONPathsType,
@@ -283,6 +287,31 @@ func TestStatusReader(t *testing.T) {
 					Value: workapiv1.FieldValue{
 						Type:   workapiv1.String,
 						String: pointer.String("Succeeded"),
+					},
+				},
+			},
+		},
+		{
+			// this is for a backward compatible test, when rawjson is disabled, and there are multiple match on
+			// json path, it should return the first item.
+			name:   "Return 1st item with multiple patch",
+			object: unstrctureObject(deploymentJson),
+			rule: workapiv1.FeedbackRule{
+				Type: workapiv1.JSONPathsType,
+				JsonPaths: []workapiv1.JsonPath{
+					{
+						Name: "type",
+						Path: ".status.conditions[?(@.status==\"true\")].type ",
+					},
+				},
+			},
+			expectError: false,
+			expectedValue: []workapiv1.FeedbackValue{
+				{
+					Name: "type",
+					Value: workapiv1.FieldValue{
+						Type:   workapiv1.String,
+						String: pointer.String("Available"),
 					},
 				},
 			},

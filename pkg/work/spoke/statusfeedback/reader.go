@@ -100,12 +100,11 @@ func (s *StatusReader) getValueByJsonPath(name, path string, obj *unstructured.U
 	}
 
 	var value any
-	switch {
-	case len(results) == 0 || len(results[0]) == 0:
-		return nil, nil
-	case len(results) == 1 && len(results[0]) == 1:
+	// if the RawFeedbackJsonString is disabled, we always get the first item
+	if (len(results) == 1 && len(results[0]) == 1) ||
+		!features.SpokeMutableFeatureGate.Enabled(ocmfeature.RawFeedbackJsonString) {
 		value = results[0][0].Interface()
-	default:
+	} else {
 		var resultList []any
 		// only take care the first item in the results list.
 		for _, r := range results[0] {

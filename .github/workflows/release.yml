@@ -63,7 +63,7 @@ jobs:
           python hack/changelog.py ${{ secrets.GITHUB_TOKEN }} ${{ needs.env.outputs.RELEASE_VERSION }} > /home/runner/work/changelog.txt
           cat /home/runner/work/changelog.txt
       - name: setup helm
-        uses: azure/setup-helm@v1
+        uses: azure/setup-helm@v4
       - name: chart package
         if: github.event_name != 'pull_request'
         run: |
