@@ -3,7 +3,7 @@ kind: ClusterRole
 metadata:
   name: open-cluster-management:managedcluster:{{ .ManagedClusterName }}
   labels:
-    open-cluster-management.io/cluster-name: {{ .ManagedClusterName }}
+    open-cluster-management.io/cluster-name: "{{ .ManagedClusterName }}"
 rules:
 # Allow agent to rotate its certificate
 - apiGroups: ["certificates.k8s.io"]
