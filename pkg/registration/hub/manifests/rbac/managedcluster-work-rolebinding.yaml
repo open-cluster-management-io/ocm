@@ -4,7 +4,7 @@ metadata:
   name: open-cluster-management:managedcluster:{{ .ManagedClusterName }}:work
   namespace: "{{ .ManagedClusterName }}"
   labels:
-    open-cluster-management.io/cluster-name: {{ .ManagedClusterName }}
+    open-cluster-management.io/cluster-name: "{{ .ManagedClusterName }}"
   finalizers:
   - cluster.open-cluster-management.io/manifest-work-cleanup
 roleRef:
