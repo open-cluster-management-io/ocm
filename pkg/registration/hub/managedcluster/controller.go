@@ -198,6 +198,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 
 	if len(errs) > 0 {
 		applyErrors := operatorhelpers.NewMultiLineAggregate(errs)
+		acceptedCondition.Status = metav1.ConditionFalse
 		acceptedCondition.Reason = "Error"
 		acceptedCondition.Message = applyErrors.Error()
 	}
