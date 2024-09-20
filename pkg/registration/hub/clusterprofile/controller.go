@@ -74,12 +74,17 @@ func (c *clusterProfileController) sync(ctx context.Context, syncCtx factory.Syn
 		return err
 	}
 
+	clusterProfile, err := c.clusterProfileLister.ClusterProfiles(ClusterProfileNamespace).Get(managedClusterName)
+
+	// if the managed cluster is deleting, delete the clusterprofile as well.
 	if !managedCluster.DeletionTimestamp.IsZero() {
-		// TODO: remove clusterprofile
-		return nil
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		err = c.clusterProfileClient.ApisV1alpha1().ClusterProfiles(ClusterProfileNamespace).Delete(ctx, managedClusterName, metav1.DeleteOptions{})
+		return err
 	}
 
-	clusterProfile, err := c.clusterProfileLister.ClusterProfiles(ClusterProfileNamespace).Get(managedClusterName)
 	// create cluster profile if not found
 	if errors.IsNotFound(err) {
 		clusterProfile = &cpv1alpha1.ClusterProfile{

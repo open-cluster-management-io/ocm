@@ -1528,7 +1528,7 @@ open-cluster-management.io/addon-framework/pkg/agent
 open-cluster-management.io/addon-framework/pkg/assets
 open-cluster-management.io/addon-framework/pkg/index
 open-cluster-management.io/addon-framework/pkg/utils
-# open-cluster-management.io/api v0.14.1-0.20240923014927-17751e4cfddb
+# open-cluster-management.io/api v0.14.1-0.20240923014927-17751e4cfddb => github.com/haoqing0110/api v0.0.0-20240920101950-b79b23b51797
 ## explicit; go 1.22.0
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/client/addon/clientset/versioned
@@ -1646,8 +1646,10 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
 ## explicit; go 1.22.0
 sigs.k8s.io/cluster-inventory-api/apis/v1alpha1
 sigs.k8s.io/cluster-inventory-api/client/clientset/versioned
+sigs.k8s.io/cluster-inventory-api/client/clientset/versioned/fake
 sigs.k8s.io/cluster-inventory-api/client/clientset/versioned/scheme
 sigs.k8s.io/cluster-inventory-api/client/clientset/versioned/typed/apis/v1alpha1
+sigs.k8s.io/cluster-inventory-api/client/clientset/versioned/typed/apis/v1alpha1/fake
 sigs.k8s.io/cluster-inventory-api/client/informers/externalversions
 sigs.k8s.io/cluster-inventory-api/client/informers/externalversions/apis
 sigs.k8s.io/cluster-inventory-api/client/informers/externalversions/apis/v1alpha1
@@ -1726,3 +1728,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 ## explicit; go 1.12
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
+# open-cluster-management.io/api => github.com/haoqing0110/api v0.0.0-20240920101950-b79b23b51797
