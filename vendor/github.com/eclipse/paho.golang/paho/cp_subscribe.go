@@ -6,11 +6,12 @@ type (
 	// Subscribe is a representation of a MQTT subscribe packet
 	Subscribe struct {
 		Properties    *SubscribeProperties
-		Subscriptions map[string]SubscribeOptions
+		Subscriptions []SubscribeOptions
 	}
 
 	// SubscribeOptions is the struct representing the options for a subscription
 	SubscribeOptions struct {
+		Topic             string
 		QoS               byte
 		RetainHandling    byte
 		NoLocal           bool
@@ -35,16 +36,17 @@ func (s *Subscribe) InitProperties(prop *packets.Properties) {
 	}
 }
 
-// PacketSubOptionsFromSubscribeOptions returns a map of string to packet
+// PacketSubOptionsFromSubscribeOptions returns a slice of packet
 // library SubOptions for the paho Subscribe on which it is called
-func (s *Subscribe) PacketSubOptionsFromSubscribeOptions() map[string]packets.SubOptions {
-	r := make(map[string]packets.SubOptions)
-	for k, v := range s.Subscriptions {
-		r[k] = packets.SubOptions{
-			QoS:               v.QoS,
-			NoLocal:           v.NoLocal,
-			RetainAsPublished: v.RetainAsPublished,
-			RetainHandling:    v.RetainHandling,
+func (s *Subscribe) PacketSubOptionsFromSubscribeOptions() []packets.SubOptions {
+	r := make([]packets.SubOptions, len(s.Subscriptions))
+	for i, sub := range s.Subscriptions {
+		r[i] = packets.SubOptions{
+			Topic:             sub.Topic,
+			QoS:               sub.QoS,
+			NoLocal:           sub.NoLocal,
+			RetainAsPublished: sub.RetainAsPublished,
+			RetainHandling:    sub.RetainHandling,
 		}
 	}
 

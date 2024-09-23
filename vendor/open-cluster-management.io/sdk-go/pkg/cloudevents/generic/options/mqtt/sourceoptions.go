@@ -82,15 +82,19 @@ func (o *mqttSourceOptions) Protocol(ctx context.Context) (options.CloudEventsPr
 	}
 
 	subscribe := &paho.Subscribe{
-		Subscriptions: map[string]paho.SubscribeOptions{
-			// receiving the agent events
-			o.Topics.AgentEvents: {QoS: byte(o.SubQoS)},
+		Subscriptions: []paho.SubscribeOptions{
+			{
+				Topic: o.Topics.AgentEvents, QoS: byte(o.SubQoS),
+			},
 		},
 	}
 
 	if len(o.Topics.AgentBroadcast) != 0 {
 		// receiving spec resync events from all agents
-		subscribe.Subscriptions[o.Topics.AgentBroadcast] = paho.SubscribeOptions{QoS: byte(o.SubQoS)}
+		subscribe.Subscriptions = append(subscribe.Subscriptions, paho.SubscribeOptions{
+			Topic: o.Topics.AgentBroadcast,
+			QoS:   byte(o.SubQoS),
+		})
 	}
 
 	receiver, err := o.GetCloudEventsProtocol(

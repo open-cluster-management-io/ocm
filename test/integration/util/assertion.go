@@ -69,7 +69,7 @@ func AssertWorkCondition(namespace, name string, workClient workclientset.Interf
 
 		// check manifest status conditions
 		if ok := HaveManifestCondition(work.Status.ResourceStatus.Manifests, expectedType, expectedManifestStatuses); !ok {
-			return fmt.Errorf("condition %s does not exist，got %v ", expectedType, work.Status.ResourceStatus.Manifests)
+			return fmt.Errorf("condition %s does not exist, got %v ", expectedType, work.Status.ResourceStatus.Manifests)
 		}
 
 		// check work status condition
@@ -143,7 +143,7 @@ func AssertAppliedManifestWorkDeleted(name string, workClient workclientset.Inte
 }
 
 // AssertFinalizerAdded check if finalizer is added
-func AssertFinalizerAdded(namespace, name string, workClient workclientset.Interface, eventuallyTimeout, eventuallyInterval int) {
+func AssertFinalizerAdded(namespace, name, expectedFinalizer string, workClient workclientset.Interface, eventuallyTimeout, eventuallyInterval int) {
 	gomega.Eventually(func() error {
 		work, err := workClient.WorkV1().ManifestWorks(namespace).Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
@@ -151,7 +151,7 @@ func AssertFinalizerAdded(namespace, name string, workClient workclientset.Inter
 		}
 
 		for _, finalizer := range work.Finalizers {
-			if finalizer == workapiv1.ManifestWorkFinalizer {
+			if finalizer == expectedFinalizer {
 				return nil
 			}
 		}
@@ -230,7 +230,7 @@ func AssertNonexistenceOfResources(gvrs []schema.GroupVersionResource, namespace
 }
 
 // AssertAppliedResources check if applied resources in work status are updated correctly
-func AssertAppliedResources(hubHash, workName string, gvrs []schema.GroupVersionResource, namespaces, names []string,
+func AssertAppliedResources(appliedManifestWorkName string, gvrs []schema.GroupVersionResource, namespaces, names []string,
 	workClient workclientset.Interface, eventuallyTimeout, eventuallyInterval int) {
 	gomega.Expect(gvrs).To(gomega.HaveLen(len(namespaces)))
 	gomega.Expect(gvrs).To(gomega.HaveLen(len(names)))
@@ -264,7 +264,6 @@ func AssertAppliedResources(hubHash, workName string, gvrs []schema.GroupVersion
 	})
 
 	gomega.Eventually(func() error {
-		appliedManifestWorkName := fmt.Sprintf("%s-%s", hubHash, workName)
 		appliedManifestWork, err := workClient.WorkV1().AppliedManifestWorks().Get(
 			context.Background(), appliedManifestWorkName, metav1.GetOptions{})
 		if err != nil {

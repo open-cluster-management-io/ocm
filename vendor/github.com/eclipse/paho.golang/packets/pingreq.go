@@ -2,7 +2,6 @@ package packets
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"net"
 )
@@ -12,10 +11,10 @@ type Pingreq struct {
 }
 
 func (p *Pingreq) String() string {
-	return fmt.Sprintf("PINGREQ")
+	return "PINGREQ"
 }
 
-//Unpack is the implementation of the interface required function for a packet
+// Unpack is the implementation of the interface required function for a packet
 func (p *Pingreq) Unpack(r *bytes.Buffer) error {
 	return nil
 }

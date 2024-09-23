@@ -43,12 +43,12 @@ type CPContext struct {
 }
 
 // MIDs is the default MIDService provided by this library.
-// It uses a map of uint16 to *CPContext to track responses
-// to messages with a messageid
+// It uses a slice of *CPContext to track responses
+// to messages with a messageid tracking the last used message id
 type MIDs struct {
 	sync.Mutex
 	lastMid uint16
-	index   []*CPContext
+	index   []*CPContext // index of slice is (messageid - 1)
 }
 
 // Request is the library provided MIDService's implementation of
@@ -56,33 +56,50 @@ type MIDs struct {
 func (m *MIDs) Request(c *CPContext) (uint16, error) {
 	m.Lock()
 	defer m.Unlock()
-	for i := uint16(1); i < midMax; i++ {
-		v := (m.lastMid + i) % midMax
-		if v == 0 {
+
+	// Scan from lastMid to end of range.
+	for i := m.lastMid; i < midMax; i++ {
+		if m.index[i] != nil {
 			continue
 		}
-		if inuse := m.index[v]; inuse == nil {
-			m.index[v] = c
-			m.lastMid = v
-			return v, nil
-		}
+		m.index[i] = c
+		m.lastMid = i + 1
+		return i + 1, nil
 	}
+	// Scan from start of range to lastMid
+	for i := uint16(0); i < m.lastMid; i++ {
+		if m.index[i] != nil {
+			continue
+		}
+		m.index[i] = c
+		m.lastMid = i + 1
+		return i + 1, nil
+	}
+
 	return 0, ErrorMidsExhausted
 }
 
 // Get is the library provided MIDService's implementation of
 // the required interface function()
 func (m *MIDs) Get(i uint16) *CPContext {
+	// 0 Packet Identifier is invalid but just in case handled with returning nil to avoid panic.
+	if i == 0 {
+	  return nil
+	}
 	m.Lock()
 	defer m.Unlock()
-	return m.index[i]
+	return m.index[i-1]
 }
 
 // Free is the library provided MIDService's implementation of
 // the required interface function()
 func (m *MIDs) Free(i uint16) {
+	// 0 Packet Identifier is invalid but just in case handled to avoid panic.
+	if i == 0 {
+	  return
+	}
 	m.Lock()
-	m.index[i] = nil
+	m.index[i-1] = nil
 	m.Unlock()
 }
 

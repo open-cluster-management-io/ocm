@@ -31,5 +31,20 @@ func (l *WatcherStoreLister) List(options types.ListOptions) ([]*workv1.Manifest
 		opts.LabelSelector = fmt.Sprintf("%s=%s", common.CloudEventsOriginalSourceLabelKey, options.Source)
 	}
 
-	return l.store.List(options.ClusterName, opts)
+	list, err := l.store.List(options.ClusterName, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	works := []*workv1.ManifestWork{}
+	for _, work := range list.Items {
+		cloudEventsDataType := work.Annotations[common.CloudEventsDataTypeAnnotationKey]
+		if cloudEventsDataType != options.CloudEventsDataType.String() {
+			continue
+		}
+
+		works = append(works, &work)
+	}
+
+	return works, nil
 }

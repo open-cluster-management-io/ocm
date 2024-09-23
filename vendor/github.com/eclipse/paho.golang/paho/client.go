@@ -220,8 +220,12 @@ func (c *Client) Connect(ctx context.Context, cp *Connect) (*Connack, error) {
 	c.debug.Println("waiting for CONNACK/AUTH")
 	var (
 		caPacket    *packets.Connack
-		caPacketCh  = make(chan *packets.Connack)
-		caPacketErr = make(chan error)
+		// We use buffered channels to prevent goroutine leak. The Details are below.
+		// - c.expectConnack waits to send data to caPacketCh or caPacketErr.
+		// - If connCtx is cancelled (done) before c.expectConnack finishes to send data to either "unbuffered" channel,
+		//   c.expectConnack cannot exit (goroutine leak).
+		caPacketCh  = make(chan *packets.Connack, 1)
+		caPacketErr = make(chan error, 1)
 	)
 	go c.expectConnack(caPacketCh, caPacketErr)
 	select {
@@ -423,14 +427,14 @@ func (c *Client) incoming() {
 				c.debug.Println("received AUTH")
 				ap := recv.Content.(*packets.Auth)
 				switch ap.ReasonCode {
-				case 0x0:
+				case packets.AuthSuccess:
 					if c.AuthHandler != nil {
 						go c.AuthHandler.Authenticated()
 					}
 					if c.raCtx != nil {
 						c.raCtx.Return <- *recv
 					}
-				case 0x18:
+				case packets.AuthContinueAuthentication:
 					if c.AuthHandler != nil {
 						if _, err := c.AuthHandler.Authenticate(AuthFromPacketAuth(ap)).Packet().WriteTo(c.Conn); err != nil {
 							go c.error(err)
@@ -619,10 +623,10 @@ func (c *Client) Authenticate(ctx context.Context, a *Auth) (*AuthResponse, erro
 // is returned from the function, along with any errors.
 func (c *Client) Subscribe(ctx context.Context, s *Subscribe) (*Suback, error) {
 	if !c.serverProps.WildcardSubAvailable {
-		for t := range s.Subscriptions {
-			if strings.ContainsAny(t, "#+") {
+		for _, sub := range s.Subscriptions {
+			if strings.ContainsAny(sub.Topic, "#+") {
 				// Using a wildcard in a subscription when not supported
-				return nil, fmt.Errorf("cannot subscribe to %s, server does not support wildcards", t)
+				return nil, fmt.Errorf("cannot subscribe to %s, server does not support wildcards", sub.Topic)
 			}
 		}
 	}
@@ -630,9 +634,9 @@ func (c *Client) Subscribe(ctx context.Context, s *Subscribe) (*Suback, error) {
 		return nil, fmt.Errorf("cannot send subscribe with subID set, server does not support subID")
 	}
 	if !c.serverProps.SharedSubAvailable {
-		for t := range s.Subscriptions {
-			if strings.HasPrefix(t, "$share") {
-				return nil, fmt.Errorf("cannont subscribe to %s, server does not support shared subscriptions", t)
+		for _, sub := range s.Subscriptions {
+			if strings.HasPrefix(sub.Topic, "$share") {
+				return nil, fmt.Errorf("cannont subscribe to %s, server does not support shared subscriptions", sub.Topic)
 			}
 		}
 	}

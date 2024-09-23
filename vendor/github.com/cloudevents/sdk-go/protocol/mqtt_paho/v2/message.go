@@ -17,8 +17,7 @@ import (
 )
 
 const (
-	prefix      = "ce-"
-	contentType = "Content-Type"
+	prefix = "ce-"
 )
 
 var specs = spec.WithPrefix(prefix)
@@ -41,8 +40,7 @@ func NewMessage(msg *paho.Publish) *Message {
 	var f format.Format
 	var v spec.Version
 	if msg.Properties != nil {
-		// Use properties.User["Content-type"] to determine if message is structured
-		if s := msg.Properties.User.Get(contentType); format.IsFormat(s) {
+		if s := msg.Properties.ContentType; format.IsFormat(s) {
 			f = format.Lookup(s)
 		} else if s := msg.Properties.User.Get(specs.PrefixedSpecVersionName()); s != "" {
 			v = specs.Version(s)
@@ -88,11 +86,17 @@ func (m *Message) ReadBinary(ctx context.Context, encoder binding.BinaryWriter) 
 			} else {
 				err = encoder.SetExtension(strings.TrimPrefix(userProperty.Key, prefix), userProperty.Value)
 			}
-		} else if userProperty.Key == contentType {
-			err = encoder.SetAttribute(m.version.AttributeFromKind(spec.DataContentType), string(userProperty.Value))
 		}
 		if err != nil {
 			return
+		}
+	}
+
+	contentType := m.internal.Properties.ContentType
+	if contentType != "" {
+		err = encoder.SetAttribute(m.version.AttributeFromKind(spec.DataContentType), contentType)
+		if err != nil {
+			return err
 		}
 	}
 

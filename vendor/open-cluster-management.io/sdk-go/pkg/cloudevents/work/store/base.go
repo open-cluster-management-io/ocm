@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
@@ -34,33 +33,43 @@ type baseStore struct {
 }
 
 // List the works from the store with the list options
-func (b *baseStore) List(namespace string, opts metav1.ListOptions) ([]*workv1.ManifestWork, error) {
+func (b *baseStore) List(namespace string, opts metav1.ListOptions) (*workv1.ManifestWorkList, error) {
 	b.RLock()
 	defer b.RUnlock()
 
-	return utils.ListWorksWithOptions(b.store, namespace, opts)
+	works, err := utils.ListWorksWithOptions(b.store, namespace, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	items := []workv1.ManifestWork{}
+	for _, work := range works {
+		items = append(items, *work)
+	}
+
+	return &workv1.ManifestWorkList{Items: items}, nil
 }
 
 // Get a works from the store
-func (b *baseStore) Get(namespace, name string) (*workv1.ManifestWork, error) {
+func (b *baseStore) Get(namespace, name string) (*workv1.ManifestWork, bool, error) {
 	b.RLock()
 	defer b.RUnlock()
 
 	obj, exists, err := b.store.GetByKey(fmt.Sprintf("%s/%s", namespace, name))
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	if !exists {
-		return nil, errors.NewNotFound(common.ManifestWorkGR, name)
+		return nil, false, nil
 	}
 
 	work, ok := obj.(*workv1.ManifestWork)
 	if !ok {
-		return nil, fmt.Errorf("unknown type %T", obj)
+		return nil, false, fmt.Errorf("unknown type %T", obj)
 	}
 
-	return work, nil
+	return work, true, nil
 }
 
 // List all of works from the store
@@ -162,7 +171,7 @@ func (b *workProcessor) handleWork(work *workv1.ManifestWork) error {
 		// 1) the source is restarted and the local cache is not ready, requeue this work.
 		// 2) (TODO) during the source restart, the work is deleted forcibly, we may need an
 		//    eviction mechanism for this.
-		return errors.NewNotFound(common.ManifestWorkGR, string(work.UID))
+		return fmt.Errorf("the work %s does not exist", string(work.UID))
 	}
 
 	updatedWork := lastWork.DeepCopy()
@@ -191,6 +200,23 @@ func (b *workProcessor) handleWork(work *workv1.ManifestWork) error {
 		return nil
 	}
 
+	if updatedWork.Annotations == nil {
+		updatedWork.Annotations = map[string]string{}
+	}
+	lastSequenceID := lastWork.Annotations[common.CloudEventsSequenceIDAnnotationKey]
+	sequenceID := work.Annotations[common.CloudEventsSequenceIDAnnotationKey]
+	greater, err := utils.CompareSnowflakeSequenceIDs(lastSequenceID, sequenceID)
+	if err != nil {
+		klog.Errorf("invalid sequenceID for work %s/%s, %v", lastWork.Namespace, lastWork.Name, err)
+		return nil
+	}
+
+	if !greater {
+		klog.Warningf("the work %s/%s current sequenceID %s is less than its last %s, ignore",
+			lastWork.Namespace, lastWork.Name, sequenceID, lastSequenceID)
+		return nil
+	}
+
 	// no status change
 	if equality.Semantic.DeepEqual(lastWork.Status, work.Status) {
 		return nil
@@ -198,6 +224,7 @@ func (b *workProcessor) handleWork(work *workv1.ManifestWork) error {
 
 	// the work has been handled by agent, we ensure a finalizer on the work
 	updatedWork.Finalizers = ensureFinalizers(updatedWork.Finalizers)
+	updatedWork.Annotations[common.CloudEventsSequenceIDAnnotationKey] = sequenceID
 	updatedWork.Status = work.Status
 	// update the work with status in the local cache.
 	return b.store.Update(updatedWork)

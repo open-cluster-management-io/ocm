@@ -1,14 +1,17 @@
 package utils
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
+	"github.com/bwmarrin/snowflake"
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/google/uuid"
 
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -115,7 +118,7 @@ func ListWorksWithOptions(store cache.Store, namespace string, opts metav1.ListO
 	return works, nil
 }
 
-func Validate(work *workv1.ManifestWork) error {
+func Validate(work *workv1.ManifestWork) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	errs := field.ErrorList{}
 
@@ -151,9 +154,55 @@ func Validate(work *workv1.ManifestWork) error {
 		errs = append(errs, field.Invalid(field.NewPath("spec"), "spec", err.Error()))
 	}
 
-	if len(errs) == 0 {
-		return nil
+	return errs
+}
+
+// Encode ensures the given work's manifests are encoded
+func Encode(work *workv1.ManifestWork) error {
+	for index, manifest := range work.Spec.Workload.Manifests {
+		if manifest.Raw == nil {
+			if manifest.Object == nil {
+				return fmt.Errorf("the Object and Raw of the manifest[%d] for the work (%s/%s) are both `nil`",
+					index, work.Namespace, work.Name)
+			}
+
+			var buf bytes.Buffer
+			if err := unstructured.UnstructuredJSONScheme.Encode(manifest.Object, &buf); err != nil {
+				return err
+			}
+
+			work.Spec.Workload.Manifests[index].Raw = buf.Bytes()
+		}
 	}
 
-	return fmt.Errorf(errs.ToAggregate().Error())
+	return nil
+}
+
+// CompareSnowflakeSequenceIDs compares two snowflake sequence IDs.
+// Returns true if the current ID is greater than the last.
+// If the last sequence ID is empty, then the current is greater.
+func CompareSnowflakeSequenceIDs(last, current string) (bool, error) {
+	if current != "" && last == "" {
+		return true, nil
+	}
+
+	lastSID, err := snowflake.ParseString(last)
+	if err != nil {
+		return false, fmt.Errorf("unable to parse last sequence ID: %s, %v", last, err)
+	}
+
+	currentSID, err := snowflake.ParseString(current)
+	if err != nil {
+		return false, fmt.Errorf("unable to parse current sequence ID: %s %v", current, err)
+	}
+
+	if currentSID.Node() != lastSID.Node() {
+		return false, fmt.Errorf("sequence IDs (%s,%s) are not from the same node", last, current)
+	}
+
+	if currentSID.Time() != lastSID.Time() {
+		return currentSID.Time() > lastSID.Time(), nil
+	}
+
+	return currentSID.Step() > lastSID.Step(), nil
 }
