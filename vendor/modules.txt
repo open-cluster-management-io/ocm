@@ -243,6 +243,8 @@ github.com/mitchellh/copystructure
 # github.com/mitchellh/reflectwalk v1.0.2
 ## explicit
 github.com/mitchellh/reflectwalk
+# github.com/moby/sys/sequential v0.6.0
+## explicit; go 1.17
 # github.com/moby/sys/user v0.1.0
 ## explicit; go 1.17
 # github.com/mochi-mqtt/server/v2 v2.6.5
@@ -1528,7 +1530,7 @@ open-cluster-management.io/addon-framework/pkg/agent
 open-cluster-management.io/addon-framework/pkg/assets
 open-cluster-management.io/addon-framework/pkg/index
 open-cluster-management.io/addon-framework/pkg/utils
-# open-cluster-management.io/api v0.14.1-0.20240923014927-17751e4cfddb => github.com/haoqing0110/api v0.0.0-20240920101950-b79b23b51797
+# open-cluster-management.io/api v0.14.1-0.20240923014927-17751e4cfddb
 ## explicit; go 1.22.0
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/client/addon/clientset/versioned
@@ -1728,4 +1730,3 @@ sigs.k8s.io/structured-merge-diff/v4/value
 ## explicit; go 1.12
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
-# open-cluster-management.io/api => github.com/haoqing0110/api v0.0.0-20240920101950-b79b23b51797

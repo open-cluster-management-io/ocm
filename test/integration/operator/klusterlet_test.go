@@ -77,6 +77,11 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				},
 				ClusterName: "testcluster",
 				Namespace:   klusterletNamespace,
+				RegistrationConfiguration: &operatorapiv1.RegistrationConfiguration{
+					RegistrationDriver: operatorapiv1.RegistrationDriver{
+						AuthType: "csr",
+					},
+				},
 			},
 		}
 
@@ -602,7 +607,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 					return false
 				}
 				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
-				gomega.Expect(len(actual.Spec.Template.Spec.Containers[0].Args)).Should(gomega.Equal(6))
+				gomega.Expect(len(actual.Spec.Template.Spec.Containers[0].Args)).Should(gomega.Equal(8))
 				return actual.Spec.Template.Spec.Containers[0].Args[2] == "--spoke-cluster-name=cluster2"
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
@@ -978,9 +983,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 		})
 
 		ginkgo.It("should set certDurationSeconds correctly", func() {
-			klusterlet.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationConfiguration{
-				ClientCertExpirationSeconds: 120,
-			}
+			klusterlet.Spec.RegistrationConfiguration.ClientCertExpirationSeconds = 120
 
 			ginkgo.By("Create the klusterlet with valid RegistrationConfiguration")
 			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(),
@@ -1029,17 +1032,15 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 		})
 
 		ginkgo.It("should be set correctly", func() {
-			klusterlet.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationConfiguration{
-				FeatureGates: []operatorapiv1.FeatureGate{
-					{
-						Feature: string(ocmfeature.ClusterClaim),
-						Mode:    operatorapiv1.FeatureGateModeTypeDisable,
-					},
+			klusterlet.Spec.RegistrationConfiguration.FeatureGates = []operatorapiv1.FeatureGate{
+				{
+					Feature: string(ocmfeature.ClusterClaim),
+					Mode:    operatorapiv1.FeatureGateModeTypeDisable,
 				},
-				ClusterAnnotations: map[string]string{
-					"foo":                                  "bar", // should be ignored
-					"agent.open-cluster-management.io/foo": "bar",
-				},
+			}
+			klusterlet.Spec.RegistrationConfiguration.ClusterAnnotations = map[string]string{
+				"foo":                                  "bar", // should be ignored
+				"agent.open-cluster-management.io/foo": "bar",
 			}
 			klusterlet.Spec.WorkConfiguration = &operatorapiv1.WorkAgentConfiguration{
 				FeatureGates: []operatorapiv1.FeatureGate{
@@ -1111,16 +1112,14 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 		})
 
 		ginkgo.It("has invalid feature gates", func() {
-			klusterlet.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationConfiguration{
-				FeatureGates: []operatorapiv1.FeatureGate{
-					{
-						Feature: "Foo",
-						Mode:    operatorapiv1.FeatureGateModeTypeDisable,
-					},
-					{
-						Feature: string(ocmfeature.ClusterClaim),
-						Mode:    operatorapiv1.FeatureGateModeTypeDisable,
-					},
+			klusterlet.Spec.RegistrationConfiguration.FeatureGates = []operatorapiv1.FeatureGate{
+				{
+					Feature: "Foo",
+					Mode:    operatorapiv1.FeatureGateModeTypeDisable,
+				},
+				{
+					Feature: string(ocmfeature.ClusterClaim),
+					Mode:    operatorapiv1.FeatureGateModeTypeDisable,
 				},
 			}
 			klusterlet.Spec.WorkConfiguration = &operatorapiv1.WorkAgentConfiguration{
