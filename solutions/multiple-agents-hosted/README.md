@@ -1,6 +1,6 @@
-# Manage a cluster with multiple hubs in hosted mode
+# Manage a cluster with multiple agents in hosted mode
 
-The scripts provided in this doc help you to setup an Open Cluster Management (OCM) environment with Kind clusters where a single cluster is managed by two hubs. The agents of the second hub runs in the hosted mode on a hostng cluster.
+The scripts provided in this doc help you to setup an Open Cluster Management (OCM) environment with Kind clusters where a single cluster is managed by two hubs via two agents installed on the managed cluster. The agents of the second hub runs in the hosted mode on a hosting cluster.
 
 ## Prerequisite
 
