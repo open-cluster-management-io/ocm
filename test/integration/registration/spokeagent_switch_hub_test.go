@@ -69,18 +69,12 @@ var _ = Describe("switch-hub", Ordered, func() {
 		var spokeCtx context.Context
 		spokeCtx, spokeCancel = context.WithCancel(context.Background())
 		go startAutoRestartAgent(spokeCtx,
-			managedClusterName, hubKubeconfigDir,
-			func() *spoke.SpokeAgentOptions {
-				agentOptions := spoke.NewSpokeAgentOptions()
-				agentOptions.HubKubeconfigSecret = hubKubeconfigSecret
-				agentOptions.BootstrapKubeconfigs = []string{hub1.bootstrapFilePath, hub2.bootstrapFilePath}
-				agentOptions.BootstrapKubeconfigSecret = "bootstrap-hub-kubeconfig"
-				agentOptions.HubConnectionTimeoutSeconds = 10
-				return agentOptions
-			},
+			managedClusterName, hubKubeconfigDir, hubKubeconfigSecret,
 			func(ctx context.Context, stopAgent context.CancelFunc, agentConfig *spoke.SpokeAgentConfig) {
 				startAgentHealthChecker(ctx, stopAgent, agentConfig.HealthCheckers())
-			})
+			},
+			hub1.bootstrapFilePath, hub2.bootstrapFilePath,
+		)
 
 		approveAndAcceptManagedCluster(managedClusterName, hub1.kubeClient, hub1.clusterClient, hub1.authn, 10*time.Minute)
 
@@ -216,18 +210,25 @@ func startNewHub(ctx context.Context, hubName string) *mockHub {
 	}
 }
 
-func startAgent(ctx context.Context, managedClusterName, hubKubeconfigDir string,
-	agentOptions *spoke.SpokeAgentOptions) (context.Context, context.CancelFunc, *spoke.SpokeAgentConfig) {
+func startAgent(ctx context.Context, managedClusterName, hubKubeconfigDir, hubKubeconfigSecret string, bootstrapKubeconfigs ...string,
+) (context.Context, context.CancelFunc, *spoke.SpokeAgentConfig, *spoke.SpokeAgentOptions) {
 	ginkgo.By("run registration agent")
+	agentCtx, stopAgent := context.WithCancel(ctx)
+
 	commOptions := commonoptions.NewAgentOptions()
 	commOptions.HubKubeconfigDir = hubKubeconfigDir
 	commOptions.SpokeClusterName = managedClusterName
 
-	agentCtx, stopAgent := context.WithCancel(ctx)
+	agentOptions := spoke.NewSpokeAgentOptions(stopAgent)
+	agentOptions.HubKubeconfigSecret = hubKubeconfigSecret
+	agentOptions.BootstrapKubeconfigs = bootstrapKubeconfigs
+	agentOptions.BootstrapKubeconfigSecret = "bootstrap-hub-kubeconfig"
+	agentOptions.HubConnectionTimeoutSeconds = 10
+
 	agentConfig := spoke.NewSpokeAgentConfig(commOptions, agentOptions)
 	runAgentWithContext(agentCtx, "switch-hub", agentConfig, spokeCfg)
 
-	return agentCtx, stopAgent, agentConfig
+	return agentCtx, stopAgent, agentConfig, agentOptions
 }
 
 func approveAndAcceptManagedCluster(managedClusterName string,
@@ -323,13 +324,12 @@ func assertManagedClusterSuccessfullyJoined(testNamespace, managedClusterName, h
 }
 
 func startAutoRestartAgent(ctx context.Context,
-	managedClusterName, hubKubeconfigDir string,
-	getNewAgentOptions func() *spoke.SpokeAgentOptions,
+	managedClusterName, hubKubeconfigDir, hubKubeconfigSecret string,
 	watchStop func(ctx context.Context, stopAgent context.CancelFunc, agentConfig *spoke.SpokeAgentConfig),
+	bootstrapKubeconfigs ...string,
 ) {
 	fmt.Println("[auto-restart-agent] - start agent...")
-	newAgentOptions := getNewAgentOptions()
-	agentCtx, stopAgent, agentConfig := startAgent(ctx, managedClusterName, hubKubeconfigDir, newAgentOptions)
+	agentCtx, stopAgent, agentConfig, _ := startAgent(ctx, managedClusterName, hubKubeconfigDir, hubKubeconfigSecret, bootstrapKubeconfigs...)
 	go watchStop(ctx, stopAgent, agentConfig)
 	for {
 		select {
@@ -338,8 +338,7 @@ func startAutoRestartAgent(ctx context.Context,
 			time.Sleep(10 * time.Second) // Wait for new secret sync to files
 
 			fmt.Println("[auto-restart-agent] - restart agent...")
-			newAgentOptions := getNewAgentOptions()
-			agentCtx, stopAgent, agentConfig = startAgent(ctx, managedClusterName, hubKubeconfigDir, newAgentOptions)
+			agentCtx, stopAgent, agentConfig, _ = startAgent(ctx, managedClusterName, hubKubeconfigDir, hubKubeconfigSecret, bootstrapKubeconfigs...)
 			go watchStop(ctx, stopAgent, agentConfig)
 		case <-ctx.Done():
 			// exit

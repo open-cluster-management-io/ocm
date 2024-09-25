@@ -298,22 +298,28 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 	}
 
 	startAgent := func(ctx context.Context, managedClusterName, hubKubeconfigDir string,
-		agentOptions *spoke.SpokeAgentOptions) (context.Context, context.CancelFunc, *spoke.SpokeAgentConfig) {
+	) (context.Context, context.CancelFunc, *spoke.SpokeAgentConfig, *spoke.SpokeAgentOptions) {
 		ginkgo.By("run registration agent")
+		agentCtx, stopAgent := context.WithCancel(ctx)
+
 		commOptions := commonoptions.NewAgentOptions()
 		commOptions.HubKubeconfigDir = hubKubeconfigDir
 		commOptions.SpokeClusterName = managedClusterName
 
-		agentCtx, stopAgent := context.WithCancel(ctx)
+		agentOptions := spoke.NewSpokeAgentOptions(stopAgent)
+		agentOptions.BootstrapKubeconfig = bootstrapFile
+		agentOptions.HubKubeconfigSecret = hubKubeconfigSecret
+
 		agentConfig := spoke.NewSpokeAgentConfig(commOptions, agentOptions)
 		runAgentWithContext(agentCtx, "rebootstrap-test", agentConfig, spokeCfg)
 
-		return agentCtx, stopAgent, agentConfig
+		return agentCtx, stopAgent, agentConfig, agentOptions
 	}
 
 	ginkgo.JustBeforeEach(func() {
 		var spokeCtx, agentCtx context.Context
 		var agentConfig *spoke.SpokeAgentConfig
+		var agentOptions *spoke.SpokeAgentOptions
 		var stopAgent context.CancelFunc
 
 		// ensure there is no remaining bootstrap-hub-kubeconfig secret
@@ -332,12 +338,8 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 
 		createBootstrapKubeconfig(bootstrapFile, serverCertFile, securePort, 10*time.Minute)
 
-		agentOptions := spoke.NewSpokeAgentOptions()
-		agentOptions.BootstrapKubeconfig = bootstrapFile
-		agentOptions.HubKubeconfigSecret = hubKubeconfigSecret
-
 		spokeCtx, stopSpoke = context.WithCancel(context.Background())
-		agentCtx, stopAgent, agentConfig = startAgent(spokeCtx, managedClusterName, hubKubeconfigDir, agentOptions)
+		agentCtx, stopAgent, agentConfig, agentOptions = startAgent(spokeCtx, managedClusterName, hubKubeconfigDir)
 
 		// simulate k8s scheduler to perform heath check and restart the agent if it is down/unhealth
 		go func() {
@@ -354,7 +356,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 							stopAgent()
 
 							// reset the health checker
-							agentOptions = spoke.NewSpokeAgentOptions()
+							agentOptions = spoke.NewSpokeAgentOptions(stopAgent)
 							agentOptions.BootstrapKubeconfig = bootstrapFile
 							agentOptions.HubKubeconfigSecret = hubKubeconfigSecret
 							break
@@ -363,7 +365,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 				case <-agentCtx.Done():
 					// restart agent
 					fmt.Println("[agent-scheduler] - restart agent...")
-					agentCtx, stopAgent, _ = startAgent(spokeCtx, managedClusterName, hubKubeconfigDir, agentOptions)
+					agentCtx, stopAgent, _, _ = startAgent(spokeCtx, managedClusterName, hubKubeconfigDir)
 				case <-spokeCtx.Done():
 					// exit
 					fmt.Println("[agent-scheduler] - shutting down...")

@@ -23,7 +23,7 @@ func init() {
 }
 
 func TestValidate(t *testing.T) {
-	defaultCompletedOptions := NewSpokeAgentOptions()
+	defaultCompletedOptions := NewSpokeAgentOptions(nil)
 	defaultCompletedOptions.BootstrapKubeconfig = "/spoke/bootstrap/kubeconfig"
 
 	cases := []struct {

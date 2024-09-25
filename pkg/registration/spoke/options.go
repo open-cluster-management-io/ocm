@@ -1,6 +1,7 @@
 package spoke
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -22,9 +23,10 @@ type SpokeAgentOptions struct {
 	// 2. BootstrapKubeconfigSecret is the secret, a event handler will watch it, if the secret is changed, then rebootstrap.
 	// 3. BootstrapKubeconfigs is a list of file path, the controller uses one of its item to build the client.
 	// BootstrapKubeconfigs can only be used when MultipleHubs is enabled.
-	BootstrapKubeconfig       string
-	BootstrapKubeconfigSecret string
-	BootstrapKubeconfigs      []string
+	BootstrapKubeconfig             string
+	BootstrapKubeconfigSecret       string
+	BootstrapKubeconfigs            []string
+	BootstrapKubeconfigEventHandler *bootstrapKubeconfigEventHandler
 
 	// TODO: The hubConnectionTimoutSeconds should always greater than leaseDurationSeconds, we need to make timeout as a build-in part of
 	// leaseController in the furture and relate timeoutseconds to leaseDurationSeconds. @xuezhaojun
@@ -39,13 +41,18 @@ type SpokeAgentOptions struct {
 	ClusterAnnotations          map[string]string
 }
 
-func NewSpokeAgentOptions() *SpokeAgentOptions {
+func NewSpokeAgentOptions(cancel context.CancelFunc) *SpokeAgentOptions {
 	options := &SpokeAgentOptions{
 		BootstrapKubeconfigSecret:   "bootstrap-hub-kubeconfig",
 		HubKubeconfigSecret:         "hub-kubeconfig-secret",
 		ClusterHealthCheckPeriod:    1 * time.Minute,
 		MaxCustomClusterClaims:      20,
 		HubConnectionTimeoutSeconds: 600, // by default, the timeout is 10 minutes
+	}
+
+	options.BootstrapKubeconfigEventHandler = &bootstrapKubeconfigEventHandler{
+		bootstrapKubeconfigSecretName: &options.BootstrapKubeconfigSecret,
+		cancel:                        cancel,
 	}
 
 	return options
