@@ -13,11 +13,9 @@ import (
 
 type bootstrapKubeconfigEventHandler struct {
 	bootstrapKubeconfigSecretName *string
-	cancel                        context.CancelFunc
-}
-
-func (hc *bootstrapKubeconfigEventHandler) Name() string {
-	return "bootstrap-hub-kubeconfig"
+	// The cancel function allows the agent to restart immediately if the bootstrap kubeconfig changes.
+	// It should be point to the root context of the agent.
+	cancel context.CancelFunc
 }
 
 // implement cache.ResourceEventHandler.OnAdd
@@ -43,8 +41,8 @@ func (hc *bootstrapKubeconfigEventHandler) OnUpdate(oldObj, newObj interface{}) 
 	}
 
 	if !reflect.DeepEqual(newSecret.Data, oldSecret.Data) {
-		// Restart immediately if the bootstrap kubeconfig changes. Otherwise, in the backup restore scenario,
-		// the work agent may resync a wrong bootstrap kubeconfig from the cache to overwrite the restored one.
+		// Restart immediately if the bootstrap kubeconfig changes. Otherwise,
+		// the work agent may resync a wrong bootstrap kubeconfig from the cache.
 		klog.Info("the bootstrap kubeconfig changes and rebootstrap is required, cancel the context")
 		hc.cancel()
 	}

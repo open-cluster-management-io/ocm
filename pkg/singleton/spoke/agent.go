@@ -22,9 +22,11 @@ type AgentConfig struct {
 func NewAgentConfig(
 	agentOption *commonoptions.AgentOptions,
 	registrationOption *registration.SpokeAgentOptions,
-	workOption *work.WorkloadAgentOptions) *AgentConfig {
+	workOption *work.WorkloadAgentOptions,
+	cancel context.CancelFunc,
+) *AgentConfig {
 	return &AgentConfig{
-		registrationConfig: registration.NewSpokeAgentConfig(agentOption, registrationOption),
+		registrationConfig: registration.NewSpokeAgentConfig(agentOption, registrationOption, cancel),
 		workConfig:         work.NewWorkAgentConfig(agentOption, workOption),
 	}
 }

@@ -54,12 +54,14 @@ type SpokeAgentConfig struct {
 
 	internalHubConfigValidFunc wait.ConditionWithContextFunc
 
-	hubKubeConfigChecker *hubKubeConfigHealthChecker
-	reSelectChecker      *reSelectChecker
+	hubKubeConfigChecker            *hubKubeConfigHealthChecker
+	bootstrapKubeconfigEventHandler *bootstrapKubeconfigEventHandler
+
+	reSelectChecker *reSelectChecker
 }
 
 // NewSpokeAgentConfig returns a SpokeAgentConfig
-func NewSpokeAgentConfig(commonOpts *commonoptions.AgentOptions, opts *SpokeAgentOptions) *SpokeAgentConfig {
+func NewSpokeAgentConfig(commonOpts *commonoptions.AgentOptions, opts *SpokeAgentOptions, cancel context.CancelFunc) *SpokeAgentConfig {
 	registerDriver := csr.NewCSRDriver()
 	cfg := &SpokeAgentConfig{
 		agentOptions:       commonOpts,
@@ -67,10 +69,15 @@ func NewSpokeAgentConfig(commonOpts *commonoptions.AgentOptions, opts *SpokeAgen
 		driver:             registerDriver,
 
 		reSelectChecker: &reSelectChecker{shouldReSelect: false},
+		bootstrapKubeconfigEventHandler: &bootstrapKubeconfigEventHandler{
+			bootstrapKubeconfigSecretName: &opts.BootstrapKubeconfigSecret,
+			cancel:                        cancel,
+		},
 	}
 	cfg.hubKubeConfigChecker = &hubKubeConfigHealthChecker{
 		checkFunc: cfg.IsHubKubeConfigValid,
 	}
+
 	return cfg
 }
 
@@ -236,14 +243,15 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	go spokeClusterCreatingController.Run(ctx, 1)
 
 	secretInformer := namespacedManagementKubeInformerFactory.Core().V1().Secrets()
-	if o.registrationOption.BootstrapKubeconfigEventHandler != nil {
+	if o.bootstrapKubeconfigEventHandler != nil {
 		// Register BootstrapKubeconfigEventHandler as an event handler of secret informer,
 		// monitor the bootstrap kubeconfig and restart the pod immediately if it changes.
 		//
-		// The BootstrapKubeconfigEventHandler was originally part of the healthcheck and was moved out to take some cases into account.
-		// For example, in the backup restore scenario, the work agent may resync a wrong bootstrap kubeconfig from the cache to
-		// overwrite the restored one, since the healthcheck will retry 3 times before restarting.
-		if _, err = secretInformer.Informer().AddEventHandler(o.registrationOption.BootstrapKubeconfigEventHandler); err != nil {
+		// The BootstrapKubeconfigEventHandler was originally part of the healthcheck and was
+		// moved out to take some cases into account. For example, the work agent may resync a
+		// wrong bootstrap kubeconfig from the cache before restarting since the healthcheck will
+		// retry 3 times.
+		if _, err = secretInformer.Informer().AddEventHandler(o.bootstrapKubeconfigEventHandler); err != nil {
 			return err
 		}
 	}
