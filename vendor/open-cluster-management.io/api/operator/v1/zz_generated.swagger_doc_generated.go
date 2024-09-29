@@ -163,6 +163,15 @@ func (WorkConfiguration) SwaggerDoc() map[string]string {
 	return map_WorkConfiguration
 }
 
+var map_AwsIrsa = map[string]string{
+	"hubClusterArn":     "The arn of the hub cluster (ie: an EKS cluster). This will be required to pass information to hub, which hub will use to create IAM identities for this klusterlet. Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1.",
+	"managedClusterArn": "The arn of the managed cluster (ie: an EKS cluster). This will be required to generate the md5hash which will be used as a suffix to create IAM role on hub as well as used by kluslerlet-agent, to assume role suffixed with the md5hash, on startup. Example - arn:eks:us-west-2:12345678910:cluster/managed-cluster1.",
+}
+
+func (AwsIrsa) SwaggerDoc() map[string]string {
+	return map_AwsIrsa
+}
+
 var map_BootstrapKubeConfigs = map[string]string{
 	"type":               "Type specifies the type of priority bootstrap kubeconfigs. By default, it is set to None, representing no priority bootstrap kubeconfigs are set.",
 	"localSecretsConfig": "LocalSecretsConfig include a list of secrets that contains the kubeconfigs for ordered bootstrap kubeconifigs. The secrets must be in the same namespace where the agent controller runs.",
@@ -268,10 +277,20 @@ var map_RegistrationConfiguration = map[string]string{
 	"kubeAPIQPS":                  "KubeAPIQPS indicates the maximum QPS while talking with apiserver of hub cluster from the spoke cluster. If it is set empty, use the default value: 50",
 	"kubeAPIBurst":                "KubeAPIBurst indicates the maximum burst of the throttle while talking with apiserver of hub cluster from the spoke cluster. If it is set empty, use the default value: 100",
 	"bootstrapKubeConfigs":        "BootstrapKubeConfigs defines the ordered list of bootstrap kubeconfigs. The order decides which bootstrap kubeconfig to use first when rebootstrap.\n\nWhen the agent loses the connection to the current hub over HubConnectionTimeoutSeconds, or the managedcluster CR is set `hubAcceptsClient=false` on the hub, the controller marks the related bootstrap kubeconfig as \"failed\".\n\nA failed bootstrapkubeconfig won't be used for the duration specified by SkipFailedBootstrapKubeConfigSeconds. But if the user updates the content of a failed bootstrapkubeconfig, the \"failed\" mark will be cleared.",
+	"registrationDriver":          "This provides driver details required to register with hub",
 }
 
 func (RegistrationConfiguration) SwaggerDoc() map[string]string {
 	return map_RegistrationConfiguration
+}
+
+var map_RegistrationDriver = map[string]string{
+	"authType": "Type of the authentication used by managedcluster to register as well as pull work from hub. Possible values are csr and awsirsa.",
+	"awsIrsa":  "Contain the details required for registering with hub cluster (ie: an EKS cluster) using AWS IAM roles for service account. This is required only when the authType is awsirsa.",
+}
+
+func (RegistrationDriver) SwaggerDoc() map[string]string {
+	return map_RegistrationDriver
 }
 
 var map_ServerURL = map[string]string{

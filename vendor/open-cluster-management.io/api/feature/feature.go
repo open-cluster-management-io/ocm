@@ -77,6 +77,9 @@ const (
 
 	// MultipleHubs allows user to configure multiple bootstrapkubeconfig connecting to different hubs via Klusterlet and let agent decide which one to use
 	MultipleHubs featuregate.Feature = "MultipleHubs"
+
+	// ClusterProfile will start new controller in the Hub that can be used to sync ManagedCluster to ClusterProfile.
+	ClusterProfile featuregate.Feature = "ClusterProfile"
 )
 
 // DefaultSpokeRegistrationFeatureGates consists of all known ocm-registration
@@ -97,6 +100,7 @@ var DefaultHubRegistrationFeatureGates = map[featuregate.Feature]featuregate.Fea
 	V1beta1CSRAPICompatibility: {Default: false, PreRelease: featuregate.Alpha},
 	ManagedClusterAutoApproval: {Default: false, PreRelease: featuregate.Alpha},
 	ResourceCleanup:            {Default: false, PreRelease: featuregate.Alpha},
+	ClusterProfile:             {Default: false, PreRelease: featuregate.Alpha},
 }
 
 var DefaultHubAddonManagerFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{

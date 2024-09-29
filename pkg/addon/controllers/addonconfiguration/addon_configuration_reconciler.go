@@ -3,7 +3,10 @@ package addonconfiguration
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -19,13 +22,50 @@ type managedClusterAddonConfigurationReconciler struct {
 func (d *managedClusterAddonConfigurationReconciler) reconcile(
 	ctx context.Context, cma *addonv1alpha1.ClusterManagementAddOn, graph *configurationGraph) (*addonv1alpha1.ClusterManagementAddOn, reconcileState, error) {
 	var errs []error
+	configured := sets.Set[string]{}
 
+	// Update the config references and set the "configured" condition to true for addons that are ready for rollout.
+	// These addons are part of the current rollout batch according to the strategy.
 	for _, addon := range graph.getAddonsToUpdate() {
-		mca := d.mergeAddonConfig(addon.mca, addon.desiredConfigs)
-		patcher := patcher.NewPatcher[
-			*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus](
-			d.addonClient.AddonV1alpha1().ManagedClusterAddOns(mca.Namespace))
-		_, err := patcher.PatchStatus(ctx, mca, mca.Status, addon.mca.Status)
+		// update mca config references in status
+		newAddon := d.mergeAddonConfig(addon.mca, addon.desiredConfigs)
+		// update mca configured condition to true
+		d.setCondition(newAddon, metav1.ConditionTrue, "ConfigurationsConfigured", "Configurations configured")
+
+		err := d.patchAddonStatus(ctx, newAddon, addon.mca)
+		if err != nil {
+			errs = append(errs, err)
+		}
+
+		configured.Insert(addon.mca.Namespace)
+	}
+
+	// Set the "configured" condition to false for addons whose configurations have not been synced yet
+	// but are waiting for rollout.
+	for _, addon := range graph.getAddonsToApply() {
+		// Skip addons that have already been configured.
+		if configured.Has(addon.mca.Namespace) {
+			continue
+		}
+		newAddon := addon.mca.DeepCopy()
+		d.setCondition(newAddon, metav1.ConditionFalse, "ConfigurationsNotConfigured", "Configurations updated and not configured yet")
+
+		err := d.patchAddonStatus(ctx, newAddon, addon.mca)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	// Set the "configured" condition to true for addons that have successfully completed rollout.
+	// This includes:
+	// a. Addons without any configurations that have had their rollout status set to success in setRolloutStatus().
+	// b. Addons with configurations and already rollout successfully. In upgrade scenario, when the
+	// addon configurations do not change while addon components upgrade, should set condition to true.
+	for _, addon := range graph.getAddonsSucceeded() {
+		newAddon := addon.mca.DeepCopy()
+		d.setCondition(newAddon, metav1.ConditionTrue, "ConfigurationsConfigured", "Configurations configured")
+
+		err := d.patchAddonStatus(ctx, newAddon, addon.mca)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -87,4 +127,26 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 	}
 	mcaCopy.Status.ConfigReferences = configRefs
 	return mcaCopy
+}
+
+// setCondition updates the configured condition for the addon
+func (d *managedClusterAddonConfigurationReconciler) setCondition(
+	addon *addonv1alpha1.ManagedClusterAddOn, status metav1.ConditionStatus, reason, message string) {
+	meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+		Type:    addonv1alpha1.ManagedClusterAddOnConditionConfigured,
+		Status:  status,
+		Reason:  reason,
+		Message: message,
+	})
+}
+
+// patchAddonStatus patches the status of the addon
+func (d *managedClusterAddonConfigurationReconciler) patchAddonStatus(
+	ctx context.Context, newaddon *addonv1alpha1.ManagedClusterAddOn, oldaddon *addonv1alpha1.ManagedClusterAddOn) error {
+	patcher := patcher.NewPatcher[
+		*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus](
+		d.addonClient.AddonV1alpha1().ManagedClusterAddOns(newaddon.Namespace))
+
+	_, err := patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
+	return err
 }

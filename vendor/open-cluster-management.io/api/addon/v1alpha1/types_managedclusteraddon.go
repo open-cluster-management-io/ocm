@@ -318,7 +318,6 @@ const (
 	// the managed cluster.
 	ManagedClusterAddOnConditionDegraded string = "Degraded"
 
-	// Deprecated: Use ManagedClusterAddOnConditionProgressing instead
 	// ManagedClusterAddOnConditionConfigured represents that the addon agent is configured with its configuration
 	ManagedClusterAddOnConditionConfigured string = "Configured"
 
