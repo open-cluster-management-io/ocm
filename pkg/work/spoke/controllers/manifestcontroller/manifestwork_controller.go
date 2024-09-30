@@ -12,13 +12,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/util/retry"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
@@ -27,17 +24,22 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
+	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
-	"open-cluster-management.io/ocm/pkg/work/spoke/auth/basic"
 )
 
 var (
 	ResyncInterval     = 5 * time.Minute
 	MaxRequeueDuration = 24 * time.Hour
 )
+
+type workReconcile interface {
+	reconcile(ctx context.Context, controllerContext factory.SyncContext, mw *workapiv1.ManifestWork,
+		amw *workapiv1.AppliedManifestWork) (*workapiv1.ManifestWork, *workapiv1.AppliedManifestWork, error)
+}
 
 // ManifestWorkController is to reconcile the workload resources
 // fetched from hub cluster on spoke cluster.
@@ -47,19 +49,9 @@ type ManifestWorkController struct {
 	appliedManifestWorkClient  workv1client.AppliedManifestWorkInterface
 	appliedManifestWorkPatcher patcher.Patcher[*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus]
 	appliedManifestWorkLister  worklister.AppliedManifestWorkLister
-	spokeDynamicClient         dynamic.Interface
 	hubHash                    string
 	agentID                    string
-	restMapper                 meta.RESTMapper
-	appliers                   *apply.Appliers
-	validator                  auth.ExecutorValidator
-}
-
-type applyResult struct {
-	Result runtime.Object
-	Error  error
-
-	resourceMeta workapiv1.ManifestResourceMeta
+	reconcilers                []workReconcile
 }
 
 // NewManifestWorkController returns a ManifestWorkController
@@ -87,12 +79,19 @@ func NewManifestWorkController(
 			*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus](
 			appliedManifestWorkClient),
 		appliedManifestWorkLister: appliedManifestWorkInformer.Lister(),
-		spokeDynamicClient:        spokeDynamicClient,
 		hubHash:                   hubHash,
 		agentID:                   agentID,
-		restMapper:                restMapper,
-		appliers:                  apply.NewAppliers(spokeDynamicClient, spokeKubeClient, spokeAPIExtensionClient),
-		validator:                 validator,
+		reconcilers: []workReconcile{
+			&manifestworkReconciler{
+				restMapper: restMapper,
+				appliers:   apply.NewAppliers(spokeDynamicClient, spokeKubeClient, spokeAPIExtensionClient),
+				validator:  validator,
+			},
+			&appliedManifestWorkReconciler{
+				spokeDynamicClient: spokeDynamicClient,
+				rateLimiter:        workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
+			},
+		},
 	}
 
 	return factory.New().
@@ -137,96 +136,45 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	if err != nil {
 		return err
 	}
+	newAppliedManifestWork := appliedManifestWork.DeepCopy()
 
-	// We creat a ownerref instead of controller ref since multiple controller can declare the ownership of a manifests
-	owner := helper.NewAppliedManifestWorkOwner(appliedManifestWork)
-
-	var errs []error
-	// Apply resources on spoke cluster.
-	resourceResults := make([]applyResult, len(manifestWork.Spec.Workload.Manifests))
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		resourceResults = m.applyManifests(
-			ctx, manifestWork.Spec.Workload.Manifests, manifestWork.Spec, controllerContext.Recorder(), *owner, resourceResults)
-
-		for _, result := range resourceResults {
-			if apierrors.IsConflict(result.Error) {
-				return result.Error
-			}
-		}
-
-		return nil
-	})
-	if err != nil {
-		klog.Errorf("failed to apply resource with error %v", err)
-	}
-
-	var newManifestConditions []workapiv1.ManifestCondition
 	var requeueTime = MaxRequeueDuration
-	for _, result := range resourceResults {
-		manifestCondition := workapiv1.ManifestCondition{
-			ResourceMeta: result.resourceMeta,
-			Conditions:   []metav1.Condition{},
-		}
-
-		// Add applied status condition
-		manifestCondition.Conditions = append(manifestCondition.Conditions, buildAppliedStatusCondition(result))
-
-		newManifestConditions = append(newManifestConditions, manifestCondition)
-
-		// If it is a forbidden error, after the condition is constructed, we set the error to nil
-		// and requeue the item
-		var authError *basic.NotAllowedError
-		if errors.As(result.Error, &authError) {
-			klog.V(2).Infof("apply work %s fails with err: %v", manifestWorkName, result.Error)
-			result.Error = nil
-
-			if authError.RequeueTime < requeueTime {
-				requeueTime = authError.RequeueTime
+	var errs []error
+	for _, reconciler := range m.reconcilers {
+		manifestWork, newAppliedManifestWork, err = reconciler.reconcile(
+			ctx, controllerContext, manifestWork, newAppliedManifestWork)
+		var rqe commonhelper.RequeueError
+		if err != nil && errors.As(err, &rqe) {
+			if requeueTime > rqe.RequeueTime {
+				requeueTime = rqe.RequeueTime
 			}
+		} else if err != nil {
+			errs = append(errs, err)
 		}
-
-		// ignore server side apply conflict error since it cannot be resolved by error fallback.
-		var ssaConflict *apply.ServerSideApplyConflictError
-		if result.Error != nil && !errors.As(result.Error, &ssaConflict) {
-			errs = append(errs, result.Error)
-		}
-	}
-	manifestWork.Status.ResourceStatus.Manifests = helper.MergeManifestConditions(
-		manifestWork.Status.ResourceStatus.Manifests, newManifestConditions)
-	// handle condition type Applied
-	// #1: Applied - work status condition (with type Applied) is applied if all manifest conditions (with type Applied) are applied
-	if inCondition, exists := allInCondition(workapiv1.ManifestApplied, newManifestConditions); exists {
-		appliedCondition := metav1.Condition{
-			Type:               workapiv1.WorkApplied,
-			ObservedGeneration: manifestWork.Generation,
-			Status:             metav1.ConditionFalse,
-			Reason:             "AppliedManifestWorkFailed",
-			Message:            "Failed to apply manifest work",
-		}
-		if inCondition {
-			appliedCondition.Status = metav1.ConditionTrue
-			appliedCondition.Reason = "AppliedManifestWorkComplete"
-			appliedCondition.Message = "Apply manifest work complete"
-		}
-		meta.SetStatusCondition(&manifestWork.Status.Conditions, appliedCondition)
 	}
 
 	// Update work status
-	updated, err := m.manifestWorkPatcher.PatchStatus(ctx, manifestWork, manifestWork.Status, oldManifestWork.Status)
+	mwUpdated, err := m.manifestWorkPatcher.PatchStatus(ctx, manifestWork, manifestWork.Status, oldManifestWork.Status)
 	if err != nil {
-		errs = append(errs, fmt.Errorf("failed to update work status with err %w", err))
+		return err
 	}
 
-	if !updated && requeueTime < MaxRequeueDuration {
-		controllerContext.Queue().AddAfter(manifestWorkName, requeueTime)
+	amwUpdated, err := m.appliedManifestWorkPatcher.PatchStatus(
+		ctx, newAppliedManifestWork, newAppliedManifestWork.Status, appliedManifestWork.Status)
+	if err != nil {
+		return err
 	}
 
 	if len(errs) > 0 {
-		err = utilerrors.NewAggregate(errs)
-		klog.Errorf("Reconcile work %s fails with err: %v", manifestWorkName, err)
+		klog.Errorf("Reconcile work %s fails with err: %v", manifestWorkName, errs)
+		return utilerrors.NewAggregate(errs)
 	}
 
-	return err
+	if !mwUpdated && !amwUpdated && requeueTime < MaxRequeueDuration {
+		controllerContext.Queue().AddAfter(manifestWorkName, requeueTime)
+	}
+
+	return nil
 }
 
 func (m *ManifestWorkController) applyAppliedManifestWork(ctx context.Context, workName, hubHash, agentID string) (*workapiv1.AppliedManifestWork, error) {
@@ -254,133 +202,4 @@ func (m *ManifestWorkController) applyAppliedManifestWork(ctx context.Context, w
 
 	_, err = m.appliedManifestWorkPatcher.PatchSpec(ctx, appliedManifestWork, requiredAppliedWork.Spec, appliedManifestWork.Spec)
 	return appliedManifestWork, err
-}
-
-func (m *ManifestWorkController) applyManifests(
-	ctx context.Context,
-	manifests []workapiv1.Manifest,
-	workSpec workapiv1.ManifestWorkSpec,
-	recorder events.Recorder,
-	owner metav1.OwnerReference,
-	existingResults []applyResult) []applyResult {
-
-	for index, manifest := range manifests {
-		switch {
-		case existingResults[index].Result == nil:
-			// Apply if there is no result.
-			existingResults[index] = m.applyOneManifest(ctx, index, manifest, workSpec, recorder, owner)
-		case apierrors.IsConflict(existingResults[index].Error):
-			// Apply if there is a resource conflict error.
-			existingResults[index] = m.applyOneManifest(ctx, index, manifest, workSpec, recorder, owner)
-		}
-	}
-
-	return existingResults
-}
-
-func (m *ManifestWorkController) applyOneManifest(
-	ctx context.Context,
-	index int,
-	manifest workapiv1.Manifest,
-	workSpec workapiv1.ManifestWorkSpec,
-	recorder events.Recorder,
-	owner metav1.OwnerReference) applyResult {
-
-	result := applyResult{}
-
-	// parse the required and set resource meta
-	required := &unstructured.Unstructured{}
-	if err := required.UnmarshalJSON(manifest.Raw); err != nil {
-		result.Error = err
-		return result
-	}
-
-	// ignore the required object UID to avoid UID precondition failed error
-	if len(required.GetUID()) != 0 {
-		klog.Warningf("Ignore the UID %s for the manifest index %d", required.GetUID(), index)
-		required.SetUID("")
-	}
-
-	resMeta, gvr, err := helper.BuildResourceMeta(index, required, m.restMapper)
-	result.resourceMeta = resMeta
-	if err != nil {
-		result.Error = err
-		return result
-	}
-
-	// check if the resource to be applied should be owned by the manifest work
-	ownedByTheWork := helper.OwnedByTheWork(gvr, resMeta.Namespace, resMeta.Name, workSpec.DeleteOption)
-
-	// check the Executor subject permission before applying
-	err = m.validator.Validate(ctx, workSpec.Executor, gvr, resMeta.Namespace, resMeta.Name, ownedByTheWork, required)
-	if err != nil {
-		result.Error = err
-		return result
-	}
-
-	// compute required ownerrefs based on delete option
-	requiredOwner := manageOwnerRef(ownedByTheWork, owner)
-
-	// find update strategy option.
-	option := helper.FindManifestConiguration(resMeta, workSpec.ManifestConfigs)
-	// strategy is update by default
-	strategy := workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeUpdate}
-	if option != nil && option.UpdateStrategy != nil {
-		strategy = *option.UpdateStrategy
-	}
-
-	applier := m.appliers.GetApplier(strategy.Type)
-	result.Result, result.Error = applier.Apply(ctx, gvr, required, requiredOwner, option, recorder)
-
-	return result
-}
-
-// manageOwnerRef return a ownerref based on the resource and the ownedByTheWork indicating whether the owneref
-// should be removed or added. If the resource is not owned by the work, the owner's UID is updated for removal.
-func manageOwnerRef(
-	ownedByTheWork bool,
-	myOwner metav1.OwnerReference) metav1.OwnerReference {
-	if ownedByTheWork {
-		return myOwner
-	}
-	removalKey := fmt.Sprintf("%s-", myOwner.UID)
-	ownerCopy := myOwner.DeepCopy()
-	ownerCopy.UID = types.UID(removalKey)
-	return *ownerCopy
-}
-
-// allInCondition checks status of conditions with a particular type in ManifestCondition array.
-// Return true only if conditions with the condition type exist and they are all in condition.
-func allInCondition(conditionType string, manifests []workapiv1.ManifestCondition) (inCondition bool, exists bool) {
-	for _, manifest := range manifests {
-		for _, condition := range manifest.Conditions {
-			if condition.Type == conditionType {
-				exists = true
-			}
-
-			if condition.Type == conditionType && condition.Status == metav1.ConditionFalse {
-				return false, true
-			}
-		}
-	}
-
-	return exists, exists
-}
-
-func buildAppliedStatusCondition(result applyResult) metav1.Condition {
-	if result.Error != nil {
-		return metav1.Condition{
-			Type:    workapiv1.ManifestApplied,
-			Status:  metav1.ConditionFalse,
-			Reason:  "AppliedManifestFailed",
-			Message: fmt.Sprintf("Failed to apply manifest: %v", result.Error),
-		}
-	}
-
-	return metav1.Condition{
-		Type:    workapiv1.ManifestApplied,
-		Status:  metav1.ConditionTrue,
-		Reason:  "AppliedManifestComplete",
-		Message: "Apply manifest complete",
-	}
 }
