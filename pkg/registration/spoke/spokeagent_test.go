@@ -2,6 +2,7 @@ package spoke
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path"
 	"testing"
@@ -178,7 +179,8 @@ func TestGetSpokeClusterCABundle(t *testing.T) {
 				restConig.CAData = nil
 				restConig.CAFile = path.Join(tempDir, c.caFile)
 			}
-			cfg := NewSpokeAgentConfig(commonoptions.NewAgentOptions(), c.options)
+			_, cancel := context.WithCancel(context.TODO())
+			cfg := NewSpokeAgentConfig(commonoptions.NewAgentOptions(), c.options, cancel)
 			caData, err := cfg.getSpokeClusterCABundle(restConig)
 			testingcommon.AssertError(t, err, c.expectedErr)
 			if c.expectedCAData == nil && caData == nil {

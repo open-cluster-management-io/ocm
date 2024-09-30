@@ -305,7 +305,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 		commOptions.SpokeClusterName = managedClusterName
 
 		agentCtx, stopAgent := context.WithCancel(ctx)
-		agentConfig := spoke.NewSpokeAgentConfig(commOptions, agentOptions)
+		agentConfig := spoke.NewSpokeAgentConfig(commOptions, agentOptions, stopAgent)
 		runAgentWithContext(agentCtx, "rebootstrap-test", agentConfig, spokeCfg)
 
 		return agentCtx, stopAgent, agentConfig

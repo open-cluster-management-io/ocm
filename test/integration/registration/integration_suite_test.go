@@ -78,8 +78,8 @@ var CRDPaths = []string{
 }
 
 func runAgent(name string, opt *spoke.SpokeAgentOptions, commOption *commonoptions.AgentOptions, cfg *rest.Config) context.CancelFunc {
-	agentConfig := spoke.NewSpokeAgentConfig(commOption, opt)
 	ctx, cancel := context.WithCancel(context.Background())
+	agentConfig := spoke.NewSpokeAgentConfig(commOption, opt, cancel)
 	runAgentWithContext(ctx, name, agentConfig, cfg)
 	return cancel
 }
