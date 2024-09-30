@@ -55,6 +55,9 @@ var _ = Describe("Deploy Klusterlet with Multiplehubs enabled", func() {
 							},
 						},
 					},
+					RegistrationDriver: operatorapiv1.RegistrationDriver{
+						AuthType: "csr",
+					},
 				},
 				DeployOption: operatorapiv1.KlusterletDeployOption{
 					Mode: operatorapiv1.InstallModeSingleton,
