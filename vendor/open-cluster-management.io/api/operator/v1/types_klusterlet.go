@@ -172,6 +172,36 @@ type RegistrationConfiguration struct {
 	// But if the user updates the content of a failed bootstrapkubeconfig, the "failed" mark will be cleared.
 	// +optional
 	BootstrapKubeConfigs BootstrapKubeConfigs `json:"bootstrapKubeConfigs,omitempty"`
+
+	// This provides driver details required to register with hub
+	// +optional
+	RegistrationDriver RegistrationDriver `json:"registrationDriver,omitempty"`
+}
+
+type RegistrationDriver struct {
+	// Type of the authentication used by managedcluster to register as well as pull work from hub. Possible values are csr and awsirsa.
+	// +required
+	// +kubebuilder:default:=csr
+	// +kubebuilder:validation:Enum=csr;awsirsa
+	AuthType string `json:"authType,omitempty"`
+
+	// Contain the details required for registering with hub cluster (ie: an EKS cluster) using AWS IAM roles for service account.
+	// This is required only when the authType is awsirsa.
+	AwsIrsa *AwsIrsa `json:"awsIrsa,omitempty"`
+}
+
+type AwsIrsa struct {
+	// The arn of the hub cluster (ie: an EKS cluster). This will be required to pass information to hub, which hub will use to create IAM identities for this klusterlet.
+	// Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1.
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	HubClusterArn string `json:"hubClusterArn"`
+	// The arn of the managed cluster (ie: an EKS cluster). This will be required to generate the md5hash which will be used as a suffix to create IAM role on hub
+	// as well as used by kluslerlet-agent, to assume role suffixed with the md5hash, on startup.
+	// Example - arn:eks:us-west-2:12345678910:cluster/managed-cluster1.
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	ManagedClusterArn string `json:"managedClusterArn"`
 }
 
 type TypeBootstrapKubeConfigs string

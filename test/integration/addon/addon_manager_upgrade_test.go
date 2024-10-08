@@ -234,6 +234,12 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 					Reason:  addonapiv1alpha1.ProgressingReasonCompleted,
 					Message: "completed with no errors.",
 				})
+				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
+					Status:  metav1.ConditionTrue,
+					Reason:  "ConfigurationsConfigured",
+					Message: "Configurations configured",
+				})
 			}
 
 			ginkgo.By("check cma status")
@@ -312,6 +318,12 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 					Status:  metav1.ConditionFalse,
 					Reason:  addonapiv1alpha1.ProgressingReasonCompleted,
 					Message: "completed with no errors.",
+				})
+				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
+					Status:  metav1.ConditionTrue,
+					Reason:  "ConfigurationsConfigured",
+					Message: "Configurations configured",
 				})
 			}
 
@@ -403,6 +415,12 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 					Reason:  addonapiv1alpha1.ProgressingReasonProgressing,
 					Message: "progressing... work is not ready",
 				})
+				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
+					Status:  metav1.ConditionTrue,
+					Reason:  "ConfigurationsConfigured",
+					Message: "Configurations configured",
+				})
 			}
 			for i := 2; i < 4; i++ {
 				assertManagedClusterAddOnConfigReferences(testAddOnConfigsImpl.name, clusterNames[i], addonapiv1alpha1.ConfigReference{
@@ -435,6 +453,12 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 					Status:  metav1.ConditionFalse,
 					Reason:  addonapiv1alpha1.ProgressingReasonCompleted,
 					Message: "completed with no errors.",
+				})
+				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
+					Status:  metav1.ConditionFalse,
+					Reason:  "ConfigurationsNotConfigured",
+					Message: "Configurations updated and not configured yet",
 				})
 			}
 
@@ -519,6 +543,12 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 					Reason:  addonapiv1alpha1.ProgressingReasonCompleted,
 					Message: "completed with no errors.",
 				})
+				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
+					Status:  metav1.ConditionTrue,
+					Reason:  "ConfigurationsConfigured",
+					Message: "Configurations configured",
+				})
 			}
 
 			ginkgo.By("check cma status")
@@ -566,6 +596,12 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 					Status:  metav1.ConditionFalse,
 					Reason:  addonapiv1alpha1.ProgressingReasonCompleted,
 					Message: "completed with no errors.",
+				})
+				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
+					Status:  metav1.ConditionTrue,
+					Reason:  "ConfigurationsConfigured",
+					Message: "Configurations configured",
 				})
 			}
 			ginkgo.By("check cma status")
@@ -664,6 +700,12 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 					Reason:  addonapiv1alpha1.ProgressingReasonProgressing,
 					Message: "progressing... work is not ready",
 				})
+				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
+					Status:  metav1.ConditionTrue,
+					Reason:  "ConfigurationsConfigured",
+					Message: "Configurations configured",
+				})
 			}
 			for i := 2; i < 4; i++ {
 				assertManagedClusterAddOnConfigReferences(testAddOnConfigsImpl.name, clusterNames[i], addonapiv1alpha1.ConfigReference{
@@ -696,6 +738,12 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 					Status:  metav1.ConditionFalse,
 					Reason:  addonapiv1alpha1.ProgressingReasonCompleted,
 					Message: "completed with no errors.",
+				})
+				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
+					Status:  metav1.ConditionFalse,
+					Reason:  "ConfigurationsNotConfigured",
+					Message: "Configurations updated and not configured yet",
 				})
 			}
 
@@ -792,6 +840,12 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 					Status:  metav1.ConditionFalse,
 					Reason:  addonapiv1alpha1.ProgressingReasonCompleted,
 					Message: "completed with no errors.",
+				})
+				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
+					Status:  metav1.ConditionTrue,
+					Reason:  "ConfigurationsConfigured",
+					Message: "Configurations configured",
 				})
 			}
 

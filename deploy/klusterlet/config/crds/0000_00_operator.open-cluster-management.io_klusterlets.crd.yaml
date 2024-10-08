@@ -289,6 +289,39 @@ spec:
                       If it is set empty, use the default value: 50
                     format: int32
                     type: integer
+                  registrationDriver:
+                    description: This provides driver details required to register
+                      with hub
+                    properties:
+                      authType:
+                        default: csr
+                        description: Type of the authentication used by managedcluster
+                          to register as well as pull work from hub. Possible values
+                          are csr and awsirsa.
+                        enum:
+                        - csr
+                        - awsirsa
+                        type: string
+                      awsIrsa:
+                        description: |-
+                          Contain the details required for registering with hub cluster (ie: an EKS cluster) using AWS IAM roles for service account.
+                          This is required only when the authType is awsirsa.
+                        properties:
+                          hubClusterArn:
+                            description: |-
+                              The arn of the hub cluster (ie: an EKS cluster). This will be required to pass information to hub, which hub will use to create IAM identities for this klusterlet.
+                              Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1.
+                            minLength: 1
+                            type: string
+                          managedClusterArn:
+                            description: |-
+                              The arn of the managed cluster (ie: an EKS cluster). This will be required to generate the md5hash which will be used as a suffix to create IAM role on hub
+                              as well as used by kluslerlet-agent, to assume role suffixed with the md5hash, on startup.
+                              Example - arn:eks:us-west-2:12345678910:cluster/managed-cluster1.
+                            minLength: 1
+                            type: string
+                        type: object
+                    type: object
                 type: object
               registrationImagePullSpec:
                 description: |-
