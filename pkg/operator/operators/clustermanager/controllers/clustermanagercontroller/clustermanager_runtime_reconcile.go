@@ -73,6 +73,14 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 		}
 	}
 
+	// If ClusterProfile is not enabled, remove related resources
+	if !config.ClusterProfileEnabled {
+		_, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, clusterProfileResourceFiles...)
+		if err != nil {
+			return cm, reconcileStop, err
+		}
+	}
+
 	// In the Hosted mode, ensure the rbac kubeconfig secrets is existed for deployments to mount.
 	// In this step, we get serviceaccount token from the hub cluster to form a kubeconfig and set it as a secret on the management cluster.
 	// Before this step, the serviceaccounts in the hub cluster and the namespace in the management cluster should be applied first.
@@ -128,6 +136,10 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 	if config.MWReplicaSetEnabled {
 		deployResources = append(deployResources, mwReplicaSetDeploymentFiles...)
 	}
+	if config.ClusterProfileEnabled {
+		deployResources = append(deployResources, clusterProfileResourceFiles...)
+	}
+
 	for _, file := range deployResources {
 		updatedDeployment, currentGeneration, err := helpers.ApplyDeployment(
 			ctx,

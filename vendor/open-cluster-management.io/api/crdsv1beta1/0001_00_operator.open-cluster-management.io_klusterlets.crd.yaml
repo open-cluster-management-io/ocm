@@ -185,6 +185,24 @@ spec:
                   type: integer
                   format: int32
                   default: 50
+                registrationDriver:
+                  description: This provides driver details required to register with hub
+                  type: object
+                  properties:
+                    authType:
+                      description: Type of the authentication used by managedcluster to register as well as pull work from hub. Possible values are csr and awsirsa.
+                      type: string
+                      default: csr
+                      enum:
+                        - csr
+                        - awsirsa
+                    awsIrsa:
+                      description: 'Contain the details required for registering with hub cluster (ie: an EKS cluster) using AWS IAM roles for service account. This is required only when the authType is awsirsa.'
+                      type: object
+                      properties:
+                        hubClusterArn:
+                          description: 'The arn of the hub cluster (ie: an EKS cluster). This will be required to pass information to hub, which hub will use to create IAM identities for this klusterlet. Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1.'
+                          type: string
             registrationImagePullSpec:
               description: RegistrationImagePullSpec represents the desired image configuration of registration agent. quay.io/open-cluster-management.io/registration:latest will be used if unspecified.
               type: string

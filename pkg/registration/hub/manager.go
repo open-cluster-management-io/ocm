@@ -11,6 +11,8 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
+	cpclientset "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned"
+	cpinformerv1alpha1 "sigs.k8s.io/cluster-inventory-api/client/informers/externalversions"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -26,6 +28,7 @@ import (
 	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/hub/addon"
+	"open-cluster-management.io/ocm/pkg/registration/hub/clusterprofile"
 	"open-cluster-management.io/ocm/pkg/registration/hub/clusterrole"
 	"open-cluster-management.io/ocm/pkg/registration/hub/gc"
 	"open-cluster-management.io/ocm/pkg/registration/hub/lease"
@@ -78,6 +81,11 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 		return err
 	}
 
+	clusterProfileClient, err := cpclientset.NewForConfig(controllerContext.KubeConfig)
+	if err != nil {
+		return err
+	}
+
 	workClient, err := workv1client.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
@@ -89,6 +97,7 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 	}
 
 	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 30*time.Minute)
+	clusterProfileInformers := cpinformerv1alpha1.NewSharedInformerFactory(clusterProfileClient, 30*time.Minute)
 	workInformers := workv1informers.NewSharedInformerFactory(workClient, 30*time.Minute)
 	kubeInfomers := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, 30*time.Minute, kubeinformers.WithTweakListOptions(
 		func(listOptions *metav1.ListOptions) {
@@ -112,8 +121,8 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 
 	return m.RunControllerManagerWithInformers(
 		ctx, controllerContext,
-		kubeClient, metadataClient, clusterClient, addOnClient,
-		kubeInfomers, clusterInformers, workInformers, addOnInformers,
+		kubeClient, metadataClient, clusterClient, clusterProfileClient, addOnClient,
+		kubeInfomers, clusterInformers, clusterProfileInformers, workInformers, addOnInformers,
 	)
 }
 
@@ -123,9 +132,11 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	kubeClient kubernetes.Interface,
 	metadataClient metadata.Interface,
 	clusterClient clusterv1client.Interface,
+	clusterProfileClient cpclientset.Interface,
 	addOnClient addonclient.Interface,
 	kubeInformers kubeinformers.SharedInformerFactory,
 	clusterInformers clusterv1informers.SharedInformerFactory,
+	clusterProfileInformers cpinformerv1alpha1.SharedInformerFactory,
 	workInformers workv1informers.SharedInformerFactory,
 	addOnInformers addoninformers.SharedInformerFactory,
 ) error {
@@ -223,6 +234,16 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		)
 	}
 
+	var clusterProfileController factory.Controller
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.ClusterProfile) {
+		clusterProfileController = clusterprofile.NewClusterProfileController(
+			clusterInformers.Cluster().V1().ManagedClusters(),
+			clusterProfileClient,
+			clusterProfileInformers.Apis().V1alpha1().ClusterProfiles(),
+			controllerContext.EventRecorder,
+		)
+	}
+
 	gcController := gc.NewGCController(
 		kubeInformers.Rbac().V1().ClusterRoles().Lister(),
 		kubeInformers.Rbac().V1().ClusterRoleBindings().Lister(),
@@ -242,6 +263,9 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	go workInformers.Start(ctx.Done())
 	go kubeInformers.Start(ctx.Done())
 	go addOnInformers.Start(ctx.Done())
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
+		go clusterProfileInformers.Start(ctx.Done())
+	}
 
 	go managedClusterController.Run(ctx, 1)
 	go taintController.Run(ctx, 1)
@@ -256,6 +280,9 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
 		go defaultManagedClusterSetController.Run(ctx, 1)
 		go globalManagedClusterSetController.Run(ctx, 1)
+	}
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.ClusterProfile) {
+		go clusterProfileController.Run(ctx, 1)
 	}
 
 	go gcController.Run(ctx, 1)

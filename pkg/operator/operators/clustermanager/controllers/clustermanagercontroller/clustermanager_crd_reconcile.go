@@ -49,6 +49,7 @@ var (
 		"cluster-manager/hub/0000_03_addon.open-cluster-management.io_addontemplates.crd.yaml",
 		"cluster-manager/hub/0000_03_clusters.open-cluster-management.io_placementdecisions.crd.yaml",
 		"cluster-manager/hub/0000_05_clusters.open-cluster-management.io_addonplacementscores.crd.yaml",
+		"cluster-manager/hub/0000_00_multicluster.x-k8s.io_clusterprofiles.crd.yaml",
 	}
 )
 
