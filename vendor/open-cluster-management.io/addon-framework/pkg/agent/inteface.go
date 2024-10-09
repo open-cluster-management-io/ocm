@@ -91,6 +91,11 @@ type AgentAddonOptions struct {
 	//   json path which is already in the existing rules, compare by the path name.
 	// +optional
 	ManifestConfigs []workapiv1.ManifestConfigOption
+
+	// ConfigCheckEnabled defines whether to check the configured condition before rendering manifests.
+	// If not set, will be defaulted to false.
+	// +optional
+	ConfigCheckEnabled bool
 }
 
 type CSRSignerFunc func(csr *certificatesv1.CertificateSigningRequest) []byte

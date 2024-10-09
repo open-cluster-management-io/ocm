@@ -169,9 +169,6 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 		}
 		if len(ns) > 0 {
 			managedClusterAddonCopy.Status.Namespace = ns
-		} else {
-			klog.InfoS("Namespace for addon returned by agent install namespace func is empty",
-				"addonNamespace", managedClusterAddonCopy.Namespace, "addonName", managedClusterAddonCopy.Name)
 		}
 	}
 

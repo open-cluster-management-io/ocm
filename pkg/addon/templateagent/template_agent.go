@@ -131,6 +131,8 @@ func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 				// if the cluster changes from unknow to true, recheck the health of the addon immediately
 				utils.ClusterAvailableConditionChanged(old, new)
 		},
+		// enable the ConfigCheckEnabled flag to check the configured condition before rendering manifests
+		ConfigCheckEnabled: true,
 	}
 
 	template, err := a.GetDesiredAddOnTemplate(nil, "", a.addonName)
