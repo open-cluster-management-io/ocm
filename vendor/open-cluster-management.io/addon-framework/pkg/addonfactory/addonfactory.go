@@ -110,6 +110,12 @@ func (f *AgentAddonFactory) WithAgentHostedInfoFn(
 	return f
 }
 
+// WithConfigCheckEnabledOption will enable the configured condition check before rendering manifests.
+func (f *AgentAddonFactory) WithConfigCheckEnabledOption() *AgentAddonFactory {
+	f.agentAddonOptions.ConfigCheckEnabled = true
+	return f
+}
+
 // WithTrimCRDDescription is to enable trim the description of CRDs in manifestWork.
 func (f *AgentAddonFactory) WithTrimCRDDescription() *AgentAddonFactory {
 	f.trimCRDDescription = true
