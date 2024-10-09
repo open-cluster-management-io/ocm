@@ -262,7 +262,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 			},
 		},
 		{
-			name:              "manifests with only daemonset and no namespace cnfigured by adc rendered successfully",
+			name:              "manifests with only daemonset and no namespace configured by adc rendered successfully",
 			addonTemplatePath: "./testmanifests/addontemplate_daemonset.yaml",
 			addonDeploymentConfig: &addonapiv1alpha1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{

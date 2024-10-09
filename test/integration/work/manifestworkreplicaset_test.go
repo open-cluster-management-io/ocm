@@ -278,7 +278,7 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 
 		ginkgo.By("rollout stop since max failure exceeds")
 		gomega.Eventually(
-			asserCondition(
+			assertCondition(
 				workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementRolledOut, metav1.ConditionFalse, manifestWorkReplicaSet),
 			eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 		gomega.Eventually(
@@ -409,7 +409,7 @@ func assertSummary(summary workapiv1alpha1.ManifestWorkReplicaSetSummary, mwrs *
 	}
 }
 
-func asserCondition(condType string, status metav1.ConditionStatus, mwrs *workapiv1alpha1.ManifestWorkReplicaSet) func() error {
+func assertCondition(condType string, status metav1.ConditionStatus, mwrs *workapiv1alpha1.ManifestWorkReplicaSet) func() error {
 	return func() error {
 		rs, err := hubWorkClient.WorkV1alpha1().ManifestWorkReplicaSets(mwrs.Namespace).Get(context.TODO(), mwrs.Name, metav1.GetOptions{})
 

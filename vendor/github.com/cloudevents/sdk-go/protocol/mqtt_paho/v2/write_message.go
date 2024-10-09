@@ -42,11 +42,9 @@ var (
 
 func (b *pubMessageWriter) SetStructuredEvent(ctx context.Context, f format.Format, event io.Reader) error {
 	if b.Properties == nil {
-		b.Properties = &paho.PublishProperties{
-			User: make([]paho.UserProperty, 0),
-		}
+		b.Properties = &paho.PublishProperties{}
 	}
-	b.Properties.User.Add(contentType, f.MediaType())
+	b.Properties.ContentType = f.MediaType()
 	var buf bytes.Buffer
 	_, err := io.Copy(&buf, event)
 	if err != nil {
@@ -85,15 +83,13 @@ func (b *pubMessageWriter) SetData(reader io.Reader) error {
 func (b *pubMessageWriter) SetAttribute(attribute spec.Attribute, value interface{}) error {
 	if attribute.Kind() == spec.DataContentType {
 		if value == nil {
-			b.removeProperty(contentType)
+			b.Properties.ContentType = ""
 		}
 		s, err := types.Format(value)
 		if err != nil {
 			return err
 		}
-		if err := b.addProperty(contentType, s); err != nil {
-			return err
-		}
+		b.Properties.ContentType = s
 	} else {
 		if value == nil {
 			b.removeProperty(prefix + attribute.Name())

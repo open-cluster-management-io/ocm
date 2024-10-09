@@ -71,8 +71,10 @@ message PublishRequest {
 }
 
 message SubscriptionRequest {
-  // Required. The original source of the respond CloudEvent(s).
+  // Optional. The original source of the respond CloudEvent(s).
   string source = 1;
+  // Optional. The cluster name of the respond CloudEvent(s).
+  string cluster_name = 2;
 }
 
 service CloudEventService {

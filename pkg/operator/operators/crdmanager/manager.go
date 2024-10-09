@@ -66,7 +66,7 @@ type RemainingCRDError struct {
 }
 
 func (r *RemainingCRDError) Error() string {
-	return fmt.Sprintf("Thera are still reaming CRDs: %s", strings.Join(r.RemainingCRDs, ","))
+	return fmt.Sprintf("There are still remaining CRDs: %s", strings.Join(r.RemainingCRDs, ","))
 }
 
 func NewManager[T CRD](client crdClient[T], equalFunc func(old, new T) bool) *Manager[T] {

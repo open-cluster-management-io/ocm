@@ -135,6 +135,9 @@ type ListOptions struct {
 	// Agent use the source ID to restrict the list of returned objects by their source ID.
 	// Defaults to all sources.
 	Source string
+
+	// CloudEventsDataType indicates the resource related cloud events data type.
+	CloudEventsDataType CloudEventsDataType
 }
 
 // CloudEventsDataType uniquely identifies the type of cloud event data.

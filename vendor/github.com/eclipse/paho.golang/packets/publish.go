@@ -23,7 +23,17 @@ func (p *Publish) String() string {
 	return fmt.Sprintf("PUBLISH: PacketID:%d QOS:%d Topic:%s Duplicate:%t Retain:%t Payload:\n%s\nProperties\n%s", p.PacketID, p.QoS, p.Topic, p.Duplicate, p.Retain, string(p.Payload), p.Properties)
 }
 
-//Unpack is the implementation of the interface required function for a packet
+// SetIdentifier sets the packet identifier
+func (p *Publish) SetIdentifier(packetID uint16) {
+	p.PacketID = packetID
+}
+
+// Type returns the current packet type
+func (s *Publish) Type() byte {
+	return PUBLISH
+}
+
+// Unpack is the implementation of the interface required function for a packet
 func (p *Publish) Unpack(r *bytes.Buffer) error {
 	var err error
 	p.Topic, err = readString(r)
@@ -65,6 +75,11 @@ func (p *Publish) Buffers() net.Buffers {
 
 // WriteTo is the implementation of the interface required function for a packet
 func (p *Publish) WriteTo(w io.Writer) (int64, error) {
+	return p.ToControlPacket().WriteTo(w)
+}
+
+// ToControlPacket returns the packet as a ControlPacket
+func (p *Publish) ToControlPacket() *ControlPacket {
 	f := p.QoS << 1
 	if p.Duplicate {
 		f |= 1 << 3
@@ -73,8 +88,5 @@ func (p *Publish) WriteTo(w io.Writer) (int64, error) {
 		f |= 1
 	}
 
-	cp := &ControlPacket{FixedHeader: FixedHeader{Type: PUBLISH, Flags: f}}
-	cp.Content = p
-
-	return cp.WriteTo(w)
+	return &ControlPacket{FixedHeader: FixedHeader{Type: PUBLISH, Flags: f}, Content: p}
 }

@@ -18,6 +18,16 @@ func (u *Unsubscribe) String() string {
 	return fmt.Sprintf("UNSUBSCRIBE: PacketID:%d Topics:%v Properties:\n%s", u.PacketID, u.Topics, u.Properties)
 }
 
+// SetIdentifier sets the packet identifier
+func (u *Unsubscribe) SetIdentifier(packetID uint16) {
+	u.PacketID = packetID
+}
+
+// Type returns the current packet type
+func (s *Unsubscribe) Type() byte {
+	return UNSUBSCRIBE
+}
+
 // Unpack is the implementation of the interface required function for a packet
 func (u *Unsubscribe) Unpack(r *bytes.Buffer) error {
 	var err error

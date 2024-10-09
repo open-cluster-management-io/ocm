@@ -301,6 +301,12 @@ func (g *configurationGraph) getPlacementNodes() map[addonv1alpha1.PlacementRef]
 	return placementNodeMap
 }
 
+// getAddonsToUpdate returns the list of addons to be updated based on the rollout strategy.
+// It is a subset of the addons returned by getAddonsToApply.
+// For example, if there are 10 addons whose desired config has not yet been synced to status,
+// all 10 addons will be returned by getAddonsToApply().
+// Given a Progressive rollout strategy with a maxConcurrency of 3, only 3 of these addons
+// will be returned by getAddonsToUpdate() for update.
 func (g *configurationGraph) getAddonsToUpdate() []*addonNode {
 	var addons []*addonNode
 	for _, node := range g.nodes {
@@ -308,6 +314,32 @@ func (g *configurationGraph) getAddonsToUpdate() []*addonNode {
 	}
 
 	addons = append(addons, g.defaults.getAddonsToUpdate()...)
+
+	return addons
+}
+
+// getAddonsToApply returns the list of addons that need their configurations synchronized.
+// ToApply indicates that the resource's desired status has not been applied yet.
+func (g *configurationGraph) getAddonsToApply() []*addonNode {
+	var addons []*addonNode
+	for _, node := range g.nodes {
+		addons = append(addons, node.getAddonsToApply()...)
+	}
+
+	addons = append(addons, g.defaults.getAddonsToApply()...)
+
+	return addons
+}
+
+// getAddonsSucceeded returns the list of addons that their configurations desired status is applied
+// and last applied status is successful.
+func (g *configurationGraph) getAddonsSucceeded() []*addonNode {
+	var addons []*addonNode
+	for _, node := range g.nodes {
+		addons = append(addons, node.getAddonsSucceeded()...)
+	}
+
+	addons = append(addons, g.defaults.getAddonsSucceeded()...)
 
 	return addons
 }
@@ -418,6 +450,31 @@ func (n *installStrategyNode) getAddonsToUpdate() []*addonNode {
 	sort.Strings(clusters)
 	for _, k := range clusters {
 		addons = append(addons, n.children[k])
+	}
+	return addons
+}
+
+// getAddonsToApply return the addons to sync configurations
+// ToApply indicates that the resource's desired status has not been applied yet.
+func (n *installStrategyNode) getAddonsToApply() []*addonNode {
+	var addons []*addonNode
+
+	for i, addon := range n.children {
+		if addon.status.Status == clustersdkv1alpha1.ToApply {
+			addons = append(addons, n.children[i])
+		}
+	}
+	return addons
+}
+
+// getAddonsSucceeded return the addons already rollout successfully or has no configurations
+func (n *installStrategyNode) getAddonsSucceeded() []*addonNode {
+	var addons []*addonNode
+
+	for i, addon := range n.children {
+		if addon.status.Status == clustersdkv1alpha1.Succeeded {
+			addons = append(addons, n.children[i])
+		}
 	}
 	return addons
 }

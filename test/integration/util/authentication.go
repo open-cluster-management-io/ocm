@@ -19,7 +19,6 @@ import (
 	certificates "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -322,7 +321,7 @@ func SyncBootstrapKubeConfigFilesToSecret(
 	}
 
 	secret, err := kubeClient.CoreV1().Secrets(secretNS).Get(context.Background(), secretName, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
+	if errors.IsNotFound(err) {
 		secret = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      secretName,

@@ -224,7 +224,7 @@ func startAgent(ctx context.Context, managedClusterName, hubKubeconfigDir string
 	commOptions.SpokeClusterName = managedClusterName
 
 	agentCtx, stopAgent := context.WithCancel(ctx)
-	agentConfig := spoke.NewSpokeAgentConfig(commOptions, agentOptions)
+	agentConfig := spoke.NewSpokeAgentConfig(commOptions, agentOptions, stopAgent)
 	runAgentWithContext(agentCtx, "switch-hub", agentConfig, spokeCfg)
 
 	return agentCtx, stopAgent, agentConfig

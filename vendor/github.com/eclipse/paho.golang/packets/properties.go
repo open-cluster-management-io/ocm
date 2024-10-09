@@ -765,12 +765,14 @@ func (i *Properties) Unpack(r *bytes.Buffer, p byte) error {
 
 // ValidProperties is a map of the various properties and the
 // PacketTypes that property is valid for.
+// A CONNECT packet has own properties, but may also include a separate set of Will Properties.
+// Currently, `CONNECT` covers both sets, this may lead to some invalid properties being accepted (this may be fixed in the future).
 var ValidProperties = map[byte]map[byte]struct{}{
-	PropPayloadFormat:          {PUBLISH: {}},
-	PropMessageExpiry:          {PUBLISH: {}},
-	PropContentType:            {PUBLISH: {}},
-	PropResponseTopic:          {PUBLISH: {}},
-	PropCorrelationData:        {PUBLISH: {}},
+	PropPayloadFormat:          {CONNECT: {}, PUBLISH: {}},
+	PropMessageExpiry:          {CONNECT: {}, PUBLISH: {}},
+	PropContentType:            {CONNECT: {}, PUBLISH: {}},
+	PropResponseTopic:          {CONNECT: {}, PUBLISH: {}},
+	PropCorrelationData:        {CONNECT: {}, PUBLISH: {}},
 	PropTopicAlias:             {PUBLISH: {}},
 	PropSubscriptionIdentifier: {PUBLISH: {}, SUBSCRIBE: {}},
 	PropSessionExpiryInterval:  {CONNECT: {}, CONNACK: {}, DISCONNECT: {}},

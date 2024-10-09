@@ -8,6 +8,7 @@ import (
 	"time"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -48,7 +49,12 @@ func TestAddonConfigReconcile(t *testing.T) {
 			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", "").Build(),
 			placements:             []runtime.Object{},
 			placementDecisions:     []runtime.Object{},
-			validateAddonActions:   addontesting.AssertNoActions,
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch", "patch")
+				sort.Sort(byPatchName(actions))
+				expectPatchConditionAction(t, actions[0], metav1.ConditionTrue)
+				expectPatchConditionAction(t, actions[1], metav1.ConditionTrue)
+			},
 		},
 		{
 			name: "manual installStrategy",
@@ -80,6 +86,17 @@ func TestAddonConfigReconcile(t *testing.T) {
 					},
 					LastObservedGeneration: 0,
 				}})
+				expectPatchConfigurationAction(t, actions[1], []addonv1alpha1.ConfigReference{{
+					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
+					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
+						SpecHash:       "hash",
+					},
+					LastObservedGeneration: 0,
+				}})
+				expectPatchConditionAction(t, actions[0], metav1.ConditionTrue)
+				expectPatchConditionAction(t, actions[1], metav1.ConditionTrue)
 			},
 		},
 		{
@@ -151,6 +168,8 @@ func TestAddonConfigReconcile(t *testing.T) {
 					},
 					LastObservedGeneration: 0,
 				}})
+				expectPatchConditionAction(t, actions[0], metav1.ConditionTrue)
+				expectPatchConditionAction(t, actions[1], metav1.ConditionTrue)
 			},
 		},
 		{
@@ -275,6 +294,8 @@ func TestAddonConfigReconcile(t *testing.T) {
 						LastObservedGeneration: 0,
 					},
 				})
+				expectPatchConditionAction(t, actions[0], metav1.ConditionTrue)
+				expectPatchConditionAction(t, actions[1], metav1.ConditionTrue)
 			},
 		},
 		{
@@ -397,6 +418,8 @@ func TestAddonConfigReconcile(t *testing.T) {
 						},
 						LastObservedGeneration: 0,
 					}})
+				expectPatchConditionAction(t, actions[0], metav1.ConditionTrue)
+				expectPatchConditionAction(t, actions[1], metav1.ConditionTrue)
 			},
 		},
 		{
@@ -477,6 +500,8 @@ func TestAddonConfigReconcile(t *testing.T) {
 					},
 					LastObservedGeneration: 0,
 				}})
+				expectPatchConditionAction(t, actions[0], metav1.ConditionTrue)
+				expectPatchConditionAction(t, actions[1], metav1.ConditionTrue)
 			},
 		},
 		{
@@ -543,6 +568,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 					},
 					LastObservedGeneration: 0,
 				}})
+				expectPatchConditionAction(t, actions[0], metav1.ConditionTrue)
 			},
 		},
 		{
@@ -616,6 +642,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 					},
 					LastObservedGeneration: 1,
 				}})
+				expectPatchConditionAction(t, actions[0], metav1.ConditionTrue)
 			},
 		},
 		{
@@ -629,7 +656,12 @@ func TestAddonConfigReconcile(t *testing.T) {
 						SpecHash:       "hash1",
 					},
 					LastObservedGeneration: 1,
-				}}, nil),
+				}}, []metav1.Condition{{
+					Type:    addonv1alpha1.ManagedClusterAddOnConditionConfigured,
+					Status:  metav1.ConditionTrue,
+					Reason:  "ConfigurationsConfigured",
+					Message: "Configurations configured",
+				}}),
 			},
 			placements: []runtime.Object{
 				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
@@ -716,9 +748,12 @@ func TestAddonConfigReconcile(t *testing.T) {
 				},
 			}).Build(),
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch")
+				addontesting.AssertActions(t, actions, "patch", "patch", "patch")
 				sort.Sort(byPatchName(actions))
-				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{{
+				// cluster1 is not in installstrategy and has no config
+				expectPatchConditionAction(t, actions[0], metav1.ConditionTrue)
+				// cluster2 is in installstrategy and is the first to rollout
+				expectPatchConfigurationAction(t, actions[1], []addonv1alpha1.ConfigReference{{
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
 					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
@@ -727,6 +762,9 @@ func TestAddonConfigReconcile(t *testing.T) {
 					},
 					LastObservedGeneration: 0,
 				}})
+				expectPatchConditionAction(t, actions[1], metav1.ConditionTrue)
+				// cluster3 is in installstrategy and is not rollout
+				expectPatchConditionAction(t, actions[2], metav1.ConditionFalse)
 			},
 		},
 		{
@@ -773,9 +811,12 @@ func TestAddonConfigReconcile(t *testing.T) {
 				},
 			}).Build(),
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch")
+				addontesting.AssertActions(t, actions, "patch", "patch", "patch")
 				sort.Sort(byPatchName(actions))
-				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{{
+				// cluster1 is not in installstrategy and has no config
+				expectPatchConditionAction(t, actions[0], metav1.ConditionTrue)
+				// cluster2 is in installstrategy and is the first to rollout
+				expectPatchConfigurationAction(t, actions[1], []addonv1alpha1.ConfigReference{{
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
 					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
@@ -784,6 +825,9 @@ func TestAddonConfigReconcile(t *testing.T) {
 					},
 					LastObservedGeneration: 0,
 				}})
+				expectPatchConditionAction(t, actions[1], metav1.ConditionTrue)
+				// cluster3 is in installstrategy and is not rollout
+				expectPatchConditionAction(t, actions[2], metav1.ConditionFalse)
 			},
 		},
 		{
@@ -827,17 +871,11 @@ func TestAddonConfigReconcile(t *testing.T) {
 				},
 			}).Build(),
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch", "patch")
+				addontesting.AssertActions(t, actions, "patch", "patch", "patch")
 				sort.Sort(byPatchName(actions))
-				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{{
-					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
-					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
-						SpecHash:       "hash1",
-					},
-					LastObservedGeneration: 0,
-				}})
+				// cluster1 is not in installstrategy and has no config
+				expectPatchConditionAction(t, actions[0], metav1.ConditionTrue)
+				// cluster2 is in installstrategy and rollout
 				expectPatchConfigurationAction(t, actions[1], []addonv1alpha1.ConfigReference{{
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
@@ -847,6 +885,18 @@ func TestAddonConfigReconcile(t *testing.T) {
 					},
 					LastObservedGeneration: 0,
 				}})
+				expectPatchConditionAction(t, actions[1], metav1.ConditionTrue)
+				// cluster2 is in installstrategy and rollout
+				expectPatchConfigurationAction(t, actions[2], []addonv1alpha1.ConfigReference{{
+					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+						SpecHash:       "hash1",
+					},
+					LastObservedGeneration: 0,
+				}})
+				expectPatchConditionAction(t, actions[2], metav1.ConditionTrue)
 			},
 		},
 		{
@@ -913,8 +963,9 @@ func TestAddonConfigReconcile(t *testing.T) {
 				},
 			}).Build(),
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch", "patch")
+				addontesting.AssertActions(t, actions, "patch", "patch", "patch")
 				sort.Sort(byPatchName(actions))
+				// cluster1 and cluster2 are rollout
 				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{{
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
@@ -933,6 +984,9 @@ func TestAddonConfigReconcile(t *testing.T) {
 					},
 					LastObservedGeneration: 0,
 				}})
+				expectPatchConditionAction(t, actions[0], metav1.ConditionTrue)
+				expectPatchConditionAction(t, actions[1], metav1.ConditionTrue)
+				expectPatchConditionAction(t, actions[2], metav1.ConditionFalse)
 			},
 		},
 		{
@@ -991,8 +1045,9 @@ func TestAddonConfigReconcile(t *testing.T) {
 				},
 			}).Build(),
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch", "patch")
+				addontesting.AssertActions(t, actions, "patch", "patch", "patch")
 				sort.Sort(byPatchName(actions))
+				// cluster1 and cluster2 are rollout
 				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{{
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
@@ -1011,6 +1066,9 @@ func TestAddonConfigReconcile(t *testing.T) {
 					},
 					LastObservedGeneration: 0,
 				}})
+				expectPatchConditionAction(t, actions[0], metav1.ConditionTrue)
+				expectPatchConditionAction(t, actions[1], metav1.ConditionTrue)
+				expectPatchConditionAction(t, actions[2], metav1.ConditionFalse)
 			},
 		},
 		{
@@ -1077,8 +1135,9 @@ func TestAddonConfigReconcile(t *testing.T) {
 				},
 			}).Build(),
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch", "patch")
+				addontesting.AssertActions(t, actions, "patch", "patch", "patch")
 				sort.Sort(byPatchName(actions))
+				// cluster1 and cluster2 are rollout
 				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{{
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
@@ -1097,6 +1156,9 @@ func TestAddonConfigReconcile(t *testing.T) {
 					},
 					LastObservedGeneration: 0,
 				}})
+				expectPatchConditionAction(t, actions[0], metav1.ConditionTrue)
+				expectPatchConditionAction(t, actions[1], metav1.ConditionTrue)
+				expectPatchConditionAction(t, actions[2], metav1.ConditionFalse)
 			},
 		},
 	}
@@ -1205,5 +1267,19 @@ func expectPatchConfigurationAction(t *testing.T, action clienttesting.Action, e
 
 	if !apiequality.Semantic.DeepEqual(mca.Status.ConfigReferences, expected) {
 		t.Errorf("Configuration not correctly patched, expected %v, actual %v", expected, mca.Status.ConfigReferences)
+	}
+}
+
+func expectPatchConditionAction(t *testing.T, action clienttesting.Action, expected metav1.ConditionStatus) {
+	patch := action.(clienttesting.PatchActionImpl).GetPatch()
+	mca := &addonv1alpha1.ManagedClusterAddOn{}
+	err := json.Unmarshal(patch, mca)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	actualCond := meta.FindStatusCondition(mca.Status.Conditions, addonv1alpha1.ManagedClusterAddOnConditionConfigured)
+	if actualCond == nil || actualCond.Status != expected {
+		t.Errorf("Condition not correctly patched, expected %v, actual %v", expected, mca.Status.Conditions)
 	}
 }

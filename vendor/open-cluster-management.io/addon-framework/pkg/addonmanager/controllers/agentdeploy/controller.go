@@ -381,6 +381,12 @@ func (c *addonDeployController) buildDeployManifestWorksFunc(addonWorkBuilder *a
 			return nil, nil, fmt.Errorf("failed to get agentAddon")
 		}
 
+		if agentAddon.GetAgentAddonOptions().ConfigCheckEnabled &&
+			!meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionConfigured) {
+			klog.InfoS("Addon configured condition is not set in status", "addonName", addon.Name)
+			return nil, nil, nil
+		}
+
 		objects, err := agentAddon.Manifests(cluster, addon)
 		if err != nil {
 			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
@@ -441,6 +447,12 @@ func (c *addonDeployController) buildHookManifestWorkFunc(addonWorkBuilder *addo
 		agentAddon := c.agentAddons[addon.Name]
 		if agentAddon == nil {
 			return nil, fmt.Errorf("failed to get agentAddon")
+		}
+
+		if agentAddon.GetAgentAddonOptions().ConfigCheckEnabled &&
+			!meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionConfigured) {
+			klog.InfoS("Addon configured condition is not set in status", "addonName", addon.Name)
+			return nil, nil
 		}
 
 		objects, err := agentAddon.Manifests(cluster, addon)

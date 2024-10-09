@@ -13,6 +13,7 @@ import (
 
 	workv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/common"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload"
 )
 
@@ -95,6 +96,11 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 		return nil, fmt.Errorf("failed to get resourceversion extension: %v", err)
 	}
 
+	sequenceID, err := cloudeventstypes.ToString(evtExtensions[types.ExtensionStatusUpdateSequenceID])
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sequenceid extension: %v", err)
+	}
+
 	metaObj := metav1.ObjectMeta{}
 
 	// the agent sends the work meta data back, restore the meta to the received work, otherwise only set the
@@ -113,6 +119,10 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 
 	metaObj.UID = kubetypes.UID(resourceID)
 	metaObj.ResourceVersion = fmt.Sprintf("%d", resourceVersion)
+	if metaObj.Annotations == nil {
+		metaObj.Annotations = map[string]string{}
+	}
+	metaObj.Annotations[common.CloudEventsSequenceIDAnnotationKey] = sequenceID
 
 	work := &workv1.ManifestWork{
 		TypeMeta:   metav1.TypeMeta{},

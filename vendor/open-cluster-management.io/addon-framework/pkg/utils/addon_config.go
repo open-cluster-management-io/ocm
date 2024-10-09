@@ -71,7 +71,6 @@ func GetDesiredAddOnDeploymentConfig(
 	ok, configRef := GetAddOnConfigRef(addon.Status.ConfigReferences,
 		AddOnDeploymentConfigGVR.Group, AddOnDeploymentConfigGVR.Resource)
 	if !ok {
-		klog.InfoS("Addon deployment config in status is empty", "addonName", addon.Name)
 		return nil, nil
 	}
 

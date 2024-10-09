@@ -1,6 +1,11 @@
 package paho
 
-import "github.com/eclipse/paho.golang/packets"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/eclipse/paho.golang/packets"
+)
 
 type (
 	// Connack is a representation of the MQTT Connack packet
@@ -81,4 +86,57 @@ func ConnackFromPacketConnack(c *packets.Connack) *Connack {
 	v.InitProperties(c.Properties)
 
 	return v
+}
+
+// String implement fmt.Stringer (mainly to simplify debugging)
+func (c *Connack) String() string {
+	return fmt.Sprintf("CONNACK: ReasonCode:%d SessionPresent:%t\nProperties:\n%s", c.ReasonCode, c.SessionPresent, c.Properties)
+}
+
+// String implement fmt.Stringer (mainly to simplify debugging)
+func (p *ConnackProperties) String() string {
+	var b strings.Builder
+	if p.SessionExpiryInterval != nil {
+		fmt.Fprintf(&b, "\tSessionExpiryInterval:%d\n", *p.SessionExpiryInterval)
+	}
+	if p.AssignedClientID != "" {
+		fmt.Fprintf(&b, "\tAssignedClientID:%s\n", p.AssignedClientID)
+	}
+	if p.ServerKeepAlive != nil {
+		fmt.Fprintf(&b, "\tServerKeepAlive:%d\n", *p.ServerKeepAlive)
+	}
+	if p.AuthMethod != "" {
+		fmt.Fprintf(&b, "\tAuthMethod:%s\n", p.AuthMethod)
+	}
+	if len(p.AuthData) > 0 {
+		fmt.Fprintf(&b, "\tAuthData:%X\n", p.AuthData)
+	}
+	if p.ServerReference != "" {
+		fmt.Fprintf(&b, "\tServerReference:%s\n", p.ServerReference)
+	}
+	if p.ReasonString != "" {
+		fmt.Fprintf(&b, "\tReasonString:%s\n", p.ReasonString)
+	}
+	if p.ReceiveMaximum != nil {
+		fmt.Fprintf(&b, "\tReceiveMaximum:%d\n", *p.ReceiveMaximum)
+	}
+	if p.TopicAliasMaximum != nil {
+		fmt.Fprintf(&b, "\tTopicAliasMaximum:%d\n", *p.TopicAliasMaximum)
+	}
+	fmt.Fprintf(&b, "\tRetainAvailable:%t\n", p.RetainAvailable)
+	if p.MaximumPacketSize != nil {
+		fmt.Fprintf(&b, "\tMaximumPacketSize:%d\n", *p.MaximumPacketSize)
+	}
+	fmt.Fprintf(&b, "\tWildcardSubAvailable:%t\n", p.WildcardSubAvailable)
+	fmt.Fprintf(&b, "\tSubIDAvailable:%t\n", p.SubIDAvailable)
+	fmt.Fprintf(&b, "\tSharedSubAvailable:%t\n", p.SharedSubAvailable)
+
+	if len(p.User) > 0 {
+		fmt.Fprint(&b, "\tUser Properties:\n")
+		for _, v := range p.User {
+			fmt.Fprintf(&b, "\t\t%s:%s\n", v.Key, v.Value)
+		}
+	}
+
+	return b.String()
 }

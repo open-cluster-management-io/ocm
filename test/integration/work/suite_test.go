@@ -2,6 +2,8 @@ package work
 
 import (
 	"context"
+	"flag"
+	"fmt"
 	"os"
 	"path"
 	"testing"
@@ -9,9 +11,11 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -20,6 +24,9 @@ import (
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work"
+	sourcecodec "open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/codec"
+	workstore "open-cluster-management.io/sdk-go/pkg/cloudevents/work/store"
 
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/helper"
@@ -33,8 +40,7 @@ const (
 	cm1, cm2           = "cm1", "cm2"
 )
 
-// focus on hub is a kube cluster
-const sourceDriver = "kube"
+var sourceDriver = util.KubeDriver
 
 var tempDir string
 
@@ -62,6 +68,13 @@ var CRDPaths = []string{
 	"./vendor/open-cluster-management.io/api/work/v1/0000_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml",
 }
 
+func init() {
+	klog.InitFlags(nil)
+	klog.SetOutput(ginkgo.GinkgoWriter)
+
+	flag.StringVar(&sourceDriver, "test.driver", util.KubeDriver, "Driver of test, default is kube")
+}
+
 func TestIntegration(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	ginkgo.RunSpecs(t, "Integration Suite")
@@ -86,41 +99,73 @@ var _ = ginkgo.BeforeSuite(func() {
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(tempDir).ToNot(gomega.BeEmpty())
 
-	sourceConfigFileName = path.Join(tempDir, "kubeconfig")
-	err = util.CreateKubeconfigFile(cfg, sourceConfigFileName)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
 	err = workapiv1.Install(scheme.Scheme)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeWorkFeatureGates)
 
+	switch sourceDriver {
+	case util.KubeDriver:
+		sourceConfigFileName = path.Join(tempDir, "kubeconfig")
+		err = util.CreateKubeconfigFile(cfg, sourceConfigFileName)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		hubHash = helper.HubHash(cfg.Host)
+
+		hubWorkClient, err = workclientset.NewForConfig(cfg)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		// start hub controller
+		go func() {
+			opts := hub.NewWorkHubManagerOptions()
+			opts.WorkDriver = "kube"
+			opts.WorkDriverConfig = sourceConfigFileName
+			hubConfig := hub.NewWorkHubManagerConfig(opts)
+			err := hubConfig.RunWorkHubManager(envCtx, &controllercmd.ControllerContext{
+				KubeConfig:    cfg,
+				EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		}()
+	case util.MQTTDriver:
+		sourceID := "work-test-mqtt"
+		err = util.RunMQTTBroker()
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		sourceConfigFileName = path.Join(tempDir, "mqttconfig")
+		err = util.CreateMQTTConfigFile(sourceConfigFileName, sourceID)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		hubHash = helper.HubHash(util.MQTTBrokerHost)
+
+		watcherStore, err := workstore.NewSourceLocalWatcherStore(envCtx, func(ctx context.Context) ([]*workapiv1.ManifestWork, error) {
+			return []*workapiv1.ManifestWork{}, nil
+		})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		sourceClient, err := work.NewClientHolderBuilder(util.NewMQTTSourceOptions(sourceID)).
+			WithClientID(fmt.Sprintf("%s-%s", sourceID, rand.String(5))).
+			WithSourceID(sourceID).
+			WithCodecs(sourcecodec.NewManifestBundleCodec()).
+			WithWorkClientWatcherStore(watcherStore).
+			NewSourceClientHolder(envCtx)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		hubWorkClient = sourceClient.WorkInterface()
+	default:
+		ginkgo.Fail(fmt.Sprintf("unsupported test driver %s", sourceDriver))
+	}
+
 	spokeRestConfig = cfg
-	hubHash = helper.HubHash(spokeRestConfig.Host)
+
 	spokeKubeClient, err = kubernetes.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	hubWorkClient, err = workclientset.NewForConfig(cfg)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	spokeWorkClient, err = workclientset.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	hubClusterClient, err = clusterclientset.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-	opts := hub.NewWorkHubManagerOptions()
-	opts.WorkDriver = "kube"
-	opts.WorkDriverConfig = sourceConfigFileName
-	hubConfig := hub.NewWorkHubManagerConfig(opts)
-
-	// start hub controller
-	go func() {
-		err := hubConfig.RunWorkHubManager(envCtx, &controllercmd.ControllerContext{
-			KubeConfig:    cfg,
-			EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
-		})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	}()
 })
 
 var _ = ginkgo.AfterSuite(func() {
@@ -129,6 +174,9 @@ var _ = ginkgo.AfterSuite(func() {
 	envCancel()
 
 	err := testEnv.Stop()
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	err = util.StopMQTTBroker()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	if tempDir != "" {

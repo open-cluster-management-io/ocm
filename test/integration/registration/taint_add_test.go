@@ -46,7 +46,7 @@ var _ = ginkgo.Describe("ManagedCluster Taints Update", func() {
 			commOptions.HubKubeconfigDir = hubKubeconfigDir
 			commOptions.SpokeClusterName = managedClusterName
 
-			agentCfg := spoke.NewSpokeAgentConfig(commOptions, agentOptions)
+			agentCfg := spoke.NewSpokeAgentConfig(commOptions, agentOptions, stop)
 			err := agentCfg.RunSpokeAgent(ctx, &controllercmd.ControllerContext{
 				KubeConfig:    spokeCfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("cluster-tainttest"),
