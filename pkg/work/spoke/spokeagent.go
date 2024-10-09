@@ -28,7 +28,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
-	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/appliedmanifestcontroller"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/finalizercontroller"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/manifestcontroller"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/statuscontroller"
@@ -165,15 +164,6 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		o.workOptions.AppliedManifestWorkEvictionGracePeriod,
 		hubHash, agentID,
 	)
-	appliedManifestWorkController := appliedmanifestcontroller.NewAppliedManifestWorkController(
-		controllerContext.EventRecorder,
-		spokeDynamicClient,
-		hubWorkInformer,
-		hubWorkInformer.Lister().ManifestWorks(o.agentOptions.SpokeClusterName),
-		spokeWorkClient.WorkV1().AppliedManifestWorks(),
-		spokeWorkInformerFactory.Work().V1().AppliedManifestWorks(),
-		hubHash,
-	)
 	availableStatusController := statuscontroller.NewAvailableStatusController(
 		controllerContext.EventRecorder,
 		spokeDynamicClient,
@@ -190,7 +180,6 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 	go addFinalizerController.Run(ctx, 1)
 	go appliedManifestWorkFinalizeController.Run(ctx, appliedManifestWorkFinalizeControllerWorkers)
 	go unmanagedAppliedManifestWorkController.Run(ctx, 1)
-	go appliedManifestWorkController.Run(ctx, 1)
 	go manifestWorkController.Run(ctx, 1)
 	go manifestWorkFinalizeController.Run(ctx, manifestWorkFinalizeControllerWorkers)
 	go availableStatusController.Run(ctx, availableStatusControllerWorkers)
