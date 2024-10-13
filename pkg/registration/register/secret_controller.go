@@ -147,6 +147,7 @@ func (c *secretController) sync(ctx context.Context, syncCtx factory.SyncContext
 	}
 
 	// save the changes into secret
+	time.Sleep(5 * time.Second)
 	if err := saveSecret(c.ManagementCoreClient, c.SecretNamespace, c.secretToSave); err != nil {
 		return err
 	}
