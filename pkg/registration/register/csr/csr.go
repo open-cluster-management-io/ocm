@@ -193,6 +193,7 @@ func (c *CSRDriver) Process(
 	if !shouldCreate {
 		return nil, nil, nil
 	}
+	fmt.Printf("TODO: remove, shouldCreateCSR is true for controller: %s, namespace: %s, name: %s\n", controllerName, secret.Namespace, secret.Name)
 
 	shouldHalt := csrOption.HaltCSRCreation()
 	if shouldHalt {
@@ -310,6 +311,7 @@ func shouldCreateCSR(
 	recorder events.Recorder,
 	subject *pkix.Name,
 	additionalSecretData map[string][]byte) (bool, error) {
+	fmt.Printf("TODO: remove, shouldCreateCSR for controller: %s, namespace: %s, name: %s\n", controllerName, secret.Namespace, secret.Name)
 	// create a csr to request new client certificate if
 	// a.there is no valid client certificate issued for the current cluster/agent
 	valid, err := isCertificateValid(logger, secret.Data[TLSCertFile], subject)

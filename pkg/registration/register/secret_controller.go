@@ -83,6 +83,7 @@ func NewSecretController(
 			}
 			// only enqueue a specific secret
 			if accessor.GetNamespace() == c.SecretNamespace && accessor.GetName() == c.SecretName {
+				fmt.Printf("TODO: remove, enqueuing secret for controller: %s, namespace: %s, name: %s", c.controllerName, c.SecretNamespace, c.SecretName)
 				return true
 			}
 			return false
@@ -101,6 +102,9 @@ func NewSecretController(
 }
 
 func (c *secretController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	// log the controller name
+	fmt.Printf("TODO: remove, syncing secret for controller: %s, namespace: %s, name: %s\n", c.controllerName, c.SecretNamespace, c.SecretName)
+
 	// get secret containing client certificate
 	secret, err := c.ManagementCoreClient.Secrets(c.SecretNamespace).Get(ctx, c.SecretName, metav1.GetOptions{})
 	switch {

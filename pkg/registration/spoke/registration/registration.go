@@ -87,6 +87,7 @@ func NewCSROption(
 			}
 
 			// only enqueue csr whose name starts with the cluster name
+			fmt.Printf("TODO: remove, enqueue csr for cluster: %s, name: %s\n", secretOption.ClusterName, accessor.GetName())
 			return strings.HasPrefix(accessor.GetName(), fmt.Sprintf("%s-", secretOption.ClusterName))
 		},
 		HaltCSRCreation:   haltCSRCreationFunc(csrControl.Informer().GetIndexer(), secretOption.ClusterName),
