@@ -50,6 +50,11 @@ var (
 		"cluster-manager/hub/0000_03_clusters.open-cluster-management.io_placementdecisions.crd.yaml",
 		"cluster-manager/hub/0000_05_clusters.open-cluster-management.io_addonplacementscores.crd.yaml",
 	}
+
+	hubClusterProfileCRDResourceFiles = []string{
+		// clusterprofile crd
+		"cluster-manager/hub/0000_00_multicluster.x-k8s.io_clusterprofiles.crd.yaml",
+	}
 )
 
 type crdReconcile struct {
@@ -68,6 +73,16 @@ func (c *crdReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 		crdmanager.EqualV1,
 	)
 
+	// CRD resource files to deploy
+	hubDeployCRDResources := hubCRDResourceFiles
+
+	// If featuregate ClusterProfile is enabled, include the ClusterProfile CRD.
+	// The ClusterProfile CRD will not be removed when featuregate is disabled (same behavior as other crds)
+	// and will not be cleaned when ClusterManager is deleting since the CRD might be used by other projects.
+	if config.ClusterProfileEnabled {
+		hubDeployCRDResources = append(hubDeployCRDResources, hubClusterProfileCRDResourceFiles...)
+	}
+
 	if err := crdManager.Apply(ctx,
 		func(name string) ([]byte, error) {
 			template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
@@ -78,7 +93,7 @@ func (c *crdReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 			helpers.SetRelatedResourcesStatusesWithObj(&cm.Status.RelatedResources, objData)
 			return objData, nil
 		},
-		hubCRDResourceFiles...); err != nil {
+		hubDeployCRDResources...); err != nil {
 		meta.SetStatusCondition(&cm.Status.Conditions, metav1.Condition{
 			Type:    operatorapiv1.ConditionClusterManagerApplied,
 			Status:  metav1.ConditionFalse,
@@ -109,6 +124,8 @@ func (c *crdReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterManag
 		return cm, reconcileContinue, nil
 	}
 
+	// Only the crds list in the hubCRDResourceFiles will be cleaned.
+	// Never clean the ClusterProfile CRD since it might be used by other projects.
 	if err := crdManager.Clean(ctx, c.skipRemoveCRDs,
 		func(name string) ([]byte, error) {
 			template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
