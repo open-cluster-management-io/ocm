@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
@@ -22,13 +21,6 @@ import (
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 )
-
-type applyResult struct {
-	Result runtime.Object
-	Error  error
-
-	resourceMeta workapiv1.ManifestResourceMeta
-}
 
 type appliedManifestWorkReconciler struct {
 	spokeDynamicClient dynamic.Interface
