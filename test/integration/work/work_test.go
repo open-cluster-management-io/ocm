@@ -719,6 +719,50 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 
+		ginkgo.It("should remove applied resource immediately when work is updated", func() {
+			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			newWork := updatedWork.DeepCopy()
+			newWork.Spec.Workload.Manifests = manifests[1:]
+
+			pathBytes, err := util.NewWorkPatch(updatedWork, newWork)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Patch(
+				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// remove finalizer from the applied resources for stale manifest after 2 seconds
+			go func() {
+				time.Sleep(2 * time.Second)
+				// remove finalizers of cm1
+				_ = util.RemoveConfigmapFinalizers(spokeKubeClient, commOptions.SpokeClusterName, cm1)
+			}()
+
+			// check if resource created by stale manifest is deleted once it is removed from applied resource list
+			gomega.Eventually(func() error {
+				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				for _, appliedResource := range appliedManifestWork.Status.AppliedResources {
+					if appliedResource.Name == cm1 {
+						return fmt.Errorf("found resource cm1")
+					}
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+
+			err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		})
+
 		ginkgo.It("should remove applied resource for stale manifest from list once the resource is gone", func() {
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 

@@ -170,6 +170,9 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 		return utilerrors.NewAggregate(errs)
 	}
 
+	// we do not need to requeue when manifestwork/appliedmanifestwork are updated, since a following
+	// reconcile will be executed with update event, and the requeue can be set in this following reconcile
+	// if needed.
 	if !mwUpdated && !amwUpdated && requeueTime < MaxRequeueDuration {
 		controllerContext.Queue().AddAfter(manifestWorkName, requeueTime)
 	}
