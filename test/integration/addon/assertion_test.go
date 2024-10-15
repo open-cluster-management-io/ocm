@@ -416,7 +416,7 @@ func assertManagedClusterAddOnConditions(name, namespace string, expect ...metav
 				cond.Status != ec.Status ||
 				cond.Reason != ec.Reason ||
 				cond.Message != ec.Message {
-				return fmt.Errorf("expected addon progressing condition is %v, actual: %v", ec, cond)
+				return fmt.Errorf("expected addon progressing condition is %v, actual: %v with status %v", ec, cond, actual.Status)
 			}
 		}
 

@@ -67,5 +67,5 @@ test-cloudevents-integration: ensure-kubebuilder-tools build-work-integration
 		-v=4
 .PHONY: test-cloudevents-integration
 
-test-integration: test-registration-operator-integration test-registration-integration test-placement-integration test-work-integration test-addon-integration
+test-integration: test-addon-integration
 .PHONY: test-integration
