@@ -1,3 +1,18 @@
+/*
+ * Copyright (c) 2024 Contributors to the Eclipse Foundation
+ *
+ *  All rights reserved. This program and the accompanying materials
+ *  are made available under the terms of the Eclipse Public License v2.0
+ *  and Eclipse Distribution License v1.0 which accompany this distribution.
+ *
+ * The Eclipse Public License is available at
+ *    https://www.eclipse.org/legal/epl-2.0/
+ *  and the Eclipse Distribution License is available at
+ *    http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ *  SPDX-License-Identifier: EPL-2.0 OR BSD-3-Clause
+ */
+
 package packets
 
 import (
@@ -285,11 +300,6 @@ func (i *Properties) Pack(p byte) []byte {
 			writeUint16(*i.TopicAliasMaximum, &b)
 		}
 
-		if i.MaximumQOS != nil {
-			b.WriteByte(PropMaximumQOS)
-			b.WriteByte(*i.MaximumQOS)
-		}
-
 		if i.MaximumPacketSize != nil {
 			b.WriteByte(PropMaximumPacketSize)
 			writeUint32(*i.MaximumPacketSize, &b)
@@ -297,6 +307,11 @@ func (i *Properties) Pack(p byte) []byte {
 	}
 
 	if p == CONNACK {
+		if i.MaximumQOS != nil {
+			b.WriteByte(PropMaximumQOS)
+			b.WriteByte(*i.MaximumQOS)
+		}
+
 		if i.AssignedClientID != "" {
 			b.WriteByte(PropAssignedClientID)
 			writeString(i.AssignedClientID, &b)
@@ -453,11 +468,6 @@ func (i *Properties) PackBuf(p byte) *bytes.Buffer {
 			writeUint16(*i.TopicAliasMaximum, &b)
 		}
 
-		if i.MaximumQOS != nil {
-			b.WriteByte(PropMaximumQOS)
-			b.WriteByte(*i.MaximumQOS)
-		}
-
 		if i.MaximumPacketSize != nil {
 			b.WriteByte(PropMaximumPacketSize)
 			writeUint32(*i.MaximumPacketSize, &b)
@@ -465,6 +475,11 @@ func (i *Properties) PackBuf(p byte) *bytes.Buffer {
 	}
 
 	if p == CONNACK {
+		if i.MaximumQOS != nil {
+			b.WriteByte(PropMaximumQOS)
+			b.WriteByte(*i.MaximumQOS)
+		}
+
 		if i.AssignedClientID != "" {
 			b.WriteByte(PropAssignedClientID)
 			writeString(i.AssignedClientID, &b)
@@ -792,7 +807,7 @@ var ValidProperties = map[byte]map[byte]struct{}{
 	PropReasonString:           {CONNACK: {}, PUBACK: {}, PUBREC: {}, PUBREL: {}, PUBCOMP: {}, SUBACK: {}, UNSUBACK: {}, DISCONNECT: {}, AUTH: {}},
 	PropReceiveMaximum:         {CONNECT: {}, CONNACK: {}},
 	PropTopicAliasMaximum:      {CONNECT: {}, CONNACK: {}},
-	PropMaximumQOS:             {CONNECT: {}, CONNACK: {}},
+	PropMaximumQOS:             {CONNACK: {}},
 	PropMaximumPacketSize:      {CONNECT: {}, CONNACK: {}},
 	PropUser:                   {CONNECT: {}, CONNACK: {}, PUBLISH: {}, PUBACK: {}, PUBREC: {}, PUBREL: {}, PUBCOMP: {}, SUBSCRIBE: {}, UNSUBSCRIBE: {}, SUBACK: {}, UNSUBACK: {}, DISCONNECT: {}, AUTH: {}},
 }
