@@ -129,10 +129,8 @@ spec:
       kubeClient:
         hubPermissions:
           - type: CurrentCluster
-            roleRef:
-              apiGroup: rbac.authorization.k8s.io
-              kind: ClusterRole
-              name: cm-admin
+            currentCluster:
+              clusterRoleName: cm-admin
     - customSigner:
         signerName: example.com/signer-name
         signingCA:
