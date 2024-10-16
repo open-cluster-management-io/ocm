@@ -28,6 +28,7 @@ jobs:
     outputs:
       MAJOR_RELEASE_VERSION: ${{ env.MAJOR_RELEASE_VERSION }}
       RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
+      TRIMMED_RELEASE_VERSION: ${{ env.TRIMMED_RELEASE_VERSION }}
   upload:
     name: upload
     runs-on: ubuntu-latest
