@@ -70,8 +70,8 @@ jobs:
         run: |
           mkdir -p release
           pushd release
-          helm package ../deploy/cluster-manager/chart/cluster-manager --app-version ${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}
-          helm package ../deploy/klusterlet/chart/klusterlet --app-version ${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}
+          helm package ../deploy/cluster-manager/chart/cluster-manager --app-version ${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }} --version ${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}
+          helm package ../deploy/klusterlet/chart/klusterlet --app-version ${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }} --version ${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}
           popd
       - name: publish release
         if: github.event_name != 'pull_request'
