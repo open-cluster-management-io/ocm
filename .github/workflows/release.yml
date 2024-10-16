@@ -83,4 +83,4 @@ jobs:
           draft: true
           generate_release_notes: true
           files: |
-            release/*.tgz
+            /home/runner/work/ocm/ocm/go/src/open-cluster-management.io/ocm/release/*.tgz
