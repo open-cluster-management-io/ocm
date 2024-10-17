@@ -312,6 +312,45 @@ func TestAddonConfigReconcile(t *testing.T) {
 					},
 				}, nil, nil),
 				addontesting.NewAddon("test", "cluster2"),
+				// cluster3 already has configs synced to status before spec hash is updated
+				newManagedClusterAddon("test", "cluster3", []addonv1alpha1.AddOnConfig{
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test3"},
+					},
+				}, []addonv1alpha1.ConfigReference{
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+							SpecHash:       "",
+						},
+						LastObservedGeneration: 0,
+					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+							SpecHash:       "",
+						},
+						LastObservedGeneration: 0,
+					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test3"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test3"},
+							SpecHash:       "",
+						},
+						LastObservedGeneration: 0,
+					},
+				}, nil),
 			},
 			placements: []runtime.Object{
 				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
@@ -327,7 +366,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 						},
 					},
 					Status: clusterv1beta1.PlacementDecisionStatus{
-						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}, {ClusterName: "cluster2"}},
+						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}, {ClusterName: "cluster2"}, {ClusterName: "cluster3"}},
 					},
 				},
 			},
@@ -343,7 +382,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 				ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 				DesiredConfig: &v1alpha1.ConfigSpecHash{
 					ConfigReferent: v1alpha1.ConfigReferent{Name: "test"},
-					SpecHash:       "hash",
+					SpecHash:       "<core-foo-test-hash>",
 				},
 			}).WithPlacementStrategy(addonv1alpha1.PlacementStrategy{
 				PlacementRef:    addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
@@ -355,20 +394,20 @@ func TestAddonConfigReconcile(t *testing.T) {
 						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
 						DesiredConfig: &v1alpha1.ConfigSpecHash{
 							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1"},
-							SpecHash:       "hash1",
+							SpecHash:       "<core-bar-test1-hash>",
 						},
 					},
 					{
 						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 						DesiredConfig: &v1alpha1.ConfigSpecHash{
 							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1"},
-							SpecHash:       "hash1",
+							SpecHash:       "<core-foo-test1-hash>",
 						},
 					},
 				},
 			}).Build(),
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch", "patch")
+				addontesting.AssertActions(t, actions, "patch", "patch", "patch")
 				sort.Sort(byPatchName(actions))
 				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{
 					{
@@ -376,7 +415,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
 						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
 							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
-							SpecHash:       "hash1",
+							SpecHash:       "<core-bar-test1-hash>",
 						},
 						LastObservedGeneration: 0,
 					},
@@ -405,7 +444,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
 						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
 							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
-							SpecHash:       "hash1",
+							SpecHash:       "<core-bar-test1-hash>",
 						},
 						LastObservedGeneration: 0,
 					},
@@ -414,10 +453,39 @@ func TestAddonConfigReconcile(t *testing.T) {
 						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
 						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
 							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
-							SpecHash:       "hash1",
+							SpecHash:       "<core-foo-test1-hash>",
 						},
 						LastObservedGeneration: 0,
 					}})
+				expectPatchConfigurationAction(t, actions[2], []addonv1alpha1.ConfigReference{
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+							SpecHash:       "<core-bar-test1-hash>",
+						},
+						LastObservedGeneration: 0,
+					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+							SpecHash:       "",
+						},
+						LastObservedGeneration: 0,
+					},
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test3"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test3"},
+							SpecHash:       "",
+						},
+						LastObservedGeneration: 0,
+					},
+				})
 				expectPatchConditionAction(t, actions[0], metav1.ConditionTrue)
 				expectPatchConditionAction(t, actions[1], metav1.ConditionTrue)
 			},
