@@ -90,7 +90,7 @@ func NewAddonConfigurationController(
 		queue.QueueKeyByMetaNamespaceName,
 		c.addonFilterFunc,
 		clusterManagementAddonInformers.Informer()).
-		WithInformersQueueKeysFunc(queue.QueueKeyByMetaNamespaceName, addonInformers.Informer()).
+		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, addonInformers.Informer()).
 		WithInformersQueueKeysFunc(
 			index.ClusterManagementAddonByPlacementDecisionQueueKey(clusterManagementAddonInformers), placementDecisionInformer.Informer()).
 		WithInformersQueueKeysFunc(
@@ -101,12 +101,7 @@ func NewAddonConfigurationController(
 
 func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	logger := klog.FromContext(ctx)
-	key := syncCtx.QueueKey()
-	_, addonName, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		// ignore addon whose key is invalid
-		return nil
-	}
+	addonName := syncCtx.QueueKey()
 	logger.V(4).Info("Reconciling addon", "addonName", addonName)
 
 	cma, err := c.clusterManagementAddonLister.Get(addonName)
@@ -157,7 +152,7 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 	}
 
 	if minRequeue < maxRequeueTime {
-		syncCtx.Queue().AddAfter(key, minRequeue)
+		syncCtx.Queue().AddAfter(addonName, minRequeue)
 	}
 
 	return nil

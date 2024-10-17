@@ -13,7 +13,6 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
@@ -106,12 +105,7 @@ func (c *addonTemplateController) stopUnusedManagers(
 
 func (c *addonTemplateController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	logger := klog.FromContext(ctx)
-	key := syncCtx.QueueKey()
-	_, addonName, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		// ignore addon whose key is not in format: namespace/name
-		return nil
-	}
+	addonName := syncCtx.QueueKey()
 
 	cma, err := c.cmaLister.Get(addonName)
 	if err != nil {

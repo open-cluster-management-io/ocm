@@ -81,13 +81,7 @@ func NewAddonManagementController(
 
 func (c *addonManagementController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	logger := klog.FromContext(ctx)
-	key := syncCtx.QueueKey()
-	_, addonName, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		// ignore addon whose key is invalid
-		return nil
-	}
-
+	addonName := syncCtx.QueueKey()
 	logger.V(4).Info("Reconciling addon", "addonName", addonName)
 
 	cma, err := c.clusterManagementAddonLister.Get(addonName)
