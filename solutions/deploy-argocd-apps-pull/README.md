@@ -21,3 +21,7 @@ The pull model may offers some advantages over the existing push model:
 
 This ArgoCD pull model controller on the Hub cluster will create [ManifestWork](https://open-cluster-management.io/concepts/manifestwork/) objects wrapping Application objects as payload.
 The OCM agent on the Managed cluster will see the ManifestWork on the Hub cluster and pull the Application down.
+
+## Quick Start
+
+See the [Getting Started](./getting-started.md) for a quick start guide.

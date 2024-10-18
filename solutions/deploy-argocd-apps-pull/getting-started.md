@@ -38,6 +38,7 @@
 
 2. If your controller starts successfully, you should see:
     ```
+    $ kubectl config use-context kind-hub
     $ kubectl -n open-cluster-management get deploy | grep pull
     argocd-pull-integration-controller-manager   1/1     1            1           106s
     ```
@@ -45,6 +46,7 @@
 3. On the Hub cluster, create ArgoCD cluster secrets that represent the managed clusters. This step can be automated with [OCM auto import controller](https://github.com/open-cluster-management-io/multicloud-integrations/).
 
     ```
+    kubectl config use-context kind-hub
     for i in "cluster1" "cluster2"
     do
       cat <<EOF | kubectl apply -f -
@@ -80,6 +82,7 @@
 
 6. On the Hub cluster, apply the `guestbook-app-set` manifest:
     ```
+    kubectl config use-context kind-hub
     kubectl apply -f example/guestbook-app-set.yaml
     ```
     **Note:** The Application template inside the ApplicationSet must contain the following content:
@@ -98,17 +101,19 @@
 
 7.  When this guestbook ApplicationSet reconciles, it will generate an Application for the registered managed clusters. For example:
     ```
+    $ kubectl config use-context kind-hub
     $ kubectl -n argocd get appset
     NAME            AGE
     guestbook-app   84s
     $ kubectl -n argocd get app
     NAME                     SYNC STATUS   HEALTH STATUS
-    cluster1-guestbook-app   Synced        Healthy
-    cluster2-guestbook-app   Synced        Healthy     
+    cluster1-guestbook-app
+    cluster2-guestbook-app
     ```
 
 8.  On the Hub cluster, the pull controller will wrap the Application with a ManifestWork. For example:
     ```
+    $ kubectl config use-context kind-hub
     $ kubectl -n cluster1 get manifestwork
     NAME                          AGE
     cluster1-guestbook-app-d0e5   2m41s
@@ -116,6 +121,7 @@
 
 9.  On a managed cluster, you should see that the Application is pulled down successfully. For example:
     ```
+    $ kubectl config use-context kind-cluster1
     $ kubectl -n argocd get app
     NAME                     SYNC STATUS   HEALTH STATUS
     cluster1-guestbook-app   Synced        Healthy
@@ -126,6 +132,7 @@
 
 10. On the Hub cluster, the status controller will sync the dormant Application with the ManifestWork status feedback. For example:
     ```
+    $ kubectl config use-context kind-hub
     $ kubectl -n argocd get app
     NAME                     SYNC STATUS   HEALTH STATUS
     cluster1-guestbook-app   Synced        Healthy
