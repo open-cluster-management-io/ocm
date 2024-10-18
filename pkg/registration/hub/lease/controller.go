@@ -71,7 +71,8 @@ func NewClusterLeaseController(
 		ToController("ManagedClusterLeaseController", recorder)
 }
 
-// sync checks the lease of each accepted cluster on hub to determine whether a managed cluster is available.
+// sync checks the lease of each cluster on hub, which is accepted or previously accepted, to determine whether
+// the managed cluster is available.
 func (c *leaseController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	clusterName := syncCtx.QueueKey()
 
@@ -84,8 +85,9 @@ func (c *leaseController) sync(ctx context.Context, syncCtx factory.SyncContext)
 		return err
 	}
 
-	if !meta.IsStatusConditionTrue(cluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted) {
-		// cluster is not accepted, skip it.
+	if cond := meta.FindStatusCondition(cluster.Status.Conditions,
+		clusterv1.ManagedClusterConditionHubAccepted); cond == nil {
+		// cluster was never accepted, skip it.
 		return nil
 	}
 

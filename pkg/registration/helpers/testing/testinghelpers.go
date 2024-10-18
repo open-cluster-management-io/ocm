@@ -19,6 +19,7 @@ import (
 	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeversion "k8s.io/client-go/pkg/version"
@@ -128,9 +129,17 @@ func NewManagedClusterWithStatus(capacity, allocatable clusterv1.ResourceList) *
 	return managedCluster
 }
 
-func NewDeniedManagedCluster() *clusterv1.ManagedCluster {
+func NewDeniedManagedCluster(acceptedConditionStatus string) *clusterv1.ManagedCluster {
 	managedCluster := NewAcceptedManagedCluster()
 	managedCluster.Spec.HubAcceptsClient = false
+
+	meta.SetStatusCondition(&managedCluster.Status.Conditions, NewManagedClusterCondition(
+		clusterv1.ManagedClusterConditionHubAccepted,
+		acceptedConditionStatus,
+		"",
+		"",
+		nil,
+	))
 	return managedCluster
 }
 
@@ -180,16 +189,6 @@ func NewAddOnLease(namespace, name string, renewTime time.Time) *coordv1.Lease {
 			RenewTime: &metav1.MicroTime{Time: renewTime},
 		},
 	}
-}
-
-func NewNamespace(name string, terminated bool) *corev1.Namespace {
-	namespace := &corev1.Namespace{}
-	namespace.Name = name
-	if terminated {
-		now := metav1.Now()
-		namespace.DeletionTimestamp = &now
-	}
-	return namespace
 }
 
 func NewManifestWork(namespace, name string, finalizers []string,

@@ -77,7 +77,7 @@ func TestSyncManagedCluster(t *testing.T) {
 		},
 		{
 			name:            "deny an accepted spoke cluster",
-			startingObjects: []runtime.Object{testinghelpers.NewDeniedManagedCluster()},
+			startingObjects: []runtime.Object{testinghelpers.NewDeniedManagedCluster("True")},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				expectedCondition := metav1.Condition{
 					Type:    v1.ManagedClusterConditionHubAccepted,
