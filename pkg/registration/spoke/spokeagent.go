@@ -54,10 +54,11 @@ type SpokeAgentConfig struct {
 
 	internalHubConfigValidFunc wait.ConditionWithContextFunc
 
-	hubKubeConfigChecker            *hubKubeConfigHealthChecker
-	bootstrapKubeconfigEventHandler *bootstrapKubeconfigEventHandler
+	hubKubeConfigChecker *hubKubeConfigHealthChecker
 
-	reSelectChecker *reSelectChecker
+	// agentStopFunc is the function to stop the agent, and the external system can restart the agent
+	// with the refreshed configuration.
+	agentStopFunc context.CancelFunc
 }
 
 // NewSpokeAgentConfig returns a SpokeAgentConfig
@@ -67,12 +68,7 @@ func NewSpokeAgentConfig(commonOpts *commonoptions.AgentOptions, opts *SpokeAgen
 		agentOptions:       commonOpts,
 		registrationOption: opts,
 		driver:             registerDriver,
-
-		reSelectChecker: &reSelectChecker{shouldReSelect: false},
-		bootstrapKubeconfigEventHandler: &bootstrapKubeconfigEventHandler{
-			bootstrapKubeconfigSecretName: &opts.BootstrapKubeconfigSecret,
-			cancel:                        cancel,
-		},
+		agentStopFunc:      cancel,
 	}
 	cfg.hubKubeConfigChecker = &hubKubeConfigHealthChecker{
 		checkFunc: cfg.IsHubKubeConfigValid,
@@ -84,7 +80,6 @@ func NewSpokeAgentConfig(commonOpts *commonoptions.AgentOptions, opts *SpokeAgen
 func (o *SpokeAgentConfig) HealthCheckers() []healthz.HealthChecker {
 	return []healthz.HealthChecker{
 		o.hubKubeConfigChecker,
-		o.reSelectChecker,
 	}
 }
 
@@ -212,8 +207,8 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		if err != nil {
 			return fmt.Errorf("failed to select a bootstrap kubeconfig: %w", err)
 		}
-		logger.Info("Select bootstrap kubeconfig", "index", index, "file", o.registrationOption.BootstrapKubeconfigs[index])
-
+		recorder.Eventf("BootstrapSelected", "Select bootstrap kubeconfig with index %d and file %s",
+			index, o.registrationOption.BootstrapKubeconfigs[index])
 		o.currentBootstrapKubeConfig = o.registrationOption.BootstrapKubeconfigs[index]
 	} else {
 		o.currentBootstrapKubeConfig = o.registrationOption.BootstrapKubeconfig
@@ -243,17 +238,18 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	go spokeClusterCreatingController.Run(ctx, 1)
 
 	secretInformer := namespacedManagementKubeInformerFactory.Core().V1().Secrets()
-	if o.bootstrapKubeconfigEventHandler != nil {
-		// Register BootstrapKubeconfigEventHandler as an event handler of secret informer,
-		// monitor the bootstrap kubeconfig and restart the pod immediately if it changes.
-		//
-		// The BootstrapKubeconfigEventHandler was originally part of the healthcheck and was
-		// moved out to take some cases into account. For example, the work agent may resync a
-		// wrong bootstrap kubeconfig from the cache before restarting since the healthcheck will
-		// retry 3 times.
-		if _, err = secretInformer.Informer().AddEventHandler(o.bootstrapKubeconfigEventHandler); err != nil {
-			return err
-		}
+	// Register BootstrapKubeconfigEventHandler as an event handler of secret informer,
+	// monitor the bootstrap kubeconfig and restart the pod immediately if it changes.
+	//
+	// The BootstrapKubeconfigEventHandler was originally part of the healthcheck and was
+	// moved out to take some cases into account. For example, the work agent may resync a
+	// wrong bootstrap kubeconfig from the cache before restarting since the healthcheck will
+	// retry 3 times.
+	if _, err = secretInformer.Informer().AddEventHandler(&bootstrapKubeconfigEventHandler{
+		bootstrapKubeconfigSecretName: &o.registrationOption.BootstrapKubeconfigSecret,
+		cancel:                        o.agentStopFunc,
+	}); err != nil {
+		return err
 	}
 
 	hubKubeconfigSecretController := registration.NewHubKubeconfigSecretController(
@@ -448,7 +444,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 			hubClusterInformerFactory.Cluster().V1().ManagedClusters(),
 			func(ctx context.Context) error {
 				logger.Info("Failed to connect to hub because of hubAcceptClient set to false, restart agent to reselect a new bootstrap kubeconfig")
-				o.reSelectChecker.shouldReSelect = true
+				o.agentStopFunc()
 				return nil
 			},
 			recorder,
@@ -460,7 +456,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 			o.registrationOption.HubConnectionTimeoutSeconds,
 			func(ctx context.Context) error {
 				logger.Info("Failed to connect to hub because of lease out-of-date, restart agent to reselect a new bootstrap kubeconfig")
-				o.reSelectChecker.shouldReSelect = true
+				o.agentStopFunc()
 				return nil
 			},
 			recorder,
