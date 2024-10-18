@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/utils/diff"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
@@ -665,6 +666,76 @@ func TestBuildResourceMeta(t *testing.T) {
 
 			if !reflect.DeepEqual(c.expectedMeta, meta) {
 				t.Errorf("Case name: %s, expect meta %v, but got %v", c.name, c.expectedMeta, meta)
+			}
+		})
+	}
+}
+
+func TestFindUntrackedResources(t *testing.T) {
+	cases := []struct {
+		name                       string
+		appliedResources           []workapiv1.AppliedManifestResourceMeta
+		newAppliedResources        []workapiv1.AppliedManifestResourceMeta
+		expectedUntrackedResources []workapiv1.AppliedManifestResourceMeta
+	}{
+		{
+			name:             "no resource untracked",
+			appliedResources: nil,
+			newAppliedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
+			},
+			expectedUntrackedResources: nil,
+		},
+		{
+			name: "some of original resources untracked",
+			appliedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
+				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
+			},
+			newAppliedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
+				{Version: "v3", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g3", Resource: "r3", Namespace: "ns3", Name: "n3"}},
+			},
+			expectedUntrackedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
+			},
+		},
+		{
+			name: "all original resources untracked",
+			appliedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
+				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
+			},
+			newAppliedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v3", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g3", Resource: "r3", Namespace: "ns3", Name: "n3"}},
+				{Version: "v4", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g4", Resource: "r4", Namespace: "ns4", Name: "n4"}},
+			},
+			expectedUntrackedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
+				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
+			},
+		},
+		{
+			name: "changing version of original resources does not make it untracked",
+			appliedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
+				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
+			},
+			newAppliedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
+				{Version: "v4", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g4", Resource: "r4", Namespace: "ns4", Name: "n4"}},
+			},
+			expectedUntrackedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual := FindUntrackedResources(c.appliedResources, c.newAppliedResources)
+			if !reflect.DeepEqual(actual, c.expectedUntrackedResources) {
+				t.Errorf(diff.ObjectDiff(actual, c.expectedUntrackedResources))
 			}
 		})
 	}
