@@ -3,7 +3,6 @@ package spoke
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -115,26 +114,4 @@ func checkBootstrapKubeConfigValid(ctx context.Context, managedCluster, bootstra
 		return fmt.Errorf("hub does not accept client")
 	}
 	return nil
-}
-
-// reSelectChecker is a health checker that checks if the bootstrap kubeconfig should be reselected.
-//
-// It is used by 2 controllers: the hubTimeoutController and hubAcceptController.
-//
-// If timeout to connect to a hub or the hubAcceptsClient flag is set to false, then shouldReSelect
-// is set to true. And then checker will return an error, trigger the agent to restart and reselect
-// the bootstrap kubeconfig.
-type reSelectChecker struct {
-	shouldReSelect bool
-}
-
-func (b *reSelectChecker) Check(_ *http.Request) error {
-	if b.shouldReSelect {
-		return fmt.Errorf("reselect bootstrap kubeconfig")
-	}
-	return nil
-}
-
-func (b *reSelectChecker) Name() string {
-	return "reSelectChecker"
 }
