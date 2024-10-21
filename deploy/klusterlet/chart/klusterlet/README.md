@@ -3,11 +3,11 @@
 The klusterlet provides the registration to the Hub clusters as a managed cluster.
 This operator supports the installation and upgrade of klusterlet.
 
-# Prerequisites
+## Prerequisites
 
 You need a Hub cluster which has installed clusterManager operator.
 
-# Get Repo Info
+## Get Repo Info
 
 ```bash
 helm repo add ocm https://open-cluster-management.io/helm-charts
@@ -15,9 +15,9 @@ helm repo update
 helm search repo ocm
 ```
 
-# Install the Chart
+## Install the Chart
 
-### Run klusterlet on Default mode.
+### Run klusterlet on Default mode
 
 Install the Chart on the managed cluster:
 
@@ -43,7 +43,7 @@ helm install klusterlet --version <version> ocm/klusterlet \
 > You can create the `bootstrap-hub-kubeconfig` secret in the `open-cluster-management-agent` namespace
 > after install the chart without setting `bootstrapHubKubeConfig`.
 
-### Run klusterlet on Hosted mode.
+### Run klusterlet on Hosted mode
 
 Install the Chart on the hosting cluster without installing operator:
 
@@ -68,17 +68,16 @@ helm install <klusterlet name> --version <version> ocm/klusterlet \
 > You can create the `bootstrap-hub-kubeconfig` and `externalManagedKubeConfig` secrets in the `klusterlet-<cluster name>` namespace
 > after install the chart without setting `bootstrapHubKubeConfig` and `externalManagedKubeConfig`.
 
+## Uninstall
 
-# Uninstall the Chart
-
-## Delete the klusterlet CR.
+### Delete the klusterlet CR
 
 ``` bash
 kubectl delete klusterlet <klusterlet name>
 ```
 
-## Uninstall the Chart
+### Uninstall the Chart
 
 ```bash
-helm uninstall <klusterlet name>
+helm uninstall klusterlet --namespace=open-cluster-management
 ```
