@@ -410,6 +410,7 @@ func assertManagedClusterAddOnConditions(name, namespace string, expect ...metav
 			return err
 		}
 
+		ginkgo.By(fmt.Sprintf("Check ManagedClusterAddOn %s/%s status %v", namespace, name, actual.Status))
 		for _, ec := range expect {
 			cond := meta.FindStatusCondition(actual.Status.Conditions, ec.Type)
 			if cond == nil ||
