@@ -446,6 +446,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		hubAcceptController = registration.NewHubAcceptController(
 			o.agentOptions.SpokeClusterName,
 			hubClusterInformerFactory.Cluster().V1().ManagedClusters(),
+			hubClusterClient,
 			func(ctx context.Context) error {
 				logger.Info("Failed to connect to hub because of hubAcceptClient set to false, restart agent to reselect a new bootstrap kubeconfig")
 				o.reSelectChecker.shouldReSelect = true

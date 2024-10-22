@@ -4,68 +4,117 @@ import (
 	"context"
 	"testing"
 
+	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	clienttesting "k8s.io/client-go/testing"
 
-	clusterv1lister "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	fakeclusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
-func TestHubAcceptController_sync(t *testing.T) {
-	var err error
-	clusterName := "testCluster"
-	handled := false
-	mockHubClusterLister := &MockManagedClusterLister{}
-	hacontroller := &hubAcceptController{
-		clusterName:      clusterName,
-		hubClusterLister: mockHubClusterLister,
-		handleAcceptFalse: func(ctx context.Context) error {
-			handled = true
-			return nil
+func TestHubAcceptControllerSync(t *testing.T) {
+	clusterName := "test-cluster"
+
+	tests := []struct {
+		name                 string
+		existingObjects      []runtime.Object
+		hubAcceptsClient     bool
+		expectedError        bool
+		expectedHandleCalled bool
+	}{
+		{
+			name: "HubAcceptsClient is true",
+			existingObjects: []runtime.Object{
+				&clusterv1.ManagedCluster{
+					ObjectMeta: metav1.ObjectMeta{Name: clusterName},
+					Spec: clusterv1.ManagedClusterSpec{
+						HubAcceptsClient: true,
+					},
+				},
+			},
+			hubAcceptsClient:     true,
+			expectedError:        false,
+			expectedHandleCalled: false,
+		},
+		{
+			name: "HubAcceptsClient is false",
+			existingObjects: []runtime.Object{
+				&clusterv1.ManagedCluster{
+					ObjectMeta: metav1.ObjectMeta{Name: clusterName},
+					Spec: clusterv1.ManagedClusterSpec{
+						HubAcceptsClient: false,
+					},
+				},
+			},
+			hubAcceptsClient:     false,
+			expectedError:        false,
+			expectedHandleCalled: true,
+		},
+		{
+			name:                 "ManagedCluster not found",
+			existingObjects:      []runtime.Object{},
+			expectedError:        true,
+			expectedHandleCalled: false,
 		},
 	}
 
-	// Create a mock hub cluster with HubAcceptsClient set to false
-	mockHubClusterLister.mockHubCluster = &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: clusterName,
-		},
-		Spec: clusterv1.ManagedClusterSpec{
-			HubAcceptsClient: true,
-		},
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Setup
+			fakeClusterClient := fakeclusterclient.NewSimpleClientset(test.existingObjects...)
+			handleCalled := false
+			handleAcceptFalse := func(ctx context.Context) error {
+				handleCalled = true
+				return nil
+			}
+
+			controller := &hubAcceptController{
+				clusterName:       clusterName,
+				hubClusterClient:  fakeClusterClient,
+				handleAcceptFalse: handleAcceptFalse,
+				recorder:          eventstesting.NewTestingEventRecorder(t),
+			}
+
+			// Execute
+			err := controller.sync(context.TODO(), nil)
+
+			// Verify
+			if test.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, test.expectedHandleCalled, handleCalled)
+		})
 	}
-
-	// Call the sync method
-	err = hacontroller.sync(context.TODO(), nil)
-	assert.NoError(t, err, "Expected no error")
-
-	// Expect handled to be false
-	assert.False(t, handled, "Expected handled to be false")
-
-	// Create a mock hub cluster with HubAcceptsClient set to true
-	mockHubClusterLister.mockHubCluster = &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: clusterName,
-		},
-		Spec: clusterv1.ManagedClusterSpec{
-			HubAcceptsClient: false,
-		},
-	}
-
-	// Call the sync method again
-	err = hacontroller.sync(context.TODO(), nil)
-	assert.NoError(t, err, "Expected no error")
-
-	// Expect handled to be true
-	assert.True(t, handled, "Expected handled to be true")
 }
 
-type MockManagedClusterLister struct {
-	clusterv1lister.ManagedClusterLister
-	mockHubCluster *clusterv1.ManagedCluster
-}
+func TestHubAcceptControllerSyncForbidden(t *testing.T) {
+	clusterName := "test-cluster"
+	fakeClusterClient := fakeclusterclient.NewSimpleClientset()
+	fakeClusterClient.PrependReactor("get", "managedclusters", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		return true, nil, errors.NewForbidden(action.GetResource().GroupResource(), clusterName, nil)
+	})
 
-func (m *MockManagedClusterLister) Get(name string) (*clusterv1.ManagedCluster, error) {
-	// Return a dummy ManagedCluster or an error based on your test case.
-	return m.mockHubCluster, nil
+	handleCalled := false
+	handleAcceptFalse := func(ctx context.Context) error {
+		handleCalled = true
+		return nil
+	}
+
+	controller := &hubAcceptController{
+		clusterName:       clusterName,
+		hubClusterClient:  fakeClusterClient,
+		handleAcceptFalse: handleAcceptFalse,
+		recorder:          eventstesting.NewTestingEventRecorder(t),
+	}
+
+	err := controller.sync(context.TODO(), nil)
+
+	assert.NoError(t, err)
+	assert.True(t, handleCalled)
 }
