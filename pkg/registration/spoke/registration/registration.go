@@ -16,13 +16,15 @@ import (
 	"k8s.io/klog/v2"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	hubclusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	managedclusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/registration/hub/user"
 	"open-cluster-management.io/ocm/pkg/registration/register"
+	awsIrsa "open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 )
 
@@ -95,6 +97,46 @@ func NewCSROption(
 	}, nil
 }
 
+func NewAWSOption(
+	secretOption register.SecretOption,
+	hubManagedClusterInformer managedclusterinformers.Interface,
+	hubClusterClientSet hubclusterclientset.Interface) (*awsIrsa.AWSOption, error) {
+	awsIrsaControl, err := awsIrsa.NewAWSIRSAControl(hubManagedClusterInformer, hubClusterClientSet)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AWS IRSA control: %w", err)
+	}
+	err = awsIrsaControl.Informer().AddIndexers(cache.Indexers{
+		indexByCluster: indexByClusterFunc,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &awsIrsa.AWSOption{
+		EventFilterFunc: func(obj interface{}) bool {
+			// TODO: implement EventFilterFunc and update below
+			accessor, err := meta.Accessor(obj)
+			if err != nil {
+				return false
+			}
+			labels := accessor.GetLabels()
+			// only enqueue csr from a specific managed cluster
+			if labels[clusterv1.ClusterNameLabelKey] != secretOption.ClusterName {
+				return false
+			}
+
+			// should not contain addon key
+			_, ok := labels[addonv1alpha1.AddonLabelKey]
+			if ok {
+				return false
+			}
+
+			// only enqueue csr whose name starts with the cluster name
+			return strings.HasPrefix(accessor.GetName(), fmt.Sprintf("%s-", secretOption.ClusterName))
+		},
+		AWSIRSAControl: awsIrsaControl,
+	}, nil
+}
+
 func haltCSRCreationFunc(indexer cache.Indexer, clusterName string) func() bool {
 	return func() bool {
 		items, err := indexer.ByIndex(indexByCluster, clusterName)
@@ -116,7 +158,7 @@ func GenerateBootstrapStatusUpdater() register.StatusUpdateFunc {
 }
 
 // GenerateStatusUpdater generates status update func for the certificate management
-func GenerateStatusUpdater(hubClusterClient clientset.Interface,
+func GenerateStatusUpdater(hubClusterClient hubclusterclientset.Interface,
 	hubClusterLister clusterv1listers.ManagedClusterLister, clusterName string) register.StatusUpdateFunc {
 	return func(ctx context.Context, cond metav1.Condition) error {
 		cluster, err := hubClusterLister.Get(clusterName)

@@ -41,6 +41,7 @@ const (
 	klusterletFinalizer                   = "operator.open-cluster-management.io/klusterlet-cleanup"
 	managedResourcesEvictionTimestampAnno = "operator.open-cluster-management.io/managed-resources-eviction-timestamp"
 	klusterletNamespaceLabelKey           = "operator.open-cluster-management.io/klusterlet"
+	AwsIrsaAuthType                       = "awsirsa"
 )
 
 type klusterletController struct {
@@ -111,6 +112,15 @@ func NewKlusterletController(
 		ToController("KlusterletController", recorder)
 }
 
+type AwsIrsa struct {
+	HubClusterArn string
+}
+
+type RegistrationDriver struct {
+	AuthType string
+	AwsIrsa  *AwsIrsa
+}
+
 // klusterletConfig is used to render the template of hub manifests
 type klusterletConfig struct {
 	KlusterletName string
@@ -174,7 +184,8 @@ type klusterletConfig struct {
 	DisableAddonNamespace bool
 
 	// Labels of the agents are synced from klusterlet CR.
-	Labels map[string]string
+	Labels             map[string]string
+	RegistrationDriver RegistrationDriver
 }
 
 // If multiplehubs feature gate is enabled, using the bootstrapkubeconfigs from klusterlet CR.
@@ -309,7 +320,20 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		config.ClientCertExpirationSeconds = klusterlet.Spec.RegistrationConfiguration.ClientCertExpirationSeconds
 		config.RegistrationKubeAPIQPS = float32(klusterlet.Spec.RegistrationConfiguration.KubeAPIQPS)
 		config.RegistrationKubeAPIBurst = klusterlet.Spec.RegistrationConfiguration.KubeAPIBurst
-
+		//Configuring Registration driver depending on registration auth
+		if &klusterlet.Spec.RegistrationConfiguration.RegistrationDriver != nil &&
+			klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType == AwsIrsaAuthType {
+			config.RegistrationDriver = RegistrationDriver{
+				AuthType: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType,
+				AwsIrsa: &AwsIrsa{
+					HubClusterArn: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.HubClusterArn,
+				},
+			}
+		} else {
+			config.RegistrationDriver = RegistrationDriver{
+				AuthType: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType,
+			}
+		}
 		// construct cluster annotations string, the final format is "key1=value1,key2=value2"
 		var annotationsArray []string
 		for k, v := range commonhelpers.FilterClusterAnnotations(klusterlet.Spec.RegistrationConfiguration.ClusterAnnotations) {

@@ -134,6 +134,7 @@ func newKlusterlet(name, namespace, clustername string) *operatorapiv1.Klusterle
 
 func newKlusterletHosted(name, namespace, clustername string) *operatorapiv1.Klusterlet {
 	klusterlet := newKlusterlet(name, namespace, clustername)
+	klusterlet.Spec.RegistrationConfiguration.RegistrationDriver = operatorapiv1.RegistrationDriver{}
 	klusterlet.Spec.DeployOption.Mode = operatorapiv1.InstallModeHosted
 	klusterlet.Finalizers = append(klusterlet.Finalizers, klusterletHostedFinalizer)
 	return klusterlet
@@ -374,7 +375,46 @@ func getDeployments(actions []clienttesting.Action, verb, suffix string) *appsv1
 	return nil
 }
 
-func assertRegistrationDeployment(t *testing.T, actions []clienttesting.Action, verb, serverURL, clusterName string, replica int32) {
+func assertKlusterletDeployment(t *testing.T, actions []clienttesting.Action, verb, serverURL, clusterName string) {
+	deployment := getDeployments(actions, verb, "agent")
+	if deployment == nil {
+		t.Errorf("klusterlet deployment not found")
+		return
+	}
+	if len(deployment.Spec.Template.Spec.Containers) != 1 {
+		t.Errorf("Expect 1 containers in deployment spec, actual %d", len(deployment.Spec.Template.Spec.Containers))
+		return
+	}
+
+	args := deployment.Spec.Template.Spec.Containers[0].Args
+	expectedArgs := []string{
+		"/registration-operator",
+		"agent",
+		fmt.Sprintf("--spoke-cluster-name=%s", clusterName),
+		"--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig",
+	}
+
+	if serverURL != "" {
+		expectedArgs = append(expectedArgs, fmt.Sprintf("--spoke-external-server-urls=%s", serverURL))
+	}
+
+	expectedArgs = append(expectedArgs, "--agent-id=", "--workload-source-driver=kube", "--workload-source-config=/spoke/hub-kubeconfig/kubeconfig")
+
+	if *deployment.Spec.Replicas == 1 {
+		expectedArgs = append(expectedArgs, "--disable-leader-election")
+	}
+
+	expectedArgs = append(expectedArgs, "--status-sync-interval=60s", "--kube-api-qps=20", "--kube-api-burst=60",
+		"--registration-auth=awsirsa", "--hub-cluster-arn=arneks:us-west-2:123456789012:cluster/hub-cluster1")
+
+	if !equality.Semantic.DeepEqual(args, expectedArgs) {
+		t.Errorf("Expect args %v, but got %v", expectedArgs, args)
+		return
+	}
+
+}
+
+func assertRegistrationDeployment(t *testing.T, actions []clienttesting.Action, verb, serverURL, clusterName string, replica int32, awsAuth bool) {
 	deployment := getDeployments(actions, verb, "registration-agent")
 	if deployment == nil {
 		t.Errorf("registration deployment not found")
@@ -402,7 +442,9 @@ func assertRegistrationDeployment(t *testing.T, actions []clienttesting.Action, 
 	}
 
 	expectedArgs = append(expectedArgs, "--kube-api-qps=10", "--kube-api-burst=60")
-
+	if awsAuth {
+		expectedArgs = append(expectedArgs, "--registration-auth=awsirsa", "--hub-cluster-arn=arneks:us-west-2:123456789012:cluster/hub-cluster1")
+	}
 	if !equality.Semantic.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expect args %v, but got %v", expectedArgs, args)
 		return
@@ -944,6 +986,67 @@ func TestGetServersFromKlusterlet(t *testing.T) {
 	}
 }
 
+func TestAWSIrsaAuthInSingletonMode(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	awsIrsaRegistrationDriver := operatorapiv1.RegistrationDriver{
+		AuthType: AwsIrsaAuthType,
+		AwsIrsa: &operatorapiv1.AwsIrsa{
+			HubClusterArn: "arneks:us-west-2:123456789012:cluster/hub-cluster1",
+		},
+	}
+	klusterlet.Spec.RegistrationConfiguration.RegistrationDriver = awsIrsaRegistrationDriver
+	klusterlet.Spec.DeployOption.Mode = operatorapiv1.InstallModeSingleton
+	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
+	hubSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubSecret.Data["cluster-name"] = []byte("cluster1")
+	objects := []runtime.Object{
+		newNamespace("testns"),
+		newSecret(helpers.BootstrapHubKubeConfig, "testns"),
+		hubSecret,
+	}
+
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
+		objects...)
+
+	err := controller.controller.sync(context.TODO(), syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	assertKlusterletDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1")
+}
+
+func TestAWSIrsaAuthInNonSingletonMode(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	awsIrsaRegistrationDriver := operatorapiv1.RegistrationDriver{
+		AuthType: AwsIrsaAuthType,
+		AwsIrsa: &operatorapiv1.AwsIrsa{
+			HubClusterArn: "arneks:us-west-2:123456789012:cluster/hub-cluster1",
+		},
+	}
+	klusterlet.Spec.RegistrationConfiguration.RegistrationDriver = awsIrsaRegistrationDriver
+	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
+	hubSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubSecret.Data["cluster-name"] = []byte("cluster1")
+	objects := []runtime.Object{
+		newNamespace("testns"),
+		newSecret(helpers.BootstrapHubKubeConfig, "testns"),
+		hubSecret,
+	}
+
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
+		objects...)
+
+	err := controller.controller.sync(context.TODO(), syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1", 1, true)
+}
+
 func TestReplica(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
@@ -965,7 +1068,7 @@ func TestReplica(t *testing.T) {
 	}
 
 	// should have 1 replica for registration deployment and 0 for work
-	assertRegistrationDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1", 1)
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1", 1, false)
 	assertWorkDeployment(t, controller.kubeClient.Actions(), createVerb, "cluster1", operatorapiv1.InstallModeDefault, 0)
 
 	klusterlet = newKlusterlet("klusterlet", "testns", "cluster1")
@@ -1010,7 +1113,7 @@ func TestReplica(t *testing.T) {
 	}
 
 	// should have 3 replicas for clusters with multiple nodes
-	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "update", "", "cluster1", 3)
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "update", "", "cluster1", 3, false)
 	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster1", operatorapiv1.InstallModeDefault, 3)
 }
 
@@ -1031,7 +1134,7 @@ func TestClusterNameChange(t *testing.T) {
 	}
 
 	// Check if deployment has the right cluster name set
-	assertRegistrationDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1", 1)
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1", 1, false)
 
 	operatorAction := controller.operatorClient.Actions()
 	testingcommon.AssertActions(t, operatorAction, "patch")
@@ -1061,7 +1164,7 @@ func TestClusterNameChange(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
-	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "update", "", "", 1)
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "update", "", "", 1, false)
 
 	// Update hubconfigsecret and sync again
 	hubSecret.Data["cluster-name"] = []byte("cluster2")
@@ -1099,7 +1202,7 @@ func TestClusterNameChange(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
-	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "update", "https://localhost", "cluster3", 1)
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "update", "https://localhost", "cluster3", 1, false)
 	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster3", "", 0)
 }
 

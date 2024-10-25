@@ -421,6 +421,9 @@ type TestCert struct {
 	Key  []byte
 }
 
+type TestIrsaRequest struct {
+}
+
 func NewHubKubeconfigSecret(namespace, name, resourceVersion string, cert *TestCert, data map[string][]byte) *corev1.Secret {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

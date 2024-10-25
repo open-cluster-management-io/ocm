@@ -19,7 +19,7 @@ var ClientCertHealthCheckInterval = 30 * time.Second
 type SpokeAgentOptions struct {
 	// The differences among BootstrapKubeconfig, BootstrapKubeconfigSecret, BootstrapKubeconfigSecrets are:
 	// 1. BootstrapKubeconfig is a file path, the controller uses it to build the client.
-	// 2. BootstrapKubeconfigSecret is the secret, a event handler will watch it, if the secret is changed, then rebootstrap.
+	// 2. BootstrapKubeconfigSecret is the secret, an event handler will watch it, if the secret is changed, then rebootstrap.
 	// 3. BootstrapKubeconfigs is a list of file path, the controller uses one of its item to build the client.
 	// BootstrapKubeconfigs can only be used when MultipleHubs is enabled.
 	BootstrapKubeconfig       string
@@ -27,7 +27,7 @@ type SpokeAgentOptions struct {
 	BootstrapKubeconfigs      []string
 
 	// TODO: The hubConnectionTimoutSeconds should always greater than leaseDurationSeconds, we need to make timeout as a build-in part of
-	// leaseController in the furture and relate timeoutseconds to leaseDurationSeconds. @xuezhaojun
+	// leaseController in the future and relate timeoutseconds to leaseDurationSeconds. @xuezhaojun
 	// See more details in: https://github.com/open-cluster-management-io/ocm/pull/443#discussion_r1610868646
 	HubConnectionTimeoutSeconds int32
 
@@ -37,6 +37,8 @@ type SpokeAgentOptions struct {
 	MaxCustomClusterClaims      int
 	ClientCertExpirationSeconds int32
 	ClusterAnnotations          map[string]string
+	RegistrationAuth            string
+	EksHubClusterArn            string
 }
 
 func NewSpokeAgentOptions() *SpokeAgentOptions {
@@ -74,6 +76,10 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 			"the value of --cluster-signing-duration command-line flag of the kube-controller-manager will be used.")
 	fs.StringToStringVar(&o.ClusterAnnotations, "cluster-annotations", o.ClusterAnnotations, `the annotations with the reserve
 	 prefix "agent.open-cluster-management.io" set on ManagedCluster when creating only, other actors can update it afterwards.`)
+	fs.StringVar(&o.RegistrationAuth, "registration-auth", o.RegistrationAuth,
+		"The type of authentication to use to authenticate with hub.")
+	fs.StringVar(&o.EksHubClusterArn, "hub-cluster-arn", o.EksHubClusterArn,
+		"The ARN of the EKS based hub cluster.")
 }
 
 // Validate verifies the inputs.
@@ -104,6 +110,10 @@ func (o *SpokeAgentOptions) Validate() error {
 
 	if o.ClientCertExpirationSeconds != 0 && o.ClientCertExpirationSeconds < 3600 {
 		return errors.New("client certificate expiration seconds must greater or qual to 3600")
+	}
+
+	if (o.RegistrationAuth == AwsIrsaAuthType) && (o.EksHubClusterArn == "") {
+		return errors.New("EksHubClusterArn cannot be empty if RegistrationAuth is awsirsa")
 	}
 
 	return nil

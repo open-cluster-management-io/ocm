@@ -3,6 +3,7 @@ package helpers
 import (
 	"embed"
 	"net/url"
+	"regexp"
 
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -157,4 +158,13 @@ func IsCSRSupported(nativeClient kubernetes.Interface) (bool, bool, error) {
 		}
 	}
 	return v1CSRSupported, v1beta1CSRSupported, nil
+}
+
+func IsEksArnWellFormed(eksArn string) bool {
+	pattern := "^arn:aws:eks:([a-zA-Z0-9-]+):(\\d{12}):cluster/([a-zA-Z0-9-]+)$"
+	matched, err := regexp.MatchString(pattern, eksArn)
+	if err != nil {
+		return false
+	}
+	return matched
 }
