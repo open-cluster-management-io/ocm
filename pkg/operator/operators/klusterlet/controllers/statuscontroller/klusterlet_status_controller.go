@@ -78,24 +78,27 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 	registrationDeploymentName := fmt.Sprintf("%s-registration-agent", klusterlet.Name)
 	workDeploymentName := fmt.Sprintf("%s-work-agent", klusterlet.Name)
 
-	if helpers.IsSingleton(klusterlet.Spec.DeployOption.Mode) {
+	IsSingleton := helpers.IsSingleton(klusterlet.Spec.DeployOption.Mode)
+	if IsSingleton {
 		registrationDeploymentName = fmt.Sprintf("%s-agent", klusterlet.Name)
 		workDeploymentName = registrationDeploymentName
 	}
 
-	availableCondition := checkAgentsDeploymentAvailable(
-		ctx, k.kubeClient,
-		[]klusterletAgent{
-			{
-				deploymentName: registrationDeploymentName,
-				namespace:      agentNamespace,
-			},
-			{
-				deploymentName: workDeploymentName,
-				namespace:      agentNamespace,
-			},
+	agents := []klusterletAgent{
+		{
+			deploymentName: registrationDeploymentName,
+			namespace:      agentNamespace,
 		},
-	)
+	}
+
+	if !IsSingleton {
+		agents = append(agents, klusterletAgent{
+			deploymentName: workDeploymentName,
+			namespace:      agentNamespace,
+		})
+	}
+
+	availableCondition := checkAgentsDeploymentAvailable(ctx, k.kubeClient, agents)
 	availableCondition.ObservedGeneration = klusterlet.Generation
 	meta.SetStatusCondition(&newKlusterlet.Status.Conditions, availableCondition)
 
