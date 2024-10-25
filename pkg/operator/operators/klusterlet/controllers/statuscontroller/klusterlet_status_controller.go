@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
 	"k8s.io/client-go/kubernetes"
 	appslister "k8s.io/client-go/listers/apps/v1"
@@ -78,27 +79,24 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 	registrationDeploymentName := fmt.Sprintf("%s-registration-agent", klusterlet.Name)
 	workDeploymentName := fmt.Sprintf("%s-work-agent", klusterlet.Name)
 
-	IsSingleton := helpers.IsSingleton(klusterlet.Spec.DeployOption.Mode)
-	if IsSingleton {
+	if helpers.IsSingleton(klusterlet.Spec.DeployOption.Mode) {
 		registrationDeploymentName = fmt.Sprintf("%s-agent", klusterlet.Name)
 		workDeploymentName = registrationDeploymentName
 	}
 
-	agents := []klusterletAgent{
-		{
-			deploymentName: registrationDeploymentName,
-			namespace:      agentNamespace,
+	availableCondition := checkAgentsDeploymentAvailable(
+		ctx, k.kubeClient,
+		[]klusterletAgent{
+			{
+				deploymentName: registrationDeploymentName,
+				namespace:      agentNamespace,
+			},
+			{
+				deploymentName: workDeploymentName,
+				namespace:      agentNamespace,
+			},
 		},
-	}
-
-	if !IsSingleton {
-		agents = append(agents, klusterletAgent{
-			deploymentName: workDeploymentName,
-			namespace:      agentNamespace,
-		})
-	}
-
-	availableCondition := checkAgentsDeploymentAvailable(ctx, k.kubeClient, agents)
+	)
 	availableCondition.ObservedGeneration = klusterlet.Generation
 	meta.SetStatusCondition(&newKlusterlet.Status.Conditions, availableCondition)
 
@@ -151,7 +149,14 @@ func checkAgentDeploymentDesired(ctx context.Context, kubeClient kubernetes.Inte
 // Check agent deployments, if both of them have at least 1 available replicas, return available condition
 func checkAgentsDeploymentAvailable(ctx context.Context, kubeClient kubernetes.Interface, agents []klusterletAgent) metav1.Condition {
 	var availableMessages []string
+	var components = sets.New[string]()
+
 	for _, agent := range agents {
+		componentID := fmt.Sprintf("%s-%s", agent.namespace, agent.deploymentName)
+		if components.Has(componentID) {
+			continue
+		}
+		components.Insert(componentID)
 		deployment, err := kubeClient.AppsV1().Deployments(agent.namespace).Get(ctx, agent.deploymentName, metav1.GetOptions{})
 		if err != nil {
 			return metav1.Condition{
