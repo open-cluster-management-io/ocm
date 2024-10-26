@@ -15,10 +15,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	ocmfeature "open-cluster-management.io/api/feature"
 	workv1 "open-cluster-management.io/api/work/v1"
+	workv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/webhook/common"
 	webhookv1 "open-cluster-management.io/ocm/pkg/work/webhook/v1"
+	webhookv1alpha1 "open-cluster-management.io/ocm/pkg/work/webhook/v1alpha1"
 )
 
 var (
@@ -28,6 +32,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(workv1.Install(scheme))
+	utilruntime.Must(workv1alpha1.Install(scheme))
 }
 
 func (c *Options) RunWebhookServer() error {
@@ -66,8 +71,15 @@ func (c *Options) RunWebhookServer() error {
 	common.ManifestValidator.WithLimit(c.ManifestLimit)
 
 	if err = (&webhookv1.ManifestWorkWebhook{}).Init(mgr); err != nil {
-		logger.Error(err, "unable to create ManagedCluster webhook")
+		logger.Error(err, "unable to create ManifestWork webhook")
 		return err
+	}
+
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManifestWorkReplicaSet) {
+		if err = (&webhookv1alpha1.ManifestWorkReplicaSetWebhook{}).Init(mgr); err != nil {
+			logger.Error(err, "unable to create ManifestWorkReplicaSet webhook")
+			return err
+		}
 	}
 
 	logger.Info("starting manager")
