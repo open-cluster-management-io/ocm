@@ -37,13 +37,6 @@ import (
 // expected to be changed or removed outside.
 const clusterAcceptedAnnotationKey = "open-cluster-management.io/automatically-accepted-on"
 
-var staticFiles = []string{
-	"rbac/managedcluster-clusterrole.yaml",
-	"rbac/managedcluster-clusterrolebinding.yaml",
-	"rbac/managedcluster-registration-rolebinding.yaml",
-	"rbac/managedcluster-work-rolebinding.yaml",
-}
-
 // managedClusterController reconciles instances of ManagedCluster on the hub.
 type managedClusterController struct {
 	kubeClient    kubernetes.Interface
@@ -180,7 +173,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		ctx,
 		syncCtx.Recorder(),
 		helpers.ManagedClusterAssetFn(manifests.RBACManifests, managedClusterName),
-		staticFiles...,
+		manifests.ClusterSpecificRBACFiles...,
 	)
 	for _, result := range resourceResults {
 		if result.Error != nil {
@@ -218,7 +211,11 @@ func (c *managedClusterController) removeManagedClusterResources(ctx context.Con
 	var errs []error
 	// Clean up managed cluster manifests
 	assetFn := helpers.ManagedClusterAssetFn(manifests.RBACManifests, managedClusterName)
-	resourceResults := resourceapply.DeleteAll(ctx, resourceapply.NewKubeClientHolder(c.kubeClient), c.eventRecorder, assetFn, staticFiles...)
+	resourceResults := resourceapply.DeleteAll(ctx,
+		resourceapply.NewKubeClientHolder(c.kubeClient),
+		c.eventRecorder,
+		assetFn,
+		manifests.ClusterSpecificRBACFiles...)
 	for _, result := range resourceResults {
 		if result.Error != nil {
 			errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
