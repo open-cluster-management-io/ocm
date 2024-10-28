@@ -25,13 +25,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
-var clusterRbacFiles = []string{
-	"rbac/managedcluster-clusterrole.yaml",
-	"rbac/managedcluster-clusterrolebinding.yaml",
-	"rbac/managedcluster-registration-rolebinding.yaml",
-	"rbac/managedcluster-work-rolebinding.yaml",
-}
-
 const (
 	manifestWorkFinalizer = "cluster.open-cluster-management.io/manifest-work-cleanup"
 )
@@ -136,7 +129,7 @@ func (r *gcClusterRbacController) removeClusterRbac(ctx context.Context, cluster
 	// Clean up managed cluster manifests
 	assetFn := helpers.ManagedClusterAssetFn(manifests.RBACManifests, clusterName)
 	resourceResults := resourceapply.DeleteAll(ctx, resourceapply.NewKubeClientHolder(r.kubeClient),
-		r.eventRecorder, assetFn, clusterRbacFiles...)
+		r.eventRecorder, assetFn, manifests.ClusterSpecificRBACFiles...)
 	for _, result := range resourceResults {
 		if result.Error != nil {
 			errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))

@@ -25,11 +25,6 @@ const (
 	workClusterRole         = "open-cluster-management:managedcluster:work"
 )
 
-var clusterRoleFiles = []string{
-	"rbac/managedcluster-registration-clusterrole.yaml",
-	"rbac/managedcluster-work-clusterrole.yaml",
-}
-
 // clusterroleController maintains the necessary clusterroles for registration and work agent on hub cluster.
 type clusterroleController struct {
 	kubeClient    kubernetes.Interface
@@ -81,7 +76,7 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 			resourceapply.NewKubeClientHolder(c.kubeClient),
 			c.eventRecorder,
 			manifests.RBACManifests.ReadFile,
-			clusterRoleFiles...,
+			manifests.CommonClusterRoleFiles...,
 		)
 		for _, result := range results {
 			if result.Error != nil {
@@ -96,7 +91,7 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 		ctx,
 		syncCtx.Recorder(),
 		manifests.RBACManifests.ReadFile,
-		clusterRoleFiles...,
+		manifests.CommonClusterRoleFiles...,
 	)
 
 	for _, result := range results {
