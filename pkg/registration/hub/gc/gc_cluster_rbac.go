@@ -91,7 +91,7 @@ func (r *gcClusterRbacController) reconcile(ctx context.Context, cluster *cluste
 		return gcReconcileStop, err
 	}
 
-	if err := r.removeClusterRbac(ctx, cluster.Name); err != nil {
+	if err := r.removeClusterRbac(ctx, cluster.Name, cluster.Spec.HubAcceptsClient); err != nil {
 		return gcReconcileContinue, err
 	}
 
@@ -124,12 +124,12 @@ func (r *gcClusterRbacController) reconcile(ctx context.Context, cluster *cluste
 	return gcReconcileContinue, r.clusterPatcher.RemoveFinalizer(ctx, cluster, clusterv1.ManagedClusterFinalizer)
 }
 
-func (r *gcClusterRbacController) removeClusterRbac(ctx context.Context, clusterName string) error {
+func (r *gcClusterRbacController) removeClusterRbac(ctx context.Context, clusterName string, accepted bool) error {
 	var errs []error
 	// Clean up managed cluster manifests
-	assetFn := helpers.ManagedClusterAssetFn(manifests.RBACManifests, clusterName)
+	assetFn := helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, clusterName, accepted)
 	resourceResults := resourceapply.DeleteAll(ctx, resourceapply.NewKubeClientHolder(r.kubeClient),
-		r.eventRecorder, assetFn, manifests.ClusterSpecificRBACFiles...)
+		r.eventRecorder, assetFn, append(manifests.ClusterSpecificRBACFiles, manifests.ClusterSpecificRoleBindings...)...)
 	for _, result := range resourceResults {
 		if result.Error != nil {
 			errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))

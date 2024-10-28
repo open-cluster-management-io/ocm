@@ -76,6 +76,24 @@ func ManagedClusterAssetFn(fs embed.FS, managedClusterName string) resourceapply
 	}
 }
 
+func ManagedClusterAssetFnWithAccepted(fs embed.FS, managedClusterName string, accepted bool) resourceapply.AssetFunc {
+	return func(name string) ([]byte, error) {
+		config := struct {
+			ManagedClusterName string
+			Accepted           bool
+		}{
+			ManagedClusterName: managedClusterName,
+			Accepted:           accepted,
+		}
+
+		template, err := fs.ReadFile(name)
+		if err != nil {
+			return nil, err
+		}
+		return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
+	}
+}
+
 // FindTaintByKey returns a taint if the managed cluster has a taint with the given key.
 func FindTaintByKey(managedCluster *clusterv1.ManagedCluster, key string) *clusterv1.Taint {
 	if managedCluster == nil {
