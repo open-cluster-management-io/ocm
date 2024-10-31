@@ -4,9 +4,14 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
+	ocmfeature "open-cluster-management.io/api/feature"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager"
+	singletonhub "open-cluster-management.io/ocm/pkg/singleton/hub"
 	"open-cluster-management.io/ocm/pkg/version"
 )
 
@@ -28,5 +33,27 @@ func NewHubOperatorCmd() *cobra.Command {
 	flags.Int32Var(&cmOptions.DeploymentReplicas, "deployment-replicas", 0,
 		"Number of deployment replicas, operator will automatically determine replicas if not set")
 	opts.AddFlags(flags)
+	return cmd
+}
+
+// NewHubManagerCmd is to start the singleton manager including registration/work/placement/addon
+func NewHubManagerCmd() *cobra.Command {
+	opts := commonoptions.NewOptions()
+	hubOpts := singletonhub.NewOption()
+
+	cmdConfig := opts.
+		NewControllerCommandConfig("ocm-controller", version.Get(), hubOpts.RunControllerManager)
+	cmd := cmdConfig.NewCommandWithContext(context.TODO())
+	cmd.Use = "manager"
+	cmd.Short = "Start the ocm manager"
+
+	flags := cmd.Flags()
+
+	opts.AddFlags(flags)
+
+	utilruntime.Must(features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubWorkFeatureGates))
+	utilruntime.Must(features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates))
+	utilruntime.Must(features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubAddonManagerFeatureGates))
+	features.HubMutableFeatureGate.AddFlag(flags)
 	return cmd
 }

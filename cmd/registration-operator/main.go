@@ -37,7 +37,7 @@ func main() {
 func newNucleusCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "registration-operator",
-		Short: "Nucleus Operator",
+		Short: "Registration Operator",
 		Run: func(cmd *cobra.Command, args []string) {
 			_ = cmd.Help()
 			os.Exit(1)
@@ -51,6 +51,7 @@ func newNucleusCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(hub.NewHubOperatorCmd())
+	cmd.AddCommand(hub.NewHubManagerCmd())
 	cmd.AddCommand(spoke.NewKlusterletOperatorCmd())
 	cmd.AddCommand(spoke.NewKlusterletAgentCmd())
 

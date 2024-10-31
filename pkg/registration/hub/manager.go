@@ -20,8 +20,8 @@ import (
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
-	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
-	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
+	workclient "open-cluster-management.io/api/client/work/clientset/versioned"
+	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 
@@ -86,7 +86,7 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 		return err
 	}
 
-	workClient, err := workv1client.NewForConfig(controllerContext.KubeConfig)
+	workClient, err := workclient.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
@@ -98,7 +98,7 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 
 	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 30*time.Minute)
 	clusterProfileInformers := cpinformerv1alpha1.NewSharedInformerFactory(clusterProfileClient, 30*time.Minute)
-	workInformers := workv1informers.NewSharedInformerFactory(workClient, 30*time.Minute)
+	workInformers := workinformers.NewSharedInformerFactory(workClient, 30*time.Minute)
 	kubeInfomers := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, 30*time.Minute, kubeinformers.WithTweakListOptions(
 		func(listOptions *metav1.ListOptions) {
 			// Note all kube resources managed by registration should have the cluster label, and should not have
@@ -137,7 +137,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	kubeInformers kubeinformers.SharedInformerFactory,
 	clusterInformers clusterv1informers.SharedInformerFactory,
 	clusterProfileInformers cpinformerv1alpha1.SharedInformerFactory,
-	workInformers workv1informers.SharedInformerFactory,
+	workInformers workinformers.SharedInformerFactory,
 	addOnInformers addoninformers.SharedInformerFactory,
 ) error {
 	csrApprover, err := csr.NewCSRApprover(kubeClient, kubeInformers, m.ClusterAutoApprovalUsers, controllerContext.EventRecorder)
