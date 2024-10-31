@@ -110,6 +110,23 @@ func TestSyncManagedCluster(t *testing.T) {
 				testingcommon.AssertActions(t, actions, "patch")
 			},
 		},
+		{
+			name:                "should add the auto approval annotation to an accepted cluster when auto approval is enabled",
+			autoApprovalEnabled: true,
+			startingObjects:     []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &v1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, ok := managedCluster.Annotations[clusterAcceptedAnnotationKey]; !ok {
+					t.Errorf("expected auto approval annotation, but failed")
+				}
+			},
+		},
 	}
 
 	features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates)

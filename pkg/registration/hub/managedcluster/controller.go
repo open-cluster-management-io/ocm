@@ -109,15 +109,15 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		return nil
 	}
 
-	if !managedCluster.Spec.HubAcceptsClient {
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
 		// If the ManagedClusterAutoApproval feature is enabled, we automatically accept a cluster only
 		// when it joins for the first time, afterwards users can deny it again.
-		if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
-			if _, ok := managedCluster.Annotations[clusterAcceptedAnnotationKey]; !ok {
-				return c.acceptCluster(ctx, managedClusterName)
-			}
+		if _, ok := managedCluster.Annotations[clusterAcceptedAnnotationKey]; !ok {
+			return c.acceptCluster(ctx, managedCluster)
 		}
+	}
 
+	if !managedCluster.Spec.HubAcceptsClient {
 		// Current spoke cluster is not accepted, do nothing.
 		if !meta.IsStatusConditionTrue(managedCluster.Status.Conditions, v1.ManagedClusterConditionHubAccepted) {
 			return nil
@@ -224,12 +224,20 @@ func (c *managedClusterController) removeManagedClusterResources(ctx context.Con
 	return operatorhelpers.NewMultiLineAggregate(errs)
 }
 
-func (c *managedClusterController) acceptCluster(ctx context.Context, managedClusterName string) error {
-	// TODO support patching both annotations and spec simultaneously in the patcher
+func (c *managedClusterController) acceptCluster(ctx context.Context, managedCluster *v1.ManagedCluster) error {
 	acceptedTime := time.Now()
-	patch := fmt.Sprintf(`{"metadata":{"annotations":{"%s":"%s"}},"spec":{"hubAcceptsClient":true}}`,
+
+	// If one cluster is already accepted, we only add the cluster accepted annotation, otherwise
+	// we add the cluster accepted annotation and accept the cluster.
+	patch := fmt.Sprintf(`{"metadata":{"annotations":{"%s":"%s"}}}`,
 		clusterAcceptedAnnotationKey, acceptedTime.Format(time.RFC3339))
-	_, err := c.clusterClient.ClusterV1().ManagedClusters().Patch(ctx, managedClusterName,
+	if !managedCluster.Spec.HubAcceptsClient {
+		// TODO support patching both annotations and spec simultaneously in the patcher
+		patch = fmt.Sprintf(`{"metadata":{"annotations":{"%s":"%s"}},"spec":{"hubAcceptsClient":true}}`,
+			clusterAcceptedAnnotationKey, acceptedTime.Format(time.RFC3339))
+	}
+
+	_, err := c.clusterClient.ClusterV1().ManagedClusters().Patch(ctx, managedCluster.Name,
 		types.MergePatchType, []byte(patch), metav1.PatchOptions{})
 	return err
 }
