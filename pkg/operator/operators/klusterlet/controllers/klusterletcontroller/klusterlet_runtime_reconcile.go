@@ -230,7 +230,7 @@ func (r *runtimeReconcile) getClusterNameFromHubKubeConfigSecret(ctx context.Con
 	if len(clusterName) == 0 {
 		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
 			Type: operatorapiv1.ConditionKlusterletApplied, Status: metav1.ConditionFalse, Reason: operatorapiv1.ReasonKlusterletApplyFailed,
-			Message: fmt.Sprintf("Failed to get cluster name from hub kubeconfig secret with error %v", err),
+			Message: fmt.Sprintf("Failed to get cluster name from hub kubeconfig secret with error: %v", fmt.Errorf("the cluster name in the secret is empty")),
 		})
 		return "", fmt.Errorf("the cluster name in the secret is empty")
 	}

@@ -289,7 +289,7 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 				Status: metav1.ConditionTrue,
 				Reason: operatorapiv1.ReasonClusterNameMissing,
 				Message: fmt.Sprintf(
-					"Failed to get cluster name from `kubectl get secret -n %q %q -ojsonpath='{.data.cluster-name}`."+
+					"Failed to get cluster name from `kubectl get secret -n %q %q -ojsonpath='{.data.cluster-name}'`."+
 						" This is set by the klusterlet registration deployment.", hubConfigSecret.Namespace, hubConfigSecret.Name),
 			}
 		}
