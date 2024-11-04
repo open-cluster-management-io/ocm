@@ -126,8 +126,33 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		// Hub cluster-admin denies the current spoke cluster, we remove its related resources and update its condition.
 		c.eventRecorder.Eventf("ManagedClusterDenied", "managed cluster %s is denied by hub cluster admin", managedClusterName)
 
-		if err := c.removeManagedClusterResources(ctx, managedClusterName); err != nil {
-			return err
+		// Apply(Update) the cluster specific rbac resources for this spoke cluster with hubAcceptsClient=false.
+		var errs []error
+		applyResults := c.applier.Apply(ctx, syncCtx.Recorder(),
+			helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, managedClusterName, managedCluster.Spec.HubAcceptsClient),
+			manifests.ClusterSpecificRBACFiles...)
+		for _, result := range applyResults {
+			if result.Error != nil {
+				errs = append(errs, result.Error)
+			}
+		}
+		if aggErr := operatorhelpers.NewMultiLineAggregate(errs); aggErr != nil {
+			return aggErr
+		}
+
+		// Remove the cluster role binding files for registration-agent and work-agent.
+		removeResults := resourceapply.DeleteAll(ctx,
+			resourceapply.NewKubeClientHolder(c.kubeClient),
+			c.eventRecorder,
+			helpers.ManagedClusterAssetFn(manifests.RBACManifests, managedClusterName),
+			manifests.ClusterSpecificRoleBindings...)
+		for _, result := range removeResults {
+			if result.Error != nil {
+				errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
+			}
+		}
+		if aggErr := operatorhelpers.NewMultiLineAggregate(errs); aggErr != nil {
+			return aggErr
 		}
 
 		if err = c.approver.Cleanup(ctx, managedCluster); err != nil {
@@ -159,25 +184,22 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		},
 	}
 
+	// Hub cluster-admin accepts the spoke cluster, we apply
+	// 1. namespace for this spoke cluster.
+	// 2. cluster specific rbac resources for this spoke cluster.(hubAcceptsClient=true)
+	// 3. cluster specific rolebinding(registration-agent and work-agent) for this spoke cluster.
 	var errs []error
 	_, _, err = resourceapply.ApplyNamespace(ctx, c.kubeClient.CoreV1(), syncCtx.Recorder(), namespace)
 	if err != nil {
 		errs = append(errs, err)
 	}
 
-	// Hub cluster-admin accepts the spoke cluster, we apply
-	// 1. clusterrole and clusterrolebinding for this spoke cluster.
-	// 2. namespace for this spoke cluster.
-	// 3. role and rolebinding for this spoke cluster on its namespace.
-	resourceResults := c.applier.Apply(
-		ctx,
-		syncCtx.Recorder(),
-		helpers.ManagedClusterAssetFn(manifests.RBACManifests, managedClusterName),
-		manifests.ClusterSpecificRBACFiles...,
-	)
+	resourceResults := c.applier.Apply(ctx, syncCtx.Recorder(),
+		helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, managedClusterName, managedCluster.Spec.HubAcceptsClient),
+		append(manifests.ClusterSpecificRBACFiles, manifests.ClusterSpecificRoleBindings...)...)
 	for _, result := range resourceResults {
 		if result.Error != nil {
-			errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
+			errs = append(errs, result.Error)
 		}
 	}
 
@@ -203,23 +225,6 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	}
 	if updated {
 		c.eventRecorder.Eventf("ManagedClusterAccepted", "managed cluster %s is accepted by hub cluster admin", managedClusterName)
-	}
-	return operatorhelpers.NewMultiLineAggregate(errs)
-}
-
-func (c *managedClusterController) removeManagedClusterResources(ctx context.Context, managedClusterName string) error {
-	var errs []error
-	// Clean up managed cluster manifests
-	assetFn := helpers.ManagedClusterAssetFn(manifests.RBACManifests, managedClusterName)
-	resourceResults := resourceapply.DeleteAll(ctx,
-		resourceapply.NewKubeClientHolder(c.kubeClient),
-		c.eventRecorder,
-		assetFn,
-		manifests.ClusterSpecificRBACFiles...)
-	for _, result := range resourceResults {
-		if result.Error != nil {
-			errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
-		}
 	}
 	return operatorhelpers.NewMultiLineAggregate(errs)
 }
