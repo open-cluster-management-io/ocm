@@ -299,8 +299,17 @@ func TestApplyUnstructred(t *testing.T) {
 
 			c.required.SetOwnerReferences([]metav1.OwnerReference{c.owner})
 			syncContext := testingcommon.NewFakeSyncContext(t, "test")
+
+			objHash := hashOfResourceStruct(c.required)
+			annotations := c.required.GetAnnotations()
+			if annotations == nil {
+				annotations = map[string]string{}
+			}
+			annotations["open-cluster-management.io/object-hash"] = objHash
+			c.required.SetAnnotations(annotations)
+
 			_, _, err := applier.applyUnstructured(
-				context.TODO(), c.required, c.gvr, syncContext.Recorder())
+				context.TODO(), c.required, c.gvr, syncContext.Recorder(), &objectHashCache{})
 
 			if err != nil {
 				t.Errorf("expect no error, but got %v", err)

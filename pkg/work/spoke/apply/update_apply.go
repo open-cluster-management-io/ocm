@@ -2,7 +2,9 @@ package apply
 
 import (
 	"context"
+	"crypto/md5"
 	"fmt"
+	"io"
 	"reflect"
 	"strings"
 
@@ -12,6 +14,7 @@ import (
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -22,6 +25,11 @@ import (
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
+
+// TODO onlyUpdateFromMW and objHashAnnotation need to be surfaced in the API
+var onlyUpdateFromMW = true
+
+const objHashAnnotation = "open-cluster-management.io/object-hash"
 
 type UpdateApply struct {
 	dynamicClient       dynamic.Interface
@@ -55,7 +63,20 @@ func (c *UpdateApply) Apply(
 		WithDynamicClient(c.dynamicClient)
 
 	required.SetOwnerReferences([]metav1.OwnerReference{owner})
-	results := resourceapply.ApplyDirectly(ctx, clientHolder, recorder, c.staticResourceCache, func(name string) ([]byte, error) {
+	cache := c.staticResourceCache
+	if onlyUpdateFromMW {
+		objHash := hashOfResourceStruct(required)
+		annotations := required.GetAnnotations()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		annotations["open-cluster-management.io/object-hash"] = objHash
+		fmt.Printf("object hash is %v\n", objHash)
+		required.SetAnnotations(annotations)
+		cache = &objectHashCache{}
+	}
+
+	results := resourceapply.ApplyDirectly(ctx, clientHolder, recorder, cache, func(name string) ([]byte, error) {
 		return required.MarshalJSON()
 	}, "manifest")
 
@@ -65,7 +86,7 @@ func (c *UpdateApply) Apply(
 	// TODO we should check the certain error.
 	// Use dynamic client when scheme cannot decode manifest or typed client cannot handle the object
 	if isDecodeError(err) || isUnhandledError(err) || isUnsupportedError(err) {
-		obj, _, err = c.applyUnstructured(ctx, required, gvr, recorder)
+		obj, _, err = c.applyUnstructured(ctx, required, gvr, recorder, cache)
 	}
 
 	if err == nil && (!reflect.ValueOf(obj).IsValid() || reflect.ValueOf(obj).IsNil()) {
@@ -82,7 +103,8 @@ func (c *UpdateApply) applyUnstructured(
 	ctx context.Context,
 	required *unstructured.Unstructured,
 	gvr schema.GroupVersionResource,
-	recorder events.Recorder) (*unstructured.Unstructured, bool, error) {
+	recorder events.Recorder,
+	cache resourceapply.ResourceCache) (*unstructured.Unstructured, bool, error) {
 	existing, err := c.dynamicClient.
 		Resource(gvr).
 		Namespace(required.GetNamespace()).
@@ -97,6 +119,11 @@ func (c *UpdateApply) applyUnstructured(
 
 	if err != nil {
 		return nil, false, err
+	}
+
+	requiredCopy := required.DeepCopy()
+	if cache.SafeToSkipApply(requiredCopy, existing) {
+		return existing, false, nil
 	}
 
 	// Merge OwnerRefs, Labels, and Annotations.
@@ -119,6 +146,7 @@ func (c *UpdateApply) applyUnstructured(
 
 	// Compare and update the unstrcuctured.
 	if !*modified && isSameUnstructured(required, existing) {
+		cache.UpdateCachedResourceMetadata(requiredCopy, existing)
 		return existing, false, nil
 	}
 	required.SetResourceVersion(existing.GetResourceVersion())
@@ -126,6 +154,7 @@ func (c *UpdateApply) applyUnstructured(
 		ctx, required, metav1.UpdateOptions{})
 	recorder.Eventf(fmt.Sprintf(
 		"%s Updated", required.GetKind()), "Updated %s/%s", required.GetNamespace(), required.GetName())
+	cache.UpdateCachedResourceMetadata(requiredCopy, actual)
 	return actual, true, err
 }
 
@@ -171,4 +200,47 @@ func isSameUnstructured(obj1, obj2 *unstructured.Unstructured) bool {
 	delete(obj2Copy.Object, "status")
 
 	return equality.Semantic.DeepEqual(obj1Copy.Object, obj2Copy.Object)
+}
+
+// detect changes in a resource by caching a hash of the string representation of the resource
+// note: some changes in a resource e.g. nil vs empty, will not be detected this way
+func hashOfResourceStruct(o interface{}) string {
+	oString := fmt.Sprintf("%v", o)
+	h := md5.New()
+	io.WriteString(h, oString)
+	rval := fmt.Sprintf("%x", h.Sum(nil))
+	return rval
+}
+
+type objectHashCache struct{}
+
+func (c *objectHashCache) UpdateCachedResourceMetadata(_ runtime.Object, _ runtime.Object) {
+	return
+}
+
+func (c *objectHashCache) SafeToSkipApply(required runtime.Object, existing runtime.Object) bool {
+	requiredAccessor, err := meta.Accessor(required)
+	if err != nil {
+		return true
+	}
+	// existing could be nil in some cases.
+	if existing == nil {
+		return false
+	}
+	existingAccessor, err := meta.Accessor(existing)
+	if err != nil {
+		return true
+	}
+	fmt.Printf("2 existing object is %v\n", required)
+	if len(requiredAccessor.GetAnnotations()) == 0 {
+		return true
+	}
+	requiredObjHash := requiredAccessor.GetAnnotations()[objHashAnnotation]
+	fmt.Printf("existing object is %v\n", existing)
+	if len(existingAccessor.GetAnnotations()) == 0 {
+		// Always update since existing does not have the annotation yet
+		return false
+	}
+	existingObjHash := existingAccessor.GetAnnotations()[objHashAnnotation]
+	return requiredObjHash == existingObjHash
 }
