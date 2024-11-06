@@ -1179,13 +1179,16 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				if err != nil {
 					return err
 				}
+
+				// Check if any argument contains "--feature-gates=DefaultClusterSet=true"
 				for _, arg := range actual.Spec.Template.Spec.Containers[0].Args {
 					if arg == "--feature-gates=DefaultClusterSet=true" {
-						return nil
+						return fmt.Errorf("unexpected argument '--feature-gates=DefaultClusterSet=true' found in args: %v", actual.Spec.Template.Spec.Containers[0].Args)
 					}
 				}
-				return fmt.Errorf("do not find the --feature-gates=DefaultClusterSet=true args, got %v", actual.Spec.Template.Spec.Containers[0].Args)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+				return nil // no matching argument found, which is the expected condition
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil(), "Expected '--feature-gates=DefaultClusterSet=true' to be absent in Args, but it was found")
 
 			util.AssertClusterManagerCondition(clusterManagerName, operatorClient,
 				helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue)

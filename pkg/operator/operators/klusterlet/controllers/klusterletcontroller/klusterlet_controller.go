@@ -303,7 +303,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	//       function is enabled, additional permissions for get, list, and watch RBAC resources required by this
 	//       function need to be applied
 	var registrationFeatureMsgs, workFeatureMsgs string
-	registrationFeatureGates := helpers.DefaultSpokeRegistrationFeatureGates
+	var registrationFeatureGates []operatorapiv1.FeatureGate
 	if klusterlet.Spec.RegistrationConfiguration != nil {
 		registrationFeatureGates = klusterlet.Spec.RegistrationConfiguration.FeatureGates
 		config.ClientCertExpirationSeconds = klusterlet.Spec.RegistrationConfiguration.ClientCertExpirationSeconds

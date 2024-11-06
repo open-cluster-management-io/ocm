@@ -446,9 +446,6 @@ func TestDefault(t *testing.T) {
 		},
 	}
 	runtime.Must(features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates))
-	if err := features.HubMutableFeatureGate.Set(fmt.Sprintf("%s=true", string(ocmfeature.DefaultClusterSet))); err != nil {
-		t.Fatal(err)
-	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			w := ManagedClusterWebhook{}
