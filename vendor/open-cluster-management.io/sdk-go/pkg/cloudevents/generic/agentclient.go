@@ -7,6 +7,7 @@ import (
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+	cloudeventstypes "github.com/cloudevents/sdk-go/v2/types"
 
 	"k8s.io/klog/v2"
 
@@ -182,6 +183,17 @@ func (c *CloudEventAgentClient[T]) receive(ctx context.Context, evt cloudevents.
 
 	if eventType.SubResource != types.SubResourceSpec {
 		klog.Warningf("unsupported event type %s, ignore", eventType)
+		return
+	}
+
+	evtExtensions := evt.Context.GetExtensions()
+	clusterName, err := cloudeventstypes.ToString(evtExtensions[types.ExtensionClusterName])
+	if err != nil {
+		klog.Errorf("failed to get clustername extension: %v", err)
+		return
+	}
+	if clusterName != c.clusterName {
+		klog.V(4).Infof("event clustername %s and agent clustername %s do not match, ignore", clusterName, c.clusterName)
 		return
 	}
 

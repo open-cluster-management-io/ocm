@@ -784,7 +784,8 @@ func filterClustersBySelector(
 ) ([]clusterapiv1beta1.ClusterDecision, *framework.Status) {
 	var matched []clusterapiv1beta1.ClusterDecision
 	// create cluster label selector
-	clusterSelector, err := helpers.NewClusterSelector(selector)
+	// cel evaluator is set to nil currently, can enable it when we decide to support CEL in decision group
+	clusterSelector, err := helpers.NewClusterSelector(selector, nil)
 	if err != nil {
 		status := framework.NewStatus("", framework.Misconfigured, err.Error())
 		return matched, status
@@ -792,7 +793,7 @@ func filterClustersBySelector(
 
 	// filter clusters by label selector
 	for _, cluster := range clusters {
-		if ok := clusterSelector.Matches(cluster.Labels, helpers.GetClusterClaims(cluster)); !ok {
+		if ok, _ := clusterSelector.Matches(cluster); !ok {
 			continue
 		}
 		if !clusterNames.Has(cluster.Name) {
