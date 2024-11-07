@@ -15,8 +15,7 @@ func TestMatches(t *testing.T) {
 	cases := []struct {
 		name            string
 		clusterselector clusterapiv1beta1.ClusterSelector
-		clusterlabels   map[string]string
-		clusterclaims   map[string]string
+		cluster         *clusterapiv1.ManagedCluster
 		expectedMatch   bool
 	}{
 		{
@@ -28,8 +27,7 @@ func TestMatches(t *testing.T) {
 					},
 				},
 			},
-			clusterlabels: map[string]string{"cloud": "Amazon"},
-			clusterclaims: map[string]string{},
+			cluster:       testinghelpers.NewManagedCluster("test").WithLabel("cloud", "Amazon").Build(),
 			expectedMatch: true,
 		},
 		{
@@ -41,8 +39,7 @@ func TestMatches(t *testing.T) {
 					},
 				},
 			},
-			clusterlabels: map[string]string{"cloud": "Google"},
-			clusterclaims: map[string]string{},
+			cluster:       testinghelpers.NewManagedCluster("test").WithLabel("cloud", "Google").Build(),
 			expectedMatch: false,
 		},
 		{
@@ -58,8 +55,7 @@ func TestMatches(t *testing.T) {
 					},
 				},
 			},
-			clusterlabels: map[string]string{},
-			clusterclaims: map[string]string{"cloud": "Amazon"},
+			cluster:       testinghelpers.NewManagedCluster("test").WithClaim("cloud", "Amazon").Build(),
 			expectedMatch: true,
 		},
 		{
@@ -75,8 +71,7 @@ func TestMatches(t *testing.T) {
 					},
 				},
 			},
-			clusterlabels: map[string]string{},
-			clusterclaims: map[string]string{"cloud": "Google"},
+			cluster:       testinghelpers.NewManagedCluster("test").WithClaim("cloud", "Google").Build(),
 			expectedMatch: false,
 		},
 		{
@@ -97,8 +92,7 @@ func TestMatches(t *testing.T) {
 					},
 				},
 			},
-			clusterlabels: map[string]string{"cloud": "Amazon"},
-			clusterclaims: map[string]string{"region": "us-east-1"},
+			cluster:       testinghelpers.NewManagedCluster("test").WithLabel("cloud", "Amazon").WithClaim("region", "us-east-1").Build(),
 			expectedMatch: true,
 		},
 		{
@@ -119,21 +113,68 @@ func TestMatches(t *testing.T) {
 					},
 				},
 			},
-			clusterlabels: map[string]string{"region": "us-east-1"},
-			clusterclaims: map[string]string{"cloud": "Amazon"},
+			cluster:       testinghelpers.NewManagedCluster("test").WithLabel("region", "us-east-1").WithClaim("cloud", "Amazon").Build(),
+			expectedMatch: false,
+		},
+		{
+			name: "match with cel expression - label",
+			clusterselector: clusterapiv1beta1.ClusterSelector{
+				CelSelector: clusterapiv1beta1.ClusterCelSelector{
+					CelExpressions: []string{
+						`managedCluster.metadata.labels["version"].matches('^1\\.(14|15)\\.\\d+$')`,
+					},
+				},
+			},
+			cluster:       testinghelpers.NewManagedCluster("test").WithLabel("version", "1.14.3").Build(),
+			expectedMatch: true,
+		},
+		{
+			name: "not match with cel expression - label",
+			clusterselector: clusterapiv1beta1.ClusterSelector{
+				CelSelector: clusterapiv1beta1.ClusterCelSelector{
+					CelExpressions: []string{
+						`managedCluster.metadata.labels["version"].matches('^1\\.(14|15)\\.\\d+$')`,
+					},
+				},
+			},
+			cluster:       testinghelpers.NewManagedCluster("test").WithLabel("version", "1.16.3").Build(),
+			expectedMatch: false,
+		},
+		{
+			name: "match with cel expression - claim",
+			clusterselector: clusterapiv1beta1.ClusterSelector{
+				CelSelector: clusterapiv1beta1.ClusterCelSelector{
+					CelExpressions: []string{
+						`managedCluster.status.clusterClaims.exists(c, c.name == "version" && c.value.matches('^1\\.(14|15)\\.\\d+$'))`,
+					},
+				},
+			},
+			cluster:       testinghelpers.NewManagedCluster("test").WithClaim("version", "1.14.3").Build(),
+			expectedMatch: true,
+		},
+		{
+			name: "not match with cel expression - claim",
+			clusterselector: clusterapiv1beta1.ClusterSelector{
+				CelSelector: clusterapiv1beta1.ClusterCelSelector{
+					CelExpressions: []string{
+						`managedCluster.status.clusterClaims.exists(c, c.name == "version" && c.value.matches('^1\\.(14|15)\\.\\d+$'))`,
+					},
+				},
+			},
+			cluster:       testinghelpers.NewManagedCluster("test").WithClaim("version", "1.16.3").Build(),
 			expectedMatch: false,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			clusterSelector, err := NewClusterSelector(c.clusterselector)
+			clusterSelector, err := NewClusterSelector(c.clusterselector, nil)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}
-			result := clusterSelector.Matches(c.clusterlabels, c.clusterclaims)
+			result := clusterSelector.Matches(c.cluster)
 			if c.expectedMatch != result {
-				t.Errorf("expected match to be %v but get : %v", c.expectedMatch, result)
+				t.Errorf("expected match to be %v but got: %v", c.expectedMatch, result)
 			}
 		})
 	}

@@ -1584,7 +1584,7 @@ open-cluster-management.io/addon-framework/pkg/agent
 open-cluster-management.io/addon-framework/pkg/assets
 open-cluster-management.io/addon-framework/pkg/index
 open-cluster-management.io/addon-framework/pkg/utils
-# open-cluster-management.io/api v0.15.1-0.20241210025410-0ba6809d0ae2
+# open-cluster-management.io/api v0.15.1-0.20241210025410-0ba6809d0ae2 => github.com/haoqing0110/api v0.0.0-20250103062352-f89d6a235b5d
 ## explicit; go 1.22.0
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/client/addon/clientset/versioned
@@ -1655,8 +1655,8 @@ open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/utils/work/v1/workvalidator
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v0.15.1-0.20241125015855-1536c3970f8f
-## explicit; go 1.22.0
+# open-cluster-management.io/sdk-go v0.15.1-0.20241125015855-1536c3970f8f => github.com/haoqing0110/sdk-go v0.0.0-20250103070425-b9c9ca7d8140
+## explicit; go 1.22.5
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta2
@@ -1665,6 +1665,7 @@ open-cluster-management.io/sdk-go/pkg/apis/work/v1/builder
 open-cluster-management.io/sdk-go/pkg/apis/work/v1/validator
 open-cluster-management.io/sdk-go/pkg/basecontroller/events
 open-cluster-management.io/sdk-go/pkg/basecontroller/factory
+open-cluster-management.io/sdk-go/pkg/cel/managedcluster
 open-cluster-management.io/sdk-go/pkg/certrotation
 open-cluster-management.io/sdk-go/pkg/cloudevents/constants
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic
@@ -1784,3 +1785,5 @@ sigs.k8s.io/structured-merge-diff/v4/value
 ## explicit; go 1.12
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
+# open-cluster-management.io/api => github.com/haoqing0110/api v0.0.0-20250103062352-f89d6a235b5d
+# open-cluster-management.io/sdk-go => github.com/haoqing0110/sdk-go v0.0.0-20250103070425-b9c9ca7d8140

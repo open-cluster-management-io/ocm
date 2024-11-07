@@ -107,11 +107,11 @@ func (b *PlacementBuilder) WithDeletionTimestamp() *PlacementBuilder {
 	return b
 }
 
-func (b *PlacementBuilder) AddPredicate(labelSelector *metav1.LabelSelector, claimSelector *clusterapiv1beta1.ClusterClaimSelector) *PlacementBuilder {
+func (b *PlacementBuilder) AddPredicate(labelSelector *metav1.LabelSelector, claimSelector *clusterapiv1beta1.ClusterClaimSelector, celSelector *clusterapiv1beta1.ClusterCelSelector) *PlacementBuilder {
 	if b.placement.Spec.Predicates == nil {
 		b.placement.Spec.Predicates = []clusterapiv1beta1.ClusterPredicate{}
 	}
-	b.placement.Spec.Predicates = append(b.placement.Spec.Predicates, NewClusterPredicate(labelSelector, claimSelector))
+	b.placement.Spec.Predicates = append(b.placement.Spec.Predicates, NewClusterPredicate(labelSelector, claimSelector, celSelector))
 	return b
 }
 
@@ -169,7 +169,7 @@ func (b *PlacementBuilder) Build() *clusterapiv1beta1.Placement {
 	return b.placement
 }
 
-func NewClusterPredicate(labelSelector *metav1.LabelSelector, claimSelector *clusterapiv1beta1.ClusterClaimSelector) clusterapiv1beta1.ClusterPredicate {
+func NewClusterPredicate(labelSelector *metav1.LabelSelector, claimSelector *clusterapiv1beta1.ClusterClaimSelector, celSelector *clusterapiv1beta1.ClusterCelSelector) clusterapiv1beta1.ClusterPredicate {
 	predicate := clusterapiv1beta1.ClusterPredicate{
 		RequiredClusterSelector: clusterapiv1beta1.ClusterSelector{},
 	}
@@ -180,6 +180,10 @@ func NewClusterPredicate(labelSelector *metav1.LabelSelector, claimSelector *clu
 
 	if claimSelector != nil {
 		predicate.RequiredClusterSelector.ClaimSelector = *claimSelector
+	}
+
+	if celSelector != nil {
+		predicate.RequiredClusterSelector.CelSelector = *celSelector
 	}
 
 	return predicate
@@ -309,6 +313,11 @@ func (b *ManagedClusterBuilder) WithDeletionTimestamp() *ManagedClusterBuilder {
 	return b
 }
 
+func (b *ManagedClusterBuilder) Withk8sVersion(version string) *ManagedClusterBuilder {
+	b.cluster.Status.Version.Kubernetes = version
+	return b
+}
+
 func (b *ManagedClusterBuilder) Build() *clusterapiv1.ManagedCluster {
 	return b.cluster
 }
@@ -378,6 +387,17 @@ func (a *AddOnPlacementScoreBuilder) WithScore(name string, score int32) *AddOnP
 func (a *AddOnPlacementScoreBuilder) WithValidUntil(validUntil time.Time) *AddOnPlacementScoreBuilder {
 	vu := metav1.NewTime(validUntil)
 	a.addOnPlacementScore.Status.ValidUntil = &vu
+	return a
+}
+
+func (a *AddOnPlacementScoreBuilder) WithQuantity(name string, quantity string) *AddOnPlacementScoreBuilder {
+	for i, score := range a.addOnPlacementScore.Status.Scores {
+		if score.Name == name {
+			q, _ := resource.ParseQuantity(quantity)
+			a.addOnPlacementScore.Status.Scores[i].Quantity = q
+			return a
+		}
+	}
 	return a
 }
 
