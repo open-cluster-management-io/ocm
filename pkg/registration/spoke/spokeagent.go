@@ -59,8 +59,7 @@ type SpokeAgentConfig struct {
 
 	internalHubConfigValidFunc wait.ConditionWithContextFunc
 
-	hubKubeConfigChecker            *hubKubeConfigHealthChecker
-	bootstrapKubeconfigEventHandler *bootstrapKubeconfigEventHandler
+	hubKubeConfigChecker *hubKubeConfigHealthChecker
 
 	// agentStopFunc is the function to stop the agent, and the external system can restart the agent
 	// with the refreshed configuration.
@@ -73,9 +72,6 @@ func NewSpokeAgentConfig(commonOpts *commonoptions.AgentOptions, opts *SpokeAgen
 		agentOptions:       commonOpts,
 		registrationOption: opts,
 		agentStopFunc:      cancel,
-		bootstrapKubeconfigEventHandler: &bootstrapKubeconfigEventHandler{
-			bootstrapKubeconfigSecretName: &opts.BootstrapKubeconfigSecret,
-		},
 	}
 	cfg.hubKubeConfigChecker = &hubKubeConfigHealthChecker{
 		checkFunc: cfg.IsHubKubeConfigValid,
