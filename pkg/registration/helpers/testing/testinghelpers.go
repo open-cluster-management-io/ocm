@@ -421,6 +421,7 @@ type TestCert struct {
 	Key  []byte
 }
 
+// TODO: Remove this struct once we have the function fully implemented for the AWSIRSADriver
 type TestIrsaRequest struct {
 }
 

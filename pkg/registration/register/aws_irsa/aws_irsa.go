@@ -16,6 +16,8 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
+//TODO: Remove these constants in once we have the function fully implemented for the AWSIRSADriver
+
 const (
 	// TLSKeyFile is the name of tls key file in kubeconfigSecret
 	TLSKeyFile = "tls.key"
