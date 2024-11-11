@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	applyoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
+
 	"github.com/robfig/cron"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -17,7 +19,6 @@ import (
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/operator/management"
-	"github.com/openshift/library-go/pkg/operator/v1helpers"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 )
 
@@ -29,21 +30,29 @@ var defaultCacheSyncTimeout = 10 * time.Minute
 
 // baseController represents generic Kubernetes controller boiler-plate
 type baseController struct {
-	name               string
-	cachesToSync       []cache.InformerSynced
-	sync               func(ctx context.Context, controllerContext SyncContext) error
-	syncContext        SyncContext
-	syncDegradedClient operatorv1helpers.OperatorClient
-	resyncEvery        time.Duration
-	resyncSchedules    []cron.Schedule
-	postStartHooks     []PostStartHook
-	cacheSyncTimeout   time.Duration
+	name                   string
+	controllerInstanceName string
+	cachesToSync           []cache.InformerSynced
+	sync                   func(ctx context.Context, controllerContext SyncContext) error
+	syncContext            SyncContext
+	syncDegradedClient     operatorv1helpers.OperatorClient
+	resyncEvery            time.Duration
+	resyncSchedules        []cron.Schedule
+	postStartHooks         []PostStartHook
+	cacheSyncTimeout       time.Duration
 }
 
 var _ Controller = &baseController{}
 
+// Name returns a controller name.
 func (c baseController) Name() string {
 	return c.name
+}
+
+// ControllerInstanceName specifies the controller instance.
+// Useful when the same controller is used multiple times.
+func (c baseController) ControllerInstanceName() string {
+	return c.controllerInstanceName
 }
 
 type scheduledJob struct {
@@ -222,23 +231,25 @@ func (c *baseController) reportDegraded(ctx context.Context, reportedError error
 		return reportedError
 	}
 	if reportedError != nil {
-		_, _, updateErr := v1helpers.UpdateStatus(ctx, c.syncDegradedClient, v1helpers.UpdateConditionFn(operatorv1.OperatorCondition{
-			Type:    c.name + "Degraded",
-			Status:  operatorv1.ConditionTrue,
-			Reason:  "SyncError",
-			Message: reportedError.Error(),
-		}))
+		condition := applyoperatorv1.OperatorStatus().
+			WithConditions(applyoperatorv1.OperatorCondition().
+				WithType(c.name + "Degraded").
+				WithStatus(operatorv1.ConditionTrue).
+				WithReason("SyncError").
+				WithMessage(reportedError.Error()))
+		updateErr := c.syncDegradedClient.ApplyOperatorStatus(ctx, ControllerFieldManager(c.name, "reportDegraded"), condition)
 		if updateErr != nil {
 			klog.Warningf("Updating status of %q failed: %v", c.Name(), updateErr)
 		}
 		return reportedError
 	}
-	_, _, updateErr := v1helpers.UpdateStatus(ctx, c.syncDegradedClient,
-		v1helpers.UpdateConditionFn(operatorv1.OperatorCondition{
-			Type:   c.name + "Degraded",
-			Status: operatorv1.ConditionFalse,
-			Reason: "AsExpected",
-		}))
+
+	condition := applyoperatorv1.OperatorStatus().
+		WithConditions(applyoperatorv1.OperatorCondition().
+			WithType(c.name + "Degraded").
+			WithStatus(operatorv1.ConditionFalse).
+			WithReason("AsExpected"))
+	updateErr := c.syncDegradedClient.ApplyOperatorStatus(ctx, ControllerFieldManager(c.name, "reportDegraded"), condition)
 	return updateErr
 }
 

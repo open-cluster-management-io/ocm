@@ -75,6 +75,11 @@ func (in *AWSMachineProviderConfig) DeepCopyInto(out *AWSMachineProviderConfig) 
 		(*in).DeepCopyInto(*out)
 	}
 	out.MetadataServiceOptions = in.MetadataServiceOptions
+	if in.PlacementGroupPartition != nil {
+		in, out := &in.PlacementGroupPartition, &out.PlacementGroupPartition
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 
@@ -1264,6 +1269,13 @@ func (in *MachineSetStatus) DeepCopyInto(out *MachineSetStatus) {
 		in, out := &in.ErrorMessage, &out.ErrorMessage
 		*out = new(string)
 		**out = **in
+	}
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]Condition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	return
 }
