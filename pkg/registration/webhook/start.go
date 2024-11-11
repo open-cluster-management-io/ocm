@@ -71,10 +71,6 @@ func (c *Options) RunWebhookServer() error {
 		logger.Error(err, "unable to create ManagedClusterSetBinding webhook", "version", "v1beta2")
 		return err
 	}
-	if err = (&internalv1beta2.ManagedClusterSet{}).SetupWebhookWithManager(mgr); err != nil {
-		logger.Error(err, "unable to create ManagedClusterSet webhook", "version", "v1beta2")
-		return err
-	}
 
 	logger.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

@@ -5,6 +5,7 @@ metadata:
   labels:
     open-cluster-management.io/cluster-name: "{{ .ManagedClusterName }}"
 rules:
+{{- if .Accepted }}
 # Allow agent to rotate its certificate
 - apiGroups: ["certificates.k8s.io"]
   resources: ["certificatesigningrequests"]
@@ -22,3 +23,10 @@ rules:
   resources: ["managedclusters/status"]
   resourceNames: ["{{ .ManagedClusterName }}"]
   verbs: ["patch", "update"]
+{{- else }}
+# Only allow agent to get/list/watch its owner managed cluster
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclusters"]
+  resourceNames: ["{{ .ManagedClusterName }}"]
+  verbs: ["get", "list", "watch"]
+{{- end }}

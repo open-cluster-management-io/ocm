@@ -62,6 +62,12 @@ var (
 		"cluster-manager/hub/cluster-manager-addon-manager-serviceaccount.yaml",
 	}
 
+	clusterProfileResourceFiles = []string{
+		// clusterprofile
+		"cluster-manager/hub/cluster-manager-clusterprofiles-clusterrole.yaml",
+		"cluster-manager/hub/cluster-manager-clusterprofiles-clusterrolebinding.yaml",
+	}
+
 	// The hubHostedWebhookServiceFiles should only be deployed on the hub cluster when the deploy mode is hosted.
 	hubDefaultWebhookServiceFiles = []string{
 		"cluster-manager/hub/cluster-manager-registration-webhook-service.yaml",
@@ -96,6 +102,14 @@ func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 	// Remove ManifestWokReplicaSet deployment if feature not enabled
 	if !config.MWReplicaSetEnabled {
 		_, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, mwReplicaSetResourceFiles...)
+		if err != nil {
+			return cm, reconcileStop, err
+		}
+	}
+
+	// If ClusterProfile is not enabled, remove related resources
+	if !config.ClusterProfileEnabled {
+		_, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, clusterProfileResourceFiles...)
 		if err != nil {
 			return cm, reconcileStop, err
 		}
@@ -156,6 +170,11 @@ func getHubResources(mode operatorapiv1.InstallMode, config manifests.HubConfig)
 	if config.MWReplicaSetEnabled {
 		hubResources = append(hubResources, mwReplicaSetResourceFiles...)
 	}
+
+	if config.ClusterProfileEnabled {
+		hubResources = append(hubResources, clusterProfileResourceFiles...)
+	}
+
 	// the hubHostedWebhookServiceFiles are only used in hosted mode
 	if helpers.IsHosted(mode) {
 		hubResources = append(hubResources, hubHostedWebhookServiceFiles...)

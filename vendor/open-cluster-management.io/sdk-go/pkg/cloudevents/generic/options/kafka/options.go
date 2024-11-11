@@ -43,6 +43,11 @@ type KafkaConfig struct {
 	// GroupID is a string that uniquely identifies the group of consumer processes to which this consumer belongs.
 	// Each different application will have a unique consumer GroupID. The default value is agentID for agent, sourceID for source
 	GroupID string `json:"groupID,omitempty" yaml:"groupID,omitempty"`
+
+	// AdvancedConfig is the advanced configuration for Kafka consumer/producer.
+	// Apply any configuration options from the official librdkafka configuration documentation:
+	// https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md
+	AdvancedConfig map[string]interface{} `json:"advancedConfig,inline,omitempty" yaml:"advancedConfig,inline,omitempty"`
 }
 
 // Listen to all the events on the default events channel
@@ -103,6 +108,7 @@ func BuildKafkaOptionsFromFlags(configPath string) (*KafkaOptions, error) {
 		return nil, fmt.Errorf("setting clientCertFile and clientKeyFile requires caFile")
 	}
 
+	// default config
 	configMap := kafka.ConfigMap{
 		"bootstrap.servers":       config.BootstrapServer,
 		"socket.keepalive.enable": true,
@@ -114,8 +120,8 @@ func BuildKafkaOptionsFromFlags(configPath string) (*KafkaOptions, error) {
 		"go.events.channel.size": 1000,
 
 		// producer
-		"acks":    "1",
-		"retries": "0",
+		"acks":    1,
+		"retries": 0,
 
 		// consumer
 		"group.id": config.GroupID,
@@ -145,6 +151,11 @@ func BuildKafkaOptionsFromFlags(configPath string) (*KafkaOptions, error) {
 		_ = configMap.SetKey("ssl.ca.location", config.CAFile)
 		_ = configMap.SetKey("ssl.certificate.location", config.ClientCertFile)
 		_ = configMap.SetKey("ssl.key.location", config.ClientKeyFile)
+	}
+
+	// apply advanced configuration overrides
+	for key, value := range config.AdvancedConfig {
+		_ = configMap.SetKey(key, value)
 	}
 
 	return &KafkaOptions{

@@ -1,3 +1,18 @@
+/*
+ * Copyright (c) 2024 Contributors to the Eclipse Foundation
+ *
+ *  All rights reserved. This program and the accompanying materials
+ *  are made available under the terms of the Eclipse Public License v2.0
+ *  and Eclipse Distribution License v1.0 which accompany this distribution.
+ *
+ * The Eclipse Public License is available at
+ *    https://www.eclipse.org/legal/epl-2.0/
+ *  and the Eclipse Distribution License is available at
+ *    http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ *  SPDX-License-Identifier: EPL-2.0 OR BSD-3-Clause
+ */
+
 package paho
 
 import (
@@ -12,6 +27,7 @@ type (
 	Publish struct {
 		PacketID   uint16
 		QoS        byte
+		duplicate  bool // private because this should only ever be set in paho/session
 		Retain     bool
 		Topic      string
 		Properties *PublishProperties
@@ -52,26 +68,34 @@ func (p *Publish) InitProperties(prop *packets.Properties) {
 // returns a paho library Publish
 func PublishFromPacketPublish(p *packets.Publish) *Publish {
 	v := &Publish{
-		PacketID: p.PacketID,
-		QoS:      p.QoS,
-		Retain:   p.Retain,
-		Topic:    p.Topic,
-		Payload:  p.Payload,
+		PacketID:  p.PacketID,
+		QoS:       p.QoS,
+		duplicate: p.Duplicate,
+		Retain:    p.Retain,
+		Topic:     p.Topic,
+		Payload:   p.Payload,
 	}
 	v.InitProperties(p.Properties)
 
 	return v
 }
 
+// Duplicate returns true if the duplicate flag is set (the server sets this if the message has
+// been sent previously; this does not necessarily mean the client has previously processed the message).
+func (p *Publish) Duplicate() bool {
+	return p.duplicate
+}
+
 // Packet returns a packets library Publish from the paho Publish
 // on which it is called
 func (p *Publish) Packet() *packets.Publish {
 	v := &packets.Publish{
-		PacketID: p.PacketID,
-		QoS:      p.QoS,
-		Retain:   p.Retain,
-		Topic:    p.Topic,
-		Payload:  p.Payload,
+		PacketID:  p.PacketID,
+		QoS:       p.QoS,
+		Duplicate: p.duplicate,
+		Retain:    p.Retain,
+		Topic:     p.Topic,
+		Payload:   p.Payload,
 	}
 	if p.Properties != nil {
 		v.Properties = &packets.Properties{
@@ -90,6 +114,9 @@ func (p *Publish) Packet() *packets.Publish {
 }
 
 func (p *Publish) String() string {
+	if p == nil {
+		return "Publish==nil"
+	}
 	var b bytes.Buffer
 
 	fmt.Fprintf(&b, "topic: %s  qos: %d  retain: %t\n", p.Topic, p.QoS, p.Retain)

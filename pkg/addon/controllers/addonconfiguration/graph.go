@@ -369,12 +369,21 @@ func (n *installStrategyNode) addNode(addon *addonv1alpha1.ManagedClusterAddOn) 
 		// TODO we should also filter out the configs which are not supported configs.
 		overrideConfigMapByAddOnConfigs(n.children[addon.Namespace].desiredConfigs, addon.Spec.Configs)
 
-		// copy the spechash from mca status
-		for _, configRef := range addon.Status.ConfigReferences {
-			if configRef.DesiredConfig == nil {
-				continue
-			}
-			if nodeDesiredConfigArray, ok := n.children[addon.Namespace].desiredConfigs[configRef.ConfigGroupResource]; ok {
+		//	go through mca spec configs and copy the specHash from status if they match
+		for _, config := range addon.Spec.Configs {
+			for _, configRef := range addon.Status.ConfigReferences {
+				if configRef.DesiredConfig == nil {
+					continue
+				}
+				// compare the ConfigGroupResource and ConfigReferent
+				if configRef.ConfigGroupResource != config.ConfigGroupResource || configRef.DesiredConfig.ConfigReferent != config.ConfigReferent {
+					continue
+				}
+				// copy the spec hash to desired configs
+				nodeDesiredConfigArray, ok := n.children[addon.Namespace].desiredConfigs[configRef.ConfigGroupResource]
+				if !ok {
+					continue
+				}
 				for i, nodeDesiredConfig := range nodeDesiredConfigArray {
 					if nodeDesiredConfig.DesiredConfig.ConfigReferent == configRef.DesiredConfig.ConfigReferent {
 						n.children[addon.Namespace].desiredConfigs[configRef.ConfigGroupResource][i].DesiredConfig.SpecHash = configRef.DesiredConfig.SpecHash

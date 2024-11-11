@@ -19,6 +19,7 @@ type HubConfig struct {
 	AddOnManagerImage              string
 	AddOnManagerEnabled            bool
 	MWReplicaSetEnabled            bool
+	ClusterProfileEnabled          bool
 	CloudEventsDriverEnabled       bool
 	WorkDriver                     string
 	AutoApproveUsers               string

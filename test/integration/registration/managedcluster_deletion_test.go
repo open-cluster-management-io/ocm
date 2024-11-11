@@ -72,81 +72,81 @@ var _ = ginkgo.Describe("Cluster deleting", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// check rbac are created
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(),
 				mclClusterRoleName(managedCluster.Name), metav1.GetOptions{}); err != nil {
-				return false
+				return err
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(),
 				mclClusterRoleBindingName(managedCluster.Name), metav1.GetOptions{}); err != nil {
-				return false
+				return err
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			if _, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).Get(context.Background(),
 				registrationRoleBindingName(managedCluster.Name), metav1.GetOptions{}); err != nil {
-				return false
+				return err
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			if _, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).Get(context.Background(),
 				workRoleBindingName(managedCluster.Name), metav1.GetOptions{}); err != nil {
-				return false
+				return err
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		// delete cluster
 		err = clusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedCluster.Name, metav1.DeleteOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// addons should be deleting and manifestworks should not be deleting
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			addon, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(context.Background(),
 				"addon1", metav1.GetOptions{})
 			if err != nil {
-				return false
+				return err
 			}
 			if addon.DeletionTimestamp.IsZero() {
-				return false
+				return fmt.Errorf("addon is not deleting")
 			}
 
 			works, err := workClient.WorkV1().ManifestWorks(managedCluster.Name).List(context.Background(), metav1.ListOptions{})
 			if err != nil {
-				return false
+				return err
 			}
 			for _, work := range works.Items {
 				if !work.DeletionTimestamp.IsZero() {
-					return false
+					return fmt.Errorf("work is not deleting")
 				}
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		// remove finalizer on addon1
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			addon, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(context.Background(),
 				"addon1", metav1.GetOptions{})
 			if errors.IsNotFound(err) {
-				return true
+				return nil
 			}
 			if err != nil {
-				return false
+				return err
 			}
 
 			addon.Finalizers = []string{}
 			_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Update(context.Background(),
 				addon, metav1.UpdateOptions{})
-			return err == nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return err
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		// addon should be deleted. work1 should be deleting ,the other work should not be deleting
 		gomega.Eventually(func() bool {
@@ -155,131 +155,131 @@ var _ = ginkgo.Describe("Cluster deleting", func() {
 			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			works, err := workClient.WorkV1().ManifestWorks(managedCluster.Name).List(context.Background(), metav1.ListOptions{})
 			if err != nil {
-				return false
+				return err
 			}
 			if len(works.Items) != 3 {
-				return false
+				return fmt.Errorf("work count is not 3")
 			}
 			for _, work := range works.Items {
 				if work.Name == "work1" && work.DeletionTimestamp.IsZero() {
-					return false
+					return fmt.Errorf("work1 is not deleting")
 				}
 				if work.Name == "work2" && !work.DeletionTimestamp.IsZero() {
-					return false
+					return fmt.Errorf("work2 is not deleting")
 				}
 				if work.Name == "work3" && !work.DeletionTimestamp.IsZero() {
-					return false
+					return fmt.Errorf("work3 is not deleting")
 				}
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		// remove finalizer on work1
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			work, err := workClient.WorkV1().ManifestWorks(managedCluster.Name).Get(context.Background(),
 				"work1", metav1.GetOptions{})
 			if errors.IsNotFound(err) {
-				return true
+				return nil
 			}
 			if err != nil {
-				return false
+				return err
 			}
 
 			work.Finalizers = []string{}
 			_, err = workClient.WorkV1().ManifestWorks(managedCluster.Name).Update(context.Background(),
 				work, metav1.UpdateOptions{})
-			return err == nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return err
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		// work1 should be deleted, work3 should be deleting, work2 should not be deleting
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			works, err := workClient.WorkV1().ManifestWorks(managedCluster.Name).List(context.Background(), metav1.ListOptions{})
 			if err != nil {
-				return false
+				return err
 			}
 			if len(works.Items) != 2 {
-				return false
+				return fmt.Errorf("work count is not 2")
 			}
 			for _, work := range works.Items {
 				if work.Name == "work3" && work.DeletionTimestamp.IsZero() {
-					return false
+					return fmt.Errorf("work3 is not deleting")
 				}
 				if work.Name == "work2" && !work.DeletionTimestamp.IsZero() {
-					return false
+					return fmt.Errorf("work2 is not deleting")
 				}
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		// remove finalizer on work3
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			work, err := workClient.WorkV1().ManifestWorks(managedCluster.Name).Get(context.Background(),
 				"work3", metav1.GetOptions{})
 			if errors.IsNotFound(err) {
-				return true
+				return nil
 			}
 			if err != nil {
-				return false
+				return err
 			}
 
 			work.Finalizers = []string{}
 			_, err = workClient.WorkV1().ManifestWorks(managedCluster.Name).Update(context.Background(),
 				work, metav1.UpdateOptions{})
-			return err == nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return err
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		// work3 should be deleted, work2 should be deleting
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			works, err := workClient.WorkV1().ManifestWorks(managedCluster.Name).List(context.Background(), metav1.ListOptions{})
 			if err != nil {
-				return false
+				return err
 			}
 			if len(works.Items) != 1 {
-				return false
+				return fmt.Errorf("work count is not 1")
 			}
 			for _, work := range works.Items {
 				if work.Name == "work2" && !work.DeletionTimestamp.IsZero() {
-					return false
+					return fmt.Errorf("work2 is not deleting")
 				}
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		// managedCluster should have deleting condition
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			cluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedCluster.Name, metav1.GetOptions{})
 			if err != nil {
-				return false
+				return err
 			}
 			condition := v1helpers.FindCondition(cluster.Status.Conditions, clusterv1.ManagedClusterConditionDeleting)
 			if condition == nil {
-				return false
+				return fmt.Errorf("deleting condition is not found")
 			}
 			if condition.Reason != clusterv1.ConditionDeletingReasonResourceRemaining {
-				return false
+				return fmt.Errorf("deleting condition reason is not %q", clusterv1.ConditionDeletingReasonResourceRemaining)
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		// remove finalizer on work2
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			work, err := workClient.WorkV1().ManifestWorks(managedCluster.Name).Get(context.Background(),
 				"work2", metav1.GetOptions{})
 			if errors.IsNotFound(err) {
-				return true
+				return nil
 			}
 			if err != nil {
-				return false
+				return err
 			}
 
 			work.Finalizers = []string{}
 			_, err = workClient.WorkV1().ManifestWorks(managedCluster.Name).Update(context.Background(),
 				work, metav1.UpdateOptions{})
-			return err == nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return err
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		// all rbac should be deleted
 		gomega.Eventually(func() bool {

@@ -3,13 +3,20 @@ package spoke
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path"
 	"testing"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	ocmfeature "open-cluster-management.io/api/feature"
 
@@ -17,7 +24,19 @@ import (
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/features"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
+	"open-cluster-management.io/ocm/test/integration/util"
 )
+
+var testEnv *envtest.Environment
+var cfg *rest.Config
+var bootstrapKubeConfigFile string
+var authn *util.TestAuthn
+
+var CRDPaths = []string{
+	// agent
+	"../../../vendor/open-cluster-management.io/api/cluster/v1/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml",
+	"../../../vendor/open-cluster-management.io/api/addon/v1alpha1/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml",
+}
 
 func init() {
 	utilruntime.Must(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeRegistrationFeatureGates))
@@ -192,3 +211,78 @@ func TestGetSpokeClusterCABundle(t *testing.T) {
 		})
 	}
 }
+
+func TestManager(t *testing.T) {
+	gomega.RegisterFailHandler(ginkgo.Fail)
+	ginkgo.RunSpecs(t, "Manager Suite")
+}
+
+var _ = ginkgo.BeforeSuite(func() {
+	logf.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
+
+	ginkgo.By("bootstrapping test environment")
+
+	var err error
+
+	authn = util.DefaultTestAuthn
+	apiServer := &envtest.APIServer{}
+	apiServer.SecureServing.Authn = authn
+
+	testEnv = &envtest.Environment{
+		ControlPlane: envtest.ControlPlane{
+			APIServer: apiServer,
+		},
+		ErrorIfCRDPathMissing: true,
+		CRDDirectoryPaths:     CRDPaths,
+	}
+
+	cfg, err = testEnv.Start()
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	gomega.Expect(cfg).ToNot(gomega.BeNil())
+
+	// prepare configs
+	securePort := testEnv.ControlPlane.APIServer.SecureServing.Port
+	gomega.Expect(len(securePort)).ToNot(gomega.BeZero())
+
+	serverCertFile := fmt.Sprintf("%s/apiserver.crt", testEnv.ControlPlane.APIServer.CertDir)
+	bootstrapKubeConfigFile = path.Join(util.TestDir, "bootstrap", "kubeconfig")
+	err = authn.CreateBootstrapKubeConfigWithCertAge(bootstrapKubeConfigFile, serverCertFile, securePort, 24*time.Hour)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	err = features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeRegistrationFeatureGates)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+})
+
+var _ = ginkgo.AfterSuite(func() {
+	ginkgo.By("tearing down the test environment")
+
+	err := testEnv.Stop()
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+})
+
+var _ = ginkgo.Describe("start agent", func() {
+	ginkgo.It("start hub manager", func() {
+		_ = features.SpokeMutableFeatureGate.SetFromMap(map[string]bool{
+			string(ocmfeature.MultipleHubs): false,
+		})
+		ctx, stopAgent := context.WithCancel(context.Background())
+		agentOptions := NewSpokeAgentOptions()
+		commonOptions := commonoptions.NewAgentOptions()
+		commonOptions.AgentID = "test"
+		commonOptions.SpokeClusterName = "cluster1"
+		agentOptions.BootstrapKubeconfig = bootstrapKubeConfigFile
+
+		agentConfig := NewSpokeAgentConfig(commonOptions, agentOptions, stopAgent)
+		go func() {
+			err := agentConfig.RunSpokeAgent(ctx, &controllercmd.ControllerContext{
+				KubeConfig:    cfg,
+				EventRecorder: util.NewIntegrationTestEventRecorder("agent"),
+			})
+			// should get err since bootstrap is not finished yet.
+			gomega.Expect(err).Should(gomega.HaveOccurred())
+		}()
+		// wait for 5 second until the controller is started
+		time.Sleep(5 * time.Second)
+		stopAgent()
+	})
+})

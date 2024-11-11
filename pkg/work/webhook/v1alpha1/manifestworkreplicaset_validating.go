@@ -6,13 +6,13 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	ocmfeature "open-cluster-management.io/api/feature"
 	workv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/webhook/common"
 )
 
@@ -78,7 +78,7 @@ func validatePlaceManifests(mwrSet *workv1alpha1.ManifestWorkReplicaSet) error {
 }
 
 func checkFeatureEnabled() error {
-	if !utilfeature.DefaultMutableFeatureGate.Enabled(ocmfeature.ManifestWorkReplicaSet) {
+	if !features.HubMutableFeatureGate.Enabled(ocmfeature.ManifestWorkReplicaSet) {
 		return errors.New("ManifestWorkReplicaSet feature is disabled")
 	}
 

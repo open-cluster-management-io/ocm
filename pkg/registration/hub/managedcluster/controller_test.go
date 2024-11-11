@@ -29,29 +29,36 @@ import (
 
 func TestSyncManagedCluster(t *testing.T) {
 	cases := []struct {
-		name                string
-		autoApprovalEnabled bool
-		startingObjects     []runtime.Object
-		validateActions     func(t *testing.T, actions []clienttesting.Action)
+		name                   string
+		autoApprovalEnabled    bool
+		startingObjects        []runtime.Object
+		validateClusterActions func(t *testing.T, actions []clienttesting.Action)
+		validateKubeActions    func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
 			name:            "sync a deleted spoke cluster",
 			startingObjects: []runtime.Object{},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateClusterActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertNoActions(t, actions)
+			},
+			validateKubeActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
-			name:            "create a new spoke cluster",
+			name:            "create a new spoke cluster(not accepted before, no accept condition)",
 			startingObjects: []runtime.Object{testinghelpers.NewManagedCluster()},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateClusterActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertNoActions(t, actions)
+			},
+			validateKubeActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
 			name:            "accept a spoke cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewAcceptingManagedCluster()},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateClusterActions: func(t *testing.T, actions []clienttesting.Action) {
 				expectedCondition := metav1.Condition{
 					Type:    v1.ManagedClusterConditionHubAccepted,
 					Status:  metav1.ConditionTrue,
@@ -67,18 +74,34 @@ func TestSyncManagedCluster(t *testing.T) {
 				}
 				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
+			validateKubeActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions,
+					"get", "create", // namespace
+					"create", // clusterrole
+					"create", // clusterrolebinding
+					"create", // registration rolebinding
+					"create") // work rolebinding
+			},
 		},
 		{
 			name:            "sync an accepted spoke cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateClusterActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertNoActions(t, actions)
+			},
+			validateKubeActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions,
+					"get", "create", // namespace
+					"create", // clusterrole
+					"create", // clusterrolebinding
+					"create", // registration rolebinding
+					"create") // work rolebinding
 			},
 		},
 		{
 			name:            "deny an accepted spoke cluster",
-			startingObjects: []runtime.Object{testinghelpers.NewDeniedManagedCluster()},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+			startingObjects: []runtime.Object{testinghelpers.NewDeniedManagedCluster("True")},
+			validateClusterActions: func(t *testing.T, actions []clienttesting.Action) {
 				expectedCondition := metav1.Condition{
 					Type:    v1.ManagedClusterConditionHubAccepted,
 					Status:  metav1.ConditionFalse,
@@ -94,11 +117,21 @@ func TestSyncManagedCluster(t *testing.T) {
 				}
 				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
+			validateKubeActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions,
+					"create", // clusterrole
+					"create", // clusterrolebinding
+					"delete", // registration rolebinding
+					"delete") // work rolebinding
+			},
 		},
 		{
 			name:            "delete a spoke cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewDeletingManagedCluster()},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateClusterActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertNoActions(t, actions)
+			},
+			validateKubeActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertNoActions(t, actions)
 			},
 		},
@@ -106,8 +139,25 @@ func TestSyncManagedCluster(t *testing.T) {
 			name:                "should accept the clusters when auto approval is enabled",
 			autoApprovalEnabled: true,
 			startingObjects:     []runtime.Object{testinghelpers.NewManagedCluster()},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateClusterActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
+			},
+		},
+		{
+			name:                "should add the auto approval annotation to an accepted cluster when auto approval is enabled",
+			autoApprovalEnabled: true,
+			startingObjects:     []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
+			validateClusterActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &v1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, ok := managedCluster.Annotations[clusterAcceptedAnnotationKey]; !ok {
+					t.Errorf("expected auto approval annotation, but failed")
+				}
 			},
 		},
 	}
@@ -148,7 +198,10 @@ func TestSyncManagedCluster(t *testing.T) {
 				t.Errorf("unexpected err: %v", syncErr)
 			}
 
-			c.validateActions(t, clusterClient.Actions())
+			c.validateClusterActions(t, clusterClient.Actions())
+			if c.validateKubeActions != nil {
+				c.validateKubeActions(t, kubeClient.Actions())
+			}
 		})
 	}
 }

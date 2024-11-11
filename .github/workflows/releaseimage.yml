@@ -34,7 +34,7 @@ jobs:
       - name: get major release version
         run: |
           echo "MAJOR_RELEASE_VERSION=${RELEASE_VERSION%.*}" >> $GITHUB_ENV
-          echo "TRIMED_RELEASE_VERSION=${RELEASE_VERSION#v}" >> $GITHUB_ENV
+          echo "TRIMMED_RELEASE_VERSION=${RELEASE_VERSION#v}" >> $GITHUB_ENV
     outputs:
       MAJOR_RELEASE_VERSION: ${{ env.MAJOR_RELEASE_VERSION }}
       RELEASE_VERSION: ${{ env.RELEASE_VERSION }}

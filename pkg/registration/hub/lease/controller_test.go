@@ -17,7 +17,6 @@ import (
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	v1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
@@ -28,6 +27,39 @@ import (
 var now = time.Now()
 
 func TestSync(t *testing.T) {
+	leaseStopUpdatingValidateActions := func(t *testing.T, hubKubeActions, clusterActions []clienttesting.Action) {
+		expected := metav1.Condition{
+			Type:    clusterv1.ManagedClusterConditionAvailable,
+			Status:  metav1.ConditionUnknown,
+			Reason:  "ManagedClusterLeaseUpdateStopped",
+			Message: "Registration agent stopped updating its lease.",
+		}
+		testingcommon.AssertActions(t, clusterActions, "patch")
+		patch := clusterActions[0].(clienttesting.PatchAction).GetPatch()
+		managedCluster := &clusterv1.ManagedCluster{}
+		err := json.Unmarshal(patch, managedCluster)
+		if err != nil {
+			t.Fatal(err)
+		}
+		testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expected)
+
+		if len(hubKubeActions) != 1 {
+			t.Errorf("Expected 1 event created in the sync loop, actual %d",
+				len(hubKubeActions))
+		}
+		actionEvent := hubKubeActions[0]
+		if actionEvent.GetResource().Resource != "events" {
+			t.Errorf("Expected event created, actual %s", actionEvent.GetResource())
+		}
+		if actionEvent.GetNamespace() != testinghelpers.TestManagedClusterName {
+			t.Errorf("Expected event created in namespace %s, actual %s",
+				testinghelpers.TestManagedClusterName, actionEvent.GetNamespace())
+		}
+		if actionEvent.GetVerb() != "create" {
+			t.Errorf("Expected event created, actual %s", actionEvent.GetVerb())
+		}
+	}
+
 	cases := []struct {
 		name            string
 		clusters        []runtime.Object
@@ -44,6 +76,15 @@ func TestSync(t *testing.T) {
 			},
 		},
 		{
+			name:          "sync previously accepted managed cluster",
+			clusters:      []runtime.Object{testinghelpers.NewDeniedManagedCluster("False")},
+			clusterLeases: []runtime.Object{},
+			validateActions: func(t *testing.T, leaseActions, clusterActions []clienttesting.Action) {
+				testingcommon.AssertActions(t, leaseActions, "create")
+				testingcommon.AssertNoActions(t, clusterActions)
+			},
+		},
+		{
 			name:          "there is no lease for a managed cluster",
 			clusters:      []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			clusterLeases: []runtime.Object{},
@@ -53,44 +94,22 @@ func TestSync(t *testing.T) {
 			},
 		},
 		{
-			name:     "managed cluster stop update lease",
+			name:     "accepted managed cluster stop update lease",
 			clusters: []runtime.Object{testinghelpers.NewAvailableManagedCluster()},
 			clusterLeases: []runtime.Object{
 				testinghelpers.NewManagedClusterLease("managed-cluster-lease", now.Add(-5*time.Minute)),
 				testinghelpers.NewManagedClusterLease(fmt.Sprintf("cluster-lease-%s", testinghelpers.TestManagedClusterName), now.Add(-5*time.Minute)),
 			},
-			validateActions: func(t *testing.T, hubKubeActions, clusterActions []clienttesting.Action) {
-				expected := metav1.Condition{
-					Type:    clusterv1.ManagedClusterConditionAvailable,
-					Status:  metav1.ConditionUnknown,
-					Reason:  "ManagedClusterLeaseUpdateStopped",
-					Message: "Registration agent stopped updating its lease.",
-				}
-				testingcommon.AssertActions(t, clusterActions, "patch")
-				patch := clusterActions[0].(clienttesting.PatchAction).GetPatch()
-				managedCluster := &v1.ManagedCluster{}
-				err := json.Unmarshal(patch, managedCluster)
-				if err != nil {
-					t.Fatal(err)
-				}
-				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expected)
-
-				if len(hubKubeActions) != 1 {
-					t.Errorf("Expected 1 event created in the sync loop, actual %d",
-						len(hubKubeActions))
-				}
-				actionEvent := hubKubeActions[0]
-				if actionEvent.GetResource().Resource != "events" {
-					t.Errorf("Expected event created, actual %s", actionEvent.GetResource())
-				}
-				if actionEvent.GetNamespace() != testinghelpers.TestManagedClusterName {
-					t.Errorf("Expected event created in namespace %s, actual %s",
-						testinghelpers.TestManagedClusterName, actionEvent.GetNamespace())
-				}
-				if actionEvent.GetVerb() != "create" {
-					t.Errorf("Expected event created, actual %s", actionEvent.GetVerb())
-				}
+			validateActions: leaseStopUpdatingValidateActions,
+		},
+		{
+			name:     "previously accepted managed cluster stop update lease",
+			clusters: []runtime.Object{testinghelpers.NewDeniedManagedCluster("False")},
+			clusterLeases: []runtime.Object{
+				testinghelpers.NewManagedClusterLease("managed-cluster-lease", now.Add(-5*time.Minute)),
+				testinghelpers.NewManagedClusterLease(fmt.Sprintf("cluster-lease-%s", testinghelpers.TestManagedClusterName), now.Add(-5*time.Minute)),
 			},
+			validateActions: leaseStopUpdatingValidateActions,
 		},
 		{
 			name:          "managed cluster is available",
@@ -112,7 +131,7 @@ func TestSync(t *testing.T) {
 				}
 				testingcommon.AssertActions(t, clusterActions, "patch")
 				patch := clusterActions[0].(clienttesting.PatchAction).GetPatch()
-				managedCluster := &v1.ManagedCluster{}
+				managedCluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
 					t.Fatal(err)

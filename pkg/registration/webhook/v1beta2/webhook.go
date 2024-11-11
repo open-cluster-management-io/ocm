@@ -33,12 +33,6 @@ type ManagedClusterSetBindingWebhook struct {
 	kubeClient kubernetes.Interface
 }
 
-func (src *ManagedClusterSet) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(src).
-		Complete()
-}
-
 func (b *ManagedClusterSetBindingWebhook) Init(mgr ctrl.Manager) error {
 	err := b.SetupWebhookWithManager(mgr)
 	if err != nil {

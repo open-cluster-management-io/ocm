@@ -64,8 +64,7 @@ func New(ctx context.Context, config *paho.ClientConfig, opts ...Option) (*Proto
 		return nil, err
 	}
 	if connAck.ReasonCode != 0 {
-		return nil, fmt.Errorf("failed to connect to %q : %d - %q", p.client.Conn.RemoteAddr(), connAck.ReasonCode,
-			connAck.Properties.ReasonString)
+		return nil, fmt.Errorf("failed to establish the connection: %s", connAck.String())
 	}
 
 	return p, nil
@@ -126,8 +125,9 @@ func (p *Protocol) OpenInbound(ctx context.Context) error {
 
 	logger := cecontext.LoggerFrom(ctx)
 
-	p.client.Router = paho.NewSingleHandlerRouter(func(m *paho.Publish) {
-		p.incoming <- m
+	p.client.AddOnPublishReceived(func(m paho.PublishReceived) (bool, error) {
+		p.incoming <- m.Packet
+		return true, nil
 	})
 
 	logger.Infof("subscribing to topics: %v", p.subscribeOption.Subscriptions)

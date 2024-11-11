@@ -37,13 +37,6 @@ import (
 // expected to be changed or removed outside.
 const clusterAcceptedAnnotationKey = "open-cluster-management.io/automatically-accepted-on"
 
-var staticFiles = []string{
-	"rbac/managedcluster-clusterrole.yaml",
-	"rbac/managedcluster-clusterrolebinding.yaml",
-	"rbac/managedcluster-registration-rolebinding.yaml",
-	"rbac/managedcluster-work-rolebinding.yaml",
-}
-
 // managedClusterController reconciles instances of ManagedCluster on the hub.
 type managedClusterController struct {
 	kubeClient    kubernetes.Interface
@@ -116,15 +109,15 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		return nil
 	}
 
-	if !managedCluster.Spec.HubAcceptsClient {
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
 		// If the ManagedClusterAutoApproval feature is enabled, we automatically accept a cluster only
 		// when it joins for the first time, afterwards users can deny it again.
-		if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
-			if _, ok := managedCluster.Annotations[clusterAcceptedAnnotationKey]; !ok {
-				return c.acceptCluster(ctx, managedClusterName)
-			}
+		if _, ok := managedCluster.Annotations[clusterAcceptedAnnotationKey]; !ok {
+			return c.acceptCluster(ctx, managedCluster)
 		}
+	}
 
+	if !managedCluster.Spec.HubAcceptsClient {
 		// Current spoke cluster is not accepted, do nothing.
 		if !meta.IsStatusConditionTrue(managedCluster.Status.Conditions, v1.ManagedClusterConditionHubAccepted) {
 			return nil
@@ -133,8 +126,33 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		// Hub cluster-admin denies the current spoke cluster, we remove its related resources and update its condition.
 		c.eventRecorder.Eventf("ManagedClusterDenied", "managed cluster %s is denied by hub cluster admin", managedClusterName)
 
-		if err := c.removeManagedClusterResources(ctx, managedClusterName); err != nil {
-			return err
+		// Apply(Update) the cluster specific rbac resources for this spoke cluster with hubAcceptsClient=false.
+		var errs []error
+		applyResults := c.applier.Apply(ctx, syncCtx.Recorder(),
+			helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, managedClusterName, managedCluster.Spec.HubAcceptsClient),
+			manifests.ClusterSpecificRBACFiles...)
+		for _, result := range applyResults {
+			if result.Error != nil {
+				errs = append(errs, result.Error)
+			}
+		}
+		if aggErr := operatorhelpers.NewMultiLineAggregate(errs); aggErr != nil {
+			return aggErr
+		}
+
+		// Remove the cluster role binding files for registration-agent and work-agent.
+		removeResults := resourceapply.DeleteAll(ctx,
+			resourceapply.NewKubeClientHolder(c.kubeClient),
+			c.eventRecorder,
+			helpers.ManagedClusterAssetFn(manifests.RBACManifests, managedClusterName),
+			manifests.ClusterSpecificRoleBindings...)
+		for _, result := range removeResults {
+			if result.Error != nil {
+				errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
+			}
+		}
+		if aggErr := operatorhelpers.NewMultiLineAggregate(errs); aggErr != nil {
+			return aggErr
 		}
 
 		if err = c.approver.Cleanup(ctx, managedCluster); err != nil {
@@ -166,25 +184,22 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		},
 	}
 
+	// Hub cluster-admin accepts the spoke cluster, we apply
+	// 1. namespace for this spoke cluster.
+	// 2. cluster specific rbac resources for this spoke cluster.(hubAcceptsClient=true)
+	// 3. cluster specific rolebinding(registration-agent and work-agent) for this spoke cluster.
 	var errs []error
 	_, _, err = resourceapply.ApplyNamespace(ctx, c.kubeClient.CoreV1(), syncCtx.Recorder(), namespace)
 	if err != nil {
 		errs = append(errs, err)
 	}
 
-	// Hub cluster-admin accepts the spoke cluster, we apply
-	// 1. clusterrole and clusterrolebinding for this spoke cluster.
-	// 2. namespace for this spoke cluster.
-	// 3. role and rolebinding for this spoke cluster on its namespace.
-	resourceResults := c.applier.Apply(
-		ctx,
-		syncCtx.Recorder(),
-		helpers.ManagedClusterAssetFn(manifests.RBACManifests, managedClusterName),
-		staticFiles...,
-	)
+	resourceResults := c.applier.Apply(ctx, syncCtx.Recorder(),
+		helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, managedClusterName, managedCluster.Spec.HubAcceptsClient),
+		append(manifests.ClusterSpecificRBACFiles, manifests.ClusterSpecificRoleBindings...)...)
 	for _, result := range resourceResults {
 		if result.Error != nil {
-			errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
+			errs = append(errs, result.Error)
 		}
 	}
 
@@ -198,6 +213,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 
 	if len(errs) > 0 {
 		applyErrors := operatorhelpers.NewMultiLineAggregate(errs)
+		acceptedCondition.Status = metav1.ConditionFalse
 		acceptedCondition.Reason = "Error"
 		acceptedCondition.Message = applyErrors.Error()
 	}
@@ -213,25 +229,20 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	return operatorhelpers.NewMultiLineAggregate(errs)
 }
 
-func (c *managedClusterController) removeManagedClusterResources(ctx context.Context, managedClusterName string) error {
-	var errs []error
-	// Clean up managed cluster manifests
-	assetFn := helpers.ManagedClusterAssetFn(manifests.RBACManifests, managedClusterName)
-	resourceResults := resourceapply.DeleteAll(ctx, resourceapply.NewKubeClientHolder(c.kubeClient), c.eventRecorder, assetFn, staticFiles...)
-	for _, result := range resourceResults {
-		if result.Error != nil {
-			errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
-		}
-	}
-	return operatorhelpers.NewMultiLineAggregate(errs)
-}
-
-func (c *managedClusterController) acceptCluster(ctx context.Context, managedClusterName string) error {
-	// TODO support patching both annotations and spec simultaneously in the patcher
+func (c *managedClusterController) acceptCluster(ctx context.Context, managedCluster *v1.ManagedCluster) error {
 	acceptedTime := time.Now()
-	patch := fmt.Sprintf(`{"metadata":{"annotations":{"%s":"%s"}},"spec":{"hubAcceptsClient":true}}`,
+
+	// If one cluster is already accepted, we only add the cluster accepted annotation, otherwise
+	// we add the cluster accepted annotation and accept the cluster.
+	patch := fmt.Sprintf(`{"metadata":{"annotations":{"%s":"%s"}}}`,
 		clusterAcceptedAnnotationKey, acceptedTime.Format(time.RFC3339))
-	_, err := c.clusterClient.ClusterV1().ManagedClusters().Patch(ctx, managedClusterName,
+	if !managedCluster.Spec.HubAcceptsClient {
+		// TODO support patching both annotations and spec simultaneously in the patcher
+		patch = fmt.Sprintf(`{"metadata":{"annotations":{"%s":"%s"}},"spec":{"hubAcceptsClient":true}}`,
+			clusterAcceptedAnnotationKey, acceptedTime.Format(time.RFC3339))
+	}
+
+	_, err := c.clusterClient.ClusterV1().ManagedClusters().Patch(ctx, managedCluster.Name,
 		types.MergePatchType, []byte(patch), metav1.PatchOptions{})
 	return err
 }
