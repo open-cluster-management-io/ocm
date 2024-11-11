@@ -1,4 +1,4 @@
-package appliedmanifestcontroller
+package manifestcontroller
 
 import (
 	"context"
@@ -15,7 +15,6 @@ import (
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/utils/diff"
 
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
@@ -206,6 +205,7 @@ func TestSyncManifestWork(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			testingWork, _ := spoketesting.NewManifestWork(0)
+			testingWork.Finalizers = []string{workapiv1.ManifestWorkFinalizer}
 			if c.applied {
 				testingWork.Status.Conditions = []metav1.Condition{
 					{
@@ -229,15 +229,22 @@ func TestSyncManifestWork(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			controller := AppliedManifestWorkController{
+			controller := ManifestWorkController{
 				manifestWorkLister: informerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks("cluster1"),
-				patcher: patcher.NewPatcher[
+				manifestWorkPatcher: patcher.NewPatcher[
+					*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
+					fakeClient.WorkV1().ManifestWorks("cluster1")),
+				appliedManifestWorkPatcher: patcher.NewPatcher[
 					*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus](
 					fakeClient.WorkV1().AppliedManifestWorks()),
 				appliedManifestWorkLister: informerFactory.Work().V1().AppliedManifestWorks().Lister(),
-				spokeDynamicClient:        fakeDynamicClient,
-				hubHash:                   "test",
-				rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(0, 1*time.Second),
+				reconcilers: []workReconcile{
+					&appliedManifestWorkReconciler{
+						spokeDynamicClient: fakeDynamicClient,
+						rateLimiter:        workqueue.NewItemExponentialFailureRateLimiter(0, 1*time.Second),
+					},
+				},
+				hubHash: "test",
 			}
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, testingWork.Name)
@@ -260,77 +267,6 @@ func TestSyncManifestWork(t *testing.T) {
 			queueLen := controllerContext.Queue().Len()
 			if queueLen != c.expectedQueueLen {
 				t.Errorf("expected %d, but %d", c.expectedQueueLen, queueLen)
-			}
-		})
-	}
-
-}
-
-func TestFindUntrackedResources(t *testing.T) {
-	cases := []struct {
-		name                       string
-		appliedResources           []workapiv1.AppliedManifestResourceMeta
-		newAppliedResources        []workapiv1.AppliedManifestResourceMeta
-		expectedUntrackedResources []workapiv1.AppliedManifestResourceMeta
-	}{
-		{
-			name:             "no resource untracked",
-			appliedResources: nil,
-			newAppliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
-			},
-			expectedUntrackedResources: nil,
-		},
-		{
-			name: "some of original resources untracked",
-			appliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
-				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
-			},
-			newAppliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
-				{Version: "v3", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g3", Resource: "r3", Namespace: "ns3", Name: "n3"}},
-			},
-			expectedUntrackedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
-			},
-		},
-		{
-			name: "all original resources untracked",
-			appliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
-				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
-			},
-			newAppliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v3", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g3", Resource: "r3", Namespace: "ns3", Name: "n3"}},
-				{Version: "v4", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g4", Resource: "r4", Namespace: "ns4", Name: "n4"}},
-			},
-			expectedUntrackedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
-				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
-			},
-		},
-		{
-			name: "changing version of original resources does not make it untracked",
-			appliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
-				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
-			},
-			newAppliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
-				{Version: "v4", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g4", Resource: "r4", Namespace: "ns4", Name: "n4"}},
-			},
-			expectedUntrackedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
-			},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			actual := findUntrackedResources(c.appliedResources, c.newAppliedResources)
-			if !reflect.DeepEqual(actual, c.expectedUntrackedResources) {
-				t.Errorf(diff.ObjectDiff(actual, c.expectedUntrackedResources))
 			}
 		})
 	}

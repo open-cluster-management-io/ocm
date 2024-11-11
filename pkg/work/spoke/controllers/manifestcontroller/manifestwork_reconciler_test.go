@@ -39,6 +39,7 @@ type testController struct {
 	dynamicClient *fakedynamic.FakeDynamicClient
 	workClient    *fakeworkclient.Clientset
 	kubeClient    *fakekube.Clientset
+	mwReconciler  *manifestworkReconciler
 }
 
 func newController(t *testing.T, work *workapiv1.ManifestWork, appliedWork *workapiv1.AppliedManifestWork, mapper meta.RESTMapper) *testController {
@@ -55,8 +56,7 @@ func newController(t *testing.T, work *workapiv1.ManifestWork, appliedWork *work
 			fakeWorkClient.WorkV1().AppliedManifestWorks()),
 		appliedManifestWorkClient: fakeWorkClient.WorkV1().AppliedManifestWorks(),
 		appliedManifestWorkLister: workInformerFactory.Work().V1().AppliedManifestWorks().Lister(),
-		restMapper:                mapper,
-		validator:                 basic.NewSARValidator(nil, spokeKubeClient),
+		reconcilers:               []workReconcile{},
 	}
 
 	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(work); err != nil {
@@ -71,11 +71,18 @@ func newController(t *testing.T, work *workapiv1.ManifestWork, appliedWork *work
 	return &testController{
 		controller: controller,
 		workClient: fakeWorkClient,
+		mwReconciler: &manifestworkReconciler{
+			restMapper: mapper,
+			validator:  basic.NewSARValidator(nil, spokeKubeClient),
+		},
 	}
 }
 
 func (t *testController) toController() *ManifestWorkController {
-	t.controller.appliers = apply.NewAppliers(t.dynamicClient, t.kubeClient, nil)
+	t.mwReconciler.appliers = apply.NewAppliers(t.dynamicClient, t.kubeClient, nil)
+	t.controller.reconcilers = []workReconcile{
+		t.mwReconciler,
+	}
 	return t.controller
 }
 
@@ -88,7 +95,6 @@ func (t *testController) withKubeObject(objects ...runtime.Object) *testControll
 func (t *testController) withUnstructuredObject(objects ...runtime.Object) *testController {
 	scheme := runtime.NewScheme()
 	dynamicClient := fakedynamic.NewSimpleDynamicClient(scheme, objects...)
-	t.controller.spokeDynamicClient = dynamicClient
 	t.dynamicClient = dynamicClient
 	return t
 }
