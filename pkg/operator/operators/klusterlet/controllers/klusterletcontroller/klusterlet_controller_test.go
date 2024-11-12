@@ -402,13 +402,8 @@ func assertKlusterletDeployment(t *testing.T, actions []clienttesting.Action, ve
 		expectedArgs = append(expectedArgs, fmt.Sprintf("--spoke-external-server-urls=%s", serverURL))
 	}
 
-	expectedArgs = append(expectedArgs, "--agent-id=", "--workload-source-driver=kube", "--workload-source-config=/spoke/hub-kubeconfig/kubeconfig")
-
-	if *deployment.Spec.Replicas == 1 {
-		expectedArgs = append(expectedArgs, "--disable-leader-election")
-	}
-
-	expectedArgs = append(expectedArgs, "--status-sync-interval=60s", "--kube-api-qps=20", "--kube-api-burst=60",
+	expectedArgs = append(expectedArgs, "--agent-id=", "--workload-source-driver=kube", "--workload-source-config=/spoke/hub-kubeconfig/kubeconfig",
+		"--status-sync-interval=60s", "--kube-api-qps=20", "--kube-api-burst=60",
 		"--registration-auth=awsirsa",
 		"--hub-cluster-arn=arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1",
 		"--managed-cluster-arn=arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
@@ -465,10 +460,6 @@ func assertRegistrationDeployment(t *testing.T, actions []clienttesting.Action, 
 		expectedArgs = append(expectedArgs, fmt.Sprintf("--spoke-external-server-urls=%s", serverURL))
 	}
 
-	if *deployment.Spec.Replicas == 1 {
-		expectedArgs = append(expectedArgs, "--disable-leader-election")
-	}
-
 	expectedArgs = append(expectedArgs, "--kube-api-qps=10", "--kube-api-burst=60")
 	if awsAuth {
 		expectedArgs = append(expectedArgs, "--registration-auth=awsirsa",
@@ -515,7 +506,7 @@ func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, cl
 	expectArgs = append(expectArgs, "--terminate-on-files=/spoke/hub-kubeconfig/kubeconfig")
 
 	if *deployment.Spec.Replicas == 1 {
-		expectArgs = append(expectArgs, "--disable-leader-election", "--status-sync-interval=60s")
+		expectArgs = append(expectArgs, "--status-sync-interval=60s")
 	}
 
 	expectArgs = append(expectArgs, "--kube-api-qps=20", "--kube-api-burst=50")
