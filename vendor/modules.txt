@@ -252,7 +252,7 @@ github.com/mitchellh/copystructure
 github.com/mitchellh/reflectwalk
 # github.com/moby/sys/user v0.1.0
 ## explicit; go 1.17
-# github.com/mochi-mqtt/server/v2 v2.6.5
+# github.com/mochi-mqtt/server/v2 v2.6.6
 ## explicit; go 1.21
 github.com/mochi-mqtt/server/v2
 github.com/mochi-mqtt/server/v2/hooks/auth
