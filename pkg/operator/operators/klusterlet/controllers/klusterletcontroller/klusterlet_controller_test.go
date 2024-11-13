@@ -48,9 +48,10 @@ import (
 )
 
 const (
-	createVerb      = "create"
-	deleteVerb      = "delete"
-	crdResourceName = "customresourcedefinitions"
+	createVerb                   = "create"
+	deleteVerb                   = "delete"
+	crdResourceName              = "customresourcedefinitions"
+	hostedKubeconfigCreationTime = "2021-01-02T15:04:05Z"
 )
 
 type testController struct {
@@ -712,7 +713,8 @@ func TestSyncDeployHosted(t *testing.T) {
 	klusterlet := newKlusterletHosted("klusterlet", "testns", "cluster1")
 	meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
 		Type: operatorapiv1.ConditionReadyToApply, Status: metav1.ConditionTrue, Reason: "KlusterletPrepared",
-		Message: "Klusterlet is ready to apply",
+		Message: "Klusterlet is ready to apply, the external managed kubeconfig secret was created at: " +
+			hostedKubeconfigCreationTime,
 	})
 	agentNamespace := helpers.AgentNamespace(klusterlet)
 	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, agentNamespace)
@@ -1490,6 +1492,11 @@ func (f *fakeManagedClusterBuilder) withKubeConfigSecret(_, _ string) managedClu
 }
 
 func (f *fakeManagedClusterBuilder) build(_ context.Context) (*managedClusterClients, error) {
+	t, err := time.Parse(time.RFC3339, hostedKubeconfigCreationTime)
+	if err != nil {
+		return nil, err
+	}
+	creationTime := metav1.NewTime(t)
 	return &managedClusterClients{
 		kubeClient:                f.fakeKubeClient,
 		apiExtensionClient:        f.fakeAPIExtensionClient,
@@ -1500,6 +1507,7 @@ func (f *fakeManagedClusterBuilder) build(_ context.Context) (*managedClusterCli
 				CAData: []byte("test"),
 			},
 		},
+		kubeconfigSecretCreationTime: &creationTime,
 	}, nil
 }
 
