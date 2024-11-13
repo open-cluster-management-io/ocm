@@ -97,6 +97,12 @@ spec:
           {{if gt .RegistrationKubeAPIBurst 0}}
           - "--kube-api-burst={{ .RegistrationKubeAPIBurst }}"
           {{end}}
+          {{if .RegistrationDriver.AuthType}}
+          - "--registration-auth={{ .RegistrationDriver.AuthType }}"
+          {{end}}
+          {{if eq .RegistrationDriver.AuthType "awsirsa"}}
+          - "--hub-cluster-arn={{ .RegistrationDriver.AwsIrsa.HubClusterArn }}"
+          {{end}}
         env:
           - name: POD_NAME
             valueFrom:

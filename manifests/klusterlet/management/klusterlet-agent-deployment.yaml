@@ -109,6 +109,12 @@ spec:
           {{if .AppliedManifestWorkEvictionGracePeriod}}
           - "--appliedmanifestwork-eviction-grace-period={{ .AppliedManifestWorkEvictionGracePeriod }}"
           {{end}}
+          {{if .RegistrationDriver.AuthType}}
+          - "--registration-auth={{ .RegistrationDriver.AuthType }}"
+          {{end}}
+          {{if eq .RegistrationDriver.AuthType "awsirsa"}}
+          - "--hub-cluster-arn={{ .RegistrationDriver.AwsIrsa.HubClusterArn }}"
+          {{end}}
         env:
           - name: POD_NAME
             valueFrom:
