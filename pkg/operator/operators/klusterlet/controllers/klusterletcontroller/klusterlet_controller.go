@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -282,9 +283,14 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 				Message: fmt.Sprintf("Failed to build managed cluster clients: %v", err),
 			})
 		} else {
+			message := "Klusterlet is ready to apply"
+			if !managedClusterClients.kubeconfigSecretCreationTime.IsZero() {
+				message = "Klusterlet is ready to apply, the external managed kubeconfig secret was created at: " +
+					managedClusterClients.kubeconfigSecretCreationTime.Format(time.RFC3339)
+			}
 			meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
 				Type: operatorapiv1.ConditionReadyToApply, Status: metav1.ConditionTrue, Reason: operatorapiv1.ReasonKlusterletPrepared,
-				Message: "Klusterlet is ready to apply",
+				Message: message,
 			})
 		}
 
@@ -457,13 +463,15 @@ func getAppliedManifestWorkEvictionGracePeriod(klusterlet *operatorapiv1.Kluster
 
 // getManagedKubeConfig is a helper func for Hosted mode, it will retrieve managed cluster
 // kubeconfig from "external-managed-kubeconfig" secret.
-func getManagedKubeConfig(ctx context.Context, kubeClient kubernetes.Interface, namespace, secretName string) (*rest.Config, error) {
+func getManagedKubeConfig(ctx context.Context, kubeClient kubernetes.Interface,
+	namespace, secretName string) (metav1.Time, *rest.Config, error) {
 	managedKubeconfigSecret, err := kubeClient.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {
-		return nil, err
+		return metav1.Time{}, nil, err
 	}
 
-	return helpers.LoadClientConfigFromSecret(managedKubeconfigSecret)
+	config, err := helpers.LoadClientConfigFromSecret(managedKubeconfigSecret)
+	return managedKubeconfigSecret.CreationTimestamp, config, err
 }
 
 // syncPullSecret will sync pull secret from the sourceClient cluster to the targetClient cluster in desired namespace.

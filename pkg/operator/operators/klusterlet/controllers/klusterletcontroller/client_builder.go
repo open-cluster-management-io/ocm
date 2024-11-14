@@ -35,7 +35,8 @@ type managedClusterClients struct {
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
 	// Only used for Hosted mode to generate managed cluster kubeconfig
 	// with minimum permission for registration and work.
-	kubeconfig *rest.Config
+	kubeconfig                   *rest.Config
+	kubeconfigSecretCreationTime *metav1.Time
 }
 
 type managedClusterClientsBuilder struct {
@@ -98,13 +99,14 @@ func (m *managedClusterClientsBuilder) build(ctx context.Context) (*managedClust
 		return nil, err
 	}
 
-	managedKubeConfig, err := getManagedKubeConfig(ctx, m.kubeClient, m.secretNamespace, m.secretName)
+	creationTime, managedKubeConfig, err := getManagedKubeConfig(ctx, m.kubeClient, m.secretNamespace, m.secretName)
 	if err != nil {
 		return nil, err
 	}
 
 	clients := &managedClusterClients{
-		kubeconfig: managedKubeConfig,
+		kubeconfig:                   managedKubeConfig,
+		kubeconfigSecretCreationTime: &creationTime,
 	}
 
 	if clients.kubeClient, err = kubernetes.NewForConfig(managedKubeConfig); err != nil {
