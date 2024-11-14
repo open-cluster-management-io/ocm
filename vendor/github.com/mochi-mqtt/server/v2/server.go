@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	Version                       = "2.6.5" // the current server version.
+	Version                       = "2.6.6" // the current server version.
 	defaultSysTopicInterval int64 = 1       // the interval between $SYS topic publishes
 	LocalListener                 = "local"
 	InlineClientId                = "inline"
@@ -1672,7 +1672,7 @@ func (s *Server) loadClients(v []storage.Client) {
 // loadInflight restores inflight messages from the datastore.
 func (s *Server) loadInflight(v []storage.Message) {
 	for _, msg := range v {
-		if client, ok := s.Clients.Get(msg.Origin); ok {
+		if client, ok := s.Clients.Get(msg.Client); ok {
 			client.State.Inflight.Set(msg.ToPacket())
 		}
 	}

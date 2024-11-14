@@ -7,7 +7,7 @@ require (
 	github.com/evanphx/json-patch v5.9.0+incompatible
 	github.com/ghodss/yaml v1.0.0
 	github.com/google/go-cmp v0.6.0
-	github.com/mochi-mqtt/server/v2 v2.6.5
+	github.com/mochi-mqtt/server/v2 v2.6.6
 	github.com/onsi/ginkgo/v2 v2.20.1
 	github.com/onsi/gomega v1.35.1
 	github.com/openshift/api v0.0.0-20241001152557-e415140e5d5f
