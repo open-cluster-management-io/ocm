@@ -176,7 +176,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	var registrationFeatureMsgs, workFeatureMsgs, addonFeatureMsgs string
 	// If there are some invalid feature gates of registration or work, will output
 	// condition `ValidFeatureGates` False in ClusterManager.
-	registrationFeatureGates := helpers.DefaultHubRegistrationFeatureGates
+	var registrationFeatureGates []operatorapiv1.FeatureGate
 	if clusterManager.Spec.RegistrationConfiguration != nil {
 		registrationFeatureGates = clusterManager.Spec.RegistrationConfiguration.FeatureGates
 		config.AutoApproveUsers = strings.Join(clusterManager.Spec.RegistrationConfiguration.AutoApproveUsers, ",")

@@ -64,10 +64,6 @@ var _ = ginkgo.BeforeSuite(func() {
 	err = clusterv1.Install(scheme.Scheme)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	// enable DefaultClusterSet feature gate
-	err = features.HubMutableFeatureGate.Set("DefaultClusterSet=true")
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
 	// enable ManagedClusterAutoApproval feature gate
 	err = features.HubMutableFeatureGate.Set("ManagedClusterAutoApproval=true")
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())

@@ -38,7 +38,6 @@ import (
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
-	"open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
 
@@ -72,13 +71,6 @@ var (
 	genericScheme = runtime.NewScheme()
 	genericCodecs = serializer.NewCodecFactory(genericScheme)
 	genericCodec  = genericCodecs.UniversalDeserializer()
-
-	DefaultHubRegistrationFeatureGates = []operatorapiv1.FeatureGate{
-		{Feature: string(feature.DefaultClusterSet), Mode: operatorapiv1.FeatureGateModeTypeEnable},
-	}
-	DefaultSpokeRegistrationFeatureGates = []operatorapiv1.FeatureGate{
-		{Feature: string(feature.AddonManagement), Mode: operatorapiv1.FeatureGateModeTypeEnable},
-	}
 )
 
 func init() {
@@ -778,6 +770,7 @@ func ConvertToFeatureGateFlags(component string, features []operatorapiv1.Featur
 		if feature.Mode == operatorapiv1.FeatureGateModeTypeDisable && defaultFeature.Default {
 			flags = append(flags, fmt.Sprintf("--feature-gates=%s=false", feature.Feature))
 		}
+
 		if feature.Mode == operatorapiv1.FeatureGateModeTypeEnable && !defaultFeature.Default {
 			flags = append(flags, fmt.Sprintf("--feature-gates=%s=true", feature.Feature))
 		}
