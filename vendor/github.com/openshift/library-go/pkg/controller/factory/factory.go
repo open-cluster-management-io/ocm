@@ -25,17 +25,18 @@ func DefaultQueueKeysFunc(_ runtime.Object) []string {
 // Factory is generator that generate standard Kubernetes controllers.
 // Factory is really generic and should be only used for simple controllers that does not require special stuff..
 type Factory struct {
-	sync               SyncFunc
-	syncContext        SyncContext
-	syncDegradedClient operatorv1helpers.OperatorClient
-	resyncInterval     time.Duration
-	resyncSchedules    []string
-	informers          []filteredInformers
-	informerQueueKeys  []informersWithQueueKey
-	bareInformers      []Informer
-	postStartHooks     []PostStartHook
-	namespaceInformers []*namespaceInformer
-	cachesToSync       []cache.InformerSynced
+	sync                   SyncFunc
+	syncContext            SyncContext
+	syncDegradedClient     operatorv1helpers.OperatorClient
+	resyncInterval         time.Duration
+	resyncSchedules        []string
+	informers              []filteredInformers
+	informerQueueKeys      []informersWithQueueKey
+	bareInformers          []Informer
+	postStartHooks         []PostStartHook
+	namespaceInformers     []*namespaceInformer
+	cachesToSync           []cache.InformerSynced
+	controllerInstanceName string
 }
 
 // Informer represents any structure that allow to register event handlers and informs if caches are synced.
@@ -237,6 +238,13 @@ func (f *Factory) WithSyncDegradedOnError(operatorClient operatorv1helpers.Opera
 	return f
 }
 
+// WithControllerInstanceName specifies the controller instance.
+// Useful when the same controller is used multiple times.
+func (f *Factory) WithControllerInstanceName(controllerInstanceName string) *Factory {
+	f.controllerInstanceName = controllerInstanceName
+	return f
+}
+
 // Controller produce a runnable controller.
 func (f *Factory) ToController(name string, eventRecorder events.Recorder) Controller {
 	if f.sync == nil {
@@ -266,15 +274,16 @@ func (f *Factory) ToController(name string, eventRecorder events.Recorder) Contr
 	}
 
 	c := &baseController{
-		name:               name,
-		syncDegradedClient: f.syncDegradedClient,
-		sync:               f.sync,
-		resyncEvery:        f.resyncInterval,
-		resyncSchedules:    cronSchedules,
-		cachesToSync:       append([]cache.InformerSynced{}, f.cachesToSync...),
-		syncContext:        ctx,
-		postStartHooks:     f.postStartHooks,
-		cacheSyncTimeout:   defaultCacheSyncTimeout,
+		name:                   name,
+		controllerInstanceName: f.controllerInstanceName,
+		syncDegradedClient:     f.syncDegradedClient,
+		sync:                   f.sync,
+		resyncEvery:            f.resyncInterval,
+		resyncSchedules:        cronSchedules,
+		cachesToSync:           append([]cache.InformerSynced{}, f.cachesToSync...),
+		syncContext:            ctx,
+		postStartHooks:         f.postStartHooks,
+		cacheSyncTimeout:       defaultCacheSyncTimeout,
 	}
 
 	for i := range f.informerQueueKeys {

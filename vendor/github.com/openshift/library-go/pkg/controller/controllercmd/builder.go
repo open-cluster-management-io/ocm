@@ -268,7 +268,7 @@ func (b *ControllerBuilder) Run(ctx context.Context, config *unstructured.Unstru
 	}
 	eventRecorder := events.NewKubeRecorderWithOptions(kubeClient.CoreV1().Events(namespace), b.eventRecorderOptions, b.componentName, controllerRef)
 
-	utilruntime.PanicHandlers = append(utilruntime.PanicHandlers, func(r interface{}) {
+	utilruntime.PanicHandlers = append(utilruntime.PanicHandlers, func(c context.Context, r interface{}) {
 		eventRecorder.Warningf(fmt.Sprintf("%sPanic", strings.Title(b.componentName)), "Panic observed: %v", r)
 	})
 
@@ -305,7 +305,7 @@ func (b *ControllerBuilder) Run(ctx context.Context, config *unstructured.Unstru
 
 	var server *genericapiserver.GenericAPIServer
 	if b.servingInfo != nil {
-		serverConfig, err := serving.ToServerConfig(ctx, *b.servingInfo, *b.authenticationConfig, *b.authorizationConfig, kubeConfig, kubeClient, b.leaderElection, b.enableHTTP2)
+		serverConfig, err := serving.ToServerConfig(ctx, *b.servingInfo, *b.authenticationConfig, *b.authorizationConfig, kubeConfig, kubeClient, b.leaderElection, b.enableHTTP2, b.versionInfo)
 		if err != nil {
 			return err
 		}

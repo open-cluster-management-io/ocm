@@ -87,7 +87,6 @@ spec:
           - "--spoke-external-server-urls={{ .ExternalServerURL }}"
           {{end}}
           {{if eq .Replica 1}}
-          - "--disable-leader-election"
           - "--status-sync-interval=60s"
           {{end}}
           {{if gt .ClientCertExpirationSeconds 0}}
@@ -108,6 +107,12 @@ spec:
           {{end}}
           {{if .AppliedManifestWorkEvictionGracePeriod}}
           - "--appliedmanifestwork-eviction-grace-period={{ .AppliedManifestWorkEvictionGracePeriod }}"
+          {{end}}
+          {{if .RegistrationDriver.AuthType}}
+          - "--registration-auth={{ .RegistrationDriver.AuthType }}"
+          {{end}}
+          {{if eq .RegistrationDriver.AuthType "awsirsa"}}
+          - "--hub-cluster-arn={{ .RegistrationDriver.AwsIrsa.HubClusterArn }}"
           {{end}}
         env:
           - name: POD_NAME

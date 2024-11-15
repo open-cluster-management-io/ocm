@@ -82,9 +82,6 @@ spec:
           - "--spoke-kubeconfig=/spoke/config/kubeconfig"
           - "--terminate-on-files=/spoke/config/kubeconfig"
           {{end}}
-          {{if eq .Replica 1}}
-          - "--disable-leader-election"
-          {{end}}
           {{if gt .ClientCertExpirationSeconds 0}}
           - "--client-cert-expiration-seconds={{ .ClientCertExpirationSeconds }}"
           {{end}}
@@ -96,6 +93,12 @@ spec:
           {{end}}
           {{if gt .RegistrationKubeAPIBurst 0}}
           - "--kube-api-burst={{ .RegistrationKubeAPIBurst }}"
+          {{end}}
+          {{if .RegistrationDriver.AuthType}}
+          - "--registration-auth={{ .RegistrationDriver.AuthType }}"
+          {{end}}
+          {{if eq .RegistrationDriver.AuthType "awsirsa"}}
+          - "--hub-cluster-arn={{ .RegistrationDriver.AwsIrsa.HubClusterArn }}"
           {{end}}
         env:
           - name: POD_NAME

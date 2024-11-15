@@ -4,7 +4,11 @@ import (
 	"context"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
+	applyoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
+	"github.com/openshift/library-go/pkg/apiserver/jsonpatch"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -20,6 +24,11 @@ type OperatorClient interface {
 	UpdateOperatorSpec(ctx context.Context, oldResourceVersion string, in *operatorv1.OperatorSpec) (out *operatorv1.OperatorSpec, newResourceVersion string, err error)
 	// UpdateOperatorStatus updates the status of the operator, assuming the given resource version.
 	UpdateOperatorStatus(ctx context.Context, oldResourceVersion string, in *operatorv1.OperatorStatus) (out *operatorv1.OperatorStatus, err error)
+
+	ApplyOperatorSpec(ctx context.Context, fieldManager string, applyConfiguration *applyoperatorv1.OperatorSpecApplyConfiguration) (err error)
+	ApplyOperatorStatus(ctx context.Context, fieldManager string, applyConfiguration *applyoperatorv1.OperatorStatusApplyConfiguration) (err error)
+
+	PatchOperatorStatus(ctx context.Context, jsonPatch *jsonpatch.PatchSet) (err error)
 }
 
 type StaticPodOperatorClient interface {
@@ -34,6 +43,11 @@ type StaticPodOperatorClient interface {
 	UpdateStaticPodOperatorStatus(ctx context.Context, resourceVersion string, in *operatorv1.StaticPodOperatorStatus) (out *operatorv1.StaticPodOperatorStatus, err error)
 	// UpdateStaticPodOperatorSpec updates the spec, assuming the given resource  version.
 	UpdateStaticPodOperatorSpec(ctx context.Context, resourceVersion string, in *operatorv1.StaticPodOperatorSpec) (out *operatorv1.StaticPodOperatorSpec, newResourceVersion string, err error)
+
+	ApplyStaticPodOperatorSpec(ctx context.Context, fieldManager string, applyConfiguration *applyoperatorv1.StaticPodOperatorSpecApplyConfiguration) (err error)
+	ApplyStaticPodOperatorStatus(ctx context.Context, fieldManager string, applyConfiguration *applyoperatorv1.StaticPodOperatorStatusApplyConfiguration) (err error)
+
+	PatchStaticOperatorStatus(ctx context.Context, jsonPatch *jsonpatch.PatchSet) (err error)
 }
 
 type OperatorClientWithFinalizers interface {
@@ -43,3 +57,11 @@ type OperatorClientWithFinalizers interface {
 	// RemoveFinalizer removes a finalizer from the operator CR, if it is there. No-op otherwise.
 	RemoveFinalizer(ctx context.Context, finalizer string) error
 }
+
+type Foo interface {
+	ExtractOperatorSpec(fieldManager string) (*applyoperatorv1.OperatorSpecApplyConfiguration, error)
+	ExtractOperatorStatus(fieldManager string) (*applyoperatorv1.OperatorStatusApplyConfiguration, error)
+}
+
+type OperatorSpecExtractor func(obj *unstructured.Unstructured, fieldManager string) (*applyoperatorv1.OperatorSpecApplyConfiguration, error)
+type OperatorStatusExtractor func(obj *unstructured.Unstructured, fieldManager string) (*applyoperatorv1.OperatorStatusApplyConfiguration, error)

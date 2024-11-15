@@ -169,7 +169,7 @@ kubectl edit klusterlet klusterlet
 
 ### Integration tests
 
-The integration tests are written in the [test/integration](test/integration) directory. They start a kubenretes
+The integration tests are written in the [test/integration](test/integration) directory. They start a kubernetes
 api server locally with [controller-runtime](https://book.kubebuilder.io/reference/envtest), and run the tests against
 the local api server.
 

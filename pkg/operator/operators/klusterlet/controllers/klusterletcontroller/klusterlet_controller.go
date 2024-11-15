@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -41,6 +42,7 @@ const (
 	klusterletFinalizer                   = "operator.open-cluster-management.io/klusterlet-cleanup"
 	managedResourcesEvictionTimestampAnno = "operator.open-cluster-management.io/managed-resources-eviction-timestamp"
 	klusterletNamespaceLabelKey           = "operator.open-cluster-management.io/klusterlet"
+	AwsIrsaAuthType                       = "awsirsa"
 )
 
 type klusterletController struct {
@@ -111,6 +113,15 @@ func NewKlusterletController(
 		ToController("KlusterletController", recorder)
 }
 
+type AwsIrsa struct {
+	HubClusterArn string
+}
+
+type RegistrationDriver struct {
+	AuthType string
+	AwsIrsa  *AwsIrsa
+}
+
 // klusterletConfig is used to render the template of hub manifests
 type klusterletConfig struct {
 	KlusterletName string
@@ -174,7 +185,8 @@ type klusterletConfig struct {
 	DisableAddonNamespace bool
 
 	// Labels of the agents are synced from klusterlet CR.
-	Labels map[string]string
+	Labels             map[string]string
+	RegistrationDriver RegistrationDriver
 }
 
 // If multiplehubs feature gate is enabled, using the bootstrapkubeconfigs from klusterlet CR.
@@ -271,9 +283,14 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 				Message: fmt.Sprintf("Failed to build managed cluster clients: %v", err),
 			})
 		} else {
+			message := "Klusterlet is ready to apply"
+			if !managedClusterClients.kubeconfigSecretCreationTime.IsZero() {
+				message = "Klusterlet is ready to apply, the external managed kubeconfig secret was created at: " +
+					managedClusterClients.kubeconfigSecretCreationTime.Format(time.RFC3339)
+			}
 			meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
 				Type: operatorapiv1.ConditionReadyToApply, Status: metav1.ConditionTrue, Reason: operatorapiv1.ReasonKlusterletPrepared,
-				Message: "Klusterlet is ready to apply",
+				Message: message,
 			})
 		}
 
@@ -303,13 +320,26 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	//       function is enabled, additional permissions for get, list, and watch RBAC resources required by this
 	//       function need to be applied
 	var registrationFeatureMsgs, workFeatureMsgs string
-	registrationFeatureGates := helpers.DefaultSpokeRegistrationFeatureGates
+	var registrationFeatureGates []operatorapiv1.FeatureGate
 	if klusterlet.Spec.RegistrationConfiguration != nil {
 		registrationFeatureGates = klusterlet.Spec.RegistrationConfiguration.FeatureGates
 		config.ClientCertExpirationSeconds = klusterlet.Spec.RegistrationConfiguration.ClientCertExpirationSeconds
 		config.RegistrationKubeAPIQPS = float32(klusterlet.Spec.RegistrationConfiguration.KubeAPIQPS)
 		config.RegistrationKubeAPIBurst = klusterlet.Spec.RegistrationConfiguration.KubeAPIBurst
-
+		//Configuring Registration driver depending on registration auth
+		if &klusterlet.Spec.RegistrationConfiguration.RegistrationDriver != nil &&
+			klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType == AwsIrsaAuthType {
+			config.RegistrationDriver = RegistrationDriver{
+				AuthType: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType,
+				AwsIrsa: &AwsIrsa{
+					HubClusterArn: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.HubClusterArn,
+				},
+			}
+		} else {
+			config.RegistrationDriver = RegistrationDriver{
+				AuthType: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType,
+			}
+		}
 		// construct cluster annotations string, the final format is "key1=value1,key2=value2"
 		var annotationsArray []string
 		for k, v := range commonhelpers.FilterClusterAnnotations(klusterlet.Spec.RegistrationConfiguration.ClusterAnnotations) {
@@ -433,13 +463,15 @@ func getAppliedManifestWorkEvictionGracePeriod(klusterlet *operatorapiv1.Kluster
 
 // getManagedKubeConfig is a helper func for Hosted mode, it will retrieve managed cluster
 // kubeconfig from "external-managed-kubeconfig" secret.
-func getManagedKubeConfig(ctx context.Context, kubeClient kubernetes.Interface, namespace, secretName string) (*rest.Config, error) {
+func getManagedKubeConfig(ctx context.Context, kubeClient kubernetes.Interface,
+	namespace, secretName string) (metav1.Time, *rest.Config, error) {
 	managedKubeconfigSecret, err := kubeClient.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {
-		return nil, err
+		return metav1.Time{}, nil, err
 	}
 
-	return helpers.LoadClientConfigFromSecret(managedKubeconfigSecret)
+	config, err := helpers.LoadClientConfigFromSecret(managedKubeconfigSecret)
+	return managedKubeconfigSecret.CreationTimestamp, config, err
 }
 
 // syncPullSecret will sync pull secret from the sourceClient cluster to the targetClient cluster in desired namespace.

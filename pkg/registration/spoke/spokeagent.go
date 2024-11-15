@@ -26,11 +26,14 @@ import (
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
+	operatorv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
+	registrationHelpers "open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/register"
+	awsIrsa "open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/addon"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/lease"
@@ -38,9 +41,11 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/spoke/registration"
 )
 
-// AddOnLeaseControllerSyncInterval is exposed so that integration tests can crank up the constroller sync speed.
+// AddOnLeaseControllerSyncInterval is exposed so that integration tests can crank up the controller sync speed.
 // TODO if we register the lease informer to the lease controller, we need to increase this time
 var AddOnLeaseControllerSyncInterval = 30 * time.Second
+
+const AwsIrsaAuthType = "awsirsa"
 
 type SpokeAgentConfig struct {
 	agentOptions       *commonoptions.AgentOptions
@@ -63,11 +68,9 @@ type SpokeAgentConfig struct {
 
 // NewSpokeAgentConfig returns a SpokeAgentConfig
 func NewSpokeAgentConfig(commonOpts *commonoptions.AgentOptions, opts *SpokeAgentOptions, cancel context.CancelFunc) *SpokeAgentConfig {
-	registerDriver := csr.NewCSRDriver()
 	cfg := &SpokeAgentConfig{
 		agentOptions:       commonOpts,
 		registrationOption: opts,
-		driver:             registerDriver,
 		agentStopFunc:      cancel,
 	}
 	cfg.hubKubeConfigChecker = &hubKubeConfigHealthChecker{
@@ -109,7 +112,7 @@ func (o *SpokeAgentConfig) HealthCheckers() []healthz.HealthChecker {
 //	#3. Bootstrap kubeconfig is invalid (e.g. certificate expired) and hub kubeconfig is valid
 //	#4. Neither bootstrap kubeconfig nor hub kubeconfig is valid
 //
-// A temporary BootstrpController with bootstrap kubeconfig is created
+// A temporary BootstrapController with bootstrap kubeconfig is created
 // and started if the hub kubeconfig does not exist or is invalid and used to
 // create a valid hub kubeconfig. Once the hub kubeconfig is valid, the
 // temporary controller is stopped and the main controllers are started.
@@ -122,7 +125,7 @@ func (o *SpokeAgentConfig) RunSpokeAgent(ctx context.Context, controllerContext 
 	kubeConfig := controllerContext.KubeConfig
 
 	// load spoke client config and create spoke clients,
-	// the registration agent may not running in the spoke/managed cluster.
+	// the registration agent may not be running in the spoke/managed cluster.
 	spokeClientConfig, err := o.agentOptions.SpokeKubeConfig(kubeConfig)
 	if err != nil {
 		return err
@@ -186,6 +189,27 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		logger.Error(err, "Error during Validating")
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
+
+	// initiate registration driver
+	var registerDriver register.RegisterDriver
+	if o.registrationOption.RegistrationAuth == AwsIrsaAuthType {
+		// TODO: may consider add additional validations
+		if o.registrationOption.EksHubClusterArn != "" && registrationHelpers.IsEksArnWellFormed(o.registrationOption.EksHubClusterArn) {
+			registerDriver = awsIrsa.NewAWSIRSADriver()
+			if o.registrationOption.ClusterAnnotations == nil {
+				o.registrationOption.ClusterAnnotations = map[string]string{}
+			}
+			o.registrationOption.ClusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/managed-cluster-arn"] = ""             //TODO: find arn from current context
+			o.registrationOption.ClusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/managed-cluster-iam-role-suffix"] = "" //TODO: Add role suffix after RE-7249
+
+		} else {
+			panic("A valid EKS Hub Cluster ARN is required with awsirsa based authentication")
+		}
+	} else {
+		registerDriver = csr.NewCSRDriver()
+	}
+
+	o.driver = registerDriver
 
 	// get spoke cluster CA bundle
 	spokeClusterCABundle, err := o.getSpokeClusterCABundle(spokeClientConfig)
@@ -294,19 +318,38 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		// the bootstrap informers are supposed to be terminated after completing the bootstrap process.
 		bootstrapInformerFactory := informers.NewSharedInformerFactory(bootstrapKubeClient, 10*time.Minute)
 
-		csrOption, err := registration.NewCSROption(logger,
-			secretOption,
-			o.registrationOption.ClientCertExpirationSeconds,
-			bootstrapInformerFactory.Certificates(),
-			bootstrapKubeClient)
-		if err != nil {
-			return err
+		bootstrapClusterInformerFactory := clusterv1informers.NewSharedInformerFactory(bootstrapClusterClient, 10*time.Minute)
+
+		// TODO: Generate csrOption or awsOption based on the value of --registration-auth may be move it under registerdriver as well
+
+		var registrationAuthOption any
+		if o.registrationOption.RegistrationAuth == AwsIrsaAuthType {
+			if o.registrationOption.EksHubClusterArn != "" && registrationHelpers.IsEksArnWellFormed(o.registrationOption.EksHubClusterArn) {
+				registrationAuthOption, err = registration.NewAWSOption(
+					secretOption,
+					bootstrapClusterInformerFactory.Cluster(),
+					bootstrapClusterClient)
+				if err != nil {
+					return err
+				}
+			} else {
+				return fmt.Errorf("please provide EKS Hub Cluster ARN for the awsirsa based authentication")
+			}
+		} else {
+			registrationAuthOption, err = registration.NewCSROption(logger,
+				secretOption,
+				o.registrationOption.ClientCertExpirationSeconds,
+				bootstrapInformerFactory.Certificates(),
+				bootstrapKubeClient)
+			if err != nil {
+				return err
+			}
 		}
 
 		controllerName := fmt.Sprintf("BootstrapController@cluster:%s", o.agentOptions.SpokeClusterName)
 		bootstrapCtx, stopBootstrap := context.WithCancel(ctx)
 		secretController := register.NewSecretController(
-			secretOption, csrOption, o.driver, registration.GenerateBootstrapStatusUpdater(), recorder, controllerName)
+			secretOption, registrationAuthOption, o.driver, registration.GenerateBootstrapStatusUpdater(), recorder, controllerName)
 
 		go bootstrapInformerFactory.Start(bootstrapCtx.Done())
 		go secretController.Run(bootstrapCtx, 1)
