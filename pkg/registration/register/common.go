@@ -29,6 +29,7 @@ func BaseKubeConfigFromBootStrap(bootstrapConfig *clientcmdapi.Config) (*clientc
 			kubeConfigCtx.Cluster: {
 				Server:                   cluster.Server,
 				InsecureSkipTLSVerify:    false,
+				CertificateAuthority:     cluster.CertificateAuthority,
 				CertificateAuthorityData: cluster.CertificateAuthorityData,
 				ProxyURL:                 cluster.ProxyURL,
 			}},
@@ -82,6 +83,7 @@ func IsHubKubeconfigValid(bootstrapKubeConfig, hubeKubeConfig *clientcmdapi.Conf
 		return false, err
 	case bootstrapCluster.Server != hubKubeConfigCluster.Server,
 		bootstrapCluster.ProxyURL != hubKubeConfigCluster.ProxyURL,
+		bootstrapCluster.CertificateAuthority != hubKubeConfigCluster.CertificateAuthority,
 		!reflect.DeepEqual(bootstrapCluster.CertificateAuthorityData, hubKubeConfigCluster.CertificateAuthorityData),
 		// Here in addition to the server, proxyURL and CA bundle, we also need to compare the cluster name,
 		// because in some cases even the hub cluster API server serving certificate(kubeconfig ca bundle)

@@ -23,7 +23,7 @@ func TestHubKubeConfigHealthChecker(t *testing.T) {
 		}
 	}()
 
-	kubeconfig := testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil)
+	kubeconfig := testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", "", nil, nil, nil)
 	testinghelpers.WriteFile(path.Join(testDir, "kubeconfig"), kubeconfig)
 
 	validCert := testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 10*time.Minute)
