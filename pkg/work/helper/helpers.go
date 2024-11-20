@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
@@ -119,7 +120,7 @@ func resetOrdinal(meta workapiv1.ManifestResourceMeta) workapiv1.ManifestResourc
 func mergeManifestCondition(condition, newCondition workapiv1.ManifestCondition) workapiv1.ManifestCondition {
 	return workapiv1.ManifestCondition{
 		ResourceMeta: newCondition.ResourceMeta,
-		//Note this func is only used for merging status conditions, the statusFeedbacks should keep the old one.
+		// Note this func is only used for merging status conditions, the statusFeedbacks should keep the old one.
 		StatusFeedbacks: condition.StatusFeedbacks,
 		Conditions:      MergeStatusConditions(condition.Conditions, newCondition.Conditions),
 	}
@@ -364,21 +365,44 @@ func NewAppliedManifestWorkOwner(appliedWork *workapiv1.AppliedManifestWork) *me
 	}
 }
 
-func FindManifestConiguration(resourceMeta workapiv1.ManifestResourceMeta, manifestOptions []workapiv1.ManifestConfigOption) *workapiv1.ManifestConfigOption {
-	identifier := workapiv1.ResourceIdentifier{
-		Group:     resourceMeta.Group,
-		Resource:  resourceMeta.Resource,
-		Namespace: resourceMeta.Namespace,
-		Name:      resourceMeta.Name,
+func resourceMatch(resourceMeta workapiv1.ManifestResourceMeta, resource workapiv1.ResourceIdentifier) bool {
+	return resourceMeta.Group == resource.Group &&
+		resourceMeta.Resource == resource.Resource &&
+		wildcardMatch(resourceMeta.Namespace, resource.Namespace) &&
+		wildcardMatch(resourceMeta.Name, resource.Name)
+}
+
+func FindManifestConfiguration(resourceMeta workapiv1.ManifestResourceMeta,
+	manifestOptions []workapiv1.ManifestConfigOption) *workapiv1.ManifestConfigOption {
+	// return the first matched FeedbackRules and UpdateStrategy
+	rstOption := &workapiv1.ManifestConfigOption{
+		ResourceIdentifier: workapiv1.ResourceIdentifier{
+			Group:     resourceMeta.Group,
+			Resource:  resourceMeta.Resource,
+			Name:      resourceMeta.Name,
+			Namespace: resourceMeta.Namespace,
+		},
 	}
 
-	for _, config := range manifestOptions {
-		if config.ResourceIdentifier == identifier {
-			return &config
+	for i := 0; i < len(manifestOptions); i++ {
+		option := manifestOptions[i]
+		if !resourceMatch(resourceMeta, option.ResourceIdentifier) {
+			continue
+		}
+
+		if len(rstOption.FeedbackRules) == 0 && len(option.FeedbackRules) != 0 {
+			rstOption.FeedbackRules = option.FeedbackRules
+		}
+		if rstOption.UpdateStrategy == nil && option.UpdateStrategy != nil {
+			rstOption.UpdateStrategy = option.UpdateStrategy
 		}
 	}
 
-	return nil
+	if len(rstOption.FeedbackRules) == 0 && rstOption.UpdateStrategy == nil {
+		return nil
+	}
+
+	return rstOption
 }
 
 func ApplyOwnerReferences(ctx context.Context, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource,
@@ -515,4 +539,21 @@ func GetPlacementTracker(client clusterlister.PlacementDecisionLister, placement
 	existingClusters sets.Set[string]) *clustersdkv1beta1.PlacementDecisionClustersTracker {
 
 	return clustersdkv1beta1.NewPlacementDecisionClustersTracker(placement, PlacementDecisionGetter{Client: client}, existingClusters)
+}
+
+// compare two string, target may include *
+func wildcardMatch(resource, target string) bool {
+	if resource == target || target == "*" {
+		return true
+	}
+
+	pattern := "^" + regexp.QuoteMeta(target) + "$"
+	pattern = strings.ReplaceAll(pattern, "\\*", ".*")
+
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return false
+	}
+
+	return re.MatchString(resource)
 }
