@@ -76,6 +76,7 @@ spec:
           {{end}}
           - "--terminate-on-files=/spoke/hub-kubeconfig/kubeconfig"
           {{if eq .Replica 1}}
+          - "--disable-leader-election"
           - "--status-sync-interval=60s"
           {{end}}
           {{if gt .WorkKubeAPIQPS 0.0}}
