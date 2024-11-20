@@ -87,6 +87,7 @@ spec:
           - "--spoke-external-server-urls={{ .ExternalServerURL }}"
           {{end}}
           {{if eq .Replica 1}}
+          - "--disable-leader-election"
           - "--status-sync-interval=60s"
           {{end}}
           {{if gt .ClientCertExpirationSeconds 0}}
