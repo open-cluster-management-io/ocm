@@ -2,6 +2,9 @@ package klusterletcontroller
 
 import (
 	"context"
+	"crypto/md5" // #nosec G501
+	"encoding/hex"
+	er "errors"
 	"fmt"
 	"strings"
 	"time"
@@ -114,7 +117,8 @@ func NewKlusterletController(
 }
 
 type AwsIrsa struct {
-	HubClusterArn string
+	HubClusterArn     string
+	ManagedClusterArn string
 }
 
 type RegistrationDriver struct {
@@ -187,6 +191,10 @@ type klusterletConfig struct {
 	// Labels of the agents are synced from klusterlet CR.
 	Labels             map[string]string
 	RegistrationDriver RegistrationDriver
+
+	ManagedClusterArn        string
+	ManagedClusterRoleArn    string
+	ManagedClusterRoleSuffix string
 }
 
 // If multiplehubs feature gate is enabled, using the bootstrapkubeconfigs from klusterlet CR.
@@ -329,12 +337,32 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		//Configuring Registration driver depending on registration auth
 		if &klusterlet.Spec.RegistrationConfiguration.RegistrationDriver != nil &&
 			klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType == AwsIrsaAuthType {
+
+			hubClusterArn := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.HubClusterArn
+			managedClusterArn := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.ManagedClusterArn
+
+			if !commonhelpers.IsEksArnWellFormed(hubClusterArn) {
+				errorMsg := fmt.Sprintf("HubClusterArn %s is not well formed", hubClusterArn)
+				klog.Errorf(errorMsg)
+				return er.New(errorMsg)
+			}
+
+			if !commonhelpers.IsEksArnWellFormed(managedClusterArn) {
+				errorMsg := fmt.Sprintf("ManagedClusterArn %s is not well formed", managedClusterArn)
+				klog.Errorf(errorMsg)
+				return er.New(errorMsg)
+			}
+
 			config.RegistrationDriver = RegistrationDriver{
 				AuthType: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType,
 				AwsIrsa: &AwsIrsa{
-					HubClusterArn: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.HubClusterArn,
+					HubClusterArn:     hubClusterArn,
+					ManagedClusterArn: managedClusterArn,
 				},
 			}
+			managedClusterRoleArn, managedClusterRoleSuffix := n.generateManagedRoleArnAndSuffix(klusterlet)
+			config.ManagedClusterRoleArn = managedClusterRoleArn
+			config.ManagedClusterRoleSuffix = managedClusterRoleSuffix
 		} else {
 			config.RegistrationDriver = RegistrationDriver{
 				AuthType: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType,
@@ -431,6 +459,23 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		errs = append(errs, updatedErr)
 	}
 	return utilerrors.NewAggregate(errs)
+}
+
+func (n *klusterletController) generateManagedRoleArnAndSuffix(klusterlet *operatorapiv1.Klusterlet) (string, string) {
+	hubClusterArn := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.HubClusterArn
+	managedClusterArn := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.ManagedClusterArn
+
+	hubClusterStringParts := strings.Split(hubClusterArn, ":")
+
+	managedClusterStringParts := strings.Split(managedClusterArn, ":")
+	hubClusterName := strings.Split(hubClusterStringParts[5], "/")[1]
+	hubClusterAccountId := hubClusterStringParts[4]
+	managedClusterName := strings.Split(managedClusterStringParts[5], "/")[1]
+	managedClusterAccountId := managedClusterStringParts[4]
+	md5HashUniqueIdentifier := generateMd5HashUniqueIdentifier(hubClusterAccountId, hubClusterName, managedClusterAccountId, managedClusterName)
+	//arn:aws:iam::<managed-cluster-account-id>:role/ocm-managed-cluster-<md5-hash-unique-identifier>
+	managedClusterRoleArn := "arn:aws:iam::" + managedClusterAccountId + ":role/ocm-managed-cluster-" + md5HashUniqueIdentifier
+	return managedClusterRoleArn, md5HashUniqueIdentifier
 }
 
 // TODO also read CABundle from ExternalServerURLs and set into registration deployment
@@ -535,4 +580,9 @@ func serviceAccountName(suffix string, klusterlet *operatorapiv1.Klusterlet) str
 		return fmt.Sprintf("%s-work-sa", klusterlet.Name)
 	}
 	return fmt.Sprintf("%s-%s", klusterlet.Name, suffix)
+}
+
+func generateMd5HashUniqueIdentifier(hubClusterAccountId string, hubClusterName string, managedClusterAccountId string, managedClusterName string) string {
+	hash := md5.Sum([]byte(hubClusterAccountId + "#" + hubClusterName + "#" + managedClusterAccountId + "#" + managedClusterName)) // #nosec G401
+	return hex.EncodeToString(hash[:])
 }

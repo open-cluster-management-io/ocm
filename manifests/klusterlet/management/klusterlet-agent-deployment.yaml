@@ -109,11 +109,15 @@ spec:
           {{if .AppliedManifestWorkEvictionGracePeriod}}
           - "--appliedmanifestwork-eviction-grace-period={{ .AppliedManifestWorkEvictionGracePeriod }}"
           {{end}}
-          {{if .RegistrationDriver.AuthType}}
+          {{if and .RegistrationDriver .RegistrationDriver.AuthType}}
           - "--registration-auth={{ .RegistrationDriver.AuthType }}"
-          {{end}}
           {{if eq .RegistrationDriver.AuthType "awsirsa"}}
           - "--hub-cluster-arn={{ .RegistrationDriver.AwsIrsa.HubClusterArn }}"
+          - "--managed-cluster-arn={{ .RegistrationDriver.AwsIrsa.ManagedClusterArn }}"
+          {{if .ManagedClusterRoleSuffix}}
+          - "--managed-cluster-role-suffix={{ .ManagedClusterRoleSuffix }}"
+          {{end}}
+          {{end}}
           {{end}}
         env:
           - name: POD_NAME
@@ -144,6 +148,10 @@ spec:
           mountPath: "/spoke/hub-kubeconfig"
         - name: tmpdir
           mountPath: /tmp
+        {{if and .RegistrationDriver .RegistrationDriver.AuthType (eq .RegistrationDriver.AuthType "awsirsa")}}
+        - name: dot-aws
+          mountPath: /.aws
+        {{end}}
         {{if eq .InstallMode "SingletonHosted"}}
         - name: spoke-kubeconfig-secret
           mountPath: "/spoke/config"
@@ -195,6 +203,10 @@ spec:
           medium: Memory
       - name: tmpdir
         emptyDir: { }
+      {{if and .RegistrationDriver .RegistrationDriver.AuthType (eq .RegistrationDriver.AuthType "awsirsa")}}
+      - name: dot-aws
+        emptyDir: { }
+      {{end}}
       {{if eq .InstallMode "SingletonHosted"}}
       - name: spoke-kubeconfig-secret
         secret:
