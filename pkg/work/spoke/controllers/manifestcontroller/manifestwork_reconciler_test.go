@@ -476,11 +476,32 @@ func TestUpdateStrategy(t *testing.T) {
 				"v1", "NewObject", "ns1", "n1",
 				map[string]interface{}{"spec": map[string]interface{}{"key1": "val2"}})).
 			withManifestConfig(newManifestConfigOption(
-				"", "newobjects", "ns1", "n1",
+				"", "newobjects", "ns*", "*",
 				&workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeCreateOnly})).
 			withExpectedWorkAction("patch").
 			withAppliedWorkAction("create").
 			withExpectedDynamicAction("get", "patch").
+			withExpectedManifestCondition(expectedCondition{workapiv1.ManifestApplied, metav1.ConditionTrue}).
+			withExpectedWorkCondition(expectedCondition{workapiv1.WorkApplied, metav1.ConditionTrue}),
+		newTestCase("update multi resources with create only updateStrategy").
+			withWorkManifest(testingcommon.NewUnstructuredWithContent(
+				"v1", "NewObject", "ns1", "n1",
+				map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}}),
+				testingcommon.NewUnstructuredWithContent(
+					"v1", "NewObject", "ns2", "n2",
+					map[string]interface{}{"spec": map[string]interface{}{"key2": "val2"}})).
+			withSpokeDynamicObject(testingcommon.NewUnstructuredWithContent(
+				"v1", "NewObject", "ns1", "n1",
+				map[string]interface{}{"spec": map[string]interface{}{"key2": "val2"}}),
+				testingcommon.NewUnstructuredWithContent(
+					"v1", "NewObject", "ns2", "n2",
+					map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}})).
+			withManifestConfig(newManifestConfigOption(
+				"", "newobjects", "ns*", "*",
+				&workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeCreateOnly})).
+			withExpectedWorkAction("patch").
+			withAppliedWorkAction("create").
+			withExpectedDynamicAction("get", "patch", "get", "patch").
 			withExpectedManifestCondition(expectedCondition{workapiv1.ManifestApplied, metav1.ConditionTrue}).
 			withExpectedWorkCondition(expectedCondition{workapiv1.WorkApplied, metav1.ConditionTrue}),
 	}

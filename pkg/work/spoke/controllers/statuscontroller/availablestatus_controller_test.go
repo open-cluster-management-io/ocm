@@ -270,7 +270,7 @@ func TestStatusFeedback(t *testing.T) {
 			},
 			configOption: []workapiv1.ManifestConfigOption{
 				{
-					ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "deploy1", Namespace: "ns1"},
+					ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "*", Namespace: "ns*"},
 					FeedbackRules:      []workapiv1.FeedbackRule{{Type: workapiv1.WellKnownStatusType}},
 				},
 			},
@@ -333,7 +333,7 @@ func TestStatusFeedback(t *testing.T) {
 			},
 			configOption: []workapiv1.ManifestConfigOption{
 				{
-					ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "deploy1", Namespace: "ns1"},
+					ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "deploy1", Namespace: "*"},
 					FeedbackRules: []workapiv1.FeedbackRule{
 						{
 							Type: workapiv1.WellKnownStatusType,
@@ -379,6 +379,75 @@ func TestStatusFeedback(t *testing.T) {
 				if !hasStatusCondition(work.Status.ResourceStatus.Manifests[0].Conditions, statusFeedbackConditionType, metav1.ConditionFalse) {
 					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests[0].Conditions))
 				}
+			},
+		},
+		{
+			name: "one option matches multi resources",
+			existingResources: []runtime.Object{
+				testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
+				testingcommon.NewUnstructuredWithContent("apps/v1", "Deployment", "ns1", "deploy1",
+					map[string]interface{}{
+						"status": map[string]interface{}{"readyReplicas": int64(2), "replicas": int64(3), "availableReplicas": int64(2)},
+					}),
+				testingcommon.NewUnstructuredWithContent("apps/v1", "Deployment", "ns2", "deploy2",
+					map[string]interface{}{
+						"status": map[string]interface{}{"readyReplicas": int64(2), "replicas": int64(3), "availableReplicas": int64(2)},
+					}),
+			},
+			configOption: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "*", Namespace: "ns*"},
+					FeedbackRules:      []workapiv1.FeedbackRule{{Type: workapiv1.WellKnownStatusType}},
+				},
+			},
+			manifests: []workapiv1.ManifestCondition{
+				newManifest("", "v1", "secrets", "ns1", "n1"),
+				newManifest("apps", "v1", "deployments", "ns1", "deploy1"),
+				newManifest("apps", "v1", "deployments", "ns2", "deploy2"),
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.ManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
+				}
+				if len(work.Status.ResourceStatus.Manifests) != 3 {
+					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests))
+				}
+
+				expectedValues := []workapiv1.FeedbackValue{
+					{
+						Name: "ReadyReplicas",
+						Value: workapiv1.FieldValue{
+							Type:    workapiv1.Integer,
+							Integer: pointer.Int64(2),
+						},
+					},
+					{
+						Name: "Replicas",
+						Value: workapiv1.FieldValue{
+							Type:    workapiv1.Integer,
+							Integer: pointer.Int64(3),
+						},
+					},
+					{
+						Name: "AvailableReplicas",
+						Value: workapiv1.FieldValue{
+							Type:    workapiv1.Integer,
+							Integer: pointer.Int64(2),
+						},
+					},
+				}
+				for i := 1; i < len(work.Status.ResourceStatus.Manifests); i++ {
+					if !equality.Semantic.DeepEqual(work.Status.ResourceStatus.Manifests[i].StatusFeedbacks.Values, expectedValues) {
+						t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests[i].StatusFeedbacks.Values))
+					}
+					if !hasStatusCondition(work.Status.ResourceStatus.Manifests[i].Conditions, statusFeedbackConditionType, metav1.ConditionTrue) {
+						t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests[i].Conditions))
+					}
+				}
+
 			},
 		},
 	}
