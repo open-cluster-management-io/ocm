@@ -59,6 +59,7 @@ func AssertClusterManagerCondition(
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
+// TODO
 func AssertWorkCondition(namespace, name string, workClient workclientset.Interface, expectedType string, expectedWorkStatus metav1.ConditionStatus,
 	expectedManifestStatuses []metav1.ConditionStatus, eventuallyTimeout, eventuallyInterval int) {
 	gomega.Eventually(func() error {
@@ -69,14 +70,16 @@ func AssertWorkCondition(namespace, name string, workClient workclientset.Interf
 
 		// check manifest status conditions
 		if ok := HaveManifestCondition(work.Status.ResourceStatus.Manifests, expectedType, expectedManifestStatuses); !ok {
-			return fmt.Errorf("condition %s does not exist, got %v ", expectedType, work.Status.ResourceStatus.Manifests)
+			return fmt.Errorf("work %s/%s condition '%s' does not exist, got %v ",
+				namespace, name, expectedType, work.Status)
 		}
 
 		// check work status condition
 		if meta.IsStatusConditionPresentAndEqual(work.Status.Conditions, expectedType, expectedWorkStatus) {
 			return nil
 		}
-		return fmt.Errorf("status of type %s does not match", expectedType)
+		return fmt.Errorf("work %s/%s condition '%s' does not match, got %v",
+			namespace, name, expectedType, work.Status)
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 }
 
