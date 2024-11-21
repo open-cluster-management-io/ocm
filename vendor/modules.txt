@@ -848,7 +848,7 @@ helm.sh/helm/v3/pkg/ignore
 helm.sh/helm/v3/pkg/release
 helm.sh/helm/v3/pkg/releaseutil
 helm.sh/helm/v3/pkg/time
-# k8s.io/api v0.31.2
+# k8s.io/api v0.31.3
 ## explicit; go 1.22.0
 k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
@@ -924,7 +924,7 @@ k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextension
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1/fake
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1/fake
-# k8s.io/apimachinery v0.31.2
+# k8s.io/apimachinery v0.31.3
 ## explicit; go 1.22.0
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/api/errors
