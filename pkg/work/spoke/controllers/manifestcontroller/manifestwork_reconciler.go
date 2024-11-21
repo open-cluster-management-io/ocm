@@ -195,8 +195,8 @@ func (m *manifestworkReconciler) applyOneManifest(
 	requiredOwner := manageOwnerRef(ownedByTheWork, owner)
 
 	// find update strategy option.
-	option := helper.FindManifestConiguration(resMeta, workSpec.ManifestConfigs)
-	// strategy is update by default
+	option := helper.FindManifestConfiguration(resMeta, workSpec.ManifestConfigs)
+	// strategy is updated by default
 	strategy := workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeUpdate}
 	if option != nil && option.UpdateStrategy != nil {
 		strategy = *option.UpdateStrategy

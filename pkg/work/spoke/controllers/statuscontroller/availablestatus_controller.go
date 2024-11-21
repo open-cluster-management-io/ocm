@@ -208,7 +208,7 @@ func (c *AvailableStatusController) getFeedbackValues(
 	var errs []error
 	var values []workapiv1.FeedbackValue
 
-	option := helper.FindManifestConiguration(resourceMeta, manifestOptions)
+	option := helper.FindManifestConfiguration(resourceMeta, manifestOptions)
 
 	if option == nil || len(option.FeedbackRules) == 0 {
 		return values, metav1.Condition{

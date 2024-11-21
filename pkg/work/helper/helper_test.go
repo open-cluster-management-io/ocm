@@ -389,7 +389,7 @@ func TestHubHash(t *testing.T) {
 	}
 }
 
-func TestFindManifestConiguration(t *testing.T) {
+func TestFindManifestConfiguration(t *testing.T) {
 	cases := []struct {
 		name           string
 		options        []workapiv1.ManifestConfigOption
@@ -412,21 +412,69 @@ func TestFindManifestConiguration(t *testing.T) {
 			expectedOption: nil,
 		},
 		{
+			name: "no feedbackRules and updateStrategy",
+			options: []workapiv1.ManifestConfigOption{
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "nodes", Name: "node1"}},
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "*", Namespace: "test*"}},
+			},
+			resourceMeta:   workapiv1.ManifestResourceMeta{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
+			expectedOption: nil,
+		},
+		{
 			name: "options found",
 			options: []workapiv1.ManifestConfigOption{
 				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "nodes", Name: "node1"}},
-				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"}},
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
+					FeedbackRules: []workapiv1.FeedbackRule{{Type: workapiv1.WellKnownStatusType}},
+				},
 			},
 			resourceMeta: workapiv1.ManifestResourceMeta{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
 			expectedOption: &workapiv1.ManifestConfigOption{
 				ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
+				FeedbackRules:      []workapiv1.FeedbackRule{{Type: workapiv1.WellKnownStatusType}},
+			},
+		},
+		{
+			name: "options found include *",
+			options: []workapiv1.ManifestConfigOption{
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "nodes", Name: "node1"}},
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "*", Namespace: "test*"},
+					FeedbackRules:  []workapiv1.FeedbackRule{{Type: workapiv1.WellKnownStatusType}},
+					UpdateStrategy: &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeUpdate}},
+			},
+			resourceMeta: workapiv1.ManifestResourceMeta{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
+			expectedOption: &workapiv1.ManifestConfigOption{
+				ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
+				FeedbackRules:      []workapiv1.FeedbackRule{{Type: workapiv1.WellKnownStatusType}},
+				UpdateStrategy:     &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeUpdate},
+			},
+		},
+		{
+			name: "multi options matched,return the first one",
+			options: []workapiv1.ManifestConfigOption{
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "test", Namespace: "test*"},
+					FeedbackRules: []workapiv1.FeedbackRule{{Type: workapiv1.WellKnownStatusType}}},
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "nodes", Name: "node1"}},
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
+					FeedbackRules: []workapiv1.FeedbackRule{{Type: workapiv1.JSONPathsType}}},
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "*", Namespace: "testns"},
+					UpdateStrategy: &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeUpdate}},
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "*", Namespace: "testns"},
+					UpdateStrategy: &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeCreateOnly}},
+			},
+			resourceMeta: workapiv1.ManifestResourceMeta{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
+
+			expectedOption: &workapiv1.ManifestConfigOption{
+				ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
+				FeedbackRules:      []workapiv1.FeedbackRule{{Type: workapiv1.WellKnownStatusType}},
+				UpdateStrategy:     &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeUpdate},
 			},
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			option := FindManifestConiguration(c.resourceMeta, c.options)
+			option := FindManifestConfiguration(c.resourceMeta, c.options)
 			if !equality.Semantic.DeepEqual(option, c.expectedOption) {
 				t.Errorf("expect option to be %v, but got %v", c.expectedOption, option)
 			}
@@ -736,6 +784,53 @@ func TestFindUntrackedResources(t *testing.T) {
 			actual := FindUntrackedResources(c.appliedResources, c.newAppliedResources)
 			if !reflect.DeepEqual(actual, c.expectedUntrackedResources) {
 				t.Errorf(diff.ObjectDiff(actual, c.expectedUntrackedResources))
+			}
+		})
+	}
+}
+
+func TestNameMatch(t *testing.T) {
+	cases := []struct {
+		name             string
+		resource, target string
+		expected         bool
+	}{
+		{
+			"case 1",
+			"my-test",
+			"my*",
+			true,
+		},
+		{
+			"case 2",
+			"my-test",
+			"*my",
+			false,
+		},
+		{
+			"case 2",
+			"my-test",
+			"*m*",
+			true,
+		},
+		{
+			"case 3",
+			"my-test",
+			"*t",
+			true,
+		},
+		{
+			"case 4",
+			"my-test",
+			"*",
+			true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			rst := wildcardMatch(c.resource, c.target)
+			if rst != c.expected {
+				t.Errorf("expected %v, got %v", c.expected, rst)
 			}
 		})
 	}

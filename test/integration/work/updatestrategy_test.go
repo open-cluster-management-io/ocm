@@ -677,4 +677,157 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 			return nil
 		}, eventuallyTimeout*3, eventuallyInterval*3).Should(gomega.BeNil())
 	})
+
+	ginkgo.Context("wildcard to filter all resources", func() {
+		ginkgo.BeforeEach(func() {
+			cm1 := util.NewConfigmap(commOptions.SpokeClusterName, "cm1",
+				map[string]string{"test1": "testdata", "test2": "test2"}, []string{})
+			_, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Create(context.TODO(), cm1, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			manifests = append(manifests, util.ToManifest(cm1))
+
+			cm2 := util.NewConfigmap(commOptions.SpokeClusterName, "cm2",
+				map[string]string{"test1": "testdata", "test2": "test2"}, []string{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Create(context.TODO(), cm2, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			manifests = append(manifests, util.ToManifest(cm2))
+		})
+
+		ginkgo.AfterEach(func() {
+			err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Delete(context.TODO(), "cm1", metav1.DeleteOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Delete(context.TODO(), "cm2", metav1.DeleteOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("read cms from the cluster", func() {
+			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Resource:  "configmaps",
+						Namespace: "*",
+						Name:      "*",
+					},
+					UpdateStrategy: &workapiv1.UpdateStrategy{
+						Type: workapiv1.UpdateStrategyTypeReadOnly,
+					},
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.JSONPathsType,
+							JsonPaths: []workapiv1.JsonPath{
+								{
+									Name: "test1",
+									Path: ".data.test1",
+								},
+							},
+						},
+					},
+				},
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Resource:  "configmaps",
+						Namespace: "*",
+						Name:      "cm*",
+					},
+					UpdateStrategy: &workapiv1.UpdateStrategy{
+						Type: workapiv1.UpdateStrategyTypeReadOnly,
+					},
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.JSONPathsType,
+							JsonPaths: []workapiv1.JsonPath{
+								{
+									Name: "test2",
+									Path: ".data.test2",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("get configmap values from the work")
+			gomega.Eventually(func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if len(work.Status.ResourceStatus.Manifests) != 2 {
+					return fmt.Errorf("the size of resource status is not correct, expect to be 2 but got %d", len(work.Status.ResourceStatus.Manifests))
+				}
+
+				expectedValues := []workapiv1.FeedbackValue{
+					{
+						Name: "test1",
+						Value: workapiv1.FieldValue{
+							Type:   workapiv1.String,
+							String: ptr.To[string]("testdata"),
+						},
+					},
+				}
+				for _, manifest := range work.Status.ResourceStatus.Manifests {
+					if !apiequality.Semantic.DeepEqual(manifest.StatusFeedbacks.Values, expectedValues) {
+						return fmt.Errorf("status feedback values are not correct, we got %v", manifest.StatusFeedbacks.Values)
+					}
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			ginkgo.By("update configmap")
+			gomega.Eventually(func() error {
+				cmName := []string{"cm1", "cm2"}
+				for _, name := range cmName {
+					cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), name, metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+
+					cm.Data["test1"] = "testdata-updated"
+
+					_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Update(context.Background(), cm, metav1.UpdateOptions{})
+					if err != nil {
+						return err
+					}
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			ginkgo.By("get updated configmap values from the work")
+			gomega.Eventually(func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if len(work.Status.ResourceStatus.Manifests) != 2 {
+					return fmt.Errorf("the size of resource status is not correct, expect to be 2 but got %d", len(work.Status.ResourceStatus.Manifests))
+				}
+
+				expectedValues := []workapiv1.FeedbackValue{
+					{
+						Name: "test1",
+						Value: workapiv1.FieldValue{
+							Type:   workapiv1.String,
+							String: ptr.To[string]("testdata-updated"),
+						},
+					},
+				}
+				for _, manifest := range work.Status.ResourceStatus.Manifests {
+					if !apiequality.Semantic.DeepEqual(manifest.StatusFeedbacks.Values, expectedValues) {
+						return fmt.Errorf("status feedback values are not correct, we got %v", manifest.StatusFeedbacks.Values)
+					}
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+	})
 })

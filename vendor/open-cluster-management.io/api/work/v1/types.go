@@ -226,6 +226,8 @@ type FeedbackRule struct {
 	Type FeedBackType `json:"type"`
 
 	// JsonPaths defines the json path under status field to be synced.
+	// +listType:=map
+	// +listMapKey:=name
 	// +optional
 	JsonPaths []JsonPath `json:"jsonPaths,omitempty"`
 }

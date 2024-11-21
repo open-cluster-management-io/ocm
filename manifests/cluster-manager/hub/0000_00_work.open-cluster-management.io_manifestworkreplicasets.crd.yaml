@@ -210,6 +210,9 @@ spec:
                                   - path
                                   type: object
                                 type: array
+                                x-kubernetes-list-map-keys:
+                                - name
+                                x-kubernetes-list-type: map
                               type:
                                 description: |-
                                   Type defines the option of how status can be returned.
