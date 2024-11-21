@@ -43,6 +43,7 @@ const (
 	appliedManifestWorkFinalizeControllerWorkers = 10
 	manifestWorkFinalizeControllerWorkers        = 10
 	availableStatusControllerWorkers             = 10
+	test                                         = 1
 )
 
 type WorkAgentConfig struct {
