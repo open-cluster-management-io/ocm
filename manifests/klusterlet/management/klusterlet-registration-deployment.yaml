@@ -82,8 +82,17 @@ spec:
           - "--spoke-kubeconfig=/spoke/config/kubeconfig"
           - "--terminate-on-files=/spoke/config/kubeconfig"
           {{end}}
-          {{if eq .Replica 1}}
+          {{if .RegistrationDisableLeaderElection }}
           - "--disable-leader-election"
+          {{end}}
+          {{if .RegistrationLeaderElectionLeaseDuration }}
+          - "--leader-election-lease-duration={{ .RegistrationLeaderElectionLeaseDuration }}"
+          {{end}}
+          {{if .RegistrationLeaderElectionRenewDeadline }}
+          - "--leader-election-renew-deadline={{ .RegistrationLeaderElectionRenewDeadline }}"
+          {{end}}
+          {{if .RegistrationLeaderElectionRetryPeriod }}
+          - "--leader-election-retry-period={{ .RegistrationLeaderElectionRetryPeriod }}"
           {{end}}
           {{if gt .ClientCertExpirationSeconds 0}}
           - "--client-cert-expiration-seconds={{ .ClientCertExpirationSeconds }}"

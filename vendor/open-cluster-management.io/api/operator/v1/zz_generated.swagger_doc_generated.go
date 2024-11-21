@@ -261,6 +261,18 @@ func (KubeConfigSecret) SwaggerDoc() map[string]string {
 	return map_KubeConfigSecret
 }
 
+var map_LeaderElectionConfig = map[string]string{
+	"":                            "Leader election configuration",
+	"disableLeaderElection":       "Disable leader election. Use the klusterlet agent default value if this field is not defined.",
+	"leaderElectionLeaseDuration": "The duration that non-leader candidates will wait after observing a leadership renewal until attempting to acquire leadership of a led but unrenewed leader slot. This is effectively the maximum duration that a leader can be stopped before it is replaced by another candidate. This is only applicable if leader election is enabled. Use the klusterlet agent default value if this field is not defined.",
+	"leaderElectionRenewDeadline": "The interval between attempts by the acting master to renew a leadership slot before it stops leading. This must be less than or equal to the lease duration. This is only applicable if leader election is enabled. Use the klusterlet agent default value if this field is not defined.",
+	"leaderElectionRetryPeriod":   "The duration the clients should wait between attempting acquisition and renewal of a leadership. This is only applicable if leader election is enabled. Use the klusterlet agent default value if this field is not defined.",
+}
+
+func (LeaderElectionConfig) SwaggerDoc() map[string]string {
+	return map_LeaderElectionConfig
+}
+
 var map_LocalSecretsConfig = map[string]string{
 	"kubeConfigSecrets":           "KubeConfigSecrets is a list of secret names. The secrets are in the same namespace where the agent controller runs.",
 	"hubConnectionTimeoutSeconds": "HubConnectionTimeoutSeconds is used to set the timeout of connecting to the hub cluster. When agent loses the connection to the hub over the timeout seconds, the agent do a rebootstrap. By default is 10 mins.",

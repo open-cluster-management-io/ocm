@@ -86,8 +86,19 @@ spec:
           {{if .ExternalServerURL}}
           - "--spoke-external-server-urls={{ .ExternalServerURL }}"
           {{end}}
-          {{if eq .Replica 1}}
+          {{if .AgentDisableLeaderElection }}
           - "--disable-leader-election"
+          {{end}}
+          {{if .AgentLeaderElectionLeaseDuration }}
+          - "--leader-election-lease-duration={{ .AgentLeaderElectionLeaseDuration }}"
+          {{end}}
+          {{if .AgentLeaderElectionRenewDeadline }}
+          - "--leader-election-renew-deadline={{ .AgentLeaderElectionRenewDeadline }}"
+          {{end}}
+          {{if .AgentLeaderElectionRetryPeriod }}
+          - "--leader-election-retry-period={{ .AgentLeaderElectionRetryPeriod }}"
+          {{end}}
+          {{if eq .Replica 1}}
           - "--status-sync-interval=60s"
           {{end}}
           {{if gt .ClientCertExpirationSeconds 0}}

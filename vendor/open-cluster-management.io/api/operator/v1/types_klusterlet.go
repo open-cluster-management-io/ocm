@@ -163,6 +163,10 @@ type RegistrationConfiguration struct {
 	// +kubebuilder:default:=100
 	KubeAPIBurst int32 `json:"kubeAPIBurst,omitempty"`
 
+	// Leader election configuration
+	// +optional
+	LeaderElectionConfig `json:",inline"`
+
 	// BootstrapKubeConfigs defines the ordered list of bootstrap kubeconfigs. The order decides which bootstrap kubeconfig to use first when rebootstrap.
 	//
 	// When the agent loses the connection to the current hub over HubConnectionTimeoutSeconds, or the managedcluster CR
@@ -269,6 +273,10 @@ type WorkAgentConfiguration struct {
 	// +kubebuilder:default:=100
 	KubeAPIBurst int32 `json:"kubeAPIBurst,omitempty"`
 
+	// Leader election configuration
+	// +optional
+	LeaderElectionConfig `json:",inline"`
+
 	// AppliedManifestWorkEvictionGracePeriod is the eviction grace period the work agent will wait before
 	// evicting the AppliedManifestWorks, whose corresponding ManifestWorks are missing on the hub cluster, from
 	// the managed cluster. If not present, the default value of the work agent will be used.
@@ -276,6 +284,42 @@ type WorkAgentConfiguration struct {
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Pattern="^([0-9]+(s|m|h))+$"
 	AppliedManifestWorkEvictionGracePeriod *metav1.Duration `json:"appliedManifestWorkEvictionGracePeriod,omitempty"`
+}
+
+// Leader election configuration
+type LeaderElectionConfig struct {
+	// Disable leader election.
+	// Use the klusterlet agent default value if this field is not defined.
+	// +optional
+	DisableLeaderElection bool `json:"disableLeaderElection,omitempty"`
+
+	// The duration that non-leader candidates will wait after observing a leadership
+	// renewal until attempting to acquire leadership of a led but unrenewed leader
+	// slot. This is effectively the maximum duration that a leader can be stopped
+	// before it is replaced by another candidate. This is only applicable if leader
+	// election is enabled.
+	// Use the klusterlet agent default value if this field is not defined.
+	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Pattern="^([0-9]+(s|m|h))+$"
+	LeaderElectionLeaseDuration *metav1.Duration `json:"leaderElectionLeaseDuration,omitempty"`
+
+	// The interval between attempts by the acting master to renew a leadership slot
+	// before it stops leading. This must be less than or equal to the lease duration.
+	// This is only applicable if leader election is enabled.
+	// Use the klusterlet agent default value if this field is not defined.
+	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Pattern="^([0-9]+(s|m|h))+$"
+	LeaderElectionRenewDeadline *metav1.Duration `json:"leaderElectionRenewDeadline,omitempty"`
+
+	// The duration the clients should wait between attempting acquisition and renewal
+	// of a leadership. This is only applicable if leader election is enabled.
+	// Use the klusterlet agent default value if this field is not defined.
+	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Pattern="^([0-9]+(s|m|h))+$"
+	LeaderElectionRetryPeriod *metav1.Duration `json:"leaderElectionRetryPeriod,omitempty"`
 }
 
 const (

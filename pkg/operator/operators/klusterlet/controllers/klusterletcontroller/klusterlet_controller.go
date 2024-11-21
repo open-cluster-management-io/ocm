@@ -179,10 +179,22 @@ type klusterletConfig struct {
 	ClusterAnnotationsString                    string
 	RegistrationKubeAPIQPS                      float32
 	RegistrationKubeAPIBurst                    int32
+	RegistrationDisableLeaderElection           bool
+	RegistrationLeaderElectionLeaseDuration     string
+	RegistrationLeaderElectionRenewDeadline     string
+	RegistrationLeaderElectionRetryPeriod       string
 	WorkKubeAPIQPS                              float32
 	WorkKubeAPIBurst                            int32
+	WorkDisableLeaderElection                   bool
+	WorkLeaderElectionLeaseDuration             string
+	WorkLeaderElectionRenewDeadline             string
+	WorkLeaderElectionRetryPeriod               string
 	AgentKubeAPIQPS                             float32
 	AgentKubeAPIBurst                           int32
+	AgentDisableLeaderElection                  bool
+	AgentLeaderElectionLeaseDuration            string
+	AgentLeaderElectionRenewDeadline            string
+	AgentLeaderElectionRetryPeriod              string
 	ExternalManagedKubeConfigSecret             string
 	ExternalManagedKubeConfigRegistrationSecret string
 	ExternalManagedKubeConfigWorkSecret         string
@@ -348,11 +360,29 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	//       function need to be applied
 	var registrationFeatureMsgs, workFeatureMsgs string
 	var registrationFeatureGates []operatorapiv1.FeatureGate
+	// for singleton agent, the leaseDuration, renewDeadline and retryPeriod use the max one between the
+	// configurations of registration and work
+	var agentLeaderElectionLeaseDuration, agentLeaderElectionRenewDeadline, agentLeaderElectionRetryPeriod *metav1.Duration
+
 	if klusterlet.Spec.RegistrationConfiguration != nil {
-		registrationFeatureGates = klusterlet.Spec.RegistrationConfiguration.FeatureGates
-		config.ClientCertExpirationSeconds = klusterlet.Spec.RegistrationConfiguration.ClientCertExpirationSeconds
-		config.RegistrationKubeAPIQPS = float32(klusterlet.Spec.RegistrationConfiguration.KubeAPIQPS)
-		config.RegistrationKubeAPIBurst = klusterlet.Spec.RegistrationConfiguration.KubeAPIBurst
+		regConfig := klusterlet.Spec.RegistrationConfiguration
+		registrationFeatureGates = regConfig.FeatureGates
+		config.ClientCertExpirationSeconds = regConfig.ClientCertExpirationSeconds
+		config.RegistrationKubeAPIQPS = float32(regConfig.KubeAPIQPS)
+		config.RegistrationKubeAPIBurst = regConfig.KubeAPIBurst
+		config.RegistrationDisableLeaderElection = regConfig.DisableLeaderElection
+		if regConfig.LeaderElectionLeaseDuration != nil {
+			config.RegistrationLeaderElectionLeaseDuration = regConfig.LeaderElectionLeaseDuration.Duration.String()
+			agentLeaderElectionLeaseDuration = regConfig.LeaderElectionLeaseDuration
+		}
+		if regConfig.LeaderElectionRenewDeadline != nil {
+			config.RegistrationLeaderElectionRenewDeadline = regConfig.LeaderElectionRenewDeadline.Duration.String()
+			agentLeaderElectionRenewDeadline = regConfig.LeaderElectionRenewDeadline
+		}
+		if regConfig.LeaderElectionRetryPeriod != nil {
+			config.RegistrationLeaderElectionRetryPeriod = regConfig.LeaderElectionRetryPeriod.Duration.String()
+			agentLeaderElectionRetryPeriod = regConfig.LeaderElectionRetryPeriod
+		}
 		//Configuring Registration driver depending on registration auth
 		if &klusterlet.Spec.RegistrationConfiguration.RegistrationDriver != nil &&
 			klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType == AwsIrsaAuthType {
@@ -361,7 +391,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			managedClusterArn := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.ManagedClusterArn
 
 			config.RegistrationDriver = RegistrationDriver{
-				AuthType: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType,
+				AuthType: regConfig.RegistrationDriver.AuthType,
 				AwsIrsa: &AwsIrsa{
 					HubClusterArn:     hubClusterArn,
 					ManagedClusterArn: managedClusterArn,
@@ -374,12 +404,12 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			config.ManagedClusterRoleSuffix = managedClusterIamRole.md5HashSuffix()
 		} else {
 			config.RegistrationDriver = RegistrationDriver{
-				AuthType: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType,
+				AuthType: regConfig.RegistrationDriver.AuthType,
 			}
 		}
 		// construct cluster annotations string, the final format is "key1=value1,key2=value2"
 		var annotationsArray []string
-		for k, v := range commonhelpers.FilterClusterAnnotations(klusterlet.Spec.RegistrationConfiguration.ClusterAnnotations) {
+		for k, v := range commonhelpers.FilterClusterAnnotations(regConfig.ClusterAnnotations) {
 			annotationsArray = append(annotationsArray, fmt.Sprintf("%s=%s", k, v))
 		}
 		config.ClusterAnnotationsString = strings.Join(annotationsArray, ",")
@@ -389,9 +419,23 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 	var workFeatureGates []operatorapiv1.FeatureGate
 	if klusterlet.Spec.WorkConfiguration != nil {
-		workFeatureGates = klusterlet.Spec.WorkConfiguration.FeatureGates
-		config.WorkKubeAPIQPS = float32(klusterlet.Spec.WorkConfiguration.KubeAPIQPS)
-		config.WorkKubeAPIBurst = klusterlet.Spec.WorkConfiguration.KubeAPIBurst
+		workConfig := klusterlet.Spec.WorkConfiguration
+		workFeatureGates = workConfig.FeatureGates
+		config.WorkKubeAPIQPS = float32(workConfig.KubeAPIQPS)
+		config.WorkKubeAPIBurst = workConfig.KubeAPIBurst
+		config.WorkDisableLeaderElection = workConfig.DisableLeaderElection
+		if workConfig.LeaderElectionLeaseDuration != nil {
+			config.WorkLeaderElectionLeaseDuration = workConfig.LeaderElectionLeaseDuration.Duration.String()
+			agentLeaderElectionLeaseDuration = maxDuration(agentLeaderElectionLeaseDuration, workConfig.LeaderElectionLeaseDuration)
+		}
+		if workConfig.LeaderElectionRenewDeadline != nil {
+			config.WorkLeaderElectionRenewDeadline = workConfig.LeaderElectionRenewDeadline.Duration.String()
+			agentLeaderElectionRenewDeadline = maxDuration(agentLeaderElectionRenewDeadline, workConfig.LeaderElectionRenewDeadline)
+		}
+		if workConfig.LeaderElectionRetryPeriod != nil {
+			config.WorkLeaderElectionRetryPeriod = workConfig.LeaderElectionRetryPeriod.Duration.String()
+			agentLeaderElectionRetryPeriod = maxDuration(agentLeaderElectionRetryPeriod, workConfig.LeaderElectionRetryPeriod)
+		}
 	}
 
 	config.WorkFeatureGates, workFeatureMsgs = helpers.ConvertToFeatureGateFlags("Work", workFeatureGates, ocmfeature.DefaultSpokeWorkFeatureGates)
@@ -405,6 +449,20 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	config.AgentKubeAPIBurst = config.RegistrationKubeAPIBurst
 	if config.AgentKubeAPIBurst < config.WorkKubeAPIBurst {
 		config.AgentKubeAPIBurst = config.WorkKubeAPIBurst
+	}
+
+	// for singleton agent, disable the leader election if both of registration and work is disabled
+	config.AgentDisableLeaderElection = config.RegistrationDisableLeaderElection && config.WorkDisableLeaderElection
+	// set the leaseDuration, renewDeadline and retryPeriod for singleton agent, use the max one between
+	// the configurations of registration and work
+	if agentLeaderElectionLeaseDuration != nil {
+		config.AgentLeaderElectionLeaseDuration = agentLeaderElectionLeaseDuration.Duration.String()
+	}
+	if agentLeaderElectionRenewDeadline != nil {
+		config.AgentLeaderElectionRenewDeadline = agentLeaderElectionRenewDeadline.Duration.String()
+	}
+	if agentLeaderElectionRetryPeriod != nil {
+		config.AgentLeaderElectionRetryPeriod = agentLeaderElectionRetryPeriod.Duration.String()
 	}
 
 	reconcilers := []klusterletReconcile{
@@ -579,4 +637,17 @@ func getAwsAccountIdAndClusterName(clusterArn string) (string, string) {
 	clusterName := strings.Split(clusterStringParts[5], "/")[1]
 	awsAccountId := clusterStringParts[4]
 	return awsAccountId, clusterName
+}
+
+func maxDuration(durationA, durationB *metav1.Duration) *metav1.Duration {
+	switch {
+	case durationA == nil:
+		return durationB
+	case durationB == nil:
+		return durationA
+	case durationA.Duration >= durationB.Duration:
+		return durationA
+	default:
+		return durationB
+	}
 }

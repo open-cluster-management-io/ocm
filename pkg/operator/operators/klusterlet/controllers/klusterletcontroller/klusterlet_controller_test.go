@@ -376,7 +376,7 @@ func getDeployments(actions []clienttesting.Action, verb, suffix string) *appsv1
 	return nil
 }
 
-func assertKlusterletDeployment(t *testing.T, actions []clienttesting.Action, verb, serverURL, clusterName string) {
+func assertKlusterletDeployment(t *testing.T, actions []clienttesting.Action, verb, serverURL, clusterName string, regDriver *operatorapiv1.RegistrationDriver, leConfig *operatorapiv1.LeaderElectionConfig) {
 	deployment := getDeployments(actions, verb, "agent")
 	if deployment == nil {
 		t.Errorf("klusterlet deployment not found")
@@ -404,23 +404,32 @@ func assertKlusterletDeployment(t *testing.T, actions []clienttesting.Action, ve
 
 	expectedArgs = append(expectedArgs, "--agent-id=", "--workload-source-driver=kube", "--workload-source-config=/spoke/hub-kubeconfig/kubeconfig")
 
-	if *deployment.Spec.Replicas == 1 {
-		expectedArgs = append(expectedArgs, "--disable-leader-election")
+	if leConfig != nil {
+		if leConfig.DisableLeaderElection {
+			expectedArgs = append(expectedArgs, "--disable-leader-election")
+		}
+		expectedArgs = append(expectedArgs, fmt.Sprintf("--leader-election-lease-duration=%s", leConfig.LeaderElectionLeaseDuration.Duration.String()),
+			fmt.Sprintf("--leader-election-renew-deadline=%s", leConfig.LeaderElectionRenewDeadline.Duration.String()),
+			fmt.Sprintf("--leader-election-retry-period=%s", leConfig.LeaderElectionRetryPeriod.Duration.String()))
 	}
 
-	expectedArgs = append(expectedArgs, "--status-sync-interval=60s", "--kube-api-qps=20", "--kube-api-burst=60",
-		"--registration-auth=awsirsa",
-		"--hub-cluster-arn=arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1",
-		"--managed-cluster-arn=arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
-		"--managed-cluster-role-suffix=7f8141296c75f2871e3d030f85c35692")
+	expectedArgs = append(expectedArgs, "--status-sync-interval=60s", "--kube-api-qps=20", "--kube-api-burst=60")
+
+	if regDriver != nil {
+		expectedArgs = append(expectedArgs, fmt.Sprintf("--registration-auth=%s", regDriver.AuthType))
+		if regDriver.AwsIrsa != nil {
+			expectedArgs = append(expectedArgs, fmt.Sprintf("--hub-cluster-arn=%s", regDriver.AwsIrsa.HubClusterArn))
+			assert.True(t, isDotAwsMounted(volumeMounts))
+			assert.True(t, isDotAwsVolumePresent(volumes))
+		}
+		expectedArgs = append(expectedArgs, "--managed-cluster-arn=arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
+			"--managed-cluster-role-suffix=7f8141296c75f2871e3d030f85c35692")
+	}
 
 	if !equality.Semantic.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expect args %v, but got %v", expectedArgs, args)
 		return
 	}
-
-	assert.True(t, isDotAwsMounted(volumeMounts))
-	assert.True(t, isDotAwsVolumePresent(volumes))
 
 }
 
@@ -442,7 +451,7 @@ func isDotAwsMounted(mounts []corev1.VolumeMount) bool {
 	return false
 }
 
-func assertRegistrationDeployment(t *testing.T, actions []clienttesting.Action, verb, serverURL, clusterName string, replica int32, awsAuth bool) {
+func assertRegistrationDeployment(t *testing.T, actions []clienttesting.Action, verb, serverURL, clusterName string, replica int32, regDriver *operatorapiv1.RegistrationDriver, leConfig *operatorapiv1.LeaderElectionConfig) {
 	deployment := getDeployments(actions, verb, "registration-agent")
 	if deployment == nil {
 		t.Errorf("registration deployment not found")
@@ -465,17 +474,26 @@ func assertRegistrationDeployment(t *testing.T, actions []clienttesting.Action, 
 		expectedArgs = append(expectedArgs, fmt.Sprintf("--spoke-external-server-urls=%s", serverURL))
 	}
 
-	if *deployment.Spec.Replicas == 1 {
-		expectedArgs = append(expectedArgs, "--disable-leader-election")
+	if leConfig != nil {
+		if leConfig.DisableLeaderElection {
+			expectedArgs = append(expectedArgs, "--disable-leader-election")
+		}
+		expectedArgs = append(expectedArgs, fmt.Sprintf("--leader-election-lease-duration=%s", leConfig.LeaderElectionLeaseDuration.Duration.String()),
+			fmt.Sprintf("--leader-election-renew-deadline=%s", leConfig.LeaderElectionRenewDeadline.Duration.String()),
+			fmt.Sprintf("--leader-election-retry-period=%s", leConfig.LeaderElectionRetryPeriod.Duration.String()))
 	}
 
 	expectedArgs = append(expectedArgs, "--kube-api-qps=10", "--kube-api-burst=60")
-	if awsAuth {
-		expectedArgs = append(expectedArgs, "--registration-auth=awsirsa",
-			"--hub-cluster-arn=arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1",
+	if regDriver != nil {
+		expectedArgs = append(expectedArgs, fmt.Sprintf("--registration-auth=%s", regDriver.AuthType))
+		if regDriver.AwsIrsa != nil {
+			expectedArgs = append(expectedArgs, fmt.Sprintf("--hub-cluster-arn=%s", regDriver.AwsIrsa.HubClusterArn))
+		}
+		expectedArgs = append(expectedArgs,
 			"--managed-cluster-arn=arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
 			"--managed-cluster-role-suffix=7f8141296c75f2871e3d030f85c35692")
 	}
+
 	if !equality.Semantic.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expect args %v, but got %v", expectedArgs, args)
 		return
@@ -487,7 +505,7 @@ func assertRegistrationDeployment(t *testing.T, actions []clienttesting.Action, 
 	}
 }
 
-func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, clusterName string, mode operatorapiv1.InstallMode, replica int32) {
+func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, clusterName string, mode operatorapiv1.InstallMode, replica int32, leConfig *operatorapiv1.LeaderElectionConfig) {
 	deployment := getDeployments(actions, verb, "work-agent")
 	if deployment == nil {
 		t.Errorf("work deployment not found")
@@ -515,7 +533,16 @@ func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, cl
 	expectArgs = append(expectArgs, "--terminate-on-files=/spoke/hub-kubeconfig/kubeconfig")
 
 	if *deployment.Spec.Replicas == 1 {
-		expectArgs = append(expectArgs, "--disable-leader-election", "--status-sync-interval=60s")
+		expectArgs = append(expectArgs, "--status-sync-interval=60s")
+	}
+
+	if leConfig != nil {
+		if leConfig.DisableLeaderElection {
+			expectArgs = append(expectArgs, "--disable-leader-election")
+		}
+		expectArgs = append(expectArgs, fmt.Sprintf("--leader-election-lease-duration=%s", leConfig.LeaderElectionLeaseDuration.Duration.String()),
+			fmt.Sprintf("--leader-election-renew-deadline=%s", leConfig.LeaderElectionRenewDeadline.Duration.String()),
+			fmt.Sprintf("--leader-election-retry-period=%s", leConfig.LeaderElectionRetryPeriod.Duration.String()))
 	}
 
 	expectArgs = append(expectArgs, "--kube-api-qps=20", "--kube-api-burst=50")
@@ -1078,7 +1105,7 @@ func TestAWSIrsaAuthInSingletonMode(t *testing.T) {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 
-	assertKlusterletDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1")
+	assertKlusterletDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1", &awsIrsaRegistrationDriver, nil)
 }
 
 func TestAWSIrsaAuthInNonSingletonMode(t *testing.T) {
@@ -1109,7 +1136,7 @@ func TestAWSIrsaAuthInNonSingletonMode(t *testing.T) {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 
-	assertRegistrationDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1", 1, true)
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1", 1, &awsIrsaRegistrationDriver, nil)
 }
 
 func TestReplica(t *testing.T) {
@@ -1133,8 +1160,8 @@ func TestReplica(t *testing.T) {
 	}
 
 	// should have 1 replica for registration deployment and 0 for work
-	assertRegistrationDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1", 1, false)
-	assertWorkDeployment(t, controller.kubeClient.Actions(), createVerb, "cluster1", operatorapiv1.InstallModeDefault, 0)
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1", 1, nil, nil)
+	assertWorkDeployment(t, controller.kubeClient.Actions(), createVerb, "cluster1", operatorapiv1.InstallModeDefault, 0, nil)
 
 	klusterlet = newKlusterlet("klusterlet", "testns", "cluster1")
 	klusterlet.Status.Conditions = []metav1.Condition{
@@ -1157,7 +1184,7 @@ func TestReplica(t *testing.T) {
 	}
 
 	// should have 1 replica for work
-	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster1", operatorapiv1.InstallModeDefault, 1)
+	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster1", operatorapiv1.InstallModeDefault, 1, nil)
 
 	controller.kubeClient.PrependReactor("list", "nodes", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 		if action.GetVerb() != "list" {
@@ -1178,8 +1205,8 @@ func TestReplica(t *testing.T) {
 	}
 
 	// should have 3 replicas for clusters with multiple nodes
-	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "update", "", "cluster1", 3, false)
-	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster1", operatorapiv1.InstallModeDefault, 3)
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "update", "", "cluster1", 3, nil, nil)
+	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster1", operatorapiv1.InstallModeDefault, 3, nil)
 }
 
 func TestClusterNameChange(t *testing.T) {
@@ -1199,7 +1226,7 @@ func TestClusterNameChange(t *testing.T) {
 	}
 
 	// Check if deployment has the right cluster name set
-	assertRegistrationDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1", 1, false)
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1", 1, nil, nil)
 
 	operatorAction := controller.operatorClient.Actions()
 	testingcommon.AssertActions(t, operatorAction, "patch")
@@ -1229,7 +1256,7 @@ func TestClusterNameChange(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
-	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "update", "", "", 1, false)
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "update", "", "", 1, nil, nil)
 
 	// Update hubconfigsecret and sync again
 	hubSecret.Data["cluster-name"] = []byte("cluster2")
@@ -1251,7 +1278,7 @@ func TestClusterNameChange(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
-	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster2", "", 0)
+	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster2", "", 0, nil)
 
 	// Update klusterlet with different cluster name and rerun sync
 	klusterlet = newKlusterlet("klusterlet", "testns", "cluster3")
@@ -1267,8 +1294,8 @@ func TestClusterNameChange(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
-	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "update", "https://localhost", "cluster3", 1, false)
-	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster3", "", 0)
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "update", "https://localhost", "cluster3", 1, nil, nil)
+	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster3", "", 0, nil)
 }
 
 func TestSyncWithPullSecret(t *testing.T) {
@@ -1449,6 +1476,95 @@ func TestRenderingResourceRequirements(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRenderingLeaderElectionSingletonMode(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	klusterlet.Spec.RegistrationConfiguration.LeaderElectionConfig = operatorapiv1.LeaderElectionConfig{
+		LeaderElectionLeaseDuration: &metav1.Duration{Duration: 10 * time.Second},
+		LeaderElectionRenewDeadline: &metav1.Duration{Duration: 8 * time.Second},
+		LeaderElectionRetryPeriod:   &metav1.Duration{Duration: 5 * time.Second},
+	}
+	klusterlet.Spec.WorkConfiguration.LeaderElectionConfig = operatorapiv1.LeaderElectionConfig{
+		DisableLeaderElection:       true,
+		LeaderElectionLeaseDuration: &metav1.Duration{Duration: 12 * time.Second},
+		LeaderElectionRenewDeadline: &metav1.Duration{Duration: 6 * time.Second},
+	}
+
+	klusterlet.Spec.DeployOption.Mode = operatorapiv1.InstallModeSingleton
+	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
+	hubSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubSecret.Data["cluster-name"] = []byte("cluster1")
+	objects := []runtime.Object{
+		newNamespace("testns"),
+		newSecret(helpers.BootstrapHubKubeConfig, "testns"),
+		hubSecret,
+	}
+
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
+		objects...)
+
+	err := controller.controller.sync(context.TODO(), syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	expectLeaderElectionConfig := &operatorapiv1.LeaderElectionConfig{
+		LeaderElectionLeaseDuration: &metav1.Duration{Duration: 12 * time.Second},
+		LeaderElectionRenewDeadline: &metav1.Duration{Duration: 8 * time.Second},
+		LeaderElectionRetryPeriod:   &metav1.Duration{Duration: 5 * time.Second},
+	}
+	assertKlusterletDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1", nil, expectLeaderElectionConfig)
+}
+
+func TestRenderingLeaderElectionNonSingletonMode(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	klusterlet.Spec.RegistrationConfiguration.LeaderElectionConfig = operatorapiv1.LeaderElectionConfig{
+		LeaderElectionLeaseDuration: &metav1.Duration{Duration: 10 * time.Second},
+		LeaderElectionRenewDeadline: &metav1.Duration{Duration: 8 * time.Second},
+		LeaderElectionRetryPeriod:   &metav1.Duration{Duration: 5 * time.Second},
+	}
+	klusterlet.Spec.WorkConfiguration.LeaderElectionConfig = operatorapiv1.LeaderElectionConfig{
+		DisableLeaderElection:       true,
+		LeaderElectionLeaseDuration: &metav1.Duration{Duration: 12 * time.Second},
+		LeaderElectionRenewDeadline: &metav1.Duration{Duration: 6 * time.Second},
+		LeaderElectionRetryPeriod:   &metav1.Duration{Duration: 4 * time.Second},
+	}
+
+	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
+	hubSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubSecret.Data["cluster-name"] = []byte("cluster1")
+	objects := []runtime.Object{
+		newNamespace("testns"),
+		newSecret(helpers.BootstrapHubKubeConfig, "testns"),
+		hubSecret,
+	}
+
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
+		objects...)
+
+	err := controller.controller.sync(context.TODO(), syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	expectRegLeaderElectionConfig := &operatorapiv1.LeaderElectionConfig{
+		LeaderElectionLeaseDuration: &metav1.Duration{Duration: 10 * time.Second},
+		LeaderElectionRenewDeadline: &metav1.Duration{Duration: 8 * time.Second},
+		LeaderElectionRetryPeriod:   &metav1.Duration{Duration: 5 * time.Second},
+	}
+
+	expectWorkLeaderElectionConfig := &operatorapiv1.LeaderElectionConfig{
+		DisableLeaderElection:       true,
+		LeaderElectionLeaseDuration: &metav1.Duration{Duration: 12 * time.Second},
+		LeaderElectionRenewDeadline: &metav1.Duration{Duration: 6 * time.Second},
+		LeaderElectionRetryPeriod:   &metav1.Duration{Duration: 4 * time.Second},
+	}
+
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1", 1, nil, expectRegLeaderElectionConfig)
+	assertWorkDeployment(t, controller.kubeClient.Actions(), createVerb, "cluster1", operatorapiv1.InstallModeDefault, 0, expectWorkLeaderElectionConfig)
 }
 
 func newKubeConfig(host string) []byte {

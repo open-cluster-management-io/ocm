@@ -245,6 +245,11 @@ spec:
                       ClusterAnnotations is annotations with the reserve prefix "agent.open-cluster-management.io" set on
                       ManagedCluster when creating only, other actors can update it afterwards.
                     type: object
+                  disableLeaderElection:
+                    description: |-
+                      Disable leader election.
+                      Use the klusterlet agent default value if this field is not defined.
+                    type: boolean
                   featureGates:
                     description: "FeatureGates represents the list of feature gates
                       for registration\nIf it is set empty, default feature gates
@@ -289,6 +294,31 @@ spec:
                       If it is set empty, use the default value: 50
                     format: int32
                     type: integer
+                  leaderElectionLeaseDuration:
+                    description: |-
+                      The duration that non-leader candidates will wait after observing a leadership
+                      renewal until attempting to acquire leadership of a led but unrenewed leader
+                      slot. This is effectively the maximum duration that a leader can be stopped
+                      before it is replaced by another candidate. This is only applicable if leader
+                      election is enabled.
+                      Use the klusterlet agent default value if this field is not defined.
+                    pattern: ^([0-9]+(s|m|h))+$
+                    type: string
+                  leaderElectionRenewDeadline:
+                    description: |-
+                      The interval between attempts by the acting master to renew a leadership slot
+                      before it stops leading. This must be less than or equal to the lease duration.
+                      This is only applicable if leader election is enabled.
+                      Use the klusterlet agent default value if this field is not defined.
+                    pattern: ^([0-9]+(s|m|h))+$
+                    type: string
+                  leaderElectionRetryPeriod:
+                    description: |-
+                      The duration the clients should wait between attempting acquisition and renewal
+                      of a leadership. This is only applicable if leader election is enabled.
+                      Use the klusterlet agent default value if this field is not defined.
+                    pattern: ^([0-9]+(s|m|h))+$
+                    type: string
                   registrationDriver:
                     description: This provides driver details required to register
                       with hub
@@ -407,6 +437,11 @@ spec:
                       the managed cluster. If not present, the default value of the work agent will be used.
                     pattern: ^([0-9]+(s|m|h))+$
                     type: string
+                  disableLeaderElection:
+                    description: |-
+                      Disable leader election.
+                      Use the klusterlet agent default value if this field is not defined.
+                    type: boolean
                   featureGates:
                     description: "FeatureGates represents the list of feature gates
                       for work\nIf it is set empty, default feature gates will be
@@ -451,6 +486,31 @@ spec:
                       If it is set empty, use the default value: 50
                     format: int32
                     type: integer
+                  leaderElectionLeaseDuration:
+                    description: |-
+                      The duration that non-leader candidates will wait after observing a leadership
+                      renewal until attempting to acquire leadership of a led but unrenewed leader
+                      slot. This is effectively the maximum duration that a leader can be stopped
+                      before it is replaced by another candidate. This is only applicable if leader
+                      election is enabled.
+                      Use the klusterlet agent default value if this field is not defined.
+                    pattern: ^([0-9]+(s|m|h))+$
+                    type: string
+                  leaderElectionRenewDeadline:
+                    description: |-
+                      The interval between attempts by the acting master to renew a leadership slot
+                      before it stops leading. This must be less than or equal to the lease duration.
+                      This is only applicable if leader election is enabled.
+                      Use the klusterlet agent default value if this field is not defined.
+                    pattern: ^([0-9]+(s|m|h))+$
+                    type: string
+                  leaderElectionRetryPeriod:
+                    description: |-
+                      The duration the clients should wait between attempting acquisition and renewal
+                      of a leadership. This is only applicable if leader election is enabled.
+                      Use the klusterlet agent default value if this field is not defined.
+                    pattern: ^([0-9]+(s|m|h))+$
+                    type: string
                 type: object
               workImagePullSpec:
                 description: |-
