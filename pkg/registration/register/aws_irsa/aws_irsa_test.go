@@ -151,7 +151,7 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 	cert1 := testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second)
 	//cert2 := testinghelpers.NewTestCert("test", 60*time.Second)
 
-	kubeconfig := testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil)
+	kubeconfig := testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", "", nil, nil, nil)
 
 	cases := []struct {
 		name               string
@@ -172,7 +172,7 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 			clusterName:        "cluster1",
 			agentName:          "agent1",
 			kubeconfig:         kubeconfig,
-			bootstapKubeconfig: testinghelpers.NewKubeconfig("c2", "https://127.0.0.1:6001", "", nil, nil, nil),
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c2", "https://127.0.0.1:6001", "", "", nil, nil, nil),
 			tlsKey:             cert1.Key,
 			tlsCert:            cert1.Cert,
 			isValid:            false,
@@ -182,7 +182,7 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 			clusterName:        "cluster1",
 			agentName:          "agent1",
 			kubeconfig:         kubeconfig,
-			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.2:6001", "", nil, nil, nil),
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.2:6001", "", "", nil, nil, nil),
 			tlsKey:             cert1.Key,
 			tlsCert:            cert1.Cert,
 			isValid:            false,
@@ -192,7 +192,7 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 			clusterName:        "cluster1",
 			agentName:          "agent1",
 			kubeconfig:         kubeconfig,
-			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "https://127.0.0.1:3129", nil, nil, nil),
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "https://127.0.0.1:3129", "", nil, nil, nil),
 			tlsKey:             cert1.Key,
 			tlsCert:            cert1.Cert,
 			isValid:            false,
@@ -202,7 +202,17 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 			clusterName:        "cluster1",
 			agentName:          "agent1",
 			kubeconfig:         kubeconfig,
-			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", []byte("test"), nil, nil),
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", "", []byte("test"), nil, nil),
+			tlsKey:             cert1.Key,
+			tlsCert:            cert1.Cert,
+			isValid:            false,
+		},
+		{
+			name:               "ca changes",
+			clusterName:        "cluster1",
+			agentName:          "agent1",
+			kubeconfig:         kubeconfig,
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", "/etc/ca.crt", nil, nil, nil),
 			tlsKey:             cert1.Key,
 			tlsCert:            cert1.Cert,
 			isValid:            false,
@@ -212,7 +222,7 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 			clusterName:        "cluster1",
 			agentName:          "agent1",
 			kubeconfig:         kubeconfig,
-			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", nil, nil, nil),
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", "", nil, nil, nil),
 			tlsKey:             cert1.Key,
 			tlsCert:            cert1.Cert,
 			isValid:            true,
