@@ -749,7 +749,8 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 
 				for _, appliedResource := range appliedManifestWork.Status.AppliedResources {
 					if appliedResource.Name == cm1 {
-						return fmt.Errorf("found resource cm1")
+						cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+						return fmt.Errorf("found resource cm1, %v, %v", cm, err)
 					}
 				}
 
