@@ -3,7 +3,6 @@ package operator
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -190,7 +189,7 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode", func() {
 				if err != nil {
 					return false
 				}
-				return sa.ObjectMeta.Annotations[irsaAnnotationKey] != prerequisiteSpokeRoleArn
+				return sa.ObjectMeta.Annotations[util.IrsaAnnotationKey] != util.PrerequisiteSpokeRoleArn
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Check deployment
@@ -200,31 +199,7 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode", func() {
 					return false
 				}
 
-				isRegistrationAuthPresent := false
-				isManagedClusterArnPresent := false
-				isManagedClusterRoleSuffixPresent := false
-				for _, arg := range deployment.Spec.Template.Spec.Containers[0].Args {
-					if strings.Contains(arg, "--registration-auth=awsirsa") {
-						isRegistrationAuthPresent = true
-					}
-					if strings.Contains(arg, "--managed-cluster-arn=arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1") {
-						isManagedClusterArnPresent = true
-					}
-					if strings.Contains(arg, "--managed-cluster-role-suffix="+managedClusterRoleSuffix) {
-						isManagedClusterRoleSuffixPresent = true
-					}
-				}
-				anyCommandLineOptionsPresent := isRegistrationAuthPresent || isManagedClusterArnPresent || isManagedClusterRoleSuffixPresent
-
-				isDotAwsMounted := false
-				for _, volumeMount := range deployment.Spec.Template.Spec.Containers[0].VolumeMounts {
-					if volumeMount.Name == "dot-aws" && volumeMount.MountPath == "/.aws" {
-						isDotAwsMounted = true
-					}
-				}
-
-				awsCliSpecificVolumesMounted := isDotAwsMounted
-				return !(anyCommandLineOptionsPresent || awsCliSpecificVolumesMounted)
+				return !util.AllCommandLineOptionsPresent(*deployment) && !util.AwsCliSpecificVolumesMounted(*deployment)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Check addon namespace

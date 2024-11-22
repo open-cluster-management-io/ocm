@@ -3,7 +3,6 @@ package operator
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -14,14 +13,9 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
+	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
-
-var hubClusterArn string = "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
-var managedClusterArn string = "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1"
-var managedClusterRoleSuffix string = "7f8141296c75f2871e3d030f85c35692"
-var prerequisiteSpokeRoleArn string = "arn:aws:iam::123456789012:role/ocm-managed-cluster-" + managedClusterRoleSuffix
-var irsaAnnotationKey string = "eks.amazonaws.com/role-arn"
 
 var _ = ginkgo.Describe("Klusterlet Singleton mode with aws auth", func() {
 	var cancel context.CancelFunc
@@ -37,7 +31,7 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode with aws auth", func() {
 				Name: fmt.Sprintf("klusterlet-%s", rand.String(6)),
 			},
 			Spec: operatorapiv1.KlusterletSpec{
-				Namespace:     fmt.Sprintf("%s-aws", helpers.KlusterletDefaultNamespace),
+				Namespace:     fmt.Sprintf("%s-singleton-aws", helpers.KlusterletDefaultNamespace),
 				ImagePullSpec: "quay.io/open-cluster-management/registration-operator",
 				ExternalServerURLs: []operatorapiv1.ServerURL{
 					{
@@ -50,10 +44,10 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode with aws auth", func() {
 				},
 				RegistrationConfiguration: &operatorapiv1.RegistrationConfiguration{
 					RegistrationDriver: operatorapiv1.RegistrationDriver{
-						AuthType: "awsirsa",
+						AuthType: spoke.AwsIrsaAuthType,
 						AwsIrsa: &operatorapiv1.AwsIrsa{
-							HubClusterArn:     hubClusterArn,
-							ManagedClusterArn: managedClusterArn,
+							HubClusterArn:     util.HubClusterArn,
+							ManagedClusterArn: util.ManagedClusterArn,
 						},
 					},
 				},
@@ -101,7 +95,7 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode with aws auth", func() {
 				if err != nil {
 					return false
 				}
-				return sa.ObjectMeta.Annotations[irsaAnnotationKey] == prerequisiteSpokeRoleArn
+				return sa.ObjectMeta.Annotations[util.IrsaAnnotationKey] == util.PrerequisiteSpokeRoleArn
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Check deployment
@@ -110,32 +104,7 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode with aws auth", func() {
 				if err != nil {
 					return false
 				}
-
-				isRegistrationAuthPresent := false
-				isManagedClusterArnPresent := false
-				isManagedClusterRoleSuffixPresent := false
-				for _, arg := range deployment.Spec.Template.Spec.Containers[0].Args {
-					if strings.Contains(arg, "--registration-auth=awsirsa") {
-						isRegistrationAuthPresent = true
-					}
-					if strings.Contains(arg, "--managed-cluster-arn=arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1") {
-						isManagedClusterArnPresent = true
-					}
-					if strings.Contains(arg, "--managed-cluster-role-suffix="+managedClusterRoleSuffix) {
-						isManagedClusterRoleSuffixPresent = true
-					}
-				}
-				allCommandLineOptionsPresent := isRegistrationAuthPresent && isManagedClusterArnPresent && isManagedClusterRoleSuffixPresent
-
-				isDotAwsMounted := false
-				for _, volumeMount := range deployment.Spec.Template.Spec.Containers[0].VolumeMounts {
-					if volumeMount.Name == "dot-aws" && volumeMount.MountPath == "/.aws" {
-						isDotAwsMounted = true
-					}
-				}
-
-				awsCliSpecificVolumesMounted := isDotAwsMounted
-				return allCommandLineOptionsPresent && awsCliSpecificVolumesMounted
+				return util.AllCommandLineOptionsPresent(*deployment) && util.AwsCliSpecificVolumesMounted(*deployment)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "Applied", "KlusterletApplied", metav1.ConditionTrue)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/md5" // #nosec G501
 	"encoding/hex"
-	er "errors"
 	"fmt"
 	"strings"
 	"time"
@@ -344,13 +343,13 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			if !commonhelpers.IsEksArnWellFormed(hubClusterArn) {
 				errorMsg := fmt.Sprintf("HubClusterArn %s is not well formed", hubClusterArn)
 				klog.Errorf(errorMsg)
-				return er.New(errorMsg)
+				return fmt.Errorf(errorMsg)
 			}
 
 			if !commonhelpers.IsEksArnWellFormed(managedClusterArn) {
 				errorMsg := fmt.Sprintf("ManagedClusterArn %s is not well formed", managedClusterArn)
 				klog.Errorf(errorMsg)
-				return er.New(errorMsg)
+				return fmt.Errorf(errorMsg)
 			}
 
 			config.RegistrationDriver = RegistrationDriver{

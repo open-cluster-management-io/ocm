@@ -270,6 +270,9 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 						serviceAccount.GetName() != workSAName {
 						return false
 					}
+					if serviceAccount.ObjectMeta.Annotations[util.IrsaAnnotationKey] == util.PrerequisiteSpokeRoleArn {
+						return false
+					}
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
@@ -288,6 +291,16 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 					if deployment.GetName() != registrationDeploymentName &&
 						deployment.GetName() != workDeploymentName {
 						return false
+					}
+					if deployment.GetName() == registrationDeploymentName {
+						if util.AllCommandLineOptionsPresent(deployment) || util.AwsCliSpecificVolumesMounted(deployment) {
+							return false
+						}
+					}
+					if deployment.GetName() == workDeploymentName {
+						if util.AwsCliSpecificVolumesMounted(deployment) {
+							return false
+						}
 					}
 				}
 				return true
