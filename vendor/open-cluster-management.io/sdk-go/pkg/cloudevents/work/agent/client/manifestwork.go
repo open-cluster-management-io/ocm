@@ -78,12 +78,17 @@ func (c *ManifestWorkAgentClient) Get(ctx context.Context, name string, opts met
 	klog.V(4).Infof("getting manifestwork %s/%s", c.namespace, name)
 	work, exists, err := c.watcherStore.Get(c.namespace, name)
 	if err != nil {
-		return nil, errors.NewInternalError(err)
+		returnErr := errors.NewInternalError(err)
+		generic.IncreaseWorkProcessedCounter("get", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 	if !exists {
-		return nil, errors.NewNotFound(common.ManifestWorkGR, name)
+		returnErr := errors.NewNotFound(common.ManifestWorkGR, name)
+		generic.IncreaseWorkProcessedCounter("get", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
+	generic.IncreaseWorkProcessedCounter("get", metav1.StatusSuccess)
 	return work, nil
 }
 
@@ -91,9 +96,12 @@ func (c *ManifestWorkAgentClient) List(ctx context.Context, opts metav1.ListOpti
 	klog.V(4).Infof("list manifestworks from cluster %s", c.namespace)
 	works, err := c.watcherStore.List(c.namespace, opts)
 	if err != nil {
-		return nil, errors.NewInternalError(err)
+		returnErr := errors.NewInternalError(err)
+		generic.IncreaseWorkProcessedCounter("list", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
+	generic.IncreaseWorkProcessedCounter("list", metav1.StatusSuccess)
 	return works, nil
 }
 
@@ -101,8 +109,12 @@ func (c *ManifestWorkAgentClient) Watch(ctx context.Context, opts metav1.ListOpt
 	klog.V(4).Infof("watch manifestworks from cluster %s", c.namespace)
 	watcher, err := c.watcherStore.GetWatcher(c.namespace, opts)
 	if err != nil {
-		return nil, errors.NewInternalError(err)
+		returnErr := errors.NewInternalError(err)
+		generic.IncreaseWorkProcessedCounter("watch", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
+
+	generic.IncreaseWorkProcessedCounter("watch", metav1.StatusSuccess)
 	return watcher, nil
 }
 
@@ -110,20 +122,28 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 	klog.V(4).Infof("patching manifestwork %s/%s", c.namespace, name)
 	lastWork, exists, err := c.watcherStore.Get(c.namespace, name)
 	if err != nil {
-		return nil, errors.NewInternalError(err)
+		returnErr := errors.NewInternalError(err)
+		generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 	if !exists {
-		return nil, errors.NewNotFound(common.ManifestWorkGR, name)
+		returnErr := errors.NewNotFound(common.ManifestWorkGR, name)
+		generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
 	patchedWork, err := utils.Patch(pt, lastWork, data)
 	if err != nil {
-		return nil, errors.NewInternalError(err)
+		returnErr := errors.NewInternalError(err)
+		generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
 	eventDataType, err := types.ParseCloudEventsDataType(patchedWork.Annotations[common.CloudEventsDataTypeAnnotationKey])
 	if err != nil {
-		return nil, errors.NewInternalError(err)
+		returnErr := errors.NewInternalError(err)
+		generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
 	eventType := types.CloudEventsType{
@@ -135,7 +155,9 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 
 	statusUpdated, err := isStatusUpdate(subresources)
 	if err != nil {
-		return nil, errors.NewGenericServerResponse(http.StatusMethodNotAllowed, "patch", common.ManifestWorkGR, name, err.Error(), 0, false)
+		returnErr := errors.NewGenericServerResponse(http.StatusMethodNotAllowed, "patch", common.ManifestWorkGR, name, err.Error(), 0, false)
+		generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
 	if statusUpdated {
@@ -147,7 +169,9 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 		// publish the status update event to source, source will check the resource version
 		// and reject the update if it's status update is outdated.
 		if err := c.cloudEventsClient.Publish(ctx, eventType, newWork); err != nil {
-			return nil, workerrors.NewPublishError(common.ManifestWorkGR, name, err)
+			returnErr := workerrors.NewPublishError(common.ManifestWorkGR, name, err)
+			generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+			return nil, returnErr
 		}
 
 		// Fetch the latest work from the store and verify the resource version to avoid updating the store
@@ -156,28 +180,42 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 		// this update operation and one from the agent informer after receiving the event from the source.
 		latestWork, exists, err := c.watcherStore.Get(c.namespace, name)
 		if err != nil {
-			return nil, errors.NewInternalError(err)
+			returnErr := errors.NewInternalError(err)
+			generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+			return nil, returnErr
 		}
 		if !exists {
-			return nil, errors.NewNotFound(common.ManifestWorkGR, name)
+			returnErr := errors.NewNotFound(common.ManifestWorkGR, name)
+			generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+			return nil, returnErr
 		}
 		lastResourceVersion, err := strconv.ParseInt(latestWork.GetResourceVersion(), 10, 64)
 		if err != nil {
-			return nil, errors.NewInternalError(err)
+			returnErr := errors.NewInternalError(err)
+			generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+			return nil, returnErr
 		}
 		newResourceVersion, err := strconv.ParseInt(newWork.GetResourceVersion(), 10, 64)
 		if err != nil {
-			return nil, errors.NewInternalError(err)
+			returnErr := errors.NewInternalError(err)
+			generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+			return nil, returnErr
 		}
 		// ensure the resource version of the work is not outdated
 		if newResourceVersion < lastResourceVersion {
 			// It's safe to return a conflict error here, even if the status update event
 			// has already been sent. The source may reject the update due to an outdated resource version.
-			return nil, errors.NewConflict(common.ManifestWorkGR, name, fmt.Errorf("the resource version of the work is outdated"))
+			returnErr := errors.NewConflict(common.ManifestWorkGR, name, fmt.Errorf("the resource version of the work is outdated"))
+			generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+			return nil, returnErr
 		}
 		if err := c.watcherStore.Update(newWork); err != nil {
-			return nil, errors.NewInternalError(err)
+			returnErr := errors.NewInternalError(err)
+			generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+			return nil, returnErr
 		}
+
+		generic.IncreaseWorkProcessedCounter("patch", metav1.StatusSuccess)
 		return newWork, nil
 	}
 
@@ -193,20 +231,28 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 
 		eventType.Action = common.DeleteRequestAction
 		if err := c.cloudEventsClient.Publish(ctx, eventType, newWork); err != nil {
-			return nil, workerrors.NewPublishError(common.ManifestWorkGR, name, err)
+			returnErr := workerrors.NewPublishError(common.ManifestWorkGR, name, err)
+			generic.IncreaseWorkProcessedCounter("delete", string(returnErr.ErrStatus.Reason))
+			return nil, returnErr
 		}
 
 		if err := c.watcherStore.Delete(newWork); err != nil {
-			return nil, errors.NewInternalError(err)
+			returnErr := errors.NewInternalError(err)
+			generic.IncreaseWorkProcessedCounter("delete", string(returnErr.ErrStatus.Reason))
+			return nil, returnErr
 		}
 
+		generic.IncreaseWorkProcessedCounter("delete", metav1.StatusSuccess)
 		return newWork, nil
 	}
 
 	if err := c.watcherStore.Update(newWork); err != nil {
-		return nil, errors.NewInternalError(err)
+		returnErr := errors.NewInternalError(err)
+		generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
+	generic.IncreaseWorkProcessedCounter("patch", metav1.StatusSuccess)
 	return newWork, nil
 }
 
