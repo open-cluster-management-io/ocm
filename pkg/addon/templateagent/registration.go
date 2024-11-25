@@ -433,14 +433,14 @@ func (a *CRDTemplateAgentAddon) createKubeClientPermissions(
 
 func (a *CRDTemplateAgentAddon) createPermissionBinding(templateName, clusterName, addonName, namespace string,
 	roleRef rbacv1.RoleRef, owner *metav1.OwnerReference) error {
-	// TODO: confirm the group
-	groups := agent.DefaultGroups(clusterName, addonName)
-	subject := []rbacv1.Subject{}
-	for _, group := range groups {
-		subject = append(subject, rbacv1.Subject{
-			Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: group,
-		})
+	subjects := []rbacv1.Subject{
+		{
+			Kind:     rbacv1.GroupKind,
+			APIGroup: rbacv1.GroupName,
+			Name:     clusterAddonGroup(clusterName, addonName),
+		},
 	}
+
 	binding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("open-cluster-management:%s:%s:agent",
@@ -452,7 +452,7 @@ func (a *CRDTemplateAgentAddon) createPermissionBinding(templateName, clusterNam
 			},
 		},
 		RoleRef:  roleRef,
-		Subjects: subject,
+		Subjects: subjects,
 	}
 	if owner != nil {
 		binding.OwnerReferences = []metav1.OwnerReference{*owner}
@@ -469,9 +469,13 @@ func (a *CRDTemplateAgentAddon) createPermissionBinding(templateName, clusterNam
 		if createErr != nil && !apierrors.IsAlreadyExists(createErr) {
 			return createErr
 		}
-	case err != nil:
+		return nil
+	default:
 		return err
 	}
+}
 
-	return nil
+// clusterAddonGroup returns the group that represents the addon for the cluster
+func clusterAddonGroup(clusterName, addonName string) string {
+	return fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", clusterName, addonName)
 }

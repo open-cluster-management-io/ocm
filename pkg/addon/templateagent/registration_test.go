@@ -586,6 +586,13 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 				if len(rb.OwnerReferences) != 0 {
 					t.Errorf("expected rolebinding to have 0 owner reference, got %d", len(rb.OwnerReferences))
 				}
+				if len(rb.Subjects) != 1 {
+					t.Errorf("expected rolebinding to have 1 subject, got %d", len(rb.Subjects))
+				}
+				if rb.Subjects[0].Name != "system:open-cluster-management:cluster:cluster1:addon:addon1" {
+					t.Errorf("expected rolebinding subject name to be system:open-cluster-management:cluster:cluster1:addon:addon1, got %s",
+						rb.Subjects[0].Name)
+				}
 			},
 		},
 		{
