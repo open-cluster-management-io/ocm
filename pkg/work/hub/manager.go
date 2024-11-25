@@ -114,7 +114,7 @@ func (c *WorkHubManagerConfig) RunWorkHubManager(ctx context.Context, controller
 
 	// For cloudevents work client, we use the informer store as the client store
 	if watcherStore != nil {
-		watcherStore.SetStore(informer.Informer().GetStore())
+		watcherStore.SetInformer(informer.Informer())
 	}
 
 	return RunControllerManagerWithInformers(

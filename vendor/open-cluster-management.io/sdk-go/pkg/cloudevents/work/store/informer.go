@@ -21,7 +21,8 @@ import (
 // It is used for building ManifestWork source client.
 type SourceInformerWatcherStore struct {
 	baseSourceStore
-	watcher *workWatcher
+	watcher  *workWatcher
+	informer cache.SharedIndexInformer
 }
 
 var _ WorkClientWatcherStore = &SourceInformerWatcherStore{}
@@ -57,7 +58,7 @@ func (s *SourceInformerWatcherStore) Delete(work *workv1.ManifestWork) error {
 }
 
 func (s *SourceInformerWatcherStore) HasInitiated() bool {
-	return s.initiated
+	return s.initiated && s.informer.HasSynced()
 }
 
 func (s *SourceInformerWatcherStore) GetWatcher(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
@@ -68,8 +69,9 @@ func (s *SourceInformerWatcherStore) GetWatcher(namespace string, opts metav1.Li
 	return s.watcher, nil
 }
 
-func (s *SourceInformerWatcherStore) SetStore(store cache.Store) {
-	s.store = store
+func (s *SourceInformerWatcherStore) SetInformer(informer cache.SharedIndexInformer) {
+	s.informer = informer
+	s.store = informer.GetStore()
 	s.initiated = true
 }
 
@@ -80,7 +82,8 @@ func (s *SourceInformerWatcherStore) SetStore(store cache.Store) {
 // It is used for building ManifestWork agent client.
 type AgentInformerWatcherStore struct {
 	baseStore
-	watcher *workWatcher
+	informer cache.SharedIndexInformer
+	watcher  *workWatcher
 }
 
 var _ WorkClientWatcherStore = &AgentInformerWatcherStore{}
@@ -157,10 +160,11 @@ func (s *AgentInformerWatcherStore) GetWatcher(namespace string, opts metav1.Lis
 }
 
 func (s *AgentInformerWatcherStore) HasInitiated() bool {
-	return s.initiated
+	return s.initiated && s.informer.HasSynced()
 }
 
-func (s *AgentInformerWatcherStore) SetStore(store cache.Store) {
-	s.store = store
+func (s *AgentInformerWatcherStore) SetInformer(informer cache.SharedIndexInformer) {
+	s.informer = informer
+	s.store = informer.GetStore()
 	s.initiated = true
 }

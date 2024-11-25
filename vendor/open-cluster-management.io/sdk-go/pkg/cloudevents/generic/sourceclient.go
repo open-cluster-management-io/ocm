@@ -7,6 +7,7 @@ import (
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+	cloudeventstypes "github.com/cloudevents/sdk-go/v2/types"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
@@ -43,6 +44,7 @@ func NewCloudEventSourceClient[T ResourceObject](
 	codecs ...Codec[T],
 ) (*CloudEventSourceClient[T], error) {
 	baseClient := &baseClient{
+		clientID:               sourceOptions.SourceID,
 		cloudEventsOptions:     sourceOptions.CloudEventsOptions,
 		cloudEventsRateLimiter: NewRateLimiter(sourceOptions.EventRateLimit),
 		reconnectedChan:        make(chan struct{}),
@@ -108,6 +110,8 @@ func (c *CloudEventSourceClient[T]) Resync(ctx context.Context, clusterName stri
 		if err := c.publish(ctx, evt); err != nil {
 			return err
 		}
+
+		increaseCloudEventsSentCounter(evt.Source(), clusterName, eventDataType.String())
 	}
 
 	return nil
@@ -133,6 +137,9 @@ func (c *CloudEventSourceClient[T]) Publish(ctx context.Context, eventType types
 		return err
 	}
 
+	clusterName := evt.Context.GetExtensions()[types.ExtensionClusterName].(string)
+	increaseCloudEventsSentCounter(evt.Source(), clusterName, eventType.CloudEventsDataType.String())
+
 	return nil
 }
 
@@ -151,6 +158,15 @@ func (c *CloudEventSourceClient[T]) receive(ctx context.Context, evt cloudevents
 		klog.Errorf("failed to parse cloud event type, %v", err)
 		return
 	}
+
+	// clusterName is not required for agent to send the request, in case of missing clusterName, set it to
+	// empty string, as the source is sufficient to infer the event's originating cluster.
+	cn, err := cloudeventstypes.ToString(evt.Context.GetExtensions()[types.ExtensionClusterName])
+	if err != nil {
+		cn = ""
+	}
+
+	increaseCloudEventsReceivedCounter(evt.Source(), cn, eventType.CloudEventsDataType.String())
 
 	if eventType.Action == types.ResyncRequestAction {
 		if eventType.SubResource != types.SubResourceSpec {
@@ -283,6 +299,8 @@ func (c *CloudEventSourceClient[T]) respondResyncSpecRequest(
 		if err := c.publish(ctx, evt); err != nil {
 			return err
 		}
+
+		increaseCloudEventsSentCounter(evt.Source(), fmt.Sprintf("%s", clusterName), evtDataType.String())
 	}
 
 	return nil
