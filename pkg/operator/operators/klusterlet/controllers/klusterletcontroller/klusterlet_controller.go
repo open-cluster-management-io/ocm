@@ -125,6 +125,26 @@ type RegistrationDriver struct {
 	AwsIrsa  *AwsIrsa
 }
 
+type ManagedClusterIamRole struct {
+	AwsIrsa *AwsIrsa
+}
+
+func (managedClusterIamRole *ManagedClusterIamRole) arn() string {
+	managedClusterAccountId, _ := getAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.ManagedClusterArn)
+	md5HashUniqueIdentifier := managedClusterIamRole.md5HashSuffix()
+
+	//arn:aws:iam::<managed-cluster-account-id>:role/ocm-managed-cluster-<md5-hash-unique-identifier>
+	return "arn:aws:iam::" + managedClusterAccountId + ":role/ocm-managed-cluster-" + md5HashUniqueIdentifier
+}
+
+func (managedClusterIamRole *ManagedClusterIamRole) md5HashSuffix() string {
+	hubClusterAccountId, hubClusterName := getAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.HubClusterArn)
+	managedClusterAccountId, managedClusterName := getAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.ManagedClusterArn)
+
+	hash := md5.Sum([]byte(strings.Join([]string{hubClusterAccountId, hubClusterName, managedClusterAccountId, managedClusterName}, "#"))) // #nosec G401
+	return hex.EncodeToString(hash[:])
+}
+
 // klusterletConfig is used to render the template of hub manifests
 type klusterletConfig struct {
 	KlusterletName string
@@ -340,18 +360,6 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			hubClusterArn := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.HubClusterArn
 			managedClusterArn := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.ManagedClusterArn
 
-			if !commonhelpers.IsEksArnWellFormed(hubClusterArn) {
-				errorMsg := fmt.Sprintf("HubClusterArn %s is not well formed", hubClusterArn)
-				klog.Errorf(errorMsg)
-				return fmt.Errorf(errorMsg)
-			}
-
-			if !commonhelpers.IsEksArnWellFormed(managedClusterArn) {
-				errorMsg := fmt.Sprintf("ManagedClusterArn %s is not well formed", managedClusterArn)
-				klog.Errorf(errorMsg)
-				return fmt.Errorf(errorMsg)
-			}
-
 			config.RegistrationDriver = RegistrationDriver{
 				AuthType: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType,
 				AwsIrsa: &AwsIrsa{
@@ -359,9 +367,11 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 					ManagedClusterArn: managedClusterArn,
 				},
 			}
-			managedClusterRoleArn, managedClusterRoleSuffix := n.generateManagedRoleArnAndSuffix(klusterlet)
-			config.ManagedClusterRoleArn = managedClusterRoleArn
-			config.ManagedClusterRoleSuffix = managedClusterRoleSuffix
+			managedClusterIamRole := ManagedClusterIamRole{
+				AwsIrsa: config.RegistrationDriver.AwsIrsa,
+			}
+			config.ManagedClusterRoleArn = managedClusterIamRole.arn()
+			config.ManagedClusterRoleSuffix = managedClusterIamRole.md5HashSuffix()
 		} else {
 			config.RegistrationDriver = RegistrationDriver{
 				AuthType: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType,
@@ -458,23 +468,6 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		errs = append(errs, updatedErr)
 	}
 	return utilerrors.NewAggregate(errs)
-}
-
-func (n *klusterletController) generateManagedRoleArnAndSuffix(klusterlet *operatorapiv1.Klusterlet) (string, string) {
-	hubClusterArn := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.HubClusterArn
-	managedClusterArn := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.ManagedClusterArn
-
-	hubClusterStringParts := strings.Split(hubClusterArn, ":")
-
-	managedClusterStringParts := strings.Split(managedClusterArn, ":")
-	hubClusterName := strings.Split(hubClusterStringParts[5], "/")[1]
-	hubClusterAccountId := hubClusterStringParts[4]
-	managedClusterName := strings.Split(managedClusterStringParts[5], "/")[1]
-	managedClusterAccountId := managedClusterStringParts[4]
-	md5HashUniqueIdentifier := generateMd5HashUniqueIdentifier(hubClusterAccountId, hubClusterName, managedClusterAccountId, managedClusterName)
-	//arn:aws:iam::<managed-cluster-account-id>:role/ocm-managed-cluster-<md5-hash-unique-identifier>
-	managedClusterRoleArn := "arn:aws:iam::" + managedClusterAccountId + ":role/ocm-managed-cluster-" + md5HashUniqueIdentifier
-	return managedClusterRoleArn, md5HashUniqueIdentifier
 }
 
 // TODO also read CABundle from ExternalServerURLs and set into registration deployment
@@ -581,7 +574,9 @@ func serviceAccountName(suffix string, klusterlet *operatorapiv1.Klusterlet) str
 	return fmt.Sprintf("%s-%s", klusterlet.Name, suffix)
 }
 
-func generateMd5HashUniqueIdentifier(hubClusterAccountId string, hubClusterName string, managedClusterAccountId string, managedClusterName string) string {
-	hash := md5.Sum([]byte(hubClusterAccountId + "#" + hubClusterName + "#" + managedClusterAccountId + "#" + managedClusterName)) // #nosec G401
-	return hex.EncodeToString(hash[:])
+func getAwsAccountIdAndClusterName(clusterArn string) (string, string) {
+	clusterStringParts := strings.Split(clusterArn, ":")
+	clusterName := strings.Split(clusterStringParts[5], "/")[1]
+	awsAccountId := clusterStringParts[4]
+	return awsAccountId, clusterName
 }

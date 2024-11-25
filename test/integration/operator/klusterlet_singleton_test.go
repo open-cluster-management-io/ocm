@@ -189,7 +189,8 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode", func() {
 				if err != nil {
 					return false
 				}
-				return sa.ObjectMeta.Annotations[util.IrsaAnnotationKey] != util.PrerequisiteSpokeRoleArn
+				_, present := sa.ObjectMeta.Annotations[util.IrsaAnnotationKey]
+				return !present
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Check deployment
