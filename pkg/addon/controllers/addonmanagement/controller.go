@@ -66,7 +66,7 @@ func NewAddonManagementController(
 	}
 
 	return factory.New().WithInformersQueueKeysFunc(
-		queue.QueueKeyByMetaNamespaceName,
+		queue.QueueKeyByMetaName,
 		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
 		WithInformersQueueKeysFunc(
 			index.ClusterManagementAddonByPlacementDecisionQueueKey(
