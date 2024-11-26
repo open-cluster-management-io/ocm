@@ -38,7 +38,9 @@ type SpokeAgentOptions struct {
 	ClientCertExpirationSeconds int32
 	ClusterAnnotations          map[string]string
 	RegistrationAuth            string
-	EksHubClusterArn            string
+	HubClusterArn               string
+	ManagedClusterArn           string
+	ManagedClusterRoleSuffix    string
 }
 
 func NewSpokeAgentOptions() *SpokeAgentOptions {
@@ -79,8 +81,12 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 	//Consider grouping these flags for driverOption in a new Option struct and add the flags using function driverOptions.AddFlags(fs).
 	fs.StringVar(&o.RegistrationAuth, "registration-auth", o.RegistrationAuth,
 		"The type of authentication to use to authenticate with hub.")
-	fs.StringVar(&o.EksHubClusterArn, "hub-cluster-arn", o.EksHubClusterArn,
+	fs.StringVar(&o.HubClusterArn, "hub-cluster-arn", o.HubClusterArn,
 		"The ARN of the EKS based hub cluster.")
+	fs.StringVar(&o.ManagedClusterArn, "managed-cluster-arn", o.ManagedClusterArn,
+		"The ARN of the EKS based managed cluster.")
+	fs.StringVar(&o.ManagedClusterRoleSuffix, "managed-cluster-role-suffix", o.ManagedClusterRoleSuffix,
+		"The suffix of the managed cluster IAM role.")
 }
 
 // Validate verifies the inputs.
@@ -113,7 +119,7 @@ func (o *SpokeAgentOptions) Validate() error {
 		return errors.New("client certificate expiration seconds must greater or qual to 3600")
 	}
 
-	if (o.RegistrationAuth == AwsIrsaAuthType) && (o.EksHubClusterArn == "") {
+	if (o.RegistrationAuth == AwsIrsaAuthType) && (o.HubClusterArn == "") {
 		return errors.New("EksHubClusterArn cannot be empty if RegistrationAuth is awsirsa")
 	}
 

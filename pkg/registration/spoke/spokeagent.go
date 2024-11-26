@@ -31,7 +31,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
-	registrationHelpers "open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	awsIrsa "open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
@@ -194,13 +193,14 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	var registerDriver register.RegisterDriver
 	if o.registrationOption.RegistrationAuth == AwsIrsaAuthType {
 		// TODO: may consider add additional validations
-		if o.registrationOption.EksHubClusterArn != "" && registrationHelpers.IsEksArnWellFormed(o.registrationOption.EksHubClusterArn) {
+		if o.registrationOption.HubClusterArn != "" {
 			registerDriver = awsIrsa.NewAWSIRSADriver()
 			if o.registrationOption.ClusterAnnotations == nil {
 				o.registrationOption.ClusterAnnotations = map[string]string{}
 			}
-			o.registrationOption.ClusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/managed-cluster-arn"] = ""             //TODO: find arn from current context
-			o.registrationOption.ClusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/managed-cluster-iam-role-suffix"] = "" //TODO: Add role suffix after RE-7249
+			o.registrationOption.ClusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/managed-cluster-arn"] = o.registrationOption.ManagedClusterArn
+			o.registrationOption.ClusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/managed-cluster-iam-role-suffix"] =
+				o.registrationOption.ManagedClusterRoleSuffix
 
 		} else {
 			panic("A valid EKS Hub Cluster ARN is required with awsirsa based authentication")
@@ -324,7 +324,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 		var registrationAuthOption any
 		if o.registrationOption.RegistrationAuth == AwsIrsaAuthType {
-			if o.registrationOption.EksHubClusterArn != "" && registrationHelpers.IsEksArnWellFormed(o.registrationOption.EksHubClusterArn) {
+			if o.registrationOption.HubClusterArn != "" {
 				registrationAuthOption, err = registration.NewAWSOption(
 					secretOption,
 					bootstrapClusterInformerFactory.Cluster(),

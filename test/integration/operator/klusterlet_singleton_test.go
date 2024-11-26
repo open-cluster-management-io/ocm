@@ -185,18 +185,22 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode", func() {
 
 			// Check service account
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.CoreV1().ServiceAccounts(agentNamespace).Get(context.Background(), saName, metav1.GetOptions{}); err != nil {
+				sa, err := kubeClient.CoreV1().ServiceAccounts(agentNamespace).Get(context.Background(), saName, metav1.GetOptions{})
+				if err != nil {
 					return false
 				}
-				return true
+				_, present := sa.ObjectMeta.Annotations[util.IrsaAnnotationKey]
+				return !present
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Check deployment
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(context.Background(), deploymentName, metav1.GetOptions{}); err != nil {
+				deployment, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
+				if err != nil {
 					return false
 				}
-				return true
+
+				return !util.AllCommandLineOptionsPresent(*deployment) && !util.AwsCliSpecificVolumesMounted(*deployment)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Check addon namespace
