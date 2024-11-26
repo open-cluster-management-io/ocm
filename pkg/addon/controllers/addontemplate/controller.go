@@ -49,6 +49,7 @@ type addonTemplateController struct {
 	dynamicInformers  dynamicinformer.DynamicSharedInformerFactory
 	workInformers     workv1informers.SharedInformerFactory
 	runControllerFunc runController
+	eventRecorder     events.Recorder
 }
 
 type runController func(ctx context.Context, addonName string) error
@@ -77,6 +78,7 @@ func NewAddonTemplateController(
 		clusterInformers: clusterInformers,
 		dynamicInformers: dynamicInformers,
 		workInformers:    workInformers,
+		eventRecorder:    recorder,
 	}
 
 	if len(runController) > 0 {
@@ -88,6 +90,11 @@ func NewAddonTemplateController(
 	return factory.New().WithInformersQueueKeysFunc(
 		queue.QueueKeyByMetaNamespaceName,
 		addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer()).
+		WithBareInformers(
+			// do not need to queue, just make sure the controller reconciles after the addonTemplate cache is synced
+			// otherwise, there will be "xx-addon-template" not found" errors in the log as the controller uses the
+			// addonTemplate lister to get the template object
+			addonInformers.Addon().V1alpha1().AddOnTemplates().Informer()).
 		WithSync(c.sync).
 		ToController("addon-template-controller", recorder)
 }
@@ -190,6 +197,7 @@ func (c *addonTemplateController) runController(
 		c.addonClient,
 		c.addonInformers,
 		kubeInformers.Rbac().V1().RoleBindings().Lister(),
+		c.eventRecorder,
 		// image overrides from cluster annotation has lower priority than from the addonDeploymentConfig
 		getValuesClosure,
 		addonfactory.GetAddOnDeploymentConfigValues(

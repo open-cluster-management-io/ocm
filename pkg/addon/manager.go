@@ -59,7 +59,7 @@ func RunManager(ctx context.Context, controllerContext *controllercmd.Controller
 	}
 
 	clusterInformerFactory := clusterinformers.NewSharedInformerFactory(hubClusterClient, 30*time.Minute)
-	addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
+	addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 10*time.Minute)
 	workInformers := workv1informers.NewSharedInformerFactoryWithOptions(workClient, 10*time.Minute,
 		workv1informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
 			selector := &metav1.LabelSelector{
