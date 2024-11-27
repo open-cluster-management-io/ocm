@@ -359,7 +359,10 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		if err := wait.PollUntilContextCancel(bootstrapCtx, 1*time.Second, true, o.internalHubConfigValidFunc); err != nil {
 			// TODO need run the bootstrap CSR forever to re-establish the client-cert if it is ever lost.
 			stopBootstrap()
-			return fmt.Errorf("failed to wait for hub client config for managed cluster to be ready: %w", err)
+			// DO NOT return error if context canceled, allows leader election to release the leadership.
+			if err != context.Canceled {
+				return fmt.Errorf("failed to wait for hub client config for managed cluster to be ready: %w", err)
+			}
 		}
 
 		// stop the clientCertForHubController for bootstrap once the hub client config is ready
