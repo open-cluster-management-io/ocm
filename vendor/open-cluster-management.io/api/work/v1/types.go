@@ -170,13 +170,14 @@ type UpdateStrategy struct {
 	// +required
 	Type UpdateStrategyType `json:"type,omitempty"`
 
-	// serverSideApply defines the configuration for server side apply. It is honored only when
-	// type of updateStrategy is ServerSideApply
+	// serverSideApply defines the configuration for server side apply. It is honored only when the
+	// type of the updateStrategy is ServerSideApply
 	// +optional
 	ServerSideApply *ServerSideApplyConfig `json:"serverSideApply,omitempty"`
 }
 
 type UpdateStrategyType string
+type IgnoreFieldsCondition string
 
 const (
 	// UpdateStrategyTypeUpdate means to update resource by an update call.
@@ -196,6 +197,13 @@ const (
 	// If the statusFeedBackRules are set, the feedbackResult will also be returned.
 	// The resource will not be removed when the type is ReadOnly, and only resource metadata is required.
 	UpdateStrategyTypeReadOnly UpdateStrategyType = "ReadOnly"
+
+	// IgnoreFieldsConditionOnSpokeChange is the condition when resource fields is updated by another actor
+	// on the spoke cluster.
+	IgnoreFieldsConditionOnSpokeChange IgnoreFieldsCondition = "OnSpokeChange"
+
+	// IgnoreFieldsConditionOnSpokePresent is the condition when the resource exist on the spoke cluster.
+	IgnoreFieldsConditionOnSpokePresent IgnoreFieldsCondition = "OnSpokePresent"
 )
 
 type ServerSideApplyConfig struct {
@@ -209,6 +217,29 @@ type ServerSideApplyConfig struct {
 	// +kubebuilder:validation:Pattern=`^work-agent`
 	// +optional
 	FieldManager string `json:"fieldManager,omitempty"`
+
+	// IgnoreFields defines a list of json paths in the resource that will not be updated on the spoke.
+	// +listType:=map
+	// +listMapKey:=condition
+	// +optional
+	IgnoreFields []IgnoreField `json:"ignoreFields,omitempty"`
+}
+
+type IgnoreField struct {
+	// Condition defines the condition that the fields should be ignored when apply the resource.
+	// Fields in JSONPaths are all ignored when condition is met, otherwise no fields is ignored
+	// in the apply operation.
+	// +kubebuilder:default=OnSpokePresent
+	// +kubebuilder:validation:Enum=OnSpokePresent;OnSpokeChange
+	// +kubebuilder:validation:Required
+	// +required
+	Condition IgnoreFieldsCondition `json:"condition"`
+
+	// JSONPaths defines the list of json path in the resource to be ignored
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +required
+	JSONPaths []string `json:"jsonPaths"`
 }
 
 // DefaultFieldManager is the default field manager of the manifestwork when the field manager is not set.
@@ -506,6 +537,10 @@ const (
 	// ensure all resource relates to appliedmanifestwork is deleted before appliedmanifestwork itself
 	// is deleted.
 	AppliedManifestWorkFinalizer = "cluster.open-cluster-management.io/applied-manifest-work-cleanup"
+
+	// ObjectSpecHash is the key of the annotation on the applied resources. The value is the computed hash
+	// from the resource manifests in the manifestwork.
+	ObjectSpecHash = "open-cluster-management.io/object-hash"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
