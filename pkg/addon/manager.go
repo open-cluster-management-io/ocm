@@ -193,6 +193,8 @@ func RunControllerManagerWithInformers(
 		hubWorkClient,
 		addonInformers,
 		clusterInformers,
+		// can share the same dynamic informers for different template type addons since
+		// these addons only support addontemplate and addondeploymentconfig
 		dynamicInformers,
 		workinformers,
 		controllerContext.EventRecorder,

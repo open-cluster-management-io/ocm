@@ -58,6 +58,8 @@ func NewAddonRegistrationController(
 			return true
 		},
 		addonInformers.Informer()).
+		// clusterLister is used, so wait for cache sync
+		WithBareInformers(clusterInformers.Informer()).
 		WithSync(c.sync).ToController("addon-registration-controller")
 }
 

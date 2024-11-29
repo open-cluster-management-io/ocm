@@ -8,6 +8,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	kubeinformers "k8s.io/client-go/informers"
@@ -195,7 +196,7 @@ func (c *addonTemplateController) runController(
 		addonName,
 		c.kubeClient,
 		c.addonClient,
-		c.addonInformers,
+		c.addonInformers, // use the shared informers, whose cache is synced already
 		kubeInformers.Rbac().V1().RoleBindings().Lister(),
 		c.eventRecorder,
 		// image overrides from cluster annotation has lower priority than from the addonDeploymentConfig
@@ -218,8 +219,19 @@ func (c *addonTemplateController) runController(
 	if err != nil {
 		return err
 	}
-
 	kubeInformers.Start(ctx.Done())
+
+	// trigger the manager to reconcile for the existing managed cluster addons
+	mcas, err := c.addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister().List(labels.Everything())
+	if err != nil {
+		return err
+	}
+
+	for _, mca := range mcas {
+		if mca.Name == addonName {
+			mgr.Trigger(mca.Namespace, addonName)
+		}
+	}
 
 	return nil
 }
