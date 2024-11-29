@@ -10,13 +10,13 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
-	"open-cluster-management.io/addon-framework/pkg/index"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	clusterinformersv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
 
+	amindex "open-cluster-management.io/ocm/pkg/addon/index"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
@@ -69,11 +69,11 @@ func NewAddonManagementController(
 		queue.QueueKeyByMetaName,
 		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
 		WithInformersQueueKeysFunc(
-			index.ClusterManagementAddonByPlacementDecisionQueueKey(
+			amindex.ClusterManagementAddonByPlacementDecisionQueueKey(
 				clusterManagementAddonInformers),
 			placementDecisionInformer.Informer()).
 		WithInformersQueueKeysFunc(
-			index.ClusterManagementAddonByPlacementQueueKey(
+			amindex.ClusterManagementAddonByPlacementQueueKey(
 				clusterManagementAddonInformers),
 			placementInformer.Informer()).
 		WithSync(c.sync).ToController("addon-management-controller", recorder)

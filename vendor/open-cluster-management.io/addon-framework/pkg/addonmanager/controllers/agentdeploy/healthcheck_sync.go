@@ -3,6 +3,7 @@ package agentdeploy
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -167,17 +168,39 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 		manifestConditions = append(manifestConditions, work.Status.ResourceStatus.Manifests...)
 	}
 
-	probeFields, healthChecker, err := s.analyzeWorkProber(s.agentAddon, cluster, addon)
+	// TODO: remove healthCheck since healthCheck has been deprecated
+	probeFields, healthCheck, healthChecker, err := s.analyzeWorkProber(s.agentAddon, cluster, addon)
 	if err != nil {
 		// should not happen, return
 		return err
 	}
 
+	var FieldResults []agent.FieldResult
+
 	for _, field := range probeFields {
-		result := findResultByIdentifier(field.ResourceIdentifier, manifestConditions)
+		results := findResultsByIdentifier(field.ResourceIdentifier, manifestConditions)
+
+		// healthCheck will be ignored if healthChecker is set
+		if healthChecker != nil {
+			if len(results) != 0 {
+				FieldResults = append(FieldResults, results...)
+			}
+			continue
+		}
+
+		if healthCheck == nil {
+			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Status:  metav1.ConditionFalse,
+				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeUnavailable,
+				Message: fmt.Sprintf("health checker function is not set %v", err),
+			})
+			return nil
+		}
+
 		// if no results are returned. it is possible that work agent has not returned the feedback value.
 		// mark condition to unknown
-		if result == nil {
+		if len(results) == 0 {
 			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 				Type:   addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
 				Status: metav1.ConditionUnknown,
@@ -189,16 +212,29 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 			return nil
 		}
 
-		err := healthChecker(field.ResourceIdentifier, *result)
-		if err != nil {
-			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
-				Status:  metav1.ConditionFalse,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeUnavailable,
-				Message: fmt.Sprintf("Probe addon unavailable with err %v", err),
-			})
-			return nil
+		for _, result := range results {
+			err := healthCheck(result.ResourceIdentifier, result.FeedbackResult)
+			if err != nil {
+				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+					Status:  metav1.ConditionFalse,
+					Reason:  addonapiv1alpha1.AddonAvailableReasonProbeUnavailable,
+					Message: fmt.Sprintf("Probe addon unavailable with err %v", err),
+				})
+				return nil
+			}
 		}
+
+	}
+
+	if healthChecker != nil && healthChecker(FieldResults, cluster, addon) != nil {
+		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+			Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+			Status:  metav1.ConditionFalse,
+			Reason:  addonapiv1alpha1.AddonAvailableReasonProbeUnavailable,
+			Message: fmt.Sprintf("Probe addon unavailable with err %v", err),
+		})
+		return nil
 	}
 
 	meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
@@ -210,25 +246,28 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 	return nil
 }
 
+// TODO: use wildcard to refactor analyzeDeploymentWorkProber and analyzeWorkloadsWorkProber
 func (s *healthCheckSyncer) analyzeWorkProber(
 	agentAddon agent.AgentAddon,
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn,
-) ([]agent.ProbeField, agent.AddonHealthCheckFunc, error) {
+) ([]agent.ProbeField, agent.AddonHealthCheckFunc, agent.AddonHealthCheckerFunc, error) {
 
 	switch agentAddon.GetAgentAddonOptions().HealthProber.Type {
 	case agent.HealthProberTypeWork:
 		workProber := agentAddon.GetAgentAddonOptions().HealthProber.WorkProber
 		if workProber != nil {
-			return workProber.ProbeFields, workProber.HealthCheck, nil
+			return workProber.ProbeFields, workProber.HealthCheck, workProber.HealthChecker, nil
 		}
-		return nil, nil, fmt.Errorf("work prober is not configured")
+		return nil, nil, nil, fmt.Errorf("work prober is not configured")
 	case agent.HealthProberTypeDeploymentAvailability:
-		return s.analyzeDeploymentWorkProber(agentAddon, cluster, addon)
+		probeFields, heathCheck, err := s.analyzeDeploymentWorkProber(agentAddon, cluster, addon)
+		return probeFields, heathCheck, nil, err
 	case agent.HealthProberTypeWorkloadAvailability:
-		return s.analyzeWorkloadsWorkProber(agentAddon, cluster, addon)
+		probeFields, heathCheck, err := s.analyzeWorkloadsWorkProber(agentAddon, cluster, addon)
+		return probeFields, heathCheck, nil, err
 	default:
-		return nil, nil, fmt.Errorf("unsupported health prober type %s", agentAddon.GetAgentAddonOptions().HealthProber.Type)
+		return nil, nil, nil, fmt.Errorf("unsupported health prober type %s", agentAddon.GetAgentAddonOptions().HealthProber.Type)
 	}
 }
 
@@ -294,27 +333,46 @@ func (s *healthCheckSyncer) analyzeWorkloadsWorkProber(
 	return probeFields, utils.WorkloadAvailabilityHealthCheck, nil
 }
 
-func findResultByIdentifier(identifier workapiv1.ResourceIdentifier, manifestConditions []workapiv1.ManifestCondition) *workapiv1.StatusFeedbackResult {
+func findResultsByIdentifier(identifier workapiv1.ResourceIdentifier,
+	manifestConditions []workapiv1.ManifestCondition) []agent.FieldResult {
+	var results []agent.FieldResult
 	for _, status := range manifestConditions {
-		if identifier.Group != status.ResourceMeta.Group {
-			continue
+		if resourceMatch(status.ResourceMeta, identifier) && len(status.StatusFeedbacks.Values) != 0 {
+			results = append(results, agent.FieldResult{
+				ResourceIdentifier: workapiv1.ResourceIdentifier{
+					Group:     status.ResourceMeta.Group,
+					Resource:  status.ResourceMeta.Resource,
+					Name:      status.ResourceMeta.Name,
+					Namespace: status.ResourceMeta.Namespace,
+				},
+				FeedbackResult: status.StatusFeedbacks,
+			})
 		}
-		if identifier.Resource != status.ResourceMeta.Resource {
-			continue
-		}
-		if identifier.Name != status.ResourceMeta.Name {
-			continue
-		}
-		if identifier.Namespace != status.ResourceMeta.Namespace {
-			continue
-		}
-
-		if len(status.StatusFeedbacks.Values) == 0 {
-			return nil
-		}
-
-		return &status.StatusFeedbacks
 	}
 
-	return nil
+	return results
+}
+
+// compare two string, target may include *
+func wildcardMatch(resource, target string) bool {
+	if resource == target || target == "*" {
+		return true
+	}
+
+	pattern := "^" + regexp.QuoteMeta(target) + "$"
+	pattern = strings.ReplaceAll(pattern, "\\*", ".*")
+
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return false
+	}
+
+	return re.MatchString(resource)
+}
+
+func resourceMatch(resourceMeta workapiv1.ManifestResourceMeta, resource workapiv1.ResourceIdentifier) bool {
+	return resourceMeta.Group == resource.Group &&
+		resourceMeta.Resource == resource.Resource &&
+		wildcardMatch(resourceMeta.Namespace, resource.Namespace) &&
+		wildcardMatch(resourceMeta.Name, resource.Name)
 }
