@@ -40,9 +40,20 @@ func (a *AgentConfig) RunSpokeAgent(ctx context.Context, controllerContext *cont
 	}()
 
 	// wait for the hub client config ready.
+	// PollUntilContextCancel periodically executes the condition func `o.internalHubConfigValidFunc`
+	// until one of the following conditions is met:
+	// - condition returns `true`: Indicates the hub client configuration
+	//   is ready, and the polling stops successfully.
+	// - condition returns an error: This happens when loading the kubeconfig
+	//   file fails or the kubeconfig is invalid. In such cases, the error is returned, causing the
+	//   agent to exit with an error and triggering a new leader election.
+	// - The context is canceled: In this case, no error is returned. This ensures that
+	//   the current leader can release leadership, allowing a new pod to get leadership quickly.
 	klog.Info("Waiting for hub client config and managed cluster to be ready")
 	if err := wait.PollUntilContextCancel(ctx, 1*time.Second, true, a.registrationConfig.IsHubKubeConfigValid); err != nil {
-		return err
+		if err != context.Canceled {
+			return err
+		}
 	}
 
 	// start work agent

@@ -354,12 +354,23 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		go bootstrapInformerFactory.Start(bootstrapCtx.Done())
 		go secretController.Run(bootstrapCtx, 1)
 
-		// wait for the hub client config is ready.
+		// Wait for the hub client config is ready.
+		// PollUntilContextCancel periodically executes the condition func `o.internalHubConfigValidFunc`
+		// until one of the following conditions is met:
+		// - condition returns `true`: Indicates the hub client configuration
+		//   is ready, and the polling stops successfully.
+		// - condition returns an error: This happens when loading the kubeconfig
+		//   file fails or the kubeconfig is invalid. In such cases, the error is returned, causing the
+		//   agent to exit with an error and triggering a new leader election.
+		// - The context is canceled: In this case, no error is returned. This ensures that
+		//   the current leader can release leadership, allowing a new pod to get leadership quickly.
 		logger.Info("Waiting for hub client config and managed cluster to be ready")
 		if err := wait.PollUntilContextCancel(bootstrapCtx, 1*time.Second, true, o.internalHubConfigValidFunc); err != nil {
 			// TODO need run the bootstrap CSR forever to re-establish the client-cert if it is ever lost.
 			stopBootstrap()
-			return fmt.Errorf("failed to wait for hub client config for managed cluster to be ready: %w", err)
+			if err != context.Canceled {
+				return fmt.Errorf("failed to wait for hub client config for managed cluster to be ready: %w", err)
+			}
 		}
 
 		// stop the clientCertForHubController for bootstrap once the hub client config is ready
