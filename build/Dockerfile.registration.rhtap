@@ -1,4 +1,4 @@
-FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_8_1.21 AS builder
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23 AS builder
 ARG OS=linux
 ARG ARCH=amd64
 WORKDIR /go/src/open-cluster-management.io/ocm
@@ -10,7 +10,7 @@ RUN GOOS=${OS} \
     GO_BUILD_PACKAGES=./cmd/registration \
     make build --warn-undefined-variables
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 ENV USER_UID=10001
 
 COPY --from=builder /go/src/open-cluster-management.io/ocm/registration /
