@@ -20,7 +20,7 @@ import (
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
-	amindex "open-cluster-management.io/ocm/pkg/addon/index"
+	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
@@ -92,9 +92,9 @@ func NewAddonConfigurationController(
 		clusterManagementAddonInformers.Informer()).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, addonInformers.Informer()).
 		WithInformersQueueKeysFunc(
-			amindex.ClusterManagementAddonByPlacementDecisionQueueKey(clusterManagementAddonInformers), placementDecisionInformer.Informer()).
+			addonindex.ClusterManagementAddonByPlacementDecisionQueueKey(clusterManagementAddonInformers), placementDecisionInformer.Informer()).
 		WithInformersQueueKeysFunc(
-			amindex.ClusterManagementAddonByPlacementQueueKey(clusterManagementAddonInformers), placementInformer.Informer())
+			addonindex.ClusterManagementAddonByPlacementQueueKey(clusterManagementAddonInformers), placementInformer.Informer())
 
 	return controllerFactory.WithSync(c.sync).ToController("addon-configuration-controller", recorder)
 }
@@ -160,7 +160,7 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 
 func (c *addonConfigurationController) buildConfigurationGraph(logger klog.Logger, cma *addonv1alpha1.ClusterManagementAddOn) (*configurationGraph, error) {
 	graph := newGraph(cma.Spec.SupportedConfigs, cma.Status.DefaultConfigReferences)
-	addons, err := c.managedClusterAddonIndexer.ByIndex(amindex.ManagedClusterAddonByName, cma.Name)
+	addons, err := c.managedClusterAddonIndexer.ByIndex(addonindex.ManagedClusterAddonByName, cma.Name)
 	if err != nil {
 		return graph, err
 	}

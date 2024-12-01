@@ -28,7 +28,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/addon/controllers/addontemplate"
 	"open-cluster-management.io/ocm/pkg/addon/controllers/cmainstallprogression"
 	"open-cluster-management.io/ocm/pkg/addon/controllers/cmamanagedby"
-	amindex "open-cluster-management.io/ocm/pkg/addon/index"
+	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 )
 
 func RunManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
@@ -113,7 +113,7 @@ func RunControllerManagerWithInformers(
 
 	err = addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
 		cache.Indexers{
-			amindex.ManagedClusterAddonByName:    amindex.IndexManagedClusterAddonByName,    // addonConfigurationController, addonManagementController
+			addonindex.ManagedClusterAddonByName: addonindex.IndexManagedClusterAddonByName, // addonConfigurationController, addonManagementController
 			index.ManagedClusterAddonByNamespace: index.IndexManagedClusterAddonByNamespace, // agentDeployController
 			index.AddonByConfig:                  index.IndexAddonByConfig,                  // addonConfigController
 		},
@@ -125,8 +125,8 @@ func RunControllerManagerWithInformers(
 	// managementAddonConfigController
 	err = addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
 		cache.Indexers{
-			amindex.ClusterManagementAddonByPlacement: amindex.IndexClusterManagementAddonByPlacement, // addonConfigurationController, addonManagementController
-			index.ClusterManagementAddonByConfig:      index.IndexClusterManagementAddonByConfig,      // cmaConfigController
+			addonindex.ClusterManagementAddonByPlacement: addonindex.IndexClusterManagementAddonByPlacement, // addonConfigurationController, addonManagementController
+			index.ClusterManagementAddonByConfig:         index.IndexClusterManagementAddonByConfig,         // cmaConfigController
 		})
 	if err != nil {
 		return err

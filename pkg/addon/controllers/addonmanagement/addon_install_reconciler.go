@@ -17,7 +17,7 @@ import (
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
-	amindex "open-cluster-management.io/ocm/pkg/addon/index"
+	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 )
 
 type managedClusterAddonInstallReconciler struct {
@@ -42,7 +42,7 @@ func (d *managedClusterAddonInstallReconciler) reconcile(
 		return cma, reconcileContinue, nil
 	}
 
-	addons, err := d.managedClusterAddonIndexer.ByIndex(amindex.ManagedClusterAddonByName, cma.Name)
+	addons, err := d.managedClusterAddonIndexer.ByIndex(addonindex.ManagedClusterAddonByName, cma.Name)
 	if err != nil {
 		return cma, reconcileContinue, err
 	}

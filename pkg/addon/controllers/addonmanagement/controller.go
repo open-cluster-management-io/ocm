@@ -16,7 +16,7 @@ import (
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	clusterinformersv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
 
-	amindex "open-cluster-management.io/ocm/pkg/addon/index"
+	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
@@ -69,11 +69,11 @@ func NewAddonManagementController(
 		queue.QueueKeyByMetaName,
 		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
 		WithInformersQueueKeysFunc(
-			amindex.ClusterManagementAddonByPlacementDecisionQueueKey(
+			addonindex.ClusterManagementAddonByPlacementDecisionQueueKey(
 				clusterManagementAddonInformers),
 			placementDecisionInformer.Informer()).
 		WithInformersQueueKeysFunc(
-			amindex.ClusterManagementAddonByPlacementQueueKey(
+			addonindex.ClusterManagementAddonByPlacementQueueKey(
 				clusterManagementAddonInformers),
 			placementInformer.Informer()).
 		WithSync(c.sync).ToController("addon-management-controller", recorder)
