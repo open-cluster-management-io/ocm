@@ -167,8 +167,8 @@ func (c *addonTemplateController) startManager(
 	return stopFunc
 }
 
-func (c *addonTemplateController) runController(
-	ctx context.Context, addonName string) error {
+func (c *addonTemplateController) runController(ctx context.Context, addonName string) error {
+	logger := klog.FromContext(ctx)
 	mgr, err := addonmanager.New(c.kubeConfig)
 	if err != nil {
 		return err
@@ -224,12 +224,12 @@ func (c *addonTemplateController) runController(
 	// trigger the manager to reconcile for the existing managed cluster addons
 	mcas, err := c.addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister().List(labels.Everything())
 	if err != nil {
-		return err
-	}
-
-	for _, mca := range mcas {
-		if mca.Name == addonName {
-			mgr.Trigger(mca.Namespace, addonName)
+		logger.Info("Failed to list ManagedClusterAddOns", "error", err)
+	} else {
+		for _, mca := range mcas {
+			if mca.Name == addonName {
+				mgr.Trigger(mca.Namespace, addonName)
+			}
 		}
 	}
 
