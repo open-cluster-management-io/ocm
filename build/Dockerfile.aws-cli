@@ -1,13 +1,14 @@
 FROM golang:1.22-bullseye AS builder
 ARG OS=linux
 ARG ARCH=x86_64
+ARG VERSION=2.22.8
 
 # Downloading aws-cli
 WORKDIR /tmp
 RUN apt-get update
 RUN apt-get install unzip
 RUN unzip -v
-RUN curl "https://awscli.amazonaws.com/awscli-exe-${OS}-${ARCH}.zip" -o "awscliv2.zip"
+RUN curl "https://awscli.amazonaws.com/awscli-exe-${OS}-${ARCH}-${VERSION}.zip" -o "awscliv2.zip"
 RUN unzip awscliv2.zip
 
 
