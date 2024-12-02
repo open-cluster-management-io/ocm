@@ -388,6 +388,9 @@ func assertKlusterletDeployment(t *testing.T, actions []clienttesting.Action, ve
 	}
 
 	args := deployment.Spec.Template.Spec.Containers[0].Args
+	volumeMounts := deployment.Spec.Template.Spec.Containers[0].VolumeMounts
+	volumes := deployment.Spec.Template.Spec.Volumes
+
 	expectedArgs := []string{
 		"/registration-operator",
 		"agent",
@@ -399,20 +402,39 @@ func assertKlusterletDeployment(t *testing.T, actions []clienttesting.Action, ve
 		expectedArgs = append(expectedArgs, fmt.Sprintf("--spoke-external-server-urls=%s", serverURL))
 	}
 
-	expectedArgs = append(expectedArgs, "--agent-id=", "--workload-source-driver=kube", "--workload-source-config=/spoke/hub-kubeconfig/kubeconfig")
-
-	if *deployment.Spec.Replicas == 1 {
-		expectedArgs = append(expectedArgs, "--disable-leader-election")
-	}
-
-	expectedArgs = append(expectedArgs, "--status-sync-interval=60s", "--kube-api-qps=20", "--kube-api-burst=60",
-		"--registration-auth=awsirsa", "--hub-cluster-arn=arneks:us-west-2:123456789012:cluster/hub-cluster1")
+	expectedArgs = append(expectedArgs, "--agent-id=", "--workload-source-driver=kube", "--workload-source-config=/spoke/hub-kubeconfig/kubeconfig",
+		"--status-sync-interval=60s", "--kube-api-qps=20", "--kube-api-burst=60",
+		"--registration-auth=awsirsa",
+		"--hub-cluster-arn=arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1",
+		"--managed-cluster-arn=arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
+		"--managed-cluster-role-suffix=7f8141296c75f2871e3d030f85c35692")
 
 	if !equality.Semantic.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expect args %v, but got %v", expectedArgs, args)
 		return
 	}
 
+	assert.True(t, isDotAwsMounted(volumeMounts))
+	assert.True(t, isDotAwsVolumePresent(volumes))
+
+}
+
+func isDotAwsVolumePresent(volumes []corev1.Volume) bool {
+	for _, volume := range volumes {
+		if volume.Name == "dot-aws" {
+			return true
+		}
+	}
+	return false
+}
+
+func isDotAwsMounted(mounts []corev1.VolumeMount) bool {
+	for _, mount := range mounts {
+		if mount.Name == "dot-aws" && mount.MountPath == "/.aws" {
+			return true
+		}
+	}
+	return false
 }
 
 func assertRegistrationDeployment(t *testing.T, actions []clienttesting.Action, verb, serverURL, clusterName string, replica int32, awsAuth bool) {
@@ -438,13 +460,12 @@ func assertRegistrationDeployment(t *testing.T, actions []clienttesting.Action, 
 		expectedArgs = append(expectedArgs, fmt.Sprintf("--spoke-external-server-urls=%s", serverURL))
 	}
 
-	if *deployment.Spec.Replicas == 1 {
-		expectedArgs = append(expectedArgs, "--disable-leader-election")
-	}
-
 	expectedArgs = append(expectedArgs, "--kube-api-qps=10", "--kube-api-burst=60")
 	if awsAuth {
-		expectedArgs = append(expectedArgs, "--registration-auth=awsirsa", "--hub-cluster-arn=arneks:us-west-2:123456789012:cluster/hub-cluster1")
+		expectedArgs = append(expectedArgs, "--registration-auth=awsirsa",
+			"--hub-cluster-arn=arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1",
+			"--managed-cluster-arn=arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
+			"--managed-cluster-role-suffix=7f8141296c75f2871e3d030f85c35692")
 	}
 	if !equality.Semantic.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expect args %v, but got %v", expectedArgs, args)
@@ -485,7 +506,7 @@ func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, cl
 	expectArgs = append(expectArgs, "--terminate-on-files=/spoke/hub-kubeconfig/kubeconfig")
 
 	if *deployment.Spec.Replicas == 1 {
-		expectArgs = append(expectArgs, "--disable-leader-election", "--status-sync-interval=60s")
+		expectArgs = append(expectArgs, "--status-sync-interval=60s")
 	}
 
 	expectArgs = append(expectArgs, "--kube-api-qps=20", "--kube-api-burst=50")
@@ -988,18 +1009,50 @@ func TestGetServersFromKlusterlet(t *testing.T) {
 	}
 }
 
-func TestAWSIrsaAuthInSingletonMode(t *testing.T) {
+func TestAWSIrsaAuthInSingletonModeWithInvalidClusterArns(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	awsIrsaRegistrationDriver := operatorapiv1.RegistrationDriver{
 		AuthType: AwsIrsaAuthType,
 		AwsIrsa: &operatorapiv1.AwsIrsa{
-			HubClusterArn: "arneks:us-west-2:123456789012:cluster/hub-cluster1",
+			HubClusterArn:     "arn:aws:bks:us-west-2:123456789012:cluster/hub-cluster1",
+			ManagedClusterArn: "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
 		},
 	}
 	klusterlet.Spec.RegistrationConfiguration.RegistrationDriver = awsIrsaRegistrationDriver
 	klusterlet.Spec.DeployOption.Mode = operatorapiv1.InstallModeSingleton
 	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
-	hubSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubSecret.Data["kubeconfig"] = []byte("dummykubeconfig")
+	hubSecret.Data["cluster-name"] = []byte("cluster1")
+	objects := []runtime.Object{
+		newNamespace("testns"),
+		newSecret(helpers.BootstrapHubKubeConfig, "testns"),
+		hubSecret,
+	}
+
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
+		objects...)
+
+	err := controller.controller.sync(context.TODO(), syncContext)
+	if err != nil {
+		assert.Equal(t, err.Error(), "HubClusterArn arn:aws:bks:us-west-2:123456789012:cluster/hub-cluster1 is not well formed")
+	}
+
+}
+
+func TestAWSIrsaAuthInSingletonMode(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	awsIrsaRegistrationDriver := operatorapiv1.RegistrationDriver{
+		AuthType: AwsIrsaAuthType,
+		AwsIrsa: &operatorapiv1.AwsIrsa{
+			HubClusterArn:     "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1",
+			ManagedClusterArn: "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
+		},
+	}
+	klusterlet.Spec.RegistrationConfiguration.RegistrationDriver = awsIrsaRegistrationDriver
+	klusterlet.Spec.DeployOption.Mode = operatorapiv1.InstallModeSingleton
+	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
+	hubSecret.Data["kubeconfig"] = []byte("dummykubeconfig")
 	hubSecret.Data["cluster-name"] = []byte("cluster1")
 	objects := []runtime.Object{
 		newNamespace("testns"),
@@ -1024,7 +1077,8 @@ func TestAWSIrsaAuthInNonSingletonMode(t *testing.T) {
 	awsIrsaRegistrationDriver := operatorapiv1.RegistrationDriver{
 		AuthType: AwsIrsaAuthType,
 		AwsIrsa: &operatorapiv1.AwsIrsa{
-			HubClusterArn: "arneks:us-west-2:123456789012:cluster/hub-cluster1",
+			HubClusterArn:     "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1",
+			ManagedClusterArn: "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
 		},
 	}
 	klusterlet.Spec.RegistrationConfiguration.RegistrationDriver = awsIrsaRegistrationDriver

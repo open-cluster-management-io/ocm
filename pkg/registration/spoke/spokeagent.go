@@ -31,7 +31,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
-	registrationHelpers "open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	awsIrsa "open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
@@ -194,13 +193,14 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	var registerDriver register.RegisterDriver
 	if o.registrationOption.RegistrationAuth == AwsIrsaAuthType {
 		// TODO: may consider add additional validations
-		if o.registrationOption.EksHubClusterArn != "" && registrationHelpers.IsEksArnWellFormed(o.registrationOption.EksHubClusterArn) {
+		if o.registrationOption.HubClusterArn != "" {
 			registerDriver = awsIrsa.NewAWSIRSADriver()
 			if o.registrationOption.ClusterAnnotations == nil {
 				o.registrationOption.ClusterAnnotations = map[string]string{}
 			}
-			o.registrationOption.ClusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/managed-cluster-arn"] = ""             //TODO: find arn from current context
-			o.registrationOption.ClusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/managed-cluster-iam-role-suffix"] = "" //TODO: Add role suffix after RE-7249
+			o.registrationOption.ClusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/managed-cluster-arn"] = o.registrationOption.ManagedClusterArn
+			o.registrationOption.ClusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/managed-cluster-iam-role-suffix"] =
+				o.registrationOption.ManagedClusterRoleSuffix
 
 		} else {
 			panic("A valid EKS Hub Cluster ARN is required with awsirsa based authentication")
@@ -324,7 +324,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 		var registrationAuthOption any
 		if o.registrationOption.RegistrationAuth == AwsIrsaAuthType {
-			if o.registrationOption.EksHubClusterArn != "" && registrationHelpers.IsEksArnWellFormed(o.registrationOption.EksHubClusterArn) {
+			if o.registrationOption.HubClusterArn != "" {
 				registrationAuthOption, err = registration.NewAWSOption(
 					secretOption,
 					bootstrapClusterInformerFactory.Cluster(),
@@ -354,12 +354,23 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		go bootstrapInformerFactory.Start(bootstrapCtx.Done())
 		go secretController.Run(bootstrapCtx, 1)
 
-		// wait for the hub client config is ready.
+		// Wait for the hub client config is ready.
+		// PollUntilContextCancel periodically executes the condition func `o.internalHubConfigValidFunc`
+		// until one of the following conditions is met:
+		// - condition returns `true`: Indicates the hub client configuration
+		//   is ready, and the polling stops successfully.
+		// - condition returns an error: This happens when loading the kubeconfig
+		//   file fails or the kubeconfig is invalid. In such cases, the error is returned, causing the
+		//   agent to exit with an error and triggering a new leader election.
+		// - The context is canceled: In this case, no error is returned. This ensures that
+		//   the current leader can release leadership, allowing a new pod to get leadership quickly.
 		logger.Info("Waiting for hub client config and managed cluster to be ready")
 		if err := wait.PollUntilContextCancel(bootstrapCtx, 1*time.Second, true, o.internalHubConfigValidFunc); err != nil {
 			// TODO need run the bootstrap CSR forever to re-establish the client-cert if it is ever lost.
 			stopBootstrap()
-			return fmt.Errorf("failed to wait for hub client config for managed cluster to be ready: %w", err)
+			if err != context.Canceled {
+				return fmt.Errorf("failed to wait for hub client config for managed cluster to be ready: %w", err)
+			}
 		}
 
 		// stop the clientCertForHubController for bootstrap once the hub client config is ready

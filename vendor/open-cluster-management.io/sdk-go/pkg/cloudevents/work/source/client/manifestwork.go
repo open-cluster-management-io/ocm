@@ -52,21 +52,27 @@ func (c *ManifestWorkSourceClient) SetNamespace(namespace string) {
 
 func (c *ManifestWorkSourceClient) Create(ctx context.Context, manifestWork *workv1.ManifestWork, opts metav1.CreateOptions) (*workv1.ManifestWork, error) {
 	if manifestWork.Namespace != "" && manifestWork.Namespace != c.namespace {
-		return nil, errors.NewInvalid(common.ManifestWorkGK, manifestWork.Name, field.ErrorList{
+		returnErr := errors.NewInvalid(common.ManifestWorkGK, manifestWork.Name, field.ErrorList{
 			field.Invalid(
 				field.NewPath("metadata").Child("namespace"),
 				manifestWork.Namespace,
 				fmt.Sprintf("does not match the namespace %s", c.namespace),
 			),
 		})
+		generic.IncreaseWorkProcessedCounter("create", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
 	_, exists, err := c.watcherStore.Get(c.namespace, manifestWork.Name)
 	if err != nil {
-		return nil, errors.NewInternalError(err)
+		returnErr := errors.NewInternalError(err)
+		generic.IncreaseWorkProcessedCounter("create", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 	if exists {
-		return nil, errors.NewAlreadyExists(common.ManifestWorkGR, manifestWork.Name)
+		returnErr := errors.NewAlreadyExists(common.ManifestWorkGR, manifestWork.Name)
+		generic.IncreaseWorkProcessedCounter("create", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
 	// TODO if we support multiple data type in future, we may need to get the data type from
@@ -83,21 +89,31 @@ func (c *ManifestWorkSourceClient) Create(ctx context.Context, manifestWork *wor
 	newWork.ResourceVersion = getWorkResourceVersion(manifestWork)
 
 	if err := utils.Encode(newWork); err != nil {
-		return nil, errors.NewInternalError(err)
+		returnErr := errors.NewInternalError(err)
+		generic.IncreaseWorkProcessedCounter("create", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
 	if errs := utils.Validate(newWork); len(errs) != 0 {
-		return nil, errors.NewInvalid(common.ManifestWorkGK, manifestWork.Name, errs)
+		returnErr := errors.NewInvalid(common.ManifestWorkGK, manifestWork.Name, errs)
+		generic.IncreaseWorkProcessedCounter("create", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
 	if err := c.cloudEventsClient.Publish(ctx, eventType, newWork); err != nil {
-		return nil, workerrors.NewPublishError(common.ManifestWorkGR, manifestWork.Name, err)
+		returnErr := workerrors.NewPublishError(common.ManifestWorkGR, manifestWork.Name, err)
+		generic.IncreaseWorkProcessedCounter("create", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
 	// add the new work to the local cache.
 	if err := c.watcherStore.Add(newWork); err != nil {
-		return nil, errors.NewInternalError(err)
+		returnErr := errors.NewInternalError(err)
+		generic.IncreaseWorkProcessedCounter("create", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
+
+	generic.IncreaseWorkProcessedCounter("create", metav1.StatusSuccess)
 	return newWork.DeepCopy(), nil
 }
 
@@ -112,7 +128,9 @@ func (c *ManifestWorkSourceClient) UpdateStatus(ctx context.Context, manifestWor
 func (c *ManifestWorkSourceClient) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	work, exists, err := c.watcherStore.Get(c.namespace, name)
 	if err != nil {
-		return errors.NewInternalError(err)
+		returnErr := errors.NewInternalError(err)
+		generic.IncreaseWorkProcessedCounter("delete", string(returnErr.ErrStatus.Reason))
+		return returnErr
 	}
 	if !exists {
 		return nil
@@ -131,7 +149,9 @@ func (c *ManifestWorkSourceClient) Delete(ctx context.Context, name string, opts
 	deletingWork.DeletionTimestamp = &now
 
 	if err := c.cloudEventsClient.Publish(ctx, eventType, deletingWork); err != nil {
-		return workerrors.NewPublishError(common.ManifestWorkGR, name, err)
+		returnErr := workerrors.NewPublishError(common.ManifestWorkGR, name, err)
+		generic.IncreaseWorkProcessedCounter("delete", string(returnErr.ErrStatus.Reason))
+		return returnErr
 	}
 
 	if len(work.Finalizers) == 0 {
@@ -140,15 +160,22 @@ func (c *ManifestWorkSourceClient) Delete(ctx context.Context, name string, opts
 		// 2) the agent is running, but the status response does not be handled by source yet,
 		//    after the deleted status is back, we need ignore this work in the ManifestWorkSourceHandler.
 		if err := c.watcherStore.Delete(deletingWork); err != nil {
-			return errors.NewInternalError(err)
+			returnErr := errors.NewInternalError(err)
+			generic.IncreaseWorkProcessedCounter("delete", string(returnErr.ErrStatus.Reason))
+			return returnErr
 		}
+
+		generic.IncreaseWorkProcessedCounter("delete", metav1.StatusSuccess)
 		return nil
 	}
 
 	// update the work with deletion timestamp in the local cache.
 	if err := c.watcherStore.Update(deletingWork); err != nil {
-		return errors.NewInternalError(err)
+		returnErr := errors.NewInternalError(err)
+		generic.IncreaseWorkProcessedCounter("delete", string(returnErr.ErrStatus.Reason))
+		return returnErr
 	}
+
 	return nil
 }
 
@@ -160,12 +187,17 @@ func (c *ManifestWorkSourceClient) Get(ctx context.Context, name string, opts me
 	klog.V(4).Infof("getting manifestwork %s", name)
 	work, exists, err := c.watcherStore.Get(c.namespace, name)
 	if err != nil {
-		return nil, errors.NewInternalError(err)
+		returnErr := errors.NewInternalError(err)
+		generic.IncreaseWorkProcessedCounter("get", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 	if !exists {
-		return nil, errors.NewNotFound(common.ManifestWorkGR, name)
+		returnErr := errors.NewNotFound(common.ManifestWorkGR, name)
+		generic.IncreaseWorkProcessedCounter("get", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
+	generic.IncreaseWorkProcessedCounter("get", metav1.StatusSuccess)
 	return work, nil
 }
 
@@ -173,17 +205,24 @@ func (c *ManifestWorkSourceClient) List(ctx context.Context, opts metav1.ListOpt
 	klog.V(4).Infof("list manifestworks")
 	works, err := c.watcherStore.List(c.namespace, opts)
 	if err != nil {
-		return nil, errors.NewInternalError(err)
+		returnErr := errors.NewInternalError(err)
+		generic.IncreaseWorkProcessedCounter("list", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
+	generic.IncreaseWorkProcessedCounter("list", metav1.StatusSuccess)
 	return works, nil
 }
 
 func (c *ManifestWorkSourceClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	watcher, err := c.watcherStore.GetWatcher(c.namespace, opts)
 	if err != nil {
-		return nil, errors.NewInternalError(err)
+		returnErr := errors.NewInternalError(err)
+		generic.IncreaseWorkProcessedCounter("watch", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
+
+	generic.IncreaseWorkProcessedCounter("watch", metav1.StatusSuccess)
 	return watcher, nil
 }
 
@@ -192,20 +231,28 @@ func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt ku
 
 	if len(subresources) != 0 {
 		msg := fmt.Sprintf("unsupported to update subresources %v", subresources)
-		return nil, errors.NewGenericServerResponse(http.StatusMethodNotAllowed, "patch", common.ManifestWorkGR, name, msg, 0, false)
+		returnErr := errors.NewGenericServerResponse(http.StatusMethodNotAllowed, "patch", common.ManifestWorkGR, name, msg, 0, false)
+		generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
 	lastWork, exists, err := c.watcherStore.Get(c.namespace, name)
 	if err != nil {
-		return nil, errors.NewInternalError(err)
+		returnErr := errors.NewInternalError(err)
+		generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 	if !exists {
-		return nil, errors.NewNotFound(common.ManifestWorkGR, name)
+		returnErr := errors.NewNotFound(common.ManifestWorkGR, name)
+		generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
 	patchedWork, err := utils.Patch(pt, lastWork, data)
 	if err != nil {
-		return nil, errors.NewInternalError(err)
+		returnErr := errors.NewInternalError(err)
+		generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
 	// TODO if we support multiple data type in future, we may need to get the data type from
@@ -220,18 +267,25 @@ func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt ku
 	newWork.ResourceVersion = getWorkResourceVersion(patchedWork)
 
 	if errs := utils.Validate(newWork); len(errs) != 0 {
-		return nil, errors.NewInvalid(common.ManifestWorkGK, name, errs)
+		returnErr := errors.NewInvalid(common.ManifestWorkGK, name, errs)
+		generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
 	if err := c.cloudEventsClient.Publish(ctx, eventType, newWork); err != nil {
-		return nil, workerrors.NewPublishError(common.ManifestWorkGR, name, err)
+		returnErr := workerrors.NewPublishError(common.ManifestWorkGR, name, err)
+		generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
 	// modify the updated work in the local cache.
 	if err := c.watcherStore.Update(newWork); err != nil {
-		return nil, errors.NewInternalError(err)
+		returnErr := errors.NewInternalError(err)
+		generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		return nil, returnErr
 	}
 
+	generic.IncreaseWorkProcessedCounter("patch", metav1.StatusSuccess)
 	return newWork.DeepCopy(), nil
 }
 

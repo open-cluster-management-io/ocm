@@ -8,8 +8,8 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/google/go-cmp v0.6.0
 	github.com/mochi-mqtt/server/v2 v2.6.6
-	github.com/onsi/ginkgo/v2 v2.21.0
-	github.com/onsi/gomega v1.35.1
+	github.com/onsi/ginkgo/v2 v2.22.0
+	github.com/onsi/gomega v1.36.0
 	github.com/openshift/api v0.0.0-20241001152557-e415140e5d5f
 	github.com/openshift/build-machinery-go v0.0.0-20240613134303-8359781da660
 	github.com/openshift/library-go v0.0.0-20241107160307-0064ad7bd060
@@ -17,26 +17,26 @@ require (
 	github.com/prometheus/client_golang v1.20.5
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/valyala/fasttemplate v1.2.2
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	golang.org/x/net v0.31.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.16.3
-	k8s.io/api v0.31.2
-	k8s.io/apiextensions-apiserver v0.31.2
-	k8s.io/apimachinery v0.31.2
-	k8s.io/apiserver v0.31.2
-	k8s.io/client-go v0.31.2
-	k8s.io/component-base v0.31.2
+	k8s.io/api v0.31.3
+	k8s.io/apiextensions-apiserver v0.31.3
+	k8s.io/apimachinery v0.31.3
+	k8s.io/apiserver v0.31.3
+	k8s.io/client-go v0.31.3
+	k8s.io/component-base v0.31.3
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/kube-aggregator v0.31.2
+	k8s.io/kube-aggregator v0.31.3
 	k8s.io/utils v0.0.0-20240921022957-49e7df575cb6
 	open-cluster-management.io/addon-framework v0.11.0
 	open-cluster-management.io/api v0.15.1-0.20241120090202-cb7ce98ab874
-	open-cluster-management.io/sdk-go v0.15.0
+	open-cluster-management.io/sdk-go v0.15.1-0.20241125015855-1536c3970f8f
 	sigs.k8s.io/cluster-inventory-api v0.0.0-20240730014211-ef0154379848
-	sigs.k8s.io/controller-runtime v0.19.1
+	sigs.k8s.io/controller-runtime v0.19.2
 	sigs.k8s.io/kube-storage-version-migrator v0.0.6-0.20230721195810-5c8923c5ff96
 	sigs.k8s.io/yaml v1.4.0
 )
@@ -153,7 +153,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/kms v0.31.2 // indirect
+	k8s.io/kms v0.31.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.30.3 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect

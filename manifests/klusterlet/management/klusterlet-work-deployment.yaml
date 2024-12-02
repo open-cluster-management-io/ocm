@@ -76,7 +76,6 @@ spec:
           {{end}}
           - "--terminate-on-files=/spoke/hub-kubeconfig/kubeconfig"
           {{if eq .Replica 1}}
-          - "--disable-leader-election"
           - "--status-sync-interval=60s"
           {{end}}
           {{if gt .WorkKubeAPIQPS 0.0}}
@@ -107,6 +106,10 @@ spec:
           readOnly: true
         - name: tmpdir
           mountPath: /tmp
+        {{if and .RegistrationDriver .RegistrationDriver.AuthType (eq .RegistrationDriver.AuthType "awsirsa")}}
+        - name: dot-aws
+          mountPath: /.aws
+        {{end}}
         {{if eq .InstallMode "Hosted"}}
         - name: spoke-kubeconfig-secret
           mountPath: "/spoke/config"
@@ -147,6 +150,10 @@ spec:
           secretName: {{ .HubKubeConfigSecret }}
       - name: tmpdir
         emptyDir: { }
+      {{if and .RegistrationDriver .RegistrationDriver.AuthType (eq .RegistrationDriver.AuthType "awsirsa")}}
+      - name: dot-aws
+        emptyDir: { }
+      {{end}}
       {{if eq .InstallMode "Hosted"}}
       - name: spoke-kubeconfig-secret
         secret:

@@ -259,7 +259,7 @@ func (o *WorkAgentConfig) newWorkClientAndInformer(
 
 	// For cloudevents work client, we use the informer store as the client store
 	if watcherStore != nil {
-		watcherStore.SetStore(informer.Informer().GetStore())
+		watcherStore.SetInformer(informer.Informer())
 	}
 
 	return hubHost, workClient.WorkV1().ManifestWorks(o.agentOptions.SpokeClusterName), informer, nil
