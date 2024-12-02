@@ -169,13 +169,19 @@ type HealthProber struct {
 }
 
 type AddonHealthCheckFunc func(workapiv1.ResourceIdentifier, workapiv1.StatusFeedbackResult) error
+type AddonHealthCheckerFunc func([]FieldResult, *clusterv1.ManagedCluster, *addonapiv1alpha1.ManagedClusterAddOn) error
 
 type WorkHealthProber struct {
 	// ProbeFields tells addon framework what field to probe
 	ProbeFields []ProbeField
 
-	// HealthCheck check status of the addon based on probe result.
+	// HealthCheck is deprecated and will be removed in the future. please use HealthChecker instead.
+	// HealthCheck will be ignored if HealthChecker is set.
+	// HealthCheck check status of the addon based on each probeField result.
 	HealthCheck AddonHealthCheckFunc
+
+	// HealthChecker check status of the addon based of all results of probeFields
+	HealthChecker AddonHealthCheckerFunc
 }
 
 // ProbeField defines the field of a resource to be probed
@@ -185,6 +191,15 @@ type ProbeField struct {
 
 	// ProbeRules sets the rules to probe the field
 	ProbeRules []workapiv1.FeedbackRule
+}
+
+// FieldResult defines the result of the filed
+type FieldResult struct {
+	// ResourceIdentifier sets what resource of the FeedbackResult
+	ResourceIdentifier workapiv1.ResourceIdentifier
+
+	// feedbackResult is the StatusFeedbackResult of the resource
+	FeedbackResult workapiv1.StatusFeedbackResult
 }
 
 type HealthProberType string

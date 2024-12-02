@@ -8,9 +8,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	workapiv1 "open-cluster-management.io/api/work/v1"
-
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/api/addon/v1alpha1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
 // DeploymentProber is to check the addon status based on status
@@ -33,6 +34,32 @@ func NewDeploymentProber(deployments ...types.NamespacedName) *agent.HealthProbe
 		WorkProber: &agent.WorkHealthProber{
 			ProbeFields: probeFields,
 			HealthCheck: DeploymentAvailabilityHealthCheck,
+		},
+	}
+}
+
+func NewAllDeploymentsProber() *agent.HealthProber {
+	probeFields := []agent.ProbeField{
+		{
+			ResourceIdentifier: workapiv1.ResourceIdentifier{
+				Group:     "apps",
+				Resource:  "deployments",
+				Name:      "*",
+				Namespace: "*",
+			},
+			ProbeRules: []workapiv1.FeedbackRule{
+				{
+					Type: workapiv1.WellKnownStatusType,
+				},
+			},
+		},
+	}
+
+	return &agent.HealthProber{
+		Type: agent.HealthProberTypeWork,
+		WorkProber: &agent.WorkHealthProber{
+			ProbeFields:   probeFields,
+			HealthChecker: AllDeploymentsAvailabilityHealthCheck,
 		},
 	}
 }
@@ -60,6 +87,20 @@ func (d *DeploymentProber) ProbeFields() []agent.ProbeField {
 func DeploymentAvailabilityHealthCheck(identifier workapiv1.ResourceIdentifier,
 	result workapiv1.StatusFeedbackResult) error {
 	return WorkloadAvailabilityHealthCheck(identifier, result)
+}
+
+func AllDeploymentsAvailabilityHealthCheck(results []agent.FieldResult,
+	cluster *clusterv1.ManagedCluster, addon *v1alpha1.ManagedClusterAddOn) error {
+	if len(results) < 2 {
+		return fmt.Errorf("all deployments are not available")
+	}
+
+	for _, result := range results {
+		if err := WorkloadAvailabilityHealthCheck(result.ResourceIdentifier, result.FeedbackResult); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func WorkloadAvailabilityHealthCheck(identifier workapiv1.ResourceIdentifier,
