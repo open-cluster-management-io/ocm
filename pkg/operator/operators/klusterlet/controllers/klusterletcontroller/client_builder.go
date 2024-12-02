@@ -36,7 +36,7 @@ type managedClusterClients struct {
 	// Only used for Hosted mode to generate managed cluster kubeconfig
 	// with minimum permission for registration and work.
 	kubeconfig                   *rest.Config
-	kubeconfigSecretCreationTime *metav1.Time
+	kubeconfigSecretCreationTime metav1.Time
 }
 
 type managedClusterClientsBuilder struct {
@@ -106,7 +106,7 @@ func (m *managedClusterClientsBuilder) build(ctx context.Context) (*managedClust
 
 	clients := &managedClusterClients{
 		kubeconfig:                   managedKubeConfig,
-		kubeconfigSecretCreationTime: &creationTime,
+		kubeconfigSecretCreationTime: creationTime,
 	}
 
 	if clients.kubeClient, err = kubernetes.NewForConfig(managedKubeConfig); err != nil {

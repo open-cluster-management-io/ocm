@@ -20,7 +20,7 @@ import (
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
-	amindex "open-cluster-management.io/ocm/pkg/addon/index"
+	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 )
 
 func TestAddonInstallReconcile(t *testing.T) {
@@ -230,7 +230,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 
 			err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
 				cache.Indexers{
-					amindex.ManagedClusterAddonByName: amindex.IndexManagedClusterAddonByName,
+					addonindex.ManagedClusterAddonByName: addonindex.IndexManagedClusterAddonByName,
 				})
 			if err != nil {
 				t.Fatal(err)

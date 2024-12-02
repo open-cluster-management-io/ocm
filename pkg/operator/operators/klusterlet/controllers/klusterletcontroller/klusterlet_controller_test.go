@@ -1561,7 +1561,7 @@ func (f *fakeManagedClusterBuilder) build(_ context.Context) (*managedClusterCli
 				CAData: []byte("test"),
 			},
 		},
-		kubeconfigSecretCreationTime: &creationTime,
+		kubeconfigSecretCreationTime: creationTime,
 	}, nil
 }
 
