@@ -62,12 +62,15 @@ REGISTRATION_IMAGE ?= $(IMAGE_REGISTRY)/registration:$(IMAGE_TAG)
 PLACEMENT_IMAGE ?= $(IMAGE_REGISTRY)/placement:$(IMAGE_TAG)
 # ADDON_MANAGER_IMAGE can be set in the env to override calculated value
 ADDON_MANAGER_IMAGE ?= $(IMAGE_REGISTRY)/addon-manager:$(IMAGE_TAG)
+# AWS_CLI_IMAGE can be set in the env to override calculated value
+AWS_CLI_IMAGE ?= $(IMAGE_REGISTRY)/aws-cli:$(IMAGE_TAG)
 
 $(call build-image,registration,$(REGISTRATION_IMAGE),./build/Dockerfile.registration,.)
 $(call build-image,work,$(WORK_IMAGE),./build/Dockerfile.work,.)
 $(call build-image,placement,$(PLACEMENT_IMAGE),./build/Dockerfile.placement,.)
 $(call build-image,registration-operator,$(OPERATOR_IMAGE_NAME),./build/Dockerfile.registration-operator,.)
 $(call build-image,addon-manager,$(ADDON_MANAGER_IMAGE),./build/Dockerfile.addon,.)
+$(call build-image,aws-cli,$(AWS_CLI_IMAGE),./build/Dockerfile.aws-cli,.)
 
 copy-crd:
 	bash -x hack/copy-crds.sh $(YAML_PATCH)
