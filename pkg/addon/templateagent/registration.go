@@ -10,11 +10,11 @@ import (
 	"time"
 
 	openshiftcrypto "github.com/openshift/library-go/pkg/crypto"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/pkg/errors"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -357,7 +357,7 @@ func (a *CRDTemplateAgentAddon) TemplatePermissionConfigFunc() agent.PermissionC
 					continue
 				}
 
-				err := a.createKubeClientPermissions(template.Name, kcrc, cluster, addon)
+				err := a.createKubeClientPermissions(kcrc, cluster, addon)
 				if err != nil {
 					return err
 				}
@@ -376,7 +376,6 @@ func (a *CRDTemplateAgentAddon) TemplatePermissionConfigFunc() agent.PermissionC
 }
 
 func (a *CRDTemplateAgentAddon) createKubeClientPermissions(
-	templateName string,
 	kcrc *addonapiv1alpha1.KubeClientRegistrationConfig,
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn,
@@ -409,8 +408,7 @@ func (a *CRDTemplateAgentAddon) createKubeClientPermissions(
 				APIGroup: rbacv1.GroupName,
 				Name:     pc.CurrentCluster.ClusterRoleName,
 			}
-			err := a.createPermissionBinding(templateName,
-				cluster.Name, addon.Name, cluster.Name, roleRef, &owner)
+			err := a.createPermissionBinding(cluster.Name, addon.Name, cluster.Name, roleRef, &owner)
 			if err != nil {
 				return err
 			}
@@ -421,8 +419,8 @@ func (a *CRDTemplateAgentAddon) createKubeClientPermissions(
 
 			// set owner reference nil since the rolebinding has different namespace with the ManagedClusterAddon
 			// TODO: cleanup the rolebinding when the addon is deleted
-			err := a.createPermissionBinding(templateName,
-				cluster.Name, addon.Name, pc.SingleNamespace.Namespace, pc.SingleNamespace.RoleRef, nil)
+			err := a.createPermissionBinding(cluster.Name, addon.Name,
+				pc.SingleNamespace.Namespace, pc.SingleNamespace.RoleRef, nil)
 			if err != nil {
 				return err
 			}
@@ -431,16 +429,9 @@ func (a *CRDTemplateAgentAddon) createKubeClientPermissions(
 	return nil
 }
 
-func (a *CRDTemplateAgentAddon) createPermissionBinding(templateName, clusterName, addonName, namespace string,
+func (a *CRDTemplateAgentAddon) createPermissionBinding(clusterName, addonName, namespace string,
 	roleRef rbacv1.RoleRef, owner *metav1.OwnerReference) error {
-	// TODO: confirm the group
-	groups := agent.DefaultGroups(clusterName, addonName)
-	subject := []rbacv1.Subject{}
-	for _, group := range groups {
-		subject = append(subject, rbacv1.Subject{
-			Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: group,
-		})
-	}
+
 	binding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("open-cluster-management:%s:%s:agent",
@@ -451,27 +442,29 @@ func (a *CRDTemplateAgentAddon) createPermissionBinding(templateName, clusterNam
 				AddonTemplateLabelKey:          "",
 			},
 		},
-		RoleRef:  roleRef,
-		Subjects: subject,
+		RoleRef: roleRef,
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:     rbacv1.GroupKind,
+				APIGroup: rbacv1.GroupName,
+				Name:     clusterAddonGroup(clusterName, addonName),
+			},
+		},
 	}
 	if owner != nil {
 		binding.OwnerReferences = []metav1.OwnerReference{*owner}
 	}
-	_, err := a.rolebindingLister.RoleBindings(namespace).Get(binding.Name)
-	switch {
-	case err == nil:
-		// TODO: update the rolebinding if it is not the same
-		a.logger.Info("Rolebinding already exists", "rolebindingName", binding.Name)
-		return nil
-	case apierrors.IsNotFound(err):
-		_, createErr := a.hubKubeClient.RbacV1().RoleBindings(namespace).Create(
-			context.TODO(), binding, metav1.CreateOptions{})
-		if createErr != nil && !apierrors.IsAlreadyExists(createErr) {
-			return createErr
-		}
-	case err != nil:
-		return err
-	}
 
-	return nil
+	_, modified, err := resourceapply.ApplyRoleBinding(context.TODO(),
+		a.hubKubeClient.RbacV1(), a.eventRecorder, binding)
+	if err == nil && modified {
+		a.logger.Info("Rolebinding for addon updated", "namespace", binding.Namespace, "name", binding.Name,
+			"clusterName", clusterName, "addonName", addonName)
+	}
+	return err
+}
+
+// clusterAddonGroup returns the group that represents the addon for the cluster
+func clusterAddonGroup(clusterName, addonName string) string {
+	return fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", clusterName, addonName)
 }

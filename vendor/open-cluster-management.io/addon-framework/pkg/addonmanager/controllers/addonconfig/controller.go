@@ -71,6 +71,8 @@ func NewAddonConfigController(
 			return []string{key}
 		}, addonInformers.Informer()).
 		WithBareInformers(configInformers...).
+		// clusterManagementAddonLister is used, so wait for cache sync
+		WithBareInformers(clusterManagementAddonInformers.Informer()).
 		WithSync(c.sync).ToController(controllerName)
 }
 
