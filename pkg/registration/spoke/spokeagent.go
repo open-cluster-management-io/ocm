@@ -45,6 +45,7 @@ import (
 var AddOnLeaseControllerSyncInterval = 30 * time.Second
 
 const AwsIrsaAuthType = "awsirsa"
+const CsrAuthType = "csr"
 
 type SpokeAgentConfig struct {
 	agentOptions       *commonoptions.AgentOptions
@@ -430,14 +431,6 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		return fmt.Errorf("failed to create CSR option: %w", err)
 	}
 
-	// create another RegisterController for registration credential rotation
-	controllerName := fmt.Sprintf("RegisterController@cluster:%s", o.agentOptions.SpokeClusterName)
-	secretController := register.NewSecretController(
-		secretOption, csrOption, o.driver, registration.GenerateStatusUpdater(
-			hubClusterClient,
-			hubClusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-			o.agentOptions.SpokeClusterName), recorder, controllerName)
-
 	// create ManagedClusterLeaseController to keep the spoke cluster heartbeat
 	managedClusterLeaseController := lease.NewManagedClusterLeaseController(
 		o.agentOptions.SpokeClusterName,
@@ -517,6 +510,18 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		)
 	}
 
+	if o.registrationOption.RegistrationAuth == CsrAuthType {
+		// create another RegisterController for registration credential rotation
+		controllerName := fmt.Sprintf("RegisterController@cluster:%s", o.agentOptions.SpokeClusterName)
+		secretController := register.NewSecretController(
+			secretOption, csrOption, o.driver, registration.GenerateStatusUpdater(
+				hubClusterClient,
+				hubClusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
+				o.agentOptions.SpokeClusterName), recorder, controllerName)
+
+		go secretController.Run(ctx, 1)
+	}
+
 	go hubKubeInformerFactory.Start(ctx.Done())
 	go hubClusterInformerFactory.Start(ctx.Done())
 	go namespacedManagementKubeInformerFactory.Start(ctx.Done())
@@ -527,7 +532,6 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		go spokeClusterInformerFactory.Start(ctx.Done())
 	}
 
-	go secretController.Run(ctx, 1)
 	go managedClusterLeaseController.Run(ctx, 1)
 	go managedClusterHealthCheckController.Run(ctx, 1)
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.AddonManagement) {
