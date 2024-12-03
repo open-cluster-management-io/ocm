@@ -28,6 +28,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/addon/controllers/addontemplate"
 	"open-cluster-management.io/ocm/pkg/addon/controllers/cmainstallprogression"
 	"open-cluster-management.io/ocm/pkg/addon/controllers/cmamanagedby"
+	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 )
 
 func RunManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
@@ -58,7 +59,7 @@ func RunManager(ctx context.Context, controllerContext *controllercmd.Controller
 	}
 
 	clusterInformerFactory := clusterinformers.NewSharedInformerFactory(hubClusterClient, 30*time.Minute)
-	addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
+	addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 10*time.Minute)
 	workInformers := workv1informers.NewSharedInformerFactoryWithOptions(workClient, 10*time.Minute,
 		workv1informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
 			selector := &metav1.LabelSelector{
@@ -112,8 +113,8 @@ func RunControllerManagerWithInformers(
 
 	err = addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
 		cache.Indexers{
-			index.ManagedClusterAddonByNamespace: index.IndexManagedClusterAddonByNamespace, // addonDeployController
-			index.ManagedClusterAddonByName:      index.IndexManagedClusterAddonByName,      // addonConfigController
+			addonindex.ManagedClusterAddonByName: addonindex.IndexManagedClusterAddonByName, // addonConfigurationController, addonManagementController
+			index.ManagedClusterAddonByNamespace: index.IndexManagedClusterAddonByNamespace, // agentDeployController
 			index.AddonByConfig:                  index.IndexAddonByConfig,                  // addonConfigController
 		},
 	)
@@ -124,8 +125,8 @@ func RunControllerManagerWithInformers(
 	// managementAddonConfigController
 	err = addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
 		cache.Indexers{
-			index.ClusterManagementAddonByConfig:    index.IndexClusterManagementAddonByConfig,
-			index.ClusterManagementAddonByPlacement: index.IndexClusterManagementAddonByPlacement,
+			addonindex.ClusterManagementAddonByPlacement: addonindex.IndexClusterManagementAddonByPlacement, // addonConfigurationController, addonManagementController
+			index.ClusterManagementAddonByConfig:         index.IndexClusterManagementAddonByConfig,         // cmaConfigController
 		})
 	if err != nil {
 		return err
@@ -192,6 +193,8 @@ func RunControllerManagerWithInformers(
 		hubWorkClient,
 		addonInformers,
 		clusterInformers,
+		// can share the same dynamic informers for different template type addons since
+		// these addons only support addontemplate and addondeploymentconfig
 		dynamicInformers,
 		workinformers,
 		controllerContext.EventRecorder,

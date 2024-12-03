@@ -14,7 +14,6 @@ import (
 	"k8s.io/klog/v2/ktesting"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
-	"open-cluster-management.io/addon-framework/pkg/index"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
@@ -24,6 +23,7 @@ import (
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
+	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 )
 
@@ -687,7 +687,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 
 			err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
 				cache.Indexers{
-					index.ManagedClusterAddonByName: index.IndexManagedClusterAddonByName,
+					addonindex.ManagedClusterAddonByName: addonindex.IndexManagedClusterAddonByName,
 				})
 			if err != nil {
 				t.Fatal(err)

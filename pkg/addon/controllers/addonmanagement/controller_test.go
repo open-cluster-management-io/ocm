@@ -12,7 +12,6 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	"open-cluster-management.io/addon-framework/pkg/index"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
@@ -20,6 +19,8 @@ import (
 	fakecluster "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+
+	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 )
 
 func TestAddonInstallReconcile(t *testing.T) {
@@ -229,7 +230,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 
 			err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
 				cache.Indexers{
-					index.ManagedClusterAddonByName: index.IndexManagedClusterAddonByName,
+					addonindex.ManagedClusterAddonByName: addonindex.IndexManagedClusterAddonByName,
 				})
 			if err != nil {
 				t.Fatal(err)
