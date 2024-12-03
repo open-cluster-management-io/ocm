@@ -15,3 +15,6 @@ subjects:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
     name: system:open-cluster-management:{{ .ManagedClusterName }}
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: open-cluster-management:{{ .ManagedClusterName }}
