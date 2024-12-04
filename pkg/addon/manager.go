@@ -58,7 +58,7 @@ func RunManager(ctx context.Context, controllerContext *controllercmd.Controller
 	}
 
 	clusterInformerFactory := clusterinformers.NewSharedInformerFactory(hubClusterClient, 30*time.Minute)
-	addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
+	addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 10*time.Minute)
 	workInformers := workv1informers.NewSharedInformerFactoryWithOptions(workClient, 10*time.Minute,
 		workv1informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
 			selector := &metav1.LabelSelector{
@@ -112,9 +112,7 @@ func RunControllerManagerWithInformers(
 
 	err = addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
 		cache.Indexers{
-			index.ManagedClusterAddonByNamespace: index.IndexManagedClusterAddonByNamespace, // addonDeployController
-			index.ManagedClusterAddonByName:      index.IndexManagedClusterAddonByName,      // addonConfigController
-			index.AddonByConfig:                  index.IndexAddonByConfig,                  // addonConfigController
+			index.ManagedClusterAddonByName: index.IndexManagedClusterAddonByName, // addonConfigurationController, addonManagementController
 		},
 	)
 	if err != nil {
@@ -124,8 +122,7 @@ func RunControllerManagerWithInformers(
 	// managementAddonConfigController
 	err = addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
 		cache.Indexers{
-			index.ClusterManagementAddonByConfig:    index.IndexClusterManagementAddonByConfig,
-			index.ClusterManagementAddonByPlacement: index.IndexClusterManagementAddonByPlacement,
+			index.ClusterManagementAddonByPlacement: index.IndexClusterManagementAddonByPlacement, // addonConfigurationController, addonManagementController
 		})
 	if err != nil {
 		return err

@@ -18,8 +18,8 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
+	"open-cluster-management.io/addon-framework/pkg/index"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
@@ -50,6 +50,7 @@ type addonTemplateController struct {
 	dynamicInformers  dynamicinformer.DynamicSharedInformerFactory
 	workInformers     workv1informers.SharedInformerFactory
 	runControllerFunc runController
+	eventRecorder     events.Recorder
 }
 
 type runController func(ctx context.Context, addonName string) error
@@ -78,6 +79,7 @@ func NewAddonTemplateController(
 		clusterInformers: clusterInformers,
 		dynamicInformers: dynamicInformers,
 		workInformers:    workInformers,
+		eventRecorder:    recorder,
 	}
 
 	if len(runController) > 0 {
@@ -89,6 +91,11 @@ func NewAddonTemplateController(
 	return factory.New().WithInformersQueueKeysFunc(
 		queue.QueueKeyByMetaNamespaceName,
 		addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer()).
+		WithBareInformers(
+			// do not need to queue, just make sure the controller reconciles after the addonTemplate cache is synced
+			// otherwise, there will be "xx-addon-template" not found" errors in the log as the controller uses the
+			// addonTemplate lister to get the template object
+			addonInformers.Addon().V1alpha1().AddOnTemplates().Informer()).
 		WithSync(c.sync).
 		ToController("addon-template-controller", recorder)
 }
@@ -186,7 +193,7 @@ func (c *addonTemplateController) runController(
 			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
 		}),
 	)
-	getValuesClosure := func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+	getValuesClosure := func(cluster *clusterv1.ManagedCluster, addon *addonv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
 		return templateagent.GetAddOnRegistriesPrivateValuesFromClusterAnnotation(klog.FromContext(ctx), cluster, addon)
 	}
 	agentAddon := templateagent.NewCRDTemplateAgentAddon(
@@ -194,8 +201,9 @@ func (c *addonTemplateController) runController(
 		addonName,
 		c.kubeClient,
 		c.addonClient,
-		c.addonInformers,
+		c.addonInformers, // use the shared informers, whose cache is synced already
 		kubeInformers.Rbac().V1().RoleBindings().Lister(),
+		c.eventRecorder,
 		// image overrides from cluster annotation has lower priority than from the addonDeploymentConfig
 		getValuesClosure,
 		addonfactory.GetAddOnDeploymentConfigValues(
@@ -211,13 +219,34 @@ func (c *addonTemplateController) runController(
 		return err
 	}
 
+	// not share the addon informers
+	addonInformerFactory := addoninformers.NewSharedInformerFactory(c.addonClient, 10*time.Minute)
+	err = addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
+		cache.Indexers{
+			index.ManagedClusterAddonByNamespace: index.IndexManagedClusterAddonByNamespace, // agentDeployController
+			index.AddonByConfig:                  index.IndexAddonByConfig,                  // addonConfigController
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	// managementAddonConfigController
+	err = addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
+		cache.Indexers{
+			index.ClusterManagementAddonByConfig: index.IndexClusterManagementAddonByConfig, // cmaConfigController
+		})
+	if err != nil {
+		return err
+	}
 	err = mgr.StartWithInformers(ctx, c.workClient, c.workInformers.Work().V1().ManifestWorks(),
-		kubeInformers, c.addonInformers, c.clusterInformers, c.dynamicInformers)
+		kubeInformers, addonInformerFactory, c.clusterInformers, c.dynamicInformers)
 	if err != nil {
 		return err
 	}
 
 	kubeInformers.Start(ctx.Done())
+	addonInformerFactory.Start(ctx.Done())
 
 	return nil
 }
