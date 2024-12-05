@@ -20,7 +20,6 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/valyala/fasttemplate v1.2.2
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
-	golang.org/x/net v0.31.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.16.3
 	k8s.io/api v0.31.3
@@ -137,6 +136,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.29.0 // indirect
+	golang.org/x/net v0.31.0 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
 	golang.org/x/sync v0.9.0 // indirect
 	golang.org/x/sys v0.27.0 // indirect
