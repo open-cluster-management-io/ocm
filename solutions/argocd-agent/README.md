@@ -81,11 +81,11 @@ Refer to the [Additional Resources](#additional-resources) for more details.
 
 ## Setup Guide
 
-Clone the `ocm` repo:
+Clone the `addon-contrib` repo:
 
 ```shell
 git clone git@github.com:open-cluster-management-io/addon-contrib.git
-cd argocd-agent-addon
+cd addon-contrib/argocd-agent-addon
 ```
 
 ### Deploy Argo CD on the Hub Cluster
@@ -114,6 +114,8 @@ argocd-repo-server-7fcd864f4c-vpfst                 1/1     Running   0         
 argocd-server-85db89dd5-qbgsm                       1/1     Running   0          31s
 ```
 
+This may take a few minutes to complete.
+
 ### Deploy OCM Argo CD AddOn on the Hub Cluster
 
 Deploy the OCM Argo CD AddOn on the hub cluster.
@@ -134,6 +136,8 @@ NAMESPACE   NAME           AVAILABLE   DEGRADED   PROGRESSING
 cluster1    argocd         True                   False
 ```
 
+This may take a few minutes to complete.
+
 ### Deploy OCM Argo CD Agent AddOn on the Hub Cluster
 
 To deploy the OCM Argo CD Agent AddOn on the hub cluster, follow the steps below. This process deploys:
@@ -144,13 +148,34 @@ Run the following `helm` command:
 
 ```shell
 helm -n argocd install argocd-agent-addon charts/argocd-agent-addon \
-  --set-file agent.secrets.cacrt=/tmp/ca.crt \
-  --set-file agent.secrets.tlscrt=/tmp/tls.crt \
-  --set-file agent.secrets.tlskey=/tmp/tls.key \
-  --set-file agent.secrets.jwtkey=/tmp/jwt.key \
-  --set agent.principal.server.address="<address>" \
-  --set agent.mode="managed" # or "autonomous"
+  --set-file agent.secrets.cacrt=/tmp/ca.crt \ # Path to the CA certificate file
+  --set-file agent.secrets.tlscrt=/tmp/tls.crt \ # Path to the TLS certificate file
+  --set-file agent.secrets.tlskey=/tmp/tls.key \ # Path to the TLS key file
+  --set-file agent.secrets.jwtkey=/tmp/jwt.key \ # Path to the JWT signing key file
+  --set agent.principal.server.address="172.18.255.201" \ # Address of the principal server
+  --set agent.mode="managed" # or "autonomous" for autonomous mode
 ```
+
+Validate that the Argo CD Agent principal pod is running:
+
+```shell
+kubectl -n open-cluster-management-hub get pod
+
+NAME                                                       READY   STATUS    RESTARTS   AGE
+argocd-agent-principal-5c47c7c6d5-mpts4                    1/1     Running   0          88s
+```
+
+Validate that the Argo CD Agent Addon is successfully deployed and available:
+
+```shell
+kubectl get managedclusteraddon --all-namespaces
+
+NAMESPACE   NAME           AVAILABLE   DEGRADED   PROGRESSING
+cluster1    argocd         True                   False
+cluster1    argocd-agent   True                   False
+```
+
+This may take a few minutes to complete.
 
 **Notes:** 
 
