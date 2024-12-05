@@ -525,7 +525,10 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	go managedClusterHealthCheckController.Run(ctx, 1)
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.AddonManagement) {
 		go addOnLeaseController.Run(ctx, 1)
-		go addOnRegistrationController.Run(ctx, 1)
+		// addon controller will only run when the registration driver is csr.
+		if _, ok := registrationAuthOption.(*csr.CSROption); ok {
+			go addOnRegistrationController.Run(ctx, 1)
+		}
 	}
 
 	// start health checking of hub client certificate
