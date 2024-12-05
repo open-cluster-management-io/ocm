@@ -72,7 +72,6 @@ jobs:
           docker push quay.io/open-cluster-management/placement:${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }}
           docker push quay.io/open-cluster-management/registration-operator:${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }}
           docker push quay.io/open-cluster-management/addon-manager:${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }}
-          docker push quay.io/open-cluster-management/aws-cli:${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }}
   image-manifest:
     name: image manifest
     runs-on: ubuntu-latest
@@ -106,10 +105,6 @@ jobs:
           docker manifest create quay.io/open-cluster-management/registration-operator:${{ needs.env.outputs.RELEASE_VERSION }} \
             quay.io/open-cluster-management/registration-operator:${{ needs.env.outputs.RELEASE_VERSION }}-amd64 \
             quay.io/open-cluster-management/registration-operator:${{ needs.env.outputs.RELEASE_VERSION }}-arm64
-          # aws-cli
-          docker manifest create quay.io/open-cluster-management/aws-cli:${{ needs.env.outputs.RELEASE_VERSION }} \
-            quay.io/open-cluster-management/aws-cli:${{ needs.env.outputs.RELEASE_VERSION }}-amd64 \
-            quay.io/open-cluster-management/aws-cli:${{ needs.env.outputs.RELEASE_VERSION }}-arm64
       - name: annotate
         run: |
           # registration
@@ -137,11 +132,6 @@ jobs:
             quay.io/open-cluster-management/registration-operator:${{ needs.env.outputs.RELEASE_VERSION }}-amd64 --arch amd64
           docker manifest annotate quay.io/open-cluster-management/registration-operator:${{ needs.env.outputs.RELEASE_VERSION }} \
             quay.io/open-cluster-management/registration-operator:${{ needs.env.outputs.RELEASE_VERSION }}-arm64 --arch arm64
-          # aws-cli
-          docker manifest annotate quay.io/open-cluster-management/aws-cli:${{ needs.env.outputs.RELEASE_VERSION }} \
-            quay.io/open-cluster-management/aws-cli:${{ needs.env.outputs.RELEASE_VERSION }}-amd64 --arch amd64
-          docker manifest annotate quay.io/open-cluster-management/aws-cli:${{ needs.env.outputs.RELEASE_VERSION }} \
-            quay.io/open-cluster-management/aws-cli:${{ needs.env.outputs.RELEASE_VERSION }}-arm64 --arch arm64
       - name: push
         run: |
           docker manifest push quay.io/open-cluster-management/registration:${{ needs.env.outputs.RELEASE_VERSION }}
@@ -149,4 +139,3 @@ jobs:
           docker manifest push quay.io/open-cluster-management/placement:${{ needs.env.outputs.RELEASE_VERSION }}
           docker manifest push quay.io/open-cluster-management/addon-manager:${{ needs.env.outputs.RELEASE_VERSION }}
           docker manifest push quay.io/open-cluster-management/registration-operator:${{ needs.env.outputs.RELEASE_VERSION }}
-          docker manifest push quay.io/open-cluster-management/aws-cli:${{ needs.env.outputs.RELEASE_VERSION }}
