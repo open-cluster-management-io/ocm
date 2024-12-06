@@ -1,0 +1,144 @@
+# the permission is copied from https://kueue.sigs.k8s.io/docs/tasks/manage/setup_multikueue/
+apiVersion: rbac.open-cluster-management.io/v1alpha1
+kind: ClusterPermission
+metadata:
+  name: kueue-admin-CLUSTER_NAME
+  namespace: CLUSTER_NAME
+spec:
+  clusterRole:
+    rules:
+    - apiGroups:
+      - batch
+      resources:
+      - jobs
+      verbs:
+      - create
+      - delete
+      - get
+      - list
+      - watch
+    - apiGroups:
+      - batch
+      resources:
+      - jobs/status
+      verbs:
+      - get
+    - apiGroups:
+      - jobset.x-k8s.io
+      resources:
+      - jobsets
+      verbs:
+      - create
+      - delete
+      - get
+      - list
+      - watch
+    - apiGroups:
+      - jobset.x-k8s.io
+      resources:
+      - jobsets/status
+      verbs:
+      - get
+    - apiGroups:
+      - kueue.x-k8s.io
+      resources:
+      - workloads
+      verbs:
+      - create
+      - delete
+      - get
+      - list
+      - watch
+    - apiGroups:
+      - kueue.x-k8s.io
+      resources:
+      - workloads/status
+      verbs:
+      - get
+      - patch
+      - update
+    - apiGroups:
+      - kubeflow.org
+      resources:
+      - tfjobs
+      verbs:
+      - create
+      - delete
+      - get
+      - list
+      - watch
+    - apiGroups:
+      - kubeflow.org
+      resources:
+      - tfjobs/status
+      verbs:
+      - get
+    - apiGroups:
+      - kubeflow.org
+      resources:
+      - paddlejobs
+      verbs:
+      - create
+      - delete
+      - get
+      - list
+      - watch
+    - apiGroups:
+      - kubeflow.org
+      resources:
+      - paddlejobs/status
+      verbs:
+      - get
+    - apiGroups:
+      - kubeflow.org
+      resources:
+      - pytorchjobs
+      verbs:
+      - create
+      - delete
+      - get
+      - list
+      - watch
+    - apiGroups:
+      - kubeflow.org
+      resources:
+      - pytorchjobs/status
+      verbs:
+      - get
+    - apiGroups:
+      - kubeflow.org
+      resources:
+      - xgboostjobs
+      verbs:
+      - create
+      - delete
+      - get
+      - list
+      - watch
+    - apiGroups:
+      - kubeflow.org
+      resources:
+      - xgboostjobs/status
+      verbs:
+      - get
+    - apiGroups:
+      - kubeflow.org
+      resources:
+      - mpijobs
+      verbs:
+      - create
+      - delete
+      - get
+      - list
+      - watch
+    - apiGroups:
+      - kubeflow.org
+      resources:
+      - mpijobs/status
+      verbs:
+      - get
+  clusterRoleBinding:
+    subject:
+      kind: ServiceAccount
+      name: kueue-admin-CLUSTER_NAME
+      namespace: open-cluster-management-agent-addon

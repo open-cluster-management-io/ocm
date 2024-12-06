@@ -40,7 +40,7 @@ spec:
     kind: MultiKueueConfig
     name: multikueue-config-demo1
 ---
-apiVersion: kueue.x-k8s.io/v1alpha1
+apiVersion: kueue.x-k8s.io/v1beta1
 kind: MultiKueueConfig
 metadata:
   name:  multikueue-config-demo1
@@ -49,7 +49,7 @@ spec:
   - multikueue-demo1-cluster1
   - multikueue-demo1-cluster2
 ---
-apiVersion: kueue.x-k8s.io/v1alpha1
+apiVersion: kueue.x-k8s.io/v1beta1
 kind: MultiKueueCluster
 metadata:
   name: multikueue-demo1-cluster1
@@ -61,7 +61,7 @@ spec:
     # controller manager runs into, holding the kubeConfig needed to connect to the
     # worker cluster in the "kubeconfig" key;
 ---
-apiVersion: kueue.x-k8s.io/v1alpha1
+apiVersion: kueue.x-k8s.io/v1beta1
 kind: MultiKueueCluster
 metadata:
   name: multikueue-demo1-cluster2
