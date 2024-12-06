@@ -148,11 +148,11 @@ Run the following `helm` command:
 
 ```shell
 helm -n argocd install argocd-agent-addon charts/argocd-agent-addon \
-  --set-file agent.secrets.cacrt=/tmp/ca.crt \ # Path to the CA certificate file
-  --set-file agent.secrets.tlscrt=/tmp/tls.crt \ # Path to the TLS certificate file
-  --set-file agent.secrets.tlskey=/tmp/tls.key \ # Path to the TLS key file
-  --set-file agent.secrets.jwtkey=/tmp/jwt.key \ # Path to the JWT signing key file
-  --set agent.principal.server.address="172.18.255.201" \ # Address of the principal server
+  --set-file agent.secrets.cacrt=/tmp/ca.crt \
+  --set-file agent.secrets.tlscrt=/tmp/tls.crt \
+  --set-file agent.secrets.tlskey=/tmp/tls.key \
+  --set-file agent.secrets.jwtkey=/tmp/jwt.key \
+  --set agent.principal.server.address="172.18.255.201" \
   --set agent.mode="managed" # or "autonomous" for autonomous mode
 ```
 
@@ -211,7 +211,7 @@ kubectl -n open-cluster-management-hub edit secret argocd-agent-principal-userpa
 
 ```shell
 # kubectl config use-context <managed-cluster>
-kubectl -n argocd argocd-agent-agent-userpass
+kubectl -n argocd edit secret argocd-agent-agent-userpass
 ```
 
 See [gen-creds.sh](https://github.com/argoproj-labs/argocd-agent/blob/main/hack/demo-env/gen-creds.sh)
