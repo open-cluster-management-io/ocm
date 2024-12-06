@@ -2,12 +2,13 @@ package registration_test
 
 import (
 	"fmt"
-	operatorv1 "open-cluster-management.io/api/operator/v1"
 	"path"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	operatorv1 "open-cluster-management.io/api/operator/v1"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
@@ -55,11 +56,13 @@ var _ = ginkgo.Describe("Cluster Annotations for aws", func() {
 			}
 
 			if mc.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+aws_irsa.ManagedClusterArn] != managedClusterArn {
-				return fmt.Errorf("expected annotation "+operatorv1.ClusterAnnotationsKeyPrefix+"/"+aws_irsa.ManagedClusterArn+" to be "+managedClusterArn+", got %s", mc.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+aws_irsa.ManagedClusterArn])
+				return fmt.Errorf("expected annotation "+operatorv1.ClusterAnnotationsKeyPrefix+"/"+aws_irsa.ManagedClusterArn+" to be "+
+					""+managedClusterArn+", got %s", mc.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+aws_irsa.ManagedClusterArn])
 			}
 
 			if mc.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+aws_irsa.ManagedClusterIAMRoleSuffix] != managedClusterRoleSuffix {
-				return fmt.Errorf("expected annotation "+operatorv1.ClusterAnnotationsKeyPrefix+"/"+aws_irsa.ManagedClusterIAMRoleSuffix+" to be "+managedClusterRoleSuffix+", got %s", mc.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+aws_irsa.ManagedClusterIAMRoleSuffix])
+				return fmt.Errorf("expected annotation "+operatorv1.ClusterAnnotationsKeyPrefix+"/"+aws_irsa.ManagedClusterIAMRoleSuffix+" "+
+					"to be "+managedClusterRoleSuffix+", got %s", mc.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+aws_irsa.ManagedClusterIAMRoleSuffix])
 			}
 
 			return nil
