@@ -3,24 +3,6 @@
     "op": "add",
     "path": "/rules/-",
     "value": {
-      "apiGroups": ["multicluster.x-k8s.io"],
-      "resources": ["clusterprofiles"],
-      "verbs": ["get", "list", "watch", "create", "update", "patch", "delete"]
-    }
-  },
-  {
-    "op": "add",
-    "path": "/rules/-",
-    "value": {
-      "apiGroups": ["multicluster.x-k8s.io"],
-      "resources": ["clusterprofiles/status"],
-      "verbs": ["update", "patch"]
-    }
-  },
-  {
-    "op": "add",
-    "path": "/rules/-",
-    "value": {
       "apiGroups": ["rbac.open-cluster-management.io"],
       "resources": ["clusterpermissions"],
       "verbs": ["get", "list", "watch", "create", "update", "patch", "delete"]
