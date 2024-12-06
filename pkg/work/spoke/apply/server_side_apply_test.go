@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/klog/v2"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
@@ -36,12 +38,14 @@ func TestServerSideApply(t *testing.T) {
 		validateActions func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
-			name:            "server side apply successfully",
-			owner:           metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
-			existing:        nil,
-			required:        testingcommon.NewUnstructured("v1", "Namespace", "", "test"),
-			gvr:             schema.GroupVersionResource{Version: "v1", Resource: "namespaces"},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {},
+			name:     "server side apply successfully",
+			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
+			existing: nil,
+			required: testingcommon.NewUnstructured("v1", "Namespace", "", "test"),
+			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "namespaces"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+			},
 		},
 		{
 			name:     "server side apply successfully conflict",
@@ -128,7 +132,17 @@ func (r *reactor) Handles(action clienttesting.Action) bool {
 func (r *reactor) React(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 	switch action.GetResource().Resource {
 	case "namespaces":
-		return true, testingcommon.NewUnstructured("v1", "Namespace", "", "test"), nil
+		return true, testingcommon.NewUnstructured(
+			"v1", "Namespace", "", "test",
+			metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner}), nil
+	case "deployments":
+		return true, testingcommon.NewUnstructured(
+			"apps/v1", "Deployment", "", "test",
+			metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner}), nil
+	case "configmaps":
+		return true, testingcommon.NewUnstructured(
+			"v1", "ConfigMap", "", "test",
+			metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner}), nil
 	case "secrets":
 		return true, nil, apierrors.NewApplyConflict([]metav1.StatusCause{
 			{
@@ -150,7 +164,7 @@ func TestRemoveCreationTime(t *testing.T) {
 	}{
 		{
 			name:     "remove creationTimestamp from a kube object",
-			required: newDeployment(),
+			required: newDeployment(2),
 			validateFunc: func(t *testing.T, obj *unstructured.Unstructured) {
 				_, existing, err := unstructured.NestedFieldCopy(obj.Object, "metadata", "creationTimestamp")
 				if err != nil {
@@ -199,16 +213,16 @@ func TestRemoveCreationTime(t *testing.T) {
 		},
 	}
 
+	logger := klog.NewKlogr()
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			removeCreationTimeFromMetadata(c.required.Object)
+			removeCreationTimeFromMetadata(c.required.Object, logger)
 			c.validateFunc(t, c.required)
 		})
 	}
 }
 
-func newDeployment() *unstructured.Unstructured {
-	var replicas int32 = 3
+func newDeployment(replicas int32) *unstructured.Unstructured {
 	deploy := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps/v1",
@@ -237,6 +251,7 @@ func newDeployment() *unstructured.Unstructured {
 	}
 
 	obj, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(deploy)
+	unstructured.RemoveNestedField(obj, "status")
 	return &unstructured.Unstructured{Object: obj}
 }
 
@@ -278,4 +293,252 @@ func newManifestWork() *unstructured.Unstructured {
 
 	obj, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(work)
 	return &unstructured.Unstructured{Object: obj}
+}
+
+func TestRemoveFieldByJSONPath(t *testing.T) {
+	cases := []struct {
+		name      string
+		req       *unstructured.Unstructured
+		exp       *unstructured.Unstructured
+		jsonPaths []string
+	}{
+		{
+			name: "remove a field",
+			req: &unstructured.Unstructured{Object: map[string]interface{}{
+				"spec": map[string]interface{}{
+					"name":     "name1",
+					"replicas": int64(1),
+				},
+			}},
+			exp: &unstructured.Unstructured{Object: map[string]interface{}{
+				"spec": map[string]interface{}{
+					"name": "name1",
+				},
+			}},
+			jsonPaths: []string{".spec.replicas"},
+		},
+		{
+			name: "remove multiple fields",
+			req: &unstructured.Unstructured{Object: map[string]interface{}{
+				"spec": map[string]interface{}{
+					"name":     "name1",
+					"replicas": int64(1),
+					"containers": []interface{}{
+						map[string]interface{}{
+							"image": "test",
+						},
+					},
+				},
+			}},
+			exp: &unstructured.Unstructured{Object: map[string]interface{}{
+				"spec": map[string]interface{}{
+					"name": "name1",
+				},
+			}},
+			jsonPaths: []string{".spec.replicas", ".spec.containers"},
+		},
+		{
+			name: "remove filtered fields",
+			req: &unstructured.Unstructured{Object: map[string]interface{}{
+				"spec": map[string]interface{}{
+					"name":     "name1",
+					"replicas": int64(1),
+					"containers": []interface{}{
+						map[string]interface{}{
+							"name":  "container1",
+							"image": "test",
+						},
+						map[string]interface{}{
+							"name":  "container2",
+							"image": "test",
+						},
+					},
+				},
+			}},
+			exp: &unstructured.Unstructured{Object: map[string]interface{}{
+				"spec": map[string]interface{}{
+					"replicas": int64(1),
+					"name":     "name1",
+					"containers": []interface{}{
+						map[string]interface{}{
+							"name": "container1",
+						},
+						map[string]interface{}{
+							"name":  "container2",
+							"image": "test",
+						},
+					},
+				},
+			}},
+			jsonPaths: []string{".spec.containers[?(@.name==\"container1\")].image"},
+		},
+		{
+			name: "list field is kept",
+			req: &unstructured.Unstructured{Object: map[string]interface{}{
+				"spec": map[string]interface{}{
+					"name":     "name1",
+					"replicas": int64(1),
+					"containers": []interface{}{
+						map[string]interface{}{
+							"name":  "container1",
+							"image": "test",
+						},
+						map[string]interface{}{
+							"name":  "container2",
+							"image": "test",
+						},
+					},
+				},
+			}},
+			exp: &unstructured.Unstructured{Object: map[string]interface{}{
+				"spec": map[string]interface{}{
+					"replicas": int64(1),
+					"name":     "name1",
+					"containers": []interface{}{
+						map[string]interface{}{
+							"name":  "container1",
+							"image": "test",
+						},
+						map[string]interface{}{
+							"name":  "container2",
+							"image": "test",
+						},
+					},
+				},
+			}},
+			jsonPaths: []string{".spec.containers[?(@.name==\"container1\")]"},
+		},
+	}
+	logger := klog.NewKlogr()
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			desired := c.req.DeepCopy()
+			for _, jsonPath := range c.jsonPaths {
+				removeFieldByJSONPath(desired.UnstructuredContent(), jsonPath, logger)
+			}
+			if !equality.Semantic.DeepEqual(c.exp, desired) {
+				t.Errorf("expected %v, got %v", c.exp, desired)
+			}
+		})
+	}
+}
+
+func TestServerSideApplyWithIgnoreFields(t *testing.T) {
+	cases := []struct {
+		name            string
+		existing        *unstructured.Unstructured
+		required        *unstructured.Unstructured
+		gvr             schema.GroupVersionResource
+		validateActions func(t *testing.T, actions []clienttesting.Action)
+		condition       workapiv1.IgnoreFieldsCondition
+		jsonPath        string
+	}{
+		{
+			name: "server side apply ignore replicas",
+			existing: testingcommon.NewUnstructuredWithContent(
+				"apps/v1", "Deployment", "default", "deploy1",
+				map[string]interface{}{
+					"spec": map[string]interface{}{
+						"replicas": int64(1),
+					},
+				}),
+			required: testingcommon.NewUnstructuredWithContent(
+				"apps/v1", "Deployment", "default", "deploy1",
+				map[string]interface{}{
+					"spec": map[string]interface{}{
+						"replicas": int64(2),
+					},
+				}),
+			gvr: schema.GroupVersionResource{Version: "v1", Group: "apps", Resource: "deployments"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "get", "patch")
+				p := actions[1].(clienttesting.PatchActionImpl).Patch
+				actual := &unstructured.Unstructured{}
+				err := actual.UnmarshalJSON(p)
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, exist, err := unstructured.NestedInt64(actual.Object, "spec", "replicas")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if exist {
+					t.Errorf("expected replicas to be removed in the patch")
+				}
+			},
+			condition: workapiv1.IgnoreFieldsConditionOnSpokePresent,
+			jsonPath:  ".spec.replicas",
+		},
+		{
+			name: "server side apply ignore update",
+			existing: func() *unstructured.Unstructured {
+				obj := testingcommon.NewUnstructuredWithContent(
+					"v1", "ConfigMap", "default", "test",
+					map[string]interface{}{
+						"data": map[string]interface{}{
+							"foo": "bar",
+						},
+					})
+				obj.SetAnnotations(map[string]string{
+					workapiv1.ManifestConfigSpecHashAnnotationKey: "4c07ba481d04e9c38e5ed3bf24139537",
+				})
+				return obj
+			}(),
+			required: testingcommon.NewUnstructuredWithContent(
+				"v1", "ConfigMap", "default", "test",
+				map[string]interface{}{
+					"data": map[string]interface{}{
+						"foo1": "bar1",
+					},
+				}),
+			gvr: schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "get")
+			},
+			condition: workapiv1.IgnoreFieldsConditionOnSpokeChange,
+			jsonPath:  ".data",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var objects []runtime.Object
+			owner := metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner}
+			if c.existing != nil {
+				c.existing.SetOwnerReferences([]metav1.OwnerReference{owner})
+				objects = append(objects, c.existing)
+			}
+			scheme := runtime.NewScheme()
+			dynamicClient := fakedynamic.NewSimpleDynamicClient(scheme, objects...)
+			applier := NewServerSideApply(dynamicClient)
+
+			// The fake client does not support PatchType ApplyPatchType, add an reactor to mock apply patch
+			// see issue: https://github.com/kubernetes/kubernetes/issues/103816
+			reactor := &reactor{}
+			reactors := []clienttesting.Reactor{reactor}
+			dynamicClient.Fake.ReactionChain = append(reactors, dynamicClient.Fake.ReactionChain...)
+
+			syncContext := testingcommon.NewFakeSyncContext(t, "test")
+			option := &workapiv1.ManifestConfigOption{
+				UpdateStrategy: &workapiv1.UpdateStrategy{
+					Type: workapiv1.UpdateStrategyTypeServerSideApply,
+					ServerSideApply: &workapiv1.ServerSideApplyConfig{
+						FieldManager: "test-agent",
+						IgnoreFields: []workapiv1.IgnoreField{
+							{
+								Condition: c.condition,
+								JSONPaths: []string{c.jsonPath},
+							},
+						},
+					},
+				},
+			}
+			_, err := applier.Apply(
+				context.TODO(), c.gvr, c.required, owner, option, syncContext.Recorder())
+			if err != nil {
+				t.Fatal(err)
+			}
+			c.validateActions(t, dynamicClient.Actions())
+		})
+	}
 }

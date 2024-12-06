@@ -312,6 +312,7 @@ spec:
                               The arn of the hub cluster (ie: an EKS cluster). This will be required to pass information to hub, which hub will use to create IAM identities for this klusterlet.
                               Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1.
                             minLength: 1
+                            pattern: ^arn:aws:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$
                             type: string
                           managedClusterArn:
                             description: |-
@@ -319,6 +320,7 @@ spec:
                               as well as used by kluslerlet-agent, to assume role suffixed with the md5hash, on startup.
                               Example - arn:eks:us-west-2:12345678910:cluster/managed-cluster1.
                             minLength: 1
+                            pattern: ^arn:aws:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$
                             type: string
                         type: object
                     type: object

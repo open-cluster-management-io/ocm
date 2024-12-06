@@ -255,8 +255,8 @@ spec:
                           properties:
                             serverSideApply:
                               description: |-
-                                serverSideApply defines the configuration for server side apply. It is honored only when
-                                type of updateStrategy is ServerSideApply
+                                serverSideApply defines the configuration for server side apply. It is honored only when the
+                                type of the updateStrategy is ServerSideApply
                               properties:
                                 fieldManager:
                                   default: work-agent
@@ -269,6 +269,37 @@ spec:
                                   description: Force represents to force apply the
                                     manifest.
                                   type: boolean
+                                ignoreFields:
+                                  description: IgnoreFields defines a list of json
+                                    paths in the resource that will not be updated
+                                    on the spoke.
+                                  items:
+                                    properties:
+                                      condition:
+                                        default: OnSpokePresent
+                                        description: |-
+                                          Condition defines the condition that the fields should be ignored when apply the resource.
+                                          Fields in JSONPaths are all ignored when condition is met, otherwise no fields is ignored
+                                          in the apply operation.
+                                        enum:
+                                        - OnSpokePresent
+                                        - OnSpokeChange
+                                        type: string
+                                      jsonPaths:
+                                        description: JSONPaths defines the list of
+                                          json path in the resource to be ignored
+                                        items:
+                                          type: string
+                                        minItems: 1
+                                        type: array
+                                    required:
+                                    - condition
+                                    - jsonPaths
+                                    type: object
+                                  type: array
+                                  x-kubernetes-list-map-keys:
+                                  - condition
+                                  x-kubernetes-list-type: map
                               type: object
                             type:
                               default: Update
