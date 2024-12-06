@@ -266,6 +266,10 @@ func (c *CSRDriver) IsHubKubeConfigValid(ctx context.Context, secretOption regis
 	return isCertificateValid(logger, certData, nil)
 }
 
+// AddClusterAnnotations noop for CSR driver
+func (c *CSRDriver) AddClusterAnnotations(clusterAnnotations map[string]string, managedClusterArn string, managedClusterRoleSuffix string) {
+}
+
 func NewCSRDriver() register.RegisterDriver {
 	return &CSRDriver{}
 }

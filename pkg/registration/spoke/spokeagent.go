@@ -26,8 +26,6 @@ import (
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
-	operatorv1 "open-cluster-management.io/api/operator/v1"
-
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
@@ -191,24 +189,14 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 	// initiate registration driver
 	var registerDriver register.RegisterDriver
-	if o.registrationOption.RegistrationAuth == AwsIrsaAuthType {
-		// TODO: may consider add additional validations
-		if o.registrationOption.HubClusterArn != "" {
-			registerDriver = awsIrsa.NewAWSIRSADriver()
-			if o.registrationOption.ClusterAnnotations == nil {
-				o.registrationOption.ClusterAnnotations = map[string]string{}
-			}
-			o.registrationOption.ClusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/managed-cluster-arn"] = o.registrationOption.ManagedClusterArn
-			o.registrationOption.ClusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/managed-cluster-iam-role-suffix"] =
-				o.registrationOption.ManagedClusterRoleSuffix
-
-		} else {
-			panic("A valid EKS Hub Cluster ARN is required with awsirsa based authentication")
-		}
+	var registrationOption = o.registrationOption
+	if registrationOption.RegistrationAuth == AwsIrsaAuthType {
+		registerDriver = awsIrsa.NewAWSIRSADriver()
 	} else {
 		registerDriver = csr.NewCSRDriver()
 	}
 
+	registerDriver.AddClusterAnnotations(registrationOption.ClusterAnnotations, registrationOption.ManagedClusterArn, registrationOption.ManagedClusterRoleSuffix)
 	o.driver = registerDriver
 
 	// get spoke cluster CA bundle
