@@ -25,13 +25,6 @@ const (
 	TLSCertFile = "tls.crt"
 )
 
-// AWSOption includes options that is used to monitor ManagedClusters
-type AWSOption struct {
-	EventFilterFunc factory.EventFilterFunc
-
-	AWSIRSAControl AWSIRSAControl
-}
-
 type AWSIRSADriver struct {
 	name string
 }

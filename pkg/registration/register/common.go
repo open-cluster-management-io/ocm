@@ -6,13 +6,19 @@ import (
 	"os"
 	"reflect"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
 
+	hubclusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/patcher"
 )
 
 // BaseKubeConfigFromBootStrap builds kubeconfig from bootstrap without authInfo configurations
@@ -164,4 +170,31 @@ func (a *NoopApprover) Run(ctx context.Context, _ int) {
 
 func (a *NoopApprover) Cleanup(_ context.Context, _ *clusterv1.ManagedCluster) error {
 	return nil
+}
+
+func GenerateBootstrapStatusUpdater() StatusUpdateFunc {
+	return func(ctx context.Context, cond metav1.Condition) error {
+		return nil
+	}
+}
+
+// GenerateStatusUpdater generates status update func after the bootstrap
+func GenerateStatusUpdater(hubClusterClient hubclusterclientset.Interface,
+	hubClusterLister clusterv1listers.ManagedClusterLister, clusterName string) StatusUpdateFunc {
+	return func(ctx context.Context, cond metav1.Condition) error {
+		cluster, err := hubClusterLister.Get(clusterName)
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		newCluster := cluster.DeepCopy()
+		meta.SetStatusCondition(&newCluster.Status.Conditions, cond)
+		patcher := patcher.NewPatcher[
+			*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
+			hubClusterClient.ClusterV1().ManagedClusters())
+		_, err = patcher.PatchStatus(ctx, newCluster, newCluster.Status, cluster.Status)
+		return err
+	}
 }

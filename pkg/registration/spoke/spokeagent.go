@@ -321,35 +321,22 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		bootstrapClusterInformerFactory := clusterv1informers.NewSharedInformerFactory(bootstrapClusterClient, 10*time.Minute)
 
 		// TODO: Generate csrOption or awsOption based on the value of --registration-auth may be move it under registerdriver as well
-
-		var registrationAuthOption any
-		if o.registrationOption.RegistrationAuth == AwsIrsaAuthType {
-			if o.registrationOption.HubClusterArn != "" {
-				registrationAuthOption, err = registration.NewAWSOption(
-					secretOption,
-					bootstrapClusterInformerFactory.Cluster(),
-					bootstrapClusterClient)
-				if err != nil {
-					return err
-				}
-			} else {
-				return fmt.Errorf("please provide EKS Hub Cluster ARN for the awsirsa based authentication")
-			}
-		} else {
-			registrationAuthOption, err = registration.NewCSROption(logger,
-				secretOption,
-				o.registrationOption.ClientCertExpirationSeconds,
-				bootstrapInformerFactory.Certificates(),
-				bootstrapKubeClient)
-			if err != nil {
-				return err
-			}
+		registrationAuthOption, err := o.newRestirationAuthOption(
+			logger,
+			secretOption,
+			bootstrapInformerFactory,
+			bootstrapKubeClient,
+			bootstrapClusterInformerFactory,
+			bootstrapClusterClient,
+		)
+		if err != nil {
+			return err
 		}
 
 		controllerName := fmt.Sprintf("BootstrapController@cluster:%s", o.agentOptions.SpokeClusterName)
 		bootstrapCtx, stopBootstrap := context.WithCancel(ctx)
 		secretController := register.NewSecretController(
-			secretOption, registrationAuthOption, o.driver, registration.GenerateBootstrapStatusUpdater(), recorder, controllerName)
+			secretOption, registrationAuthOption, o.driver, register.GenerateBootstrapStatusUpdater(), recorder, controllerName)
 
 		go bootstrapInformerFactory.Start(bootstrapCtx.Done())
 		go secretController.Run(bootstrapCtx, 1)
@@ -421,19 +408,22 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 	recorder.Event("HubClientConfigReady", "Client config for hub is ready.")
 
-	csrOption, err := registration.NewCSROption(logger,
+	registrationAuthOption, err := o.newRestirationAuthOption(
+		logger,
 		secretOption,
-		o.registrationOption.ClientCertExpirationSeconds,
-		hubKubeInformerFactory.Certificates(),
-		hubKubeClient)
+		hubKubeInformerFactory,
+		hubKubeClient,
+		hubClusterInformerFactory,
+		hubClusterClient,
+	)
 	if err != nil {
-		return fmt.Errorf("failed to create CSR option: %w", err)
+		return err
 	}
 
 	// create another RegisterController for registration credential rotation
 	controllerName := fmt.Sprintf("RegisterController@cluster:%s", o.agentOptions.SpokeClusterName)
 	secretController := register.NewSecretController(
-		secretOption, csrOption, o.driver, registration.GenerateStatusUpdater(
+		secretOption, registrationAuthOption, o.driver, register.GenerateStatusUpdater(
 			hubClusterClient,
 			hubClusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 			o.agentOptions.SpokeClusterName), recorder, controllerName)
@@ -478,17 +468,20 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 			recorder,
 		)
 
-		addOnRegistrationController = addon.NewAddOnRegistrationController(
-			o.agentOptions.SpokeClusterName,
-			o.agentOptions.AgentID,
-			kubeconfig,
-			addOnClient,
-			managementKubeClient,
-			spokeKubeClient,
-			csrOption.CSRControl,
-			addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
-			recorder,
-		)
+		// addon registration only enabled when the registration driver is csr.
+		if csrOption, ok := registrationAuthOption.(*csr.CSROption); ok {
+			addOnRegistrationController = addon.NewAddOnRegistrationController(
+				o.agentOptions.SpokeClusterName,
+				o.agentOptions.AgentID,
+				kubeconfig,
+				addOnClient,
+				managementKubeClient,
+				spokeKubeClient,
+				csrOption.CSRControl,
+				addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
+				recorder,
+			)
+		}
 	}
 
 	var hubAcceptController, hubTimeoutController factory.Controller
@@ -532,7 +525,10 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	go managedClusterHealthCheckController.Run(ctx, 1)
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.AddonManagement) {
 		go addOnLeaseController.Run(ctx, 1)
-		go addOnRegistrationController.Run(ctx, 1)
+		// addon controller will only run when the registration driver is csr.
+		if _, ok := registrationAuthOption.(*csr.CSROption); ok {
+			go addOnRegistrationController.Run(ctx, 1)
+		}
 	}
 
 	// start health checking of hub client certificate
@@ -569,4 +565,30 @@ func (o *SpokeAgentConfig) getSpokeClusterCABundle(kubeConfig *rest.Config) ([]b
 		return nil, err
 	}
 	return data, nil
+}
+
+func (o *SpokeAgentConfig) newRestirationAuthOption(
+	logger klog.Logger,
+	secretOption register.SecretOption,
+	kubeInformers informers.SharedInformerFactory,
+	kubeClient kubernetes.Interface,
+	clusterInformers clusterv1informers.SharedInformerFactory,
+	clusterClient clusterv1client.Interface,
+) (any, error) {
+	if o.registrationOption.RegistrationAuth == AwsIrsaAuthType {
+		if o.registrationOption.HubClusterArn != "" {
+			return awsIrsa.NewAWSOption(
+				secretOption,
+				clusterInformers.Cluster(),
+				clusterClient)
+		} else {
+			return nil, fmt.Errorf("please provide EKS Hub Cluster ARN for the awsirsa based authentication")
+		}
+	} else {
+		return csr.NewCSROption(logger,
+			secretOption,
+			o.registrationOption.ClientCertExpirationSeconds,
+			kubeInformers.Certificates(),
+			kubeClient)
+	}
 }
