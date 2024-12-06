@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 	"testing"
@@ -13,12 +14,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificates "k8s.io/api/certificates/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	fakekube "k8s.io/client-go/kubernetes/fake"
+	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2/ktesting"
 
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -248,11 +251,28 @@ func TestTemplateCSRApproveCheckFunc(t *testing.T) {
 }
 
 func TestTemplateCSRSignFunc(t *testing.T) {
+	ca, key, err := certutil.GenerateSelfSignedCertKey("test", []net.IP{}, []string{})
+	if err != nil {
+		t.Errorf("Failed to generate self signed CA config: %v", err)
+	}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "test-ns",
+		},
+		Data: map[string][]byte{
+			corev1.TLSCertKey:       ca,
+			corev1.TLSPrivateKeyKey: key,
+		},
+		Type: corev1.SecretTypeTLS,
+	}
+
 	cases := []struct {
 		name         string
 		cluster      *clusterv1.ManagedCluster
 		addon        *addonapiv1alpha1.ManagedClusterAddOn
 		template     *addonapiv1alpha1.AddOnTemplate
+		casecret     *corev1.Secret
 		csr          *certificatesv1.CertificateSigningRequest
 		expectedCert []byte
 	}{
@@ -325,11 +345,53 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 			},
 			expectedCert: nil,
 		},
+		{
+			name:     "customsigner with ca secret",
+			casecret: secret,
+			cluster:  NewFakeManagedCluster("cluster1"),
+			template: NewFakeAddonTemplate("template1", []addonapiv1alpha1.RegistrationSpec{
+				{
+					Type: addonapiv1alpha1.RegistrationTypeCustomSigner,
+					CustomSigner: &addonapiv1alpha1.CustomSignerRegistrationConfig{
+						SignerName: "s1",
+						Subject: &addonapiv1alpha1.Subject{
+							User: "u1",
+							Groups: []string{
+								"g1",
+								"g2",
+							},
+							OrganizationUnits: []string{},
+						},
+						SigningCA: addonapiv1alpha1.SigningCARef{
+							Name:      secret.Name,
+							Namespace: secret.Namespace,
+						},
+					},
+				},
+			}),
+			addon: NewFakeTemplateManagedClusterAddon("addon1", "cluster1", "template1", "fakehash"),
+			csr: &certificatesv1.CertificateSigningRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "csr1",
+					Labels: map[string]string{
+						clusterv1.ClusterNameLabelKey: "cluster1",
+					},
+				},
+				Spec: certificatesv1.CertificateSigningRequestSpec{
+					SignerName: "s1",
+					Username:   "system:open-cluster-management:cluster1:adcde",
+				},
+			},
+			expectedCert: nil,
+		},
 	}
 	for _, c := range cases {
 		_, ctx := ktesting.NewTestContext(t)
 		addonClient := fakeaddon.NewSimpleClientset(c.template, c.addon)
 		hubKubeClient := fakekube.NewSimpleClientset()
+		if c.casecret != nil {
+			hubKubeClient = fakekube.NewSimpleClientset(c.casecret)
+		}
 		addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
 		mcaStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
 		if err := mcaStore.Add(c.addon); err != nil {
