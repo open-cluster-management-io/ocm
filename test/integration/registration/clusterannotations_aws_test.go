@@ -16,14 +16,21 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("Cluster Annotations", func() {
-	ginkgo.It("Cluster Annotations should be created on the managed cluster", func() {
-		managedClusterName := "clusterannotations-spokecluster"
+var _ = ginkgo.Describe("Cluster Annotations for aws", func() {
+	ginkgo.It("Cluster Annotations for aws flow should be created on the managed cluster", func() {
+		managedClusterName := "clusterannotations-spokecluster-aws"
 		//#nosec G101
 		hubKubeconfigSecret := "clusterannotations-hub-kubeconfig-secret"
 		hubKubeconfigDir := path.Join(util.TestDir, "clusterannotations", "hub-kubeconfig")
 
+		managedClusterArn := "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1"
+		managedClusterRoleSuffix := "7f8141296c75f2871e3d030f85c35692"
+		hubClusterArn := "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
 		agentOptions := &spoke.SpokeAgentOptions{
+			RegistrationAuth:         spoke.AwsIrsaAuthType,
+			HubClusterArn:            hubClusterArn,
+			ManagedClusterArn:        managedClusterArn,
+			ManagedClusterRoleSuffix: managedClusterRoleSuffix,
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
@@ -48,21 +55,16 @@ var _ = ginkgo.Describe("Cluster Annotations", func() {
 				return err
 			}
 
-			if _, ok := mc.Annotations["foo"]; ok {
-				return fmt.Errorf("unexpected annotations %v", mc.Annotations)
+			if mc.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+aws_irsa.ManagedClusterArn] != managedClusterArn {
+				return fmt.Errorf("expected annotation "+operatorv1.ClusterAnnotationsKeyPrefix+"/"+aws_irsa.ManagedClusterArn+" to be "+
+					""+managedClusterArn+", got %s", mc.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+aws_irsa.ManagedClusterArn])
 			}
 
-			if _, ok := mc.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+aws_irsa.ManagedClusterArn]; ok {
-				return fmt.Errorf("unexpected annotations %v", mc.Annotations)
+			if mc.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+aws_irsa.ManagedClusterIAMRoleSuffix] != managedClusterRoleSuffix {
+				return fmt.Errorf("expected annotation "+operatorv1.ClusterAnnotationsKeyPrefix+"/"+aws_irsa.ManagedClusterIAMRoleSuffix+" "+
+					"to be "+managedClusterRoleSuffix+", got %s", mc.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+aws_irsa.ManagedClusterIAMRoleSuffix])
 			}
 
-			if _, ok := mc.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+aws_irsa.ManagedClusterIAMRoleSuffix]; ok {
-				return fmt.Errorf("unexpected annotations %v", mc.Annotations)
-			}
-
-			if mc.Annotations["agent.open-cluster-management.io/foo"] != "bar" {
-				return fmt.Errorf("expected annotation agent.open-cluster-management.io/foo to be bar, got %s", mc.Annotations["agent.open-cluster-management.io/foo"])
-			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 

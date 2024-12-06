@@ -13,6 +13,8 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
 
+	operatorv1 "open-cluster-management.io/api/operator/v1"
+
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
@@ -22,7 +24,9 @@ const (
 	// TLSKeyFile is the name of tls key file in kubeconfigSecret
 	TLSKeyFile = "tls.key"
 	// TLSCertFile is the name of the tls cert file in kubeconfigSecret
-	TLSCertFile = "tls.crt"
+	TLSCertFile                 = "tls.crt"
+	ManagedClusterArn           = "managed-cluster-arn"
+	ManagedClusterIAMRoleSuffix = "managed-cluster-iam-role-suffix"
 )
 
 type AWSIRSADriver struct {
@@ -93,6 +97,15 @@ func (c *AWSIRSADriver) InformerHandler(option any) (cache.SharedIndexInformer, 
 func (c *AWSIRSADriver) IsHubKubeConfigValid(ctx context.Context, secretOption register.SecretOption) (bool, error) {
 	// TODO: implement the logic to validate the kubeconfig
 	return true, nil
+}
+
+func (c *AWSIRSADriver) AddClusterAnnotations(clusterAnnotations map[string]string, managedClusterArn string, managedClusterRoleSuffix string) {
+	if clusterAnnotations == nil {
+		clusterAnnotations = map[string]string{}
+	}
+
+	clusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterArn] = managedClusterArn
+	clusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterIAMRoleSuffix] = managedClusterRoleSuffix
 }
 
 func NewAWSIRSADriver() register.RegisterDriver {

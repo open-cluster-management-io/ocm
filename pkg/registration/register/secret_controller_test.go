@@ -167,6 +167,9 @@ type fakeDriver struct {
 	cond   *metav1.Condition
 }
 
+func (f *fakeDriver) AddClusterAnnotations(clusterAnnotations map[string]string, managedClusterArn string, managedClusterRoleSuffix string) {
+}
+
 func newFakeDriver(secret *corev1.Secret, cond *metav1.Condition, err error) *fakeDriver {
 	return &fakeDriver{
 		secret: secret,

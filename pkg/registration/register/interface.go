@@ -71,6 +71,9 @@ type RegisterDriver interface {
 	// InformerHandler returns informer of the related object. If no object needs to be watched, the func could
 	// return nil, nil.
 	InformerHandler(option any) (cache.SharedIndexInformer, factory.EventFilterFunc)
+
+	// AddClusterAnnotations adds cluster annotations for non-CSR drivers
+	AddClusterAnnotations(clusterAnnotations map[string]string, managedClusterArn string, managedClusterRoleSuffix string)
 }
 
 // Approvers is the inteface that each driver should implement on hub side. The hub controller will use this driver
