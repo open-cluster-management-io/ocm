@@ -125,7 +125,7 @@ func (CurrentClusterBindingConfig) SwaggerDoc() map[string]string {
 var map_CustomSignerRegistrationConfig = map[string]string{
 	"signerName": "signerName is the name of signer that addon agent will use to create csr.",
 	"subject":    "Subject is the user subject of the addon agent to be registered to the hub. If it is not set, the addon agent will have the default subject \"subject\": {\n  \"user\": \"system:open-cluster-management:cluster:{clusterName}:addon:{addonName}:agent:{agentName}\",\n  \"groups: [\"system:open-cluster-management:cluster:{clusterName}:addon:{addonName}\",\n            \"system:open-cluster-management:addon:{addonName}\", \"system:authenticated\"]\n}",
-	"signingCA":  "SigningCA represents the reference of the secret on the hub cluster to sign the CSR the secret must be in the namespace where the addon-manager is located, and the secret type must be \"kubernetes.io/tls\" Note: The addon manager will not have permission to access the secret by default, so the user must grant the permission to the addon manager(by creating rolebinding for the addon-manager serviceaccount \"addon-manager-controller-sa\").",
+	"signingCA":  "SigningCA represents the reference of the secret on the hub cluster to sign the CSR the secret type must be \"kubernetes.io/tls\" Note: The addon manager will not have permission to access the secret by default, so the user must grant the permission to the addon manager(by creating rolebinding/clusterrolebinding for the addon-manager serviceaccount \"addon-manager-controller-sa\").",
 }
 
 func (CustomSignerRegistrationConfig) SwaggerDoc() map[string]string {
@@ -163,8 +163,9 @@ func (RegistrationSpec) SwaggerDoc() map[string]string {
 }
 
 var map_SigningCARef = map[string]string{
-	"":     "SigningCARef is the reference to the signing CA secret which type must be \"kubernetes.io/tls\" and which namespace must be the same as the addon-manager.",
-	"name": "Name of the signing CA secret",
+	"":          "SigningCARef is the reference to the signing CA secret which type must be \"kubernetes.io/tls\" and which namespace must be the same as the addon-manager.",
+	"name":      "Name of the signing CA secret",
+	"namespace": "Namespace of the signing CA secret, the namespace of the addon-manager will be used if it is not set.",
 }
 
 func (SigningCARef) SwaggerDoc() map[string]string {
