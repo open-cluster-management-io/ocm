@@ -22,9 +22,11 @@ func TestMatches(t *testing.T) {
 		{
 			name: "match with label",
 			clusterselector: clusterapiv1beta1.ClusterSelector{
-				LabelSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"cloud": "Amazon",
+				LabelSelector: clusterapiv1beta1.ClusterLabelSelector{
+					LabelSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"cloud": "Amazon",
+						},
 					},
 				},
 			},
@@ -35,13 +37,48 @@ func TestMatches(t *testing.T) {
 		{
 			name: "not match with label",
 			clusterselector: clusterapiv1beta1.ClusterSelector{
-				LabelSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"cloud": "Amazon",
+				LabelSelector: clusterapiv1beta1.ClusterLabelSelector{
+					LabelSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"cloud": "Amazon",
+						},
 					},
 				},
 			},
 			clusterlabels: map[string]string{"cloud": "Google"},
+			clusterclaims: map[string]string{},
+			expectedMatch: false,
+		},
+		{
+			name: "match with regex label",
+			clusterselector: clusterapiv1beta1.ClusterSelector{
+				LabelSelector: clusterapiv1beta1.ClusterLabelSelector{
+					RegexSelector: map[string]string{"version": "^1\\.14\\.\\d+$"}, // ^1\.14\.\d+$
+				},
+			},
+			clusterlabels: map[string]string{"version": "1.14.3"},
+			clusterclaims: map[string]string{},
+			expectedMatch: true,
+		},
+		{
+			name: "not match with regex label",
+			clusterselector: clusterapiv1beta1.ClusterSelector{
+				LabelSelector: clusterapiv1beta1.ClusterLabelSelector{
+					RegexSelector: map[string]string{"version": "^1\\.14\\.\\d+$"},
+				},
+			},
+			clusterlabels: map[string]string{"version": "1.15.3"},
+			clusterclaims: map[string]string{},
+			expectedMatch: false,
+		},
+		{
+			name: "invalid regex label",
+			clusterselector: clusterapiv1beta1.ClusterSelector{
+				LabelSelector: clusterapiv1beta1.ClusterLabelSelector{
+					RegexSelector: map[string]string{"version": "^1\\.14\\.\\d+("},
+				},
+			},
+			clusterlabels: map[string]string{"version": "1.14.3"},
 			clusterclaims: map[string]string{},
 			expectedMatch: false,
 		},
@@ -80,11 +117,46 @@ func TestMatches(t *testing.T) {
 			expectedMatch: false,
 		},
 		{
+			name: "match with regex claim",
+			clusterselector: clusterapiv1beta1.ClusterSelector{
+				ClaimSelector: clusterapiv1beta1.ClusterClaimSelector{
+					RegexSelector: map[string]string{"version": "^1\\.14\\.\\d+$"}, // ^1\.14\.\d+$
+				},
+			},
+			clusterlabels: map[string]string{},
+			clusterclaims: map[string]string{"version": "1.14.3"},
+			expectedMatch: true,
+		},
+		{
+			name: "not match with regex claim",
+			clusterselector: clusterapiv1beta1.ClusterSelector{
+				ClaimSelector: clusterapiv1beta1.ClusterClaimSelector{
+					RegexSelector: map[string]string{"version": "^1\\.14\\.\\d+$"},
+				},
+			},
+			clusterlabels: map[string]string{},
+			clusterclaims: map[string]string{"version": "1.15.3"},
+			expectedMatch: false,
+		},
+		{
+			name: "invalid regex claim",
+			clusterselector: clusterapiv1beta1.ClusterSelector{
+				ClaimSelector: clusterapiv1beta1.ClusterClaimSelector{
+					RegexSelector: map[string]string{"version": "^1\\.14\\.\\d+("},
+				},
+			},
+			clusterlabels: map[string]string{},
+			clusterclaims: map[string]string{"version": "1.14.3"},
+			expectedMatch: false,
+		},
+		{
 			name: "match with both label and claim",
 			clusterselector: clusterapiv1beta1.ClusterSelector{
-				LabelSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"cloud": "Amazon",
+				LabelSelector: clusterapiv1beta1.ClusterLabelSelector{
+					LabelSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"cloud": "Amazon",
+						},
 					},
 				},
 				ClaimSelector: clusterapiv1beta1.ClusterClaimSelector{
@@ -104,9 +176,11 @@ func TestMatches(t *testing.T) {
 		{
 			name: "not match with both label and claim",
 			clusterselector: clusterapiv1beta1.ClusterSelector{
-				LabelSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"cloud": "Amazon",
+				LabelSelector: clusterapiv1beta1.ClusterLabelSelector{
+					LabelSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"cloud": "Amazon",
+						},
 					},
 				},
 				ClaimSelector: clusterapiv1beta1.ClusterClaimSelector{

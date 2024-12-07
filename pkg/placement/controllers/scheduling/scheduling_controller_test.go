@@ -159,7 +159,9 @@ func TestSchedulingController_sync(t *testing.T) {
 					{
 						GroupName: "canary",
 						ClusterSelector: clusterapiv1beta1.ClusterSelector{
-							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
+							LabelSelector: clusterapiv1beta1.ClusterLabelSelector{
+								LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
+							},
 						},
 					},
 				}}).Build(),
@@ -237,13 +239,17 @@ func TestSchedulingController_sync(t *testing.T) {
 					{
 						GroupName: "group1",
 						ClusterSelector: clusterapiv1beta1.ClusterSelector{
-							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Amazon"}},
+							LabelSelector: clusterapiv1beta1.ClusterLabelSelector{
+								LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Amazon"}},
+							},
 						},
 					},
 					{
 						GroupName: "group2",
 						ClusterSelector: clusterapiv1beta1.ClusterSelector{
-							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
+							LabelSelector: clusterapiv1beta1.ClusterLabelSelector{
+								LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
+							},
 						},
 					},
 				}}).Build(),
@@ -1072,7 +1078,9 @@ func TestBind(t *testing.T) {
 					{
 						GroupName: "canary",
 						ClusterSelector: clusterapiv1beta1.ClusterSelector{
-							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
+							LabelSelector: clusterapiv1beta1.ClusterLabelSelector{
+								LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
+							},
 						},
 					},
 				}}).Build(),
@@ -1145,7 +1153,9 @@ func TestBind(t *testing.T) {
 					{
 						GroupName: "canary",
 						ClusterSelector: clusterapiv1beta1.ClusterSelector{
-							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
+							LabelSelector: clusterapiv1beta1.ClusterLabelSelector{
+								LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
+							},
 						},
 					},
 				}}).Build(),
@@ -1178,13 +1188,17 @@ func TestBind(t *testing.T) {
 					{
 						GroupName: "group1",
 						ClusterSelector: clusterapiv1beta1.ClusterSelector{
-							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Amazon"}},
+							LabelSelector: clusterapiv1beta1.ClusterLabelSelector{
+								LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Amazon"}},
+							},
 						},
 					},
 					{
 						GroupName: "group2",
 						ClusterSelector: clusterapiv1beta1.ClusterSelector{
-							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
+							LabelSelector: clusterapiv1beta1.ClusterLabelSelector{
+								LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
+							},
 						},
 					},
 				}}).Build(),
