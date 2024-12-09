@@ -73,7 +73,7 @@ type RegisterDriver interface {
 	InformerHandler(option any) (cache.SharedIndexInformer, factory.EventFilterFunc)
 
 	// ManagedClusterDecorator is to change managed cluster metadata or spec during registration process.
-	ManagedClusterDecorator(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster
+	ManagedClusterDecorator(cluster *clusterv1.ManagedCluster, clusterAnnotations map[string]string, managedClusterArn string, managedClusterRoleSuffix string) *clusterv1.ManagedCluster
 
 	//// AddClusterAnnotations adds cluster annotations for non-CSR drivers
 	//AddClusterAnnotations(clusterAnnotations map[string]string, managedClusterArn string, managedClusterRoleSuffix string)

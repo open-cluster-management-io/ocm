@@ -268,7 +268,7 @@ func (c *CSRDriver) IsHubKubeConfigValid(ctx context.Context, secretOption regis
 	return isCertificateValid(logger, certData, nil)
 }
 
-func (c *CSRDriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
+func (c *CSRDriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluster, clusterAnnotations map[string]string, managedClusterArn string, managedClusterRoleSuffix string) *clusterv1.ManagedCluster {
 	return cluster
 }
 

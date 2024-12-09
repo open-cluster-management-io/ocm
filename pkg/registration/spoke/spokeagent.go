@@ -197,7 +197,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		registerDriver = csr.NewCSRDriver()
 	}
 
-	registerDriver.AddClusterAnnotations(registrationOption.ClusterAnnotations, registrationOption.ManagedClusterArn, registrationOption.ManagedClusterRoleSuffix)
+	//registerDriver.AddClusterAnnotations(registrationOption.ClusterAnnotations, registrationOption.ManagedClusterArn, registrationOption.ManagedClusterRoleSuffix)
 	o.driver = registerDriver
 
 	// get spoke cluster CA bundle

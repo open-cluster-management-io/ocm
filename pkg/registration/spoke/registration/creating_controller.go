@@ -23,7 +23,7 @@ var (
 	CreatingControllerSyncInterval = 60 * time.Minute
 )
 
-type ManagedClusterDecorator func(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster
+type ManagedClusterDecorator func(cluster *clusterv1.ManagedCluster, clusterAnnotations map[string]string, managedClusterArn string, managedClusterRoleSuffix string) *clusterv1.ManagedCluster
 
 // managedClusterCreatingController creates a ManagedCluster on hub cluster during the spoke agent bootstrap phase
 type managedClusterCreatingController struct {
@@ -72,7 +72,7 @@ func (c *managedClusterCreatingController) sync(ctx context.Context, syncCtx fac
 		}
 
 		for _, decorator := range c.clusterDecorators {
-			managedCluster = decorator(managedCluster)
+			managedCluster = decorator(managedCluster, nil, "", "")
 		}
 
 		_, err = c.hubClusterClient.ClusterV1().ManagedClusters().Create(ctx, managedCluster, metav1.CreateOptions{})
@@ -86,7 +86,7 @@ func (c *managedClusterCreatingController) sync(ctx context.Context, syncCtx fac
 
 	managedCluster := existingCluster.DeepCopy()
 	for _, decorator := range c.clusterDecorators {
-		managedCluster = decorator(managedCluster)
+		managedCluster = decorator(managedCluster, nil, "", "")
 	}
 
 	if len(existingCluster.Spec.ManagedClusterClientConfigs) == len(managedCluster.Spec.ManagedClusterClientConfigs) {
@@ -113,7 +113,7 @@ func skipUnauthorizedError(err error) error {
 }
 
 func AnnotationDecorator(annotations map[string]string) ManagedClusterDecorator {
-	return func(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
+	return func(cluster *clusterv1.ManagedCluster, clusterAnnotations map[string]string, managedClusterArn string, managedClusterRoleSuffix string) *clusterv1.ManagedCluster {
 		filteredAnnotations := commonhelpers.FilterClusterAnnotations(annotations)
 		if cluster.Annotations == nil {
 			cluster.Annotations = make(map[string]string)
@@ -127,7 +127,7 @@ func AnnotationDecorator(annotations map[string]string) ManagedClusterDecorator 
 
 // ClientConfigDecorator merge ClientConfig
 func ClientConfigDecorator(externalServerURLs []string, caBundle []byte) ManagedClusterDecorator {
-	return func(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
+	return func(cluster *clusterv1.ManagedCluster, clusterAnnotations map[string]string, managedClusterArn string, managedClusterRoleSuffix string) *clusterv1.ManagedCluster {
 		for _, serverURL := range externalServerURLs {
 			isIncludeByExisting := false
 			for _, existingClientConfig := range cluster.Spec.ManagedClusterClientConfigs {
