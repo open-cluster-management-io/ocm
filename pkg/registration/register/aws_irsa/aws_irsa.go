@@ -13,7 +13,9 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
 
-	operatorv1 "open-cluster-management.io/api/operator/v1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	//operatorv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
@@ -25,8 +27,8 @@ const (
 	TLSKeyFile = "tls.key"
 	// TLSCertFile is the name of the tls cert file in kubeconfigSecret
 	TLSCertFile                 = "tls.crt"
-	ManagedClusterArn           = "managed-cluster-arn"
-	ManagedClusterIAMRoleSuffix = "managed-cluster-iam-role-suffix"
+	//ManagedClusterArn           = "managed-cluster-arn"
+	//ManagedClusterIAMRoleSuffix = "managed-cluster-iam-role-suffix"
 )
 
 type AWSIRSADriver struct {
@@ -99,14 +101,18 @@ func (c *AWSIRSADriver) IsHubKubeConfigValid(ctx context.Context, secretOption r
 	return true, nil
 }
 
-func (c *AWSIRSADriver) AddClusterAnnotations(clusterAnnotations map[string]string, managedClusterArn string, managedClusterRoleSuffix string) {
-	if clusterAnnotations == nil {
-		clusterAnnotations = map[string]string{}
-	}
-
-	clusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterArn] = managedClusterArn
-	clusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterIAMRoleSuffix] = managedClusterRoleSuffix
+func (c *AWSIRSADriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
+	return cluster
 }
+
+//func (c *AWSIRSADriver) AddClusterAnnotations(clusterAnnotations map[string]string, managedClusterArn string, managedClusterRoleSuffix string) {
+//	if clusterAnnotations == nil {
+//		clusterAnnotations = map[string]string{}
+//	}
+//
+//	clusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterArn] = managedClusterArn
+//	clusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterIAMRoleSuffix] = managedClusterRoleSuffix
+//}
 
 func NewAWSIRSADriver() register.RegisterDriver {
 	return &AWSIRSADriver{}
