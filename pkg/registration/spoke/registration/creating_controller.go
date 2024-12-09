@@ -23,28 +23,26 @@ var (
 	CreatingControllerSyncInterval = 60 * time.Minute
 )
 
+type ManagedClusterDecorator func(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster
+
 // managedClusterCreatingController creates a ManagedCluster on hub cluster during the spoke agent bootstrap phase
 type managedClusterCreatingController struct {
-	clusterName             string
-	spokeExternalServerURLs []string
-	spokeCABundle           []byte
-	clusterAnnotations      map[string]string
-	hubClusterClient        clientset.Interface
+	clusterName       string
+	clusterDecorators []ManagedClusterDecorator
+	hubClusterClient  clientset.Interface
 }
 
 // NewManagedClusterCreatingController creates a new managedClusterCreatingController on the managed cluster.
 func NewManagedClusterCreatingController(
-	clusterName string, spokeExternalServerURLs []string, annotations map[string]string,
-	spokeCABundle []byte,
+	clusterName string,
+	decorators []ManagedClusterDecorator,
 	hubClusterClient clientset.Interface,
 	recorder events.Recorder) factory.Controller {
 
 	c := &managedClusterCreatingController{
-		clusterName:             clusterName,
-		spokeExternalServerURLs: spokeExternalServerURLs,
-		spokeCABundle:           spokeCABundle,
-		clusterAnnotations:      commonhelpers.FilterClusterAnnotations(annotations),
-		hubClusterClient:        hubClusterClient,
+		clusterName:       clusterName,
+		hubClusterClient:  hubClusterClient,
+		clusterDecorators: decorators,
 	}
 
 	return factory.New().
@@ -69,20 +67,12 @@ func (c *managedClusterCreatingController) sync(ctx context.Context, syncCtx fac
 	if errors.IsNotFound(err) {
 		managedCluster := &clusterv1.ManagedCluster{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:        c.clusterName,
-				Annotations: c.clusterAnnotations,
+				Name: c.clusterName,
 			},
 		}
 
-		if len(c.spokeExternalServerURLs) != 0 {
-			var managedClusterClientConfigs []clusterv1.ClientConfig
-			for _, serverURL := range c.spokeExternalServerURLs {
-				managedClusterClientConfigs = append(managedClusterClientConfigs, clusterv1.ClientConfig{
-					URL:      serverURL,
-					CABundle: c.spokeCABundle,
-				})
-			}
-			managedCluster.Spec.ManagedClusterClientConfigs = managedClusterClientConfigs
+		for _, decorator := range c.clusterDecorators {
+			managedCluster = decorator(managedCluster)
 		}
 
 		_, err = c.hubClusterClient.ClusterV1().ManagedClusters().Create(ctx, managedCluster, metav1.CreateOptions{})
@@ -94,37 +84,17 @@ func (c *managedClusterCreatingController) sync(ctx context.Context, syncCtx fac
 		return nil
 	}
 
-	// do not update ManagedClusterClientConfigs in ManagedCluster if spokeExternalServerURLs is empty
-	if len(c.spokeExternalServerURLs) == 0 {
-		return nil
+	managedCluster := existingCluster.DeepCopy()
+	for _, decorator := range c.clusterDecorators {
+		managedCluster = decorator(managedCluster)
 	}
 
-	// merge ClientConfig
-	managedClusterClientConfigs := existingCluster.Spec.ManagedClusterClientConfigs
-	for _, serverURL := range c.spokeExternalServerURLs {
-		isIncludeByExisting := false
-		for _, existingClientConfig := range existingCluster.Spec.ManagedClusterClientConfigs {
-			if serverURL == existingClientConfig.URL {
-				isIncludeByExisting = true
-				break
-			}
-		}
-
-		if !isIncludeByExisting {
-			managedClusterClientConfigs = append(managedClusterClientConfigs, clusterv1.ClientConfig{
-				URL:      serverURL,
-				CABundle: c.spokeCABundle,
-			})
-		}
-	}
-	if len(existingCluster.Spec.ManagedClusterClientConfigs) == len(managedClusterClientConfigs) {
+	if len(existingCluster.Spec.ManagedClusterClientConfigs) == len(managedCluster.Spec.ManagedClusterClientConfigs) {
 		return nil
 	}
 
 	// update ManagedClusterClientConfigs in ManagedCluster
-	clusterCopy := existingCluster.DeepCopy()
-	clusterCopy.Spec.ManagedClusterClientConfigs = managedClusterClientConfigs
-	_, err = c.hubClusterClient.ClusterV1().ManagedClusters().Update(ctx, clusterCopy, metav1.UpdateOptions{})
+	_, err = c.hubClusterClient.ClusterV1().ManagedClusters().Update(ctx, managedCluster, metav1.UpdateOptions{})
 	// ManagedClusterClientConfigs in ManagedCluster is only allowed updated during bootstrap.
 	// After bootstrap secret expired, an unauthorized error will be got, skip it
 	if skipUnauthorizedError(err) != nil {
@@ -140,4 +110,41 @@ func skipUnauthorizedError(err error) error {
 	}
 
 	return err
+}
+
+func AnnotationDecorator(annotations map[string]string) ManagedClusterDecorator {
+	return func(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
+		filteredAnnotations := commonhelpers.FilterClusterAnnotations(annotations)
+		if cluster.Annotations == nil {
+			cluster.Annotations = make(map[string]string)
+		}
+		for key, value := range filteredAnnotations {
+			cluster.Annotations[key] = value
+		}
+		return cluster
+	}
+}
+
+// ClientConfigDecorator merge ClientConfig
+func ClientConfigDecorator(externalServerURLs []string, caBundle []byte) ManagedClusterDecorator {
+	return func(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
+		for _, serverURL := range externalServerURLs {
+			isIncludeByExisting := false
+			for _, existingClientConfig := range cluster.Spec.ManagedClusterClientConfigs {
+				if serverURL == existingClientConfig.URL {
+					isIncludeByExisting = true
+					break
+				}
+			}
+
+			if !isIncludeByExisting {
+				cluster.Spec.ManagedClusterClientConfigs = append(
+					cluster.Spec.ManagedClusterClientConfigs, clusterv1.ClientConfig{
+						URL:      serverURL,
+						CABundle: caBundle,
+					})
+			}
+		}
+		return cluster
+	}
 }
