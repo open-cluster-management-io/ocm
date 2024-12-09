@@ -1,7 +1,7 @@
 apiVersion: authentication.open-cluster-management.io/v1beta1
 kind: ManagedServiceAccount
 metadata:
-  name: kueue-admin-cluster2
-  namespace: cluster2
+  name: kueue-admin-CLUSTER_NAME
+  namespace: CLUSTER_NAME
 spec:
   rotation: {}
