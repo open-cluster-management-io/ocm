@@ -4,17 +4,17 @@ This guide provides list of manual steps on how we can manually join AWS EKS clu
 
 # Background
 
-We are working on a new feature to run OCM natively on EKS with AWS IAM based authentication. More details, on why and how, can be found in [enhancement proposal](https://github.com/open-cluster-management-io/enhancements/blob/main/enhancements/sig-architecture/105-aws-iam-registration/README.md). This purpose of this document is to:
-- Share with community, 
-- sthe proof of design proposed in [enhancement proposal](https://github.com/open-cluster-management-io/enhancements/blob/main/enhancements/sig-architecture/105-aws-iam-registration/README.md)
+We are working on a new feature to run OCM natively on EKS with AWS IAM based authentication. More details, on why and how, can be found in [enhancement proposal](https://github.com/open-cluster-management-io/enhancements/blob/main/enhancements/sig-architecture/105-aws-iam-registration/README.md). The purpose of this document is to:
+- Share with community, the proof of design proposed in [enhancement proposal](https://github.com/open-cluster-management-io/enhancements/blob/main/enhancements/sig-architecture/105-aws-iam-registration/README.md)
 - Get early feedback
+- Share our progress on the implementation
 
 
 >  **Note:**
 > 
 > This solution uses [AWS IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html) for out going authentication from within an EKS cluster to AWS, and [EKS access entries](https://docs.aws.amazon.com/eks/latest/userguide/access-entries.html) for incoming authentication from outside world to inside the EKS cluster.
 
-While the implementation of this feature is in progress, in the hub and spoke side components. The hub and spoke can be joined using AWS IAM based authentication by running following steps to manipulate hub and spoke components manually:
+While the implementation of this feature is in progress, in the hub and spoke side components, the hub and spoke can be joined using AWS IAM based authentication by running following steps to manipulate hub and spoke components manually:
 
 1. Login to hub and spoke clusters in 2 separate shell sessions with admin access to aws as well as EKS cluster and set following env vars in both.
     > **Note:** The md5 hash is generated as described [here](https://github.com/open-cluster-management-io/enhancements/blob/main/enhancements/sig-architecture/105-aws-iam-registration/README.md?plain=1#L249). [This](https://www.md5hashgenerator.com/) website can be used to generate md5 hash for these steps.
@@ -47,7 +47,7 @@ While the implementation of this feature is in progress, in the hub and spoke si
     export SPOKE_REGION=us-west-2
    ```
 
-2. Login to spoke AWS account and create IAM role, policy and tags on spoke IAM. Go to the folder containing this markdown file in this [repository](https://github.com/open-cluster-management-io/open-cluster-management-io.github.io) and run following commands:
+2. Login to spoke AWS account and create IAM role, policy and tags on spoke IAM. Go to the folder containing this markdown file in this [repository](https://github.com/open-cluster-management-io/ocm/tree/main/solutions/joining-hub-and-spoke-with-aws-auth-manually) and run following commands:
    ```bash
    sed -e "s/PROVIDER_ID/$SPOKE_OIDC_PROVIDER_ID/g" -e "s/ACCOUNT_ID/$SPOKE_ACCOUNT_ID/g" -e "s/REGION/$SPOKE_REGION/g" templates/Template-Spoke-Role-Trust-Policy.json > templates/Spoke-Role-Trust-Policy.json
    aws iam create-role --role-name $SPOKE_ROLE_NAME --assume-role-policy-document file://templates/Spoke-Role-Trust-Policy.json
