@@ -168,11 +168,19 @@ type ClusterPredicate struct {
 type ClusterSelector struct {
 	// LabelSelector represents a selector of ManagedClusters by label
 	// +optional
-	LabelSelector metav1.LabelSelector `json:"labelSelector,omitempty"`
+	LabelSelector ClusterLabelSelector `json:"labelSelector,omitempty"`
 
 	// ClaimSelector represents a selector of ManagedClusters by clusterClaims in status
 	// +optional
 	ClaimSelector ClusterClaimSelector `json:"claimSelector,omitempty"`
+}
+
+type ClusterLabelSelector struct {
+	// +optional
+	metav1.LabelSelector `json:",inline"`
+
+	// +optional
+	RegexSelector map[string]string `json:"regexSelector,omitempty"`
 }
 
 // ClusterClaimSelector is a claim query over a set of ManagedClusters. An empty cluster claim
@@ -181,6 +189,9 @@ type ClusterClaimSelector struct {
 	// matchExpressions is a list of cluster claim selector requirements. The requirements are ANDed.
 	// +optional
 	MatchExpressions []metav1.LabelSelectorRequirement `json:"matchExpressions,omitempty"`
+
+	// +optional
+	RegexSelector map[string]string `json:"regexSelector,omitempty"`
 }
 
 // PrioritizerPolicy represents the policy of prioritizer

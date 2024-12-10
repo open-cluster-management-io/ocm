@@ -175,7 +175,7 @@ func NewClusterPredicate(labelSelector *metav1.LabelSelector, claimSelector *clu
 	}
 
 	if labelSelector != nil {
-		predicate.RequiredClusterSelector.LabelSelector = *labelSelector
+		predicate.RequiredClusterSelector.LabelSelector = clusterapiv1beta1.ClusterLabelSelector{LabelSelector: *labelSelector}
 	}
 
 	if claimSelector != nil {
