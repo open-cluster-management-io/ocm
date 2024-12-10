@@ -17,6 +17,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
@@ -133,7 +135,7 @@ func TestSync(t *testing.T) {
 	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
 			syncCtx := testingcommon.NewFakeSyncContext(t, "test")
-			kubeClient := kubefake.NewSimpleClientset(c.secrets...)
+			kubeClient := kubefake.NewClientset(c.secrets...)
 			c.option.ManagementCoreClient = kubeClient.CoreV1()
 			informerFactory := informers.NewSharedInformerFactory(kubeClient, 10*time.Minute)
 			c.option.ManagementSecretInformer = informerFactory.Core().V1().Secrets().Informer()
@@ -167,6 +169,9 @@ type fakeDriver struct {
 	cond   *metav1.Condition
 }
 
+func (f *fakeDriver) AddClusterAnnotations(clusterAnnotations map[string]string, managedClusterArn string, managedClusterRoleSuffix string) {
+}
+
 func newFakeDriver(secret *corev1.Secret, cond *metav1.Condition, err error) *fakeDriver {
 	return &fakeDriver{
 		secret: secret,
@@ -194,4 +199,8 @@ func (f *fakeDriver) Process(
 
 func (f *fakeDriver) InformerHandler(_ any) (cache.SharedIndexInformer, factory.EventFilterFunc) {
 	return nil, nil
+}
+
+func (f *fakeDriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluster, clusterAnnotations map[string]string, managedClusterArn string, managedClusterRoleSuffix string) *clusterv1.ManagedCluster {
+	return cluster
 }

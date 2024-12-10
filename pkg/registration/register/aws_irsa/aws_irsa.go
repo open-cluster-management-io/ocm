@@ -3,6 +3,7 @@ package aws_irsa
 import (
 	"context"
 	"fmt"
+	operatorv1 "open-cluster-management.io/api/operator/v1"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -13,6 +14,10 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
 
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	//operatorv1 "open-cluster-management.io/api/operator/v1"
+
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
@@ -22,7 +27,9 @@ const (
 	// TLSKeyFile is the name of tls key file in kubeconfigSecret
 	TLSKeyFile = "tls.key"
 	// TLSCertFile is the name of the tls cert file in kubeconfigSecret
-	TLSCertFile = "tls.crt"
+	TLSCertFile                 = "tls.crt"
+	ManagedClusterArn           = "managed-cluster-arn"
+	ManagedClusterIAMRoleSuffix = "managed-cluster-iam-role-suffix"
 )
 
 type AWSIRSADriver struct {
@@ -94,6 +101,24 @@ func (c *AWSIRSADriver) IsHubKubeConfigValid(ctx context.Context, secretOption r
 	// TODO: implement the logic to validate the kubeconfig
 	return true, nil
 }
+
+func (c *AWSIRSADriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluster, clusterAnnotations map[string]string, managedClusterArn string, managedClusterRoleSuffix string) *clusterv1.ManagedCluster {
+	if clusterAnnotations == nil {
+		clusterAnnotations = map[string]string{}
+	}
+	clusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterArn] = managedClusterArn
+	clusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterIAMRoleSuffix] = managedClusterRoleSuffix
+	return cluster
+}
+
+//func (c *AWSIRSADriver) AddClusterAnnotations(clusterAnnotations map[string]string, managedClusterArn string, managedClusterRoleSuffix string) {
+//	if clusterAnnotations == nil {
+//		clusterAnnotations = map[string]string{}
+//	}
+//
+//	clusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterArn] = managedClusterArn
+//	clusterAnnotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterIAMRoleSuffix] = managedClusterRoleSuffix
+//}
 
 func NewAWSIRSADriver() register.RegisterDriver {
 	return &AWSIRSADriver{}
