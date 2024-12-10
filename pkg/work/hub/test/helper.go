@@ -147,7 +147,9 @@ func CreateTestPlacementWithDecisionStrategy(name string, ns string, clsPerDecis
 
 	clusterPredicate := clusterv1beta1.ClusterPredicate{
 		RequiredClusterSelector: clusterv1beta1.ClusterSelector{
-			LabelSelector: *labelSelector,
+			LabelSelector: clusterv1beta1.ClusterLabelSelector{
+				LabelSelector: *labelSelector,
+			},
 		},
 	}
 
