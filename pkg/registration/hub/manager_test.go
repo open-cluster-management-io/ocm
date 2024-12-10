@@ -71,6 +71,9 @@ var _ = ginkgo.BeforeSuite(func() {
 	// enable resourceCleanup feature gate
 	err = features.HubMutableFeatureGate.Set("ResourceCleanup=true")
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	err = features.HubMutableFeatureGate.Set("ClusterImporter=true")
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 })
 
 var _ = ginkgo.AfterSuite(func() {

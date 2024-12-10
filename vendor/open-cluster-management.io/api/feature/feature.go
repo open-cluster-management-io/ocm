@@ -80,6 +80,9 @@ const (
 
 	// ClusterProfile will start new controller in the Hub that can be used to sync ManagedCluster to ClusterProfile.
 	ClusterProfile featuregate.Feature = "ClusterProfile"
+
+	// ClusterImporter will enable the auto import of managed cluster for certain cluster providers, e.g. cluster-api.
+	ClusterImporter featuregate.Feature = "ClusterImporter"
 )
 
 // DefaultSpokeRegistrationFeatureGates consists of all known ocm-registration
@@ -87,7 +90,7 @@ const (
 // add it here.
 var DefaultSpokeRegistrationFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	ClusterClaim:               {Default: true, PreRelease: featuregate.Beta},
-	AddonManagement:            {Default: true, PreRelease: featuregate.Alpha},
+	AddonManagement:            {Default: true, PreRelease: featuregate.Beta},
 	V1beta1CSRAPICompatibility: {Default: false, PreRelease: featuregate.Alpha},
 	MultipleHubs:               {Default: false, PreRelease: featuregate.Alpha},
 }
@@ -101,10 +104,11 @@ var DefaultHubRegistrationFeatureGates = map[featuregate.Feature]featuregate.Fea
 	ManagedClusterAutoApproval: {Default: false, PreRelease: featuregate.Alpha},
 	ResourceCleanup:            {Default: false, PreRelease: featuregate.Alpha},
 	ClusterProfile:             {Default: false, PreRelease: featuregate.Alpha},
+	ClusterImporter:            {Default: false, PreRelease: featuregate.Alpha},
 }
 
 var DefaultHubAddonManagerFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	AddonManagement: {Default: true, PreRelease: featuregate.Alpha},
+	AddonManagement: {Default: true, PreRelease: featuregate.Beta},
 }
 
 // DefaultHubWorkFeatureGates consists of all known acm work wehbook feature keys.
