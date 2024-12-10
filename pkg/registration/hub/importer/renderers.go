@@ -22,7 +22,7 @@ func RenderBootstrapHubKubeConfig(
 		// get bootstrap token
 		tr, err := kubeClient.CoreV1().
 			ServiceAccounts(operatorNamesapce).
-			CreateToken(ctx, "cluster-bootstrap", &authv1.TokenRequest{
+			CreateToken(ctx, bootstrapSA, &authv1.TokenRequest{
 				Spec: authv1.TokenRequestSpec{
 					// token expired in 1 hour
 					ExpirationSeconds: ptr.To[int64](3600),
@@ -30,7 +30,7 @@ func RenderBootstrapHubKubeConfig(
 			}, metav1.CreateOptions{})
 		if err != nil {
 			return config, fmt.Errorf(
-				"failed to get token from sa %s/cluster-bootstrap: %v", operatorNamesapce, err)
+				"failed to get token from sa %s/%s: %v", operatorNamesapce, bootstrapSA, err)
 		}
 
 		// get apisever url

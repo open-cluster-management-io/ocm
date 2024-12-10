@@ -62,7 +62,7 @@ func NewCAPIProvider(
 	}
 }
 
-func (c *CAPIProvider) KubeConfig(cluster *clusterv1.ManagedCluster) (*rest.Config, error) {
+func (c *CAPIProvider) Clients(cluster *clusterv1.ManagedCluster) (*providers.Clients, error) {
 	clusterKey := capiNameFromManagedCluster(cluster)
 	namespace, name, err := cache.SplitMetaNamespaceKey(clusterKey)
 	if err != nil {
@@ -93,7 +93,12 @@ func (c *CAPIProvider) KubeConfig(cluster *clusterv1.ManagedCluster) (*rest.Conf
 	if err != nil {
 		return nil, err
 	}
-	return configOverride.ClientConfig()
+
+	config, err := configOverride.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	return providers.NewClient(config)
 }
 
 func (c *CAPIProvider) Register(syncCtx factory.SyncContext) {
@@ -128,7 +133,7 @@ func (c *CAPIProvider) enqueueManagedClusterByCAPI(obj interface{}, syncCtx fact
 	}
 	for _, obj := range objs {
 		accessor, _ := meta.Accessor(obj)
-		syncCtx.Queue().Add(fmt.Sprintf("%s/%s", accessor.GetNamespace(), accessor.GetName()))
+		syncCtx.Queue().Add(accessor.GetName())
 	}
 }
 
@@ -141,11 +146,10 @@ func indexByCAPIResource(obj interface{}) ([]string, error) {
 }
 
 func capiNameFromManagedCluster(cluster *clusterv1.ManagedCluster) string {
-	name := fmt.Sprintf("%s/%s", cluster.Name, cluster.Namespace)
 	if len(cluster.Annotations) > 0 {
 		if key, ok := cluster.Annotations[CAPIAnnotationKey]; ok {
 			return key
 		}
 	}
-	return name
+	return fmt.Sprintf("%s/%s", cluster.Name, cluster.Name)
 }

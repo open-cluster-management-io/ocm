@@ -31,6 +31,9 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/hub/clusterprofile"
 	"open-cluster-management.io/ocm/pkg/registration/hub/clusterrole"
 	"open-cluster-management.io/ocm/pkg/registration/hub/gc"
+	"open-cluster-management.io/ocm/pkg/registration/hub/importer"
+	cloudproviders "open-cluster-management.io/ocm/pkg/registration/hub/importer/providers"
+	"open-cluster-management.io/ocm/pkg/registration/hub/importer/providers/capi"
 	"open-cluster-management.io/ocm/pkg/registration/hub/lease"
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedcluster"
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedclusterset"
@@ -244,6 +247,23 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		)
 	}
 
+	var providers []cloudproviders.Interface
+	var clusterImporter factory.Controller
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.ClusterImporter) {
+		providers = []cloudproviders.Interface{
+			capi.NewCAPIProvider(controllerContext.KubeConfig, clusterInformers.Cluster().V1().ManagedClusters()),
+		}
+		clusterImporter = importer.NewImporter(
+			[]importer.KlusterletConfigRenderer{
+				importer.RenderBootstrapHubKubeConfig(kubeClient, ""),
+			},
+			clusterClient,
+			clusterInformers.Cluster().V1().ManagedClusters(),
+			providers,
+			controllerContext.EventRecorder,
+		)
+	}
+
 	gcController := gc.NewGCController(
 		kubeInformers.Rbac().V1().ClusterRoles().Lister(),
 		kubeInformers.Rbac().V1().ClusterRoleBindings().Lister(),
@@ -283,6 +303,12 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	}
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.ClusterProfile) {
 		go clusterProfileController.Run(ctx, 1)
+	}
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.ClusterImporter) {
+		for _, provider := range providers {
+			go provider.Run(ctx)
+		}
+		go clusterImporter.Run(ctx, 1)
 	}
 
 	go gcController.Run(ctx, 1)

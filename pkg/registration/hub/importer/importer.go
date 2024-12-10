@@ -8,10 +8,10 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	appsv1 "k8s.io/api/apps/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
 
@@ -37,6 +36,12 @@ import (
 	cloudproviders "open-cluster-management.io/ocm/pkg/registration/hub/importer/providers"
 )
 
+const (
+	operatorNamesapce     = "open-cluster-management"
+	bootstrapSA           = "cluster-bootstrap"
+	conditionTypeImported = "Imported"
+)
+
 var (
 	genericScheme = runtime.NewScheme()
 	genericCodecs = serializer.NewCodecFactory(genericScheme)
@@ -48,8 +53,6 @@ func init() {
 	utilruntime.Must(apiextensionsv1.AddToScheme(genericScheme))
 	utilruntime.Must(operatorv1.Install(genericScheme))
 }
-
-const operatorNamesapce = "open-cluster-management"
 
 // KlusterletConfigRenderer renders the config for klusterlet chart.
 type KlusterletConfigRenderer func(
@@ -104,7 +107,7 @@ func (i *Importer) sync(ctx context.Context, syncCtx factory.SyncContext) error 
 	}
 
 	// If the cluster is imported, skip the reconcile
-	if meta.IsStatusConditionTrue(cluster.Status.Conditions, "Imported") {
+	if meta.IsStatusConditionTrue(cluster.Status.Conditions, conditionTypeImported) {
 		return nil
 	}
 
@@ -143,10 +146,10 @@ func (i *Importer) reconcile(
 	recorder events.Recorder,
 	provider cloudproviders.Interface,
 	cluster *v1.ManagedCluster) (*v1.ManagedCluster, error) {
-	config, err := provider.KubeConfig(cluster)
+	clients, err := provider.Clients(cluster)
 	if err != nil {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:   "Imported",
+			Type:   conditionTypeImported,
 			Status: metav1.ConditionFalse,
 			Reason: "KubeConfigGetFailed",
 			Message: fmt.Sprintf("failed to get kubeconfig. See errors:\n%s",
@@ -155,9 +158,9 @@ func (i *Importer) reconcile(
 		return cluster, err
 	}
 
-	if config == nil {
+	if clients == nil {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:    "Imported",
+			Type:    conditionTypeImported,
 			Status:  metav1.ConditionFalse,
 			Reason:  "KubeConfigNotFound",
 			Message: "Secret for kubeconfig is not found.",
@@ -176,7 +179,7 @@ func (i *Importer) reconcile(
 		klusterletChartConfig, err = renderer(ctx, klusterletChartConfig)
 		if err != nil {
 			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-				Type:   "Imported",
+				Type:   conditionTypeImported,
 				Status: metav1.ConditionFalse,
 				Reason: "ConfigRendererFailed",
 				Message: fmt.Sprintf("failed to render config. See errors:\n%s",
@@ -190,29 +193,8 @@ func (i *Importer) reconcile(
 		return cluster, err
 	}
 
-	// build related client
-	kubeClient, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:   "Imported",
-			Status: metav1.ConditionFalse,
-			Reason: "ClientBuildErr",
-			Message: fmt.Sprintf("failed to import the klusterlet. See errors: %s",
-				err.Error()),
-		})
-		return cluster, err
-	}
-	hubApiExtensionClient, err := apiextensionsclient.NewForConfig(config)
-	if err != nil {
-		return cluster, err
-	}
-	operatorClient, err := operatorclient.NewForConfig(config)
-	if err != nil {
-		return cluster, err
-	}
-
-	clientHolder := resourceapply.NewKubeClientHolder(kubeClient).
-		WithAPIExtensionsClient(hubApiExtensionClient)
+	clientHolder := resourceapply.NewKubeClientHolder(clients.KubeClient).
+		WithAPIExtensionsClient(clients.APIExtClient).WithDynamicClient(clients.DynamicClient)
 	cache := resourceapply.NewResourceCache()
 	var results []resourceapply.ApplyResult
 	for _, manifest := range rawManifests {
@@ -225,11 +207,11 @@ func (i *Importer) reconcile(
 		switch t := requiredObj.(type) {
 		case *appsv1.Deployment:
 			result.Result, result.Changed, result.Error = resourceapply.ApplyDeployment(
-				ctx, kubeClient.AppsV1(), recorder, t, 0)
+				ctx, clients.KubeClient.AppsV1(), recorder, t, 0)
 			results = append(results, result)
 		case *operatorv1.Klusterlet:
 			result.Result, result.Changed, result.Error = ApplyKlusterlet(
-				ctx, operatorClient, t)
+				ctx, clients.OperatorClient, recorder, t)
 			results = append(results, result)
 		default:
 			tempResults := resourceapply.ApplyDirectly(ctx, clientHolder, recorder, cache,
@@ -249,15 +231,15 @@ func (i *Importer) reconcile(
 	}
 	if len(errs) > 0 {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:   "Imported",
+			Type:   conditionTypeImported,
 			Status: metav1.ConditionFalse,
 			Reason: "ImportFailed",
 			Message: fmt.Sprintf("failed to import the klusterlet. See errors:\n%s",
-				err.Error()),
+				utilerrors.NewAggregate(errs).Error()),
 		})
 	} else {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:   "Imported",
+			Type:   conditionTypeImported,
 			Status: metav1.ConditionTrue,
 			Reason: "ImportSucceed",
 		})
@@ -266,11 +248,16 @@ func (i *Importer) reconcile(
 	return cluster, utilerrors.NewAggregate(errs)
 }
 
-func ApplyKlusterlet(ctx context.Context, client operatorclient.Interface, required *operatorv1.Klusterlet) (*operatorv1.Klusterlet, bool, error) {
+func ApplyKlusterlet(
+	ctx context.Context,
+	client operatorclient.Interface,
+	recorder events.Recorder,
+	required *operatorv1.Klusterlet) (*operatorv1.Klusterlet, bool, error) {
 	existing, err := client.OperatorV1().Klusterlets().Get(ctx, required.Name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		requiredCopy := required.DeepCopy()
 		actual, err := client.OperatorV1().Klusterlets().Create(ctx, requiredCopy, metav1.CreateOptions{})
+		resourcehelper.ReportCreateEvent(recorder, required, err)
 		return actual, true, err
 	}
 	if err != nil {
@@ -287,5 +274,6 @@ func ApplyKlusterlet(ctx context.Context, client operatorclient.Interface, requi
 
 	existingCopy.Spec = required.Spec
 	actual, err := client.OperatorV1().Klusterlets().Update(ctx, existingCopy, metav1.UpdateOptions{})
+	resourcehelper.ReportUpdateEvent(recorder, required, err)
 	return actual, true, err
 }
