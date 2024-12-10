@@ -45,6 +45,10 @@ func init() {
 func TestValidate(t *testing.T) {
 	defaultCompletedOptions := NewSpokeAgentOptions()
 	defaultCompletedOptions.BootstrapKubeconfig = "/spoke/bootstrap/kubeconfig"
+	awsCompletedOptionsHubArnMissing := *defaultCompletedOptions
+	awsCompletedOptionsHubArnMissing.RegistrationAuth = AwsIrsaAuthType
+	awsDefaultCompletedOptions := awsCompletedOptionsHubArnMissing
+	awsDefaultCompletedOptions.HubClusterArn = "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
 
 	cases := []struct {
 		name        string
@@ -77,6 +81,16 @@ func TestValidate(t *testing.T) {
 			name:        "default completed options",
 			options:     defaultCompletedOptions,
 			expectedErr: "",
+		},
+		{
+			name:        "default completed options for aws flow",
+			options:     &awsDefaultCompletedOptions,
+			expectedErr: "",
+		},
+		{
+			name:        "default completed options without HubClusterArn for aws flow",
+			options:     &awsCompletedOptionsHubArnMissing,
+			expectedErr: "EksHubClusterArn cannot be empty if RegistrationAuth is awsirsa",
 		},
 		{
 			name: "default completed options",

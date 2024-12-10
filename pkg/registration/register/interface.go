@@ -71,6 +71,9 @@ type RegisterDriver interface {
 	// InformerHandler returns informer of the related object. If no object needs to be watched, the func could
 	// return nil, nil.
 	InformerHandler(option any) (cache.SharedIndexInformer, factory.EventFilterFunc)
+
+	// ManagedClusterDecorator is to change managed cluster metadata or spec during registration process.
+	ManagedClusterDecorator(managedClusterArn string, managedClusterRoleSuffix string) ManagedClusterDecorator
 }
 
 // Approvers is the inteface that each driver should implement on hub side. The hub controller will use this driver
@@ -84,3 +87,5 @@ type Approver interface {
 	// deletes rolebindings for the agent, and then this is the additional operation a driver should process.
 	Cleanup(ctx context.Context, cluster *clusterv1.ManagedCluster) error
 }
+
+type ManagedClusterDecorator func(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster

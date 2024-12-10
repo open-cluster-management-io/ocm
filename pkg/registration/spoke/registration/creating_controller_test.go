@@ -12,6 +12,7 @@ import (
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
+	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
 const testSpokeExternalServerUrl = "https://192.168.3.77:32769"
@@ -59,13 +60,14 @@ func TestCreateSpokeCluster(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.startingObjects...)
 			ctrl := managedClusterCreatingController{
-				clusterName:             testinghelpers.TestManagedClusterName,
-				spokeExternalServerURLs: []string{testSpokeExternalServerUrl},
-				spokeCABundle:           []byte("testcabundle"),
-				hubClusterClient:        clusterClient,
-				clusterAnnotations: map[string]string{
-					"agent.open-cluster-management.io/test": "true",
+				clusterName: testinghelpers.TestManagedClusterName,
+				clusterDecorators: []register.ManagedClusterDecorator{
+					AnnotationDecorator(map[string]string{
+						"agent.open-cluster-management.io/test": "true",
+					}),
+					ClientConfigDecorator([]string{testSpokeExternalServerUrl}, []byte("testcabundle")),
 				},
+				hubClusterClient: clusterClient,
 			}
 
 			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""))
