@@ -71,10 +71,24 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		"addon/signca_secret_rolebinding.yaml",
 	}
 
+	var signerSecretNamespace string
+
 	ginkgo.BeforeEach(func() {
+		signerSecretNamespace = "signer-secret-test-ns" + rand.String(6)
+
+		ginkgo.By("create addon custom sign secret namespace")
+		_, err := hub.KubeClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: signerSecretNamespace,
+			},
+		}, metav1.CreateOptions{})
+		if err != nil && !errors.IsAlreadyExists(err) {
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		}
+
 		ginkgo.By("create addon custom sign secret")
-		err := copySignerSecret(context.TODO(), hub.KubeClient, "open-cluster-management-hub",
-			"signer-secret", templateagent.AddonManagerNamespace(), customSignerSecretName)
+		err = copySignerSecret(context.TODO(), hub.KubeClient, "open-cluster-management-hub",
+			"signer-secret", signerSecretNamespace, customSignerSecretName)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		// the addon manager deployment should be running
@@ -85,11 +99,12 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		ginkgo.By(fmt.Sprintf("create addon template resources for cluster %v", universalClusterName))
 		err = createResourcesFromYamlFiles(context.Background(), hub.DynamicClient, hub.RestMapper, s,
 			defaultAddonTemplateReaderManifestsFunc(manifests.AddonManifestFiles, map[string]interface{}{
-				"Namespace":              universalClusterName,
-				"AddonInstallNamespace":  addonInstallNamespace,
-				"CustomSignerName":       customSignerName,
-				"AddonManagerNamespace":  templateagent.AddonManagerNamespace(),
-				"CustomSignerSecretName": customSignerSecretName,
+				"Namespace":                   universalClusterName,
+				"AddonInstallNamespace":       addonInstallNamespace,
+				"CustomSignerName":            customSignerName,
+				"AddonManagerNamespace":       templateagent.AddonManagerNamespace(),
+				"CustomSignerSecretName":      customSignerSecretName,
+				"CustomSignerSecretNamespace": signerSecretNamespace,
 			}),
 			templateResources,
 		)
@@ -132,22 +147,29 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		ginkgo.By(fmt.Sprintf("delete addon template resources for cluster %v", universalClusterName))
 		err = deleteResourcesFromYamlFiles(context.Background(), hub.DynamicClient, hub.RestMapper, s,
 			defaultAddonTemplateReaderManifestsFunc(manifests.AddonManifestFiles, map[string]interface{}{
-				"Namespace":              universalClusterName,
-				"AddonInstallNamespace":  addonInstallNamespace,
-				"CustomSignerName":       customSignerName,
-				"AddonManagerNamespace":  templateagent.AddonManagerNamespace(),
-				"CustomSignerSecretName": customSignerSecretName,
+				"Namespace":                   universalClusterName,
+				"AddonInstallNamespace":       addonInstallNamespace,
+				"CustomSignerName":            customSignerName,
+				"AddonManagerNamespace":       templateagent.AddonManagerNamespace(),
+				"CustomSignerSecretName":      customSignerSecretName,
+				"CustomSignerSecretNamespace": signerSecretNamespace,
 			}),
 			templateResources,
 		)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By("delete addon custom sign secret")
-		err = hub.KubeClient.CoreV1().Secrets(templateagent.AddonManagerNamespace()).Delete(context.TODO(),
+		err = hub.KubeClient.CoreV1().Secrets(signerSecretNamespace).Delete(context.TODO(),
 			customSignerSecretName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			ginkgo.Fail(fmt.Sprintf("failed to delete custom signer secret %v/%v: %v",
-				templateagent.AddonManagerNamespace(), customSignerSecretName, err))
+				signerSecretNamespace, customSignerSecretName, err))
+		}
+
+		ginkgo.By("delete addon custom sign secret namespace")
+		err = hub.KubeClient.CoreV1().Namespaces().Delete(context.TODO(), signerSecretNamespace, metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			ginkgo.Fail(fmt.Sprintf("failed to delete custom signer secret namespace %v: %v", signerSecretNamespace, err))
 		}
 
 		// delete all CSR created for the addon on the hub cluster, otherwise if it reches the limit number 10, the
@@ -182,7 +204,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			return err
 		}).Should(gomega.Succeed())
 
-		ginkgo.By("Check custom signer secret is created")
+		ginkgo.By("Check custom client cert secret is created")
 		gomega.Eventually(func() error {
 			_, err := hub.KubeClient.CoreV1().Secrets(addonInstallNamespace).Get(context.TODO(),
 				templateagent.CustomSignedSecretName(addOnName, customSignerName), metav1.GetOptions{})

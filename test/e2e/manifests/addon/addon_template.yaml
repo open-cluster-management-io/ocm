@@ -152,6 +152,7 @@ spec:
         signerName: << CustomSignerName >>
         signingCA:
           name: << CustomSignerSecretName >>
+          namespace: << CustomSignerSecretNamespace >>
         subject:
           groups:
           - g1

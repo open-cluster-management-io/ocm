@@ -285,18 +285,23 @@ func CustomSignerWithExpiry(
 		if csr.Spec.SignerName != customSignerConfig.SignerName {
 			return nil
 		}
-		caSecret, err := kubeclient.CoreV1().Secrets(AddonManagerNamespace()).Get(
+
+		secretNamespace := AddonManagerNamespace()
+		if len(customSignerConfig.SigningCA.Namespace) != 0 {
+			secretNamespace = customSignerConfig.SigningCA.Namespace
+		}
+		caSecret, err := kubeclient.CoreV1().Secrets(secretNamespace).Get(
 			context.TODO(), customSignerConfig.SigningCA.Name, metav1.GetOptions{})
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("get custome signer ca %s/%s failed, %v",
-				AddonManagerNamespace(), customSignerConfig.SigningCA.Name, err))
+				secretNamespace, customSignerConfig.SigningCA.Name, err))
 			return nil
 		}
 
 		caData, caKey, err := extractCAdata(caSecret.Data[corev1.TLSCertKey], caSecret.Data[corev1.TLSPrivateKeyKey])
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("get ca %s/%s data failed, %v",
-				AddonManagerNamespace(), customSignerConfig.SigningCA.Name, err))
+				secretNamespace, customSignerConfig.SigningCA.Name, err))
 			return nil
 		}
 		return utils.DefaultSignerWithExpiry(caKey, caData, duration)(csr)
