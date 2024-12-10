@@ -13,6 +13,8 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
 
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
@@ -93,6 +95,10 @@ func (c *AWSIRSADriver) InformerHandler(option any) (cache.SharedIndexInformer, 
 func (c *AWSIRSADriver) IsHubKubeConfigValid(ctx context.Context, secretOption register.SecretOption) (bool, error) {
 	// TODO: implement the logic to validate the kubeconfig
 	return true, nil
+}
+
+func (c *AWSIRSADriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
+	return cluster
 }
 
 func NewAWSIRSADriver() register.RegisterDriver {
