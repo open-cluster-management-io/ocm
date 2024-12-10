@@ -73,7 +73,16 @@ func AssertWorkCondition(namespace, name string, workClient workclientset.Interf
 		}
 
 		// check work status condition
-		if meta.IsStatusConditionPresentAndEqual(work.Status.Conditions, expectedType, expectedWorkStatus) {
+		actualCond := meta.FindStatusCondition(work.Status.Conditions, expectedType)
+		if actualCond == nil {
+			return fmt.Errorf("Cannot find expected condition %s", expectedType)
+		}
+		if work.Generation != actualCond.ObservedGeneration {
+			return fmt.Errorf(
+				"Generation of condition %d does not match work condition %d",
+				actualCond.ObservedGeneration, work.Generation)
+		}
+		if actualCond.Status == expectedWorkStatus {
 			return nil
 		}
 		return fmt.Errorf("status of type %s does not match", expectedType)
