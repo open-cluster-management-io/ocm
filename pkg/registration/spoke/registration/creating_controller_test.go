@@ -12,6 +12,7 @@ import (
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
+	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
 const testSpokeExternalServerUrl = "https://192.168.3.77:32769"
@@ -60,7 +61,7 @@ func TestCreateSpokeCluster(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.startingObjects...)
 			ctrl := managedClusterCreatingController{
 				clusterName: testinghelpers.TestManagedClusterName,
-				clusterDecorators: []ManagedClusterDecorator{
+				clusterDecorators: []register.ManagedClusterDecorator{
 					AnnotationDecorator(map[string]string{
 						"agent.open-cluster-management.io/test": "true",
 					}),
