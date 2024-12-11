@@ -22,6 +22,8 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog/v2"
 
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
@@ -265,6 +267,14 @@ func (c *CSRDriver) IsHubKubeConfigValid(ctx context.Context, secretOption regis
 
 	return isCertificateValid(logger, certData, nil)
 }
+
+func (c *CSRDriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluster, clusterAnnotations map[string]string, managedClusterArn string, managedClusterRoleSuffix string) *clusterv1.ManagedCluster {
+	return cluster
+}
+
+//// AddClusterAnnotations noop for CSR driver
+//func (c *CSRDriver) AddClusterAnnotations(clusterAnnotations map[string]string, managedClusterArn string, managedClusterRoleSuffix string) {
+//}
 
 func NewCSRDriver() register.RegisterDriver {
 	return &CSRDriver{}
