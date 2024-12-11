@@ -32,6 +32,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/hub/clusterrole"
 	"open-cluster-management.io/ocm/pkg/registration/hub/gc"
 	"open-cluster-management.io/ocm/pkg/registration/hub/importer"
+	importeroptions "open-cluster-management.io/ocm/pkg/registration/hub/importer/options"
 	cloudproviders "open-cluster-management.io/ocm/pkg/registration/hub/importer/providers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/importer/providers/capi"
 	"open-cluster-management.io/ocm/pkg/registration/hub/lease"
@@ -47,6 +48,7 @@ import (
 type HubManagerOptions struct {
 	ClusterAutoApprovalUsers []string
 	GCResourceList           []string
+	ImportOption             *importeroptions.Options
 }
 
 // NewHubManagerOptions returns a HubManagerOptions
@@ -54,6 +56,7 @@ func NewHubManagerOptions() *HubManagerOptions {
 	return &HubManagerOptions{
 		GCResourceList: []string{"addon.open-cluster-management.io/v1alpha1/managedclusteraddons",
 			"work.open-cluster-management.io/v1/manifestworks"},
+		ImportOption: importeroptions.New(),
 	}
 }
 
@@ -65,6 +68,7 @@ func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 		"A list GVR user can customize which are cleaned up after cluster is deleted. Format is group/version/resource, "+
 			"and the default are managedclusteraddon and manifestwork. The resources will be deleted in order."+
 			"The flag works only when ResourceCleanup feature gate is enable.")
+	m.ImportOption.AddFlags(fs)
 }
 
 // RunControllerManager starts the controllers on hub to manage spoke cluster registration.
@@ -255,7 +259,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		}
 		clusterImporter = importer.NewImporter(
 			[]importer.KlusterletConfigRenderer{
-				importer.RenderBootstrapHubKubeConfig(kubeClient, ""),
+				importer.RenderBootstrapHubKubeConfig(kubeClient, m.ImportOption.APIServerURL),
 			},
 			clusterClient,
 			clusterInformers.Cluster().V1().ManagedClusters(),

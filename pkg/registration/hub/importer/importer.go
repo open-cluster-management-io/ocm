@@ -37,9 +37,9 @@ import (
 )
 
 const (
-	operatorNamesapce     = "open-cluster-management"
-	bootstrapSA           = "cluster-bootstrap"
-	conditionTypeImported = "Imported"
+	operatorNamesapce               = "open-cluster-management"
+	bootstrapSA                     = "cluster-bootstrap"
+	ManagedClusterConditionImported = "Imported"
 )
 
 var (
@@ -66,6 +66,7 @@ type Importer struct {
 	patcher       patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
 }
 
+// NewImporter creates an auto import controller
 func NewImporter(
 	renders []KlusterletConfigRenderer,
 	clusterClient clusterclientset.Interface,
@@ -107,7 +108,7 @@ func (i *Importer) sync(ctx context.Context, syncCtx factory.SyncContext) error 
 	}
 
 	// If the cluster is imported, skip the reconcile
-	if meta.IsStatusConditionTrue(cluster.Status.Conditions, conditionTypeImported) {
+	if meta.IsStatusConditionTrue(cluster.Status.Conditions, ManagedClusterConditionImported) {
 		return nil
 	}
 
@@ -116,10 +117,11 @@ func (i *Importer) sync(ctx context.Context, syncCtx factory.SyncContext) error 
 	for _, p := range i.providers {
 		if p.IsManagedClusterOwner(cluster) {
 			provider = p
+			break
 		}
 	}
 	if provider == nil {
-		logger.Info("provider not found for cluster", "cluster", cluster.Name)
+		logger.V(2).Info("provider not found for cluster", "cluster", cluster.Name)
 		return nil
 	}
 
@@ -146,10 +148,10 @@ func (i *Importer) reconcile(
 	recorder events.Recorder,
 	provider cloudproviders.Interface,
 	cluster *v1.ManagedCluster) (*v1.ManagedCluster, error) {
-	clients, err := provider.Clients(cluster)
+	clients, err := provider.Clients(ctx, cluster)
 	if err != nil {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:   conditionTypeImported,
+			Type:   ManagedClusterConditionImported,
 			Status: metav1.ConditionFalse,
 			Reason: "KubeConfigGetFailed",
 			Message: fmt.Sprintf("failed to get kubeconfig. See errors:\n%s",
@@ -160,7 +162,7 @@ func (i *Importer) reconcile(
 
 	if clients == nil {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:    conditionTypeImported,
+			Type:    ManagedClusterConditionImported,
 			Status:  metav1.ConditionFalse,
 			Reason:  "KubeConfigNotFound",
 			Message: "Secret for kubeconfig is not found.",
@@ -172,14 +174,18 @@ func (i *Importer) reconcile(
 	klusterletChartConfig := &chart.KlusterletChartConfig{
 		CreateNamespace: true,
 		Klusterlet: chart.KlusterletConfig{
+			Create:      true,
 			ClusterName: cluster.Name,
+			ResourceRequirement: operatorv1.ResourceRequirement{
+				Type: operatorv1.ResourceQosClassDefault,
+			},
 		},
 	}
 	for _, renderer := range i.renders {
 		klusterletChartConfig, err = renderer(ctx, klusterletChartConfig)
 		if err != nil {
 			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-				Type:   conditionTypeImported,
+				Type:   ManagedClusterConditionImported,
 				Status: metav1.ConditionFalse,
 				Reason: "ConfigRendererFailed",
 				Message: fmt.Sprintf("failed to render config. See errors:\n%s",
@@ -231,7 +237,7 @@ func (i *Importer) reconcile(
 	}
 	if len(errs) > 0 {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:   conditionTypeImported,
+			Type:   ManagedClusterConditionImported,
 			Status: metav1.ConditionFalse,
 			Reason: "ImportFailed",
 			Message: fmt.Sprintf("failed to import the klusterlet. See errors:\n%s",
@@ -239,7 +245,7 @@ func (i *Importer) reconcile(
 		})
 	} else {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:   conditionTypeImported,
+			Type:   ManagedClusterConditionImported,
 			Status: metav1.ConditionTrue,
 			Reason: "ImportSucceed",
 		})

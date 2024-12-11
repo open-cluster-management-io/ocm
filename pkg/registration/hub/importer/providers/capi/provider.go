@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
 
 	clusterinformerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -25,7 +26,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/hub/importer/providers"
 )
 
-var gvr = schema.GroupVersionResource{
+var ClusterAPIGVR = schema.GroupVersionResource{
 	Group:    "cluster.x-k8s.io",
 	Version:  "v1beta1",
 	Resource: "clusters",
@@ -56,13 +57,14 @@ func NewCAPIProvider(
 
 	return &CAPIProvider{
 		informer:              dynamicInformer,
-		lister:                dynamicInformer.ForResource(gvr).Lister(),
+		lister:                dynamicInformer.ForResource(ClusterAPIGVR).Lister(),
 		kubeClient:            kubeClient,
 		managedClusterIndexer: clusterInformer.Informer().GetIndexer(),
 	}
 }
 
-func (c *CAPIProvider) Clients(cluster *clusterv1.ManagedCluster) (*providers.Clients, error) {
+func (c *CAPIProvider) Clients(ctx context.Context, cluster *clusterv1.ManagedCluster) (*providers.Clients, error) {
+	logger := klog.FromContext(ctx)
 	clusterKey := capiNameFromManagedCluster(cluster)
 	namespace, name, err := cache.SplitMetaNamespaceKey(clusterKey)
 	if err != nil {
@@ -71,14 +73,18 @@ func (c *CAPIProvider) Clients(cluster *clusterv1.ManagedCluster) (*providers.Cl
 	_, err = c.lister.ByNamespace(namespace).Get(name)
 	switch {
 	case apierrors.IsNotFound(err):
+		logger.V(4).Info("cluster is not found", "name", name, "namespace", namespace)
+		// TODO(qiujian16) need to consider requeue in this case, since secrets is not watched.
 		return nil, nil
 	case err != nil:
 		return nil, err
 	}
 
-	secret, err := c.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name+"-kubeconfig", metav1.GetOptions{})
+	secret, err := c.kubeClient.CoreV1().Secrets(namespace).Get(ctx, name+"-kubeconfig", metav1.GetOptions{})
 	switch {
 	case apierrors.IsNotFound(err):
+		logger.V(4).Info(
+			"kubeconfig secret is not found", "name", name+"-kubeconfig", "namespace", namespace)
 		return nil, nil
 	case err != nil:
 		return nil, err
@@ -102,7 +108,7 @@ func (c *CAPIProvider) Clients(cluster *clusterv1.ManagedCluster) (*providers.Cl
 }
 
 func (c *CAPIProvider) Register(syncCtx factory.SyncContext) {
-	_, err := c.informer.ForResource(gvr).Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := c.informer.ForResource(ClusterAPIGVR).Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			c.enqueueManagedClusterByCAPI(obj, syncCtx)
 		},

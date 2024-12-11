@@ -47,7 +47,7 @@ func TestSync(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !meta.IsStatusConditionTrue(managedCluster.Status.Conditions, conditionTypeImported) {
+				if !meta.IsStatusConditionTrue(managedCluster.Status.Conditions, ManagedClusterConditionImported) {
 					t.Errorf("expected managed cluster to be imported")
 				}
 			},
@@ -83,7 +83,7 @@ func TestSync(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !meta.IsStatusConditionFalse(managedCluster.Status.Conditions, conditionTypeImported) {
+				if !meta.IsStatusConditionFalse(managedCluster.Status.Conditions, ManagedClusterConditionImported) {
 					t.Errorf("expected managed cluster to be imported")
 				}
 			},
@@ -123,7 +123,7 @@ type fakeProvider struct {
 }
 
 // KubeConfig is to return the config to connect to the target cluster.
-func (f *fakeProvider) Clients(_ *clusterv1.ManagedCluster) (*providers.Clients, error) {
+func (f *fakeProvider) Clients(_ context.Context, _ *clusterv1.ManagedCluster) (*providers.Clients, error) {
 	if f.kubeConfigErr != nil {
 		return nil, f.kubeConfigErr
 	}

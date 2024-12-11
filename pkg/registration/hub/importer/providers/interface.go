@@ -15,8 +15,9 @@ import (
 
 // Interface is the interface that a cluster provider should implement
 type Interface interface {
-	// Clients is to return the client to connect to the target cluster.
-	Clients(cluster *clusterv1.ManagedCluster) (*Clients, error)
+	// Clients returns the client to connect to the target cluster. The client should have the sufficient
+	// permission to create CRDs/operator and klusterlet CR in the remote cluster.
+	Clients(ctx context.Context, cluster *clusterv1.ManagedCluster) (*Clients, error)
 
 	// IsManagedClusterOwner check if the provider is used to manage this cluster
 	IsManagedClusterOwner(cluster *clusterv1.ManagedCluster) bool
@@ -25,7 +26,8 @@ type Interface interface {
 	// into the queue with the name of the managed cluster
 	Register(syncCtx factory.SyncContext)
 
-	// Run starts the provider
+	// Run starts the provider. The provider might need to watch the provider related resources
+	// on the hub cluster, or start a periodic task.
 	Run(ctx context.Context)
 }
 

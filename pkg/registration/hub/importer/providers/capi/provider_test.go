@@ -1,6 +1,7 @@
 package capi
 
 import (
+	"context"
 	"testing"
 
 	"github.com/ghodss/yaml"
@@ -180,16 +181,16 @@ func TestClients(t *testing.T) {
 			kubeClient := fakekube.NewClientset(c.kubeObjects...)
 			dynamicInformers := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, 0)
 			for _, capiObj := range c.capiObjects {
-				if err := dynamicInformers.ForResource(gvr).Informer().GetStore().Add(capiObj); err != nil {
+				if err := dynamicInformers.ForResource(ClusterAPIGVR).Informer().GetStore().Add(capiObj); err != nil {
 					t.Fatal(err)
 				}
 			}
 			provider := &CAPIProvider{
 				kubeClient: kubeClient,
 				informer:   dynamicInformers,
-				lister:     dynamicInformers.ForResource(gvr).Lister(),
+				lister:     dynamicInformers.ForResource(ClusterAPIGVR).Lister(),
 			}
-			_, err := provider.Clients(c.cluster)
+			_, err := provider.Clients(context.TODO(), c.cluster)
 			if c.expectErr && err == nil {
 				t.Errorf("expected error but got nil")
 			}
@@ -254,12 +255,12 @@ func TestIsManagedClusterOwner(t *testing.T) {
 			dynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), c.capiObjects...)
 			dynamicInformers := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, 0)
 			for _, capiObj := range c.capiObjects {
-				if err := dynamicInformers.ForResource(gvr).Informer().GetStore().Add(capiObj); err != nil {
+				if err := dynamicInformers.ForResource(ClusterAPIGVR).Informer().GetStore().Add(capiObj); err != nil {
 					t.Fatal(err)
 				}
 			}
 			provider := &CAPIProvider{
-				lister: dynamicInformers.ForResource(gvr).Lister(),
+				lister: dynamicInformers.ForResource(ClusterAPIGVR).Lister(),
 			}
 			owned := provider.IsManagedClusterOwner(c.cluster)
 			if c.expectedOwn != owned {
