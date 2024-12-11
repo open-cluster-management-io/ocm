@@ -230,7 +230,7 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			driver := NewAWSIRSADriver()
+			driver := NewAWSIRSADriver("", "")
 			secretOption := register.SecretOption{
 				ClusterName:       c.clusterName,
 				AgentName:         c.agentName,
