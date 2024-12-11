@@ -31,7 +31,9 @@ const (
 )
 
 type AWSIRSADriver struct {
-	name string
+	name                     string
+	managedClusterArn        string
+	managedClusterRoleSuffix string
 }
 
 func (c *AWSIRSADriver) Process(
@@ -100,18 +102,18 @@ func (c *AWSIRSADriver) IsHubKubeConfigValid(ctx context.Context, secretOption r
 	return true, nil
 }
 
-func (c *AWSIRSADriver) ManagedClusterDecorator(managedClusterArn string, managedClusterRoleSuffix string) register.ManagedClusterDecorator {
-	return func(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
-
-		if cluster.Annotations == nil {
-			cluster.Annotations = make(map[string]string)
-		}
-		cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterArn] = managedClusterArn
-		cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterIAMRoleSuffix] = managedClusterRoleSuffix
-		return cluster
+func (c *AWSIRSADriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
+	if cluster.Annotations == nil {
+		cluster.Annotations = make(map[string]string)
 	}
+	cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterArn] = c.managedClusterArn
+	cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterIAMRoleSuffix] = c.managedClusterRoleSuffix
+	return cluster
 }
 
-func NewAWSIRSADriver() register.RegisterDriver {
-	return &AWSIRSADriver{}
+func NewAWSIRSADriver(managedClusterArn string, managedClusterRoleSuffix string) register.RegisterDriver {
+	return &AWSIRSADriver{
+		managedClusterArn:        managedClusterArn,
+		managedClusterRoleSuffix: managedClusterRoleSuffix,
+	}
 }

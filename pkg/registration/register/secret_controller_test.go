@@ -198,8 +198,6 @@ func (f *fakeDriver) InformerHandler(_ any) (cache.SharedIndexInformer, factory.
 	return nil, nil
 }
 
-func (f *fakeDriver) ManagedClusterDecorator(managedClusterArn string, managedClusterRoleSuffix string) ManagedClusterDecorator {
-	return func(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
-		return cluster
-	}
+func (f *fakeDriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
+	return cluster
 }

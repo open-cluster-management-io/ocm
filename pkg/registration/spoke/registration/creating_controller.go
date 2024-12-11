@@ -16,7 +16,6 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
-	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
 var (
@@ -24,17 +23,19 @@ var (
 	CreatingControllerSyncInterval = 60 * time.Minute
 )
 
+type ManagedClusterDecorator func(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster
+
 // managedClusterCreatingController creates a ManagedCluster on hub cluster during the spoke agent bootstrap phase
 type managedClusterCreatingController struct {
 	clusterName       string
-	clusterDecorators []register.ManagedClusterDecorator
+	clusterDecorators []ManagedClusterDecorator
 	hubClusterClient  clientset.Interface
 }
 
 // NewManagedClusterCreatingController creates a new managedClusterCreatingController on the managed cluster.
 func NewManagedClusterCreatingController(
 	clusterName string,
-	decorators []register.ManagedClusterDecorator,
+	decorators []ManagedClusterDecorator,
 	hubClusterClient clientset.Interface,
 	recorder events.Recorder) factory.Controller {
 
@@ -111,7 +112,7 @@ func skipUnauthorizedError(err error) error {
 	return err
 }
 
-func AnnotationDecorator(annotations map[string]string) register.ManagedClusterDecorator {
+func AnnotationDecorator(annotations map[string]string) ManagedClusterDecorator {
 	return func(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
 		filteredAnnotations := commonhelpers.FilterClusterAnnotations(annotations)
 		if cluster.Annotations == nil {
@@ -125,7 +126,7 @@ func AnnotationDecorator(annotations map[string]string) register.ManagedClusterD
 }
 
 // ClientConfigDecorator merge ClientConfig
-func ClientConfigDecorator(externalServerURLs []string, caBundle []byte) register.ManagedClusterDecorator {
+func ClientConfigDecorator(externalServerURLs []string, caBundle []byte) ManagedClusterDecorator {
 	return func(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
 		for _, serverURL := range externalServerURLs {
 			isIncludeByExisting := false

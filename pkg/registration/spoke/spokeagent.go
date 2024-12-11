@@ -192,7 +192,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	var registerDriver register.RegisterDriver
 	var registrationOption = o.registrationOption
 	if registrationOption.RegistrationAuth == AwsIrsaAuthType {
-		registerDriver = awsIrsa.NewAWSIRSADriver()
+		registerDriver = awsIrsa.NewAWSIRSADriver(o.registrationOption.ManagedClusterArn, o.registrationOption.ManagedClusterRoleSuffix)
 	} else {
 		registerDriver = csr.NewCSRDriver()
 	}
@@ -243,10 +243,10 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	// start a SpokeClusterCreatingController to make sure there is a spoke cluster on hub cluster
 	spokeClusterCreatingController := registration.NewManagedClusterCreatingController(
 		o.agentOptions.SpokeClusterName,
-		[]register.ManagedClusterDecorator{
+		[]registration.ManagedClusterDecorator{
 			registration.AnnotationDecorator(o.registrationOption.ClusterAnnotations),
 			registration.ClientConfigDecorator(o.registrationOption.SpokeExternalServerURLs, spokeClusterCABundle),
-			o.driver.ManagedClusterDecorator(o.registrationOption.ManagedClusterArn, o.registrationOption.ManagedClusterRoleSuffix),
+			o.driver.ManagedClusterDecorator,
 		},
 		bootstrapClusterClient,
 		recorder,
