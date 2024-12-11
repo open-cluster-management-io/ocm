@@ -99,6 +99,7 @@ func newDeploymentDecorator(
 			newVolumeDecorator(addonName, template),
 			newNodePlacementDecorator(privateValues),
 			newImageDecorator(privateValues),
+			newProxyDecorator(privateValues),
 		},
 	}
 }
@@ -141,6 +142,7 @@ func newDaemonSetDecorator(
 			newVolumeDecorator(addonName, template),
 			newNodePlacementDecorator(privateValues),
 			newImageDecorator(privateValues),
+			newProxyDecorator(privateValues),
 		},
 	}
 }
@@ -327,6 +329,60 @@ func (d *imageDecorator) decorate(pod *corev1.PodTemplateSpec) error {
 	}
 
 	return nil
+}
+
+type proxyDecorator struct {
+	privateValues addonfactory.Values
+}
+
+func newProxyDecorator(privateValues addonfactory.Values) podTemplateSpecDecorator {
+	return &proxyDecorator{
+		privateValues: privateValues,
+	}
+}
+
+func (d *proxyDecorator) decorate(pod *corev1.PodTemplateSpec) error {
+	proxyConfig, ok := d.privateValues[ProxyPrivateValueKey]
+	if !ok {
+		return nil
+	}
+
+	pc, ok := proxyConfig.(addonapiv1alpha1.ProxyConfig)
+	if !ok {
+		return fmt.Errorf("proxy config value is invalid")
+	}
+
+	keyValues := []keyValuePair{}
+	if len(pc.HTTPProxy) > 0 {
+		keyValues = append(keyValues, keyValuePair{
+			name:  "HTTP_PROXY",
+			value: pc.HTTPProxy,
+		})
+	}
+	if len(pc.HTTPSProxy) > 0 {
+		keyValues = append(keyValues, keyValuePair{
+			name:  "HTTPS_PROXY",
+			value: pc.HTTPSProxy,
+		})
+	}
+	if len(pc.NoProxy) > 0 {
+		keyValues = append(keyValues, keyValuePair{
+			name:  "NO_PROXY",
+			value: pc.NoProxy,
+		})
+	}
+	if len(pc.CABundle) > 0 {
+		keyValues = append(keyValues, keyValuePair{
+			name:  "PROXY_CA_BUNDLE",
+			value: string(pc.CABundle),
+		})
+	}
+
+	if len(keyValues) == 0 {
+		return nil
+	}
+
+	return newEnvironmentDecorator(keyValues).decorate(pod)
 }
 
 func hubKubeconfigSecretMountPath() string {

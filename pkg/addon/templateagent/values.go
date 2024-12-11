@@ -45,6 +45,19 @@ func ToAddOnInstallNamespacePrivateValues(config addonapiv1alpha1.AddOnDeploymen
 	}, nil
 }
 
+func ToAddOnProxyPrivateValues(config addonapiv1alpha1.AddOnDeploymentConfig) (addonfactory.Values, error) {
+	proxyConfig := config.Spec.ProxyConfig
+	if len(proxyConfig.HTTPProxy) == 0 &&
+		len(proxyConfig.HTTPSProxy) == 0 &&
+		len(proxyConfig.NoProxy) == 0 &&
+		len(proxyConfig.CABundle) == 0 {
+		return nil, nil
+	}
+	return addonfactory.Values{
+		ProxyPrivateValueKey: proxyConfig,
+	}, nil
+}
+
 type keyValuePair struct {
 	name  string
 	value string
@@ -75,6 +88,7 @@ func (a *CRDTemplateAgentAddon) getValues(
 		NodePlacementPrivateValueKey:    {},
 		RegistriesPrivateValueKey:       {},
 		InstallNamespacePrivateValueKey: {},
+		ProxyPrivateValueKey:            {},
 	}
 
 	for i := 0; i < len(a.getValuesFuncs); i++ {
