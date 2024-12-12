@@ -371,18 +371,13 @@ func (d *proxyDecorator) decorate(pod *corev1.PodTemplateSpec) error {
 			value: pc.NoProxy,
 		})
 	}
-	if len(pc.CABundle) > 0 {
-		keyValues = append(keyValues, keyValuePair{
-			name:  "PROXY_CA_BUNDLE",
-			value: string(pc.CABundle),
-		})
-	}
 
 	if len(keyValues) == 0 {
 		return nil
 	}
 
 	return newEnvironmentDecorator(keyValues).decorate(pod)
+	// TODO: consider to create a configmap to store the proxyConfig.CABundle and mount it to the Deployment/DaemonSet
 }
 
 func hubKubeconfigSecretMountPath() string {
