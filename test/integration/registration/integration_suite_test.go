@@ -75,6 +75,8 @@ var CRDPaths = []string{
 	"./vendor/open-cluster-management.io/api/cluster/v1beta2/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml",
 	// spoke
 	"./vendor/open-cluster-management.io/api/cluster/v1alpha1/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml",
+	// external API deps
+	"./test/integration/testdeps/capi/cluster.x-k8s.io_clusters.yaml",
 }
 
 func runAgent(name string, opt *spoke.SpokeAgentOptions, commOption *commonoptions.AgentOptions, cfg *rest.Config) context.CancelFunc {
@@ -196,12 +198,17 @@ var _ = ginkgo.BeforeSuite(func() {
 	err = features.HubMutableFeatureGate.Set("ResourceCleanup=true")
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
+	// enable clusterImporter feature gate
+	err = features.HubMutableFeatureGate.Set("ClusterImporter=true")
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 	// start hub controller
 	var ctx context.Context
 	startHub = func() {
 		ctx, stopHub = context.WithCancel(context.Background())
 		go func() {
 			m := hub.NewHubManagerOptions()
+			m.ImportOption.APIServerURL = cfg.Host
 			m.ClusterAutoApprovalUsers = []string{util.AutoApprovalBootstrapUser}
 			err := m.RunControllerManager(ctx, &controllercmd.ControllerContext{
 				KubeConfig:    cfg,
