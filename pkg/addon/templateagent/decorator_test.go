@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
@@ -155,6 +156,100 @@ func TestNamespaceDecorator(t *testing.T) {
 				t.Fatal(err)
 			}
 			tc.validateObject(t, result)
+		})
+	}
+
+}
+
+func TestProxyDecorator(t *testing.T) {
+	tests := []struct {
+		name           string
+		config         addonapiv1alpha1.AddOnDeploymentConfig
+		pod            *corev1.PodTemplateSpec
+		validateObject func(t *testing.T, pod *corev1.PodTemplateSpec)
+	}{
+		{
+			name: "no proxy set",
+			pod: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "test",
+							Image: "test",
+						},
+					},
+				},
+			},
+			validateObject: func(t *testing.T, pod *corev1.PodTemplateSpec) {
+				for _, c := range pod.Spec.Containers {
+					if c.Env != nil {
+						for _, e := range c.Env {
+							if e.Name == "HTTP_PROXY" || e.Name == "HTTPS_PROXY" || e.Name == "NO_PROXY" ||
+								e.Name == "http_proxy" || e.Name == "https_proxy" || e.Name == "no_proxy" {
+								t.Errorf("proxy env is not expected, got %v", e)
+							}
+						}
+					}
+				}
+			},
+		},
+		{
+			name: "proxy set",
+			pod: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "test",
+							Image: "test",
+						},
+					},
+				},
+			},
+			config: addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					ProxyConfig: addonapiv1alpha1.ProxyConfig{
+						HTTPProxy:  "http://proxy",
+						HTTPSProxy: "https://proxy",
+						NoProxy:    "no-proxy",
+					},
+				},
+			},
+			validateObject: func(t *testing.T, pod *corev1.PodTemplateSpec) {
+				for _, c := range pod.Spec.Containers {
+					if c.Env != nil {
+						for _, e := range c.Env {
+							if e.Name == "HTTP_PROXY" || e.Name == "http_proxy" {
+								if e.Value != "http://proxy" {
+									t.Errorf("http proxy env is not correct, got %v", e)
+								}
+							} else if e.Name == "HTTPS_PROXY" || e.Name == "https_proxy" {
+								if e.Value != "https://proxy" {
+									t.Errorf("https proxy env is not correct, got %v", e)
+								}
+							} else if e.Name == "NO_PROXY" || e.Name == "no_proxy" {
+								if e.Value != "no-proxy" {
+									t.Errorf("no proxy env is not correct, got %v", e)
+								}
+							}
+						}
+					}
+				}
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			values, err := ToAddOnProxyPrivateValues(tc.config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			d := newProxyDecorator(values)
+			err = d.decorate(tc.pod)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tc.validateObject(t, tc.pod)
 		})
 	}
 

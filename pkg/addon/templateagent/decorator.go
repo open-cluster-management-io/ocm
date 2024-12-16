@@ -99,6 +99,7 @@ func newDeploymentDecorator(
 			newVolumeDecorator(addonName, template),
 			newNodePlacementDecorator(privateValues),
 			newImageDecorator(privateValues),
+			newProxyDecorator(privateValues),
 		},
 	}
 }
@@ -141,6 +142,7 @@ func newDaemonSetDecorator(
 			newVolumeDecorator(addonName, template),
 			newNodePlacementDecorator(privateValues),
 			newImageDecorator(privateValues),
+			newProxyDecorator(privateValues),
 		},
 	}
 }
@@ -327,6 +329,55 @@ func (d *imageDecorator) decorate(pod *corev1.PodTemplateSpec) error {
 	}
 
 	return nil
+}
+
+type proxyDecorator struct {
+	privateValues addonfactory.Values
+}
+
+func newProxyDecorator(privateValues addonfactory.Values) podTemplateSpecDecorator {
+	return &proxyDecorator{
+		privateValues: privateValues,
+	}
+}
+
+func (d *proxyDecorator) decorate(pod *corev1.PodTemplateSpec) error {
+	proxyConfig, ok := d.privateValues[ProxyPrivateValueKey]
+	if !ok {
+		return nil
+	}
+
+	pc, ok := proxyConfig.(addonapiv1alpha1.ProxyConfig)
+	if !ok {
+		return fmt.Errorf("proxy config value is invalid")
+	}
+
+	keyValues := []keyValuePair{}
+	if len(pc.HTTPProxy) > 0 {
+		keyValues = append(keyValues,
+			keyValuePair{name: "HTTP_PROXY", value: pc.HTTPProxy},
+			keyValuePair{name: "http_proxy", value: pc.HTTPProxy},
+		)
+	}
+	if len(pc.HTTPSProxy) > 0 {
+		keyValues = append(keyValues,
+			keyValuePair{name: "HTTPS_PROXY", value: pc.HTTPSProxy},
+			keyValuePair{name: "https_proxy", value: pc.HTTPSProxy},
+		)
+	}
+	if len(pc.NoProxy) > 0 {
+		keyValues = append(keyValues,
+			keyValuePair{name: "NO_PROXY", value: pc.NoProxy},
+			keyValuePair{name: "no_proxy", value: pc.NoProxy},
+		)
+	}
+
+	if len(keyValues) == 0 {
+		return nil
+	}
+
+	return newEnvironmentDecorator(keyValues).decorate(pod)
+	// TODO: consider to create a configmap to store the proxyConfig.CABundle and mount it to the Deployment/DaemonSet
 }
 
 func hubKubeconfigSecretMountPath() string {

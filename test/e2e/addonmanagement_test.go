@@ -36,6 +36,7 @@ const (
 	nodePlacementDeploymentConfigName = "node-placement-deploy-config"
 	imageOverrideDeploymentConfigName = "image-override-deploy-config"
 	namespaceOverrideConfigName       = "namespace-override-config"
+	proxyDeploymentConfigName         = "proxy-deploy-config"
 	originalImageValue                = "quay.io/open-cluster-management/addon-examples:latest"
 	overrideImageValue                = "quay.io/ocm/addon-examples:latest"
 	customSignerName                  = "example.com/signer-name"
@@ -51,6 +52,11 @@ var (
 			Source: "quay.io/open-cluster-management/addon-examples",
 			Mirror: "quay.io/ocm/addon-examples",
 		},
+	}
+	proxyConfig = addonapiv1alpha1.ProxyConfig{
+		HTTPProxy:  "http://proxy.example.com",
+		HTTPSProxy: "http://proxy.example.com",
+		NoProxy:    "localhost",
 	}
 )
 
@@ -652,6 +658,79 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		}).ShouldNot(gomega.HaveOccurred())
 	})
 
+	ginkgo.It("Template type addon should be configured by addon deployment config for proxy", func() {
+		ginkgo.By("Prepare a AddOnDeploymentConfig for addon proxy config")
+		gomega.Eventually(func() error {
+			return prepareProxyAddOnDeploymentConfig(universalClusterName, addonInstallNamespace)
+		}).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Add the configs to ManagedClusterAddOn")
+		gomega.Eventually(func() error {
+			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
+				context.Background(), addOnName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			newAddon := addon.DeepCopy()
+			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+				{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						Group:    "addon.open-cluster-management.io",
+						Resource: "addondeploymentconfigs",
+					},
+					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+						Namespace: universalClusterName,
+						Name:      proxyDeploymentConfigName,
+					},
+				},
+			}
+			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
+				context.Background(), newAddon, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
+			return nil
+		}).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Make sure addon is configured")
+		gomega.Eventually(func() error {
+			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
+				context.Background(), "hello-template-agent", metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			for _, container := range agentDeploy.Spec.Template.Spec.Containers {
+				found := 0
+				for _, env := range container.Env {
+					if env.Name == "HTTP_PROXY" || env.Name == "http_proxy" {
+						if env.Value != proxyConfig.HTTPProxy {
+							return fmt.Errorf("unexpected HTTP_PROXY %s", env.Value)
+						}
+						found++
+					}
+					if env.Name == "HTTPS_PROXY" || env.Name == "https_proxy" {
+						if env.Value != proxyConfig.HTTPSProxy {
+							return fmt.Errorf("unexpected HTTPS_PROXY %s", env.Value)
+						}
+						found++
+					}
+					if env.Name == "NO_PROXY" || env.Name == "no_proxy" {
+						if env.Value != proxyConfig.NoProxy {
+							return fmt.Errorf("unexpected NO_PROXY %s", env.Value)
+						}
+						found++
+					}
+				}
+				if found != 6 {
+					return fmt.Errorf("unexpected env %v", container.Env)
+				}
+			}
+
+			return nil
+		}).ShouldNot(gomega.HaveOccurred())
+	})
+
 })
 
 func prepareInstallNamespace(namespace, installNamespace string) error {
@@ -724,6 +803,37 @@ func prepareNodePlacementAddOnDeploymentConfig(namespace, installNamespace strin
 						Tolerations:  tolerations,
 					},
 					AgentInstallNamespace: installNamespace,
+				},
+			},
+			metav1.CreateOptions{},
+		); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	return err
+}
+
+func prepareProxyAddOnDeploymentConfig(namespace, installNamespace string) error {
+	_, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
+		context.Background(), proxyDeploymentConfigName, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		if _, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Create(
+			context.Background(),
+			&addonapiv1alpha1.AddOnDeploymentConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      proxyDeploymentConfigName,
+					Namespace: namespace,
+				},
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					NodePlacement: &addonapiv1alpha1.NodePlacement{
+						NodeSelector: nodeSelector,
+						Tolerations:  tolerations,
+					},
+					AgentInstallNamespace: installNamespace,
+					ProxyConfig:           proxyConfig,
 				},
 			},
 			metav1.CreateOptions{},
