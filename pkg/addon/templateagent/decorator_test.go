@@ -184,7 +184,8 @@ func TestProxyDecorator(t *testing.T) {
 				for _, c := range pod.Spec.Containers {
 					if c.Env != nil {
 						for _, e := range c.Env {
-							if e.Name == "HTTP_PROXY" || e.Name == "HTTPS_PROXY" || e.Name == "NO_PROXY" {
+							if e.Name == "HTTP_PROXY" || e.Name == "HTTPS_PROXY" || e.Name == "NO_PROXY" ||
+								e.Name == "http_proxy" || e.Name == "https_proxy" || e.Name == "no_proxy" {
 								t.Errorf("proxy env is not expected, got %v", e)
 							}
 						}
@@ -217,15 +218,15 @@ func TestProxyDecorator(t *testing.T) {
 				for _, c := range pod.Spec.Containers {
 					if c.Env != nil {
 						for _, e := range c.Env {
-							if e.Name == "HTTP_PROXY" {
+							if e.Name == "HTTP_PROXY" || e.Name == "http_proxy" {
 								if e.Value != "http://proxy" {
 									t.Errorf("http proxy env is not correct, got %v", e)
 								}
-							} else if e.Name == "HTTPS_PROXY" {
+							} else if e.Name == "HTTPS_PROXY" || e.Name == "https_proxy" {
 								if e.Value != "https://proxy" {
 									t.Errorf("https proxy env is not correct, got %v", e)
 								}
-							} else if e.Name == "NO_PROXY" {
+							} else if e.Name == "NO_PROXY" || e.Name == "no_proxy" {
 								if e.Value != "no-proxy" {
 									t.Errorf("no proxy env is not correct, got %v", e)
 								}

@@ -354,22 +354,22 @@ func (d *proxyDecorator) decorate(pod *corev1.PodTemplateSpec) error {
 
 	keyValues := []keyValuePair{}
 	if len(pc.HTTPProxy) > 0 {
-		keyValues = append(keyValues, keyValuePair{
-			name:  "HTTP_PROXY",
-			value: pc.HTTPProxy,
-		})
+		keyValues = append(keyValues,
+			keyValuePair{name: "HTTP_PROXY", value: pc.HTTPProxy},
+			keyValuePair{name: "http_proxy", value: pc.HTTPProxy},
+		)
 	}
 	if len(pc.HTTPSProxy) > 0 {
-		keyValues = append(keyValues, keyValuePair{
-			name:  "HTTPS_PROXY",
-			value: pc.HTTPSProxy,
-		})
+		keyValues = append(keyValues,
+			keyValuePair{name: "HTTPS_PROXY", value: pc.HTTPSProxy},
+			keyValuePair{name: "https_proxy", value: pc.HTTPSProxy},
+		)
 	}
 	if len(pc.NoProxy) > 0 {
-		keyValues = append(keyValues, keyValuePair{
-			name:  "NO_PROXY",
-			value: pc.NoProxy,
-		})
+		keyValues = append(keyValues,
+			keyValuePair{name: "NO_PROXY", value: pc.NoProxy},
+			keyValuePair{name: "no_proxy", value: pc.NoProxy},
+		)
 	}
 
 	if len(keyValues) == 0 {
