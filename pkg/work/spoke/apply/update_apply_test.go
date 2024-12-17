@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	fakeapiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
@@ -285,6 +286,31 @@ func TestApplyUnstructred(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "skip update with cache",
+			existing: func() *unstructured.Unstructured {
+				obj := testingcommon.NewUnstructured(
+					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
+				obj.SetLabels(map[string]string{"foo": "bar"})
+				obj.SetAnnotations(map[string]string{"foo": "bar"})
+				obj.SetResourceVersion("1")
+				return obj
+			}(),
+			owner: metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"},
+			required: func() *unstructured.Unstructured {
+				obj := testingcommon.NewUnstructured(
+					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
+				obj.SetLabels(map[string]string{"foo": "bar"})
+				obj.SetAnnotations(map[string]string{"foo": "bar"})
+				return obj
+			}(),
+			gvr: schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 1 {
+					t.Errorf("Expect 1 actions, but have %v", actions)
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -299,8 +325,10 @@ func TestApplyUnstructred(t *testing.T) {
 
 			c.required.SetOwnerReferences([]metav1.OwnerReference{c.owner})
 			syncContext := testingcommon.NewFakeSyncContext(t, "test")
+			cache := resourceapply.NewResourceCache()
+			cache.UpdateCachedResourceMetadata(c.required, c.existing)
 			_, _, err := applier.applyUnstructured(
-				context.TODO(), c.required, c.gvr, syncContext.Recorder())
+				context.TODO(), c.required, c.gvr, syncContext.Recorder(), cache)
 
 			if err != nil {
 				t.Errorf("expect no error, but got %v", err)
