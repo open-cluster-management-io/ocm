@@ -63,7 +63,7 @@ func TestClockSyncController(t *testing.T) {
 				testinghelpers.NewManagedCluster(),
 			},
 			leases: []runtime.Object{
-				testinghelpers.NewManagedClusterLease("managed-cluster-lease", now.Add(61*time.Second)),
+				testinghelpers.NewManagedClusterLease("managed-cluster-lease", now.Add(301*time.Second)),
 			},
 			validateActions: func(t *testing.T, leaseActions, clusterActions []clienttesting.Action) {
 				expected := metav1.Condition{

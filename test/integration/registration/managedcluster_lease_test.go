@@ -186,7 +186,7 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 		// stop the agent in case agent update the lease.
 		stop()
 
-		// update the managed cluster lease renew time
+		// update the managed cluster lease renew time, check if conditions are updated
 		now := time.Now()
 		gomega.Eventually(func() error {
 			lease, err := util.GetManagedClusterLease(kubeClient, managedClusterName)
@@ -194,15 +194,23 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 				return err
 			}
 			// The default lease duration is 60s.
-			// The renewTime is 2 leaseDuration before the hub's now, so the clock should be out of sync.
-			// The renewTime + 5 * leaseDuration > now, so the available condition should be true
-			lease.Spec.RenewTime = &metav1.MicroTime{Time: now.Add(-120 * time.Second)}
+			// The renewTime + 5 * leaseDuration < now, so:
+			// * the clock should be out of sync
+			// * the available condition should be true
+			lease.Spec.RenewTime = &metav1.MicroTime{Time: now.Add(-301 * time.Second)}
 			_, err = kubeClient.CoordinationV1().Leases(managedClusterName).Update(context.TODO(), lease, metav1.UpdateOptions{})
 			return err
 		}, eventuallyInterval, eventuallyTimeout).ShouldNot(gomega.HaveOccurred())
 
-		assertAvailableCondition(managedClusterName, metav1.ConditionTrue, 0)
+		assertAvailableCondition(managedClusterName, metav1.ConditionUnknown, 0)
 		assertCloclSyncedCondition(managedClusterName, metav1.ConditionFalse, 0)
+
+		// run agent again, check if conditions are updated to True
+		stop = runAgent(managedClusterName, agentOptions, commOptions, spokeCfg)
+		defer stop()
+
+		assertAvailableCondition(managedClusterName, metav1.ConditionTrue, 0)
+		assertCloclSyncedCondition(managedClusterName, metav1.ConditionTrue, 0)
 	})
 })
 
