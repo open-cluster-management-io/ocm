@@ -57,6 +57,7 @@ var (
 		HTTPProxy:  "http://proxy.example.com",
 		HTTPSProxy: "http://proxy.example.com",
 		NoProxy:    "localhost",
+		CABundle:   []byte("test-ca-bundle"),
 	}
 )
 
@@ -721,14 +722,26 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 						}
 						found++
 					}
+					if env.Name == "CA_BUNDLE_FILE_PATH" {
+						if env.Value != "/managed/proxy-ca/ca-bundle.crt" {
+							return fmt.Errorf("unexpected CA_BUNDLE_FILE_PATH %s", env.Value)
+						}
+						found++
+					}
 				}
-				if found != 6 {
+				if found != 7 {
 					return fmt.Errorf("unexpected env %v", container.Env)
 				}
 			}
 
 			return nil
 		}).ShouldNot(gomega.HaveOccurred())
+
+		cm, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(context.TODO(),
+			fmt.Sprintf("%s-proxy-ca", addOnName), metav1.GetOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gomega.Expect(cm.Data).To(gomega.HaveKey("ca-bundle.crt"))
+		gomega.Expect(cm.Data["ca-bundle.crt"]).To(gomega.Equal(string(proxyConfig.CABundle)))
 	})
 
 })

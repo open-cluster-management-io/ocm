@@ -244,7 +244,7 @@ func TestProxyDecorator(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			d := newProxyDecorator(values)
+			d := newProxyHandler("addon1", values)
 			err = d.decorate(tc.pod)
 			if err != nil {
 				t.Fatal(err)
