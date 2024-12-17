@@ -3,6 +3,7 @@ package importer
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/ghodss/yaml"
 	authv1 "k8s.io/api/authentication/v1"
@@ -88,6 +89,18 @@ func RenderBootstrapHubKubeConfig(
 		}
 
 		config.BootstrapHubKubeConfig = string(bootstrapConfigBytes)
+		return config, nil
+	}
+}
+
+func RenderImage(image string) KlusterletConfigRenderer {
+	return func(ctx context.Context, config *chart.KlusterletChartConfig) (*chart.KlusterletChartConfig, error) {
+		imageArray := strings.Split(image, ":")
+		if len(imageArray) != 2 {
+			return config, nil
+		}
+		config.Images.Registry = imageArray[0]
+		config.Images.Tag = imageArray[1]
 		return config, nil
 	}
 }
