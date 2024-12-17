@@ -21,7 +21,7 @@ hub-kubeconfig:
 deploy-hub: deploy-hub-helm hub-kubeconfig cluster-ip
 
 deploy-hub-helm: ensure-helm
-	$(HELM) install cluster-manager deploy/cluster-manager/chart/cluster-manager --namespace=open-cluster-management --create-namespace --set images.registry=$(IMAGE_REGISTRY),image.tag=$(IMAGE_TAG)
+	$(HELM) install cluster-manager deploy/cluster-manager/chart/cluster-manager --namespace=open-cluster-management --create-namespace --set images.registry=$(IMAGE_REGISTRY),images.tag=$(IMAGE_TAG)
 
 deploy-hub-operator: ensure-kustomize
 	cp deploy/cluster-manager/config/kustomization.yaml deploy/cluster-manager/config/kustomization.yaml.tmp
@@ -56,7 +56,7 @@ bootstrap-secret:
 	$(KUSTOMIZE) build deploy/klusterlet/config/samples/bootstrap | $(KUBECTL) apply -f -
 
 deploy-spoke-operator-helm: ensure-helm
-	$(HELM) install klusterlet deploy/klusterlet/chart/klusterlet --namespace=open-cluster-management --set klusterlet.create=false,images.registry=$(IMAGE_REGISTRY),image.tag=$(IMAGE_TAG) --set-file bootstrapHubKubeConfig=$(HUB_KUBECONFIG)
+	$(HELM) install klusterlet deploy/klusterlet/chart/klusterlet --namespace=open-cluster-management --set klusterlet.create=false,images.registry=$(IMAGE_REGISTRY),images.tag=$(IMAGE_TAG) --set-file bootstrapHubKubeConfig=$(HUB_KUBECONFIG)
 
 deploy-spoke-operator: ensure-kustomize
 	cp deploy/klusterlet/config/kustomization.yaml deploy/klusterlet/config/kustomization.yaml.tmp

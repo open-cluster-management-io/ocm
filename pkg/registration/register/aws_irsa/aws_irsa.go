@@ -13,6 +13,9 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
 
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	operatorv1 "open-cluster-management.io/api/operator/v1"
+
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
@@ -22,18 +25,15 @@ const (
 	// TLSKeyFile is the name of tls key file in kubeconfigSecret
 	TLSKeyFile = "tls.key"
 	// TLSCertFile is the name of the tls cert file in kubeconfigSecret
-	TLSCertFile = "tls.crt"
+	TLSCertFile                 = "tls.crt"
+	ManagedClusterArn           = "managed-cluster-arn"
+	ManagedClusterIAMRoleSuffix = "managed-cluster-iam-role-suffix"
 )
 
-// AWSOption includes options that is used to monitor ManagedClusters
-type AWSOption struct {
-	EventFilterFunc factory.EventFilterFunc
-
-	AWSIRSAControl AWSIRSAControl
-}
-
 type AWSIRSADriver struct {
-	name string
+	name                     string
+	managedClusterArn        string
+	managedClusterRoleSuffix string
 }
 
 func (c *AWSIRSADriver) Process(
@@ -102,6 +102,18 @@ func (c *AWSIRSADriver) IsHubKubeConfigValid(ctx context.Context, secretOption r
 	return true, nil
 }
 
-func NewAWSIRSADriver() register.RegisterDriver {
-	return &AWSIRSADriver{}
+func (c *AWSIRSADriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
+	if cluster.Annotations == nil {
+		cluster.Annotations = make(map[string]string)
+	}
+	cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterArn] = c.managedClusterArn
+	cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterIAMRoleSuffix] = c.managedClusterRoleSuffix
+	return cluster
+}
+
+func NewAWSIRSADriver(managedClusterArn string, managedClusterRoleSuffix string) register.RegisterDriver {
+	return &AWSIRSADriver{
+		managedClusterArn:        managedClusterArn,
+		managedClusterRoleSuffix: managedClusterRoleSuffix,
+	}
 }

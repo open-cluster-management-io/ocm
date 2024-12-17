@@ -30,6 +30,7 @@ const (
 	NodePlacementPrivateValueKey    = "__NODE_PLACEMENT"
 	RegistriesPrivateValueKey       = "__REGISTRIES"
 	InstallNamespacePrivateValueKey = "__INSTALL_NAMESPACE"
+	ProxyPrivateValueKey            = "__PROXY"
 )
 
 // templateBuiltinValues includes the built-in values for crd template agentAddon.

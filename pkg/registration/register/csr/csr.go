@@ -22,6 +22,8 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog/v2"
 
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
@@ -34,39 +36,6 @@ const (
 	// ClusterCertificateRotatedCondition is a condition type that client certificate is rotated
 	ClusterCertificateRotatedCondition = "ClusterCertificateRotated"
 )
-
-// CSROption includes options that is used to create and monitor csrs
-type CSROption struct {
-	// ObjectMeta is the ObjectMeta shared by all created csrs. It should use GenerateName instead of Name
-	// to generate random csr names
-	ObjectMeta metav1.ObjectMeta
-	// Subject represents the subject of the client certificate used to create csrs
-	Subject *pkix.Name
-	// DNSNames represents DNS names used to create the client certificate
-	DNSNames []string
-	// SignerName is the name of the signer specified in the created csrs
-	SignerName string
-
-	// ExpirationSeconds is the requested duration of validity of the issued
-	// certificate.
-	// Certificate signers may not honor this field for various reasons:
-	//
-	//   1. Old signer that is unaware of the field (such as the in-tree
-	//      implementations prior to v1.22)
-	//   2. Signer whose configured maximum is shorter than the requested duration
-	//   3. Signer whose configured minimum is longer than the requested duration
-	//
-	// The minimum valid value for expirationSeconds is 3600, i.e. 1 hour.
-	ExpirationSeconds *int32
-
-	// EventFilterFunc matches csrs created with above options
-	EventFilterFunc factory.EventFilterFunc
-
-	CSRControl CSRControl
-
-	// HaltCSRCreation halt the csr creation
-	HaltCSRCreation func() bool
-}
 
 type CSRDriver struct {
 	// csrName is the name of csr created by controller and waiting for approval.
@@ -297,6 +266,10 @@ func (c *CSRDriver) IsHubKubeConfigValid(ctx context.Context, secretOption regis
 	}
 
 	return isCertificateValid(logger, certData, nil)
+}
+
+func (c *CSRDriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
+	return cluster
 }
 
 func NewCSRDriver() register.RegisterDriver {

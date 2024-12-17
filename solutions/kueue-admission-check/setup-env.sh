@@ -14,58 +14,69 @@ c1ctx="kind-${c1}"
 c2ctx="kind-${c2}"
 c3ctx="kind-${c3}"
 
-kind create cluster --name "${hub}" --image kindest/node:v1.29.0@sha256:eaa1450915475849a73a9227b8f201df25e55e268e5d619312131292e324d570
-kind create cluster --name "${c1}" --image kindest/node:v1.29.0@sha256:eaa1450915475849a73a9227b8f201df25e55e268e5d619312131292e324d570
-kind create cluster --name "${c2}" --image kindest/node:v1.29.0@sha256:eaa1450915475849a73a9227b8f201df25e55e268e5d619312131292e324d570
-kind create cluster --name "${c3}" --image kindest/node:v1.29.0@sha256:eaa1450915475849a73a9227b8f201df25e55e268e5d619312131292e324d570
+spoke_clusters=(${c1} ${c2} ${c3})
+all_clusters=(${hub} ${spoke_clusters[@]})
+spoke_ctx=(${c1ctx} ${c2ctx} ${c3ctx})
+all_ctx=(${hubctx} ${spoke_ctx[@]})
 
-echo "Initialize the ocm hub cluster"
+kueue_manifest="https://github.com/kubernetes-sigs/kueue/releases/download/v0.9.1/manifests.yaml"
+jobset_manifest="https://github.com/kubernetes-sigs/jobset/releases/download/v0.7.1/manifests.yaml"
+mpi_operator_manifest="https://github.com/kubeflow/mpi-operator/releases/download/v0.6.0/mpi-operator.yaml"
+training_operator_kustomize="github.com/kubeflow/training-operator.git/manifests/overlays/standalone?ref=v1.8.1"
 
-clusteradm init --feature-gates="ManifestWorkReplicaSet=true,ManagedClusterAutoApproval=true" --bundle-version="latest" --wait --context ${hubctx}
+# ocm setup
+echo "Parepare kind clusters"
+for cluster in "${all_clusters[@]}"; do
+  kind create cluster --name "$cluster" --image kindest/node:v1.29.0
+done
+
+echo "Initialize the ocm hub cluster with ClusterProfile enabled"
+clusteradm init --feature-gates="ManifestWorkReplicaSet=true,ManagedClusterAutoApproval=true,ClusterProfile=true" --bundle-version="v0.15.0" --wait --context ${hubctx}
 joincmd=$(clusteradm get token --context ${hubctx} | grep clusteradm)
 
-echo "Join cluster1 to hub"
+echo "Join clusters to hub"
 $(echo ${joincmd} --force-internal-endpoint-lookup --wait --context ${c1ctx} | sed "s/<cluster_name>/$c1/g")
-
-echo "Join cluster2 to hub"
 $(echo ${joincmd} --force-internal-endpoint-lookup --wait --context ${c2ctx} | sed "s/<cluster_name>/$c2/g")
-
-echo "Join cluster3 to hub"
 $(echo ${joincmd} --force-internal-endpoint-lookup --wait --context ${c3ctx} | sed "s/<cluster_name>/$c3/g")
 
-echo "Accept join of cluster1 and cluster2"
+echo "Accept join of clusters"
 clusteradm accept --context ${hubctx} --clusters ${c1},${c2},${c3} --wait
 
 kubectl get managedclusters --all-namespaces --context ${hubctx}
 
-echo "Install Kueue (this can be replaced with OCM Manifestwork in the future)"
-kubectl apply --server-side -f https://github.com/kubernetes-sigs/kueue/releases/download/v0.7.1/manifests.yaml --context ${hubctx}
-kubectl apply --server-side -f https://github.com/kubernetes-sigs/kueue/releases/download/v0.7.1/manifests.yaml --context ${c1ctx}
-kubectl apply --server-side -f https://github.com/kubernetes-sigs/kueue/releases/download/v0.7.1/manifests.yaml --context ${c2ctx}
-kubectl apply --server-side -f https://github.com/kubernetes-sigs/kueue/releases/download/v0.7.1/manifests.yaml --context ${c3ctx}
+# install kueue, jobset, workflow
+for ctx in "${all_ctx[@]}"; do
+    echo "Install Kueue, Jobset on $ctx"
+    kubectl apply --server-side -f "$kueue_manifest" --context "$ctx"
+    kubectl apply --server-side -f "$jobset_manifest" --context "$ctx"
+done
 
-echo "Install Jobset for MultiKueue (this can be replaced with OCM Manifestwork in the future)"
-kubectl apply --server-side -f https://github.com/kubernetes-sigs/jobset/releases/download/v0.5.2/manifests.yaml --context ${hubctx}
-kubectl apply --server-side -f https://github.com/kubernetes-sigs/jobset/releases/download/v0.5.2/manifests.yaml --context ${c1ctx}
-kubectl apply --server-side -f https://github.com/kubernetes-sigs/jobset/releases/download/v0.5.2/manifests.yaml --context ${c2ctx}
-kubectl apply --server-side -f https://github.com/kubernetes-sigs/jobset/releases/download/v0.5.2/manifests.yaml --context ${c3ctx}
+for ctx in "${spoke_ctx[@]}"; do
+    echo "Install Kubeflow MPI Operator, Training Operator on $ctx"
+    kubectl apply --server-side -f "$mpi_operator_manifest" --context "$ctx" || true
+    kubectl apply --server-side -k "$training_operator_kustomize" --context "$ctx" || true
+done
 
 kubectl config use-context ${hubctx}
-
+# patch some ocm resoures and images
 echo "Patch permission"
 kubectl patch clusterrole cluster-manager --type='json' -p "$(cat env/patch-clusterrole.json)"
 
 echo "Patch image"
+# quay.io/haoqing/registration-operator:kueue-v0.9.1 grants more permission for registration and placement.
+# quay.io/haoqing/registration-operator:kueue-v0.9.1 creates worker’s kubeconfig secret for multikueue.
+# quay.io/haoqing/placement:kueue-v0.9.1 implements the admission check controller.
+# The source code is in repo https://github.com/haoqing0110/OCM/tree/br_ocm-v0.15.1-kueue-v0.9.1.
 kubectl patch deployment cluster-manager -n open-cluster-management --type=json -p='[
-  {"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "quay.io/haoqing/registration-operator:latest"},
+  {"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "quay.io/haoqing/registration-operator:kueue-v0.9.1"},
   {"op": "replace", "path": "/spec/template/spec/containers/0/imagePullPolicy", "value": "Always"}
 ]'
-kubectl patch clustermanager cluster-manager --type=json -p='[{"op": "replace", "path": "/spec/registrationImagePullSpec", "value": "quay.io/haoqing/registration:latest"}]'
-kubectl patch clustermanager cluster-manager --type=json -p='[{"op": "replace", "path": "/spec/placementImagePullSpec", "value": "quay.io/haoqing/placement:latest"}]'
+kubectl patch clustermanager cluster-manager --type=json -p='[
+  {"op": "replace", "path": "/spec/registrationImagePullSpec", "value": "quay.io/haoqing/registration:kueue-v0.9.1"},
+  {"op": "replace", "path": "/spec/placementImagePullSpec", "value": "quay.io/haoqing/placement:kueue-v0.9.1"}
+]'
 
-echo "Install CRDs"
-kubectl create -f env/multicluster.x-k8s.io_clusterprofiles.yaml
-
+# install addons
 echo "Install managed-serviceaccount"
 git clone git@github.com:open-cluster-management-io/managed-serviceaccount.git || true
 cd managed-serviceaccount
@@ -103,19 +114,15 @@ make deploy
 cd -
 rm -rf addon-contrib
 
-echo "Enable MultiKueue on the hub"
-kubectl patch deployment kueue-controller-manager -n kueue-system --type='json' -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/args", "value": ["--config=/controller_manager_config.yaml", "--zap-log-level=2", "--feature-gates=MultiKueue=true"]}]' 
-
+# prepare credentials for multikueue
 echo "Setup queue on the spoke"
 kubectl apply -f env/single-clusterqueue-setup-mwrs.yaml
 
 echo "Setup credentials for clusterprofile"
-kubectl apply -f env/cp-c1.yaml
-kubectl apply -f env/cp-c2.yaml
-kubectl apply -f env/cp-c3.yaml
-kubectl apply -f env/msa-c1.yaml
-kubectl apply -f env/msa-c2.yaml
-kubectl apply -f env/msa-c3.yaml
+for CLUSTER in "${spoke_clusters[@]}"; do
+    sed "s/CLUSTER_NAME/$CLUSTER/g" env/clusterpermission.yaml | kubectl apply -f -
+    sed "s/CLUSTER_NAME/$CLUSTER/g" env/msa.yaml | kubectl apply -f -
+done
 
 echo "Setup faked GPU on the spoke"
 kubectl label managedcluster cluster2 accelerator=nvidia-tesla-t4

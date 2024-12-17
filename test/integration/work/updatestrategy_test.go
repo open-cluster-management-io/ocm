@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -615,6 +616,214 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 
 				if len(deploy.OwnerReferences) != 1 {
 					return fmt.Errorf("expected ownerrefs is not correct, got %v", deploy.OwnerReferences)
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("IgnoreField with onSpokeChange", func() {
+			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Namespace: commOptions.SpokeClusterName,
+						Name:      "deploy1",
+					},
+					UpdateStrategy: &workapiv1.UpdateStrategy{
+						Type: workapiv1.UpdateStrategyTypeServerSideApply,
+						ServerSideApply: &workapiv1.ServerSideApplyConfig{
+							IgnoreFields: []workapiv1.IgnoreField{
+								{
+									Condition: workapiv1.IgnoreFieldsConditionOnSpokeChange,
+									JSONPaths: []string{".spec.replicas"},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("Update deployment replica to 2")
+			gomega.Eventually(func() error {
+				deploy, err := spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if _, ok := deploy.Annotations[workapiv1.ManifestConfigSpecHashAnnotationKey]; !ok {
+					return fmt.Errorf("expected annotation %q not found", workapiv1.ManifestConfigSpecHashAnnotationKey)
+				}
+
+				deploy.Spec.Replicas = pointer.Int32(2)
+				_, err = spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Update(context.Background(), deploy, metav1.UpdateOptions{})
+
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			ginkgo.By("Update manifestwork with force apply to trigger a reconcile")
+			gomega.Eventually(func() error {
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				newWork := updatedWork.DeepCopy()
+				newWork.Spec.ManifestConfigs[0].UpdateStrategy.ServerSideApply.Force = true
+				pathBytes, err := util.NewWorkPatch(updatedWork, newWork)
+				if err != nil {
+					return err
+				}
+
+				_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Patch(
+					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("Deployment replicas should not be updated")
+			gomega.Eventually(func() error {
+				deploy, err := spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if _, ok := deploy.Annotations[workapiv1.ManifestConfigSpecHashAnnotationKey]; !ok {
+					return fmt.Errorf("expected annotation %q not found", workapiv1.ManifestConfigSpecHashAnnotationKey)
+				}
+
+				if *deploy.Spec.Replicas != 2 {
+					return fmt.Errorf("expected replicas %d, got %d", 2, *deploy.Spec.Replicas)
+				}
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			ginkgo.By("update manifestwork's deployment replica to 3")
+			err = unstructured.SetNestedField(object.Object, int64(3), "spec", "replicas")
+			gomega.Eventually(func() error {
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				newWork := updatedWork.DeepCopy()
+				newWork.Spec.Workload.Manifests[0] = util.ToManifest(object)
+
+				pathBytes, err := util.NewWorkPatch(updatedWork, newWork)
+				if err != nil {
+					return err
+				}
+
+				_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Patch(
+					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			gomega.Eventually(func() error {
+				deploy, err := spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if *deploy.Spec.Replicas != 3 {
+					return fmt.Errorf("replicas should be updated to 3 but got %d", *deploy.Spec.Replicas)
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("IgnoreField with onSpokePresent", func() {
+			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Namespace: commOptions.SpokeClusterName,
+						Name:      "deploy1",
+					},
+					UpdateStrategy: &workapiv1.UpdateStrategy{
+						Type: workapiv1.UpdateStrategyTypeServerSideApply,
+						ServerSideApply: &workapiv1.ServerSideApplyConfig{
+							IgnoreFields: []workapiv1.IgnoreField{
+								{
+									Condition: workapiv1.IgnoreFieldsConditionOnSpokePresent,
+									JSONPaths: []string{".spec.replicas"},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("Update deployment replica to 2")
+			gomega.Eventually(func() error {
+				deploy, err := spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if _, ok := deploy.Annotations[workapiv1.ManifestConfigSpecHashAnnotationKey]; !ok {
+					return fmt.Errorf("expected annotation %q not found", workapiv1.ManifestConfigSpecHashAnnotationKey)
+				}
+
+				deploy.Spec.Replicas = pointer.Int32(2)
+				_, err = spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Update(context.Background(), deploy, metav1.UpdateOptions{})
+
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("update manifestwork's deployment replica to 3")
+			err = unstructured.SetNestedField(object.Object, int64(3), "spec", "replicas")
+			gomega.Eventually(func() error {
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				newWork := updatedWork.DeepCopy()
+				newWork.Spec.Workload.Manifests[0] = util.ToManifest(object)
+
+				pathBytes, err := util.NewWorkPatch(updatedWork, newWork)
+				if err != nil {
+					return err
+				}
+
+				_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Patch(
+					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("Deployment replica should not be changed")
+			gomega.Eventually(func() error {
+				deploy, err := spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if *deploy.Spec.Replicas != 2 {
+					return fmt.Errorf("replicas should be updated to 2 but got %d", *deploy.Spec.Replicas)
 				}
 
 				return nil

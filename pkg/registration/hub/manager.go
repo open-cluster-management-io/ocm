@@ -31,6 +31,10 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/hub/clusterprofile"
 	"open-cluster-management.io/ocm/pkg/registration/hub/clusterrole"
 	"open-cluster-management.io/ocm/pkg/registration/hub/gc"
+	"open-cluster-management.io/ocm/pkg/registration/hub/importer"
+	importeroptions "open-cluster-management.io/ocm/pkg/registration/hub/importer/options"
+	cloudproviders "open-cluster-management.io/ocm/pkg/registration/hub/importer/providers"
+	"open-cluster-management.io/ocm/pkg/registration/hub/importer/providers/capi"
 	"open-cluster-management.io/ocm/pkg/registration/hub/lease"
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedcluster"
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedclusterset"
@@ -44,6 +48,7 @@ import (
 type HubManagerOptions struct {
 	ClusterAutoApprovalUsers []string
 	GCResourceList           []string
+	ImportOption             *importeroptions.Options
 }
 
 // NewHubManagerOptions returns a HubManagerOptions
@@ -51,6 +56,7 @@ func NewHubManagerOptions() *HubManagerOptions {
 	return &HubManagerOptions{
 		GCResourceList: []string{"addon.open-cluster-management.io/v1alpha1/managedclusteraddons",
 			"work.open-cluster-management.io/v1/manifestworks"},
+		ImportOption: importeroptions.New(),
 	}
 }
 
@@ -62,6 +68,7 @@ func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 		"A list GVR user can customize which are cleaned up after cluster is deleted. Format is group/version/resource, "+
 			"and the default are managedclusteraddon and manifestwork. The resources will be deleted in order."+
 			"The flag works only when ResourceCleanup feature gate is enable.")
+	m.ImportOption.AddFlags(fs)
 }
 
 // RunControllerManager starts the controllers on hub to manage spoke cluster registration.
@@ -244,6 +251,23 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		)
 	}
 
+	var providers []cloudproviders.Interface
+	var clusterImporter factory.Controller
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.ClusterImporter) {
+		providers = []cloudproviders.Interface{
+			capi.NewCAPIProvider(controllerContext.KubeConfig, clusterInformers.Cluster().V1().ManagedClusters()),
+		}
+		clusterImporter = importer.NewImporter(
+			[]importer.KlusterletConfigRenderer{
+				importer.RenderBootstrapHubKubeConfig(kubeClient, m.ImportOption.APIServerURL),
+			},
+			clusterClient,
+			clusterInformers.Cluster().V1().ManagedClusters(),
+			providers,
+			controllerContext.EventRecorder,
+		)
+	}
+
 	gcController := gc.NewGCController(
 		kubeInformers.Rbac().V1().ClusterRoles().Lister(),
 		kubeInformers.Rbac().V1().ClusterRoleBindings().Lister(),
@@ -283,6 +307,12 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	}
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.ClusterProfile) {
 		go clusterProfileController.Run(ctx, 1)
+	}
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.ClusterImporter) {
+		for _, provider := range providers {
+			go provider.Run(ctx)
+		}
+		go clusterImporter.Run(ctx, 1)
 	}
 
 	go gcController.Run(ctx, 1)
