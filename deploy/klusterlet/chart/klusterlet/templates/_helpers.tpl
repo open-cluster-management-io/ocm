@@ -14,11 +14,32 @@ Create secret to access docker registry
 {{- end }}
 {{- end }}
 
-{{/* Define the image tag. */}}
-{{- define "imageTag" }}
-{{- if .Values.images.tag }}
-{{- printf "%s" .Values.images.tag }}
+{{- define "registrationImage" }}
+{{- if .Values.images.overrides.registrationImage }}
+{{- printf "%s" .Values.images.overrides.registrationImage }}
+{{- else if .Values.images.tag }}
+{{- printf "%s/registration:%s" .Values.images.registry .Values.images.tag }}
 {{- else }}
-{{- printf "%s" .Chart.AppVersion }}
+{{- printf "%s/registration:%s" .Values.images.registry .Chart.AppVersion }}
+{{- end }}
+{{- end }}
+
+{{- define "workImage" }}
+{{- if .Values.images.overrides.workImage }}
+{{- printf "%s" .Values.images.overrides.workImage }}
+{{- else if .Values.images.tag }}
+{{- printf "%s/work:%s" .Values.images.registry .Values.images.tag }}
+{{- else }}
+{{- printf "%s/work:%s" .Values.images.registry .Chart.AppVersion }}
+{{- end }}
+{{- end }}
+
+{{- define "operatorImage" }}
+{{- if .Values.images.overrides.operatorImage }}
+{{- printf "%s" .Values.images.overrides.operatorImage }}
+{{- else if .Values.images.tag }}
+{{- printf "%s/registration-operator:%s" .Values.images.registry .Values.images.tag }}
+{{- else }}
+{{- printf "%s/registration-operator:%s" .Values.images.registry .Chart.AppVersion }}
 {{- end }}
 {{- end }}

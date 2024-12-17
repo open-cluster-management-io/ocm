@@ -32,7 +32,7 @@ spec:
       serviceAccountName: cluster-manager
       containers:
       - name: registration-operator
-        image: "{{ .Values.images.registry }}/registration-operator:{{ template "imageTag" . }}"
+        image: "{{ template "operatorImage" . }}"
         imagePullPolicy: {{ .Values.images.imagePullPolicy }}
         args:
           - "/registration-operator"
