@@ -150,3 +150,6 @@ rules:
 - apiGroups: ["multicluster.x-k8s.io"]
   resources: ["clusterprofiles/status"]
   verbs: ["update", "patch"]
+- apiGroups: [ "cluster.x-k8s.io" ]
+  resources: [ "clusters" ]
+  verbs: ["get", "list", "watch"]

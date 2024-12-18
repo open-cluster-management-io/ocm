@@ -53,6 +53,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: AGENT_IMAGE
+          value: quay.io/open-cluster-management/registration-operator:latest
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
