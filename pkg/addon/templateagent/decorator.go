@@ -87,22 +87,25 @@ func setUnstructuredNestedField(obj interface{}, val string, paths []string) err
 }
 
 type deploymentDecorator struct {
+	logger     klog.Logger
 	decorators []podTemplateSpecDecorator
 }
 
 func newDeploymentDecorator(
+	logger klog.Logger,
 	addonName string,
 	template *addonapiv1alpha1.AddOnTemplate,
 	orderedValues orderedValues,
 	privateValues addonfactory.Values,
 ) decorator {
 	return &deploymentDecorator{
+		logger: logger,
 		decorators: []podTemplateSpecDecorator{
 			newEnvironmentDecorator(orderedValues),
 			newVolumeDecorator(addonName, template),
 			newNodePlacementDecorator(privateValues),
 			newImageDecorator(privateValues),
-			newProxyHandler(addonName, privateValues),
+			newProxyHandler(logger, addonName, privateValues),
 		},
 	}
 }
@@ -130,22 +133,25 @@ func (d *deploymentDecorator) decorate(obj *unstructured.Unstructured) (*unstruc
 }
 
 type daemonSetDecorator struct {
+	logger     klog.Logger
 	decorators []podTemplateSpecDecorator
 }
 
 func newDaemonSetDecorator(
+	logger klog.Logger,
 	addonName string,
 	template *addonapiv1alpha1.AddOnTemplate,
 	orderedValues orderedValues,
 	privateValues addonfactory.Values,
 ) decorator {
 	return &daemonSetDecorator{
+		logger: logger,
 		decorators: []podTemplateSpecDecorator{
 			newEnvironmentDecorator(orderedValues),
 			newVolumeDecorator(addonName, template),
 			newNodePlacementDecorator(privateValues),
 			newImageDecorator(privateValues),
-			newProxyHandler(addonName, privateValues),
+			newProxyHandler(logger, addonName, privateValues),
 		},
 	}
 }
@@ -349,12 +355,14 @@ type podTemplateHandler interface {
 }
 
 type proxyHandler struct {
+	logger        klog.Logger
 	addonName     string
 	privateValues addonfactory.Values
 }
 
-func newProxyHandler(addonName string, privateValues addonfactory.Values) podTemplateHandler {
+func newProxyHandler(logger klog.Logger, addonName string, privateValues addonfactory.Values) podTemplateHandler {
 	return &proxyHandler{
+		logger:        logger,
 		addonName:     addonName,
 		privateValues: privateValues,
 	}
@@ -410,7 +418,7 @@ func (d *proxyHandler) getProxyConfig() (addonapiv1alpha1.ProxyConfig, bool) {
 
 	pc, ok := proxyConfig.(addonapiv1alpha1.ProxyConfig)
 	if !ok {
-		klog.Warningf("proxy config value is invalid: %v", proxyConfig)
+		d.logger.Error(nil, "proxy config value is invalid", "value", proxyConfig)
 		return addonapiv1alpha1.ProxyConfig{}, false
 	}
 

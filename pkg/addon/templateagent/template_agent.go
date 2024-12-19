@@ -202,8 +202,8 @@ func (a *CRDTemplateAgentAddon) decorateObject(
 	orderedValues orderedValues,
 	privateValues addonfactory.Values) (*unstructured.Unstructured, error) {
 	decorators := []decorator{
-		newDeploymentDecorator(a.addonName, template, orderedValues, privateValues),
-		newDaemonSetDecorator(a.addonName, template, orderedValues, privateValues),
+		newDeploymentDecorator(a.logger, a.addonName, template, orderedValues, privateValues),
+		newDaemonSetDecorator(a.logger, a.addonName, template, orderedValues, privateValues),
 		newNamespaceDecorator(privateValues),
 	}
 
@@ -223,7 +223,7 @@ func (a *CRDTemplateAgentAddon) injectAdditionalObjects(
 	orderedValues orderedValues,
 	privateValues addonfactory.Values) ([]runtime.Object, error) {
 	injectors := []objectsInjector{
-		newProxyHandler(a.addonName, privateValues),
+		newProxyHandler(a.logger, a.addonName, privateValues),
 	}
 
 	decorators := []decorator{
