@@ -186,6 +186,13 @@ func (a *CRDTemplateAgentAddon) renderObjects(
 		}
 		objects = append(objects, object)
 	}
+
+	additionalObjects, err := a.injectAdditionalObjects(template, presetValues, privateValues)
+	if err != nil {
+		return objects, err
+	}
+	objects = append(objects, additionalObjects...)
+
 	return objects, nil
 }
 
@@ -195,8 +202,8 @@ func (a *CRDTemplateAgentAddon) decorateObject(
 	orderedValues orderedValues,
 	privateValues addonfactory.Values) (*unstructured.Unstructured, error) {
 	decorators := []decorator{
-		newDeploymentDecorator(a.addonName, template, orderedValues, privateValues),
-		newDaemonSetDecorator(a.addonName, template, orderedValues, privateValues),
+		newDeploymentDecorator(a.logger, a.addonName, template, orderedValues, privateValues),
+		newDaemonSetDecorator(a.logger, a.addonName, template, orderedValues, privateValues),
 		newNamespaceDecorator(privateValues),
 	}
 
@@ -209,6 +216,49 @@ func (a *CRDTemplateAgentAddon) decorateObject(
 	}
 
 	return obj, nil
+}
+
+func (a *CRDTemplateAgentAddon) injectAdditionalObjects(
+	template *addonapiv1alpha1.AddOnTemplate,
+	orderedValues orderedValues,
+	privateValues addonfactory.Values) ([]runtime.Object, error) {
+	injectors := []objectsInjector{
+		newProxyHandler(a.logger, a.addonName, privateValues),
+	}
+
+	decorators := []decorator{
+		// decorate the namespace of the additional objects
+		newNamespaceDecorator(privateValues),
+	}
+
+	var objs []runtime.Object
+	for _, injector := range injectors {
+		objects, err := injector.inject()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, object := range objects {
+			// convert the runtime.Object to unstructured.Unstructured
+			unstructuredMapObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(object)
+			if err != nil {
+				return nil, err
+			}
+			unstructuredObject := &unstructured.Unstructured{Object: unstructuredMapObj}
+
+			for _, decorator := range decorators {
+				unstructuredObject, err = decorator.decorate(unstructuredObject)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			objs = append(objs, unstructuredObject)
+		}
+
+	}
+
+	return objs, nil
 }
 
 // getDesiredAddOnTemplateInner returns the desired template of the addon,

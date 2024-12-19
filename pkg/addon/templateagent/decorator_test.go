@@ -1,6 +1,7 @@
 package templateagent
 
 import (
+	"context"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -8,6 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -244,7 +246,9 @@ func TestProxyDecorator(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			d := newProxyDecorator(values)
+			ctx := context.TODO()
+			logger := klog.FromContext(ctx)
+			d := newProxyHandler(logger, "addon1", values)
 			err = d.decorate(tc.pod)
 			if err != nil {
 				t.Fatal(err)
