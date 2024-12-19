@@ -57,6 +57,9 @@ spec:
           {{if .AutoApproveUsers}}
           - "--cluster-auto-approval-users={{ .AutoApproveUsers }}"
           {{end}}
+          {{if .ClusterImporterEnabled}}
+          - "--agent-image={{ .AgentImage }}"
+          {{end}}
           {{ if .HostedMode }}
           - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
           {{ end }}

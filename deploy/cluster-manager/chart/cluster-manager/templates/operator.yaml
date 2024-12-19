@@ -42,6 +42,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: AGENT_IMAGE
+          value: {{ template "operatorImage" . }}
         securityContext:
           {{- toYaml .Values.securityContext | nindent 10 }}
         livenessProbe:

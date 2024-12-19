@@ -260,6 +260,8 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		clusterImporter = importer.NewImporter(
 			[]importer.KlusterletConfigRenderer{
 				importer.RenderBootstrapHubKubeConfig(kubeClient, m.ImportOption.APIServerURL),
+				importer.RenderImage(m.ImportOption.AgentImage),
+				importer.RenderImagePullSecret(kubeClient, controllerContext.OperatorNamespace),
 			},
 			clusterClient,
 			clusterInformers.Cluster().V1().ManagedClusters(),

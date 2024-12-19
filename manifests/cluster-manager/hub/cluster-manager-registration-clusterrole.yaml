@@ -100,3 +100,20 @@ rules:
 - apiGroups: ["register.open-cluster-management.io"]
   resources: ["managedclusters/accept"]
   verbs: ["update"]
+{{if .ClusterImporterEnabled}}
+- apiGroups: ["cluster.x-k8s.io"]
+  resources: ["clusters"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get"]
+{{end}}
+{{if .ClusterProfileEnabled}}
+# Allow hub to manage clusterprofile
+- apiGroups: ["multicluster.x-k8s.io"]
+  resources: ["clusterprofiles"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["multicluster.x-k8s.io"]
+  resources: ["clusterprofiles/status"]
+  verbs: ["update", "patch"]
+{{end}}
