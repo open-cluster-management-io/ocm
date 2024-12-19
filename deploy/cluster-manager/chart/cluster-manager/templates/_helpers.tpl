@@ -13,11 +13,52 @@
 
 
 
-{{/* Define the image tag. */}}
-{{- define "imageTag" }}
-{{- if .Values.images.tag }}
-{{- printf "%s" .Values.images.tag }}
+{{- define "registrationImage" }}
+{{- if .Values.images.overrides.registrationImage }}
+{{- printf "%s" .Values.images.overrides.registrationImage }}
+{{- else if .Values.images.tag }}
+{{- printf "%s/registration:%s" .Values.images.registry .Values.images.tag }}
 {{- else }}
-{{- printf "%s" .Chart.AppVersion }}
+{{- printf "%s/registration:%s" .Values.images.registry .Chart.AppVersion }}
+{{- end }}
+{{- end }}
+
+{{- define "workImage" }}
+{{- if .Values.images.overrides.workImage }}
+{{- printf "%s" .Values.images.overrides.workImage }}
+{{- else if .Values.images.tag }}
+{{- printf "%s/work:%s" .Values.images.registry .Values.images.tag }}
+{{- else }}
+{{- printf "%s/work:%s" .Values.images.registry .Chart.AppVersion }}
+{{- end }}
+{{- end }}
+
+{{- define "addOnManagerImage" }}
+{{- if .Values.images.overrides.addOnManagerImage }}
+{{- printf "%s" .Values.images.overrides.addOnManagerImage }}
+{{- else if .Values.images.tag }}
+{{- printf "%s/addon-manager:%s" .Values.images.registry .Values.images.tag }}
+{{- else }}
+{{- printf "%s/addon-manager:%s" .Values.images.registry .Chart.AppVersion }}
+{{- end }}
+{{- end }}
+
+{{- define "placementImage" }}
+{{- if .Values.images.overrides.placementImage }}
+{{- printf "%s" .Values.images.overrides.placementImage }}
+{{- else if .Values.images.tag }}
+{{- printf "%s/placement:%s" .Values.images.registry .Values.images.tag }}
+{{- else }}
+{{- printf "%s/placement:%s" .Values.images.registry .Chart.AppVersion }}
+{{- end }}
+{{- end }}
+
+{{- define "operatorImage" }}
+{{- if .Values.images.overrides.operatorImage }}
+{{- printf "%s" .Values.images.overrides.operatorImage }}
+{{- else if .Values.images.tag }}
+{{- printf "%s/registration-operator:%s" .Values.images.registry .Values.images.tag }}
+{{- else }}
+{{- printf "%s/registration-operator:%s" .Values.images.registry .Chart.AppVersion }}
 {{- end }}
 {{- end }}

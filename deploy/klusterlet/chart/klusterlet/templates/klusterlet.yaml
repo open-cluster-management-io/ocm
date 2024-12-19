@@ -10,9 +10,9 @@ metadata:
 spec:
   deployOption:
     mode: {{ .Values.klusterlet.mode | default "Singleton" }}
-  registrationImagePullSpec: "{{ .Values.images.registry }}/registration:{{ template "imageTag" . }}"
-  workImagePullSpec: "{{ .Values.images.registry }}/work:{{ template "imageTag" . }}"
-  imagePullSpec: "{{ .Values.images.registry }}/registration-operator:{{ template "imageTag" . }}"
+  registrationImagePullSpec: "{{ template "registrationImage" . }}"
+  workImagePullSpec: "{{ template "workImage" . }}"
+  imagePullSpec: "{{ template "operatorImage" . }}"
   clusterName: {{ .Values.klusterlet.clusterName }}
   {{- if or ( eq .Values.klusterlet.mode "Hosted") (eq .Values.klusterlet.mode "SingletonHosted") }}
   namespace: "open-cluster-management-{{ .Values.klusterlet.clusterName }}"

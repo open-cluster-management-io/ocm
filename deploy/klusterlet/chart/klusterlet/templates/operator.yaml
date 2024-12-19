@@ -35,7 +35,7 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
       - name: klusterlet
-        image:  "{{ .Values.images.registry }}/registration-operator:{{ template "imageTag" . }}"
+        image:  "{{ template "operatorImage" . }}"
         imagePullPolicy: {{ .Values.images.imagePullPolicy }}
         args:
           - "/registration-operator"

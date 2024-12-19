@@ -4,10 +4,10 @@ kind: ClusterManager
 metadata:
   name: cluster-manager
 spec:
-  registrationImagePullSpec: {{ .Values.images.registry }}/registration:{{ template "imageTag" . }}
-  workImagePullSpec: {{ .Values.images.registry }}/work:{{ template "imageTag" . }}
-  placementImagePullSpec: {{ .Values.images.registry }}/placement:{{ template "imageTag" . }}
-  addOnManagerImagePullSpec: {{ .Values.images.registry }}/addon-manager:{{ template "imageTag" . }}
+  registrationImagePullSpec: "{{ template "registrationImage" . }}"
+  workImagePullSpec: "{{ template "workImage" . }}"
+  placementImagePullSpec: "{{ template "placementImage" . }}"
+  addOnManagerImagePullSpec: "{{ template "addOnManagerImage" . }}"
   deployOption:
     mode: {{ .Values.clusterManager.mode }}
   {{- with .Values.clusterManager.resourceRequirement }}

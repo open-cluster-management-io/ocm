@@ -46,7 +46,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 	decoder := serializer.NewCodecFactory(s).UniversalDeserializer()
 
 	validatePodTemplate := func(t *testing.T, podTemplate corev1.PodTemplateSpec,
-		expectedEnvs []corev1.EnvVar) {
+		expectedEnvs []corev1.EnvVar, caBundleConfigured bool) {
 		image := podTemplate.Spec.Containers[0].Image
 		if image != "quay.io/ocm/addon-examples:v1" {
 			t.Errorf("unexpected image %v", image)
@@ -93,7 +93,19 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 				},
 			},
 		}
-
+		if caBundleConfigured {
+			expectedVolumes = append(expectedVolumes,
+				corev1.Volume{
+					Name: "proxy-ca-bundle",
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "hello-template-proxy-ca",
+							},
+						},
+					},
+				})
+		}
 		if !equality.Semantic.DeepEqual(volumes, expectedVolumes) {
 			t.Errorf("expected volumes %+v, but got: %+v", expectedVolumes, volumes)
 		}
@@ -108,6 +120,12 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 				Name:      "cert-example-com-signer-name",
 				MountPath: "/managed/example.com-signer-name",
 			},
+		}
+		if caBundleConfigured {
+			expectedVolumeMounts = append(expectedVolumeMounts, corev1.VolumeMount{
+				Name:      "proxy-ca-bundle",
+				MountPath: "/managed/proxy-ca",
+			})
 		}
 		if !equality.Semantic.DeepEqual(volumeMounts, expectedVolumeMounts) {
 			t.Errorf("expected volumeMounts %v, but got: %v", expectedVolumeMounts, volumeMounts)
@@ -221,7 +239,8 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 						{Name: "HUB_KUBECONFIG", Value: "/managed/hub-kubeconfig/kubeconfig"},
 						{Name: "CLUSTER_NAME", Value: clusterName},
 						{Name: "INSTALL_NAMESPACE", Value: "test-install-namespace"},
-					})
+					},
+					false)
 
 				unstructDaemonSet, ok := objects[1].(*unstructured.Unstructured)
 				if !ok {
@@ -240,7 +259,8 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 						{Name: "HUB_KUBECONFIG", Value: "/managed/hub-kubeconfig/kubeconfig"},
 						{Name: "CLUSTER_NAME", Value: clusterName},
 						{Name: "INSTALL_NAMESPACE", Value: "test-install-namespace"},
-					})
+					},
+					false)
 
 				// check clusterrole
 				unstructCRB, ok := objects[3].(*unstructured.Unstructured)
@@ -256,6 +276,148 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 					t.Errorf("clusterRolebinding namespace does not match, got %s",
 						clusterRoleBinding.Subjects[0].Namespace)
 				}
+			},
+			validateAgentOptions: func(t *testing.T, o agent.AgentAddonOptions,
+				mca *addonapiv1alpha1.ManagedClusterAddOn) {
+				validateAgentOptions(t, o, mca, "test-install-namespace")
+			},
+		},
+		{
+			name:              "manifests with proxy config rendered successfully",
+			addonTemplatePath: "./testmanifests/addontemplate.yaml",
+			addonDeploymentConfig: &addonapiv1alpha1.AddOnDeploymentConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "hello-config",
+					Namespace: "default",
+				},
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					AgentInstallNamespace: "test-install-namespace",
+					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+						{
+							Name:  "LOG_LEVEL",
+							Value: "4",
+						},
+					},
+					NodePlacement: &addonapiv1alpha1.NodePlacement{
+						NodeSelector: map[string]string{
+							"host": "ssd",
+						},
+						Tolerations: []corev1.Toleration{
+							{
+								Key:      "foo",
+								Operator: corev1.TolerationOpExists,
+								Effect:   corev1.TaintEffectNoExecute,
+							},
+						},
+					},
+					Registries: []addonapiv1alpha1.ImageMirror{
+						{
+							Source: "quay.io/open-cluster-management",
+							Mirror: "quay.io/ocm",
+						},
+					},
+					ProxyConfig: addonapiv1alpha1.ProxyConfig{
+						HTTPProxy:  "http://proxy.example.com:8080",
+						HTTPSProxy: "http://proxy.example.com:8080",
+						NoProxy:    "localhost",
+						CABundle:   []byte("fake-ca-bundle"),
+					},
+				},
+			},
+			managedCluster: addonfactory.NewFakeManagedCluster(clusterName, "1.10.1"),
+			validateObjects: func(t *testing.T, objects []runtime.Object) {
+				if len(objects) != 6 {
+					t.Fatalf("expected 6 objects, but got %v", len(objects))
+				}
+
+				unstructDeployment, ok := objects[0].(*unstructured.Unstructured)
+				if !ok {
+					t.Errorf("expected object to be *appsv1.Deployment, but got %T", objects[0])
+				}
+				deployment, err := utils.ConvertToDeployment(unstructDeployment)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if deployment.Namespace != "test-install-namespace" {
+					t.Errorf("unexpected namespace %s", deployment.Namespace)
+				}
+				validatePodTemplate(t, deployment.Spec.Template,
+					[]corev1.EnvVar{
+						{Name: "LOG_LEVEL", Value: "4"},
+						{Name: "HUB_KUBECONFIG", Value: "/managed/hub-kubeconfig/kubeconfig"},
+						{Name: "CLUSTER_NAME", Value: clusterName},
+						{Name: "INSTALL_NAMESPACE", Value: "test-install-namespace"},
+						{Name: "HTTP_PROXY", Value: "http://proxy.example.com:8080"},
+						{Name: "http_proxy", Value: "http://proxy.example.com:8080"},
+						{Name: "HTTPS_PROXY", Value: "http://proxy.example.com:8080"},
+						{Name: "https_proxy", Value: "http://proxy.example.com:8080"},
+						{Name: "NO_PROXY", Value: "localhost"},
+						{Name: "no_proxy", Value: "localhost"},
+						{Name: "CA_BUNDLE_FILE_PATH", Value: "/managed/proxy-ca/ca-bundle.crt"},
+					},
+					true)
+
+				unstructDaemonSet, ok := objects[1].(*unstructured.Unstructured)
+				if !ok {
+					t.Errorf("expected object to be *appsv1.DaemonSet, but got %T", objects[1])
+				}
+				daemonSet, err := utils.ConvertToDaemonSet(unstructDaemonSet)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if daemonSet.Namespace != "test-install-namespace" {
+					t.Errorf("unexpected namespace %s", daemonSet.Namespace)
+				}
+				validatePodTemplate(t, daemonSet.Spec.Template,
+					[]corev1.EnvVar{
+						{Name: "LOG_LEVEL", Value: "4"},
+						{Name: "HUB_KUBECONFIG", Value: "/managed/hub-kubeconfig/kubeconfig"},
+						{Name: "CLUSTER_NAME", Value: clusterName},
+						{Name: "INSTALL_NAMESPACE", Value: "test-install-namespace"},
+						{Name: "HTTP_PROXY", Value: "http://proxy.example.com:8080"},
+						{Name: "http_proxy", Value: "http://proxy.example.com:8080"},
+						{Name: "HTTPS_PROXY", Value: "http://proxy.example.com:8080"},
+						{Name: "https_proxy", Value: "http://proxy.example.com:8080"},
+						{Name: "NO_PROXY", Value: "localhost"},
+						{Name: "no_proxy", Value: "localhost"},
+						{Name: "CA_BUNDLE_FILE_PATH", Value: "/managed/proxy-ca/ca-bundle.crt"},
+					},
+					true)
+
+				// check clusterrole
+				unstructCRB, ok := objects[3].(*unstructured.Unstructured)
+				if !ok {
+					t.Errorf("expected object to be unstructured, but got %T", objects[3])
+				}
+				clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
+				err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructCRB.Object, clusterRoleBinding)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if clusterRoleBinding.Subjects[0].Namespace != "test-install-namespace" {
+					t.Errorf("clusterRolebinding namespace does not match, got %s",
+						clusterRoleBinding.Subjects[0].Namespace)
+				}
+
+				unstructConfigmap, ok := objects[5].(*unstructured.Unstructured)
+				if !ok {
+					t.Errorf("expected object to be unstructured, but got %T", objects[5])
+				}
+				configmap := &corev1.ConfigMap{}
+				err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructConfigmap.Object, configmap)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if configmap.Namespace != "test-install-namespace" {
+					t.Errorf("unexpected namespace %s", configmap.Namespace)
+				}
+				if configmap.Name != "hello-template-proxy-ca" {
+					t.Errorf("unexpected name %s", configmap.Name)
+				}
+				if configmap.Data["ca-bundle.crt"] != "fake-ca-bundle" {
+					t.Errorf("unexpected data %s", configmap.Data["ca-bundle.crt"])
+				}
+
 			},
 			validateAgentOptions: func(t *testing.T, o agent.AgentAddonOptions,
 				mca *addonapiv1alpha1.ManagedClusterAddOn) {
@@ -321,7 +483,8 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 						{Name: "HUB_KUBECONFIG", Value: "/managed/hub-kubeconfig/kubeconfig"},
 						{Name: "CLUSTER_NAME", Value: clusterName},
 						// {Name: "INSTALL_NAMESPACE", Value: "test-install-namespace"},
-					})
+					},
+					false)
 
 				// check clusterrole
 				unstructCRB, ok := objects[2].(*unstructured.Unstructured)
@@ -401,7 +564,8 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 						{Name: "HUB_KUBECONFIG", Value: "/managed/hub-kubeconfig/kubeconfig"},
 						{Name: "CLUSTER_NAME", Value: clusterName},
 						{Name: "INSTALL_NAMESPACE", Value: "test-install-namespace"},
-					})
+					},
+					false)
 
 				// check clusterrole
 				unstructCRB, ok := objects[2].(*unstructured.Unstructured)
@@ -526,6 +690,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 					ToAddOnNodePlacementPrivateValues,
 					ToAddOnRegistriesPrivateValues,
 					ToAddOnInstallNamespacePrivateValues,
+					ToAddOnProxyPrivateValues,
 				),
 			)
 

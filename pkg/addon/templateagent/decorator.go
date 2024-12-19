@@ -2,11 +2,14 @@ package templateagent
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/utils"
@@ -84,22 +87,25 @@ func setUnstructuredNestedField(obj interface{}, val string, paths []string) err
 }
 
 type deploymentDecorator struct {
+	logger     klog.Logger
 	decorators []podTemplateSpecDecorator
 }
 
 func newDeploymentDecorator(
+	logger klog.Logger,
 	addonName string,
 	template *addonapiv1alpha1.AddOnTemplate,
 	orderedValues orderedValues,
 	privateValues addonfactory.Values,
 ) decorator {
 	return &deploymentDecorator{
+		logger: logger,
 		decorators: []podTemplateSpecDecorator{
 			newEnvironmentDecorator(orderedValues),
 			newVolumeDecorator(addonName, template),
 			newNodePlacementDecorator(privateValues),
 			newImageDecorator(privateValues),
-			newProxyDecorator(privateValues),
+			newProxyHandler(logger, addonName, privateValues),
 		},
 	}
 }
@@ -127,22 +133,25 @@ func (d *deploymentDecorator) decorate(obj *unstructured.Unstructured) (*unstruc
 }
 
 type daemonSetDecorator struct {
+	logger     klog.Logger
 	decorators []podTemplateSpecDecorator
 }
 
 func newDaemonSetDecorator(
+	logger klog.Logger,
 	addonName string,
 	template *addonapiv1alpha1.AddOnTemplate,
 	orderedValues orderedValues,
 	privateValues addonfactory.Values,
 ) decorator {
 	return &daemonSetDecorator{
+		logger: logger,
 		decorators: []podTemplateSpecDecorator{
 			newEnvironmentDecorator(orderedValues),
 			newVolumeDecorator(addonName, template),
 			newNodePlacementDecorator(privateValues),
 			newImageDecorator(privateValues),
-			newProxyDecorator(privateValues),
+			newProxyHandler(logger, addonName, privateValues),
 		},
 	}
 }
@@ -331,25 +340,38 @@ func (d *imageDecorator) decorate(pod *corev1.PodTemplateSpec) error {
 	return nil
 }
 
-type proxyDecorator struct {
+// objectsInjector injects additional runtime objects to the manifests, these objects will be created
+// in the managed clusters
+type objectsInjector interface {
+	// inject returns a list of runtime objects to be created in the managed cluster
+	inject() ([]runtime.Object, error)
+}
+
+// podTemplateHandler is a combination of podTemplateSpecDecorator and objectsInjector, it can decorate
+// the pod in the deployments/daemonsets and inject additional runtime objects into the manifests
+type podTemplateHandler interface {
+	podTemplateSpecDecorator
+	objectsInjector
+}
+
+type proxyHandler struct {
+	logger        klog.Logger
+	addonName     string
 	privateValues addonfactory.Values
 }
 
-func newProxyDecorator(privateValues addonfactory.Values) podTemplateSpecDecorator {
-	return &proxyDecorator{
+func newProxyHandler(logger klog.Logger, addonName string, privateValues addonfactory.Values) podTemplateHandler {
+	return &proxyHandler{
+		logger:        logger,
+		addonName:     addonName,
 		privateValues: privateValues,
 	}
 }
 
-func (d *proxyDecorator) decorate(pod *corev1.PodTemplateSpec) error {
-	proxyConfig, ok := d.privateValues[ProxyPrivateValueKey]
+func (d *proxyHandler) decorate(pod *corev1.PodTemplateSpec) error {
+	pc, ok := d.getProxyConfig()
 	if !ok {
 		return nil
-	}
-
-	pc, ok := proxyConfig.(addonapiv1alpha1.ProxyConfig)
-	if !ok {
-		return fmt.Errorf("proxy config value is invalid")
 	}
 
 	keyValues := []keyValuePair{}
@@ -376,8 +398,114 @@ func (d *proxyDecorator) decorate(pod *corev1.PodTemplateSpec) error {
 		return nil
 	}
 
-	return newEnvironmentDecorator(keyValues).decorate(pod)
-	// TODO: consider to create a configmap to store the proxyConfig.CABundle and mount it to the Deployment/DaemonSet
+	err := newEnvironmentDecorator(keyValues).decorate(pod)
+	if err != nil {
+		return err
+	}
+
+	if len(pc.CABundle) == 0 {
+		return nil
+	}
+
+	return newCABundleDecorator(d.addonName, pc.CABundle).decorate(pod)
+}
+
+func (d *proxyHandler) getProxyConfig() (addonapiv1alpha1.ProxyConfig, bool) {
+	proxyConfig, ok := d.privateValues[ProxyPrivateValueKey]
+	if !ok {
+		return addonapiv1alpha1.ProxyConfig{}, false
+	}
+
+	pc, ok := proxyConfig.(addonapiv1alpha1.ProxyConfig)
+	if !ok {
+		d.logger.Error(nil, "proxy config value is invalid", "value", proxyConfig)
+		return addonapiv1alpha1.ProxyConfig{}, false
+	}
+
+	return pc, true
+}
+
+func (d *proxyHandler) inject() ([]runtime.Object, error) {
+	pc, ok := d.getProxyConfig()
+	if !ok {
+		return nil, nil
+	}
+
+	if len(pc.CABundle) == 0 {
+		return nil, nil
+	}
+
+	return []runtime.Object{
+		&corev1.ConfigMap{
+			// add TypeMeta to prevent error:
+			//   "failed to generate required mapper.err got empty kind/version from object"
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "ConfigMap",
+				APIVersion: "v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: proxyCABundleConfigMapName(d.addonName),
+				// use the default namespace, will be decorated by the namespaceDecorator
+				Namespace: "open-cluster-management-agent-addon",
+			},
+			Data: map[string]string{
+				proxyCABundleConfigMapDataKey(): string(pc.CABundle),
+			},
+		},
+	}, nil
+}
+
+type caBundleDecorator struct {
+	addonName    string
+	caBundle     []byte
+	envDecorator podTemplateSpecDecorator
+}
+
+func newCABundleDecorator(addonName string, caBundle []byte) podTemplateSpecDecorator {
+	keyValues := []keyValuePair{}
+	keyValues = append(keyValues,
+		keyValuePair{name: "CA_BUNDLE_FILE_PATH", value: proxyCABundleFilePath()},
+	)
+
+	return &caBundleDecorator{
+		addonName:    addonName,
+		caBundle:     caBundle,
+		envDecorator: newEnvironmentDecorator(keyValues),
+	}
+}
+
+func (d *caBundleDecorator) decorate(pod *corev1.PodTemplateSpec) error {
+	err := d.envDecorator.decorate(pod)
+	if err != nil {
+		return err
+	}
+
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "proxy-ca-bundle",
+			MountPath: proxyCABundleConfigMapMountPath(),
+		},
+	}
+	volumes := []corev1.Volume{
+		{
+			Name: "proxy-ca-bundle",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: proxyCABundleConfigMapName(d.addonName),
+					},
+				},
+			},
+		},
+	}
+
+	for j := range pod.Spec.Containers {
+		pod.Spec.Containers[j].VolumeMounts = append(
+			pod.Spec.Containers[j].VolumeMounts, volumeMounts...)
+	}
+
+	pod.Spec.Volumes = append(pod.Spec.Volumes, volumes...)
+	return nil
 }
 
 func hubKubeconfigSecretMountPath() string {
@@ -394,4 +522,20 @@ func CustomSignedSecretName(addonName, signerName string) string {
 
 func customSignedSecretMountPath(signerName string) string {
 	return fmt.Sprintf("/managed/%s", strings.ReplaceAll(signerName, "/", "-"))
+}
+
+func proxyCABundleConfigMapMountPath() string {
+	return "/managed/proxy-ca"
+}
+
+func proxyCABundleConfigMapName(addonName string) string {
+	return fmt.Sprintf("%s-proxy-ca", addonName)
+}
+
+func proxyCABundleConfigMapDataKey() string {
+	return "ca-bundle.crt"
+}
+
+func proxyCABundleFilePath() string {
+	return path.Join(proxyCABundleConfigMapMountPath(), proxyCABundleConfigMapDataKey())
 }
