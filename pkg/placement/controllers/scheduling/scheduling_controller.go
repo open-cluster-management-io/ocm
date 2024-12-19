@@ -790,9 +790,22 @@ func filterClustersBySelector(
 		return matched, status
 	}
 
+	// cel evaluator
+	evaluator, err := helpers.NewEvaluator()
+	if err != nil {
+		panic(err)
+	}
+
 	// filter clusters by label selector
 	for _, cluster := range clusters {
 		if ok := clusterSelector.Matches(cluster.Labels, helpers.GetClusterClaims(cluster)); !ok {
+			continue
+		}
+		if ok, err := evaluator.Evaluate(cluster, selector.CelSelector.CelExpressions); !ok {
+			if err != nil {
+				status := framework.NewStatus("", framework.Misconfigured, err.Error())
+				return []clusterapiv1beta1.ClusterDecision{}, status
+			}
 			continue
 		}
 		if !clusterNames.Has(cluster.Name) {

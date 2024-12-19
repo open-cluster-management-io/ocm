@@ -309,6 +309,11 @@ func (b *ManagedClusterBuilder) WithDeletionTimestamp() *ManagedClusterBuilder {
 	return b
 }
 
+func (b *ManagedClusterBuilder) Withk8sVersion(version string) *ManagedClusterBuilder {
+	b.cluster.Status.Version.Kubernetes = version
+	return b
+}
+
 func (b *ManagedClusterBuilder) Build() *clusterapiv1.ManagedCluster {
 	return b.cluster
 }
