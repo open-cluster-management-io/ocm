@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	errorhelpers "errors"
+	"os"
 	"strings"
 	"time"
 
@@ -184,6 +185,12 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration",
 		registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates)
 	config.ClusterProfileEnabled = helpers.FeatureGateEnabled(registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates, ocmfeature.ClusterProfile)
+	// setting for cluster importer.
+	// TODO(qiujian16) since this is disabled by feature gate, the image is obtained from cluster manager's env var. Need a more elegant approach.
+	config.ClusterImporterEnabled = helpers.FeatureGateEnabled(registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates, ocmfeature.ClusterImporter)
+	if config.ClusterImporterEnabled {
+		config.AgentImage = os.Getenv("AGENT_IMAGE")
+	}
 
 	var workFeatureGates []operatorapiv1.FeatureGate
 	if clusterManager.Spec.WorkConfiguration != nil {

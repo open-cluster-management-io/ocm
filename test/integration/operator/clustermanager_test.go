@@ -3,6 +3,7 @@ package operator
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -12,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
 
@@ -63,7 +65,6 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 	var hubAddonManagerDeployment = fmt.Sprintf("%s-addon-manager-controller", clusterManagerName)
 	var hubRegistrationClusterRole = fmt.Sprintf("open-cluster-management:%s-registration:controller", clusterManagerName)
 	var hubRegistrationWebhookClusterRole = fmt.Sprintf("open-cluster-management:%s-registration:webhook", clusterManagerName)
-	var hubRegistrationClusterProfileRole = fmt.Sprintf("open-cluster-management:%s-clusterprofile:controller", clusterManagerName)
 	var hubWorkWebhookClusterRole = fmt.Sprintf("open-cluster-management:%s-work:webhook", clusterManagerName)
 	var hubWorkControllerClusterRole = fmt.Sprintf("open-cluster-management:%s-work:controller", clusterManagerName)
 	var hubAddOnManagerClusterRole = fmt.Sprintf("open-cluster-management:%s-addon-manager:controller", clusterManagerName)
@@ -760,36 +761,21 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
-			// Check clusterrole/clusterrolebinding
+			// Check clusterrole
 			gomega.Eventually(func() error {
-				if _, err := kubeClient.RbacV1().ClusterRoles().Get(
-					context.Background(), hubRegistrationClusterProfileRole, metav1.GetOptions{}); err != nil {
-					return err
-				}
-				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
-			gomega.Eventually(func() error {
-				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(
-					context.Background(), hubRegistrationClusterProfileRole, metav1.GetOptions{}); err != nil {
-					return err
-				}
-				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
-
-			// Check if relatedResources are correct
-			gomega.Eventually(func() error {
-				actual, err := operatorClient.OperatorV1().ClusterManagers().Get(
-					context.Background(), clusterManagerName, metav1.GetOptions{})
+				cr, err := kubeClient.RbacV1().ClusterRoles().Get(
+					context.Background(), hubRegistrationClusterRole, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
-				// increase 3 resources clusterrole/clusterrolebinding and crd
-				if len(actual.Status.RelatedResources) != 48 {
-					return fmt.Errorf("should get 48 relatedResources, actual got %v, %v",
-						len(actual.Status.RelatedResources), actual.Status.RelatedResources)
+				for _, rule := range cr.Rules {
+					apiGrouSet := sets.New[string](rule.APIGroups...)
+					if apiGrouSet.Has("multicluster.x-k8s.io") {
+						return nil
+					}
 				}
-				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+				return fmt.Errorf("expected multicluster.x-k8s.io rules to exist")
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
 			ginkgo.By("Revert ClusterProfile to disable mode")
 			// Check ClusterProfile disable
@@ -820,41 +806,141 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
-			// Check clusterrole/clusterrolebinding
-			gomega.Eventually(func() bool {
-				_, err := kubeClient.RbacV1().ClusterRoles().Get(
-					context.Background(), hubRegistrationClusterProfileRole, metav1.GetOptions{})
-				if err == nil {
-					return false
-				}
-				return errors.IsNotFound(err)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-			gomega.Eventually(func() bool {
-				_, err := kubeClient.RbacV1().ClusterRoleBindings().Get(
-					context.Background(), hubRegistrationClusterProfileRole, metav1.GetOptions{})
-				if err == nil {
-					return false
-				}
-				return errors.IsNotFound(err)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
-			// Check if relatedResources are correct
 			gomega.Eventually(func() error {
-				actual, err := operatorClient.OperatorV1().ClusterManagers().Get(
+				cr, err := kubeClient.RbacV1().ClusterRoles().Get(
+					context.Background(), hubRegistrationClusterRole, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				for _, rule := range cr.Rules {
+					apiGrouSet := sets.New[string](rule.APIGroups...)
+					if apiGrouSet.Has("multicluster.x-k8s.io") {
+						return fmt.Errorf("expected multicluster.x-k8s.io rules to not exist")
+					}
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+		})
+
+		ginkgo.It("should have expected resource created/deleted when feature gates ClusterImporter enabled/disabled", func() {
+			ginkgo.By("Enable ClusterImporter feature gate")
+			os.Setenv("AGENT_IMAGE", "test-agent:latest")
+			gomega.Eventually(func() error {
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(
 					context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
-				// reduce 2 resources clusterrole/clusterrolebinding
-				if len(actual.Status.RelatedResources) != 46 {
-					return fmt.Errorf("should get 46 relatedResources, actual got %v, %v",
-						len(actual.Status.RelatedResources), actual.Status.RelatedResources)
+				featureGate := []operatorapiv1.FeatureGate{
+					{
+						Feature: string(feature.ClusterImporter),
+						Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+					},
+				}
+				if clusterManager.Spec.RegistrationConfiguration != nil {
+					for _, fg := range clusterManager.Spec.RegistrationConfiguration.FeatureGates {
+						if fg.Feature != string(feature.ClusterImporter) {
+							featureGate = append(featureGate, fg)
+						}
+					}
+				}
+				clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+					FeatureGates: featureGate,
+				}
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(
+					context.Background(), clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			// Check clusterrole
+			gomega.Eventually(func() error {
+				cr, err := kubeClient.RbacV1().ClusterRoles().Get(
+					context.Background(), hubRegistrationClusterRole, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				for _, rule := range cr.Rules {
+					apiGrouSet := sets.New[string](rule.APIGroups...)
+					if apiGrouSet.Has("cluster.x-k8s.io") {
+						return nil
+					}
+				}
+				return fmt.Errorf("expected cluster.x-k8s.io rules to exist")
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			// check deployment
+			gomega.Eventually(func() error {
+				deploy, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(
+					context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				argSet := sets.New[string](deploy.Spec.Template.Spec.Containers[0].Args...)
+				if argSet.Has("--agent-image=test-agent:latest") {
+					return nil
+				}
+				return fmt.Errorf("expected agent-image flag to be set")
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			ginkgo.By("Revert ClusterImporter to disable mode")
+			// Check ClusterProfile disable
+			gomega.Eventually(func() error {
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(
+					context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				featureGate := []operatorapiv1.FeatureGate{
+					{
+						Feature: string(feature.ClusterImporter),
+						Mode:    operatorapiv1.FeatureGateModeTypeDisable,
+					},
+				}
+				if clusterManager.Spec.RegistrationConfiguration != nil {
+					for _, fg := range clusterManager.Spec.RegistrationConfiguration.FeatureGates {
+						if fg.Feature != string(feature.ClusterImporter) {
+							featureGate = append(featureGate, fg)
+						}
+					}
+				}
+				clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+					FeatureGates: featureGate,
+				}
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(
+					context.Background(), clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			// Check deployment
+			gomega.Eventually(func() error {
+				deploy, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(
+					context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				argSet := sets.New[string](deploy.Spec.Template.Spec.Containers[0].Args...)
+				if argSet.Has("--agent-image=test-agent:latest") {
+					return fmt.Errorf("expected agent-image flag not to be set")
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
+			// check cluster role
+			gomega.Eventually(func() error {
+				cr, err := kubeClient.RbacV1().ClusterRoles().Get(
+					context.Background(), hubRegistrationClusterRole, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				for _, rule := range cr.Rules {
+					apiGrouSet := sets.New[string](rule.APIGroups...)
+					if apiGrouSet.Has("cluster.x-k8s.io") {
+						return fmt.Errorf("expected cluster.x-k8s.io rules to not exist")
+					}
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 		})
-
 		ginkgo.It("Deployment should be updated when clustermanager is changed", func() {
 			gomega.Eventually(func() error {
 				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
