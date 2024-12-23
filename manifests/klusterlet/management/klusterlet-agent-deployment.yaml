@@ -121,6 +121,10 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
+          {{if and .RegistrationDriver .RegistrationDriver.AuthType (eq .RegistrationDriver.AuthType "awsirsa")}}
+          - name: PATH
+            value: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/awscli/dist
+          {{end}}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -148,6 +152,8 @@ spec:
         {{if and .RegistrationDriver .RegistrationDriver.AuthType (eq .RegistrationDriver.AuthType "awsirsa")}}
         - name: dot-aws
           mountPath: /.aws
+        - name: awscli
+          mountPath: "/awscli"
         {{end}}
         {{if eq .InstallMode "SingletonHosted"}}
         - name: spoke-kubeconfig-secret
@@ -180,6 +186,19 @@ spec:
         resources:
           {{ .ResourceRequirements | indent 10 }}
         {{- end }}
+      {{if and .RegistrationDriver .RegistrationDriver.AuthType (eq .RegistrationDriver.AuthType "awsirsa")}}
+      initContainers:
+      - command:
+          - cp
+          - -vr
+          - /usr/local/aws-cli/v2/current/dist
+          - /awscli
+        image: amazon/aws-cli:latest
+        name: load-awscli
+        volumeMounts:
+          - mountPath: /awscli
+            name: awscli
+      {{end}}
       {{- if .PriorityClassName }}
       priorityClassName: "{{ .PriorityClassName }}"
       {{- end }}
@@ -202,6 +221,8 @@ spec:
         emptyDir: { }
       {{if and .RegistrationDriver .RegistrationDriver.AuthType (eq .RegistrationDriver.AuthType "awsirsa")}}
       - name: dot-aws
+        emptyDir: { }
+      - name: awscli
         emptyDir: { }
       {{end}}
       {{if eq .InstallMode "SingletonHosted"}}
