@@ -6,6 +6,8 @@ import (
 
 	"github.com/ghodss/yaml"
 	authv1 "k8s.io/api/authentication/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	clientcmdapiv1 "k8s.io/client-go/tools/clientcmd/api/v1"
@@ -15,6 +17,8 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
 )
+
+const imagePullSecretName = "open-cluster-management-image-pull-credentials"
 
 func RenderBootstrapHubKubeConfig(
 	kubeClient kubernetes.Interface, apiServerURL string) KlusterletConfigRenderer {
@@ -88,6 +92,37 @@ func RenderBootstrapHubKubeConfig(
 		}
 
 		config.BootstrapHubKubeConfig = string(bootstrapConfigBytes)
+		return config, nil
+	}
+}
+
+func RenderImage(image string) KlusterletConfigRenderer {
+	return func(ctx context.Context, config *chart.KlusterletChartConfig) (*chart.KlusterletChartConfig, error) {
+		if len(image) == 0 {
+			return config, nil
+		}
+		config.Images.Overrides = chart.Overrides{
+			OperatorImage: image,
+		}
+		return config, nil
+	}
+}
+
+func RenderImagePullSecret(kubeClient kubernetes.Interface, namespace string) KlusterletConfigRenderer {
+	return func(ctx context.Context, config *chart.KlusterletChartConfig) (*chart.KlusterletChartConfig, error) {
+		secret, err := kubeClient.CoreV1().Secrets(namespace).Get(ctx, imagePullSecretName, metav1.GetOptions{})
+		switch {
+		case errors.IsNotFound(err):
+			return config, nil
+		case err != nil:
+			return config, err
+		}
+
+		if len(secret.Data[corev1.DockerConfigJsonKey]) == 0 {
+			return config, nil
+		}
+
+		config.Images.ImageCredentials.DockerConfigJson = string(secret.Data[corev1.DockerConfigJsonKey])
 		return config, nil
 	}
 }

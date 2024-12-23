@@ -103,10 +103,15 @@ func (c *clockSyncController) sync(ctx context.Context, syncCtx factory.SyncCont
 		return err
 	}
 	// When the agent's lease get renewed, the "now" on hub should close to the RenewTime on agent.
-	// If the two time are not close(over 1 lease duration), we assume the clock is out of sync.
-	oneLeaseDuration := time.Duration(LeaseDurationSeconds) * time.Second
+	// If the two time are not close(the same duration in the lease controller), we assume the clock is out of sync.
+	// Then, if the Clock is out of sync, the agent will not be able to update the status of managed cluster.
+	leaseDuration := time.Duration(leaseDurationTimes*cluster.Spec.LeaseDurationSeconds) * time.Second
+	if leaseDuration == 0 {
+		leaseDuration = time.Duration(LeaseDurationSeconds*leaseDurationTimes) * time.Second
+	}
+
 	if err := c.updateClusterStatusClockSynced(ctx, cluster,
-		now.Sub(observedLease.Spec.RenewTime.Time) < oneLeaseDuration && observedLease.Spec.RenewTime.Time.Sub(now) < oneLeaseDuration); err != nil {
+		now.Sub(observedLease.Spec.RenewTime.Time) < leaseDuration && observedLease.Spec.RenewTime.Time.Sub(now) < leaseDuration); err != nil {
 		return err
 	}
 	return nil

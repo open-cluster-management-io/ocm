@@ -97,3 +97,91 @@ func TestRenderBootstrapHubKubeConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderImage(t *testing.T) {
+	cases := []struct {
+		name          string
+		image         string
+		expectedImage string
+	}{
+		{
+			name: "image is not set",
+		},
+		{
+			name:          "image is set",
+			image:         "test:latest",
+			expectedImage: "test:latest",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			config := &chart.KlusterletChartConfig{}
+			render := RenderImage(c.image)
+			config, err := render(context.TODO(), config)
+			if err != nil {
+				t.Fatalf("failed to render image: %v", err)
+			}
+			if config.Images.Overrides.OperatorImage != c.expectedImage {
+				t.Errorf("expected: %s, got: %s", c.expectedImage, config.Images.Overrides.OperatorImage)
+			}
+		})
+	}
+}
+
+func TestRenderImagePullSecret(t *testing.T) {
+	cases := []struct {
+		name     string
+		secrets  []runtime.Object
+		expected string
+	}{
+		{
+			name:    "not image secret",
+			secrets: []runtime.Object{},
+		},
+		{
+			name: "secert has not correct key",
+			secrets: []runtime.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      imagePullSecretName,
+						Namespace: "test",
+					},
+					Data: map[string][]byte{
+						"docker": []byte("test"),
+					},
+				},
+			},
+		},
+		{
+			name: "secert has correct key",
+			secrets: []runtime.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      imagePullSecretName,
+						Namespace: "test",
+					},
+					Data: map[string][]byte{
+						corev1.DockerConfigJsonKey: []byte("test"),
+					},
+				},
+			},
+			expected: "test",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			client := kubefake.NewClientset(c.secrets...)
+			config := &chart.KlusterletChartConfig{}
+			render := RenderImagePullSecret(client, "test")
+			config, err := render(context.TODO(), config)
+			if err != nil {
+				t.Fatalf("failed to render image: %v", err)
+			}
+			if config.Images.ImageCredentials.DockerConfigJson != c.expected {
+				t.Errorf("expected: %s, got: %s", c.expected, config.Images.ImageCredentials.DockerConfigJson)
+			}
+		})
+	}
+}

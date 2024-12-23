@@ -81,6 +81,9 @@ type ImagesConfig struct {
 	// The image pull secret name is open-cluster-management-image-pull-credentials.
 	// Please set the userName and password if you use a private image registry.
 	ImageCredentials ImageCredentials `json:"imageCredentials,omitempty"`
+	// Overrides is to override the image of the component, if this is specified,
+	// the registry and tag will be ignored.
+	Overrides Overrides `json:"overrides,omitempty"`
 }
 
 type ImageCredentials struct {
@@ -88,6 +91,19 @@ type ImageCredentials struct {
 	UserName               string `json:"userName,omitempty"`
 	Password               string `json:"password,omitempty"`
 	DockerConfigJson       string `json:"dockerConfigJson,omitempty"`
+}
+
+type Overrides struct {
+	// RegistrationImage is the image of the registration component.
+	RegistrationImage string `json:"registrationImage,omitempty"`
+	// WorkImage is the image of the work component.
+	WorkImage string `json:"workImage,omitempty"`
+	// OperatorImage is the image of the operator component.
+	OperatorImage string `json:"operatorImage,omitempty"`
+	// PlacementImage is the image of the placement component
+	PlacementImage string `json:"placementImage,omitempty"`
+	// AddOnManagerImage is the image of the addOnManager component
+	AddOnManagerImage string `json:"addOnManagerImage,omitempty"`
 }
 
 type ClusterManagerConfig struct {
