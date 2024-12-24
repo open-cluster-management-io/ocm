@@ -77,8 +77,6 @@ spec:
             port: 8443
           initialDelaySeconds: 2
         resources:
-          limits:
-            memory: 2Gi
           requests:
             cpu: 2m
             memory: 16Mi
