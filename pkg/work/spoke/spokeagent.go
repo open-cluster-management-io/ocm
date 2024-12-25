@@ -31,6 +31,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/finalizercontroller"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/manifestcontroller"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/statuscontroller"
+	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/timestampcontroller"
 )
 
 const (
@@ -173,6 +174,13 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		o.workOptions.MaxJSONRawLength,
 		o.workOptions.StatusSyncInterval,
 	)
+	timestampController := timestampcontroller.NewTimestampController(
+		controllerContext.EventRecorder,
+		hubWorkClient,
+		hubWorkInformer,
+		hubWorkInformer.Lister().ManifestWorks(o.agentOptions.SpokeClusterName),
+		o.workOptions.StatusSyncInterval,
+	)
 
 	go spokeWorkInformerFactory.Start(ctx.Done())
 	go hubWorkInformer.Informer().Run(ctx.Done())
@@ -183,6 +191,7 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 	go manifestWorkController.Run(ctx, 1)
 	go manifestWorkFinalizeController.Run(ctx, manifestWorkFinalizeControllerWorkers)
 	go availableStatusController.Run(ctx, availableStatusControllerWorkers)
+	go timestampController.Run(ctx, 1)
 
 	<-ctx.Done()
 
