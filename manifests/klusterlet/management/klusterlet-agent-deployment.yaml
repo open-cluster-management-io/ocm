@@ -108,14 +108,12 @@ spec:
           {{if .AppliedManifestWorkEvictionGracePeriod}}
           - "--appliedmanifestwork-eviction-grace-period={{ .AppliedManifestWorkEvictionGracePeriod }}"
           {{end}}
-          {{if and .RegistrationDriver .RegistrationDriver.AuthType}}
-          - "--registration-auth={{ .RegistrationDriver.AuthType }}"
           {{if eq .RegistrationDriver.AuthType "awsirsa"}}
+          - "--registration-auth={{ .RegistrationDriver.AuthType }}"
           - "--hub-cluster-arn={{ .RegistrationDriver.AwsIrsa.HubClusterArn }}"
           - "--managed-cluster-arn={{ .RegistrationDriver.AwsIrsa.ManagedClusterArn }}"
           {{if .ManagedClusterRoleSuffix}}
           - "--managed-cluster-role-suffix={{ .ManagedClusterRoleSuffix }}"
-          {{end}}
           {{end}}
           {{end}}
         env:

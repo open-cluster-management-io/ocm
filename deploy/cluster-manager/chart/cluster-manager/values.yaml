@@ -48,8 +48,6 @@ resources:
   requests:
     cpu: 2m
     memory: 16Mi
-  limits:
-    memory: 2Gi
 
 # nodeSelector for clusterManager operator deployment.
 nodeSelector: {}
