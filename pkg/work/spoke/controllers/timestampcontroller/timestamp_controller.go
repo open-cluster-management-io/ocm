@@ -56,8 +56,7 @@ func NewTimestampController(
 
 func (c *TimestampController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	manifestWorkName := controllerContext.QueueKey()
-	logger := klog.FromContext(ctx)
-	logger.WithName("manifestwork-timestamp-controller").WithValues("manifestwork", manifestWorkName)
+	logger := klog.FromContext(ctx).WithName("manifestwork-timestamp-ctrl").WithValues("manifestwork", manifestWorkName)
 	logger.V(4).Info("Reconciling ManifestWork")
 	manifestWork, err := c.manifestWorkLister.Get(manifestWorkName)
 	if errors.IsNotFound(err) {
@@ -66,6 +65,10 @@ func (c *TimestampController) sync(ctx context.Context, controllerContext factor
 	}
 	if err != nil {
 		return fmt.Errorf("unable to fetch manifestwork %q: %w", manifestWorkName, err)
+	}
+
+	if !manifestWork.DeletionTimestamp.IsZero() {
+		return nil
 	}
 
 	err = c.syncManifestWork(ctx, logger, manifestWork)
@@ -90,7 +93,13 @@ func (c *TimestampController) syncManifestWork(ctx context.Context, logger klog.
 		Generation: manifestWork.Generation,
 		StartTime:  manifestWork.CreationTimestamp.Time,
 	}
+	if oldGenerationTime != nil {
+		logger.V(4).Info("keep the first generation applied time we observed unchanged",
+			"firstGenerationAppliedTime", oldGenerationTime.FirstGenerationAppliedTime)
+		generationTime.FirstGenerationAppliedTime = oldGenerationTime.FirstGenerationAppliedTime
+	}
 
+	// set the generation start time
 	for _, field := range manifestWork.ManagedFields {
 		if field.Time == nil || field.FieldsV1 == nil {
 			continue
@@ -101,20 +110,27 @@ func (c *TimestampController) syncManifestWork(ctx context.Context, logger klog.
 				generationTime.StartTime = field.Time.Time
 			}
 		}
-
 	}
 
-	// set the applied time if it matches
+	// set the generation applied time if it matches
 	cond := meta.FindStatusCondition(manifestWork.Status.Conditions, workapiv1.WorkApplied)
-	if cond != nil && cond.Status == metav1.ConditionTrue && cond.ObservedGeneration == generationTime.Generation {
-		generationTime.AppliedTime = cond.LastTransitionTime.Time
+	if cond != nil && cond.Status == metav1.ConditionTrue {
+		// if the first generation applied time does not set, set the value we observed
+		if generationTime.FirstGenerationAppliedTime.IsZero() {
+			logger.V(4).Info("set the first generation applied time to the Applied condition last transtion time",
+				"lastTransitionTime", cond.LastTransitionTime.Time)
+			generationTime.FirstGenerationAppliedTime = cond.LastTransitionTime.Time
+		}
+		if cond.ObservedGeneration == generationTime.Generation {
+			generationTime.AppliedTime = cond.LastTransitionTime.Time
 
-		// if the generation changes, but the status of the manifestwork Applied condition does not change, the
-		// lastTransitionTime will not change, so it is possible that the lastTransitionTime is befor the generation
-		// start time
-		if generationTime.AppliedTime.Before(generationTime.StartTime) {
-			// TODO: review whether time.Now() makes sence here
-			generationTime.AppliedTime = time.Now()
+			// if the generation changes, but the status of the manifestwork Applied condition does not change, the
+			// lastTransitionTime will not change, so it is possible that the lastTransitionTime is befor the generation
+			// start time
+			if generationTime.AppliedTime.Before(generationTime.StartTime) {
+				// TODO: review whether time.Now() makes sence here
+				generationTime.AppliedTime = time.Now()
+			}
 		}
 	}
 
@@ -158,7 +174,8 @@ func (c *TimestampController) getGenerationTime(mw *workapiv1.ManifestWork) *Gen
 }
 
 type GenerationTimestamp struct {
-	Generation  int64     `json:"generation"`
-	StartTime   time.Time `json:"startTime"`
-	AppliedTime time.Time `json:"appliedTime"`
+	Generation                 int64     `json:"generation"`
+	StartTime                  time.Time `json:"startTime"`
+	AppliedTime                time.Time `json:"appliedTime"`
+	FirstGenerationAppliedTime time.Time `json:"firstGenerationAppliedTime"`
 }
