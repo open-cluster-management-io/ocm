@@ -174,6 +174,8 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		o.workOptions.MaxJSONRawLength,
 		o.workOptions.StatusSyncInterval,
 	)
+
+	// TODO: feature gate the timestamp controller
 	timestampController := timestampcontroller.NewTimestampController(
 		controllerContext.EventRecorder,
 		hubWorkClient,
