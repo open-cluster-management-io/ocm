@@ -121,7 +121,7 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
-          {{if and .RegistrationDriver .RegistrationDriver.AuthType (eq .RegistrationDriver.AuthType "awsirsa")}}
+          {{if eq .RegistrationDriver.AuthType "awsirsa"}}
           - name: PATH
             value: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/awscli/dist
           {{end}}
@@ -149,7 +149,7 @@ spec:
           mountPath: "/spoke/hub-kubeconfig"
         - name: tmpdir
           mountPath: /tmp
-        {{if and .RegistrationDriver .RegistrationDriver.AuthType (eq .RegistrationDriver.AuthType "awsirsa")}}
+        {{if eq .RegistrationDriver.AuthType "awsirsa"}}
         - name: dot-aws
           mountPath: /.aws
         - name: awscli
@@ -186,7 +186,7 @@ spec:
         resources:
           {{ .ResourceRequirements | indent 10 }}
         {{- end }}
-      {{if and .RegistrationDriver .RegistrationDriver.AuthType (eq .RegistrationDriver.AuthType "awsirsa")}}
+      {{if eq .RegistrationDriver.AuthType "awsirsa"}}
       initContainers:
       - command:
           - cp
@@ -219,7 +219,7 @@ spec:
           medium: Memory
       - name: tmpdir
         emptyDir: { }
-      {{if and .RegistrationDriver .RegistrationDriver.AuthType (eq .RegistrationDriver.AuthType "awsirsa")}}
+      {{if eq .RegistrationDriver.AuthType "awsirsa"}}
       - name: dot-aws
         emptyDir: { }
       - name: awscli
