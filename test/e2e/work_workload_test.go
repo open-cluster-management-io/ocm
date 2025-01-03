@@ -766,6 +766,103 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 	})
+
+	ginkgo.Context("ManifestWork server side apply", func() {
+		ginkgo.It("should ignore fields with certain field", func() {
+			deployment := newDeployment("busybox-ssa")
+			deployment.Spec.Replicas = pointer.Int32(2)
+			objects := []runtime.Object{deployment}
+			work := newManifestWork(universalClusterName, workName, objects...)
+			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "busybox-ssa",
+						Namespace: "default",
+					},
+					UpdateStrategy: &workapiv1.UpdateStrategy{
+						Type: workapiv1.UpdateStrategyTypeServerSideApply,
+						ServerSideApply: &workapiv1.ServerSideApplyConfig{
+							IgnoreFields: []workapiv1.IgnoreField{
+								{
+									Condition: workapiv1.IgnoreFieldsConditionOnSpokeChange,
+									JSONPaths: []string{"spec.replicas"},
+								},
+							},
+						},
+					},
+				},
+			}
+			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Check deployment status
+			gomega.Eventually(func() error {
+				deploy, err := spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Get(context.Background(), deployment.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if *deploy.Spec.Replicas != int32(2) {
+					return fmt.Errorf("expected 2 replicas, got %d", *deploy.Spec.Replicas)
+				}
+				return nil
+			}).ShouldNot(gomega.HaveOccurred())
+
+			ginkgo.By("update replicas in the manifestwork")
+			gomega.Eventually(func() error {
+				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				deployment.Spec.Replicas = pointer.Int32(3)
+				objects := []runtime.Object{deployment}
+				newWork := newManifestWork(universalClusterName, workName, objects...)
+				actualWork.Spec.Workload = newWork.Spec.Workload
+				_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(context.Background(), actualWork, metav1.UpdateOptions{})
+				return err
+			}).ShouldNot(gomega.HaveOccurred())
+
+			// Check deployment status
+			gomega.Eventually(func() error {
+				deploy, err := spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Get(context.Background(), deployment.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if *deploy.Spec.Replicas != int32(3) {
+					return fmt.Errorf("expected 3 replicas, got %d", *deploy.Spec.Replicas)
+				}
+				return nil
+			}).ShouldNot(gomega.HaveOccurred())
+
+			ginkgo.By("update work with new replicas and type to onSpokePresent")
+			gomega.Eventually(func() error {
+				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				deployment.Spec.Replicas = pointer.Int32(4)
+				objects := []runtime.Object{deployment}
+				newWork := newManifestWork(universalClusterName, workName, objects...)
+				actualWork.Spec.Workload = newWork.Spec.Workload
+				actualWork.Spec.ManifestConfigs[0].UpdateStrategy.ServerSideApply.IgnoreFields[0].Condition = workapiv1.IgnoreFieldsConditionOnSpokePresent
+				_, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Update(context.Background(), actualWork, metav1.UpdateOptions{})
+				return err
+			}).ShouldNot(gomega.HaveOccurred())
+
+			// Check deployment status, it should not be changed
+			gomega.Eventually(func() error {
+				deploy, err := spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Get(context.Background(), deployment.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if *deploy.Spec.Replicas != int32(3) {
+					return fmt.Errorf("expected 3 replicas, got %d", *deploy.Spec.Replicas)
+				}
+				return nil
+			}).ShouldNot(gomega.HaveOccurred())
+		})
+	})
 })
 
 func assertManifestWorkAppliedSuccessfully(workNamespace, workName string,

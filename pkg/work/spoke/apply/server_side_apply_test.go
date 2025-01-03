@@ -470,6 +470,38 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 			jsonPath:  ".spec.replicas",
 		},
 		{
+			name: "server side apply should not ignore when create",
+			required: testingcommon.NewUnstructuredWithContent(
+				"apps/v1", "Deployment", "default", "deploy1",
+				map[string]interface{}{
+					"spec": map[string]interface{}{
+						"replicas": int64(2),
+					},
+				}),
+			gvr: schema.GroupVersionResource{Version: "v1", Group: "apps", Resource: "deployments"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "get", "patch")
+				p := actions[1].(clienttesting.PatchActionImpl).Patch
+				actual := &unstructured.Unstructured{}
+				err := actual.UnmarshalJSON(p)
+				if err != nil {
+					t.Fatal(err)
+				}
+				actualReplicas, exist, err := unstructured.NestedInt64(actual.Object, "spec", "replicas")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !exist {
+					t.Errorf("expected replicas to exist in the patch")
+				}
+				if actualReplicas != int64(2) {
+					t.Errorf("expected replicas to be 2 but got %d", actualReplicas)
+				}
+			},
+			condition: workapiv1.IgnoreFieldsConditionOnSpokePresent,
+			jsonPath:  ".spec.replicas",
+		},
+		{
 			name: "server side apply ignore update",
 			existing: func() *unstructured.Unstructured {
 				obj := testingcommon.NewUnstructuredWithContent(
