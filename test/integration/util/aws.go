@@ -16,12 +16,15 @@ const (
 
 func AwsCliSpecificVolumesMounted(deployment v1.Deployment) bool {
 	isDotAwsMounted := false
+	isAwsCliMounted := false
 	for _, volumeMount := range deployment.Spec.Template.Spec.Containers[0].VolumeMounts {
 		if volumeMount.Name == "dot-aws" && volumeMount.MountPath == "/.aws" {
 			isDotAwsMounted = true
+		} else if volumeMount.Name == "awscli" && volumeMount.MountPath == "/awscli" {
+			isAwsCliMounted = true
 		}
 	}
-	return isDotAwsMounted
+	return isDotAwsMounted && isAwsCliMounted
 }
 
 func AllCommandLineOptionsPresent(deployment v1.Deployment) bool {
