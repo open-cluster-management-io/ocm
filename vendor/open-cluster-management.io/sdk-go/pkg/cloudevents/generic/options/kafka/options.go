@@ -13,16 +13,10 @@ import (
 )
 
 const (
-	// sourceEventsTopic is a topic for sources to publish their resource create/update/delete events, the first
-	// asterisk is a wildcard for source, the second asterisk is a wildcard for cluster.
-	sourceEventsTopic = "sourceevents.*.*"
-	// agentEventsTopic is a topic for agents to publish their resource status update events, the first
-	// asterisk is a wildcard for source, the second asterisk is a wildcard for cluster.
-	agentEventsTopic = "agentevents.*.*"
-	// sourceBroadcastTopic is for a source to publish its events to all agents, the asterisk is a wildcard for source.
-	sourceBroadcastTopic = "sourcebroadcast.*"
-	// agentBroadcastTopic is for a agent to publish its events to all sources, the asterisk is a wildcard for cluster.
-	agentBroadcastTopic = "agentbroadcast.*"
+	// sourceEventsTopic is a topic for sources to publish their events.
+	sourceEventsTopic = "sourceevents"
+	// agentEventsTopic is a topic for agents to publish their events.
+	agentEventsTopic = "agentevents"
 )
 
 type KafkaOptions struct {

@@ -2,6 +2,10 @@ module open-cluster-management.io/ocm
 
 go 1.22.5
 
+replace open-cluster-management.io/api => github.com/haoqing0110/api v0.0.0-20250103062352-f89d6a235b5d
+
+replace open-cluster-management.io/sdk-go => github.com/haoqing0110/sdk-go v0.0.0-20250103070425-b9c9ca7d8140
+
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/evanphx/json-patch v5.9.0+incompatible

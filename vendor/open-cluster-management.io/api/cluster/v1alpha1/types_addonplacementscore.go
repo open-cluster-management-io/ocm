@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -58,6 +59,8 @@ type AddOnPlacementScoreItem struct {
 	// +kubebuilder:validation:Maximum:=100
 	// +required
 	Value int32 `json:"value"`
+
+	Quantity resource.Quantity `json:"quantity"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -6,14 +6,17 @@ import (
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	mclcel "open-cluster-management.io/sdk-go/pkg/cel/managedcluster"
 )
 
 type ClusterSelector struct {
 	labelSelector labels.Selector
 	claimSelector labels.Selector
+	celSelector   *clusterapiv1beta1.ClusterCelSelector
+	celEvaluator  *mclcel.ManagedClusterEvaluator
 }
 
-func NewClusterSelector(selector clusterapiv1beta1.ClusterSelector) (*ClusterSelector, error) {
+func NewClusterSelector(selector clusterapiv1beta1.ClusterSelector, celEvaluator *mclcel.ManagedClusterEvaluator) (*ClusterSelector, error) {
 	// build label selector
 	labelSelector, err := convertLabelSelector(&selector.LabelSelector)
 	if err != nil {
@@ -27,18 +30,28 @@ func NewClusterSelector(selector clusterapiv1beta1.ClusterSelector) (*ClusterSel
 	return &ClusterSelector{
 		labelSelector: labelSelector,
 		claimSelector: claimSelector,
+		celSelector:   &selector.CelSelector,
+		celEvaluator:  celEvaluator,
 	}, nil
 }
 
-func (c *ClusterSelector) Matches(clusterlabels, clusterclaims map[string]string) bool {
+func (c *ClusterSelector) Matches(cluster *clusterapiv1.ManagedCluster) bool {
 	// match with label selector
-	if ok := c.labelSelector.Matches(labels.Set(clusterlabels)); !ok {
+	if ok := c.labelSelector.Matches(labels.Set(cluster.Labels)); !ok {
 		return false
 	}
 	// match with claim selector
-	if ok := c.claimSelector.Matches(labels.Set(clusterclaims)); !ok {
+	if ok := c.claimSelector.Matches(labels.Set(GetClusterClaims(cluster))); !ok {
 		return false
 	}
+	// match with cel selector if exists
+	if c.celEvaluator != nil && len(c.celSelector.CelExpressions) > 0 {
+		ok, err := c.celEvaluator.Evaluate(cluster, c.celSelector.CelExpressions)
+		if err != nil || !ok {
+			return false
+		}
+	}
+
 	return true
 }
 
