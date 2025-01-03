@@ -87,7 +87,9 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 	if err != nil {
 		return err
 	}
-	spokeWorkInformerFactory := workinformers.NewSharedInformerFactory(spokeWorkClient, 5*time.Minute)
+	// resync with a small interval could result in performance issue when the number of appliedmanifestworks
+	// is large.
+	spokeWorkInformerFactory := workinformers.NewSharedInformerFactory(spokeWorkClient, 21*time.Hour)
 
 	httpClient, err := rest.HTTPClientFor(spokeRestConfig)
 	if err != nil {
@@ -180,7 +182,7 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 	go addFinalizerController.Run(ctx, 1)
 	go appliedManifestWorkFinalizeController.Run(ctx, appliedManifestWorkFinalizeControllerWorkers)
 	go unmanagedAppliedManifestWorkController.Run(ctx, 1)
-	go manifestWorkController.Run(ctx, 1)
+	go manifestWorkController.Run(ctx, 10)
 	go manifestWorkFinalizeController.Run(ctx, manifestWorkFinalizeControllerWorkers)
 	go availableStatusController.Run(ctx, availableStatusControllerWorkers)
 
@@ -252,7 +254,9 @@ func (o *WorkAgentConfig) newWorkClientAndInformer(
 
 	factory := workinformers.NewSharedInformerFactoryWithOptions(
 		workClient,
-		5*time.Minute,
+		// resync with a small interval could result in performance issue when the number of manifestworks
+		// is large.
+		24*time.Hour,
 		workinformers.WithNamespace(o.agentOptions.SpokeClusterName),
 	)
 	informer := factory.Work().V1().ManifestWorks()

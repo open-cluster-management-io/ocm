@@ -175,6 +175,9 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	// if needed.
 	if !mwUpdated && !amwUpdated && requeueTime < MaxRequeueDuration {
 		controllerContext.Queue().AddAfter(manifestWorkName, requeueTime)
+	} else {
+		// resync each manifestwork every 5 minutes
+		controllerContext.Queue().AddAfter(manifestWorkName, 5*time.Minute)
 	}
 
 	return nil
