@@ -155,8 +155,20 @@ While the implementation of this feature is in progress, in the hub and spoke si
 
 9. Generate the secret called `hub-kubeconfig-secret` in `open-cluster-management-agent` namespace using above kubeconfig:
    ```shell
-   HUB_KUBECONFIG=$(aws eks update-kubeconfig --name $HUB_CLUSTER_NAME --kubeconfig /awscli/kubeconfig.kubeconfig --role-arn arn:aws:iam::"$HUB_ACCOUNT_ID":role/$HUB_ROLE_NAME --dry-run)
+   aws eks update-kubeconfig --name $HUB_CLUSTER_NAME --kubeconfig /awscli/kubeconfig.kubeconfig --role-arn arn:aws:iam::"$HUB_ACCOUNT_ID":role/$HUB_ROLE_NAME --dry-run > hub-kubeconfig
    
+    # Updating the clusterName to "hub" to make it same as bootstrap-kubeconfig
+   # to pass a validation in ocm. Install yq, if missing.
+   # Note - The yq command works only on a Linux machine. Please use a text editor to manually replace the values otherwise.
+   NEW_CLUSTER_NAME="hub"
+   yq eval "
+   (.clusters[].name = \"${NEW_CLUSTER_NAME}\") |
+   (.contexts[].context.cluster = \"${NEW_CLUSTER_NAME}\") |
+   del(.users[].user.exec.env)
+   " -i "hub-kubeconfig"
+
+   HUB_KUBECONFIG=$(cat hub-kubeconfig)
+
    AGENT_NAME_ENCODED=$(kubectl get klusterlet klusterlet -o jsonpath='{.metadata.uid}' | tr -d '\n' | base64 | tr -d '\n')
    SPOKE_CLUSTER_NAME_ENCODED=$(echo -n "$SPOKE_CLUSTER_NAME" | base64 | tr -d '\n')
    HUB_KUBECONFIG_ENCODED=$(echo -n "$HUB_KUBECONFIG" | base64 | tr -d '\n')
@@ -166,15 +178,6 @@ While the implementation of this feature is in progress, in the hub and spoke si
        -e "s|\${SPOKE_CLUSTER_NAME_ENCODED}|$SPOKE_CLUSTER_NAME_ENCODED|g" \
        -e "s|\${HUB_KUBECONFIG_ENCODED}|$HUB_KUBECONFIG_ENCODED_ESCAPED|g" \
        templates/Template-hub-kubeconfig-secret.yaml > hubKubeconfigSecret.yaml
-   
-   # Updating the clusterName to "hub" to make it same as bootstrap-kubeconfig
-   # to pass a validation in ocm. Install yq, if missing, for following command
-   NEW_CLUSTER_NAME="hub"
-   yq eval "
-   (.clusters[].name = \"${NEW_CLUSTER_NAME}\") |
-   (.contexts[].context.cluster = \"${NEW_CLUSTER_NAME}\") |
-   del(.users[].user.exec.env)
-   " -i "hubKubeconfigSecret.yaml"
        
    kubectl apply -f hubKubeconfigSecret.yaml
    ```
