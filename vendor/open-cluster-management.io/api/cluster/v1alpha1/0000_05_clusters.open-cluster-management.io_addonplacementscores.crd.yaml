@@ -123,6 +123,12 @@ spec:
                     name:
                       description: Name is the name of the score
                       type: string
+                    quantity:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
                     value:
                       description: Value is the value of the score. The score range
                         is from -100 to 100.

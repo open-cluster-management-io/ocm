@@ -126,6 +126,16 @@ spec:
                               description: LabelSelector to select clusters subset
                                 by label.
                               properties:
+                                celSelector:
+                                  description: CelSelector represents a selector of
+                                    ManagedClusters by CEL expressions on ManagedCluster
+                                    fields
+                                  properties:
+                                    celExpressions:
+                                      items:
+                                        type: string
+                                      type: array
+                                  type: object
                                 claimSelector:
                                   description: ClaimSelector represents a selector
                                     of ManagedClusters by clusterClaims in status
@@ -256,6 +266,15 @@ spec:
                         3) If a ManagedCluster (not selected previously) starts to match the selector, it will either
                            be selected or at least has a chance to be selected (when NumberOfClusters is specified);
                       properties:
+                        celSelector:
+                          description: CelSelector represents a selector of ManagedClusters
+                            by CEL expressions on ManagedCluster fields
+                          properties:
+                            celExpressions:
+                              items:
+                                type: string
+                              type: array
+                          type: object
                         claimSelector:
                           description: ClaimSelector represents a selector of ManagedClusters
                             by clusterClaims in status

@@ -173,6 +173,16 @@ type ClusterSelector struct {
 	// ClaimSelector represents a selector of ManagedClusters by clusterClaims in status
 	// +optional
 	ClaimSelector ClusterClaimSelector `json:"claimSelector,omitempty"`
+
+	// CelSelector represents a selector of ManagedClusters by CEL expressions on ManagedCluster fields
+	// +optional
+	CelSelector ClusterCelSelector `json:"celSelector,omitempty"`
+}
+
+// ClusterCelSelector is a list of CEL expressions. The expressions are ANDed.
+type ClusterCelSelector struct {
+	// +optional
+	CelExpressions []string `json:"celExpressions,omitempty"`
 }
 
 // ClusterClaimSelector is a claim query over a set of ManagedClusters. An empty cluster claim

@@ -6,6 +6,7 @@ import (
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	mclcel "open-cluster-management.io/sdk-go/pkg/cel/managedcluster"
 
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
 	"open-cluster-management.io/ocm/pkg/placement/helpers"
@@ -16,10 +17,12 @@ var _ plugins.Filter = &Predicate{}
 
 const description = "Predicate filter filters the clusters based on predicate defined in placement"
 
-type Predicate struct{}
+type Predicate struct {
+	handle plugins.Handle
+}
 
 func New(handle plugins.Handle) *Predicate {
-	return &Predicate{}
+	return &Predicate{handle: handle}
 }
 
 func (p *Predicate) Name() string {
@@ -39,16 +42,17 @@ func (p *Predicate) Filter(
 			Filtered: clusters,
 		}, status
 	}
-	if len(clusters) == 0 {
-		return plugins.PluginFilterResult{
-			Filtered: clusters,
-		}, status
+
+	// Create CEL evaluator once for all predicates
+	celEvaluator, err := mclcel.NewManagedClusterEvaluator(p.handle.ScoreLister())
+	if err != nil {
+		return plugins.PluginFilterResult{}, framework.NewStatus(p.Name(), framework.Misconfigured, err.Error())
 	}
 
-	// prebuild label/claim selectors for each predicate
+	// prebuild cluster selectors for each predicate
 	clusterSelectors := []*helpers.ClusterSelector{}
 	for _, predicate := range placement.Spec.Predicates {
-		clusterSelector, err := helpers.NewClusterSelector(predicate.RequiredClusterSelector)
+		clusterSelector, err := helpers.NewClusterSelector(predicate.RequiredClusterSelector, celEvaluator)
 		if err != nil {
 			return plugins.PluginFilterResult{}, framework.NewStatus(
 				p.Name(),
@@ -62,9 +66,15 @@ func (p *Predicate) Filter(
 	// match cluster with selectors one by one
 	matched := []*clusterapiv1.ManagedCluster{}
 	for _, cluster := range clusters {
-		claims := helpers.GetClusterClaims(cluster)
 		for _, cs := range clusterSelectors {
-			if ok := cs.Matches(cluster.Labels, claims); !ok {
+			if ok, err := cs.Matches(cluster); !ok {
+				if err != nil {
+					return plugins.PluginFilterResult{}, framework.NewStatus(
+						p.Name(),
+						framework.Misconfigured,
+						err.Error(),
+					)
+				}
 				continue
 			}
 			matched = append(matched, cluster)
