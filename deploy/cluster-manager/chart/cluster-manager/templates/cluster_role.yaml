@@ -8,6 +8,11 @@ rules:
   resources: ["configmaps", "namespaces", "serviceaccounts", "services"]
   verbs: ["create", "get", "list", "update", "watch", "patch", "delete", "deletecollection"]
 - apiGroups: [""]
+  resources: ["serviceaccounts/token"]
+  resourceNames:
+    - "cluster-bootstrap"
+  verbs: ["get", "create"]
+- apiGroups: [""]
   resources: ["pods"]
   verbs: ["get"]
 - apiGroups: [""]
