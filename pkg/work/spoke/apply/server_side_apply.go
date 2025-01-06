@@ -42,7 +42,7 @@ func NewServerSideApply(client dynamic.Interface) *ServerSideApply {
 func (c *ServerSideApply) Apply(
 	ctx context.Context,
 	gvr schema.GroupVersionResource,
-	required *unstructured.Unstructured,
+	requiredOriginal *unstructured.Unstructured,
 	owner metav1.OwnerReference,
 	applyOption *workapiv1.ManifestConfigOption,
 	recorder events.Recorder) (runtime.Object, error) {
@@ -52,11 +52,13 @@ func (c *ServerSideApply) Apply(
 	// https://github.com/kubernetes/kubernetes/issues/67610
 	//
 	// TODO Remove this after the above issue fixed in Kubernetes
-	removeCreationTimeFromMetadata(required.Object, logger)
+	removeCreationTimeFromMetadata(requiredOriginal.Object, logger)
 
 	force := false
 	fieldManager := workapiv1.DefaultFieldManager
 	var requiredHash string
+
+	required := requiredOriginal.DeepCopy()
 
 	if applyOption.UpdateStrategy.ServerSideApply != nil {
 		force = applyOption.UpdateStrategy.ServerSideApply.Force
@@ -83,6 +85,7 @@ func (c *ServerSideApply) Apply(
 			}
 			annotation[workapiv1.ManifestConfigSpecHashAnnotationKey] = requiredHash
 			required.SetAnnotations(annotation)
+			requiredOriginal.SetAnnotations(annotation)
 		}
 	}
 
@@ -90,15 +93,21 @@ func (c *ServerSideApply) Apply(
 	if len(requiredHash) > 0 {
 		existing, err := c.client.Resource(gvr).Namespace(required.GetNamespace()).Get(
 			ctx, required.GetName(), metav1.GetOptions{})
-		if err != nil && !errors.IsNotFound(err) {
+		switch {
+		case errors.IsNotFound(err):
+			// if object is not found, directly apply without removing ignore fields in the object.
+			obj, createErr := c.client.
+				Resource(gvr).
+				Namespace(required.GetNamespace()).
+				Apply(ctx, required.GetName(), requiredOriginal, metav1.ApplyOptions{FieldManager: fieldManager, Force: force})
+			return obj, createErr
+		case err != nil:
 			return nil, err
-		} else if err == nil {
-			if len(existing.GetAnnotations()) > 0 {
-				// skip the apply operation when the hash of the existing resource does match the required hash
-				existingHash := existing.GetAnnotations()[workapiv1.ManifestConfigSpecHashAnnotationKey]
-				if requiredHash == existingHash {
-					return existing, nil
-				}
+		case len(existing.GetAnnotations()) > 0:
+			// skip the apply operation when the hash of the existing resource matches the required hash
+			existingHash := existing.GetAnnotations()[workapiv1.ManifestConfigSpecHashAnnotationKey]
+			if requiredHash == existingHash {
+				return existing, nil
 			}
 		}
 	}
