@@ -1,12 +1,18 @@
 package aws_irsa
 
 import (
+	"context"
+	"fmt"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
 	cluster "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	managedclusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1"
 	managedclusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster"
 	managedclusterv1lister "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	v1 "open-cluster-management.io/api/cluster/v1"
 )
 
 type AWSIRSAControl interface {
@@ -26,14 +32,24 @@ type v1AWSIRSAControl struct {
 }
 
 func (v *v1AWSIRSAControl) isApproved(name string) (bool, error) {
-	// TODO: check if the managedclusuter cr on hub has required condition and is approved
+	managedcluster, err := v.get(name)
+	if err != nil {
+		return false, err
+	}
+	v1Managedcluster := managedcluster.(*v1.ManagedCluster)
 	approved := false
-
+	for _, condition := range v1Managedcluster.Status.Conditions {
+		if condition.Type == v1.ManagedClusterConditionHubDenied {
+			return false, nil
+		} else if condition.Type == v1.ManagedClusterConditionHubAccepted {
+			approved = true
+		}
+	}
 	return approved, nil
 }
 
 func (v *v1AWSIRSAControl) generateEKSKubeConfig(name string) ([]byte, error) {
-	// TODO: generate and return kubeconfig
+	// TODO: generate and return kubeconfig, remove this if not needed
 	return nil, nil
 }
 
@@ -41,8 +57,6 @@ func (v *v1AWSIRSAControl) Informer() cache.SharedIndexInformer {
 	return v.hubManagedClusterInformer
 }
 
-//TODO: Uncomment the below once required in the aws irsa authentication implementation
-/*
 func (v *v1AWSIRSAControl) get(name string) (metav1.Object, error) {
 	managedcluster, err := v.hubManagedClusterLister.Get(name)
 	switch {
@@ -57,7 +71,6 @@ func (v *v1AWSIRSAControl) get(name string) (metav1.Object, error) {
 	}
 	return managedcluster, nil
 }
-*/
 
 func NewAWSIRSAControl(hubManagedClusterInformer managedclusterinformers.Interface, hubManagedClusterClient cluster.Interface) (AWSIRSAControl, error) {
 	return &v1AWSIRSAControl{
