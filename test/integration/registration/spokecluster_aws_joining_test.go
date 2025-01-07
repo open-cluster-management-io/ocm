@@ -10,7 +10,6 @@ import (
 	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/clientcmd"
-	"slices"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/klusterletcontroller"
@@ -80,9 +79,11 @@ var _ = ginkgo.Describe("Joining Process for aws flow", func() {
 			err = authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 
-			// ensure that generated hub-kubeconfig-secret is correct
+			// Kubeconfig secret in integration test for AWS won't be able to connect to hub server, since it is not in the eks environment
+			// So we only  ensure that generated hub-kubeconfig-secret has a correct format
+
 			gomega.Eventually(func() error {
-				secret, err := util.GetFilledAWSHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret)
+				secret, err := util.GetHubKubeConfigFromSecret(kubeClient, testNamespace, hubKubeconfigSecret)
 				if err != nil {
 					return err
 				}
@@ -114,9 +115,9 @@ var _ = ginkgo.Describe("Joining Process for aws flow", func() {
 				hubClusterAccountId, hubClusterName := klusterletcontroller.GetAwsAccountIdAndClusterName(hubClusterArn)
 				awsRegion := klusterletcontroller.GetAwsRegion(hubClusterArn)
 
-				if !slices.Contains(hubUser.Exec.Args, fmt.Sprintf("arn:aws:iam::%s:role/ocm-hub-%s", hubClusterAccountId, managedClusterRoleSuffix)) ||
-					!slices.Contains(hubUser.Exec.Args, hubClusterName) ||
-					!slices.Contains(hubUser.Exec.Args, awsRegion) {
+				if !contains(hubUser.Exec.Args, fmt.Sprintf("arn:aws:iam::%s:role/ocm-hub-%s", hubClusterAccountId, managedClusterRoleSuffix)) ||
+					!contains(hubUser.Exec.Args, hubClusterName) ||
+					!contains(hubUser.Exec.Args, awsRegion) {
 					return fmt.Errorf("aws get-token command is not well formed")
 				}
 
@@ -167,3 +168,12 @@ var _ = ginkgo.Describe("Joining Process for aws flow", func() {
 	})
 
 })
+
+func contains(slice []string, value string) bool {
+	for _, item := range slice {
+		if item == value {
+			return true
+		}
+	}
+	return false
+}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
@@ -38,12 +39,11 @@ func (v *v1AWSIRSAControl) isApproved(name string) (bool, error) {
 	}
 	v1Managedcluster := managedcluster.(*v1.ManagedCluster)
 	approved := false
-	for _, condition := range v1Managedcluster.Status.Conditions {
-		if condition.Type == v1.ManagedClusterConditionHubDenied {
-			return false, nil
-		} else if condition.Type == v1.ManagedClusterConditionHubAccepted {
-			approved = true
-		}
+	condition := meta.FindStatusCondition(v1Managedcluster.Status.Conditions, v1.ManagedClusterConditionHubAccepted)
+	if condition != nil {
+		approved = true
+	} else {
+		return false, nil
 	}
 	return approved, nil
 }

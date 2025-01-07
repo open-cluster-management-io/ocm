@@ -516,7 +516,7 @@ func PrepareSpokeAgentNamespace(kubeClient kubernetes.Interface, namespace strin
 }
 
 func GetFilledHubKubeConfigSecret(kubeClient kubernetes.Interface, secretNamespace, secretName string) (*corev1.Secret, error) {
-	secret, err := GetFilledAWSHubKubeConfigSecret(kubeClient, secretNamespace, secretName)
+	secret, err := GetHubKubeConfigFromSecret(kubeClient, secretNamespace, secretName)
 	if err != nil {
 		return nil, err
 	}
@@ -530,7 +530,7 @@ func GetFilledHubKubeConfigSecret(kubeClient kubernetes.Interface, secretNamespa
 	return secret, nil
 }
 
-func GetFilledAWSHubKubeConfigSecret(kubeClient kubernetes.Interface, secretNamespace, secretName string) (*corev1.Secret, error) {
+func GetHubKubeConfigFromSecret(kubeClient kubernetes.Interface, secretNamespace, secretName string) (*corev1.Secret, error) {
 	secret, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
