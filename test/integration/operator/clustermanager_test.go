@@ -153,8 +153,13 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 
 			// Check service account
 			gomega.Eventually(func() error {
-				if _, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(context.Background(), hubRegistrationSA, metav1.GetOptions{}); err != nil {
+				registrationControllerSA, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(context.Background(), hubRegistrationSA, metav1.GetOptions{})
+				if err != nil {
 					return err
+				}
+
+				if _, ok := registrationControllerSA.Annotations["eks.amazonaws.com/role-arn"]; ok {
+					return fmt.Errorf("Annotation applicable to awsirsa registration only")
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
@@ -1294,4 +1299,5 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				gomega.ContainElement("manager"))
 		})
 	})
+
 })

@@ -15,7 +15,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 
-	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/klusterletcontroller"
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
@@ -59,8 +59,8 @@ func (c *AWSIRSADriver) Process(
 }
 
 func (c *AWSIRSADriver) BuildKubeConfigFromTemplate(kubeConfig *clientcmdapi.Config) *clientcmdapi.Config {
-	hubClusterAccountId, hubClusterName := klusterletcontroller.GetAwsAccountIdAndClusterName(c.hubClusterArn)
-	awsRegion := klusterletcontroller.GetAwsRegion(c.hubClusterArn)
+	hubClusterAccountId, hubClusterName := helpers.GetAwsAccountIdAndClusterName(c.hubClusterArn)
+	awsRegion := helpers.GetAwsRegion(c.hubClusterArn)
 	kubeConfig.AuthInfos = map[string]*clientcmdapi.AuthInfo{register.DefaultKubeConfigAuth: {
 		Exec: &clientcmdapi.ExecConfig{
 			APIVersion: "client.authentication.k8s.io/v1beta1",
