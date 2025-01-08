@@ -65,7 +65,7 @@ func (c *UpdateApply) Apply(
 	// TODO we should check the certain error.
 	// Use dynamic client when scheme cannot decode manifest or typed client cannot handle the object
 	if isDecodeError(err) || isUnhandledError(err) || isUnsupportedError(err) {
-		obj, _, err = c.applyUnstructured(ctx, required, gvr, recorder)
+		obj, _, err = c.applyUnstructured(ctx, required, gvr, recorder, c.staticResourceCache)
 	}
 
 	if err == nil && (!reflect.ValueOf(obj).IsValid() || reflect.ValueOf(obj).IsNil()) {
@@ -82,7 +82,8 @@ func (c *UpdateApply) applyUnstructured(
 	ctx context.Context,
 	required *unstructured.Unstructured,
 	gvr schema.GroupVersionResource,
-	recorder events.Recorder) (*unstructured.Unstructured, bool, error) {
+	recorder events.Recorder,
+	cache resourceapply.ResourceCache) (*unstructured.Unstructured, bool, error) {
 	existing, err := c.dynamicClient.
 		Resource(gvr).
 		Namespace(required.GetNamespace()).
@@ -92,11 +93,16 @@ func (c *UpdateApply) applyUnstructured(
 			ctx, resourcemerge.WithCleanLabelsAndAnnotations(required).(*unstructured.Unstructured), metav1.CreateOptions{})
 		recorder.Eventf(fmt.Sprintf(
 			"%s Created", required.GetKind()), "Created %s/%s because it was missing", required.GetNamespace(), required.GetName())
+		cache.UpdateCachedResourceMetadata(required, actual)
 		return actual, true, err
 	}
 
 	if err != nil {
 		return nil, false, err
+	}
+
+	if cache.SafeToSkipApply(required, existing) {
+		return existing, false, nil
 	}
 
 	// Merge OwnerRefs, Labels, and Annotations.
@@ -126,6 +132,7 @@ func (c *UpdateApply) applyUnstructured(
 		ctx, required, metav1.UpdateOptions{})
 	recorder.Eventf(fmt.Sprintf(
 		"%s Updated", required.GetKind()), "Updated %s/%s", required.GetNamespace(), required.GetName())
+	cache.UpdateCachedResourceMetadata(required, actual)
 	return actual, true, err
 }
 
