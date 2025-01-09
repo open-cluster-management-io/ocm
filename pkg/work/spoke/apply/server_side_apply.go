@@ -95,12 +95,8 @@ func (c *ServerSideApply) Apply(
 			ctx, required.GetName(), metav1.GetOptions{})
 		switch {
 		case errors.IsNotFound(err):
-			// if object is not found, directly apply without removing ignore fields in the object.
-			obj, createErr := c.client.
-				Resource(gvr).
-				Namespace(required.GetNamespace()).
-				Apply(ctx, required.GetName(), requiredOriginal, metav1.ApplyOptions{FieldManager: fieldManager, Force: force})
-			return obj, createErr
+			// if object is not found, use requiredOriginal to apply so the ignore fields are kept when create
+			required = requiredOriginal
 		case err != nil:
 			return nil, err
 		case len(existing.GetAnnotations()) > 0:
