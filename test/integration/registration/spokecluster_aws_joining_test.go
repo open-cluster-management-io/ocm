@@ -9,6 +9,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/clientcmd"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
@@ -170,10 +171,6 @@ var _ = ginkgo.Describe("Joining Process for aws flow", func() {
 })
 
 func contains(slice []string, value string) bool {
-	for _, item := range slice {
-		if item == value {
-			return true
-		}
-	}
-	return false
+	stringSet := sets.New[string](slice...)
+	return stringSet.Has(value)
 }
