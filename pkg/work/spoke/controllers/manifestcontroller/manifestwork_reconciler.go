@@ -67,7 +67,7 @@ func (m *manifestworkReconciler) reconcile(
 	}
 
 	var newManifestConditions []workapiv1.ManifestCondition
-	var requeueTime = MaxRequeueDuration
+	var requeueTime = ResyncInterval
 	for _, result := range resourceResults {
 		manifestCondition := workapiv1.ManifestCondition{
 			ResourceMeta: result.resourceMeta,
@@ -119,7 +119,7 @@ func (m *manifestworkReconciler) reconcile(
 
 	if len(errs) > 0 {
 		err = utilerrors.NewAggregate(errs)
-	} else if requeueTime != MaxRequeueDuration {
+	} else if requeueTime != ResyncInterval {
 		err = commonhelper.NewRequeueError(
 			fmt.Sprintf("requeu work %s due to authorization err", manifestWork.Name),
 			requeueTime,

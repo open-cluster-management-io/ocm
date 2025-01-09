@@ -15,6 +15,11 @@ rules:
   resources: ["namespaces", "serviceaccounts", "configmaps"]
   verbs: ["get", "list", "watch", "create", "delete", "update"]
 - apiGroups: [""]
+  resources: ["serviceaccounts/token"]
+  resourceNames:
+    - "cluster-bootstrap"
+  verbs: ["get", "create"]
+- apiGroups: [""]
   resources: ["pods"]
   verbs: ["get"]
 - apiGroups: ["", "events.k8s.io"]
@@ -104,9 +109,6 @@ rules:
 - apiGroups: ["cluster.x-k8s.io"]
   resources: ["clusters"]
   verbs: ["get", "list", "watch"]
-- apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["get"]
 {{end}}
 {{if .ClusterProfileEnabled}}
 # Allow hub to manage clusterprofile
