@@ -58,6 +58,34 @@ type AddOnDeploymentConfigSpec struct {
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
 	AgentInstallNamespace string `json:"agentInstallNamespace,omitempty"`
+
+	// ResourceRequirements specify the resources required by add-on agents.
+	// If a container matches multiple ContainerResourceRequirements, the last matched configuration in the
+	// array will take precedence.
+	// +optional
+	// +listType=map
+	// +listMapKey=containerID
+	ResourceRequirements []ContainerResourceRequirements `json:"resourceRequirements,omitempty"`
+}
+
+// ContainerResourceRequirements defines resources required by one or a group of containers.
+type ContainerResourceRequirements struct {
+	// ContainerID is a unique identifier for an agent container. It consists of three parts: resource types,
+	// resource name, and container name, separated by ':'. The format follows
+	// '{resource_types}:{resource_name}:{container_name}' where
+	//   1). Supported resource types include deployments, daemonsets, statefulsets, replicasets, jobs,
+	//     cronjobs and pods;
+	//   2). Wildcards (*) can be used in any part to match multiple containers. For example, '*:*:*'
+	//     matches all containers of the agent.
+	// +required
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^(deployments|daemonsets|statefulsets|replicasets|jobs|cronjobs|pods|\*):.+:.+$`
+	ContainerID string `json:"containerID"`
+
+	// Compute resources required by matched containers.
+	// +required
+	// +kubebuilder:validation:Required
+	Resources corev1.ResourceRequirements `json:"resources"`
 }
 
 // CustomizedVariable represents a customized variable for add-on deployment.

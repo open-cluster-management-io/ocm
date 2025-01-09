@@ -179,6 +179,89 @@ spec:
                   - mirror
                   type: object
                 type: array
+              resourceRequirements:
+                description: |-
+                  ResourceRequirements specify the resources required by add-on agents.
+                  If a container matches multiple ContainerResourceRequirements, the last matched configuration in the
+                  array will take precedence.
+                items:
+                  description: ContainerResourceRequirements defines resources required
+                    by one or a group of containers.
+                  properties:
+                    containerID:
+                      description: |-
+                        ContainerID is a unique identifier for an agent container. It consists of three parts: resource types,
+                        resource name, and container name, separated by ':'. The format follows
+                        '{resource_types}:{resource_name}:{container_name}' where
+                          1). Supported resource types include deployments, daemonsets, statefulsets, replicasets, jobs,
+                            cronjobs and pods;
+                          2). Wildcards (*) can be used in any part to match multiple containers. For example, '*:*:*'
+                            matches all containers of the agent.
+                      pattern: ^(deployments|daemonsets|statefulsets|replicasets|jobs|cronjobs|pods|\*):.+:.+$
+                      type: string
+                    resources:
+                      description: Compute resources required by matched containers.
+                      properties:
+                        claims:
+                          description: |-
+                            Claims lists the names of resources, defined in spec.resourceClaims,
+                            that are used by this container.
+
+
+                            This is an alpha field and requires enabling the
+                            DynamicResourceAllocation feature gate.
+
+
+                            This field is immutable. It can only be set for containers.
+                          items:
+                            description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                            properties:
+                              name:
+                                description: |-
+                                  Name must match the name of one entry in pod.spec.resourceClaims of
+                                  the Pod where this field is used. It makes that resource available
+                                  inside a container.
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
+                        limits:
+                          additionalProperties:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          description: |-
+                            Limits describes the maximum amount of compute resources allowed.
+                            More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                          type: object
+                        requests:
+                          additionalProperties:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          description: |-
+                            Requests describes the minimum amount of compute resources required.
+                            If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                            otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                            More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                          type: object
+                      type: object
+                  required:
+                  - containerID
+                  - resources
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - containerID
+                x-kubernetes-list-type: map
             type: object
         type: object
     served: true
