@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	applyappsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
 	"k8s.io/utils/pointer"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -787,7 +788,7 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 							IgnoreFields: []workapiv1.IgnoreField{
 								{
 									Condition: workapiv1.IgnoreFieldsConditionOnSpokeChange,
-									JSONPaths: []string{"spec.replicas"},
+									JSONPaths: []string{".spec.replicas"},
 								},
 							},
 						},
@@ -805,6 +806,9 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				}
 				if *deploy.Spec.Replicas != int32(2) {
 					return fmt.Errorf("expected 2 replicas, got %d", *deploy.Spec.Replicas)
+				}
+				if len(deploy.OwnerReferences) == 0 {
+					return fmt.Errorf("expected owner references, got none")
 				}
 				return nil
 			}).ShouldNot(gomega.HaveOccurred())
@@ -835,6 +839,15 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				return nil
 			}).ShouldNot(gomega.HaveOccurred())
 
+			ginkgo.By("update deployment with new replicas")
+			specConfig := applyappsv1.DeploymentSpec().WithReplicas(5)
+			applyConfig := applyappsv1.Deployment(deployment.Name, deployment.Namespace).WithSpec(specConfig)
+			_, err = spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Apply(context.Background(), applyConfig, metav1.ApplyOptions{
+				FieldManager: "another-actor",
+				Force:        true,
+			})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 			ginkgo.By("update work with new replicas and type to onSpokePresent")
 			gomega.Eventually(func() error {
 				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
@@ -850,16 +863,49 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				return err
 			}).ShouldNot(gomega.HaveOccurred())
 
+			// wait until the work has been applied
+			gomega.Eventually(func() error {
+				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				appliedCond := meta.FindStatusCondition(actualWork.Status.Conditions, workapiv1.WorkApplied)
+				if appliedCond == nil {
+					return fmt.Errorf("expected a work applied condition")
+				}
+				if appliedCond.ObservedGeneration != actualWork.Generation {
+					return fmt.Errorf("expect work is applied.")
+				}
+				return nil
+			}).ShouldNot(gomega.HaveOccurred())
+
 			// Check deployment status, it should not be changed
 			gomega.Eventually(func() error {
 				deploy, err := spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Get(context.Background(), deployment.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
-				if *deploy.Spec.Replicas != int32(3) {
-					return fmt.Errorf("expected 3 replicas, got %d", *deploy.Spec.Replicas)
+				if *deploy.Spec.Replicas != int32(5) {
+					return fmt.Errorf("expected 5 replicas, got %d", *deploy.Spec.Replicas)
 				}
 				return nil
+			}).ShouldNot(gomega.HaveOccurred())
+
+			err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Delete(
+				context.Background(), work.Name, metav1.DeleteOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Check deployment is removed
+			gomega.Eventually(func() error {
+				_, err := spoke.KubeClient.AppsV1().Deployments(deployment.Namespace).Get(
+					context.Background(), deployment.Name, metav1.GetOptions{})
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				if err != nil {
+					return err
+				}
+				return fmt.Errorf("resource still exists")
 			}).ShouldNot(gomega.HaveOccurred())
 		})
 	})

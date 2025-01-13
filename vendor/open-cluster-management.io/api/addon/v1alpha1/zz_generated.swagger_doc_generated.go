@@ -36,10 +36,21 @@ var map_AddOnDeploymentConfigSpec = map[string]string{
 	"registries":            "Registries describes how to override images used by the addon agent on the managed cluster. the following example will override image \"quay.io/open-cluster-management/addon-agent\" to \"quay.io/ocm/addon-agent\" when deploying the addon agent\n\nregistries:\n  - source: quay.io/open-cluster-management/addon-agent\n    mirror: quay.io/ocm/addon-agent",
 	"proxyConfig":           "ProxyConfig holds proxy settings for add-on agent on the managed cluster. Empty means no proxy settings is available.",
 	"agentInstallNamespace": "AgentInstallNamespace is the namespace where the add-on agent should be installed on the managed cluster.",
+	"resourceRequirements":  "ResourceRequirements specify the resources required by add-on agents. If a container matches multiple ContainerResourceRequirements, the last matched configuration in the array will take precedence.",
 }
 
 func (AddOnDeploymentConfigSpec) SwaggerDoc() map[string]string {
 	return map_AddOnDeploymentConfigSpec
+}
+
+var map_ContainerResourceRequirements = map[string]string{
+	"":            "ContainerResourceRequirements defines resources required by one or a group of containers.",
+	"containerID": "ContainerID is a unique identifier for an agent container. It consists of three parts: resource types, resource name, and container name, separated by ':'. The format follows '{resource_types}:{resource_name}:{container_name}' where\n  1). Supported resource types include deployments, daemonsets, statefulsets, replicasets, jobs,\n    cronjobs and pods;\n  2). Wildcards (*) can be used in any part to match multiple containers. For example, '*:*:*'\n    matches all containers of the agent.",
+	"resources":   "Compute resources required by matched containers.",
+}
+
+func (ContainerResourceRequirements) SwaggerDoc() map[string]string {
+	return map_ContainerResourceRequirements
 }
 
 var map_CustomizedVariable = map[string]string{

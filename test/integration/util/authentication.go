@@ -516,6 +516,21 @@ func PrepareSpokeAgentNamespace(kubeClient kubernetes.Interface, namespace strin
 }
 
 func GetFilledHubKubeConfigSecret(kubeClient kubernetes.Interface, secretNamespace, secretName string) (*corev1.Secret, error) {
+	secret, err := GetHubKubeConfigFromSecret(kubeClient, secretNamespace, secretName)
+	if err != nil {
+		return nil, err
+	}
+	if _, existed := secret.Data["tls.crt"]; !existed {
+		return nil, fmt.Errorf("tls.crt is not found")
+	}
+
+	if _, existed := secret.Data["tls.key"]; !existed {
+		return nil, fmt.Errorf("tls.key is not found")
+	}
+	return secret, nil
+}
+
+func GetHubKubeConfigFromSecret(kubeClient kubernetes.Interface, secretNamespace, secretName string) (*corev1.Secret, error) {
 	secret, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -530,14 +545,6 @@ func GetFilledHubKubeConfigSecret(kubeClient kubernetes.Interface, secretNamespa
 
 	if _, existed := secret.Data["kubeconfig"]; !existed {
 		return nil, fmt.Errorf("kubeconfig is not found")
-	}
-
-	if _, existed := secret.Data["tls.crt"]; !existed {
-		return nil, fmt.Errorf("tls.crt is not found")
-	}
-
-	if _, existed := secret.Data["tls.key"]; !existed {
-		return nil, fmt.Errorf("tls.key is not found")
 	}
 	return secret, nil
 }

@@ -1,6 +1,7 @@
 package aws_irsa
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -12,6 +13,7 @@ import (
 	managedclusterv1lister "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 
 	"open-cluster-management.io/ocm/pkg/registration/register"
+	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 func TestIsCRApproved(t *testing.T) {
@@ -49,21 +51,27 @@ func TestBuildKubeconfig(t *testing.T) {
 		caData         []byte
 		clientCertFile string
 		clientKeyFile  string
+		AuthInfoExec   *clientcmdapi.ExecConfig
 	}{
 		{
-			name:           "without proxy",
-			server:         "https://127.0.0.1:6443",
-			caData:         []byte("fake-ca-bundle"),
-			clientCertFile: "tls.crt",
-			clientKeyFile:  "tls.key",
-		},
-		{
-			name:           "with proxy",
-			server:         "https://127.0.0.1:6443",
-			caData:         []byte("fake-ca-bundle-with-proxy-ca"),
-			proxyURL:       "https://127.0.0.1:3129",
-			clientCertFile: "tls.crt",
-			clientKeyFile:  "tls.key",
+			name:   "without proxy",
+			server: "https://127.0.0.1:6443",
+			AuthInfoExec: &clientcmdapi.ExecConfig{
+				APIVersion: "client.authentication.k8s.io/v1beta1",
+				Command:    "aws",
+				Args: []string{
+					"--region",
+					"us-west-2",
+					"eks",
+					"get-token",
+					"--cluster-name",
+					"hub-cluster1",
+					"--output",
+					"json",
+					"--role",
+					fmt.Sprintf("arn:aws:iam::123456789012:role/ocm-hub-%s", ManagedClusterIAMRoleSuffix),
+				},
+			},
 		},
 	}
 	for _, c := range cases {
@@ -71,10 +79,8 @@ func TestBuildKubeconfig(t *testing.T) {
 			bootstrapKubeconfig := &clientcmdapi.Config{
 				Clusters: map[string]*clientcmdapi.Cluster{
 					"default-cluster": {
-						Server:                   c.server,
-						InsecureSkipTLSVerify:    false,
-						CertificateAuthorityData: c.caData,
-						ProxyURL:                 c.proxyURL,
+						Server:                c.server,
+						InsecureSkipTLSVerify: false,
 					}},
 				// Define a context that connects the auth info and cluster, and set it as the default
 				Contexts: map[string]*clientcmdapi.Context{register.DefaultKubeConfigContext: {
@@ -92,6 +98,8 @@ func TestBuildKubeconfig(t *testing.T) {
 			}
 
 			registerImpl := &AWSIRSADriver{}
+			registerImpl.hubClusterArn = util.HubClusterArn
+			registerImpl.managedClusterRoleSuffix = ManagedClusterIAMRoleSuffix
 			kubeconfig := registerImpl.BuildKubeConfigFromTemplate(bootstrapKubeconfig)
 			currentContext, ok := kubeconfig.Contexts[kubeconfig.CurrentContext]
 			if !ok {
@@ -107,26 +115,23 @@ func TestBuildKubeconfig(t *testing.T) {
 				t.Errorf("expected server %q, but got %q", c.server, cluster.Server)
 			}
 
-			if cluster.ProxyURL != c.proxyURL {
-				t.Errorf("expected proxy URL %q, but got %q", c.proxyURL, cluster.ProxyURL)
-			}
-
-			if !reflect.DeepEqual(cluster.CertificateAuthorityData, c.caData) {
-				t.Errorf("expected ca data %v, but got %v", c.caData, cluster.CertificateAuthorityData)
-			}
-
 			authInfo, ok := kubeconfig.AuthInfos[currentContext.AuthInfo]
 			if !ok {
 				t.Errorf("auth info %q not found: %v", currentContext.AuthInfo, kubeconfig)
 			}
 
-			if authInfo.ClientCertificate != c.clientCertFile {
-				t.Errorf("expected client certificate %q, but got %q", c.clientCertFile, authInfo.ClientCertificate)
+			if authInfo.Exec.APIVersion != c.AuthInfoExec.APIVersion {
+				t.Errorf("The value of api version is %s but is expected to be %s", authInfo.Exec.APIVersion, c.AuthInfoExec.APIVersion)
 			}
 
-			if authInfo.ClientKey != c.clientKeyFile {
-				t.Errorf("expected client key %q, but got %q", c.clientKeyFile, authInfo.ClientKey)
+			if authInfo.Exec.Command != c.AuthInfoExec.Command {
+				t.Errorf("Value of AuthInfo.Exec.Command is expected to be %s but got %s", authInfo.Exec.Command, c.AuthInfoExec.Command)
 			}
+
+			if !reflect.DeepEqual(authInfo.Exec.Args, c.AuthInfoExec.Args) {
+				t.Errorf("Value of AuthInfo.Exec.Args is expected to be %s but got  %s", authInfo.Exec.Args, c.AuthInfoExec.Args)
+			}
+
 		})
 	}
 }

@@ -11,11 +11,11 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/klog/v2"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 
+	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/klusterletcontroller"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
@@ -33,20 +33,19 @@ const (
 type AWSIRSADriver struct {
 	name                     string
 	managedClusterArn        string
+	hubClusterArn            string
 	managedClusterRoleSuffix string
 }
 
 func (c *AWSIRSADriver) Process(
 	ctx context.Context, controllerName string, secret *corev1.Secret, additionalSecretData map[string][]byte,
 	recorder events.Recorder, opt any) (*corev1.Secret, *metav1.Condition, error) {
-	logger := klog.FromContext(ctx)
 
 	awsOption, ok := opt.(*AWSOption)
 	if !ok {
 		return nil, nil, fmt.Errorf("option type is not correct")
 	}
 
-	// TODO: skip if registration request is not accepted yet, that is the required condition is missing on ManagedCluster CR
 	isApproved, err := awsOption.AWSIRSAControl.isApproved(c.name)
 	if err != nil {
 		return nil, nil, err
@@ -55,37 +54,31 @@ func (c *AWSIRSADriver) Process(
 		return nil, nil, nil
 	}
 
-	// TODO: Generate kubeconfig if the request is accepted
-	eksKubeConfigData, err := awsOption.AWSIRSAControl.generateEKSKubeConfig(c.name)
-	if err != nil {
-		return nil, nil, err
-	}
-	if len(eksKubeConfigData) == 0 {
-		return nil, nil, nil
-	}
-
-	secret.Data["kubeconfig"] = eksKubeConfigData
-	logger.Info("Store kubeconfig into the secret.")
-
-	recorder.Eventf("EKSHubKubeconfigCreated", "A new eks hub Kubeconfig for %s is available", controllerName)
-	//return secret, cond, err
-	return secret, nil, err
+	recorder.Eventf("EKSRegistrationRequestApproved", "An EKS registration request is approved for %s", controllerName)
+	return secret, nil, nil
 }
-
-//TODO: Uncomment the below once required in the aws irsa authentication implementation
-
-/*
-func (c *AWSIRSADriver) reset() {
-	c.name = ""
-}
-*/
 
 func (c *AWSIRSADriver) BuildKubeConfigFromTemplate(kubeConfig *clientcmdapi.Config) *clientcmdapi.Config {
+	hubClusterAccountId, hubClusterName := klusterletcontroller.GetAwsAccountIdAndClusterName(c.hubClusterArn)
+	awsRegion := klusterletcontroller.GetAwsRegion(c.hubClusterArn)
 	kubeConfig.AuthInfos = map[string]*clientcmdapi.AuthInfo{register.DefaultKubeConfigAuth: {
-		ClientCertificate: TLSCertFile,
-		ClientKey:         TLSKeyFile,
+		Exec: &clientcmdapi.ExecConfig{
+			APIVersion: "client.authentication.k8s.io/v1beta1",
+			Command:    "aws",
+			Args: []string{
+				"--region",
+				awsRegion,
+				"eks",
+				"get-token",
+				"--cluster-name",
+				hubClusterName,
+				"--output",
+				"json",
+				"--role",
+				fmt.Sprintf("arn:aws:iam::%s:role/ocm-hub-%s", hubClusterAccountId, c.managedClusterRoleSuffix),
+			},
+		},
 	}}
-
 	return kubeConfig
 }
 
@@ -111,9 +104,11 @@ func (c *AWSIRSADriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluste
 	return cluster
 }
 
-func NewAWSIRSADriver(managedClusterArn string, managedClusterRoleSuffix string) register.RegisterDriver {
+func NewAWSIRSADriver(managedClusterArn string, managedClusterRoleSuffix string, hubClusterArn string, name string) register.RegisterDriver {
 	return &AWSIRSADriver{
 		managedClusterArn:        managedClusterArn,
 		managedClusterRoleSuffix: managedClusterRoleSuffix,
+		hubClusterArn:            hubClusterArn,
+		name:                     name,
 	}
 }

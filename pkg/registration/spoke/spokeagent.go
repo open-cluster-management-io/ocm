@@ -190,9 +190,11 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 	// initiate registration driver
 	var registerDriver register.RegisterDriver
-	var registrationOption = o.registrationOption
-	if registrationOption.RegistrationAuth == AwsIrsaAuthType {
-		registerDriver = awsIrsa.NewAWSIRSADriver(o.registrationOption.ManagedClusterArn, o.registrationOption.ManagedClusterRoleSuffix)
+	if o.registrationOption.RegistrationAuth == AwsIrsaAuthType {
+		registerDriver = awsIrsa.NewAWSIRSADriver(o.registrationOption.ManagedClusterArn,
+			o.registrationOption.ManagedClusterRoleSuffix,
+			o.registrationOption.HubClusterArn,
+			o.agentOptions.SpokeClusterName)
 	} else {
 		registerDriver = csr.NewCSRDriver()
 	}
@@ -331,6 +333,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 			secretOption, registrationAuthOption, o.driver, register.GenerateBootstrapStatusUpdater(), recorder, controllerName)
 
 		go bootstrapInformerFactory.Start(bootstrapCtx.Done())
+		go bootstrapClusterInformerFactory.Start(bootstrapCtx.Done())
 		go secretController.Run(bootstrapCtx, 1)
 
 		// Wait for the hub client config is ready.
