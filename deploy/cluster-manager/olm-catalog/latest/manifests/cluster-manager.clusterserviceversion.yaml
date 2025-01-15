@@ -130,7 +130,7 @@ spec:
         - apiGroups:
           - ""
           resourceNames:
-          - cluster-bootstrap
+          - agent-registration-bootstrap
           resources:
           - serviceaccounts/token
           verbs:

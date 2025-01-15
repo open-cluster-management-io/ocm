@@ -38,7 +38,7 @@ import (
 
 const (
 	operatorNamesapce               = "open-cluster-management"
-	bootstrapSA                     = "cluster-bootstrap"
+	bootstrapSA                     = "agent-registration-bootstrap"
 	ManagedClusterConditionImported = "Imported"
 )
 
