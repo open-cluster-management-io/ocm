@@ -10,6 +10,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
@@ -45,7 +46,8 @@ type CAPIProvider struct {
 }
 
 func NewCAPIProvider(
-	kubeconfig *rest.Config, clusterInformer clusterinformerv1.ManagedClusterInformer) providers.Interface {
+	kubeconfig *rest.Config,
+	clusterInformer clusterinformerv1.ManagedClusterInformer) providers.Interface {
 	dynamicClient := dynamic.NewForConfigOrDie(kubeconfig)
 	kubeClient := kubernetes.NewForConfigOrDie(kubeconfig)
 
@@ -70,7 +72,7 @@ func (c *CAPIProvider) Clients(ctx context.Context, cluster *clusterv1.ManagedCl
 	if err != nil {
 		return nil, err
 	}
-	_, err = c.lister.ByNamespace(namespace).Get(name)
+	capiCluster, err := c.lister.ByNamespace(namespace).Get(name)
 	switch {
 	case apierrors.IsNotFound(err):
 		logger.V(4).Info("cluster is not found", "name", name, "namespace", namespace)
@@ -78,6 +80,19 @@ func (c *CAPIProvider) Clients(ctx context.Context, cluster *clusterv1.ManagedCl
 		return nil, nil
 	case err != nil:
 		return nil, err
+	}
+
+	// check phase field of capi cluster
+	capiClusterUnstructured, ok := capiCluster.(*unstructured.Unstructured)
+	if !ok {
+		return nil, fmt.Errorf("invalid cluster type: %T", capiCluster)
+	}
+	status, exists, err := unstructured.NestedString(capiClusterUnstructured.Object, "status", "phase")
+	if err != nil {
+		return nil, err
+	}
+	if !exists || status != "Provisioned" {
+		return nil, nil
 	}
 
 	secret, err := c.kubeClient.CoreV1().Secrets(namespace).Get(ctx, name+"-kubeconfig", metav1.GetOptions{})

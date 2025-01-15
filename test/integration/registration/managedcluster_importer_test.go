@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -146,8 +147,10 @@ var _ = ginkgo.Describe("Cluster Auto Importer", func() {
 				if err != nil {
 					return err
 				}
-				capiCluster.SetLabels(map[string]string{"reconcile": "trigger"})
-				_, err = dynamicClient.Resource(capi.ClusterAPIGVR).Namespace(managedClusterName).Update(
+				unstructured.SetNestedField(capiCluster.Object, map[string]interface{}{
+					"phase": "Provisioned",
+				}, "status")
+				_, err = dynamicClient.Resource(capi.ClusterAPIGVR).Namespace(managedClusterName).UpdateStatus(
 					context.TODO(), capiCluster, metav1.UpdateOptions{})
 				if err != nil {
 					return err
@@ -162,6 +165,7 @@ var _ = ginkgo.Describe("Cluster Auto Importer", func() {
 				}
 				if !meta.IsStatusConditionTrue(
 					spokeCluster.Status.Conditions, importer.ManagedClusterConditionImported) {
+					ginkgo.By(fmt.Sprintf("condition is %v", spokeCluster.Status.Conditions))
 					return fmt.Errorf("cluster should have imported")
 				}
 				_, err = operatorClient.OperatorV1().Klusterlets().Get(
