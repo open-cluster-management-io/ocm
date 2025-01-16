@@ -22,15 +22,18 @@ func TestRenderBootstrapHubKubeConfig(t *testing.T) {
 		name         string
 		objects      []runtime.Object
 		apiserverURL string
+		bootstrapSA  string
 		expectedURL  string
 	}{
 		{
 			name:         "render apiserver from input",
 			apiserverURL: "https://127.0.0.1:6443",
 			expectedURL:  "https://127.0.0.1:6443",
+			bootstrapSA:  "open-cluster-management/bootstrap-sa",
 		},
 		{
-			name: "render apiserver from cluster-info",
+			name:        "render apiserver from cluster-info",
+			bootstrapSA: "open-cluster-management/bootstrap-sa",
 			objects: []runtime.Object{
 				func() *corev1.ConfigMap {
 					config := clientcmdapiv1.Config{
@@ -78,7 +81,7 @@ func TestRenderBootstrapHubKubeConfig(t *testing.T) {
 				},
 			)
 			config := &chart.KlusterletChartConfig{}
-			config, err := RenderBootstrapHubKubeConfig(client, c.apiserverURL)(context.TODO(), config)
+			config, err := RenderBootstrapHubKubeConfig(client, c.apiserverURL, c.bootstrapSA)(context.TODO(), config)
 			if err != nil {
 				t.Fatalf("failed to render bootstrap hub kubeconfig: %v", err)
 			}

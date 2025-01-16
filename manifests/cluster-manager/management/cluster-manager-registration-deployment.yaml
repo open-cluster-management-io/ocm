@@ -59,6 +59,7 @@ spec:
           {{end}}
           {{if .ClusterImporterEnabled}}
           - "--agent-image={{ .AgentImage }}"
+          - "--bootstrap-serviceaccount={{ .OperatorNamespace }}/agent-registration-bootstrap"
           {{end}}
           {{ if .HostedMode }}
           - "--kubeconfig=/var/run/secrets/hub/kubeconfig"

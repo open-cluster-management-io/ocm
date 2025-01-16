@@ -37,9 +37,7 @@ import (
 )
 
 const (
-	operatorNamesapce               = "open-cluster-management"
 	kluterletNamespace              = "open-cluster-management-agent"
-	bootstrapSA                     = "agent-registration-bootstrap"
 	ManagedClusterConditionImported = "ManagedClusterImportSucceeded"
 )
 

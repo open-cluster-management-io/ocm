@@ -5,6 +5,7 @@ import operatorapiv1 "open-cluster-management.io/api/operator/v1"
 type HubConfig struct {
 	ClusterManagerName             string
 	ClusterManagerNamespace        string
+	OperatorNamespace              string
 	RegistrationImage              string
 	RegistrationAPIServiceCABundle string
 	WorkImage                      string
