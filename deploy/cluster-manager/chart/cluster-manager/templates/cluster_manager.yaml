@@ -22,7 +22,7 @@ spec:
       - system:bootstrap:bootstrap-token-ocmhub
       {{- end }}
       {{- if .Values.createBootstrapSA }}
-      - system:serviceaccount:open-cluster-management:cluster-bootstrap
+      - system:serviceaccount:{{ .Release.Namespace }}:agent-registration-bootstrap
       {{- end }}
     {{- end }}
     {{- with .Values.clusterManager.registrationConfiguration.featureGates }}
