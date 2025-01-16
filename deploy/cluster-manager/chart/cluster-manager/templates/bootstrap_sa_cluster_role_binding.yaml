@@ -2,13 +2,13 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: cluster-bootstrap-sa
+  name: open-cluster-management:bootstrap:agent-registration
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: system:open-cluster-management:bootstrap
+  name: open-cluster-management:bootstrap
 subjects:
   - kind: ServiceAccount
-    name: cluster-bootstrap
+    name: agent-registration-bootstrap
     namespace: {{ .Release.Namespace }}
 {{- end }}

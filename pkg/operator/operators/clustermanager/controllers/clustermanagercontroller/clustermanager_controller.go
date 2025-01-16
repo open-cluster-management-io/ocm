@@ -157,6 +157,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	config := manifests.HubConfig{
 		ClusterManagerName:      clusterManager.Name,
 		ClusterManagerNamespace: clusterManagerNamespace,
+		OperatorNamespace:       n.operatorNamespace,
 		RegistrationImage:       clusterManager.Spec.RegistrationImagePullSpec,
 		WorkImage:               clusterManager.Spec.WorkImagePullSpec,
 		PlacementImage:          clusterManager.Spec.PlacementImagePullSpec,

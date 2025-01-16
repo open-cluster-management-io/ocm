@@ -146,6 +146,14 @@ var _ = BeforeSuite(func() {
 		return hub.CheckHubReady()
 	}).Should(Succeed())
 
+	By("Enable ClusterImporter Feature")
+	Eventually(func() error {
+		return hub.EnableHubRegistrationFeature("ClusterImporter")
+	}).Should(Succeed())
+	Eventually(func() error {
+		return hub.CheckHubReady()
+	}).Should(Succeed())
+
 	By("Create a universal Klusterlet/managedcluster")
 	framework.CreateAndApproveKlusterlet(
 		hub, spoke,

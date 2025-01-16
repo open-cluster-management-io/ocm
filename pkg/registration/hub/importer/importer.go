@@ -37,9 +37,8 @@ import (
 )
 
 const (
-	operatorNamesapce               = "open-cluster-management"
-	bootstrapSA                     = "cluster-bootstrap"
-	ManagedClusterConditionImported = "Imported"
+	kluterletNamespace              = "open-cluster-management-agent"
+	ManagedClusterConditionImported = "ManagedClusterImportSucceeded"
 )
 
 var (
@@ -194,7 +193,7 @@ func (i *Importer) reconcile(
 			return cluster, err
 		}
 	}
-	rawManifests, err := chart.RenderKlusterletChart(klusterletChartConfig, operatorNamesapce)
+	rawManifests, err := chart.RenderKlusterletChart(klusterletChartConfig, kluterletNamespace)
 	if err != nil {
 		return cluster, err
 	}

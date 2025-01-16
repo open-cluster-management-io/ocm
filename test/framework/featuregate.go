@@ -10,6 +10,41 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
 
+func (hub *Hub) EnableHubRegistrationFeature(feature string) error {
+	cm, err := hub.OperatorClient.OperatorV1().ClusterManagers().Get(context.TODO(), hub.ClusterManagerName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	if cm.Spec.RegistrationConfiguration == nil {
+		cm.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{}
+	}
+
+	if len(cm.Spec.RegistrationConfiguration.FeatureGates) == 0 {
+		cm.Spec.RegistrationConfiguration.FeatureGates = make([]operatorapiv1.FeatureGate, 0)
+	}
+
+	for idx, f := range cm.Spec.RegistrationConfiguration.FeatureGates {
+		if f.Feature == feature {
+			if f.Mode == operatorapiv1.FeatureGateModeTypeEnable {
+				return nil
+			}
+			cm.Spec.RegistrationConfiguration.FeatureGates[idx].Mode = operatorapiv1.FeatureGateModeTypeEnable
+			_, err = hub.OperatorClient.OperatorV1().ClusterManagers().Update(context.TODO(), cm, metav1.UpdateOptions{})
+			return err
+		}
+	}
+
+	featureGate := operatorapiv1.FeatureGate{
+		Feature: feature,
+		Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+	}
+
+	cm.Spec.RegistrationConfiguration.FeatureGates = append(cm.Spec.RegistrationConfiguration.FeatureGates, featureGate)
+	_, err = hub.OperatorClient.OperatorV1().ClusterManagers().Update(context.TODO(), cm, metav1.UpdateOptions{})
+	return err
+}
+
 func (hub *Hub) EnableHubWorkFeature(feature string) error {
 	cm, err := hub.OperatorClient.OperatorV1().ClusterManagers().Get(context.TODO(), hub.ClusterManagerName, metav1.GetOptions{})
 	if err != nil {

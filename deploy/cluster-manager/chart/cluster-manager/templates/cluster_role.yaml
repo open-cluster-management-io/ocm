@@ -10,7 +10,7 @@ rules:
 - apiGroups: [""]
   resources: ["serviceaccounts/token"]
   resourceNames:
-    - "cluster-bootstrap"
+    - "agent-registration-bootstrap"
   verbs: ["get", "create"]
 - apiGroups: [""]
   resources: ["pods"]
