@@ -122,6 +122,7 @@ func RenderImagePullSecret(kubeClient kubernetes.Interface, namespace string) Kl
 			return config, nil
 		}
 
+		config.Images.ImageCredentials.CreateImageCredentials = true
 		config.Images.ImageCredentials.DockerConfigJson = string(secret.Data[corev1.DockerConfigJsonKey])
 		return config, nil
 	}

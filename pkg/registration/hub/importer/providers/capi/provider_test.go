@@ -98,6 +98,19 @@ func TestClients(t *testing.T) {
 			cluster: &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster1"}},
 		},
 		{
+			name:    "capi cluster not provisionde",
+			cluster: &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster1"}},
+			capiObjects: []runtime.Object{
+				testingcommon.NewUnstructuredWithContent("cluster.x-k8s.io/v1beta1", "Cluster", "cluster1", "cluster1",
+					map[string]interface{}{
+						"status": map[string]interface{}{
+							"phase": "Provisioning",
+						},
+					},
+				),
+			},
+		},
+		{
 			name:    "secret not found",
 			cluster: &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster1"}},
 			capiObjects: []runtime.Object{
@@ -108,8 +121,14 @@ func TestClients(t *testing.T) {
 			name:    "secret found with invalid key",
 			cluster: &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster1"}},
 			capiObjects: []runtime.Object{
-				testingcommon.NewUnstructured(
-					"cluster.x-k8s.io/v1beta1", "Cluster", "cluster1", "cluster1")},
+				testingcommon.NewUnstructuredWithContent("cluster.x-k8s.io/v1beta1", "Cluster", "cluster1", "cluster1",
+					map[string]interface{}{
+						"status": map[string]interface{}{
+							"phase": "Provisioned",
+						},
+					},
+				),
+			},
 			kubeObjects: []runtime.Object{
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
@@ -124,8 +143,13 @@ func TestClients(t *testing.T) {
 			name:    "build client successfully",
 			cluster: &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster1"}},
 			capiObjects: []runtime.Object{
-				testingcommon.NewUnstructured(
-					"cluster.x-k8s.io/v1beta1", "Cluster", "cluster1", "cluster1")},
+				testingcommon.NewUnstructuredWithContent("cluster.x-k8s.io/v1beta1", "Cluster", "cluster1", "cluster1",
+					map[string]interface{}{
+						"status": map[string]interface{}{
+							"phase": "Provisioned",
+						},
+					},
+				)},
 			kubeObjects: []runtime.Object{
 				func() *corev1.Secret {
 					clientConfig := clientcmdapiv1.Config{
