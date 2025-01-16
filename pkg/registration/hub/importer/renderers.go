@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	clientcmdapiv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	"k8s.io/utils/ptr"
 
@@ -21,12 +22,16 @@ import (
 const imagePullSecretName = "open-cluster-management-image-pull-credentials"
 
 func RenderBootstrapHubKubeConfig(
-	kubeClient kubernetes.Interface, apiServerURL string) KlusterletConfigRenderer {
+	kubeClient kubernetes.Interface, apiServerURL, bootstrapSA string) KlusterletConfigRenderer {
 	return func(ctx context.Context, config *chart.KlusterletChartConfig) (*chart.KlusterletChartConfig, error) {
 		// get bootstrap token
+		bootstrapSANamespace, bootstrapSAName, err := cache.SplitMetaNamespaceKey(bootstrapSA)
+		if err != nil {
+			return config, err
+		}
 		tr, err := kubeClient.CoreV1().
-			ServiceAccounts(operatorNamesapce).
-			CreateToken(ctx, bootstrapSA, &authv1.TokenRequest{
+			ServiceAccounts(bootstrapSANamespace).
+			CreateToken(ctx, bootstrapSAName, &authv1.TokenRequest{
 				Spec: authv1.TokenRequestSpec{
 					// token expired in 1 hour
 					ExpirationSeconds: ptr.To[int64](3600),
@@ -34,7 +39,7 @@ func RenderBootstrapHubKubeConfig(
 			}, metav1.CreateOptions{})
 		if err != nil {
 			return config, fmt.Errorf(
-				"failed to get token from sa %s/%s: %v", operatorNamesapce, bootstrapSA, err)
+				"failed to get token from sa %s/%s: %v", bootstrapSANamespace, bootstrapSA, err)
 		}
 
 		// get apisever url
