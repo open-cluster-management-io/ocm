@@ -24,6 +24,7 @@ import (
 	clusterinformerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/importer/providers"
 )
 
@@ -100,7 +101,7 @@ func (c *CAPIProvider) Clients(ctx context.Context, cluster *clusterv1.ManagedCl
 	case apierrors.IsNotFound(err):
 		logger.V(4).Info(
 			"kubeconfig secret is not found", "name", name+"-kubeconfig", "namespace", namespace)
-		return nil, nil
+		return nil, helpers.NewRequeueError("kubeconfig secret is not found", 1*time.Minute)
 	case err != nil:
 		return nil, err
 	}

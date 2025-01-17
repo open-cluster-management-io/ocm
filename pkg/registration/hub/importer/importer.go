@@ -2,6 +2,7 @@ package importer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/openshift/api"
@@ -13,7 +14,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,6 +32,7 @@ import (
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
 	cloudproviders "open-cluster-management.io/ocm/pkg/registration/hub/importer/providers"
@@ -100,7 +102,7 @@ func (i *Importer) sync(ctx context.Context, syncCtx factory.SyncContext) error 
 
 	cluster, err := i.clusterLister.Get(clusterName)
 	switch {
-	case errors.IsNotFound(err):
+	case apierrors.IsNotFound(err):
 		return nil
 	case err != nil:
 		return err
@@ -130,15 +132,17 @@ func (i *Importer) sync(ctx context.Context, syncCtx factory.SyncContext) error 
 	if updatedErr != nil {
 		return updatedErr
 	}
-	if err != nil {
-		return err
-	}
 	if updated {
 		syncCtx.Recorder().Eventf(
 			"ManagedClusterImported", "managed cluster %s is imported", clusterName)
 	}
+	var rqe helpers.RequeueError
+	if err != nil && errors.As(err, &rqe) {
+		syncCtx.Queue().AddAfter(clusterName, rqe.RequeueTime)
+		return nil
+	}
 
-	return nil
+	return err
 }
 
 func (i *Importer) reconcile(
@@ -259,7 +263,7 @@ func ApplyKlusterlet(
 	recorder events.Recorder,
 	required *operatorv1.Klusterlet) (*operatorv1.Klusterlet, bool, error) {
 	existing, err := client.OperatorV1().Klusterlets().Get(ctx, required.Name, metav1.GetOptions{})
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		requiredCopy := required.DeepCopy()
 		actual, err := client.OperatorV1().Klusterlets().Create(ctx, requiredCopy, metav1.CreateOptions{})
 		resourcehelper.ReportCreateEvent(recorder, required, err)
