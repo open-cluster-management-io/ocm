@@ -12,8 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/clientcmd"
 
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
-	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/klusterletcontroller"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
@@ -113,8 +113,8 @@ var _ = ginkgo.Describe("Joining Process for aws flow", func() {
 					return fmt.Errorf("user exec plugun command is invalid")
 				}
 
-				hubClusterAccountId, hubClusterName := klusterletcontroller.GetAwsAccountIdAndClusterName(hubClusterArn)
-				awsRegion := klusterletcontroller.GetAwsRegion(hubClusterArn)
+				hubClusterAccountId, hubClusterName := helpers.GetAwsAccountIdAndClusterName(hubClusterArn)
+				awsRegion := helpers.GetAwsRegion(hubClusterArn)
 
 				if !contains(hubUser.Exec.Args, fmt.Sprintf("arn:aws:iam::%s:role/ocm-hub-%s", hubClusterAccountId, managedClusterRoleSuffix)) ||
 					!contains(hubUser.Exec.Args, hubClusterName) ||

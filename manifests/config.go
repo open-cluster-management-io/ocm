@@ -31,7 +31,8 @@ type HubConfig struct {
 	ResourceRequirementResourceType operatorapiv1.ResourceQosClass
 	// ResourceRequirements is the resource requirements for the cluster manager managed containers.
 	// The type has to be []byte to use "indent" template function.
-	ResourceRequirements []byte
+	ResourceRequirements              []byte
+	ManagedClusterIdentityCreatorRole string
 }
 
 type Webhook struct {

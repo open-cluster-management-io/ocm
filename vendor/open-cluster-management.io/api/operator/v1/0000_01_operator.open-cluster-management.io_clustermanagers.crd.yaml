@@ -255,6 +255,31 @@ spec:
                       - feature
                       type: object
                     type: array
+                  registrationDrivers:
+                    description: |-
+                      RegistrationDrivers represent the list of hub registration drivers that contain information used by hub to initialize the hub cluster
+                      A RegistrationDriverHub contains details of authentication type and the hub cluster ARN
+                    items:
+                      properties:
+                        authType:
+                          default: csr
+                          description: Type of the authentication used by hub to initialize
+                            the Hub cluster. Possible values are csr and awsirsa.
+                          enum:
+                          - csr
+                          - awsirsa
+                          type: string
+                        hubClusterArn:
+                          description: |-
+                            This represents the hub cluster ARN
+                            Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1
+                          pattern: ^arn:aws:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$
+                          type: string
+                      type: object
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - authType
+                    x-kubernetes-list-type: map
                 type: object
               registrationImagePullSpec:
                 default: quay.io/open-cluster-management/registration

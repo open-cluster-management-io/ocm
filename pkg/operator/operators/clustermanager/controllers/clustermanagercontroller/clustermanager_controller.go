@@ -211,6 +211,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	// Check if addon management is enabled by the feature gate
 	config.AddOnManagerEnabled = helpers.FeatureGateEnabled(addonFeatureGates, ocmfeature.DefaultHubAddonManagerFeatureGates, ocmfeature.AddonManagement)
 
+	// Compute and populate the value of managed cluster identity creator role to be used in cluster manager registration service account
+	config.ManagedClusterIdentityCreatorRole = getManagedClusterIdentityCreatorRolename(*clusterManager)
+
 	// If we are deploying in the hosted mode, it requires us to create webhook in a different way with the default mode.
 	// In the hosted mode, the webhook servers is running in the management cluster but the users are accessing the hub cluster.
 	// So we need to add configuration to make the apiserver of the hub cluster could access the webhook servers on the management cluster.
@@ -419,4 +422,17 @@ func (n *clusterManagerController) getImagePullSecret(ctx context.Context) (stri
 	}
 
 	return helpers.ImagePullSecret, nil
+}
+
+func getManagedClusterIdentityCreatorRolename(cm operatorapiv1.ClusterManager) string {
+	if cm.Spec.RegistrationConfiguration != nil {
+		for _, registrationDriver := range cm.Spec.RegistrationConfiguration.RegistrationDrivers {
+			if registrationDriver.AuthType == "awsirsa" {
+				hubClusterArn := registrationDriver.HubClusterArn
+				hubClusterAccountId, hubClusterName := commonhelper.GetAwsAccountIdAndClusterName(hubClusterArn)
+				return "arn:aws:iam::" + hubClusterAccountId + ":role/" + hubClusterName + "_managed-cluster-identity-creator"
+			}
+		}
+	}
+	return ""
 }
