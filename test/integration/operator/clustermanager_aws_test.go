@@ -55,6 +55,15 @@ var _ = ginkgo.Describe("ClusterManager Default Mode with aws registration", fun
 					return false
 				}
 				annotation := registrationControllerSA.Annotations["eks.amazonaws.com/role-arn"]
+
+				// The same cluster-manager CR is used for other tests.
+				// Hence updating it here, so that annotation is removed for other test testing with csr or empty registration
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				clusterManager.Spec.RegistrationConfiguration = nil
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 				return annotation == "arn:aws:iam::123456789012:role/hub-cluster_managed-cluster-identity-creator"
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
