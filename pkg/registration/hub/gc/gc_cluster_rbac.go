@@ -12,10 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	rbacv1listers "k8s.io/client-go/listers/rbac/v1"
-	"k8s.io/klog/v2"
 
-	informerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
-	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
@@ -46,9 +43,7 @@ var (
 
 type gcClusterRbacController struct {
 	kubeClient                       kubernetes.Interface
-	clusterLister                    clusterv1listers.ManagedClusterLister
 	clusterRoleLister                rbacv1listers.ClusterRoleLister
-	clusterRoleBingLister            rbacv1listers.ClusterRoleBindingLister
 	roleBindingLister                rbacv1listers.RoleBindingLister
 	manifestWorkLister               worklister.ManifestWorkLister
 	clusterPatcher                   patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus]
@@ -61,21 +56,16 @@ type gcClusterRbacController struct {
 func newGCClusterRbacController(
 	kubeClient kubernetes.Interface,
 	clusterPatcher patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus],
-	clusterInformer informerv1.ManagedClusterInformer,
 	clusterRoleLister rbacv1listers.ClusterRoleLister,
-	clusterRoleBindingLister rbacv1listers.ClusterRoleBindingLister,
 	roleBindingLister rbacv1listers.RoleBindingLister,
 	manifestWorkLister worklister.ManifestWorkLister,
 	approver register.Approver,
 	eventRecorder events.Recorder,
 	resourceCleanupFeatureGateEnable bool,
 ) gcReconciler {
-
 	return &gcClusterRbacController{
 		kubeClient:                       kubeClient,
-		clusterLister:                    clusterInformer.Lister(),
 		clusterRoleLister:                clusterRoleLister,
-		clusterRoleBingLister:            clusterRoleBindingLister,
 		roleBindingLister:                roleBindingLister,
 		manifestWorkLister:               manifestWorkLister,
 		clusterPatcher:                   clusterPatcher,
@@ -85,43 +75,35 @@ func newGCClusterRbacController(
 	}
 }
 
-func (r *gcClusterRbacController) reconcile(ctx context.Context, cluster *clusterv1.ManagedCluster) (gcReconcileOp, error) {
-	if cluster.DeletionTimestamp.IsZero() {
-		_, err := r.clusterPatcher.AddFinalizer(ctx, cluster, clusterv1.ManagedClusterFinalizer)
-		return gcReconcileStop, err
+func (r *gcClusterRbacController) reconcile(ctx context.Context,
+	cluster *clusterv1.ManagedCluster, clusterNamespace string) (gcReconcileOp, error) {
+	if cluster != nil {
+		if err := r.removeClusterRbac(ctx, cluster.Name, cluster.Spec.HubAcceptsClient); err != nil {
+			return gcReconcileContinue, err
+		}
+
+		if err := r.approver.Cleanup(ctx, cluster); err != nil {
+			return gcReconcileContinue, err
+		}
+
+		// if GC feature gate is disable, the finalizer is removed from the cluster after the related rbac is deleted.
+		// there is no need to wait other resources are cleaned up before remove the finalizer.
+		if !r.resourceCleanupFeatureGateEnable {
+			if err := r.clusterPatcher.RemoveFinalizer(ctx, cluster, clusterv1.ManagedClusterFinalizer); err != nil {
+				return gcReconcileStop, err
+			}
+		}
 	}
 
-	if err := r.removeClusterRbac(ctx, cluster.Name, cluster.Spec.HubAcceptsClient); err != nil {
-		return gcReconcileContinue, err
-	}
-
-	if err := r.approver.Cleanup(ctx, cluster); err != nil {
-		return gcReconcileContinue, err
-	}
-
-	works, err := r.manifestWorkLister.ManifestWorks(cluster.Name).List(labels.Everything())
+	works, err := r.manifestWorkLister.ManifestWorks(clusterNamespace).List(labels.Everything())
 	if err != nil && !errors.IsNotFound(err) {
 		return gcReconcileStop, err
 	}
 	if len(works) != 0 {
-		klog.V(2).Infof("cluster %s is deleting, waiting %d works in the cluster namespace to be deleted.",
-			cluster.Name, len(works))
-
-		// remove finalizer to delete the cluster for backwards compatible.
-		if !r.resourceCleanupFeatureGateEnable {
-			return gcReconcileStop, r.clusterPatcher.RemoveFinalizer(ctx, cluster, clusterv1.ManagedClusterFinalizer)
-		}
 		return gcReconcileRequeue, nil
 	}
 
-	if err = r.removeFinalizerFromWorkRoleBinding(ctx, cluster.Name, manifestWorkFinalizer); err != nil {
-		return gcReconcileStop, err
-	}
-
-	r.eventRecorder.Eventf("ManagedClusterGC",
-		"managed cluster %s is deleting and the cluster rbac are deleted", cluster.Name)
-
-	return gcReconcileContinue, r.clusterPatcher.RemoveFinalizer(ctx, cluster, clusterv1.ManagedClusterFinalizer)
+	return gcReconcileStop, r.removeFinalizerFromWorkRoleBinding(ctx, clusterNamespace, manifestWorkFinalizer)
 }
 
 func (r *gcClusterRbacController) removeClusterRbac(ctx context.Context, clusterName string, accepted bool) error {

@@ -46,17 +46,13 @@ func newGCResourcesController(
 	}
 }
 
-func (r *gcResourcesController) reconcile(ctx context.Context, cluster *clusterv1.ManagedCluster) (gcReconcileOp, error) {
+func (r *gcResourcesController) reconcile(ctx context.Context,
+	cluster *clusterv1.ManagedCluster, clusterNamespace string) (gcReconcileOp, error) {
 	var errs []error
-
-	if cluster.DeletionTimestamp.IsZero() {
-		return gcReconcileContinue, nil
-	}
-
 	// delete the resources in order. to delete the next resource after all resource instances are deleted.
 	for _, resourceGVR := range r.resourceGVRList {
 		resourceList, err := r.metadataClient.Resource(resourceGVR).
-			Namespace(cluster.Name).List(ctx, metav1.ListOptions{})
+			Namespace(clusterNamespace).List(ctx, metav1.ListOptions{})
 		if errors.IsNotFound(err) {
 			continue
 		}
@@ -68,21 +64,23 @@ func (r *gcResourcesController) reconcile(ctx context.Context, cluster *clusterv
 			continue
 		}
 
-		remainingCnt, finalizerPendingCnt := r.RemainingCnt(resourceList)
-		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:   clusterv1.ManagedClusterConditionDeleting,
-			Status: metav1.ConditionFalse,
-			Reason: clusterv1.ConditionDeletingReasonResourceRemaining,
-			Message: fmt.Sprintf("The resource %v is remaning, the remaining count is %v, "+
-				"the finalizer pending count is %v", resourceGVR.Resource, remainingCnt, finalizerPendingCnt),
-		})
+		if cluster != nil {
+			remainingCnt, finalizerPendingCnt := r.RemainingCnt(resourceList)
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:   clusterv1.ManagedClusterConditionDeleting,
+				Status: metav1.ConditionFalse,
+				Reason: clusterv1.ConditionDeletingReasonResourceRemaining,
+				Message: fmt.Sprintf("The resource %v is remaning, the remaining count is %v, "+
+					"the finalizer pending count is %v", resourceGVR.Resource, remainingCnt, finalizerPendingCnt),
+			})
+		}
 
 		// sort the resources by priority, and then find the lowest priority.
 		priorityResourceMap := mapPriorityResource(resourceList)
 		firstDeletePriority := getFirstDeletePriority(priorityResourceMap)
 		// delete the resource instances with the lowest priority in one reconciling.
 		for _, resourceName := range priorityResourceMap[firstDeletePriority] {
-			err = r.metadataClient.Resource(resourceGVR).Namespace(cluster.Name).
+			err = r.metadataClient.Resource(resourceGVR).Namespace(clusterNamespace).
 				Delete(ctx, resourceName, metav1.DeleteOptions{})
 			if err != nil && !errors.IsNotFound(err) {
 				errs = append(errs, err)
@@ -95,12 +93,14 @@ func (r *gcResourcesController) reconcile(ctx context.Context, cluster *clusterv
 		return gcReconcileRequeue, nil
 	}
 
-	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-		Type:    clusterv1.ManagedClusterConditionDeleting,
-		Status:  metav1.ConditionTrue,
-		Reason:  clusterv1.ConditionDeletingReasonNoResource,
-		Message: "No cleaned resource in cluster ns.",
-	})
+	if cluster != nil {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    clusterv1.ManagedClusterConditionDeleting,
+			Status:  metav1.ConditionTrue,
+			Reason:  clusterv1.ConditionDeletingReasonNoResource,
+			Message: "No cleaned resource in cluster ns.",
+		})
+	}
 	return gcReconcileContinue, nil
 }
 
