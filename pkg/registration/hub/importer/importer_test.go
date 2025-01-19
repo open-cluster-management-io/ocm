@@ -21,6 +21,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/registration/hub/importer/providers"
 	cloudproviders "open-cluster-management.io/ocm/pkg/registration/hub/importer/providers"
@@ -68,6 +69,24 @@ func TestSync(t *testing.T) {
 			cluster:  &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster1"}},
 			validate: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertNoActions(t, actions)
+			},
+		},
+		{
+			name:     "clients for remote cluster is not generated with requeue error",
+			provider: &fakeProvider{isOwned: true, noClients: true, kubeConfigErr: helpers.NewRequeueError("test", 1*time.Minute)},
+			key:      "cluster1",
+			cluster:  &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster1"}},
+			validate: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !meta.IsStatusConditionFalse(managedCluster.Status.Conditions, ManagedClusterConditionImported) {
+					t.Errorf("expected managed cluster to be imported")
+				}
 			},
 		},
 		{

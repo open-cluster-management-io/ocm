@@ -130,7 +130,7 @@ type ManagedClusterIamRole struct {
 }
 
 func (managedClusterIamRole *ManagedClusterIamRole) arn() string {
-	managedClusterAccountId, _ := GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.ManagedClusterArn)
+	managedClusterAccountId, _ := commonhelpers.GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.ManagedClusterArn)
 	md5HashUniqueIdentifier := managedClusterIamRole.md5HashSuffix()
 
 	//arn:aws:iam::<managed-cluster-account-id>:role/ocm-managed-cluster-<md5-hash-unique-identifier>
@@ -138,8 +138,8 @@ func (managedClusterIamRole *ManagedClusterIamRole) arn() string {
 }
 
 func (managedClusterIamRole *ManagedClusterIamRole) md5HashSuffix() string {
-	hubClusterAccountId, hubClusterName := GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.HubClusterArn)
-	managedClusterAccountId, managedClusterName := GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.ManagedClusterArn)
+	hubClusterAccountId, hubClusterName := commonhelpers.GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.HubClusterArn)
+	managedClusterAccountId, managedClusterName := commonhelpers.GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.ManagedClusterArn)
 
 	hash := md5.Sum([]byte(strings.Join([]string{hubClusterAccountId, hubClusterName, managedClusterAccountId, managedClusterName}, "#"))) // #nosec G401
 	return hex.EncodeToString(hash[:])
@@ -572,16 +572,4 @@ func serviceAccountName(suffix string, klusterlet *operatorapiv1.Klusterlet) str
 		return fmt.Sprintf("%s-work-sa", klusterlet.Name)
 	}
 	return fmt.Sprintf("%s-%s", klusterlet.Name, suffix)
-}
-
-func GetAwsAccountIdAndClusterName(clusterArn string) (string, string) {
-	clusterStringParts := strings.Split(clusterArn, ":")
-	clusterName := strings.Split(clusterStringParts[5], "/")[1]
-	awsAccountId := clusterStringParts[4]
-	return awsAccountId, clusterName
-}
-
-func GetAwsRegion(clusterArn string) string {
-	clusterStringParts := strings.Split(clusterArn, ":")
-	return clusterStringParts[3]
 }

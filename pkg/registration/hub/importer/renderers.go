@@ -33,8 +33,8 @@ func RenderBootstrapHubKubeConfig(
 			ServiceAccounts(bootstrapSANamespace).
 			CreateToken(ctx, bootstrapSAName, &authv1.TokenRequest{
 				Spec: authv1.TokenRequestSpec{
-					// token expired in 1 hour
-					ExpirationSeconds: ptr.To[int64](3600),
+					// token expired in 24 hours
+					ExpirationSeconds: ptr.To[int64](24 * 3600),
 				},
 			}, metav1.CreateOptions{})
 		if err != nil {
