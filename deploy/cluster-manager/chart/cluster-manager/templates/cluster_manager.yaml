@@ -29,6 +29,10 @@ spec:
     featureGates:
       {{- toYaml . | nindent 6 }}
     {{- end }}
+    {{- with .Values.clusterManager.registrationConfiguration.registrationDrivers }}
+    registrationDrivers:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
   {{- with .Values.clusterManager.workConfiguration }}
   workConfiguration:
     {{- toYaml . | nindent 4 }}
