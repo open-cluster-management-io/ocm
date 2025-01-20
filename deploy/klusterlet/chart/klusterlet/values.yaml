@@ -1,5 +1,5 @@
 
-replicaCount: 3
+replicaCount: 1
 
 # image configurations for all images used in operator deployment and klusterlet CR.
 images:

@@ -34,7 +34,7 @@ func NewDefaultClusterManagerChartConfig() *ClusterManagerChartConfig {
 
 func NewDefaultKlusterletChartConfig() *KlusterletChartConfig {
 	return &KlusterletChartConfig{
-		ReplicaCount: 3,
+		ReplicaCount: 1,
 		Klusterlet: KlusterletConfig{
 			Create: true,
 		},

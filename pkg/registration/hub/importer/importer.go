@@ -173,8 +173,9 @@ func (i *Importer) reconcile(
 		return cluster, nil
 	}
 
-	// render the klsuterlet chart config
+	// render the klusterlet chart config
 	klusterletChartConfig := &chart.KlusterletChartConfig{
+		ReplicaCount:    1,
 		CreateNamespace: true,
 		Klusterlet: chart.KlusterletConfig{
 			Create:      true,
