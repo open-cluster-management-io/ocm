@@ -30,24 +30,42 @@ var _ = ginkgo.Describe("ClusterManager Default Mode with aws registration", fun
 	})
 
 	ginkgo.Context("Deploy hub with aws auth", func() {
-
-		ginkgo.It("should have IAM role annotation when initialized with awsirsa", func() {
-
-			clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-			if clusterManager.Spec.RegistrationConfiguration == nil {
-				clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{}
-				clusterManager.Spec.RegistrationConfiguration.RegistrationDrivers = []operatorapiv1.RegistrationDriverHub{
-					{
-						AuthType:      "awsirsa",
-						HubClusterArn: "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
-					},
+		ginkgo.BeforeEach(func() {
+			gomega.Eventually(func() error {
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(),
+					clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
 				}
-			}
-			_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+				if clusterManager.Spec.RegistrationConfiguration == nil {
+					clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{}
+					clusterManager.Spec.RegistrationConfiguration.RegistrationDrivers = []operatorapiv1.RegistrationDriverHub{
+						{
+							AuthType:      "awsirsa",
+							HubClusterArn: "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
+						},
+					}
+				}
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(),
+					clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+		ginkgo.AfterEach(func() {
+			gomega.Eventually(func() error {
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(),
+					clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				clusterManager.Spec.RegistrationConfiguration = nil
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(),
+					clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+		ginkgo.It("should have IAM role annotation when initialized with awsirsa", func() {
 			gomega.Eventually(func() bool {
 				registrationControllerSA, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(
 					context.Background(), hubRegistrationSA, metav1.GetOptions{})
@@ -56,18 +74,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode with aws registration", fun
 				}
 				annotation := registrationControllerSA.Annotations["eks.amazonaws.com/role-arn"]
 
-				// The same cluster-manager CR is used for other tests.
-				// Hence updating it here, so that annotation is removed for other test testing with csr or empty registration
-				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-				clusterManager.Spec.RegistrationConfiguration = nil
-				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
 				return annotation == "arn:aws:iam::123456789012:role/hub-cluster_managed-cluster-identity-creator"
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
 		})
 	})
-
 })
