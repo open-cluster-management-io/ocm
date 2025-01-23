@@ -272,7 +272,6 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 
 	gcController := gc.NewGCController(
 		kubeInformers.Rbac().V1().ClusterRoles().Lister(),
-		kubeInformers.Rbac().V1().ClusterRoleBindings().Lister(),
 		kubeInformers.Rbac().V1().RoleBindings().Lister(),
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		workInformers.Work().V1().ManifestWorks().Lister(),
