@@ -95,6 +95,8 @@ clusterManager:
     featureGates:
     - feature: DefaultClusterSet
       mode: Enable
+    registrationDrivers:
+    - authType: csr
   workConfiguration:
     workDriver: kube
   addOnManagerConfiguration: {}

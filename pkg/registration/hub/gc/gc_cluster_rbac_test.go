@@ -27,37 +27,70 @@ import (
 
 func TestGCClusterRbacController(t *testing.T) {
 	cases := []struct {
-		name            string
-		cluster         *clusterv1.ManagedCluster
-		works           []*workv1.ManifestWork
-		workRoleBinding runtime.Object
-		expectedOp      gcReconcileOp
-		validateActions func(t *testing.T, kubeActions, clusterActions []clienttesting.Action)
+		name                             string
+		clusterName                      string
+		cluster                          *clusterv1.ManagedCluster
+		works                            []*workv1.ManifestWork
+		workRoleBinding                  runtime.Object
+		resourceCleanupFeatureGateEnable bool
+		expectedOp                       gcReconcileOp
+		validateActions                  func(t *testing.T, kubeActions, clusterActions []clienttesting.Action)
 	}{
 		{
-			name:       "add finalizer to the mcl",
-			cluster:    testinghelpers.NewManagedCluster(),
+			name:       "no cluster and work, do nothing",
 			expectedOp: gcReconcileStop,
 			validateActions: func(t *testing.T, kubeActions, clusterActions []clienttesting.Action) {
-				testingcommon.AssertActions(t, clusterActions, "patch")
 				testingcommon.AssertNoActions(t, kubeActions)
 			},
 		},
 		{
-			name:    "delete rbac with no works",
-			cluster: testinghelpers.NewDeletingManagedCluster(),
-			workRoleBinding: testinghelpers.NewRoleBinding(testinghelpers.TestManagedClusterName,
-				workRoleBindingName(testinghelpers.TestManagedClusterName), []string{manifestWorkFinalizer},
-				map[string]string{clusterv1.ClusterNameLabelKey: testinghelpers.TestManagedClusterName}, true),
-			expectedOp: gcReconcileContinue,
+			name:        "cluster is nil and have works, Requeue",
+			clusterName: "cluster1",
+			works: []*workv1.ManifestWork{
+				testinghelpers.NewManifestWork("cluster1", "test", nil, nil, nil, nil),
+			},
+			expectedOp: gcReconcileRequeue,
 			validateActions: func(t *testing.T, kubeActions, clusterActions []clienttesting.Action) {
-				testingcommon.AssertActions(t, kubeActions, "delete", "delete", "delete", "delete", "patch")
+				testingcommon.AssertNoActions(t, kubeActions)
+			},
+		},
+		{
+			name:        "cluster is nil and no works, remove finalizer from work rolebinding",
+			clusterName: "cluster1",
+			expectedOp:  gcReconcileStop,
+			workRoleBinding: testinghelpers.NewRoleBinding("cluster1",
+				workRoleBindingName("cluster1"), []string{manifestWorkFinalizer},
+				map[string]string{clusterv1.ClusterNameLabelKey: "cluster1"}, true),
+			validateActions: func(t *testing.T, kubeActions, clusterActions []clienttesting.Action) {
+				testingcommon.AssertActions(t, kubeActions, "patch")
+			},
+		},
+		{
+			name:                             "gc is disable,  delete rbac and remove finalizer from cluster",
+			clusterName:                      testinghelpers.TestManagedClusterName,
+			cluster:                          testinghelpers.NewDeletingManagedCluster(),
+			resourceCleanupFeatureGateEnable: false,
+			expectedOp:                       gcReconcileStop,
+			validateActions: func(t *testing.T, kubeActions, clusterActions []clienttesting.Action) {
+				testingcommon.AssertActions(t, kubeActions, "delete", "delete", "delete", "delete")
 				testingcommon.AssertActions(t, clusterActions, "patch")
 			},
 		},
 		{
-			name:    "delete rbac with works",
-			cluster: testinghelpers.NewDeletingManagedCluster(),
+			name:                             "gc is enable with no work, delete rbac ",
+			clusterName:                      testinghelpers.TestManagedClusterName,
+			cluster:                          testinghelpers.NewDeletingManagedCluster(),
+			resourceCleanupFeatureGateEnable: true,
+			expectedOp:                       gcReconcileStop,
+			validateActions: func(t *testing.T, kubeActions, clusterActions []clienttesting.Action) {
+				testingcommon.AssertActions(t, kubeActions, "delete", "delete", "delete", "delete")
+			},
+		},
+		{
+			name:                             "gc is disable with works",
+			clusterName:                      testinghelpers.TestManagedClusterName,
+			cluster:                          testinghelpers.NewDeletingManagedCluster(),
+			resourceCleanupFeatureGateEnable: false,
 			works: []*workv1.ManifestWork{
 				testinghelpers.NewManifestWork(testinghelpers.TestManagedClusterName, "test", nil, nil, nil, nil),
 			},
@@ -68,32 +101,41 @@ func TestGCClusterRbacController(t *testing.T) {
 			expectedOp: gcReconcileRequeue,
 			validateActions: func(t *testing.T, kubeActions, clusterActions []clienttesting.Action) {
 				testingcommon.AssertActions(t, kubeActions, "delete", "delete", "delete", "delete")
-				testingcommon.AssertNoActions(t, clusterActions)
+				testingcommon.AssertActions(t, clusterActions, "patch")
 			},
 		},
 		{
-			name:       "remove finalizer of mcl",
-			cluster:    testinghelpers.NewDeletingManagedCluster(),
-			expectedOp: gcReconcileContinue,
+			name:                             "gc is disable with no works",
+			clusterName:                      testinghelpers.TestManagedClusterName,
+			cluster:                          testinghelpers.NewDeletingManagedCluster(),
+			resourceCleanupFeatureGateEnable: false,
+			workRoleBinding: testinghelpers.NewRoleBinding(testinghelpers.TestManagedClusterName,
+				workRoleBindingName(testinghelpers.TestManagedClusterName), []string{manifestWorkFinalizer},
+				map[string]string{clusterv1.ClusterNameLabelKey: testinghelpers.TestManagedClusterName}, true),
+
+			expectedOp: gcReconcileStop,
 			validateActions: func(t *testing.T, kubeActions, clusterActions []clienttesting.Action) {
-				testingcommon.AssertActions(t, kubeActions, "delete", "delete", "delete", "delete")
+				testingcommon.AssertActions(t, kubeActions, "delete", "delete", "delete", "delete", "patch")
 				testingcommon.AssertActions(t, clusterActions, "patch")
 			},
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			objs := []runtime.Object{}
+
 			mclClusterRole := testinghelpers.NewClusterRole(
-				mclClusterRoleName(c.cluster.Name),
+				mclClusterRoleName(c.clusterName),
 				[]string{}, map[string]string{clusterv1.ClusterNameLabelKey: ""}, false)
 			mclClusterRoleBinding := testinghelpers.NewClusterRoleBinding(
-				mclClusterRoleBindingName(c.cluster.Name),
-				[]string{}, map[string]string{clusterv1.ClusterNameLabelKey: ""}, false)
-			registrationRoleBinding := testinghelpers.NewRoleBinding(c.cluster.Name,
-				registrationRoleBindingName(c.cluster.Name),
+				mclClusterRoleBindingName(c.clusterName),
 				[]string{}, map[string]string{clusterv1.ClusterNameLabelKey: ""}, false)
 
-			objs := []runtime.Object{mclClusterRole, mclClusterRoleBinding, registrationRoleBinding}
+			registrationRoleBinding := testinghelpers.NewRoleBinding(c.clusterName,
+				registrationRoleBindingName(c.clusterName),
+				[]string{}, map[string]string{clusterv1.ClusterNameLabelKey: ""}, false)
+			objs = append(objs, mclClusterRole, mclClusterRoleBinding, registrationRoleBinding)
+
 			if c.workRoleBinding != nil {
 				objs = append(objs, c.workRoleBinding)
 			}
@@ -107,16 +149,20 @@ func TestGCClusterRbacController(t *testing.T) {
 				}
 			}
 
-			clusterClient := fakeclusterclient.NewSimpleClientset(c.cluster)
-			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
-			clusterStore := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore()
-			if err := clusterStore.Add(c.cluster); err != nil {
-				t.Fatal(err)
-			}
+			var clusterPatcher patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus]
+			var clusterClient *fakeclusterclient.Clientset
+			if c.cluster != nil {
+				clusterClient = fakeclusterclient.NewSimpleClientset(c.cluster)
+				clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
+				clusterStore := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore()
+				if err := clusterStore.Add(c.cluster); err != nil {
+					t.Fatal(err)
+				}
 
-			clusterPatcher := patcher.NewPatcher[
-				*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
-				clusterClient.ClusterV1().ManagedClusters())
+				clusterPatcher = patcher.NewPatcher[
+					*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
+					clusterClient.ClusterV1().ManagedClusters())
+			}
 
 			workClient := fakeworkclient.NewSimpleClientset()
 			workInformerFactory := workinformers.NewSharedInformerFactory(workClient, 5*time.Minute)
@@ -130,32 +176,32 @@ func TestGCClusterRbacController(t *testing.T) {
 			_ = newGCClusterRbacController(
 				kubeClient,
 				clusterPatcher,
-				clusterInformerFactory.Cluster().V1().ManagedClusters(),
 				kubeInformerFactory.Rbac().V1().ClusterRoles().Lister(),
-				kubeInformerFactory.Rbac().V1().ClusterRoleBindings().Lister(),
 				kubeInformerFactory.Rbac().V1().RoleBindings().Lister(),
 				workInformerFactory.Work().V1().ManifestWorks().Lister(),
 				register.NewNoopApprover(),
 				events.NewInMemoryRecorder(""),
-				true,
+				c.resourceCleanupFeatureGateEnable,
 			)
 
 			ctrl := &gcClusterRbacController{
 				kubeClient:                       kubeClient,
-				clusterLister:                    clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				clusterRoleLister:                kubeInformerFactory.Rbac().V1().ClusterRoles().Lister(),
-				clusterRoleBingLister:            kubeInformerFactory.Rbac().V1().ClusterRoleBindings().Lister(),
 				roleBindingLister:                kubeInformerFactory.Rbac().V1().RoleBindings().Lister(),
 				manifestWorkLister:               workInformerFactory.Work().V1().ManifestWorks().Lister(),
 				clusterPatcher:                   clusterPatcher,
 				approver:                         register.NewNoopApprover(),
 				eventRecorder:                    events.NewInMemoryRecorder(""),
-				resourceCleanupFeatureGateEnable: true,
+				resourceCleanupFeatureGateEnable: c.resourceCleanupFeatureGateEnable,
 			}
-			op, err := ctrl.reconcile(context.TODO(), c.cluster)
+			op, err := ctrl.reconcile(context.TODO(), c.cluster, c.clusterName)
 			testingcommon.AssertError(t, err, "")
 			assert.Equal(t, op, c.expectedOp)
-			c.validateActions(t, kubeClient.Actions(), clusterClient.Actions())
+			if clusterClient != nil {
+				c.validateActions(t, kubeClient.Actions(), clusterClient.Actions())
+			} else {
+				c.validateActions(t, kubeClient.Actions(), nil)
+			}
 		})
 	}
 }
