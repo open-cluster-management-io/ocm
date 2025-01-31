@@ -64,6 +64,9 @@ spec:
           {{ if .HostedMode }}
           - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
           {{ end }}
+          {{if .HubClusterArn}}
+          - "--hub-cluster-arn={{ .HubClusterArn }}"
+          {{end}}
         env:
           - name: POD_NAME
             valueFrom:

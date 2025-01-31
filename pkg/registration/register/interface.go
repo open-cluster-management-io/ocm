@@ -87,3 +87,9 @@ type Approver interface {
 	// deletes rolebindings for the agent, and then this is the additional operation a driver should process.
 	Cleanup(ctx context.Context, cluster *clusterv1.ManagedCluster) error
 }
+
+type RegisterDriverForHub interface {
+	// CreatePermissions is executed when hubAcceptClient in ManagedCluster is set to true. The hub controller creates the
+	// required permissions for the spoke to be able to access resources on the hub cluster.
+	CreatePermissions(ctx context.Context, cluster *clusterv1.ManagedCluster) error
+}

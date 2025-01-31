@@ -346,3 +346,16 @@ func jitter(percentage float64, maxFactor float64) float64 {
 	newPercentage := percentage + percentage*rand.Float64()*maxFactor //#nosec G404
 	return newPercentage
 }
+
+type CSRDriverForHub struct {
+}
+
+func NewCSRDriverForHub() register.RegisterDriverForHub {
+	csrDriverForHub := &CSRDriverForHub{}
+	return csrDriverForHub
+}
+
+func (a *CSRDriverForHub) CreatePermissions(ctx context.Context, cluster *clusterv1.ManagedCluster) error {
+	// noop
+	return nil
+}

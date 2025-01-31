@@ -41,6 +41,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedclustersetbinding"
 	"open-cluster-management.io/ocm/pkg/registration/hub/taint"
 	"open-cluster-management.io/ocm/pkg/registration/register"
+	awsirsa "open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 )
 
@@ -49,6 +50,7 @@ type HubManagerOptions struct {
 	ClusterAutoApprovalUsers []string
 	GCResourceList           []string
 	ImportOption             *importeroptions.Options
+	HubClusterArn            string
 }
 
 // NewHubManagerOptions returns a HubManagerOptions
@@ -68,6 +70,8 @@ func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 		"A list GVR user can customize which are cleaned up after cluster is deleted. Format is group/version/resource, "+
 			"and the default are managedclusteraddon and manifestwork. The resources will be deleted in order."+
 			"The flag works only when ResourceCleanup feature gate is enable.")
+	fs.StringVar(&m.HubClusterArn, "hub-cluster-arn", m.HubClusterArn,
+		"Hub Cluster Arn required to connect to Hub and create IAM Roles and Policies")
 	m.ImportOption.AddFlags(fs)
 }
 
@@ -147,12 +151,17 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	workInformers workv1informers.SharedInformerFactory,
 	addOnInformers addoninformers.SharedInformerFactory,
 ) error {
+
 	csrApprover, err := csr.NewCSRApprover(kubeClient, kubeInformers, m.ClusterAutoApprovalUsers, controllerContext.EventRecorder)
 	if err != nil {
 		return err
 	}
 
 	approver := register.NewAggregatedApprover(csrApprover)
+
+	awsIRSADriverForHub := awsirsa.NewAWSIRSADriverForHub(m.HubClusterArn)
+	csrDriverForHub := csr.NewCSRDriverForHub()
+	registerDriverForHub := register.NewAggregatedDriverForHub(csrDriverForHub, awsIRSADriverForHub)
 
 	managedClusterController := managedcluster.NewManagedClusterController(
 		kubeClient,
@@ -163,6 +172,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		kubeInformers.Rbac().V1().RoleBindings(),
 		kubeInformers.Rbac().V1().ClusterRoleBindings(),
 		approver,
+		registerDriverForHub,
 		controllerContext.EventRecorder,
 	)
 

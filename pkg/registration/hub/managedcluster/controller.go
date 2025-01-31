@@ -3,6 +3,7 @@ package managedcluster
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -39,13 +40,14 @@ const clusterAcceptedAnnotationKey = "open-cluster-management.io/automatically-a
 
 // managedClusterController reconciles instances of ManagedCluster on the hub.
 type managedClusterController struct {
-	kubeClient    kubernetes.Interface
-	clusterClient clientset.Interface
-	clusterLister listerv1.ManagedClusterLister
-	applier       *apply.PermissionApplier
-	patcher       patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
-	approver      register.Approver
-	eventRecorder events.Recorder
+	kubeClient           kubernetes.Interface
+	clusterClient        clientset.Interface
+	clusterLister        listerv1.ManagedClusterLister
+	applier              *apply.PermissionApplier
+	patcher              patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
+	approver             register.Approver
+	registerDriverForHub register.RegisterDriverForHub
+	eventRecorder        events.Recorder
 }
 
 // NewManagedClusterController creates a new managed cluster controller
@@ -58,12 +60,15 @@ func NewManagedClusterController(
 	rolebindingInformer rbacv1informers.RoleBindingInformer,
 	clusterRoleBindingInformer rbacv1informers.ClusterRoleBindingInformer,
 	approver register.Approver,
+	registerDriverForHub register.RegisterDriverForHub,
 	recorder events.Recorder) factory.Controller {
+
 	c := &managedClusterController{
-		kubeClient:    kubeClient,
-		clusterClient: clusterClient,
-		clusterLister: clusterInformer.Lister(),
-		approver:      approver,
+		kubeClient:           kubeClient,
+		clusterClient:        clusterClient,
+		clusterLister:        clusterInformer.Lister(),
+		approver:             approver,
+		registerDriverForHub: registerDriverForHub,
 		applier: apply.NewPermissionApplier(
 			kubeClient,
 			roleInformer.Lister(),
@@ -200,6 +205,20 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	for _, result := range resourceResults {
 		if result.Error != nil {
 			errs = append(errs, result.Error)
+		}
+	}
+
+	// Only create new IAM roles when status is not present
+	if !meta.IsStatusConditionTrue(managedCluster.Status.Conditions, v1.ManagedClusterConditionHubAccepted) {
+		if err != nil {
+			log.Printf("Failed to get cluster manager %v", err)
+			errs = append(errs, err)
+		}
+
+		err = c.registerDriverForHub.CreatePermissions(ctx, managedCluster)
+		if err != nil {
+			log.Printf("Failed to create permissions %v", err)
+			errs = append(errs, err)
 		}
 	}
 
