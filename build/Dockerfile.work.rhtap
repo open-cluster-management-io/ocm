@@ -11,6 +11,16 @@ RUN GOOS=${OS} \
     make build --warn-undefined-variables
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+
+LABEL \
+      name="multicluster-engine/work-rhel9" \
+      summary="work" \
+      description="work" \
+      io.k8s.description="work" \
+      io.k8s.display-name="work" \
+      com.redhat.component="multicluster-engine-work-container" \
+      io.openshift.tags="data,images"
+
 ENV USER_UID=10001
 
 COPY --from=builder /go/src/open-cluster-management.io/ocm/work /

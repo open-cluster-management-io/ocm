@@ -11,6 +11,16 @@ RUN GOOS=${OS} \
     make build --warn-undefined-variables
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+
+LABEL \
+      name="multicluster-engine/registration-operator-rhel9" \
+      summary="registration-operator" \
+      description="registration-operator" \
+      io.k8s.description="registration-operator" \
+      io.k8s.display-name="registration-operator" \
+      com.redhat.component="multicluster-engine-registration-operator-container" \
+      io.openshift.tags="data,images"
+
 ENV USER_UID=10001
 
 COPY --from=builder /go/src/open-cluster-management.io/ocm/registration-operator /

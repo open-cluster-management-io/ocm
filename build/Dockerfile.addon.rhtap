@@ -11,6 +11,16 @@ RUN GOOS=${OS} \
     make build --warn-undefined-variables
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+
+LABEL \
+      name="multicluster-engine/addon-manager-rhel9" \
+      summary="addon-manager" \
+      description="addon-manager" \
+      io.k8s.description="addon-manager" \
+      io.k8s.display-name="addon-manager" \
+      com.redhat.component="multicluster-engine-addon-manager-container" \
+      io.openshift.tags="data,images"
+
 ENV USER_UID=10001
 COPY --from=builder /go/src/open-cluster-management.io/ocm/addon /
 

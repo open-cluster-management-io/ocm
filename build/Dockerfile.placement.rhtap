@@ -11,6 +11,16 @@ RUN GOOS=${OS} \
     make build --warn-undefined-variables
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+
+LABEL \
+      name="multicluster-engine/placement-rhel9" \
+      summary="placement" \
+      description="placement" \
+      io.k8s.description="placement" \
+      io.k8s.display-name="placement" \
+      com.redhat.component="multicluster-engine-placement-container" \
+      io.openshift.tags="data,images"
+
 ENV USER_UID=10001
 
 COPY --from=builder /go/src/open-cluster-management.io/ocm/placement /
