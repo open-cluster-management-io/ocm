@@ -176,3 +176,14 @@ func IsCSRSupported(nativeClient kubernetes.Interface) (bool, bool, error) {
 	}
 	return v1CSRSupported, v1beta1CSRSupported, nil
 }
+
+func HasFinalizer(finalizers []string, finalizer string) bool {
+	found := false
+	for i := range finalizers {
+		if finalizers[i] == finalizer {
+			found = true
+			break
+		}
+	}
+	return found
+}

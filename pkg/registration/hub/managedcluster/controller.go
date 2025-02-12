@@ -194,12 +194,19 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		errs = append(errs, err)
 	}
 
-	resourceResults := c.applier.Apply(ctx, syncCtx.Recorder(),
-		helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, managedClusterName, managedCluster.Spec.HubAcceptsClient),
-		append(manifests.ClusterSpecificRBACFiles, manifests.ClusterSpecificRoleBindings...)...)
-	for _, result := range resourceResults {
-		if result.Error != nil {
-			errs = append(errs, result.Error)
+	// the ManagedClusterFinalizer is added and removed by gc controller.
+	// the rbac resources are deleted by gc controller too.
+	// should apply the rbac resources after the finalizer is added to the cluster, because in the case the cluster is
+	// created and deleted so quickly, the rbac resources are applied but the cluster is gone, there is no event to
+	// gc controller to trigger gc .
+	if helpers.HasFinalizer(managedCluster.Finalizers, v1.ManagedClusterFinalizer) {
+		resourceResults := c.applier.Apply(ctx, syncCtx.Recorder(),
+			helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, managedClusterName, managedCluster.Spec.HubAcceptsClient),
+			append(manifests.ClusterSpecificRBACFiles, manifests.ClusterSpecificRoleBindings...)...)
+		for _, result := range resourceResults {
+			if result.Error != nil {
+				errs = append(errs, result.Error)
+			}
 		}
 	}
 

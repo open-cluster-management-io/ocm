@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	coreinformer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	rbacv1listers "k8s.io/client-go/listers/rbac/v1"
 	"k8s.io/client-go/metadata"
@@ -60,6 +61,7 @@ func NewGCController(
 	clusterRoleLister rbacv1listers.ClusterRoleLister,
 	roleBindingLister rbacv1listers.RoleBindingLister,
 	clusterInformer informerv1.ManagedClusterInformer,
+	namespaceInformer coreinformer.NamespaceInformer,
 	manifestWorkLister worklister.ManifestWorkLister,
 	clusterClient clientset.Interface,
 	kubeClient kubernetes.Interface,
@@ -101,6 +103,10 @@ func NewGCController(
 
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterInformer.Informer()).
+		WithFilteredEventsInformersQueueKeysFunc(
+			queue.QueueKeyByMetaName,
+			queue.FileterByLabel(clusterv1.ClusterNameLabelKey),
+			namespaceInformer.Informer()).
 		WithSync(controller.sync).ToController("GCController", eventRecorder)
 }
 

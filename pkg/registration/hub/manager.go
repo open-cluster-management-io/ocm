@@ -274,6 +274,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		kubeInformers.Rbac().V1().ClusterRoles().Lister(),
 		kubeInformers.Rbac().V1().RoleBindings().Lister(),
 		clusterInformers.Cluster().V1().ManagedClusters(),
+		kubeInformers.Core().V1().Namespaces(),
 		workInformers.Work().V1().ManifestWorks().Lister(),
 		clusterClient,
 		kubeClient,

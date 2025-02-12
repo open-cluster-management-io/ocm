@@ -86,6 +86,7 @@ func TestGController(t *testing.T) {
 				kubeInformerFactory.Rbac().V1().ClusterRoles().Lister(),
 				kubeInformerFactory.Rbac().V1().RoleBindings().Lister(),
 				clusterInformerFactory.Cluster().V1().ManagedClusters(),
+				kubeInformerFactory.Core().V1().Namespaces(),
 				workInformerFactory.Work().V1().ManifestWorks().Lister(),
 				clusterClient,
 				kubeClient,
