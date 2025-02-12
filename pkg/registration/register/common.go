@@ -128,50 +128,6 @@ func IsHubKubeConfigValidFunc(driver RegisterDriver, secretOption SecretOption) 
 	}
 }
 
-// AggregatedApprover is a list of approver that hub controller will run at the same time
-type AggregatedApprover struct {
-	approvers []Approver
-}
-
-func NewAggregatedApprover(approvers ...Approver) Approver {
-	return &AggregatedApprover{
-		approvers: approvers,
-	}
-}
-
-func (a *AggregatedApprover) Run(ctx context.Context, workers int) {
-	for _, approver := range a.approvers {
-		go approver.Run(ctx, workers)
-	}
-
-	<-ctx.Done()
-}
-
-func (a *AggregatedApprover) Cleanup(ctx context.Context, cluster *clusterv1.ManagedCluster) error {
-	var errs []error
-	for _, approver := range a.approvers {
-		if err := approver.Cleanup(ctx, cluster); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	return errors.NewAggregate(errs)
-}
-
-// NoopApprover is an approver with no operation, for testing
-type NoopApprover struct{}
-
-func NewNoopApprover() Approver {
-	return &NoopApprover{}
-}
-
-func (a *NoopApprover) Run(ctx context.Context, _ int) {
-	<-ctx.Done()
-}
-
-func (a *NoopApprover) Cleanup(_ context.Context, _ *clusterv1.ManagedCluster) error {
-	return nil
-}
-
 func GenerateBootstrapStatusUpdater() StatusUpdateFunc {
 	return func(ctx context.Context, cond metav1.Condition) error {
 		return nil
@@ -219,4 +175,59 @@ func (a *AggregatedHubDriver) CreatePermissions(ctx context.Context, cluster *cl
 	}
 	return errors.NewAggregate(errs)
 
+}
+
+func (a *AggregatedHubDriver) Accept(ctx context.Context, cluster *clusterv1.ManagedCluster) (bool, error) {
+	for _, hubRegisterDriver := range a.hubRegisterDrivers {
+		accept, err := hubRegisterDriver.Accept(ctx, cluster)
+		if err == nil && accept {
+			return accept, nil
+		}
+	}
+	return false, nil
+}
+
+func (a *AggregatedHubDriver) Run(ctx context.Context, workers int) {
+	for _, hubRegisterDriver := range a.hubRegisterDrivers {
+		go hubRegisterDriver.Run(ctx, workers)
+	}
+
+	<-ctx.Done()
+}
+
+func (a *AggregatedHubDriver) Cleanup(ctx context.Context, cluster *clusterv1.ManagedCluster) error {
+	var errs []error
+	for _, hubRegisterDriver := range a.hubRegisterDrivers {
+		if err := hubRegisterDriver.Cleanup(ctx, cluster); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.NewAggregate(errs)
+}
+
+// NoopHubDriver is a HubDriver with no operation for testing.
+type NoopHubDriver struct{}
+
+// Accept implements HubDriver.
+func (n *NoopHubDriver) Accept(ctx context.Context, cluster *clusterv1.ManagedCluster) (bool, error) {
+	return true, nil
+}
+
+// Cleanup implements HubDriver.
+func (n *NoopHubDriver) Cleanup(ctx context.Context, cluster *clusterv1.ManagedCluster) error {
+	return nil
+}
+
+// CreatePermissions implements HubDriver.
+func (n *NoopHubDriver) CreatePermissions(ctx context.Context, cluster *clusterv1.ManagedCluster) error {
+	return nil
+}
+
+// Run implements HubDriver.
+func (n *NoopHubDriver) Run(ctx context.Context, workers int) {
+	<-ctx.Done()
+}
+
+func NewNoopHubDriver() HubDriver {
+	return &NoopHubDriver{}
 }

@@ -47,7 +47,7 @@ type gcClusterRbacController struct {
 	roleBindingLister                rbacv1listers.RoleBindingLister
 	manifestWorkLister               worklister.ManifestWorkLister
 	clusterPatcher                   patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus]
-	approver                         register.Approver
+	hubDriver                        register.HubDriver
 	eventRecorder                    events.Recorder
 	resourceCleanupFeatureGateEnable bool
 }
@@ -59,7 +59,7 @@ func newGCClusterRbacController(
 	clusterRoleLister rbacv1listers.ClusterRoleLister,
 	roleBindingLister rbacv1listers.RoleBindingLister,
 	manifestWorkLister worklister.ManifestWorkLister,
-	approver register.Approver,
+	hubDriver register.HubDriver,
 	eventRecorder events.Recorder,
 	resourceCleanupFeatureGateEnable bool,
 ) gcReconciler {
@@ -69,7 +69,7 @@ func newGCClusterRbacController(
 		roleBindingLister:                roleBindingLister,
 		manifestWorkLister:               manifestWorkLister,
 		clusterPatcher:                   clusterPatcher,
-		approver:                         approver,
+		hubDriver:                        hubDriver,
 		eventRecorder:                    eventRecorder.WithComponentSuffix("gc-cluster-rbac"),
 		resourceCleanupFeatureGateEnable: resourceCleanupFeatureGateEnable,
 	}
@@ -82,7 +82,7 @@ func (r *gcClusterRbacController) reconcile(ctx context.Context,
 			return gcReconcileContinue, err
 		}
 
-		if err := r.approver.Cleanup(ctx, cluster); err != nil {
+		if err := r.hubDriver.Cleanup(ctx, cluster); err != nil {
 			return gcReconcileContinue, err
 		}
 

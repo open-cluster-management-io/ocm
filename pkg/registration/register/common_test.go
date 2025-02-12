@@ -113,40 +113,48 @@ func TestBaseKubeConfigFromBootStrap(t *testing.T) {
 	}
 }
 
-type testApprover struct {
+type testHubDriver struct {
 	cleanupErr error
 }
 
-func newTestApprover(err error) Approver {
-	return &testApprover{cleanupErr: err}
+func newTestHubDriver(err error) HubDriver {
+	return &testHubDriver{cleanupErr: err}
 }
 
-func (t *testApprover) Run(_ context.Context, _ int) {}
+func (t *testHubDriver) Accept(ctx context.Context, cluster *clusterv1.ManagedCluster) (bool, error) {
+	return true, nil
+}
 
-func (t *testApprover) Cleanup(_ context.Context, _ *clusterv1.ManagedCluster) error {
+func (t *testHubDriver) Run(_ context.Context, _ int) {}
+
+func (t *testHubDriver) Cleanup(_ context.Context, _ *clusterv1.ManagedCluster) error {
 	return t.cleanupErr
 }
 
-func TestAggregateApprover(t *testing.T) {
+func (t *testHubDriver) CreatePermissions(ctx context.Context, cluster *clusterv1.ManagedCluster) error {
+	return nil
+}
+
+func TestAggregateAggregatedHubDriver(t *testing.T) {
 	cases := []struct {
 		name      string
-		approvers []Approver
+		hubDrivers []HubDriver
 		expectErr bool
 	}{
 		{
 			name:      "noop",
-			approvers: []Approver{NewNoopApprover()},
+			hubDrivers: []HubDriver{NewNoopHubDriver()},
 		},
 		{
 			name:      "two approvers, one with err",
-			approvers: []Approver{NewNoopApprover(), newTestApprover(fmt.Errorf("error test"))},
+			hubDrivers: []HubDriver{NewNoopHubDriver(), newTestHubDriver(fmt.Errorf("error test"))},
 			expectErr: true,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			aggregated := NewAggregatedApprover(c.approvers...)
+			aggregated := NewAggregatedHubDriver(c.hubDrivers...)
 			err := aggregated.Cleanup(context.Background(), testinghelpers.NewManagedCluster())
 			if err != nil && !c.expectErr {
 				t.Errorf("should have no err but got %v", err)

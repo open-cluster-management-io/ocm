@@ -35,6 +35,8 @@ type HubConfig struct {
 	ManagedClusterIdentityCreatorRole string
 	HubClusterArn                     string
 	EnabledRegistrationDrivers        string
+	AutoApproveCsrUsers               []string
+	AutoApproveAwsPatterns            []string
 }
 
 type Webhook struct {

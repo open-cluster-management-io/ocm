@@ -64,7 +64,7 @@ func NewGCController(
 	clusterClient clientset.Interface,
 	kubeClient kubernetes.Interface,
 	metadataClient metadata.Interface,
-	approver register.Approver,
+	hubDriver register.HubDriver,
 	eventRecorder events.Recorder,
 	gcResourceList []string,
 	resourceCleanupFeatureGateEnable bool,
@@ -97,7 +97,7 @@ func NewGCController(
 
 	controller.gcReconcilers = append(controller.gcReconcilers,
 		newGCClusterRbacController(kubeClient, clusterPatcher, clusterRoleLister, roleBindingLister,
-			manifestWorkLister, approver, eventRecorder, resourceCleanupFeatureGateEnable))
+			manifestWorkLister, hubDriver, eventRecorder, resourceCleanupFeatureGateEnable))
 
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterInformer.Informer()).

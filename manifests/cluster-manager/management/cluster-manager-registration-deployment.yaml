@@ -70,6 +70,12 @@ spec:
           {{if .EnabledRegistrationDrivers}}
           - "--enabled-registration-drivers={{ .EnabledRegistrationDrivers }}"
           {{end}}
+          {{ if .AutoApproveCsrUsers }}
+          - "--auto-approved-csr-users={{ .AutoApproveCsrUsers }}"
+          {{ end }}
+           {{ if .AutoApproveAwsPatterns }}
+          - "--auto-approved-aws-patterns={{ .AutoApproveAwsPatterns }}"
+          {{ end }}
         env:
           - name: POD_NAME
             valueFrom:
