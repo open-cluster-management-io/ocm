@@ -8,7 +8,6 @@ import (
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -412,20 +411,6 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 	})
 
 	ginkgo.It("Should not update unsupported config spec hash", func() {
-		addOnConfig := &addonapiv1alpha1.AddOnDeploymentConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "addon-config",
-				Namespace: managedClusterName,
-			},
-			Spec: addOnTest1ConfigSpec,
-		}
-		_, err = hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(managedClusterName).Create(context.Background(), addOnConfig, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		// empty supported config
-		supportedConfig := testAddOnConfigsImpl.supportedConfigGVRs
-		testAddOnConfigsImpl.supportedConfigGVRs = []schema.GroupVersionResource{}
-
 		// do not update mca status.SupportedConfigs
 		addon := &addonapiv1alpha1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
@@ -437,12 +422,12 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 				Configs: []addonapiv1alpha1.AddOnConfig{
 					{
 						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-							Group:    addOnDeploymentConfigGVR.Group,
-							Resource: addOnDeploymentConfigGVR.Resource,
+							Group:    addOnDeploymentConfigGVR.Group + "test",
+							Resource: addOnDeploymentConfigGVR.Resource + "test",
 						},
 						ConfigReferent: addonapiv1alpha1.ConfigReferent{
-							Name:      addOnConfig.Name,
-							Namespace: addOnConfig.Namespace,
+							Name:      "addon-config-test",
+							Namespace: managedClusterName,
 						},
 					},
 				},
@@ -451,22 +436,6 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		// check cma status
-		assertClusterManagementAddOnDefaultConfigReferences(testAddOnConfigsImpl.name, addonapiv1alpha1.DefaultConfigReference{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    addOnDeploymentConfigGVR.Group,
-				Resource: addOnDeploymentConfigGVR.Resource,
-			},
-			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-				ConfigReferent: addonapiv1alpha1.ConfigReferent{
-					Namespace: configDefaultNamespace,
-					Name:      configDefaultName,
-				},
-				SpecHash: addOnDefaultConfigSpecHash,
-			},
-		})
-		assertClusterManagementAddOnInstallProgression(testAddOnConfigsImpl.name)
-
 		// check mca status
 		assertManagedClusterAddOnConfigReferences(testAddOnConfigsImpl.name, managedClusterName, addonapiv1alpha1.ConfigReference{
 			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
@@ -474,19 +443,34 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 				Resource: addOnDeploymentConfigGVR.Resource,
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: addOnConfig.Namespace,
-				Name:      addOnConfig.Name,
+				Namespace: configDefaultNamespace,
+				Name:      configDefaultName,
 			},
 			LastObservedGeneration: 1,
 			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 				ConfigReferent: addonapiv1alpha1.ConfigReferent{
-					Namespace: addOnConfig.Namespace,
-					Name:      addOnConfig.Name,
+					Namespace: configDefaultNamespace,
+					Name:      configDefaultName,
+				},
+				SpecHash: addOnDefaultConfigSpecHash,
+			},
+		}, addonapiv1alpha1.ConfigReference{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    addOnDeploymentConfigGVR.Group + "test",
+				Resource: addOnDeploymentConfigGVR.Resource + "test",
+			},
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Namespace: managedClusterName,
+				Name:      "addon-config-test",
+			},
+			LastObservedGeneration: 0,
+			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					Namespace: managedClusterName,
+					Name:      "addon-config-test",
 				},
 				SpecHash: "",
 			},
 		})
-
-		testAddOnConfigsImpl.supportedConfigGVRs = supportedConfig
 	})
 })

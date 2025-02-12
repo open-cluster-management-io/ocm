@@ -227,14 +227,16 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 
 	}
 
-	if healthChecker != nil && healthChecker(FieldResults, cluster, addon) != nil {
-		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-			Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
-			Status:  metav1.ConditionFalse,
-			Reason:  addonapiv1alpha1.AddonAvailableReasonProbeUnavailable,
-			Message: fmt.Sprintf("Probe addon unavailable with err %v", err),
-		})
-		return nil
+	if healthChecker != nil {
+		if err := healthChecker(FieldResults, cluster, addon); err != nil {
+			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Status:  metav1.ConditionFalse,
+				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeUnavailable,
+				Message: fmt.Sprintf("Probe addon unavailable with err %v", err),
+			})
+			return nil
+		}
 	}
 
 	meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
