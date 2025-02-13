@@ -24,6 +24,7 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
+	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/statusfeedback"
@@ -105,7 +106,7 @@ func (c *AvailableStatusController) syncManifestWork(ctx context.Context, origin
 	manifestWork := originalManifestWork.DeepCopy()
 
 	// do nothing when finalizer is not added.
-	if !helper.HasFinalizer(manifestWork.Finalizers, workapiv1.ManifestWorkFinalizer) {
+	if !commonhelper.HasFinalizer(manifestWork.Finalizers, workapiv1.ManifestWorkFinalizer) {
 		return nil
 	}
 
