@@ -13,6 +13,7 @@ import (
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
@@ -70,11 +71,8 @@ var _ = ginkgo.Describe("Joining Process", func() {
 				if err != nil {
 					return err
 				}
-				if len(spokeCluster.Finalizers) != 1 {
-					return fmt.Errorf("cluster should have finalizer")
-				}
 
-				if spokeCluster.Finalizers[0] != clusterv1.ManagedClusterFinalizer {
+				if !commonhelpers.HasFinalizer(spokeCluster.Finalizers, clusterv1.ManagedClusterFinalizer) {
 					return fmt.Errorf("finalizer is not correct")
 				}
 

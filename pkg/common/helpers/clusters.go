@@ -9,6 +9,11 @@ import (
 	clustersdkv1beta1 "open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1"
 )
 
+const (
+	// GcFinalizer is added to the managedCluster for resource cleanup, which maintained by gc controller.
+	GcFinalizer = "cluster.open-cluster-management.io/resource-cleanup"
+)
+
 type PlacementDecisionGetter struct {
 	Client clusterlister.PlacementDecisionLister
 }

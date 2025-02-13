@@ -2,29 +2,29 @@ package gc
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	corev1 "k8s.io/api/core/v1"
+	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kubeinformers "k8s.io/client-go/informers"
-	fakeclient "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/kubernetes/scheme"
 	fakemetadataclient "k8s.io/client-go/metadata/fake"
 	clienttesting "k8s.io/client-go/testing"
 
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeclusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
-	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
-	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	workv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
-	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
 func TestGController(t *testing.T) {
@@ -32,43 +32,105 @@ func TestGController(t *testing.T) {
 		name            string
 		key             string
 		cluster         *clusterv1.ManagedCluster
-		namespace       *corev1.Namespace
-		expectedErr     string
+		objs            []runtime.Object
 		validateActions func(t *testing.T, clusterActions []clienttesting.Action)
 	}{
 		{
-			name:        "invalid key",
-			key:         factory.DefaultQueueKey,
-			cluster:     testinghelpers.NewDeletingManagedCluster(),
-			expectedErr: "",
+			name:    "invalid key",
+			key:     factory.DefaultQueueKey,
+			cluster: testinghelpers.NewDeletingManagedCluster(),
+
 			validateActions: func(t *testing.T, clusterActions []clienttesting.Action) {
 				testingcommon.AssertNoActions(t, clusterActions)
 			},
 		},
 		{
-			name:        "valid key with cluster",
-			key:         testinghelpers.TestManagedClusterName,
-			cluster:     testinghelpers.NewDeletingManagedCluster(),
-			expectedErr: "",
+			name:    " cluster is not deleting",
+			key:     testinghelpers.TestManagedClusterName,
+			cluster: testinghelpers.NewManagedCluster(),
 			validateActions: func(t *testing.T, clusterActions []clienttesting.Action) {
-				testingcommon.AssertActions(t, clusterActions, "patch", "patch")
+				testingcommon.AssertActions(t, clusterActions, "patch")
+				patch := clusterActions[0].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !commonhelpers.HasFinalizer(managedCluster.Finalizers, commonhelpers.GcFinalizer) {
+					t.Errorf("expected gc finalizer")
+				}
 			},
 		},
 		{
-			name:        "valid key with no cluster ",
-			key:         "cluster1",
-			cluster:     testinghelpers.NewDeletingManagedCluster(),
-			expectedErr: "",
+			name:    "cluster is deleting with no resources",
+			key:     testinghelpers.TestManagedClusterName,
+			cluster: testinghelpers.NewDeletingManagedClusterWithFinalizers([]string{commonhelpers.GcFinalizer}),
+			validateActions: func(t *testing.T, clusterActions []clienttesting.Action) {
+				testingcommon.AssertActions(t, clusterActions, "patch", "patch")
+				expectedCondition := metav1.Condition{
+					Type:    clusterv1.ManagedClusterConditionDeleting,
+					Status:  metav1.ConditionTrue,
+					Reason:  clusterv1.ConditionDeletingReasonNoResource,
+					Message: "No cleaned resource in cluster ns."}
+
+				patch := clusterActions[0].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &clusterv1.ManagedCluster{}
+				if err := json.Unmarshal(patch, managedCluster); err != nil {
+					t.Fatal(err)
+				}
+				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
+
+				patch = clusterActions[1].(clienttesting.PatchAction).GetPatch()
+				if err := json.Unmarshal(patch, managedCluster); err != nil {
+					t.Fatal(err)
+				}
+				if len(managedCluster.Finalizers) != 0 {
+					t.Errorf("expected no finalizer")
+				}
+			},
+		},
+		{
+			name:    "cluster is deleting with resources",
+			key:     testinghelpers.TestManagedClusterName,
+			cluster: testinghelpers.NewDeletingManagedClusterWithFinalizers([]string{commonhelpers.GcFinalizer}),
+			objs:    []runtime.Object{newAddonMetadata(testinghelpers.TestManagedClusterName, "test", nil)},
+			validateActions: func(t *testing.T, clusterActions []clienttesting.Action) {
+				testingcommon.AssertActions(t, clusterActions, "patch")
+				expectedCondition := metav1.Condition{
+					Type:   clusterv1.ManagedClusterConditionDeleting,
+					Status: metav1.ConditionFalse,
+					Reason: clusterv1.ConditionDeletingReasonResourceRemaining,
+					Message: "The resource managedclusteraddons is remaning, the remaining count is 1, " +
+						"the finalizer pending count is 0",
+				}
+
+				patch := clusterActions[0].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &clusterv1.ManagedCluster{}
+				if err := json.Unmarshal(patch, managedCluster); err != nil {
+					t.Fatal(err)
+				}
+				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
+
+			},
+		},
+		{
+			name:    "cluster is gone with resources",
+			key:     "test",
+			cluster: testinghelpers.NewDeletingManagedClusterWithFinalizers([]string{commonhelpers.GcFinalizer}),
+			objs:    []runtime.Object{newAddonMetadata(testinghelpers.TestManagedClusterName, "test", nil)},
 			validateActions: func(t *testing.T, clusterActions []clienttesting.Action) {
 				testingcommon.AssertNoActions(t, clusterActions)
 			},
 		},
 	}
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			kubeClient := fakeclient.NewSimpleClientset()
-			kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Minute*10)
-			metadataClient := fakemetadataclient.NewSimpleMetadataClient(scheme.Scheme)
+			scheme := fakemetadataclient.NewTestScheme()
+			_ = addonv1alpha1.Install(scheme)
+			_ = workv1.Install(scheme)
+			_ = metav1.AddMetaToScheme(scheme)
+			metadataClient := fakemetadataclient.NewSimpleMetadataClient(scheme, c.objs...)
 
 			clusterClient := fakeclusterclient.NewSimpleClientset(c.cluster)
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
@@ -79,52 +141,31 @@ func TestGController(t *testing.T) {
 				}
 			}
 
-			workClient := fakeworkclient.NewSimpleClientset()
-			workInformerFactory := workinformers.NewSharedInformerFactory(workClient, 5*time.Minute)
-
 			_ = NewGCController(
-				kubeInformerFactory.Rbac().V1().ClusterRoles().Lister(),
-				kubeInformerFactory.Rbac().V1().RoleBindings().Lister(),
 				clusterInformerFactory.Cluster().V1().ManagedClusters(),
-				workInformerFactory.Work().V1().ManifestWorks().Lister(),
 				clusterClient,
-				kubeClient,
 				metadataClient,
-				register.NewNoopApprover(),
 				events.NewInMemoryRecorder(""),
 				[]string{"addon.open-cluster-management.io/v1alpha1/managedclusteraddons",
 					"work.open-cluster-management.io/v1/manifestworks"},
-				true,
 			)
-			namespaceStore := kubeInformerFactory.Core().V1().Namespaces().Informer().GetStore()
-			if c.namespace != nil {
-				if err := namespaceStore.Add(c.namespace); err != nil {
-					t.Fatal(err)
-				}
-			}
+
 			clusterPatcher := patcher.NewPatcher[
 				*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
 				clusterClient.ClusterV1().ManagedClusters())
 
 			ctrl := &GCController{
-				clusterLister:  clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				clusterPatcher: clusterPatcher,
-				gcReconcilers: []gcReconciler{
-					newGCResourcesController(metadataClient, []schema.GroupVersionResource{addonGvr, workGvr},
-						events.NewInMemoryRecorder("")),
-					newGCClusterRbacController(kubeClient, clusterPatcher,
-						kubeInformerFactory.Rbac().V1().ClusterRoles().Lister(),
-						kubeInformerFactory.Rbac().V1().RoleBindings().Lister(),
-						workInformerFactory.Work().V1().ManifestWorks().Lister(),
-						register.NewNoopApprover(),
-						events.NewInMemoryRecorder(""),
-						true),
-				},
+				clusterLister:         clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
+				clusterPatcher:        clusterPatcher,
+				gcResourcesController: newGCResourcesController(metadataClient, []schema.GroupVersionResource{addonGvr, workGvr}),
+				eventRecorder:         events.NewInMemoryRecorder(""),
 			}
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, c.key)
 			err := ctrl.sync(context.TODO(), controllerContext)
-			testingcommon.AssertError(t, err, c.expectedErr)
+			if err != nil && !errors.Is(err, requeueError) {
+				t.Error(err)
+			}
 			c.validateActions(t, clusterClient.Actions())
 		})
 	}
