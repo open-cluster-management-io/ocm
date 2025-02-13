@@ -19,6 +19,7 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
+	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 )
@@ -83,7 +84,7 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 	}
 
 	// don't do work if the finalizer is not present
-	if !helper.HasFinalizer(appliedManifestWork.Finalizers, workapiv1.AppliedManifestWorkFinalizer) {
+	if !commonhelper.HasFinalizer(appliedManifestWork.Finalizers, workapiv1.AppliedManifestWorkFinalizer) {
 		return nil
 	}
 

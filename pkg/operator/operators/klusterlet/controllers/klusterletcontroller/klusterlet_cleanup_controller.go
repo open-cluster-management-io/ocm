@@ -27,6 +27,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/manifests"
+	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
@@ -143,7 +144,7 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 	// we should clean managedcluster resource when
 	// 1. install mode is not hosted
 	// 2. install mode is hosted and some resources has been applied on managed cluster (if hosted finalizer exists)
-	if !helpers.IsHosted(config.InstallMode) || hasFinalizer(klusterlet, klusterletHostedFinalizer) {
+	if !helpers.IsHosted(config.InstallMode) || commonhelper.HasFinalizer(klusterlet.Finalizers, klusterletHostedFinalizer) {
 		managedClusterClients, err := n.managedClusterClientsBuilder.
 			withMode(config.InstallMode).
 			withKubeConfigSecret(config.AgentNamespace, config.ExternalManagedKubeConfigSecret).
@@ -287,15 +288,6 @@ func readyToAddHostedFinalizer(klusterlet *operatorapiv1.Klusterlet, mode operat
 	}
 
 	return meta.IsStatusConditionTrue(klusterlet.Status.Conditions, operatorapiv1.ConditionReadyToApply)
-}
-
-func hasFinalizer(klusterlet *operatorapiv1.Klusterlet, finalizer string) bool {
-	for _, f := range klusterlet.Finalizers {
-		if f == finalizer {
-			return true
-		}
-	}
-	return false
 }
 
 func removeStaticResources(ctx context.Context,

@@ -129,7 +129,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 
 	// don't do work if the finalizer is not present
 	// it ensures all maintained resources will be cleaned once manifestwork is deleted
-	if !helper.HasFinalizer(manifestWork.Finalizers, workapiv1.ManifestWorkFinalizer) {
+	if !commonhelper.HasFinalizer(manifestWork.Finalizers, workapiv1.ManifestWorkFinalizer) {
 		return nil
 	}
 

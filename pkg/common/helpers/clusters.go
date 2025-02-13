@@ -25,3 +25,16 @@ func GetClusterChanges(client clusterlister.PlacementDecisionLister, placement *
 
 	return pdtracker.GetClusterChanges()
 }
+
+func HasFinalizer(finalizers []string, finalizer string) bool {
+	if len(finalizers) == 0 || len(finalizer) == 0 {
+		return false
+	}
+
+	for i := range finalizers {
+		if finalizers[i] == finalizer {
+			return true
+		}
+	}
+	return false
+}

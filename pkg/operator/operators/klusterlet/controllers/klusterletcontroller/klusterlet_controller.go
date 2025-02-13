@@ -337,7 +337,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 
 	// do nothing until finalizer is added.
-	if !hasFinalizer(klusterlet, klusterletFinalizer) {
+	if !commonhelpers.HasFinalizer(klusterlet.Finalizers, klusterletFinalizer) {
 		return nil
 	}
 
@@ -353,7 +353,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		config.ClientCertExpirationSeconds = klusterlet.Spec.RegistrationConfiguration.ClientCertExpirationSeconds
 		config.RegistrationKubeAPIQPS = float32(klusterlet.Spec.RegistrationConfiguration.KubeAPIQPS)
 		config.RegistrationKubeAPIBurst = klusterlet.Spec.RegistrationConfiguration.KubeAPIBurst
-		//Configuring Registration driver depending on registration auth
+		// Configuring Registration driver depending on registration auth
 		if &klusterlet.Spec.RegistrationConfiguration.RegistrationDriver != nil &&
 			klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType == AwsIrsaAuthType {
 

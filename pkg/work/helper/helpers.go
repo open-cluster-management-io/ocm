@@ -298,17 +298,6 @@ func GuessObjectGroupVersionKind(object runtime.Object) (*schema.GroupVersionKin
 	return nil, fmt.Errorf("cannot get gvk of %v", object)
 }
 
-func HasFinalizer(finalizers []string, finalizer string) bool {
-	found := false
-	for i := range finalizers {
-		if finalizers[i] == finalizer {
-			found = true
-			break
-		}
-	}
-	return found
-}
-
 // AppliedManifestworkQueueKeyFunc return manifestwork key from appliedmanifestwork
 func AppliedManifestworkQueueKeyFunc(hubhash string) factory.ObjectQueueKeyFunc {
 	return func(obj runtime.Object) string {
