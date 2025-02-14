@@ -1,0 +1,27 @@
+
+name: FOSSA License Scanning
+
+on:
+  push:
+    branches:
+      - main
+      - release-*
+  pull_request:
+    branches:
+      - main
+      - release-*
+
+permissions:
+  contents: read
+
+jobs:
+  fossa-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tree
+        uses: actions/checkout@v4
+
+      - name: Run FOSSA scan and upload build data
+        uses: fossas/fossa-action@v1.5.0
+        with:
+          api-key: ${{ secrets.FOSSA_API_KEY }}
