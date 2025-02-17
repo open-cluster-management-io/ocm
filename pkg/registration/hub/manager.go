@@ -59,7 +59,8 @@ func NewHubManagerOptions() *HubManagerOptions {
 	return &HubManagerOptions{
 		GCResourceList: []string{"addon.open-cluster-management.io/v1alpha1/managedclusteraddons",
 			"work.open-cluster-management.io/v1/manifestworks"},
-		ImportOption: importeroptions.New(),
+		ImportOption:               importeroptions.New(),
+		EnabledRegistrationDrivers: []string{"csr"},
 	}
 }
 
