@@ -76,7 +76,7 @@ type RegisterDriver interface {
 	ManagedClusterDecorator(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster
 }
 
-// approvers is the inteface that each driver should implement on hub side. The hub controller will use this driver
+// Approvers is the inteface that each driver should implement on hub side. The hub controller will use this driver
 // to check the registration request from the agent and cleanup.
 type Approver interface {
 	// Run starts a reconciler on the hub side to monitor the registration request and approve the request

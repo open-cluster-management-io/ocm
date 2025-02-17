@@ -8,7 +8,6 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
@@ -156,31 +155,27 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	addOnInformers addoninformers.SharedInformerFactory,
 ) error {
 
-	csrApprover, err := csr.NewCSRApprover(kubeClient, kubeInformers, m.ClusterAutoApprovalUsers, controllerContext.EventRecorder)
-	if err != nil {
-		return err
+	var approvers []register.Approver
+	var drivers []register.HubDriver
+	for _, enabledRegistrationDriver := range m.EnabledRegistrationDrivers {
+		switch enabledRegistrationDriver {
+		case "csr":
+			csrApprover, err := csr.NewCSRApprover(kubeClient, kubeInformers, m.ClusterAutoApprovalUsers, controllerContext.EventRecorder)
+			if err != nil {
+				return err
+			}
+			approvers = append(approvers, csrApprover)
+			drivers = append(drivers, csr.NewCSRHubDriver())
+		case "awsirsa":
+			awsIRSAHubDriver, err := awsirsa.NewAWSIRSAHubDriver(ctx, m.HubClusterArn)
+			if err != nil {
+				return err
+			}
+			drivers = append(drivers, awsIRSAHubDriver)
+		}
 	}
-	awsIRSAHubDriver, err := awsirsa.NewAWSIRSAHubDriver(ctx, m.HubClusterArn)
-	if err != nil {
-		return err
-	}
-
-	var approver register.Approver
-	var hubDriver register.HubDriver
-	enabledRegistrationDriversSet := sets.New[string](m.EnabledRegistrationDrivers...)
-	if len(m.EnabledRegistrationDrivers) == 0 {
-		approver = register.NewAggregatedApprover()
-		hubDriver = register.NewAggregatedHubDriver()
-	} else if enabledRegistrationDriversSet.Has("csr") && !enabledRegistrationDriversSet.Has("awsirsa") {
-		approver = register.NewAggregatedApprover(csrApprover)
-		hubDriver = register.NewAggregatedHubDriver(csr.NewCSRHubDriver())
-	} else if !enabledRegistrationDriversSet.Has("csr") && enabledRegistrationDriversSet.Has("awsirsa") {
-		approver = register.NewAggregatedApprover()
-		hubDriver = register.NewAggregatedHubDriver(awsIRSAHubDriver)
-	} else if enabledRegistrationDriversSet.Has("csr") && enabledRegistrationDriversSet.Has("awsirsa") {
-		approver = register.NewAggregatedApprover(csrApprover)
-		hubDriver = register.NewAggregatedHubDriver(awsIRSAHubDriver, csr.NewCSRHubDriver())
-	}
+	approver := register.NewAggregatedApprover(approvers...)
+	hubDriver := register.NewAggregatedHubDriver(drivers...)
 
 	managedClusterController := managedcluster.NewManagedClusterController(
 		kubeClient,

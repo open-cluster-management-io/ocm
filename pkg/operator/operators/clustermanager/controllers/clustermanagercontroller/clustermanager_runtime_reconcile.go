@@ -81,6 +81,10 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 				config.HubClusterArn = registrationDriver.HubClusterArn
 			}
 		}
+		// If no registration drivers are enabled, default to csr for backward compatibility
+		if len(enabledRegistrationDrivers) == 0 {
+			enabledRegistrationDrivers = []string{"csr"}
+		}
 	}
 	config.EnabledRegistrationDrivers = strings.Join(enabledRegistrationDrivers, ",")
 
