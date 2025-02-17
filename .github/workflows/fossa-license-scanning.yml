@@ -19,7 +19,7 @@ jobs:
   fossa-scan:
     runs-on: ubuntu-latest
     steps:
-      - name: Debug secrets
+      - name: Debug secret
         run: echo "FOSSA_API_KEY is set"
         env:
           fossa_api_key: ${{ secrets.FOSSA_API_KEY }}
