@@ -438,7 +438,7 @@ func TestCreateIAMRoleAndPolicy(t *testing.T) {
 				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "test",
 				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
 			},
-			want:    fmt.Errorf("HubClusterARN provided during join is different from the current hub cluster"),
+			want:    fmt.Errorf("HubClusterARN provided during join by ManagedCluster spoke-cluster is different from the current hub cluster"),
 			wantErr: true,
 		},
 		{
@@ -670,6 +670,10 @@ func TestCreateIAMRoleAndPolicy(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
+			os.Setenv("AWS_ACCESS_KEY_ID", "test")
+			os.Setenv("AWS_SECRET_ACCESS_KEY", "test")
+			os.Setenv("AWS_ACCOUNT_ID", "test")
+
 			cfg, err := config.LoadDefaultConfig(
 				tt.args.ctx,
 				config.WithAPIOptions([]func(*middleware.Stack) error{tt.args.withAPIOptionsFunc}),
@@ -683,7 +687,7 @@ func TestCreateIAMRoleAndPolicy(t *testing.T) {
 			managedCluster := testinghelpers.NewManagedCluster()
 			managedCluster.Annotations = tt.managedClusterAnnotations
 
-			_, _, err = CreateIAMRoleAndPolicy(tt.args.ctx, HubClusterArn, managedCluster, cfg)
+			_, _, err = createIAMRoleAndPolicy(tt.args.ctx, HubClusterArn, managedCluster, cfg)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("error = %#v, wantErr %#v", err, tt.wantErr)
 				return

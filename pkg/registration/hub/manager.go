@@ -8,6 +8,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
@@ -47,10 +48,11 @@ import (
 
 // HubManagerOptions holds configuration for hub manager controller
 type HubManagerOptions struct {
-	ClusterAutoApprovalUsers []string
-	GCResourceList           []string
-	ImportOption             *importeroptions.Options
-	HubClusterArn            string
+	ClusterAutoApprovalUsers   []string
+	EnabledRegistrationDrivers []string
+	GCResourceList             []string
+	ImportOption               *importeroptions.Options
+	HubClusterArn              string
 }
 
 // NewHubManagerOptions returns a HubManagerOptions
@@ -66,6 +68,8 @@ func NewHubManagerOptions() *HubManagerOptions {
 func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&m.ClusterAutoApprovalUsers, "cluster-auto-approval-users", m.ClusterAutoApprovalUsers,
 		"A bootstrap user list whose cluster registration requests can be automatically approved.")
+	fs.StringSliceVar(&m.EnabledRegistrationDrivers, "enabled-registration-drivers", m.EnabledRegistrationDrivers,
+		"A list of registration drivers enabled on hub.")
 	fs.StringSliceVar(&m.GCResourceList, "gc-resource-list", m.GCResourceList,
 		"A list GVR user can customize which are cleaned up after cluster is deleted. Format is group/version/resource, "+
 			"and the default are managedclusteraddon and manifestwork. The resources will be deleted in order."+
@@ -156,12 +160,27 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	if err != nil {
 		return err
 	}
+	awsIRSAHubDriver, err := awsirsa.NewAWSIRSAHubDriver(ctx, m.HubClusterArn)
+	if err != nil {
+		return err
+	}
 
-	approver := register.NewAggregatedApprover(csrApprover)
-
-	awsIRSADriverForHub := awsirsa.NewAWSIRSADriverForHub(m.HubClusterArn)
-	csrDriverForHub := csr.NewCSRDriverForHub()
-	registerDriverForHub := register.NewAggregatedDriverForHub(csrDriverForHub, awsIRSADriverForHub)
+	var approver register.Approver
+	var hubDriver register.HubDriver
+	enabledRegistrationDriversSet := sets.New[string](m.EnabledRegistrationDrivers...)
+	if len(m.EnabledRegistrationDrivers) == 0 {
+		approver = register.NewAggregatedApprover()
+		hubDriver = register.NewAggregatedHubDriver()
+	} else if enabledRegistrationDriversSet.Has("csr") && !enabledRegistrationDriversSet.Has("awsirsa") {
+		approver = register.NewAggregatedApprover(csrApprover)
+		hubDriver = register.NewAggregatedHubDriver(csr.NewCSRHubDriver())
+	} else if !enabledRegistrationDriversSet.Has("csr") && enabledRegistrationDriversSet.Has("awsirsa") {
+		approver = register.NewAggregatedApprover()
+		hubDriver = register.NewAggregatedHubDriver(awsIRSAHubDriver)
+	} else if enabledRegistrationDriversSet.Has("csr") && enabledRegistrationDriversSet.Has("awsirsa") {
+		approver = register.NewAggregatedApprover(csrApprover)
+		hubDriver = register.NewAggregatedHubDriver(awsIRSAHubDriver, csr.NewCSRHubDriver())
+	}
 
 	managedClusterController := managedcluster.NewManagedClusterController(
 		kubeClient,
@@ -172,7 +191,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		kubeInformers.Rbac().V1().RoleBindings(),
 		kubeInformers.Rbac().V1().ClusterRoleBindings(),
 		approver,
-		registerDriverForHub,
+		hubDriver,
 		controllerContext.EventRecorder,
 	)
 

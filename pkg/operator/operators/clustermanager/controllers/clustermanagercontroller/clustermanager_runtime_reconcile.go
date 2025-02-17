@@ -73,13 +73,16 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 		}
 	}
 
+	var enabledRegistrationDrivers []string
 	if cm.Spec.RegistrationConfiguration != nil {
 		for _, registrationDriver := range cm.Spec.RegistrationConfiguration.RegistrationDrivers {
+			enabledRegistrationDrivers = append(enabledRegistrationDrivers, registrationDriver.AuthType)
 			if registrationDriver.AuthType == "awsirsa" {
 				config.HubClusterArn = registrationDriver.HubClusterArn
 			}
 		}
 	}
+	config.EnabledRegistrationDrivers = strings.Join(enabledRegistrationDrivers, ",")
 
 	// In the Hosted mode, ensure the rbac kubeconfig secrets is existed for deployments to mount.
 	// In this step, we get serviceaccount token from the hub cluster to form a kubeconfig and set it as a secret on the management cluster.

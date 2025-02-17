@@ -192,7 +192,7 @@ func TestSyncManagedCluster(t *testing.T) {
 				),
 				patcher.NewPatcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus](clusterClient.ClusterV1().ManagedClusters()),
 				register.NewNoopApprover(),
-				csr.NewCSRDriverForHub(),
+				csr.NewCSRHubDriver(),
 				eventstesting.NewTestingEventRecorder(t)}
 			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
 			if syncErr != nil {

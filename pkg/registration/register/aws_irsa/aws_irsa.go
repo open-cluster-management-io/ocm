@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"html/template"
-	"log"
 	"strings"
 	"time"
 
@@ -22,6 +21,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog/v2"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	v1 "open-cluster-management.io/api/cluster/v1"
@@ -127,11 +127,12 @@ func NewAWSIRSADriver(managedClusterArn string, managedClusterRoleSuffix string,
 	}
 }
 
-type AWSIRSADriverForHub struct {
+type AWSIRSAHubDriver struct {
 	hubClusterArn string
+	cfg           aws.Config
 }
 
-func (a *AWSIRSADriverForHub) allows(cluster *clusterv1.ManagedCluster) bool {
+func (a *AWSIRSAHubDriver) allows(cluster *clusterv1.ManagedCluster) bool {
 	_, isManagedClusterArnPresent := cluster.Annotations["agent.open-cluster-management.io/managed-cluster-arn"]
 	_, isManagedClusterIAMRoleSuffixPresent := cluster.Annotations["agent.open-cluster-management.io/managed-cluster-iam-role-suffix"]
 	if isManagedClusterArnPresent && isManagedClusterIAMRoleSuffixPresent {
@@ -140,45 +141,35 @@ func (a *AWSIRSADriverForHub) allows(cluster *clusterv1.ManagedCluster) bool {
 	return false
 }
 
-func (a *AWSIRSADriverForHub) CreatePermissions(ctx context.Context, cluster *clusterv1.ManagedCluster) error {
-
+func (a *AWSIRSAHubDriver) CreatePermissions(ctx context.Context, cluster *clusterv1.ManagedCluster) error {
 	if !a.allows(cluster) {
 		return nil
 	}
-	log.Printf("ManagedCluster %s is joined using aws-irsa registration-auth", cluster.Name)
-
-	//Creating config for aws
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		log.Printf("Failed to load aws config %v", err)
-	}
+	klog.Infof("ManagedCluster %s is joined using aws-irsa registration-auth", cluster.Name)
 
 	// Create an EKS client
-	eksClient := eks.NewFromConfig(cfg)
-	hubClusterName, roleArn, err := CreateIAMRoleAndPolicy(ctx, a.hubClusterArn, cluster, cfg)
+	eksClient := eks.NewFromConfig(a.cfg)
+	hubClusterName, roleArn, err := createIAMRoleAndPolicy(ctx, a.hubClusterArn, cluster, a.cfg)
 	if err != nil {
-		log.Printf("Failed to create IAM Roles and Policies %v", err)
 		return err
 	}
 
 	err = createAccessEntry(ctx, eksClient, roleArn, hubClusterName, cluster.Name)
 	if err != nil {
-		log.Printf("Failed to create Access Entries for aws irsa %v", err)
+		return err
 	}
 
 	return nil
 }
 
 // This function creates:
-// 1. IAM Roles and Policies in the hub cluster IAM
-// 2. Returns the hubclustername and the roleArn to be used for Access Entry creation
-func CreateIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCluster *v1.ManagedCluster, cfg aws.Config) (string, string, error) {
+// 1. IAM Role and Policy in the hub cluster IAM
+// 2. Returns the hubClusterName and the roleArn to be used for Access Entry creation
+func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCluster *v1.ManagedCluster, cfg aws.Config) (string, string, error) {
 	var managedClusterIamRoleSuffix string
-	var getRoleOutput *iam.GetRoleOutput
 	var createRoleOutput *iam.CreateRoleOutput
 	var hubClusterName string
 	var managedClusterName string
-	var roleArn string
 	var hubAccountId string
 	var managedClusterAccountId string
 
@@ -189,18 +180,25 @@ func CreateIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 		managedCluster.Annotations["agent.open-cluster-management.io/managed-cluster-iam-role-suffix"]
 	managedClusterArn, isManagedClusterArnPresent := managedCluster.Annotations["agent.open-cluster-management.io/managed-cluster-arn"]
 
-	if hubClusterArn != "" && isManagedClusterIamRoleSuffixPresent && isManagedClusterArnPresent {
+	roleName := fmt.Sprintf("ocm-hub-%s", managedClusterIamRoleSuffix)
+	policyName := roleName
+	creds, err := cfg.Credentials.Retrieve(ctx)
+	if err != nil {
+		klog.Errorf("Failed to get IAM Credentials")
+		return hubClusterName, "", err
+	}
+	awsAccountId := creds.AccountID
+	roleArn := fmt.Sprintf("arn:aws:iam::%s:role/%s", awsAccountId, roleName)
+	policyArn := fmt.Sprintf("arn:aws:iam::%s:policy/%s", awsAccountId, policyName)
+	hubAccountId, hubClusterName = commonhelpers.GetAwsAccountIdAndClusterName(hubClusterArn)
+	managedClusterAccountId, managedClusterName = commonhelpers.GetAwsAccountIdAndClusterName(managedClusterArn)
 
-		managedClusterAccountId, managedClusterName = commonhelpers.GetAwsAccountIdAndClusterName(managedClusterArn)
-		hubAccountId, hubClusterName = commonhelpers.GetAwsAccountIdAndClusterName(hubClusterArn)
-		// Define the role name and trust policy
-		roleName := "ocm-hub-" + managedClusterIamRoleSuffix
-		policyName := "ocm-hub-" + managedClusterIamRoleSuffix
+	if hubClusterArn != "" && isManagedClusterIamRoleSuffixPresent && isManagedClusterArnPresent {
 
 		// Check if hash is the same
 		hash := commonhelpers.Md5HashSuffix(hubAccountId, hubClusterName, managedClusterAccountId, managedClusterName)
 		if hash != managedClusterIamRoleSuffix {
-			err := fmt.Errorf("HubClusterARN provided during join is different from the current hub cluster")
+			err := fmt.Errorf("HubClusterARN provided during join by ManagedCluster %s is different from the current hub cluster", managedClusterName)
 			return hubClusterName, roleArn, err
 		}
 
@@ -215,7 +213,7 @@ func CreateIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 		}
 		renderedTemplates, err := renderTemplates(templateFiles, data)
 		if err != nil {
-			log.Printf("Failed to render templates while creating IAM role and policy %v", err)
+			klog.Errorf("Failed to render templates while creating IAM role and policy for ManagedCluster %s", managedClusterName)
 			return hubClusterName, roleArn, err
 		}
 
@@ -226,48 +224,28 @@ func CreateIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 		if err != nil {
 			// Ignore error when role already exists as we will always create the same role
 			if !(strings.Contains(err.Error(), "EntityAlreadyExists")) {
-				log.Printf("Failed to create IAM role: %v\n", err)
+				klog.Errorf("Failed to create IAM role %s for ManagedCluster %s", roleName, managedClusterName)
 				return hubClusterName, roleArn, err
 			} else {
-				log.Printf("Ignore IAM role creation error as entity already exists")
-				getRoleOutput, err = iamClient.GetRole(ctx, &iam.GetRoleInput{
-					RoleName: aws.String(roleName),
-				})
-				if err != nil {
-					log.Printf("Failed to get IAM role: %v\n", err)
-					return hubClusterName, roleArn, err
-				}
+				klog.Infof("Ignore IAM role %s creation error for ManagedCluster %s as it already exists", roleName, managedClusterName)
 			}
 		} else {
-			log.Printf("Role created successfully: %s\n", *createRoleOutput.Role.Arn)
+			klog.Infof("Role %s created successfully for ManagedCluster %s", *createRoleOutput.Role.Arn, managedClusterName)
 		}
 
 		createPolicyResult, err := iamClient.CreatePolicy(ctx, &iam.CreatePolicyInput{
 			PolicyDocument: aws.String(renderedTemplates[0]),
 			PolicyName:     aws.String(policyName),
 		})
-
-		creds, err := cfg.Credentials.Retrieve(ctx)
-		if err != nil {
-			log.Printf("Failed to get IAM Credentials: %v\n", err)
-			return hubClusterName, roleArn, err
-		}
-		awsAccountId := creds.AccountID
-		policyArn := fmt.Sprintf("arn:aws:iam::%s:policy/%s", awsAccountId, policyName)
-
 		if err != nil {
 			if !(strings.Contains(err.Error(), "EntityAlreadyExists")) {
-				log.Printf("Failed to create IAM Policy:%s %v\n", err, roleName)
+				klog.Errorf("Failed to create IAM Policy %s for ManagedCluster %s", policyName, managedClusterName)
 				return hubClusterName, roleArn, err
 			} else {
-				log.Printf("Ignore IAM policy creation error as entity already exists %v", err)
+				klog.Infof("Ignore IAM policy %s creation error for ManagedCluster %s as it already exists", policyName, managedClusterName)
 			}
 		} else {
-			log.Printf("Policy created successfully: %s\n", *createPolicyResult.Policy.Arn)
-		}
-
-		if createPolicyResult != nil {
-			policyArn = *createPolicyResult.Policy.Arn
+			klog.Infof("Policy %s created successfully for ManagedCluster %s", *createPolicyResult.Policy.Arn, managedClusterName)
 		}
 
 		_, err = iamClient.AttachRolePolicy(ctx, &iam.AttachRolePolicyInput{
@@ -275,16 +253,11 @@ func CreateIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 			RoleName:  aws.String(roleName),
 		})
 		if err != nil {
-			log.Printf("Couldn't attach policy %v to role %v. Here's why: %v\n", policyArn, roleName, err)
+			klog.Errorf("Unable to attach policy %s to role %s for ManagedCluster %s", policyArn, roleName, managedClusterName)
 			return hubClusterName, roleArn, err
-		}
-		if getRoleOutput != nil {
-			roleArn = *getRoleOutput.Role.Arn
 		} else {
-			roleArn = *createRoleOutput.Role.Arn
+			klog.Infof("Successfully attached IAM Policy %s to Role %s for ManagedCluster %s", policyArn, roleName, managedClusterName)
 		}
-		log.Printf("Created IAM Role %v and policy %v. \n", roleName, policyArn)
-
 	}
 	return hubClusterName, roleArn, nil
 }
@@ -323,7 +296,7 @@ func createAccessEntry(ctx context.Context, eksClient *eks.Client, roleArn strin
 		ClusterName:      aws.String(hubClusterName),
 		PrincipalArn:     aws.String(roleArn),
 		Username:         aws.String(managedClusterName),
-		KubernetesGroups: []string{"open-cluster-management:" + managedClusterName},
+		KubernetesGroups: []string{fmt.Sprintf("open-cluster-management:%s", managedClusterName)},
 	}
 
 	createAccessEntryOutput, err := eksClient.CreateAccessEntry(ctx, params, func(opts *eks.Options) {
@@ -333,20 +306,28 @@ func createAccessEntry(ctx context.Context, eksClient *eks.Client, roleArn strin
 		}), (*types.InvalidParameterException)(nil).ErrorCode())
 	})
 	if err != nil {
-		if !(strings.Contains(err.Error(), "EntityAlreadyExists")) {
-			log.Printf("Failed to create Access entry for the managed cluster %v because of %v\n", managedClusterName, err)
+		if !(strings.Contains(err.Error(), "ResourceInUseException")) {
+			klog.Errorf("Failed to create Access entry for managed cluster %s", managedClusterName)
 			return err
 		} else {
-			log.Printf("Ignore Access entry creation error as entity already exists")
+			klog.Infof("Ignore Access Entry creation for managed cluster %s as it is already in use", managedClusterName)
 		}
+	} else {
+		klog.Infof("Access entry %s created successfully for managed cluster %s", *createAccessEntryOutput.AccessEntry.AccessEntryArn, managedClusterName)
 	}
-	log.Printf("Access entry created successfully: %s\n", *createAccessEntryOutput.AccessEntry.AccessEntryArn)
 	return nil
 }
 
-func NewAWSIRSADriverForHub(hubClusterArn string) register.RegisterDriverForHub {
-	awsIRSADriverForHub := &AWSIRSADriverForHub{
-		hubClusterArn: hubClusterArn,
+func NewAWSIRSAHubDriver(ctx context.Context, hubClusterArn string) (register.HubDriver, error) {
+	logger := klog.FromContext(ctx)
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		logger.Error(err, "Failed to load aws config")
+		return nil, err
 	}
-	return awsIRSADriverForHub
+	awsIRSADriverForHub := &AWSIRSAHubDriver{
+		hubClusterArn: hubClusterArn,
+		cfg:           cfg,
+	}
+	return awsIRSADriverForHub, nil
 }

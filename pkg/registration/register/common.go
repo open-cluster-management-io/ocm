@@ -199,18 +199,18 @@ func GenerateStatusUpdater(hubClusterClient hubclusterclientset.Interface,
 	}
 }
 
-// AggregatedDriverForHub is a list of HubRegisterDrivers
-type AggregatedDriverForHub struct {
-	hubRegisterDrivers []RegisterDriverForHub
+// AggregatedHubDriver is a list of HubRegisterDrivers
+type AggregatedHubDriver struct {
+	hubRegisterDrivers []HubDriver
 }
 
-func NewAggregatedDriverForHub(hubRegisterDrivers ...RegisterDriverForHub) RegisterDriverForHub {
-	return &AggregatedDriverForHub{
+func NewAggregatedHubDriver(hubRegisterDrivers ...HubDriver) HubDriver {
+	return &AggregatedHubDriver{
 		hubRegisterDrivers: hubRegisterDrivers,
 	}
 }
 
-func (a *AggregatedDriverForHub) CreatePermissions(ctx context.Context, cluster *clusterv1.ManagedCluster) error {
+func (a *AggregatedHubDriver) CreatePermissions(ctx context.Context, cluster *clusterv1.ManagedCluster) error {
 	var errs []error
 	for _, hubRegisterDriver := range a.hubRegisterDrivers {
 		if err := hubRegisterDriver.CreatePermissions(ctx, cluster); err != nil {
