@@ -2,8 +2,6 @@ package klusterletcontroller
 
 import (
 	"context"
-	"crypto/md5" // #nosec G501
-	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -130,19 +128,12 @@ type ManagedClusterIamRole struct {
 }
 
 func (managedClusterIamRole *ManagedClusterIamRole) arn() string {
-	managedClusterAccountId, _ := commonhelpers.GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.ManagedClusterArn)
-	md5HashUniqueIdentifier := managedClusterIamRole.md5HashSuffix()
+	managedClusterAccountId, managedClusterName := commonhelpers.GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.ManagedClusterArn)
+	hubClusterAccountId, hubClusterName := commonhelpers.GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.HubClusterArn)
+	md5HashUniqueIdentifier := commonhelpers.Md5HashSuffix(hubClusterAccountId, hubClusterName, managedClusterAccountId, managedClusterName)
 
 	//arn:aws:iam::<managed-cluster-account-id>:role/ocm-managed-cluster-<md5-hash-unique-identifier>
 	return "arn:aws:iam::" + managedClusterAccountId + ":role/ocm-managed-cluster-" + md5HashUniqueIdentifier
-}
-
-func (managedClusterIamRole *ManagedClusterIamRole) md5HashSuffix() string {
-	hubClusterAccountId, hubClusterName := commonhelpers.GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.HubClusterArn)
-	managedClusterAccountId, managedClusterName := commonhelpers.GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.ManagedClusterArn)
-
-	hash := md5.Sum([]byte(strings.Join([]string{hubClusterAccountId, hubClusterName, managedClusterAccountId, managedClusterName}, "#"))) // #nosec G401
-	return hex.EncodeToString(hash[:])
 }
 
 // klusterletConfig is used to render the template of hub manifests
@@ -371,7 +362,9 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 				AwsIrsa: config.RegistrationDriver.AwsIrsa,
 			}
 			config.ManagedClusterRoleArn = managedClusterIamRole.arn()
-			config.ManagedClusterRoleSuffix = managedClusterIamRole.md5HashSuffix()
+			managedClusterAccountId, managedClusterName := commonhelpers.GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.ManagedClusterArn)
+			hubClusterAccountId, hubClusterName := commonhelpers.GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.HubClusterArn)
+			config.ManagedClusterRoleSuffix = commonhelpers.Md5HashSuffix(hubClusterAccountId, hubClusterName, managedClusterAccountId, managedClusterName)
 		} else {
 			config.RegistrationDriver = RegistrationDriver{
 				AuthType: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType,

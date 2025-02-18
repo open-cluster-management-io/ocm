@@ -45,6 +45,7 @@ type managedClusterController struct {
 	applier       *apply.PermissionApplier
 	patcher       patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
 	approver      register.Approver
+	hubDriver     register.HubDriver
 	eventRecorder events.Recorder
 }
 
@@ -58,12 +59,15 @@ func NewManagedClusterController(
 	rolebindingInformer rbacv1informers.RoleBindingInformer,
 	clusterRoleBindingInformer rbacv1informers.ClusterRoleBindingInformer,
 	approver register.Approver,
+	hubDriver register.HubDriver,
 	recorder events.Recorder) factory.Controller {
+
 	c := &managedClusterController{
 		kubeClient:    kubeClient,
 		clusterClient: clusterClient,
 		clusterLister: clusterInformer.Lister(),
 		approver:      approver,
+		hubDriver:     hubDriver,
 		applier: apply.NewPermissionApplier(
 			kubeClient,
 			roleInformer.Lister(),
@@ -201,6 +205,12 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		if result.Error != nil {
 			errs = append(errs, result.Error)
 		}
+	}
+
+	// If the resources already exist, errors are ignored
+	err = c.hubDriver.CreatePermissions(ctx, managedCluster)
+	if err != nil {
+		errs = append(errs, err)
 	}
 
 	// We add the accepted condition to spoke cluster

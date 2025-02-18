@@ -64,6 +64,12 @@ spec:
           {{ if .HostedMode }}
           - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
           {{ end }}
+          {{if .HubClusterArn}}
+          - "--hub-cluster-arn={{ .HubClusterArn }}"
+          {{end}}
+          {{if .EnabledRegistrationDrivers}}
+          - "--enabled-registration-drivers={{ .EnabledRegistrationDrivers }}"
+          {{end}}
         env:
           - name: POD_NAME
             valueFrom:
