@@ -3,27 +3,112 @@ package csr
 import (
 	"context"
 	"fmt"
+	"log"
+
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
-
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
+
+type CSRHubDriver struct {
+	controller           factory.Controller
+	AutoApprovalCsrUsers []string
+}
+
+func NewCSRHubDriver(
+	AutoApprovalCsrUsers []string,
+	kubeClient kubernetes.Interface,
+	kubeInformers informers.SharedInformerFactory,
+	clusterAutoApprovalUsers []string,
+	recorder events.Recorder) (register.HubDriver, error) {
+
+	csrDriverForHub := &CSRHubDriver{
+		AutoApprovalCsrUsers: AutoApprovalCsrUsers,
+	}
+	csrReconciles := []Reconciler{NewCSRRenewalReconciler(kubeClient, recorder)}
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
+		csrReconciles = append(csrReconciles, NewCSRBootstrapReconciler(
+			kubeClient,
+			clusterAutoApprovalUsers,
+			recorder,
+		))
+	}
+
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.V1beta1CSRAPICompatibility) {
+		v1CSRSupported, v1beta1CSRSupported, err := helpers.IsCSRSupported(kubeClient)
+		if err != nil {
+			return nil, fmt.Errorf("failed CSR api discovery: %v", err)
+		}
+
+		if !v1CSRSupported && v1beta1CSRSupported {
+			csrDriverForHub.controller = NewCSRApprovingController[*certificatesv1beta1.CertificateSigningRequest](
+				kubeInformers.Certificates().V1beta1().CertificateSigningRequests().Informer(),
+				kubeInformers.Certificates().V1beta1().CertificateSigningRequests().Lister(),
+				newCSRV1beta1Approver(kubeClient),
+				csrReconciles,
+				recorder,
+			)
+			recorder.Eventf("CSRV1beta1Approver", "Using v1beta1 CSR api to manage managed cluster client certificate")
+			return csrDriverForHub, nil
+		}
+	}
+
+	csrDriverForHub.controller = NewCSRApprovingController[*certificatesv1.CertificateSigningRequest](
+		kubeInformers.Certificates().V1().CertificateSigningRequests().Informer(),
+		kubeInformers.Certificates().V1().CertificateSigningRequests().Lister(),
+		newCSRV1Approver(kubeClient),
+		csrReconciles,
+		recorder,
+	)
+	return csrDriverForHub, nil
+}
+
+func (a *CSRHubDriver) CreatePermissions(ctx context.Context, cluster *clusterv1.ManagedCluster) error {
+	// noop
+	return nil
+}
+
+func (c *CSRHubDriver) Accept(ctx context.Context, cluster *clusterv1.ManagedCluster) (bool, error) {
+	allowAccept, err := c.allowAccept(ctx, cluster)
+	if err == nil && allowAccept {
+		return true, nil
+	}
+	return false, err
+}
+
+func (c *CSRHubDriver) allowAccept(ctx context.Context, cluster *clusterv1.ManagedCluster) (bool, error) {
+	if cluster.Annotations["agent.open-cluster-management.io/managed-cluster-iam-role-suffix"] == "" && cluster.Annotations["agent.open-cluster-management.io/managed-cluster-arn"] == "" {
+		log.Println("managed cluster auto accepted for csr.")
+		return true, nil
+	}
+	log.Println("managed cluster not auto accepted in csr.")
+	return false, nil
+}
+
+func (c *CSRHubDriver) Run(ctx context.Context, workers int) {
+	c.controller.Run(ctx, workers)
+}
+
+// Cleanup is run when the cluster is deleting or hubAcceptClient is set false
+func (c *CSRHubDriver) Cleanup(_ context.Context, _ *clusterv1.ManagedCluster) error {
+	// noop
+	return nil
+}
 
 type CSR interface {
 	*certificatesv1.CertificateSigningRequest | *certificatesv1beta1.CertificateSigningRequest
@@ -152,63 +237,4 @@ func (c *csrV1beta1Approver) approve(ctx context.Context, csr *certificatesv1bet
 		_, err := kubeClient.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(ctx, csrCopy, metav1.UpdateOptions{})
 		return err
 	}
-}
-
-type CSRApprover struct {
-	controller factory.Controller
-}
-
-func (c *CSRApprover) Run(ctx context.Context, workers int) {
-	c.controller.Run(ctx, workers)
-}
-
-// Cleanup is run when the cluster is deleting or hubAcceptClient is set false
-func (c *CSRApprover) Cleanup(_ context.Context, _ *clusterv1.ManagedCluster) error {
-	// noop
-	return nil
-}
-
-func NewCSRApprover(
-	kubeClient kubernetes.Interface,
-	kubeInformers informers.SharedInformerFactory,
-	clusterAutoApprovalUsers []string,
-	recorder events.Recorder) (register.Approver, error) {
-	csrApprover := &CSRApprover{}
-	csrReconciles := []Reconciler{NewCSRRenewalReconciler(kubeClient, recorder)}
-	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
-		csrReconciles = append(csrReconciles, NewCSRBootstrapReconciler(
-			kubeClient,
-			clusterAutoApprovalUsers,
-			recorder,
-		))
-	}
-
-	if features.HubMutableFeatureGate.Enabled(ocmfeature.V1beta1CSRAPICompatibility) {
-		v1CSRSupported, v1beta1CSRSupported, err := helpers.IsCSRSupported(kubeClient)
-		if err != nil {
-			return nil, fmt.Errorf("failed CSR api discovery: %v", err)
-		}
-
-		if !v1CSRSupported && v1beta1CSRSupported {
-			csrApprover.controller = NewCSRApprovingController[*certificatesv1beta1.CertificateSigningRequest](
-				kubeInformers.Certificates().V1beta1().CertificateSigningRequests().Informer(),
-				kubeInformers.Certificates().V1beta1().CertificateSigningRequests().Lister(),
-				newCSRV1beta1Approver(kubeClient),
-				csrReconciles,
-				recorder,
-			)
-			recorder.Eventf("CSRV1beta1Approver", "Using v1beta1 CSR api to manage managed cluster client certificate")
-			return csrApprover, nil
-		}
-	}
-
-	csrApprover.controller = NewCSRApprovingController[*certificatesv1.CertificateSigningRequest](
-		kubeInformers.Certificates().V1().CertificateSigningRequests().Informer(),
-		kubeInformers.Certificates().V1().CertificateSigningRequests().Lister(),
-		newCSRV1Approver(kubeClient),
-		csrReconciles,
-		recorder,
-	)
-
-	return csrApprover, nil
 }

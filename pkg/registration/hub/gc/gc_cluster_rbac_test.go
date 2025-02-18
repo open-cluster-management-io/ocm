@@ -179,7 +179,7 @@ func TestGCClusterRbacController(t *testing.T) {
 				kubeInformerFactory.Rbac().V1().ClusterRoles().Lister(),
 				kubeInformerFactory.Rbac().V1().RoleBindings().Lister(),
 				workInformerFactory.Work().V1().ManifestWorks().Lister(),
-				register.NewNoopApprover(),
+				register.NewNoopHubDriver(),
 				events.NewInMemoryRecorder(""),
 				c.resourceCleanupFeatureGateEnable,
 			)
@@ -190,7 +190,7 @@ func TestGCClusterRbacController(t *testing.T) {
 				roleBindingLister:                kubeInformerFactory.Rbac().V1().RoleBindings().Lister(),
 				manifestWorkLister:               workInformerFactory.Work().V1().ManifestWorks().Lister(),
 				clusterPatcher:                   clusterPatcher,
-				approver:                         register.NewNoopApprover(),
+				hubDriver:                         register.NewNoopHubDriver(),
 				eventRecorder:                    events.NewInMemoryRecorder(""),
 				resourceCleanupFeatureGateEnable: c.resourceCleanupFeatureGateEnable,
 			}
