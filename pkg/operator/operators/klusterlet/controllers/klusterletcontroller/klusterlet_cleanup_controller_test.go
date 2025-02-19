@@ -15,6 +15,7 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
 
+	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
@@ -206,7 +207,7 @@ func TestSyncAddHostedFinalizerWhenKubeconfigReady(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected non error when get klusterlet, %v", err)
 	}
-	if hasFinalizer(klusterlet, klusterletHostedFinalizer) {
+	if commonhelper.HasFinalizer(klusterlet.Finalizers, klusterletHostedFinalizer) {
 		t.Errorf("Expected no klusterlet hosted finalizer")
 	}
 
@@ -226,7 +227,7 @@ func TestSyncAddHostedFinalizerWhenKubeconfigReady(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected non error when get klusterlet, %v", err)
 	}
-	if !hasFinalizer(klusterlet, klusterletHostedFinalizer) {
+	if !commonhelper.HasFinalizer(klusterlet.Finalizers, klusterletHostedFinalizer) {
 		t.Errorf("Expected there is klusterlet hosted finalizer")
 	}
 }

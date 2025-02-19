@@ -41,14 +41,17 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedclustersetbinding"
 	"open-cluster-management.io/ocm/pkg/registration/hub/taint"
 	"open-cluster-management.io/ocm/pkg/registration/register"
+	awsirsa "open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 )
 
 // HubManagerOptions holds configuration for hub manager controller
 type HubManagerOptions struct {
-	ClusterAutoApprovalUsers []string
-	GCResourceList           []string
-	ImportOption             *importeroptions.Options
+	ClusterAutoApprovalUsers   []string
+	EnabledRegistrationDrivers []string
+	GCResourceList             []string
+	ImportOption               *importeroptions.Options
+	HubClusterArn              string
 }
 
 // NewHubManagerOptions returns a HubManagerOptions
@@ -56,7 +59,8 @@ func NewHubManagerOptions() *HubManagerOptions {
 	return &HubManagerOptions{
 		GCResourceList: []string{"addon.open-cluster-management.io/v1alpha1/managedclusteraddons",
 			"work.open-cluster-management.io/v1/manifestworks"},
-		ImportOption: importeroptions.New(),
+		ImportOption:               importeroptions.New(),
+		EnabledRegistrationDrivers: []string{"csr"},
 	}
 }
 
@@ -64,10 +68,14 @@ func NewHubManagerOptions() *HubManagerOptions {
 func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&m.ClusterAutoApprovalUsers, "cluster-auto-approval-users", m.ClusterAutoApprovalUsers,
 		"A bootstrap user list whose cluster registration requests can be automatically approved.")
+	fs.StringSliceVar(&m.EnabledRegistrationDrivers, "enabled-registration-drivers", m.EnabledRegistrationDrivers,
+		"A list of registration drivers enabled on hub.")
 	fs.StringSliceVar(&m.GCResourceList, "gc-resource-list", m.GCResourceList,
 		"A list GVR user can customize which are cleaned up after cluster is deleted. Format is group/version/resource, "+
 			"and the default are managedclusteraddon and manifestwork. The resources will be deleted in order."+
 			"The flag works only when ResourceCleanup feature gate is enable.")
+	fs.StringVar(&m.HubClusterArn, "hub-cluster-arn", m.HubClusterArn,
+		"Hub Cluster Arn required to connect to Hub and create IAM Roles and Policies")
 	m.ImportOption.AddFlags(fs)
 }
 
@@ -147,12 +155,28 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	workInformers workv1informers.SharedInformerFactory,
 	addOnInformers addoninformers.SharedInformerFactory,
 ) error {
-	csrApprover, err := csr.NewCSRApprover(kubeClient, kubeInformers, m.ClusterAutoApprovalUsers, controllerContext.EventRecorder)
-	if err != nil {
-		return err
-	}
 
-	approver := register.NewAggregatedApprover(csrApprover)
+	var approvers []register.Approver
+	var drivers []register.HubDriver
+	for _, enabledRegistrationDriver := range m.EnabledRegistrationDrivers {
+		switch enabledRegistrationDriver {
+		case "csr":
+			csrApprover, err := csr.NewCSRApprover(kubeClient, kubeInformers, m.ClusterAutoApprovalUsers, controllerContext.EventRecorder)
+			if err != nil {
+				return err
+			}
+			approvers = append(approvers, csrApprover)
+			drivers = append(drivers, csr.NewCSRHubDriver())
+		case "awsirsa":
+			awsIRSAHubDriver, err := awsirsa.NewAWSIRSAHubDriver(ctx, m.HubClusterArn)
+			if err != nil {
+				return err
+			}
+			drivers = append(drivers, awsIRSAHubDriver)
+		}
+	}
+	approver := register.NewAggregatedApprover(approvers...)
+	hubDriver := register.NewAggregatedHubDriver(drivers...)
 
 	managedClusterController := managedcluster.NewManagedClusterController(
 		kubeClient,
@@ -162,7 +186,9 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		kubeInformers.Rbac().V1().ClusterRoles(),
 		kubeInformers.Rbac().V1().RoleBindings(),
 		kubeInformers.Rbac().V1().ClusterRoleBindings(),
+		workInformers.Work().V1().ManifestWorks(),
 		approver,
+		hubDriver,
 		controllerContext.EventRecorder,
 	)
 
@@ -271,17 +297,11 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	}
 
 	gcController := gc.NewGCController(
-		kubeInformers.Rbac().V1().ClusterRoles().Lister(),
-		kubeInformers.Rbac().V1().RoleBindings().Lister(),
 		clusterInformers.Cluster().V1().ManagedClusters(),
-		workInformers.Work().V1().ManifestWorks().Lister(),
 		clusterClient,
-		kubeClient,
 		metadataClient,
-		approver,
 		controllerContext.EventRecorder,
 		m.GCResourceList,
-		features.HubMutableFeatureGate.Enabled(ocmfeature.ResourceCleanup),
 	)
 
 	go clusterInformers.Start(ctx.Done())
@@ -316,7 +336,9 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		go clusterImporter.Run(ctx, 1)
 	}
 
-	go gcController.Run(ctx, 1)
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.ResourceCleanup) {
+		go gcController.Run(ctx, 1)
+	}
 
 	<-ctx.Done()
 	return nil

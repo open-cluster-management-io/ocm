@@ -112,3 +112,38 @@ func TestPlacementDecisionClustersTracker_GetClusterChanges(t *testing.T) {
 		}
 	}
 }
+
+func TestHasFinalizer(t *testing.T) {
+	tests := []struct {
+		name       string
+		finalizers []string
+		finalizer  string
+		expected   bool
+	}{
+		{
+			name:       "has finalizer",
+			finalizers: []string{"abc", "clustername", "test"},
+			finalizer:  "clustername",
+			expected:   true,
+		},
+		{
+			name:       "has no finalizer",
+			finalizers: []string{"abc", "clustername", "test"},
+			finalizer:  "name",
+			expected:   false,
+		},
+		{
+			name:       "has empty finalizers",
+			finalizers: []string{},
+			finalizer:  "clustername",
+			expected:   false,
+		},
+	}
+
+	for _, test := range tests {
+		rst := HasFinalizer(test.finalizers, test.finalizer)
+		if test.expected != rst {
+			t.Errorf("expected %v, got %v", test.expected, rst)
+		}
+	}
+}

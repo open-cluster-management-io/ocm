@@ -17,6 +17,7 @@ import (
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
@@ -50,11 +51,8 @@ var _ = ginkgo.Describe("Addon Lease Resync", func() {
 			if err != nil {
 				return false
 			}
-			if len(spokeCluster.Finalizers) != 1 {
-				return false
-			}
 
-			if spokeCluster.Finalizers[0] != clusterv1.ManagedClusterFinalizer {
+			if !commonhelpers.HasFinalizer(spokeCluster.Finalizers, clusterv1.ManagedClusterFinalizer) {
 				return false
 			}
 

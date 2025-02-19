@@ -153,6 +153,16 @@ func NewDeletingManagedCluster() *clusterv1.ManagedCluster {
 		},
 	}
 }
+func NewDeletingManagedClusterWithFinalizers(finalizers []string) *clusterv1.ManagedCluster {
+	now := metav1.Now()
+	return &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              TestManagedClusterName,
+			DeletionTimestamp: &now,
+			Finalizers:        finalizers,
+		},
+	}
+}
 
 func NewManagedClusterCondition(name, status, reason, message string, lastTransition *metav1.Time) metav1.Condition {
 	ret := metav1.Condition{

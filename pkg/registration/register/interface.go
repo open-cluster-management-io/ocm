@@ -87,3 +87,12 @@ type Approver interface {
 	// deletes rolebindings for the agent, and then this is the additional operation a driver should process.
 	Cleanup(ctx context.Context, cluster *clusterv1.ManagedCluster) error
 }
+
+// HubDriver interface is used to implement operations required to complete aws-irsa registration and csr registration.
+// The Approver interface above is used to implement operations related to approving the CSR request, and permission
+// creation is not related to CSR approval. Hence, created CreatePermissions under a separate interface.
+type HubDriver interface {
+	// CreatePermissions is executed when hubAcceptClient in ManagedCluster is set to true. The hub controller creates the
+	// required permissions for the spoke to be able to access resources on the hub cluster.
+	CreatePermissions(ctx context.Context, cluster *clusterv1.ManagedCluster) error
+}

@@ -3,37 +3,25 @@ package gc
 import (
 	"context"
 	"strings"
-	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/client-go/kubernetes"
-	rbacv1listers "k8s.io/client-go/listers/rbac/v1"
 	"k8s.io/client-go/metadata"
 	"k8s.io/klog/v2"
 
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	informerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
-	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
+	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
-	"open-cluster-management.io/ocm/pkg/registration/register"
-)
-
-type gcReconcileOp int
-
-const (
-	gcReconcileRequeue gcReconcileOp = iota
-	gcReconcileStop
-	gcReconcileContinue
 )
 
 var (
@@ -43,31 +31,20 @@ var (
 		Version: "v1", Resource: "manifestworks"}
 )
 
-// gcReconciler is an interface for reconcile cleanup logic after cluster is deleted.
-// clusterName is from the queueKey, cluster may be nil.
-type gcReconciler interface {
-	reconcile(ctx context.Context, cluster *clusterv1.ManagedCluster, clusterNamespace string) (gcReconcileOp, error)
-}
-
 type GCController struct {
-	clusterLister  clusterv1listers.ManagedClusterLister
-	clusterPatcher patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus]
-	gcReconcilers  []gcReconciler
+	clusterLister         clusterv1listers.ManagedClusterLister
+	clusterPatcher        patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus]
+	gcResourcesController *gcResourcesController
+	eventRecorder         events.Recorder
 }
 
 // NewGCController ensures the related resources are cleaned up after cluster is deleted
 func NewGCController(
-	clusterRoleLister rbacv1listers.ClusterRoleLister,
-	roleBindingLister rbacv1listers.RoleBindingLister,
 	clusterInformer informerv1.ManagedClusterInformer,
-	manifestWorkLister worklister.ManifestWorkLister,
 	clusterClient clientset.Interface,
-	kubeClient kubernetes.Interface,
 	metadataClient metadata.Interface,
-	approver register.Approver,
 	eventRecorder events.Recorder,
 	gcResourceList []string,
-	resourceCleanupFeatureGateEnable bool,
 ) factory.Controller {
 	clusterPatcher := patcher.NewPatcher[
 		*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
@@ -76,11 +53,9 @@ func NewGCController(
 	controller := &GCController{
 		clusterLister:  clusterInformer.Lister(),
 		clusterPatcher: clusterPatcher,
-		gcReconcilers:  []gcReconciler{},
+		eventRecorder:  eventRecorder.WithComponentSuffix("gc-resources"),
 	}
-
-	// do not clean resources if featureGate is disabled or no gc resource list for backwards compatible.
-	if resourceCleanupFeatureGateEnable && len(gcResourceList) != 0 {
+	if len(gcResourceList) != 0 {
 		gcResources := []schema.GroupVersionResource{}
 		for _, gcResource := range gcResourceList {
 			subStrings := strings.Split(gcResource, "/")
@@ -91,13 +66,8 @@ func NewGCController(
 			gcResources = append(gcResources, schema.GroupVersionResource{
 				Group: subStrings[0], Version: subStrings[1], Resource: subStrings[2]})
 		}
-		controller.gcReconcilers = append(controller.gcReconcilers,
-			newGCResourcesController(metadataClient, gcResources, eventRecorder))
+		controller.gcResourcesController = newGCResourcesController(metadataClient, gcResources)
 	}
-
-	controller.gcReconcilers = append(controller.gcReconcilers,
-		newGCClusterRbacController(kubeClient, clusterPatcher, clusterRoleLister, roleBindingLister,
-			manifestWorkLister, approver, eventRecorder, resourceCleanupFeatureGateEnable))
 
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterInformer.Informer()).
@@ -106,70 +76,53 @@ func NewGCController(
 
 // gc controller is watching cluster and to do these jobs:
 //  1. add a cleanup finalizer to managedCluster if the cluster is not deleting.
-//  2. clean up all rolebinding and resources in the cluster ns after the cluster is deleted.
+//  2. clean up the resources in the cluster ns after the cluster is deleted.
 func (r *GCController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	clusterName := controllerContext.QueueKey()
 	if clusterName == "" || clusterName == factory.DefaultQueueKey {
 		return nil
 	}
 
-	// cluster could be nil, that means the cluster is gone but the gc is not finished.
 	cluster, err := r.clusterLister.Get(clusterName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
-
 	var copyCluster *clusterv1.ManagedCluster
 	if cluster != nil {
 		if cluster.DeletionTimestamp.IsZero() {
-			_, err = r.clusterPatcher.AddFinalizer(ctx, cluster, clusterv1.ManagedClusterFinalizer)
+			_, err = r.clusterPatcher.AddFinalizer(ctx, cluster, commonhelper.GcFinalizer)
 			return err
 		}
-
 		copyCluster = cluster.DeepCopy()
 	}
 
-	var errs []error
-	var requeue bool
-	for _, reconciler := range r.gcReconcilers {
-		op, err := reconciler.reconcile(ctx, copyCluster, clusterName)
-		if err != nil {
-			errs = append(errs, err)
-		}
-		if op == gcReconcileRequeue {
-			requeue = true
-		}
-		if op == gcReconcileStop {
-			break
-		}
-	}
-
-	if requeue {
-		controllerContext.Queue().AddAfter(clusterName, 5*time.Second)
-	}
-
+	gcErr := r.gcResourcesController.reconcile(ctx, copyCluster, clusterName)
 	if cluster == nil {
-		return utilerrors.NewAggregate(errs)
+		return gcErr
 	}
 
-	// update cluster condition
-	if len(errs) != 0 {
-		applyErrors := utilerrors.NewAggregate(errs)
+	if gcErr != nil && !errors.Is(gcErr, requeueError) {
+		r.eventRecorder.Eventf("ResourceCleanupFail",
+			"failed to cleanup resources in cluster %s:%v", cluster.Name, gcErr)
+
 		meta.SetStatusCondition(&copyCluster.Status.Conditions, metav1.Condition{
 			Type:    clusterv1.ManagedClusterConditionDeleting,
 			Status:  metav1.ConditionFalse,
 			Reason:  clusterv1.ConditionDeletingReasonResourceError,
-			Message: applyErrors.Error(),
+			Message: gcErr.Error(),
 		})
 	}
 
 	if _, err = r.clusterPatcher.PatchStatus(ctx, cluster, copyCluster.Status, cluster.Status); err != nil {
-		errs = append(errs, err)
+		return err
 	}
 
-	if len(errs) != 0 || requeue {
-		return utilerrors.NewAggregate(errs)
+	if gcErr != nil {
+		return gcErr
 	}
 
-	return r.clusterPatcher.RemoveFinalizer(ctx, cluster, clusterv1.ManagedClusterFinalizer)
+	r.eventRecorder.Eventf("ResourceCleanupCompleted",
+		"resources in cluster %s are cleaned up", cluster.Name)
+
+	return r.clusterPatcher.RemoveFinalizer(ctx, cluster, commonhelper.GcFinalizer)
 }

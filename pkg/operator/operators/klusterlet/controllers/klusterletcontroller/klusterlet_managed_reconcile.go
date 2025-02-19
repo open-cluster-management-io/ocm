@@ -24,6 +24,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/manifests"
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
@@ -182,7 +183,7 @@ func (r *managedReconcile) createAggregationRule(ctx context.Context, klusterlet
 func (r *managedReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
 	// nothing should be done when deploy mode is hosted and hosted finalizer is not added.
-	if helpers.IsHosted(klusterlet.Spec.DeployOption.Mode) && !hasFinalizer(klusterlet, klusterletHostedFinalizer) {
+	if helpers.IsHosted(klusterlet.Spec.DeployOption.Mode) && !commonhelpers.HasFinalizer(klusterlet.Finalizers, klusterletHostedFinalizer) {
 		return klusterlet, reconcileContinue, nil
 	}
 

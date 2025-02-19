@@ -10,22 +10,29 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	rbacv1informers "k8s.io/client-go/informers/rbac/v1"
 	"k8s.io/client-go/kubernetes"
+	rbacv1listers "k8s.io/client-go/listers/rbac/v1"
 	"k8s.io/klog/v2"
 
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	informerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	listerv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	workinformers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
+	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	v1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
+	workv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/apply"
+	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
@@ -37,15 +44,25 @@ import (
 // expected to be changed or removed outside.
 const clusterAcceptedAnnotationKey = "open-cluster-management.io/automatically-accepted-on"
 
+var (
+	workRoleBindingName = func(clusterName string) string {
+		return fmt.Sprintf("open-cluster-management:managedcluster:%s:work", clusterName)
+	}
+	requeueError = commonhelper.NewRequeueError("cluster rbac cleanup requeue", 5*time.Second)
+)
+
 // managedClusterController reconciles instances of ManagedCluster on the hub.
 type managedClusterController struct {
-	kubeClient    kubernetes.Interface
-	clusterClient clientset.Interface
-	clusterLister listerv1.ManagedClusterLister
-	applier       *apply.PermissionApplier
-	patcher       patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
-	approver      register.Approver
-	eventRecorder events.Recorder
+	kubeClient         kubernetes.Interface
+	clusterClient      clientset.Interface
+	roleBindingLister  rbacv1listers.RoleBindingLister
+	manifestWorkLister worklister.ManifestWorkLister
+	clusterLister      listerv1.ManagedClusterLister
+	applier            *apply.PermissionApplier
+	patcher            patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
+	approver           register.Approver
+	hubDriver          register.HubDriver
+	eventRecorder      events.Recorder
 }
 
 // NewManagedClusterController creates a new managed cluster controller
@@ -57,13 +74,19 @@ func NewManagedClusterController(
 	clusterRoleInformer rbacv1informers.ClusterRoleInformer,
 	rolebindingInformer rbacv1informers.RoleBindingInformer,
 	clusterRoleBindingInformer rbacv1informers.ClusterRoleBindingInformer,
+	manifestWorkInformer workinformers.ManifestWorkInformer,
 	approver register.Approver,
+	hubDriver register.HubDriver,
 	recorder events.Recorder) factory.Controller {
+
 	c := &managedClusterController{
-		kubeClient:    kubeClient,
-		clusterClient: clusterClient,
-		clusterLister: clusterInformer.Lister(),
-		approver:      approver,
+		kubeClient:         kubeClient,
+		clusterClient:      clusterClient,
+		roleBindingLister:  rolebindingInformer.Lister(),
+		manifestWorkLister: manifestWorkInformer.Lister(),
+		clusterLister:      clusterInformer.Lister(),
+		hubDriver:          hubDriver,
+		approver:           approver,
 		applier: apply.NewPermissionApplier(
 			kubeClient,
 			roleInformer.Lister(),
@@ -95,8 +118,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	logger.V(4).Info("Reconciling ManagedCluster", "managedClusterName", managedClusterName)
 	managedCluster, err := c.clusterLister.Get(managedClusterName)
 	if errors.IsNotFound(err) {
-		// Spoke cluster not found, could have been deleted, do nothing.
-		return nil
+		return c.removeClusterRbac(ctx, managedClusterName, true)
 	}
 	if err != nil {
 		return err
@@ -105,8 +127,16 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	newManagedCluster := managedCluster.DeepCopy()
 
 	if !managedCluster.DeletionTimestamp.IsZero() {
-		// the cleanup job is moved to gc controller
-		return nil
+		if err = c.approver.Cleanup(ctx, managedCluster); err != nil {
+			return err
+		}
+
+		err = c.removeClusterRbac(ctx, managedClusterName, true)
+		if err != nil {
+			return err
+		}
+
+		return c.patcher.RemoveFinalizer(ctx, newManagedCluster, v1.ManagedClusterFinalizer)
 	}
 
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
@@ -140,25 +170,6 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 			return aggErr
 		}
 
-		// Remove the cluster role binding files for registration-agent and work-agent.
-		removeResults := resourceapply.DeleteAll(ctx,
-			resourceapply.NewKubeClientHolder(c.kubeClient),
-			c.eventRecorder,
-			helpers.ManagedClusterAssetFn(manifests.RBACManifests, managedClusterName),
-			manifests.ClusterSpecificRoleBindings...)
-		for _, result := range removeResults {
-			if result.Error != nil {
-				errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
-			}
-		}
-		if aggErr := operatorhelpers.NewMultiLineAggregate(errs); aggErr != nil {
-			return aggErr
-		}
-
-		if err = c.approver.Cleanup(ctx, managedCluster); err != nil {
-			return err
-		}
-
 		meta.SetStatusCondition(&newManagedCluster.Status.Conditions, metav1.Condition{
 			Type:    v1.ManagedClusterConditionHubAccepted,
 			Status:  metav1.ConditionFalse,
@@ -169,7 +180,9 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		if _, err := c.patcher.PatchStatus(ctx, newManagedCluster, newManagedCluster.Status, managedCluster.Status); err != nil {
 			return err
 		}
-		return nil
+
+		// Remove the cluster role binding files for registration-agent and work-agent.
+		return c.removeClusterRbac(ctx, managedClusterName, managedCluster.Spec.HubAcceptsClient)
 	}
 
 	// TODO consider to add the managedcluster-namespace.yaml back to staticFiles,
@@ -194,6 +207,11 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		errs = append(errs, err)
 	}
 
+	_, err = c.patcher.AddFinalizer(ctx, newManagedCluster, v1.ManagedClusterFinalizer)
+	if err != nil {
+		return err
+	}
+
 	resourceResults := c.applier.Apply(ctx, syncCtx.Recorder(),
 		helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, managedClusterName, managedCluster.Spec.HubAcceptsClient),
 		append(manifests.ClusterSpecificRBACFiles, manifests.ClusterSpecificRoleBindings...)...)
@@ -201,6 +219,12 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		if result.Error != nil {
 			errs = append(errs, result.Error)
 		}
+	}
+
+	// If the resources already exist, errors are ignored
+	err = c.hubDriver.CreatePermissions(ctx, managedCluster)
+	if err != nil {
+		errs = append(errs, err)
 	}
 
 	// We add the accepted condition to spoke cluster
@@ -245,4 +269,49 @@ func (c *managedClusterController) acceptCluster(ctx context.Context, managedClu
 	_, err := c.clusterClient.ClusterV1().ManagedClusters().Patch(ctx, managedCluster.Name,
 		types.MergePatchType, []byte(patch), metav1.PatchOptions{})
 	return err
+}
+
+// remove the cluster rbac resources firstly.
+// the work roleBinding with a finalizer remains because it is used by work agent to operator the works.
+// the finalizer on work roleBinding will be removed after there is no works in the ns.
+func (c *managedClusterController) removeClusterRbac(ctx context.Context, clusterName string, accepted bool) error {
+	var errs []error
+	assetFn := helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, clusterName, accepted)
+	files := manifests.ClusterSpecificRoleBindings
+	if accepted {
+		files = append(files, manifests.ClusterSpecificRBACFiles...)
+	}
+
+	resourceResults := resourceapply.DeleteAll(ctx, resourceapply.NewKubeClientHolder(c.kubeClient),
+		c.eventRecorder, assetFn, files...)
+	for _, result := range resourceResults {
+		if result.Error != nil {
+			errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
+		}
+	}
+
+	works, err := c.manifestWorkLister.ManifestWorks(clusterName).List(labels.Everything())
+	if err != nil && !errors.IsNotFound(err) {
+		errs = append(errs, err)
+		return operatorhelpers.NewMultiLineAggregate(errs)
+	}
+	if len(works) != 0 {
+		return requeueError
+	}
+
+	return c.removeFinalizerFromWorkRoleBinding(ctx, clusterName)
+}
+
+func (c *managedClusterController) removeFinalizerFromWorkRoleBinding(ctx context.Context, clusterName string) error {
+	workRoleBinding, err := c.roleBindingLister.RoleBindings(clusterName).Get(workRoleBindingName(clusterName))
+	switch {
+	case errors.IsNotFound(err):
+		return nil
+	case err != nil:
+		return err
+	}
+
+	roleBindingFinalizerPatcher := patcher.NewPatcher[*rbacv1.RoleBinding, rbacv1.RoleBinding,
+		rbacv1.RoleBinding](c.kubeClient.RbacV1().RoleBindings(clusterName))
+	return roleBindingFinalizerPatcher.RemoveFinalizer(ctx, workRoleBinding, workv1.ManifestWorkFinalizer)
 }

@@ -9,6 +9,11 @@ import (
 	clustersdkv1beta1 "open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1"
 )
 
+const (
+	// GcFinalizer is added to the managedCluster for resource cleanup, which maintained by gc controller.
+	GcFinalizer = "cluster.open-cluster-management.io/resource-cleanup"
+)
+
 type PlacementDecisionGetter struct {
 	Client clusterlister.PlacementDecisionLister
 }
@@ -24,4 +29,17 @@ func GetClusterChanges(client clusterlister.PlacementDecisionLister, placement *
 		placement, PlacementDecisionGetter{Client: client}, existingClusters)
 
 	return pdtracker.GetClusterChanges()
+}
+
+func HasFinalizer(finalizers []string, finalizer string) bool {
+	if len(finalizers) == 0 || len(finalizer) == 0 {
+		return false
+	}
+
+	for i := range finalizers {
+		if finalizers[i] == finalizer {
+			return true
+		}
+	}
+	return false
 }

@@ -1,0 +1,20 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::{{.managedClusterAccountId}}:role/ocm-managed-cluster-{{.managedClusterIamRoleSuffix}}"
+            },
+            "Action": "sts:AssumeRole",
+            "Condition": {
+                "StringEquals": {
+                    "aws:PrincipalTag/hub_cluster_account_id": "{{.hubAccountId}}",
+                    "aws:PrincipalTag/hub_cluster_name": "{{.hubClusterName}}",
+                    "aws:PrincipalTag/managed_cluster_account_id": "{{.managedClusterAccountId}}",
+                    "aws:PrincipalTag/managed_cluster_name": "{{.managedClusterName}}"
+                }
+            }
+        }
+    ]
+}
