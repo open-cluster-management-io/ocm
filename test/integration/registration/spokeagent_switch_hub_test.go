@@ -25,6 +25,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/hub"
@@ -255,11 +256,7 @@ func approveAndAcceptManagedCluster(managedClusterName string,
 		if err != nil {
 			return false
 		}
-		if len(spokeCluster.Finalizers) != 1 {
-			return false
-		}
-
-		if spokeCluster.Finalizers[0] != clusterv1.ManagedClusterFinalizer {
+		if !commonhelpers.HasFinalizer(spokeCluster.Finalizers, clusterv1.ManagedClusterFinalizer) {
 			return false
 		}
 

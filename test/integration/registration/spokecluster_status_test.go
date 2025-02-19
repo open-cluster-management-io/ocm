@@ -11,6 +11,7 @@ import (
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
@@ -27,7 +28,7 @@ var _ = ginkgo.Describe("Collecting Node Resource", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		managedClusterName := "resorucetest-managedcluster"
-		//#nosec G101
+		// #nosec G101
 		hubKubeconfigSecret := "resorucetest-hub-kubeconfig-secret"
 		hubKubeconfigDir := path.Join(util.TestDir, "resorucetest", "hub-kubeconfig")
 
@@ -65,11 +66,7 @@ var _ = ginkgo.Describe("Collecting Node Resource", func() {
 			if err != nil {
 				return false
 			}
-			if len(spokeCluster.Finalizers) != 1 {
-				return false
-			}
-
-			if spokeCluster.Finalizers[0] != clusterv1.ManagedClusterFinalizer {
+			if !commonhelpers.HasFinalizer(spokeCluster.Finalizers, clusterv1.ManagedClusterFinalizer) {
 				return false
 			}
 
