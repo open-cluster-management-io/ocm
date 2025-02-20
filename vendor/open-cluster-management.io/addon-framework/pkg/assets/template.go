@@ -3,6 +3,7 @@ package assets
 import (
 	"bytes"
 	"encoding/base64"
+	"regexp"
 	"strings"
 	"text/template"
 	"time"
@@ -11,12 +12,13 @@ import (
 )
 
 var templateFuncs = map[string]interface{}{
-	"notAfter":  notAfter,
-	"notBefore": notBefore,
-	"issuer":    issuer,
-	"base64":    base64encode,
-	"indent":    indent,
-	"load":      load,
+	"notAfter":   notAfter,
+	"notBefore":  notBefore,
+	"issuer":     issuer,
+	"base64":     base64encode,
+	"indent":     indent,
+	"load":       load,
+	"regexMatch": regexMatch,
 }
 
 func indent(indention int, v []byte) string {
@@ -63,6 +65,11 @@ func issuer(certBytes []byte) string {
 
 func load(n string, assets map[string][]byte) []byte {
 	return assets[n]
+}
+
+func regexMatch(pattern, input string) bool {
+	match, _ := regexp.MatchString(pattern, input)
+	return match
 }
 
 func renderFile(name string, tb []byte, data interface{}) ([]byte, error) {
