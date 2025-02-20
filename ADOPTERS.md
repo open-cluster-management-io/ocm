@@ -1,12 +1,29 @@
-# Who's using Open Cluster Management
+# Adopters
 
-### Adopters
+## End users
 
-Below is a list of companies and projects that have adopted Open Cluster Management(OCM). If you have been using OCM and your name is not on this list, send us a PR!
+Open Cluster Management are being used by numerous other companies, both large and small.
+The list includes but is not limited to:
 
 - [Alibaba Cloud](https://www.alibabacloud.com/)
 - [Ant Group](https://www.antgroup.com/)
-- [AppsCode Inc.](https://appscode.com)
-- [RamenDR](https://github.com/RamenDR)
+- [AppsCode Inc.](https://appscode.com/)
+- [RamenDR](https://github.com/RamenDR/)
 - [Red Hat](https://www.redhat.com/)
 - [Xiao Hong Shu](https://www.xiaohongshu.com/)
+
+## Ecosystem
+
+Open Cluster Management have integrations available with a number of open-source projects.
+The list includes but is not limited to:
+
+- [Argo CD](https://argo-cd.readthedocs.io/)
+- [Argo CD Agent](https://argocd-agent.readthedocs.io/)
+- [ICOS Meta OS](https://www.icos-project.eu/docs/)
+- [Janus](https://janus-idp.io/)
+- [KubeStellar](https://docs.kubestellar.io/)
+- [KubeVela](https://kubevela.io/)
+
+## Adding a name
+
+If you have been using OCM and your name is not on this list, send us a PR!
