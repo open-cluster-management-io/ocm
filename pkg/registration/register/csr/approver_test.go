@@ -332,17 +332,17 @@ func TestIsSpokeClusterClientCertRenewal(t *testing.T) {
 }
 
 func TestNewApprover(t *testing.T) {
-	kubeClient := kubefake.NewSimpleClientset()
+	kubeClient := kubefake.NewClientset()
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, 3*time.Minute)
 	recorder := eventstesting.NewTestingEventRecorder(t)
 	utilruntime.Must(features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates))
-	_, err := NewCSRApprover(kubeClient, informerFactory, []string{}, recorder)
+	_, err := NewCSRHubDriver(kubeClient, informerFactory, []string{}, recorder)
 	if err != nil {
 		t.Error(err)
 	}
 
 	features.HubMutableFeatureGate.Set(fmt.Sprintf("%s=true", ocmfeature.ManagedClusterAutoApproval))
-	_, err = NewCSRApprover(kubeClient, informerFactory, []string{}, recorder)
+	_, err = NewCSRHubDriver(kubeClient, informerFactory, []string{}, recorder)
 	if err != nil {
 		t.Error(err)
 	}

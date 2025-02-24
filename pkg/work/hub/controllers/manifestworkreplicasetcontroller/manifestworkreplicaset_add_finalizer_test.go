@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	fakeclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 
+	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	helpertest "open-cluster-management.io/ocm/pkg/work/hub/test"
 )
 
@@ -31,7 +31,7 @@ func TestAddFinalizerReconcile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Contains(updatetSet.Finalizers, ManifestWorkReplicaSetFinalizer) {
+	if !commonhelper.HasFinalizer(updatetSet.Finalizers, ManifestWorkReplicaSetFinalizer) {
 		t.Fatal("Finalizer did not added")
 	}
 
@@ -47,7 +47,7 @@ func TestAddFinalizerReconcile(t *testing.T) {
 	}
 
 	// Check finalizer not exist
-	if slices.Contains(mwrSetTest.Finalizers, ManifestWorkReplicaSetFinalizer) {
+	if commonhelper.HasFinalizer(mwrSetTest.Finalizers, ManifestWorkReplicaSetFinalizer) {
 		t.Fatal("Finalizer added to deleted ManifestWorkReplicaSet")
 	}
 }

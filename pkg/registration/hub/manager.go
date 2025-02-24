@@ -155,18 +155,15 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	workInformers workv1informers.SharedInformerFactory,
 	addOnInformers addoninformers.SharedInformerFactory,
 ) error {
-
-	var approvers []register.Approver
 	var drivers []register.HubDriver
 	for _, enabledRegistrationDriver := range m.EnabledRegistrationDrivers {
 		switch enabledRegistrationDriver {
 		case "csr":
-			csrApprover, err := csr.NewCSRApprover(kubeClient, kubeInformers, m.ClusterAutoApprovalUsers, controllerContext.EventRecorder)
+			csrDriver, err := csr.NewCSRHubDriver(kubeClient, kubeInformers, m.ClusterAutoApprovalUsers, controllerContext.EventRecorder)
 			if err != nil {
 				return err
 			}
-			approvers = append(approvers, csrApprover)
-			drivers = append(drivers, csr.NewCSRHubDriver())
+			drivers = append(drivers, csrDriver)
 		case "awsirsa":
 			awsIRSAHubDriver, err := awsirsa.NewAWSIRSAHubDriver(ctx, m.HubClusterArn)
 			if err != nil {
@@ -175,7 +172,6 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 			drivers = append(drivers, awsIRSAHubDriver)
 		}
 	}
-	approver := register.NewAggregatedApprover(approvers...)
 	hubDriver := register.NewAggregatedHubDriver(drivers...)
 
 	managedClusterController := managedcluster.NewManagedClusterController(
@@ -187,7 +183,6 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		kubeInformers.Rbac().V1().RoleBindings(),
 		kubeInformers.Rbac().V1().ClusterRoleBindings(),
 		workInformers.Work().V1().ManifestWorks(),
-		approver,
 		hubDriver,
 		controllerContext.EventRecorder,
 	)
@@ -314,7 +309,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 
 	go managedClusterController.Run(ctx, 1)
 	go taintController.Run(ctx, 1)
-	go approver.Run(ctx, 1)
+	go hubDriver.Run(ctx, 1)
 	go leaseController.Run(ctx, 1)
 	go clockSyncController.Run(ctx, 1)
 	go managedClusterSetController.Run(ctx, 1)

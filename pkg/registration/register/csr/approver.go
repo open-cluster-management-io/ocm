@@ -154,26 +154,26 @@ func (c *csrV1beta1Approver) approve(ctx context.Context, csr *certificatesv1bet
 	}
 }
 
-type CSRApprover struct {
+type CSRHubDriver struct {
 	controller factory.Controller
 }
 
-func (c *CSRApprover) Run(ctx context.Context, workers int) {
+func (c *CSRHubDriver) Run(ctx context.Context, workers int) {
 	c.controller.Run(ctx, workers)
 }
 
 // Cleanup is run when the cluster is deleting or hubAcceptClient is set false
-func (c *CSRApprover) Cleanup(_ context.Context, _ *clusterv1.ManagedCluster) error {
+func (c *CSRHubDriver) Cleanup(_ context.Context, _ *clusterv1.ManagedCluster) error {
 	// noop
 	return nil
 }
 
-func NewCSRApprover(
+func NewCSRHubDriver(
 	kubeClient kubernetes.Interface,
 	kubeInformers informers.SharedInformerFactory,
 	clusterAutoApprovalUsers []string,
-	recorder events.Recorder) (register.Approver, error) {
-	csrApprover := &CSRApprover{}
+	recorder events.Recorder) (register.HubDriver, error) {
+	csrApprover := &CSRHubDriver{}
 	csrReconciles := []Reconciler{NewCSRRenewalReconciler(kubeClient, recorder)}
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
 		csrReconciles = append(csrReconciles, NewCSRBootstrapReconciler(
@@ -211,4 +211,9 @@ func NewCSRApprover(
 	)
 
 	return csrApprover, nil
+}
+
+func (a *CSRHubDriver) CreatePermissions(_ context.Context, _ *clusterv1.ManagedCluster) error {
+	// noop
+	return nil
 }

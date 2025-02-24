@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	fakeclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapplier "open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier"
 
+	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	helpertest "open-cluster-management.io/ocm/pkg/work/hub/test"
 )
 
@@ -45,7 +45,7 @@ func TestFinalizeReconcile(t *testing.T) {
 	}
 
 	// Check mwrSetTest finalizer removed
-	if slices.Contains(updatetSet.Finalizers, ManifestWorkReplicaSetFinalizer) {
+	if commonhelper.HasFinalizer(updatetSet.Finalizers, ManifestWorkReplicaSetFinalizer) {
 		t.Fatal("Finalizer not deleted", mwrSetTest.Finalizers)
 	}
 }

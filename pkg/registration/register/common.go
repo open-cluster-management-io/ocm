@@ -128,47 +128,22 @@ func IsHubKubeConfigValidFunc(driver RegisterDriver, secretOption SecretOption) 
 	}
 }
 
-// AggregatedApprover is a list of approver that hub controller will run at the same time
-type AggregatedApprover struct {
-	approvers []Approver
-}
-
-func NewAggregatedApprover(approvers ...Approver) Approver {
-	return &AggregatedApprover{
-		approvers: approvers,
-	}
-}
-
-func (a *AggregatedApprover) Run(ctx context.Context, workers int) {
-	for _, approver := range a.approvers {
-		go approver.Run(ctx, workers)
-	}
-
-	<-ctx.Done()
-}
-
-func (a *AggregatedApprover) Cleanup(ctx context.Context, cluster *clusterv1.ManagedCluster) error {
-	var errs []error
-	for _, approver := range a.approvers {
-		if err := approver.Cleanup(ctx, cluster); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	return errors.NewAggregate(errs)
-}
-
 // NoopApprover is an approver with no operation, for testing
-type NoopApprover struct{}
+type NoopHubDriver struct{}
 
-func NewNoopApprover() Approver {
-	return &NoopApprover{}
+func NewNoopHubDriver() HubDriver {
+	return &NoopHubDriver{}
 }
 
-func (a *NoopApprover) Run(ctx context.Context, _ int) {
+func (a *NoopHubDriver) CreatePermissions(_ context.Context, _ *clusterv1.ManagedCluster) error {
+	return nil
+}
+
+func (a *NoopHubDriver) Run(ctx context.Context, _ int) {
 	<-ctx.Done()
 }
 
-func (a *NoopApprover) Cleanup(_ context.Context, _ *clusterv1.ManagedCluster) error {
+func (a *NoopHubDriver) Cleanup(_ context.Context, _ *clusterv1.ManagedCluster) error {
 	return nil
 }
 
@@ -219,4 +194,22 @@ func (a *AggregatedHubDriver) CreatePermissions(ctx context.Context, cluster *cl
 	}
 	return errors.NewAggregate(errs)
 
+}
+
+func (a *AggregatedHubDriver) Run(ctx context.Context, workers int) {
+	for _, driver := range a.hubRegisterDrivers {
+		go driver.Run(ctx, workers)
+	}
+
+	<-ctx.Done()
+}
+
+func (a *AggregatedHubDriver) Cleanup(ctx context.Context, cluster *clusterv1.ManagedCluster) error {
+	var errs []error
+	for _, driver := range a.hubRegisterDrivers {
+		if err := driver.Cleanup(ctx, cluster); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.NewAggregate(errs)
 }

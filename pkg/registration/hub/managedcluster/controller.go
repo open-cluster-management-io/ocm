@@ -60,7 +60,6 @@ type managedClusterController struct {
 	clusterLister      listerv1.ManagedClusterLister
 	applier            *apply.PermissionApplier
 	patcher            patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
-	approver           register.Approver
 	hubDriver          register.HubDriver
 	eventRecorder      events.Recorder
 }
@@ -75,7 +74,6 @@ func NewManagedClusterController(
 	rolebindingInformer rbacv1informers.RoleBindingInformer,
 	clusterRoleBindingInformer rbacv1informers.ClusterRoleBindingInformer,
 	manifestWorkInformer workinformers.ManifestWorkInformer,
-	approver register.Approver,
 	hubDriver register.HubDriver,
 	recorder events.Recorder) factory.Controller {
 
@@ -86,7 +84,6 @@ func NewManagedClusterController(
 		manifestWorkLister: manifestWorkInformer.Lister(),
 		clusterLister:      clusterInformer.Lister(),
 		hubDriver:          hubDriver,
-		approver:           approver,
 		applier: apply.NewPermissionApplier(
 			kubeClient,
 			roleInformer.Lister(),
@@ -127,7 +124,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	newManagedCluster := managedCluster.DeepCopy()
 
 	if !managedCluster.DeletionTimestamp.IsZero() {
-		if err = c.approver.Cleanup(ctx, managedCluster); err != nil {
+		if err = c.hubDriver.Cleanup(ctx, managedCluster); err != nil {
 			return err
 		}
 
@@ -166,6 +163,11 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 				errs = append(errs, result.Error)
 			}
 		}
+
+		if err = c.hubDriver.Cleanup(ctx, managedCluster); err != nil {
+			errs = append(errs, err)
+		}
+
 		if aggErr := operatorhelpers.NewMultiLineAggregate(errs); aggErr != nil {
 			return aggErr
 		}
