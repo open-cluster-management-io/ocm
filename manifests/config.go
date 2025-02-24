@@ -35,6 +35,7 @@ type HubConfig struct {
 	ManagedClusterIdentityCreatorRole string
 	HubClusterArn                     string
 	EnabledRegistrationDrivers        string
+	Tags                              []string
 }
 
 type Webhook struct {

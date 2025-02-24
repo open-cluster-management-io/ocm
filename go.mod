@@ -2,6 +2,8 @@ module open-cluster-management.io/ocm
 
 go 1.22.5
 
+replace open-cluster-management.io/api => /Users/gjaswal/Documents/codebase/guidewire-oss/ocm-api
+
 require (
 	github.com/aws/aws-sdk-go-v2 v1.35.0
 	github.com/aws/aws-sdk-go-v2/config v1.28.11

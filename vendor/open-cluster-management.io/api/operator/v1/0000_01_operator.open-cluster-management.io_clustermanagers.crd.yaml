@@ -269,12 +269,27 @@ spec:
                           - csr
                           - awsirsa
                           type: string
+                        autoApprovedIdentities:
+                          description: |-
+                            For csr authentication type, AutoApprovedIdentities represent a list of approved users
+                            For awsirsa authentication type, AutoApprovedIdentities represent a list of approved arn patterns
+                          items:
+                            type: string
+                          type: array
                         hubClusterArn:
                           description: |-
-                            This represents the hub cluster ARN
+                            This represents the hub cluster ARN. Applicable to only awsirsa authentication type.
                             Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1
                           pattern: ^arn:aws:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$
                           type: string
+                        tags:
+                          description: |-
+                            List of tags to be added to AWS resources created by hub while processing awsirsa registration request.
+                            Applicable to only awsirsa authentication type.
+                            Example - "product:v1:tenant:app-name=My-App"
+                          items:
+                            type: string
+                          type: array
                       type: object
                     type: array
                     x-kubernetes-list-map-keys:

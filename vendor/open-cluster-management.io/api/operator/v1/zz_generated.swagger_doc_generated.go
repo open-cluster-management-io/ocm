@@ -123,8 +123,10 @@ func (NodePlacement) SwaggerDoc() map[string]string {
 }
 
 var map_RegistrationDriverHub = map[string]string{
-	"authType":      "Type of the authentication used by hub to initialize the Hub cluster. Possible values are csr and awsirsa.",
-	"hubClusterArn": "This represents the hub cluster ARN Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1",
+	"authType":               "Type of the authentication used by hub to initialize the Hub cluster. Possible values are csr and awsirsa.",
+	"hubClusterArn":          "This represents the hub cluster ARN. Applicable to only awsirsa authentication type. Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1",
+	"autoApprovedIdentities": "For csr authentication type, AutoApprovedIdentities represent a list of approved users For awsirsa authentication type, AutoApprovedIdentities represent a list of approved arn patterns",
+	"tags":                   "List of tags to be added to AWS resources created by hub while processing awsirsa registration request. Applicable to only awsirsa authentication type. Example - \"product:v1:tenant:app-name=My-App\"",
 }
 
 func (RegistrationDriverHub) SwaggerDoc() map[string]string {
