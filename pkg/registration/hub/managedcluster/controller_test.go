@@ -30,7 +30,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/features"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/register"
-	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 )
 
 func TestSyncManagedCluster(t *testing.T) {
@@ -263,8 +262,7 @@ func TestSyncManagedCluster(t *testing.T) {
 					kubeInformer.Rbac().V1().ClusterRoleBindings().Lister(),
 				),
 				patcher.NewPatcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus](clusterClient.ClusterV1().ManagedClusters()),
-				register.NewNoopApprover(),
-				csr.NewCSRHubDriver(),
+				register.NewNoopHubDriver(),
 				eventstesting.NewTestingEventRecorder(t)}
 			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
 			if syncErr != nil && !errors.Is(syncErr, requeueError) {

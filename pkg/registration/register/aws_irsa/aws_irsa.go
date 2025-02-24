@@ -162,6 +162,16 @@ func (a *AWSIRSAHubDriver) CreatePermissions(ctx context.Context, cluster *clust
 	return nil
 }
 
+func (c *AWSIRSAHubDriver) Run(_ context.Context, _ int) {
+	// noop
+}
+
+// Cleanup is run when the cluster is deleting or hubAcceptClient is set false
+func (c *AWSIRSAHubDriver) Cleanup(_ context.Context, _ *clusterv1.ManagedCluster) error {
+	// noop
+	return nil
+}
+
 // This function creates:
 // 1. IAM Role and Policy in the hub cluster IAM
 // 2. Returns the hubClusterName and the roleArn to be used for Access Entry creation
