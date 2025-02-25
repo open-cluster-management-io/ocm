@@ -8,6 +8,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
@@ -52,6 +53,8 @@ type HubManagerOptions struct {
 	GCResourceList             []string
 	ImportOption               *importeroptions.Options
 	HubClusterArn              string
+	AutoApprovedCSRUsers       []string
+	AutoApprovedARNPatterns    []string
 }
 
 // NewHubManagerOptions returns a HubManagerOptions
@@ -68,6 +71,9 @@ func NewHubManagerOptions() *HubManagerOptions {
 func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&m.ClusterAutoApprovalUsers, "cluster-auto-approval-users", m.ClusterAutoApprovalUsers,
 		"A bootstrap user list whose cluster registration requests can be automatically approved.")
+	if err := fs.MarkDeprecated("cluster-auto-approval-users", "use auto-approved-csr-users flag instead"); err != nil {
+		utilruntime.Must(err)
+	}
 	fs.StringSliceVar(&m.EnabledRegistrationDrivers, "enabled-registration-drivers", m.EnabledRegistrationDrivers,
 		"A list of registration drivers enabled on hub.")
 	fs.StringSliceVar(&m.GCResourceList, "gc-resource-list", m.GCResourceList,
@@ -76,6 +82,10 @@ func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 			"The flag works only when ResourceCleanup feature gate is enable.")
 	fs.StringVar(&m.HubClusterArn, "hub-cluster-arn", m.HubClusterArn,
 		"Hub Cluster Arn required to connect to Hub and create IAM Roles and Policies")
+	fs.StringSliceVar(&m.AutoApprovedCSRUsers, "auto-approved-csr-users", m.AutoApprovedCSRUsers,
+		"A bootstrap user list whose cluster registration requests can be automatically approved.")
+	fs.StringSliceVar(&m.AutoApprovedARNPatterns, "auto-approved-arn-patterns", m.AutoApprovedARNPatterns,
+		"A list of AWS EKS ARN patterns such that an EKS cluster will be auto approved if its ARN matches with any of the patterns")
 	m.ImportOption.AddFlags(fs)
 }
 
@@ -159,13 +169,17 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	for _, enabledRegistrationDriver := range m.EnabledRegistrationDrivers {
 		switch enabledRegistrationDriver {
 		case "csr":
-			csrDriver, err := csr.NewCSRHubDriver(kubeClient, kubeInformers, m.ClusterAutoApprovalUsers, controllerContext.EventRecorder)
+			autoApprovedCSRUsers := m.ClusterAutoApprovalUsers
+			if len(m.AutoApprovedCSRUsers) > 0 {
+				autoApprovedCSRUsers = m.AutoApprovedCSRUsers
+			}
+			csrDriver, err := csr.NewCSRHubDriver(kubeClient, kubeInformers, autoApprovedCSRUsers, controllerContext.EventRecorder)
 			if err != nil {
 				return err
 			}
 			drivers = append(drivers, csrDriver)
 		case "awsirsa":
-			awsIRSAHubDriver, err := awsirsa.NewAWSIRSAHubDriver(ctx, m.HubClusterArn)
+			awsIRSAHubDriver, err := awsirsa.NewAWSIRSAHubDriver(ctx, m.HubClusterArn, m.AutoApprovedARNPatterns)
 			if err != nil {
 				return err
 			}

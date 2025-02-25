@@ -135,6 +135,10 @@ func NewNoopHubDriver() HubDriver {
 	return &NoopHubDriver{}
 }
 
+func (n *NoopHubDriver) Accept(cluster *clusterv1.ManagedCluster) bool {
+	return true
+}
+
 func (a *NoopHubDriver) CreatePermissions(_ context.Context, _ *clusterv1.ManagedCluster) error {
 	return nil
 }
@@ -194,6 +198,16 @@ func (a *AggregatedHubDriver) CreatePermissions(ctx context.Context, cluster *cl
 	}
 	return errors.NewAggregate(errs)
 
+}
+
+// Accept returns true only if all the HubDrivers implementations accept the cluster
+func (a *AggregatedHubDriver) Accept(cluster *clusterv1.ManagedCluster) bool {
+	for _, hubRegisterDriver := range a.hubRegisterDrivers {
+		if !hubRegisterDriver.Accept(cluster) {
+			return false
+		}
+	}
+	return true
 }
 
 func (a *AggregatedHubDriver) Run(ctx context.Context, workers int) {

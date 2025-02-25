@@ -121,6 +121,10 @@ func newTestApprover(err error) HubDriver {
 	return &testHubDriver{cleanupErr: err}
 }
 
+func (t *testHubDriver) Accept(_ *clusterv1.ManagedCluster) bool {
+	return true
+}
+
 func (t *testHubDriver) Run(_ context.Context, _ int) {}
 
 func (t *testHubDriver) CreatePermissions(_ context.Context, _ *clusterv1.ManagedCluster) error {
