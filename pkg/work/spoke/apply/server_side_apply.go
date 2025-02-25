@@ -103,7 +103,9 @@ func (c *ServerSideApply) Apply(
 			// skip the apply operation when the hash of the existing resource matches the required hash
 			existingHash := existing.GetAnnotations()[workapiv1.ManifestConfigSpecHashAnnotationKey]
 			if requiredHash == existingHash {
-				return existing, nil
+				// still needs to apply ownerref since it might be changed due to deleteoption update.
+				err := helper.ApplyOwnerReferences(ctx, c.client, gvr, existing, owner)
+				return existing, err
 			}
 		}
 	}
