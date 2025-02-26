@@ -31,7 +31,7 @@ build-work-integration:
 
 test-registration-integration: ensure-kubebuilder-tools
 	go test -c ./test/integration/registration -o ./registration-integration.test
-	./registration-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast
+	./registration-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast -ginkgo.focus="managedcluster should join successfully with auto approval of manged cluster in patterns for aws flow"
 .PHONY: test-registration-integration
 
 test-work-integration: ensure-kubebuilder-tools build-work-integration
@@ -45,7 +45,7 @@ test-placement-integration: ensure-kubebuilder-tools
 
 test-registration-operator-integration: ensure-kubebuilder-tools
 	go test -c ./test/integration/operator -o ./registration-operator-integration.test
-	./registration-operator-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast
+	./registration-operator-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast -ginkgo.focus="registration-controller should have command line option tags when initialized with awsirsa"
 .PHONY: test-registration-operator-integration
 
 test-addon-integration: ensure-kubebuilder-tools

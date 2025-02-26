@@ -70,6 +70,9 @@ spec:
           {{if .EnabledRegistrationDrivers}}
           - "--enabled-registration-drivers={{ .EnabledRegistrationDrivers }}"
           {{end}}
+          {{if .Tags}}
+          - "--tags={{ .Tags }}"
+          {{end}}
         env:
           - name: POD_NAME
             valueFrom:

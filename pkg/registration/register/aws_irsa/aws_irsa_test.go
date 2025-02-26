@@ -687,7 +687,9 @@ func TestCreateIAMRoleAndPolicy(t *testing.T) {
 			managedCluster := testinghelpers.NewManagedCluster()
 			managedCluster.Annotations = tt.managedClusterAnnotations
 
-			_, _, err = createIAMRoleAndPolicy(tt.args.ctx, HubClusterArn, managedCluster, cfg)
+			tags := []string{}
+
+			_, _, err = createIAMRoleAndPolicy(tt.args.ctx, HubClusterArn, managedCluster, cfg, tags)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("error = %#v, wantErr %#v", err, tt.wantErr)
 				return
@@ -794,6 +796,121 @@ func TestCreateAccessEntries(t *testing.T) {
 			managedCluster.Annotations = tt.managedClusterAnnotations
 
 			err = createAccessEntry(tt.args.ctx, eksClient, principalArn, hubClusterName, managedClusterName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("error = %#v, wantErr %#v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && err.Error() != tt.want.Error() {
+				t.Errorf("err = %#v, want %#v", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestCreateTags(t *testing.T) {
+	type args struct {
+		ctx                context.Context
+		withAPIOptionsFunc func(*middleware.Stack) error
+	}
+
+	cases := []struct {
+		name                      string
+		args                      args
+		managedClusterAnnotations map[string]string
+		want                      error
+		wantErr                   bool
+	}{
+		{
+			name: "test create IAM Role and Policy with Tags",
+			args: args{
+				ctx: context.Background(),
+				withAPIOptionsFunc: func(stack *middleware.Stack) error {
+					return stack.Finalize.Add(
+						middleware.FinalizeMiddlewareFunc(
+							"CreateRoleAndPolicyWithTagsMock",
+							func(ctx context.Context, input middleware.FinalizeInput, handler middleware.FinalizeHandler) (middleware.FinalizeOutput, middleware.Metadata, error) {
+								operationName := middleware.GetOperationName(ctx)
+								if operationName == "CreateRole" {
+									return middleware.FinalizeOutput{
+										Result: &iam.CreateRoleOutput{Role: &iamtypes.Role{
+											RoleName: aws.String("TestRole"),
+											Arn:      aws.String("arn:aws:iam::123456789012:role/TestRole"),
+											Tags: []iamtypes.Tag{
+												{
+													Key:   aws.String("product:v1:tenant:app-name"),
+													Value: aws.String("My-App"),
+												},
+												{
+													Key: aws.String("product:v1:tenant:created-by"),
+													Value: aws.String("Team-1"),
+												},
+											},
+										},
+										},
+									}, middleware.Metadata{}, nil
+								}
+								if operationName == "CreatePolicy" {
+									return middleware.FinalizeOutput{
+										Result: &iam.CreatePolicyOutput{Policy: &iamtypes.Policy{
+											PolicyName: aws.String("TestPolicy"),
+											Arn:        aws.String("arn:aws:iam::123456789012:role/TestPolicy"),
+											Tags: []iamtypes.Tag{
+												{
+													Key:   aws.String("product:v1:tenant:app-name"),
+													Value: aws.String("My-App"),
+												},
+												{
+													Key: aws.String("product:v1:tenant:created-by"),
+													Value: aws.String("Team-1"),
+												},
+											},
+										},
+										},
+									}, middleware.Metadata{}, nil
+								}
+								if operationName == "AttachRolePolicy" {
+									return middleware.FinalizeOutput{
+										Result: &iam.AttachRolePolicyOutput{},
+									}, middleware.Metadata{}, nil
+								}
+								return middleware.FinalizeOutput{}, middleware.Metadata{}, nil
+							},
+						),
+						middleware.Before,
+					)
+				},
+			},
+			managedClusterAnnotations: map[string]string{
+				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
+				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+			},
+			want:    nil,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			os.Setenv("AWS_ACCESS_KEY_ID", "test")
+			os.Setenv("AWS_SECRET_ACCESS_KEY", "test")
+			os.Setenv("AWS_ACCOUNT_ID", "test")
+
+			cfg, err := config.LoadDefaultConfig(
+				tt.args.ctx,
+				config.WithAPIOptions([]func(*middleware.Stack) error{tt.args.withAPIOptionsFunc}),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			HubClusterArn := "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster"
+
+			managedCluster := testinghelpers.NewManagedCluster()
+			managedCluster.Annotations = tt.managedClusterAnnotations
+
+			tags := []string{"product:v1:tenant:app-name=My-App", "product:v1:tenant:created-by=Team-1"}
+
+			_, _, err = createIAMRoleAndPolicy(tt.args.ctx, HubClusterArn, managedCluster, cfg, tags)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("error = %#v, wantErr %#v", err, tt.wantErr)
 				return

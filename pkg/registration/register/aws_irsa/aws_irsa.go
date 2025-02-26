@@ -147,9 +147,12 @@ func (a *AWSIRSAHubDriver) CreatePermissions(ctx context.Context, cluster *clust
 	}
 	klog.Infof("ManagedCluster %s is joined using aws-irsa registration-auth", cluster.Name)
 
+	// TODO: find a way to get tags from HubConfig and pass in to createIAMRoleAndPolicy
+	tags := []string{}
+
 	// Create an EKS client
 	eksClient := eks.NewFromConfig(a.cfg)
-	hubClusterName, roleArn, err := createIAMRoleAndPolicy(ctx, a.hubClusterArn, cluster, a.cfg)
+	hubClusterName, roleArn, err := createIAMRoleAndPolicy(ctx, a.hubClusterArn, cluster, a.cfg, tags)
 	if err != nil {
 		return err
 	}
@@ -175,13 +178,15 @@ func (c *AWSIRSAHubDriver) Cleanup(_ context.Context, _ *clusterv1.ManagedCluste
 // This function creates:
 // 1. IAM Role and Policy in the hub cluster IAM
 // 2. Returns the hubClusterName and the roleArn to be used for Access Entry creation
-func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCluster *v1.ManagedCluster, cfg aws.Config) (string, string, error) {
+func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCluster *v1.ManagedCluster, cfg aws.Config, tags []string) (string, string, error) {
 	var managedClusterIamRoleSuffix string
 	var createRoleOutput *iam.CreateRoleOutput
 	var hubClusterName string
 	var managedClusterName string
 	var hubAccountId string
 	var managedClusterAccountId string
+
+	// TODO: use passed in tags and apply it to CreateRole and CreatePolicy
 
 	// Create an IAM client
 	iamClient := iam.NewFromConfig(cfg)
