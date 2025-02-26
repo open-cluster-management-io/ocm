@@ -12,8 +12,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
-	"github.com/aws/aws-sdk-go-v2/service/eks/types"
+	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	corev1 "k8s.io/api/core/v1"
@@ -130,6 +131,7 @@ func NewAWSIRSADriver(managedClusterArn string, managedClusterRoleSuffix string,
 type AWSIRSAHubDriver struct {
 	hubClusterArn string
 	cfg           aws.Config
+	tags          []string
 }
 
 func (a *AWSIRSAHubDriver) allows(cluster *clusterv1.ManagedCluster) bool {
@@ -147,17 +149,14 @@ func (a *AWSIRSAHubDriver) CreatePermissions(ctx context.Context, cluster *clust
 	}
 	klog.Infof("ManagedCluster %s is joined using aws-irsa registration-auth", cluster.Name)
 
-	// TODO: find a way to get tags from HubConfig and pass in to createIAMRoleAndPolicy
-	tags := []string{}
-
 	// Create an EKS client
 	eksClient := eks.NewFromConfig(a.cfg)
-	hubClusterName, roleArn, err := createIAMRoleAndPolicy(ctx, a.hubClusterArn, cluster, a.cfg, tags)
+	hubClusterName, roleArn, err := createIAMRoleAndPolicy(ctx, a.hubClusterArn, cluster, a.cfg, a.tags)
 	if err != nil {
 		return err
 	}
 
-	err = createAccessEntry(ctx, eksClient, roleArn, hubClusterName, cluster.Name)
+	err = createAccessEntry(ctx, eksClient, roleArn, hubClusterName, cluster.Name, a.tags)
 	if err != nil {
 		return err
 	}
@@ -185,8 +184,6 @@ func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 	var managedClusterName string
 	var hubAccountId string
 	var managedClusterAccountId string
-
-	// TODO: use passed in tags and apply it to CreateRole and CreatePolicy
 
 	// Create an IAM client
 	iamClient := iam.NewFromConfig(cfg)
@@ -232,10 +229,14 @@ func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 			return hubClusterName, roleArn, err
 		}
 
+		parsedTags, err := parseTagsForRolesAndPolicies(tags)
+
 		createRoleOutput, err = iamClient.CreateRole(ctx, &iam.CreateRoleInput{
 			RoleName:                 aws.String(roleName),
 			AssumeRolePolicyDocument: aws.String(renderedTemplates[1]),
+			Tags:                     parsedTags,
 		})
+
 		if err != nil {
 			// Ignore error when role already exists as we will always create the same role
 			if !(strings.Contains(err.Error(), "EntityAlreadyExists")) {
@@ -251,6 +252,7 @@ func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 		createPolicyResult, err := iamClient.CreatePolicy(ctx, &iam.CreatePolicyInput{
 			PolicyDocument: aws.String(renderedTemplates[0]),
 			PolicyName:     aws.String(policyName),
+			Tags:           parsedTags,
 		})
 		if err != nil {
 			if !(strings.Contains(err.Error(), "EntityAlreadyExists")) {
@@ -276,6 +278,7 @@ func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 	}
 	return hubClusterName, roleArn, nil
 }
+
 
 func renderTemplates(argTemplates []string, data interface{}) (args []string, err error) {
 	var t *template.Template
@@ -306,19 +309,21 @@ func renderTemplates(argTemplates []string, data interface{}) (args []string, er
 }
 
 // This function creates access entry which allow access to an IAM role from outside the cluster
-func createAccessEntry(ctx context.Context, eksClient *eks.Client, roleArn string, hubClusterName string, managedClusterName string) error {
+func createAccessEntry(ctx context.Context, eksClient *eks.Client, roleArn string, hubClusterName string, managedClusterName string, tags []string) error {
 	params := &eks.CreateAccessEntryInput{
 		ClusterName:      aws.String(hubClusterName),
 		PrincipalArn:     aws.String(roleArn),
 		Username:         aws.String(managedClusterName),
 		KubernetesGroups: []string{fmt.Sprintf("open-cluster-management:%s", managedClusterName)},
+		Tags: 			  parseTagsForAccessEntry(tags),
 	}
+
 
 	createAccessEntryOutput, err := eksClient.CreateAccessEntry(ctx, params, func(opts *eks.Options) {
 		opts.Retryer = retry.AddWithErrorCodes(retry.NewStandard(func(o *retry.StandardOptions) {
 			o.MaxAttempts = 10
 			o.Backoff = retry.NewExponentialJitterBackoff(100 * time.Second)
-		}), (*types.InvalidParameterException)(nil).ErrorCode())
+		}), (*ekstypes.InvalidParameterException)(nil).ErrorCode())
 	})
 	if err != nil {
 		if !(strings.Contains(err.Error(), "ResourceInUseException")) {
@@ -333,7 +338,7 @@ func createAccessEntry(ctx context.Context, eksClient *eks.Client, roleArn strin
 	return nil
 }
 
-func NewAWSIRSAHubDriver(ctx context.Context, hubClusterArn string) (register.HubDriver, error) {
+func NewAWSIRSAHubDriver(ctx context.Context, hubClusterArn string, tags []string) (register.HubDriver, error) {
 	logger := klog.FromContext(ctx)
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
@@ -342,7 +347,40 @@ func NewAWSIRSAHubDriver(ctx context.Context, hubClusterArn string) (register.Hu
 	}
 	awsIRSADriverForHub := &AWSIRSAHubDriver{
 		hubClusterArn: hubClusterArn,
+		tags:          tags,
 		cfg:           cfg,
 	}
 	return awsIRSADriverForHub, nil
 }
+
+
+func parseTagsForAccessEntry(tags []string) map[string]string {
+
+	parsedTags := map[string]string{}
+	for _, tag := range tags {
+		splitTag := strings.Split(tag, "=")
+		key, value := splitTag[0], splitTag[1]
+		parsedTags[key] = value
+	}
+	return parsedTags
+}
+
+
+func parseTagsForRolesAndPolicies(tags []string) ([]iamtypes.Tag, error) {
+
+	var parsedTags []iamtypes.Tag
+
+	for _, tag := range tags {
+		splitTag := strings.Split(tag, "=")
+		if len(splitTag) != 2 {
+			return nil, fmt.Errorf("missing value from tag")
+		}
+		key, value := splitTag[0], splitTag[1]
+		parsedTags = append(parsedTags, iamtypes.Tag{
+			Key:   &key,
+			Value: &value,
+		})
+	}
+	return parsedTags, nil 
+}
+

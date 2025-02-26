@@ -33,7 +33,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode with aws registration", fun
 		}
 	})
 
-	ginkgo.Context("Deploy hub with aws auth", func() {
+	ginkgo.Context("Deploy hub with correct aws auth", func() {
 		ginkgo.BeforeEach(func() {
 			gomega.Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(),
@@ -100,7 +100,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode with aws registration", fun
 				return present && strings.Split(hubClusterArnArg, "=")[1] == hubClusterArn
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 		})
-		ginkgo.It("registration-controller should have command line option tags when initialized with awsirsa", func() {
+		ginkgo.It("registration-controller should have command line option tags when initialized with awsirsa when passed in init", func() {
 			gomega.Eventually(func() bool {
 
 				registrationControllerDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).
@@ -112,6 +112,60 @@ var _ = ginkgo.Describe("ClusterManager Default Mode with aws registration", fun
 				tagsArg, present := findMatchingArg(commandLineArgs, "--tags")
 
 				return present && strings.SplitN(tagsArg, "=", 2)[1] == tags
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		})
+	})
+
+	ginkgo.Context("Deploy hub with aws auth with no tags", func() {
+		ginkgo.BeforeEach(func() {
+			gomega.Eventually(func() error {
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(),
+					clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if clusterManager.Spec.RegistrationConfiguration == nil {
+					clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{}
+					clusterManager.Spec.RegistrationConfiguration.RegistrationDrivers = []operatorapiv1.RegistrationDriverHub{
+						{
+							AuthType: "awsirsa",
+							AwsIrsa: &operatorapiv1.AwsIrsaConfig{
+								HubClusterArn: hubClusterArn,
+							},
+						},
+					}
+				}
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(),
+					clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+		ginkgo.AfterEach(func() {
+			gomega.Eventually(func() error {
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(),
+					clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				clusterManager.Spec.RegistrationConfiguration = nil
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(),
+					clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+		ginkgo.It("registration-controller should not have command line option tags when initialized with awsirsa when not present on clustermanager", func() {
+			gomega.Eventually(func() bool {
+
+				registrationControllerDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).
+					Get(context.Background(), fmt.Sprintf("%s-registration-controller", clusterManagerName), metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				commandLineArgs := registrationControllerDeployment.Spec.Template.Spec.Containers[0].Args
+				_, present := findMatchingArg(commandLineArgs, "--tags")
+
+				return !present
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 		})
 	})

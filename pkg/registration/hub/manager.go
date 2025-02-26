@@ -52,6 +52,7 @@ type HubManagerOptions struct {
 	GCResourceList             []string
 	ImportOption               *importeroptions.Options
 	HubClusterArn              string
+	Tags					   []string
 }
 
 // NewHubManagerOptions returns a HubManagerOptions
@@ -76,6 +77,7 @@ func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 			"The flag works only when ResourceCleanup feature gate is enable.")
 	fs.StringVar(&m.HubClusterArn, "hub-cluster-arn", m.HubClusterArn,
 		"Hub Cluster Arn required to connect to Hub and create IAM Roles and Policies")
+	fs.StringSliceVar(&m.Tags, "tags", m.Tags, "A list of tags to apply to AWS resources created through the OCM controllers")
 	m.ImportOption.AddFlags(fs)
 }
 
@@ -165,7 +167,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 			}
 			drivers = append(drivers, csrDriver)
 		case "awsirsa":
-			awsIRSAHubDriver, err := awsirsa.NewAWSIRSAHubDriver(ctx, m.HubClusterArn)
+			awsIRSAHubDriver, err := awsirsa.NewAWSIRSAHubDriver(ctx, m.HubClusterArn , m.Tags)
 			if err != nil {
 				return err
 			}
