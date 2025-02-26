@@ -821,7 +821,7 @@ func TestCreateTags(t *testing.T) {
 		managedClusterAnnotations map[string]string
 		want                      error
 		wantErr                   bool
-		tags 					  []string
+		tags                      []string
 	}{
 		{
 			name: "test create IAM Role and Policy with Tags",
@@ -844,7 +844,7 @@ func TestCreateTags(t *testing.T) {
 													Value: aws.String("My-App"),
 												},
 												{
-													Key: aws.String("product:v1:tenant:created-by"),
+													Key:   aws.String("product:v1:tenant:created-by"),
 													Value: aws.String("Team-1"),
 												},
 											},
@@ -863,7 +863,7 @@ func TestCreateTags(t *testing.T) {
 													Value: aws.String("My-App"),
 												},
 												{
-													Key: aws.String("product:v1:tenant:created-by"),
+													Key:   aws.String("product:v1:tenant:created-by"),
 													Value: aws.String("Team-1"),
 												},
 											},
@@ -889,7 +889,7 @@ func TestCreateTags(t *testing.T) {
 			},
 			want:    nil,
 			wantErr: false,
-			tags: []string{"product:v1:tenant:app-name=My-App", "product:v1:tenant:created-by=Team-1"},
+			tags:    []string{"product:v1:tenant:app-name=My-App", "product:v1:tenant:created-by=Team-1"},
 		},
 		{
 			name: "test create IAM Role and Policy with invalid Tag with key beginning with aws",
@@ -919,7 +919,7 @@ func TestCreateTags(t *testing.T) {
 			},
 			want:    fmt.Errorf("operation error IAM: CreateRole, failed to create IAM role"),
 			wantErr: true,
-			tags: []string{"aws:invalid:tag=invalid-tag"},
+			tags:    []string{"aws:invalid:tag=invalid-tag"},
 		},
 		{
 			name: "test create IAM Role and Policy with invalid Tag with empty key",
@@ -949,7 +949,7 @@ func TestCreateTags(t *testing.T) {
 			},
 			want:    fmt.Errorf("operation error IAM: CreateRole, failed to create IAM role"),
 			wantErr: true,
-			tags: []string{"=emptykey"},
+			tags:    []string{"=emptykey"},
 		},
 	}
 
@@ -986,30 +986,27 @@ func TestCreateTags(t *testing.T) {
 
 func TestParseTagsForRolesAndPolicies(t *testing.T) {
 	cases := []struct {
-		name  string 
-		tags  []string 
-		result []iamtypes.Tag 
+		name   string
+		tags   []string
+		result []iamtypes.Tag
 		err    error
-		expectError bool
-	} {
+	}{
 		{
 			name: "Test Parsing Tags Correctly",
 			tags: []string{"product:v1:tenant:app-name=My-App"},
 			result: []iamtypes.Tag{
 				{
-					Key: &[]string{"product:v1:tenant:app-name"}[0], 
+					Key:   &[]string{"product:v1:tenant:app-name"}[0],
 					Value: &[]string{"My-App"}[0],
 				},
 			},
-			expectError: false,
 			err: nil,
 		},
 		{
-			name: "Test Parsing Tags Incorrectly",
-			tags: []string{"product:v1:tenant:app-nameMy-App"},
-			result: nil, 
-			expectError: true,
-			err: fmt.Errorf("missing value from tag"),
+			name:   "Test Parsing Tags Incorrectly",
+			tags:   []string{"product:v1:tenant:app-nameMy-App"},
+			result: nil,
+			err:    fmt.Errorf("missing value from tag"),
 		},
 	}
 	for _, tt := range cases {
@@ -1027,5 +1024,35 @@ func TestParseTagsForRolesAndPolicies(t *testing.T) {
 }
 
 func TestParseTagsForAccessEntries(t *testing.T) {
-	
+	cases := []struct {
+		name   string
+		tags   []string
+		result map[string]string
+		err    error
+	}{
+		{
+			name:   "Test Parsing Tags Correctly for access entries",
+			tags:   []string{"product:v1:tenant:app-name=My-App"},
+			result: map[string]string{"product:v1:tenant:app-name": "My-App"},
+			err:    nil,
+		},
+		{
+			name:   "Test Parsing Tags Incorrectly  access entries",
+			tags:   []string{"product:v1:tenant:app-nameMy-App"},
+			result: nil,
+			err:    fmt.Errorf("missing value in the tag"),
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			output, err := parseTagsForAccessEntry(tt.tags)
+
+			if !reflect.DeepEqual(output, tt.result) && err != tt.err {
+				for key, _ := range output {
+					t.Errorf("Expected error to be %#v, but got %#v", tt.err, err)
+					t.Errorf("Expected {Key: %s, Value: %s}, but got {Key: %s, Value: %s}", key, tt.result[key], key, output[key])
+				}
+			}
+		})
+	}
 }

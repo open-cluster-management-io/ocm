@@ -279,7 +279,6 @@ func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 	return hubClusterName, roleArn, nil
 }
 
-
 func renderTemplates(argTemplates []string, data interface{}) (args []string, err error) {
 	var t *template.Template
 	var filebytes []byte
@@ -310,14 +309,14 @@ func renderTemplates(argTemplates []string, data interface{}) (args []string, er
 
 // This function creates access entry which allow access to an IAM role from outside the cluster
 func createAccessEntry(ctx context.Context, eksClient *eks.Client, roleArn string, hubClusterName string, managedClusterName string, tags []string) error {
+	tagsForAccessEntry, err := parseTagsForAccessEntry(tags)
 	params := &eks.CreateAccessEntryInput{
 		ClusterName:      aws.String(hubClusterName),
 		PrincipalArn:     aws.String(roleArn),
 		Username:         aws.String(managedClusterName),
 		KubernetesGroups: []string{fmt.Sprintf("open-cluster-management:%s", managedClusterName)},
-		Tags: 			  parseTagsForAccessEntry(tags),
+		Tags:             tagsForAccessEntry,
 	}
-
 
 	createAccessEntryOutput, err := eksClient.CreateAccessEntry(ctx, params, func(opts *eks.Options) {
 		opts.Retryer = retry.AddWithErrorCodes(retry.NewStandard(func(o *retry.StandardOptions) {
@@ -353,18 +352,19 @@ func NewAWSIRSAHubDriver(ctx context.Context, hubClusterArn string, tags []strin
 	return awsIRSADriverForHub, nil
 }
 
-
-func parseTagsForAccessEntry(tags []string) map[string]string {
+func parseTagsForAccessEntry(tags []string) (map[string]string, error) {
 
 	parsedTags := map[string]string{}
 	for _, tag := range tags {
 		splitTag := strings.Split(tag, "=")
+		if len(splitTag) != 2 {
+			return nil, fmt.Errorf("missing value in the tag")
+		}
 		key, value := splitTag[0], splitTag[1]
 		parsedTags[key] = value
 	}
-	return parsedTags
+	return parsedTags, nil
 }
-
 
 func parseTagsForRolesAndPolicies(tags []string) ([]iamtypes.Tag, error) {
 
@@ -381,6 +381,5 @@ func parseTagsForRolesAndPolicies(tags []string) ([]iamtypes.Tag, error) {
 			Value: &value,
 		})
 	}
-	return parsedTags, nil 
+	return parsedTags, nil
 }
-
