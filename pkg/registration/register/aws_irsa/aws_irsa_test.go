@@ -887,6 +887,84 @@ func TestCreateTags(t *testing.T) {
 			want:    nil,
 			wantErr: false,
 		},
+		{
+			name: "test create IAM Role and Policy with invalid Tag with key beginning with aws",
+			args: args{
+				ctx: context.Background(),
+				withAPIOptionsFunc: func(stack *middleware.Stack) error {
+					return stack.Finalize.Add(
+						middleware.FinalizeMiddlewareFunc(
+							"CreateRoleWithInvalidTagBeginsAwsMock",
+							func(ctx context.Context, input middleware.FinalizeInput, handler middleware.FinalizeHandler) (middleware.FinalizeOutput, middleware.Metadata, error) {
+								operationName := middleware.GetOperationName(ctx)
+								if operationName == "CreateRole" {
+									return middleware.FinalizeOutput{
+										Result: &iam.CreateRoleOutput{Role: &iamtypes.Role{
+											RoleName: aws.String("TestRole"),
+											Arn:      aws.String("arn:aws:iam::123456789012:role/TestRole"),
+											Tags: []iamtypes.Tag{
+												{
+													Key:   aws.String("aws:invalid:tag"),
+													Value: aws.String("invalid-tag"),
+												},
+											},
+										},
+										},
+									}, middleware.Metadata{}, fmt.Errorf("failed to create IAM role")
+								}
+								return middleware.FinalizeOutput{}, middleware.Metadata{}, nil
+							},
+						),
+						middleware.Before,
+					)
+				},
+			},
+			managedClusterAnnotations: map[string]string{
+				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
+				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+			},
+			want:    fmt.Errorf("operation error IAM: CreateRole, failed to create IAM role"),
+			wantErr: true,
+		},
+		{
+			name: "test create IAM Role and Policy with invalid Tag with empty key",
+			args: args{
+				ctx: context.Background(),
+				withAPIOptionsFunc: func(stack *middleware.Stack) error {
+					return stack.Finalize.Add(
+						middleware.FinalizeMiddlewareFunc(
+							"CreateRoleWithInvalidTagEmptyKeyMock",
+							func(ctx context.Context, input middleware.FinalizeInput, handler middleware.FinalizeHandler) (middleware.FinalizeOutput, middleware.Metadata, error) {
+								operationName := middleware.GetOperationName(ctx)
+								if operationName == "CreateRole" {
+									return middleware.FinalizeOutput{
+										Result: &iam.CreateRoleOutput{Role: &iamtypes.Role{
+											RoleName: aws.String("TestRole"),
+											Arn:      aws.String("arn:aws:iam::123456789012:role/TestRole"),
+											Tags: []iamtypes.Tag{
+												{
+													Key:   nil,
+													Value: aws.String("invalid-tag"),
+												},
+											},
+										},
+										},
+									}, middleware.Metadata{}, fmt.Errorf("failed to create IAM role")
+								}
+								return middleware.FinalizeOutput{}, middleware.Metadata{}, nil
+							},
+						),
+						middleware.Before,
+					)
+				},
+			},
+			managedClusterAnnotations: map[string]string{
+				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
+				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+			},
+			want:    fmt.Errorf("operation error IAM: CreateRole, failed to create IAM role"),
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range cases {
