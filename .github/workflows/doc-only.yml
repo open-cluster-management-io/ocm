@@ -45,3 +45,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: 'echo "Not required"'
+  e2e-hosted:
+    runs-on: ubuntu-latest
+    steps:
+      - run: 'echo "Not required"'
+  e2e-singleton:
+    runs-on: ubuntu-latest
+    steps:
+      - run: 'echo "Not required"'
