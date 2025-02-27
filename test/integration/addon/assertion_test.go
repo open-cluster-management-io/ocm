@@ -150,10 +150,9 @@ func assertClusterManagementAddOnAnnotations(name string) {
 			return err
 		}
 
-		if actual.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey] != addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue {
-			return fmt.Errorf("expected annotation %v to be %v, actual: %v",
+		if _, ok := actual.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey]; ok {
+			return fmt.Errorf("expected annotation %v to be empty, actual: %v",
 				addonapiv1alpha1.AddonLifecycleAnnotationKey,
-				addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue,
 				actual.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey])
 		}
 
