@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
@@ -117,7 +119,7 @@ func TestAccept(t *testing.T) {
 			isAccepted: true,
 		},
 	}
-	AwsIrsaHubDriver, err := NewAWSIRSAHubDriver(context.Background(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
+	awsIrsaHubDriver, err := NewAWSIRSAHubDriver(context.Background(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
 		[]string{
 			"arn:aws:eks:us-west-2:123456789012:cluster/.*",
 			"arn:aws:eks:us-west-1:123456789012:cluster/.*",
@@ -129,7 +131,7 @@ func TestAccept(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			isAccepted := AwsIrsaHubDriver.Accept(c.cluster)
+			isAccepted := awsIrsaHubDriver.Accept(c.cluster)
 			if c.isAccepted != isAccepted {
 				t.Errorf("expect %t, but %t", c.isAccepted, isAccepted)
 			}
@@ -206,6 +208,377 @@ func TestRenderTemplates(t *testing.T) {
 	}
 }
 
+func TestDeleteIAMRoleAndPolicy(t *testing.T) {
+	type args struct {
+		ctx                context.Context
+		withAPIOptionsFunc func(*middleware.Stack) error
+	}
+
+	cases := []struct {
+		name                      string
+		args                      args
+		managedClusterAnnotations map[string]string
+		want                      error
+		wantErr                   bool
+	}{
+		{
+			name: "test delete IAM Role and policy",
+			args: args{
+				ctx:                context.Background(),
+				withAPIOptionsFunc: mockSuccessfulDeletionBehaviour,
+			},
+			managedClusterAnnotations: map[string]string{
+				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
+				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+			},
+			want:    nil,
+			wantErr: false,
+		},
+		{
+			name: "test delete IAM Role and policy with NoSuchEntity in DeleteRole",
+			args: args{
+				ctx: context.Background(),
+				withAPIOptionsFunc: func(stack *middleware.Stack) error {
+					err := mockSuccessfulDeletionBehaviour(stack)
+					if err != nil {
+						return err
+					}
+
+					return stack.Finalize.Add(
+						middleware.FinalizeMiddlewareFunc(
+							"DeleteRoleOrDeletePolicyOrDetachPolicyMock3",
+							func(ctx context.Context, input middleware.FinalizeInput, next middleware.FinalizeHandler) (middleware.FinalizeOutput, middleware.Metadata, error) {
+								if middleware.GetOperationName(ctx) == "DetachRolePolicy" {
+									return middleware.FinalizeOutput{
+										Result: &iam.DetachRolePolicyOutput{},
+									}, middleware.Metadata{}, fmt.Errorf("failed to detach IAM policy from role, NoSuchEntity")
+								}
+								return next.HandleFinalize(ctx, input)
+							},
+						),
+						middleware.Before,
+					)
+				},
+			},
+			managedClusterAnnotations: map[string]string{
+				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
+				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+			},
+			want:    nil,
+			wantErr: false,
+		},
+		{
+			name: "test delete IAM Role and policy with NoSuchEntity in DeletePolicy",
+			args: args{
+				ctx: context.Background(),
+				withAPIOptionsFunc: func(stack *middleware.Stack) error {
+					err := mockSuccessfulDeletionBehaviour(stack)
+					if err != nil {
+						return err
+					}
+
+					return stack.Finalize.Add(
+						middleware.FinalizeMiddlewareFunc(
+							"DeleteRoleOrDeletePolicyOrDetachPolicyMock3",
+							func(ctx context.Context, input middleware.FinalizeInput, next middleware.FinalizeHandler) (middleware.FinalizeOutput, middleware.Metadata, error) {
+								if middleware.GetOperationName(ctx) == "DeletePolicy" {
+									return middleware.FinalizeOutput{
+										Result: nil,
+									}, middleware.Metadata{}, fmt.Errorf("failed to delete IAM policy, NoSuchEntity")
+								}
+								return next.HandleFinalize(ctx, input)
+							},
+						),
+						middleware.Before,
+					)
+				},
+			},
+			managedClusterAnnotations: map[string]string{
+				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
+				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+			},
+			want:    nil,
+			wantErr: false,
+		},
+		{
+			name: "test delete IAM Role and policy with NoSuchEntity in DeleteRole",
+			args: args{
+				ctx: context.Background(),
+				withAPIOptionsFunc: func(stack *middleware.Stack) error {
+					err := mockSuccessfulDeletionBehaviour(stack)
+					if err != nil {
+						return err
+					}
+
+					return stack.Finalize.Add(
+						middleware.FinalizeMiddlewareFunc(
+							"DeleteRoleOrDeletePolicyOrDetachPolicyMock3",
+							func(ctx context.Context, input middleware.FinalizeInput, next middleware.FinalizeHandler) (middleware.FinalizeOutput, middleware.Metadata, error) {
+								if middleware.GetOperationName(ctx) == "DeleteRole" {
+									return middleware.FinalizeOutput{
+										Result: nil,
+									}, middleware.Metadata{}, fmt.Errorf("failed to delete IAM role, NoSuchEntity")
+								}
+								return next.HandleFinalize(ctx, input)
+							},
+						),
+						middleware.Before,
+					)
+				},
+			},
+			managedClusterAnnotations: map[string]string{
+				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
+				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+			},
+			want:    nil,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			os.Setenv("AWS_ACCESS_KEY_ID", "test")
+			os.Setenv("AWS_SECRET_ACCESS_KEY", "test")
+			os.Setenv("AWS_ACCOUNT_ID", "test")
+
+			cfg, err := config.LoadDefaultConfig(
+				tt.args.ctx,
+				config.WithAPIOptions([]func(*middleware.Stack) error{tt.args.withAPIOptionsFunc}),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			managedCluster := testinghelpers.NewManagedCluster()
+			managedCluster.Annotations = tt.managedClusterAnnotations
+
+			roleName, _, _, policyArn, err := getRoleAndPolicyArn(tt.args.ctx, managedCluster, cfg)
+			err = deleteIAMRoleAndPolicy(tt.args.ctx, cfg, roleName, policyArn)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("error = %#v, wantErr %#v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && err.Error() != tt.want.Error() {
+				t.Errorf("err = %#v, want %#v", err, tt.want)
+			}
+		})
+	}
+}
+
+func mockSuccessfulDeletionBehaviour(stack *middleware.Stack) error {
+	isValidRoleName := regexp.MustCompile(`^[A-Za-z0-9_+=,.@-]+$`).MatchString
+	isValidClusterName := regexp.MustCompile(`^[0-9A-Za-z][A-Za-z0-9-_]*$`).MatchString
+
+	err := stack.Initialize.Add(
+		middleware.InitializeMiddlewareFunc(
+			"DeleteRoleOrDeletePolicyOrDetachPolicyMock1",
+			func(ctx context.Context, input middleware.InitializeInput, next middleware.InitializeHandler) (middleware.InitializeOutput, middleware.Metadata, error) {
+				switch v := input.Parameters.(type) {
+				case *iam.DeleteRoleInput:
+					if !isValidRoleName(*v.RoleName) {
+						return middleware.InitializeOutput{Result: nil}, middleware.Metadata{}, fmt.Errorf("invalid role name")
+					}
+				case *iam.DeletePolicyInput:
+					if !arn.IsARN(*v.PolicyArn) {
+						return middleware.InitializeOutput{Result: nil}, middleware.Metadata{}, fmt.Errorf("invalid ARN")
+					}
+
+				case *eks.DeleteAccessEntryInput:
+					if !isValidClusterName(*v.ClusterName) {
+						return middleware.InitializeOutput{Result: nil}, middleware.Metadata{}, fmt.Errorf("invalid cluster name")
+					}
+					if !arn.IsARN(*v.PrincipalArn) {
+						return middleware.InitializeOutput{Result: nil}, middleware.Metadata{}, fmt.Errorf("invalid ARN")
+					}
+				}
+
+				return next.HandleInitialize(ctx, input)
+			},
+		),
+		middleware.Before,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	err = stack.Finalize.Add(
+		middleware.FinalizeMiddlewareFunc(
+			"DeleteRoleOrDeletePolicyOrDetachPolicyMock2",
+			func(ctx context.Context, input middleware.FinalizeInput, handler middleware.FinalizeHandler) (middleware.FinalizeOutput, middleware.Metadata, error) {
+				operationName := middleware.GetOperationName(ctx)
+				switch operationName {
+				case "DeleteRole":
+					return middleware.FinalizeOutput{
+						Result: &iam.DeleteRoleOutput{},
+					}, middleware.Metadata{}, nil
+				case "DeletePolicy":
+					return middleware.FinalizeOutput{
+						Result: &iam.DeletePolicyOutput{},
+					}, middleware.Metadata{}, nil
+				case "DetachRolePolicy":
+					return middleware.FinalizeOutput{
+						Result: &iam.DetachRolePolicyOutput{},
+					}, middleware.Metadata{}, nil
+				case "DeleteAccessEntry":
+					return middleware.FinalizeOutput{
+						Result: &eks.DeleteAccessEntryOutput{},
+					}, middleware.Metadata{}, nil
+				}
+				return middleware.FinalizeOutput{}, middleware.Metadata{}, nil
+			},
+		),
+		middleware.Before,
+	)
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func TestDeleteAccessEntry(t *testing.T) {
+	type args struct {
+		ctx                context.Context
+		withAPIOptionsFunc func(*middleware.Stack) error
+	}
+
+	cases := []struct {
+		name           string
+		hubClusterName string
+		args           args
+		want           error
+		wantErr        bool
+	}{
+		{
+			name:           "test delete Access Entry",
+			hubClusterName: "hub",
+			args: args{
+				ctx:                context.Background(),
+				withAPIOptionsFunc: mockSuccessfulDeletionBehaviour,
+			},
+			want:    nil,
+			wantErr: false,
+		},
+		{
+			name:           "test delete Access Entry error due to cluster name being an ARN",
+			hubClusterName: "arn:aws:eks:us-west-2:123456789012:cluster/hub", // Not a cluster name, it is an ARN
+			args: args{
+				ctx:                context.Background(),
+				withAPIOptionsFunc: mockSuccessfulDeletionBehaviour,
+			},
+			want:    fmt.Errorf("operation error EKS: DeleteAccessEntry, invalid cluster name"),
+			wantErr: true,
+		},
+		{
+			name:           "test delete Access Entry error",
+			hubClusterName: "hub",
+			args: args{
+				ctx: context.Background(),
+				withAPIOptionsFunc: func(stack *middleware.Stack) error {
+					return stack.Finalize.Add(
+						middleware.FinalizeMiddlewareFunc(
+							"DeleteAccessEntryErrorMock",
+							func(ctx context.Context, input middleware.FinalizeInput, handler middleware.FinalizeHandler) (middleware.FinalizeOutput, middleware.Metadata, error) {
+								operationName := middleware.GetOperationName(ctx)
+								if operationName == "DeleteAccessEntry" {
+									return middleware.FinalizeOutput{
+										Result: nil,
+									}, middleware.Metadata{}, fmt.Errorf("failed to delete access entry")
+								}
+								return middleware.FinalizeOutput{}, middleware.Metadata{}, nil
+							},
+						),
+						middleware.Before,
+					)
+				},
+			},
+			want:    fmt.Errorf("operation error EKS: DeleteAccessEntry, failed to delete access entry"),
+			wantErr: true,
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := config.LoadDefaultConfig(
+				tt.args.ctx,
+				config.WithAPIOptions([]func(*middleware.Stack) error{tt.args.withAPIOptionsFunc}),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			eksClient := eks.NewFromConfig(cfg)
+			principalArn := "arn:aws:iam::123456789012:role/TestRole"
+
+			err = deleteAccessEntry(tt.args.ctx, eksClient, principalArn, tt.hubClusterName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("error = %#v, wantErr %#v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && err.Error() != tt.want.Error() {
+				t.Errorf("err = %#v, want %#v", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestCleanup(t *testing.T) {
+	type args struct {
+		ctx                context.Context
+		withAPIOptionsFunc func(*middleware.Stack) error
+	}
+
+	cases := []struct {
+		name    string
+		cluster *clusterv1.ManagedCluster
+		args    args
+		want    error
+		wantErr bool
+	}{
+		{
+			name: "test Cleanup",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "managed-cluster",
+					Annotations: map[string]string{
+						"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
+						"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "7f8141296c75f2871e3d030f85c35692",
+					},
+				},
+			},
+			args: args{
+				ctx:                context.Background(),
+				withAPIOptionsFunc: mockSuccessfulDeletionBehaviour,
+			},
+			want:    nil,
+			wantErr: false,
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := config.LoadDefaultConfig(
+				tt.args.ctx,
+				config.WithAPIOptions([]func(*middleware.Stack) error{tt.args.withAPIOptionsFunc}),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			awsIrsaHubDriver, err := NewAWSIRSAHubDriver(context.Background(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster", []string{})
+			awsIrsaHubDriver.(*AWSIRSAHubDriver).cfg = cfg
+
+			err = awsIrsaHubDriver.Cleanup(tt.args.ctx, tt.cluster)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("error = %#v, wantErr %#v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && err.Error() != tt.want.Error() {
+				t.Errorf("err = %#v, want %#v", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestCreateIAMRoleAndPolicy(t *testing.T) {
 	type args struct {
 		ctx                context.Context
@@ -267,7 +640,7 @@ func TestCreateIAMRoleAndPolicy(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "test invalid hubclusrterarn passed during join.",
+			name: "test invalid hubclusterarn passed during join.",
 			args: args{
 				ctx: context.Background(),
 				withAPIOptionsFunc: func(stack *middleware.Stack) error {
