@@ -127,14 +127,14 @@ type RegistrationDriverHub struct {
 
 	// CSR represents the configuration for csr driver.
 	// +optional
-	CSR *CSRDriverConfig `json:"csr,omitempty"`
+	CSR *CSRConfig `json:"csr,omitempty"`
 
 	// AwsIrsa represents the configuration for awsisra driver.
 	// +optional
 	AwsIrsa *AwsIrsaConfig `json:"awsisra,omitempty"`
 }
 
-type CSRDriverConfig struct {
+type CSRConfig struct {
 	// AutoApprovedIdentities represent a list of approved users
 	// +optional
 	AutoApprovedIdentities []string `json:"autoApprovedIdentities,omitempty"`

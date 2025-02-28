@@ -29,12 +29,12 @@ func (AwsIrsaConfig) SwaggerDoc() map[string]string {
 	return map_AwsIrsaConfig
 }
 
-var map_CSRDriverConfig = map[string]string{
+var map_CSRConfig = map[string]string{
 	"autoApprovedIdentities": "AutoApprovedIdentities represent a list of approved users",
 }
 
-func (CSRDriverConfig) SwaggerDoc() map[string]string {
-	return map_CSRDriverConfig
+func (CSRConfig) SwaggerDoc() map[string]string {
+	return map_CSRConfig
 }
 
 var map_ClusterManager = map[string]string{

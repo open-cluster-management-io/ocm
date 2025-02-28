@@ -2,8 +2,6 @@ module open-cluster-management.io/ocm
 
 go 1.22.5
 
-replace open-cluster-management.io/api => /Users/jefwong/Vulcan/ocm-api
-
 require (
 	github.com/aws/aws-sdk-go-v2 v1.35.0
 	github.com/aws/aws-sdk-go-v2/config v1.28.11
@@ -38,7 +36,7 @@ require (
 	k8s.io/kube-aggregator v0.31.4
 	k8s.io/utils v0.0.0-20240921022957-49e7df575cb6
 	open-cluster-management.io/addon-framework v0.11.1-0.20250227151105-aede957fa2ca
-	open-cluster-management.io/api v0.15.1-0.20250219064651-4281b7684d9b
+	open-cluster-management.io/api v0.15.1-0.20250226073118-8c9793267c9e
 	open-cluster-management.io/sdk-go v0.15.1-0.20241125015855-1536c3970f8f
 	sigs.k8s.io/cluster-inventory-api v0.0.0-20240730014211-ef0154379848
 	sigs.k8s.io/controller-runtime v0.19.3
