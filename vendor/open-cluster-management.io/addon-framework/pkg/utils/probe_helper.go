@@ -187,6 +187,12 @@ func FilterWorkloads(objects []runtime.Object) []WorkloadMetadata {
 	for _, obj := range objects {
 		deployment, err := ConvertToDeployment(obj)
 		if err == nil {
+			// deployment replicas defaults to 1
+			// https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#replicas
+			var deploymentReplicas int32 = 1
+			if deployment.Spec.Replicas != nil {
+				deploymentReplicas = *deployment.Spec.Replicas
+			}
 			workloads = append(workloads, WorkloadMetadata{
 				GroupResource: schema.GroupResource{
 					Group:    appsv1.GroupName,
@@ -197,7 +203,7 @@ func FilterWorkloads(objects []runtime.Object) []WorkloadMetadata {
 					Name:      deployment.Name,
 				},
 				DeploymentSpec: &DeploymentSpec{
-					Replicas: *deployment.Spec.Replicas,
+					Replicas: deploymentReplicas,
 				},
 			})
 		}
