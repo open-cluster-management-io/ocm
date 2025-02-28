@@ -359,8 +359,8 @@ Run the following commands to generate the necessary cryptographic keys and cert
 openssl genrsa -out /tmp/jwt.key 2048
 openssl genpkey -algorithm RSA -out /tmp/ca.key
 openssl req -new -x509 -key /tmp/ca.key -out /tmp/ca.crt -days 365 -subj "/C=/ST=/L=/O=/OU=/CN=CA"
-openssl genpkey -algorithm RSA -out /tmp/server.key
-openssl req -new -key /tmp/server.key -out /tmp/server.csr -subj "/C=/ST=/L=/O=/OU=/CN=principal"
+openssl genpkey -algorithm RSA -out /tmp/tls.key
+openssl req -new -key /tmp/tls.key -out /tmp/tls.csr -subj "/C=/ST=/L=/O=/OU=/CN=principal"
 cat <<EOF > /tmp/openssl_ext.cnf
 [ req ]
 distinguished_name = req_distinguished_name
@@ -373,5 +373,5 @@ CN = principal
 [ v3_req ]
 subjectAltName = IP:172.18.255.201 # Replace with the intented Argo CD Agent principal IP
 EOF
-openssl x509 -req -in /tmp/server.csr -CA /tmp/ca.crt -CAkey /tmp/ca.key -CAcreateserial -out /tmp/server.crt -days 365 -extfile /tmp/openssl_ext.cnf -extensions v3_req
+openssl x509 -req -in /tmp/tls.csr -CA /tmp/ca.crt -CAkey /tmp/ca.key -CAcreateserial -out /tmp/tls.crt -days 365 -extfile /tmp/openssl_ext.cnf -extensions v3_req
 ```

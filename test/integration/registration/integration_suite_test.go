@@ -207,9 +207,13 @@ var _ = ginkgo.BeforeSuite(func() {
 	startHub = func() {
 		ctx, stopHub = context.WithCancel(context.Background())
 		go func() {
+			defer ginkgo.GinkgoRecover()
 			m := hub.NewHubManagerOptions()
 			m.ImportOption.APIServerURL = cfg.Host
+			m.EnabledRegistrationDrivers = []string{"csr", "awsirsa"}
+			m.HubClusterArn = "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
 			m.ClusterAutoApprovalUsers = []string{util.AutoApprovalBootstrapUser}
+			m.AutoApprovedARNPatterns = []string{"arn:aws:eks:us-west-2:123456789012:cluster/.*"}
 			err := m.RunControllerManager(ctx, &controllercmd.ControllerContext{
 				KubeConfig:    cfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("hub"),

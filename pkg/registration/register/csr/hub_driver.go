@@ -155,7 +155,8 @@ func (c *csrV1beta1Approver) approve(ctx context.Context, csr *certificatesv1bet
 }
 
 type CSRHubDriver struct {
-	controller factory.Controller
+	controller           factory.Controller
+	autoApprovedCSRUsers []string
 }
 
 func (c *CSRHubDriver) Run(ctx context.Context, workers int) {
@@ -171,14 +172,16 @@ func (c *CSRHubDriver) Cleanup(_ context.Context, _ *clusterv1.ManagedCluster) e
 func NewCSRHubDriver(
 	kubeClient kubernetes.Interface,
 	kubeInformers informers.SharedInformerFactory,
-	clusterAutoApprovalUsers []string,
+	autoApprovedCSRUsers []string,
 	recorder events.Recorder) (register.HubDriver, error) {
-	csrApprover := &CSRHubDriver{}
+	csrDriverForHub := &CSRHubDriver{
+		autoApprovedCSRUsers: autoApprovedCSRUsers,
+	}
 	csrReconciles := []Reconciler{NewCSRRenewalReconciler(kubeClient, recorder)}
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
 		csrReconciles = append(csrReconciles, NewCSRBootstrapReconciler(
 			kubeClient,
-			clusterAutoApprovalUsers,
+			autoApprovedCSRUsers,
 			recorder,
 		))
 	}
@@ -190,7 +193,7 @@ func NewCSRHubDriver(
 		}
 
 		if !v1CSRSupported && v1beta1CSRSupported {
-			csrApprover.controller = NewCSRApprovingController[*certificatesv1beta1.CertificateSigningRequest](
+			csrDriverForHub.controller = NewCSRApprovingController[*certificatesv1beta1.CertificateSigningRequest](
 				kubeInformers.Certificates().V1beta1().CertificateSigningRequests().Informer(),
 				kubeInformers.Certificates().V1beta1().CertificateSigningRequests().Lister(),
 				newCSRV1beta1Approver(kubeClient),
@@ -198,11 +201,11 @@ func NewCSRHubDriver(
 				recorder,
 			)
 			recorder.Eventf("CSRV1beta1Approver", "Using v1beta1 CSR api to manage managed cluster client certificate")
-			return csrApprover, nil
+			return csrDriverForHub, nil
 		}
 	}
 
-	csrApprover.controller = NewCSRApprovingController[*certificatesv1.CertificateSigningRequest](
+	csrDriverForHub.controller = NewCSRApprovingController[*certificatesv1.CertificateSigningRequest](
 		kubeInformers.Certificates().V1().CertificateSigningRequests().Informer(),
 		kubeInformers.Certificates().V1().CertificateSigningRequests().Lister(),
 		newCSRV1Approver(kubeClient),
@@ -210,10 +213,14 @@ func NewCSRHubDriver(
 		recorder,
 	)
 
-	return csrApprover, nil
+	return csrDriverForHub, nil
 }
 
 func (a *CSRHubDriver) CreatePermissions(_ context.Context, _ *clusterv1.ManagedCluster) error {
 	// noop
 	return nil
+}
+
+func (c *CSRHubDriver) Accept(cluster *clusterv1.ManagedCluster) bool {
+	return true
 }

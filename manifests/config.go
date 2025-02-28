@@ -35,6 +35,8 @@ type HubConfig struct {
 	ManagedClusterIdentityCreatorRole string
 	HubClusterArn                     string
 	EnabledRegistrationDrivers        string
+	AutoApprovedCSRUsers              []string
+	AutoApprovedARNPatterns           []string
 	Tags                              []string
 }
 

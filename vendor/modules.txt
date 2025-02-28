@@ -1691,7 +1691,7 @@ k8s.io/utils/pointer
 k8s.io/utils/ptr
 k8s.io/utils/strings/slices
 k8s.io/utils/trace
-# open-cluster-management.io/addon-framework v0.11.1-0.20250218075422-4329ebea390c
+# open-cluster-management.io/addon-framework v0.11.1-0.20250227151105-aede957fa2ca
 ## explicit; go 1.22.0
 open-cluster-management.io/addon-framework/pkg/addonfactory
 open-cluster-management.io/addon-framework/pkg/addonmanager
@@ -1707,7 +1707,7 @@ open-cluster-management.io/addon-framework/pkg/agent
 open-cluster-management.io/addon-framework/pkg/assets
 open-cluster-management.io/addon-framework/pkg/index
 open-cluster-management.io/addon-framework/pkg/utils
-# open-cluster-management.io/api v0.15.1-0.20250116010516-3a595d6a4e40 => /Users/jefwong/Vulcan/ocm-api
+# open-cluster-management.io/api v0.15.1-0.20250219064651-4281b7684d9b
 ## explicit; go 1.22.0
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/client/addon/clientset/versioned
@@ -1907,4 +1907,3 @@ sigs.k8s.io/structured-merge-diff/v4/value
 ## explicit; go 1.12
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
-# open-cluster-management.io/api => /Users/jefwong/Vulcan/ocm-api
