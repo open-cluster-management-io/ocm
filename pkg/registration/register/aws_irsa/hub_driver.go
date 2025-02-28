@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"html/template"
 	"regexp"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/aws/aws-sdk-go-v2/service/eks/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"k8s.io/klog/v2"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
