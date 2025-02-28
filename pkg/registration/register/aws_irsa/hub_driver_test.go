@@ -884,7 +884,7 @@ func TestParseTagsForRolesAndPolicies(t *testing.T) {
 			output, err := parseTagsForRolesAndPolicies(tt.tags)
 
 			if !reflect.DeepEqual(output, tt.result) && err != tt.err {
-				for idx, _ := range output {
+				for idx := range output {
 					t.Errorf("Expected error to be %#v, but got %#v", tt.err, err)
 					t.Errorf("Expected {Key: %s, Value: %s}, but got {Key: %s, Value: %s}", *tt.result[idx].Key, *tt.result[idx].Value, *output[idx].Key, *output[idx].Value)
 				}
@@ -918,7 +918,7 @@ func TestParseTagsForAccessEntries(t *testing.T) {
 			output, err := parseTagsForAccessEntry(tt.tags)
 
 			if !reflect.DeepEqual(output, tt.result) && err != tt.err {
-				for key, _ := range output {
+				for key := range output {
 					t.Errorf("Expected error to be %#v, but got %#v", tt.err, err)
 					t.Errorf("Expected {Key: %s, Value: %s}, but got {Key: %s, Value: %s}", key, tt.result[key], key, output[key])
 				}

@@ -55,7 +55,7 @@ type HubManagerOptions struct {
 	HubClusterArn              string
 	AutoApprovedCSRUsers       []string
 	AutoApprovedARNPatterns    []string
-	Tags					   []string
+	Tags                       []string
 }
 
 // NewHubManagerOptions returns a HubManagerOptions
