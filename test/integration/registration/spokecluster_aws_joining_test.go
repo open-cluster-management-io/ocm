@@ -159,6 +159,76 @@ var _ = ginkgo.Describe("Joining Process for aws flow", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		})
+
+		ginkgo.It("managedcluster should join successfully with auto approval of manged cluster in patterns for aws flow", func() {
+
+			managedClusterArn := "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1"
+			managedClusterRoleSuffix := "7f8141296c75f2871e3d030f85c35692"
+			hubClusterArn := "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
+
+			// run registration agent
+			agentOptions := &spoke.SpokeAgentOptions{
+				RegistrationAuth:         spoke.AwsIrsaAuthType,
+				HubClusterArn:            hubClusterArn,
+				ManagedClusterArn:        managedClusterArn,
+				ManagedClusterRoleSuffix: managedClusterRoleSuffix,
+				BootstrapKubeconfig:      bootstrapKubeconfig,
+				HubKubeconfigSecret:      hubKubeconfigSecret,
+				ClusterHealthCheckPeriod: 1 * time.Minute,
+			}
+			commOptions := commonoptions.NewAgentOptions()
+			commOptions.HubKubeconfigDir = hubKubeconfigDir
+			commOptions.SpokeClusterName = managedClusterName
+
+			cancel := runAgent("joiningtest", agentOptions, commOptions, spokeCfg)
+			defer cancel()
+
+			// the ManagedCluster CR should be created after bootstrap
+			gomega.Eventually(func() bool {
+				cluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
+				if err != nil {
+					return false
+				}
+				return cluster.Spec.HubAcceptsClient
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		})
+
+		ginkgo.It("managedcluster should join successfully with auto approval rejected of manged cluster not in patterns for aws flow", func() {
+
+			managedClusterArn := "arn:aws:eks:us-west-1:123456789012:cluster/managed-cluster2"
+			managedClusterRoleSuffix := "7f8141296c75f2871e3d030f85c35692"
+			hubClusterArn := "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
+
+			// run registration agent
+			agentOptions := &spoke.SpokeAgentOptions{
+				RegistrationAuth:         spoke.AwsIrsaAuthType,
+				HubClusterArn:            hubClusterArn,
+				ManagedClusterArn:        managedClusterArn,
+				ManagedClusterRoleSuffix: managedClusterRoleSuffix,
+				BootstrapKubeconfig:      bootstrapKubeconfig,
+				HubKubeconfigSecret:      hubKubeconfigSecret,
+				ClusterHealthCheckPeriod: 1 * time.Minute,
+			}
+			commOptions := commonoptions.NewAgentOptions()
+			commOptions.HubKubeconfigDir = hubKubeconfigDir
+			commOptions.SpokeClusterName = managedClusterName
+
+			cancel := runAgent("joiningtest", agentOptions, commOptions, spokeCfg)
+			defer cancel()
+
+			// The ManagedCluster CR should be created
+			gomega.Eventually(func() error {
+				_, err := util.GetManagedCluster(clusterClient, managedClusterName)
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			// The ManagedCluster CR should never be accepted
+			gomega.Consistently(func() bool {
+				cluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cluster.Spec.HubAcceptsClient
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeFalse())
+		})
 	}
 
 	ginkgo.Context("without proxy", func() {

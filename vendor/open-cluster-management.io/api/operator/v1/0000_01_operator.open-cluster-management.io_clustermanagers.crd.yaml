@@ -269,6 +269,13 @@ spec:
                           - csr
                           - awsirsa
                           type: string
+                        autoApprovedIdentities:
+                          description: |-
+                            For csr authentication type, AutoApprovedIdentities represent a list of approved users
+                            For awsirsa authentication type, AutoApprovedIdentities represent a list of approved arn patterns
+                          items:
+                            type: string
+                          type: array
                         hubClusterArn:
                           description: |-
                             This represents the hub cluster ARN

@@ -36,7 +36,7 @@ require (
 	k8s.io/kube-aggregator v0.31.4
 	k8s.io/utils v0.0.0-20240921022957-49e7df575cb6
 	open-cluster-management.io/addon-framework v0.11.1-0.20250227151105-aede957fa2ca
-	open-cluster-management.io/api v0.15.1-0.20250116010516-3a595d6a4e40
+	open-cluster-management.io/api v0.15.1-0.20250219064651-4281b7684d9b
 	open-cluster-management.io/sdk-go v0.15.1-0.20241125015855-1536c3970f8f
 	sigs.k8s.io/cluster-inventory-api v0.0.0-20240730014211-ef0154379848
 	sigs.k8s.io/controller-runtime v0.19.3

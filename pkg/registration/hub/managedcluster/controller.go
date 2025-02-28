@@ -140,7 +140,9 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		// If the ManagedClusterAutoApproval feature is enabled, we automatically accept a cluster only
 		// when it joins for the first time, afterwards users can deny it again.
 		if _, ok := managedCluster.Annotations[clusterAcceptedAnnotationKey]; !ok {
-			return c.acceptCluster(ctx, managedCluster)
+			if c.hubDriver.Accept(managedCluster) {
+				return c.acceptCluster(ctx, managedCluster)
+			}
 		}
 	}
 
