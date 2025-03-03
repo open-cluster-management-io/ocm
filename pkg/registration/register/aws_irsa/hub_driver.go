@@ -317,7 +317,7 @@ func deleteIAMRoleAndPolicy(ctx context.Context, cfg aws.Config, roleName string
 func getRoleAndPolicyArn(ctx context.Context, managedCluster *v1.ManagedCluster, cfg aws.Config) (string, string, string, string, error) {
 	logger := klog.FromContext(ctx)
 
-	managedClusterIamRoleSuffix, _ :=
+	managedClusterIamRoleSuffix :=
 		managedCluster.Annotations["agent.open-cluster-management.io/managed-cluster-iam-role-suffix"]
 
 	roleName := fmt.Sprintf("ocm-hub-%s", managedClusterIamRoleSuffix)

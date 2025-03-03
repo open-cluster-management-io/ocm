@@ -353,6 +353,10 @@ func TestDeleteIAMRoleAndPolicy(t *testing.T) {
 			managedCluster.Annotations = tt.managedClusterAnnotations
 
 			roleName, _, _, policyArn, err := getRoleAndPolicyArn(tt.args.ctx, managedCluster, cfg)
+			if err != nil {
+				t.Errorf("Error getting role and policy Arn.")
+				return
+			}
 			err = deleteIAMRoleAndPolicy(tt.args.ctx, cfg, roleName, policyArn)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("error = %#v, wantErr %#v", err, tt.wantErr)
@@ -565,6 +569,10 @@ func TestCleanup(t *testing.T) {
 			}
 
 			awsIrsaHubDriver, err := NewAWSIRSAHubDriver(context.Background(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster", []string{})
+			if err != nil {
+				t.Errorf("error creating AWSIRSAHubDriver")
+				return
+			}
 			awsIrsaHubDriver.(*AWSIRSAHubDriver).cfg = cfg
 
 			err = awsIrsaHubDriver.Cleanup(tt.args.ctx, tt.cluster)
