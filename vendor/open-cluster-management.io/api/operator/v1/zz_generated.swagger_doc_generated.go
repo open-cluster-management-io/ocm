@@ -19,6 +19,24 @@ func (AddOnManagerConfiguration) SwaggerDoc() map[string]string {
 	return map_AddOnManagerConfiguration
 }
 
+var map_AwsIrsaConfig = map[string]string{
+	"hubClusterArn":          "This represents the hub cluster ARN Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1",
+	"autoApprovedIdentities": "AutoApprovedIdentities represent a list of approved arn patterns",
+	"tags":                   "List of tags to be added to AWS resources created by hub while processing awsirsa registration request Example - \"product:v1:tenant:app-name=My-App\"",
+}
+
+func (AwsIrsaConfig) SwaggerDoc() map[string]string {
+	return map_AwsIrsaConfig
+}
+
+var map_CSRConfig = map[string]string{
+	"autoApprovedIdentities": "AutoApprovedIdentities represent a list of approved users",
+}
+
+func (CSRConfig) SwaggerDoc() map[string]string {
+	return map_CSRConfig
+}
+
 var map_ClusterManager = map[string]string{
 	"":       "ClusterManager configures the controllers on the hub that govern registration and work distribution for attached Klusterlets. In Default mode, ClusterManager will only be deployed in open-cluster-management-hub namespace. In Hosted mode, ClusterManager will be deployed in the namespace with the same name as cluster manager.",
 	"spec":   "Spec represents a desired deployment configuration of controllers that govern registration and work distribution for attached Klusterlets.",
@@ -123,9 +141,9 @@ func (NodePlacement) SwaggerDoc() map[string]string {
 }
 
 var map_RegistrationDriverHub = map[string]string{
-	"authType":               "Type of the authentication used by hub to initialize the Hub cluster. Possible values are csr and awsirsa.",
-	"hubClusterArn":          "This represents the hub cluster ARN Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1",
-	"autoApprovedIdentities": "For csr authentication type, AutoApprovedIdentities represent a list of approved users For awsirsa authentication type, AutoApprovedIdentities represent a list of approved arn patterns",
+	"authType": "Type of the authentication used by hub to initialize the Hub cluster. Possible values are csr and awsirsa.",
+	"csr":      "CSR represents the configuration for csr driver.",
+	"awsisra":  "AwsIrsa represents the configuration for awsisra driver.",
 }
 
 func (RegistrationDriverHub) SwaggerDoc() map[string]string {

@@ -269,19 +269,40 @@ spec:
                           - csr
                           - awsirsa
                           type: string
-                        autoApprovedIdentities:
-                          description: |-
-                            For csr authentication type, AutoApprovedIdentities represent a list of approved users
-                            For awsirsa authentication type, AutoApprovedIdentities represent a list of approved arn patterns
-                          items:
-                            type: string
-                          type: array
-                        hubClusterArn:
-                          description: |-
-                            This represents the hub cluster ARN
-                            Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1
-                          pattern: ^arn:aws:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$
-                          type: string
+                        awsisra:
+                          description: AwsIrsa represents the configuration for awsisra
+                            driver.
+                          properties:
+                            autoApprovedIdentities:
+                              description: AutoApprovedIdentities represent a list
+                                of approved arn patterns
+                              items:
+                                type: string
+                              type: array
+                            hubClusterArn:
+                              description: |-
+                                This represents the hub cluster ARN
+                                Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1
+                              pattern: ^arn:aws:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$
+                              type: string
+                            tags:
+                              description: |-
+                                List of tags to be added to AWS resources created by hub while processing awsirsa registration request
+                                Example - "product:v1:tenant:app-name=My-App"
+                              items:
+                                type: string
+                              type: array
+                          type: object
+                        csr:
+                          description: CSR represents the configuration for csr driver.
+                          properties:
+                            autoApprovedIdentities:
+                              description: AutoApprovedIdentities represent a list
+                                of approved users
+                              items:
+                                type: string
+                              type: array
+                          type: object
                       type: object
                     type: array
                     x-kubernetes-list-map-keys:

@@ -37,6 +37,7 @@ type HubConfig struct {
 	EnabledRegistrationDrivers        string
 	AutoApprovedCSRUsers              string
 	AutoApprovedARNPatterns           string
+	AwsResourceTags                   string
 }
 
 type Webhook struct {

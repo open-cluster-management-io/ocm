@@ -55,6 +55,7 @@ type HubManagerOptions struct {
 	HubClusterArn              string
 	AutoApprovedCSRUsers       []string
 	AutoApprovedARNPatterns    []string
+	AwsResourceTags            []string
 }
 
 // NewHubManagerOptions returns a HubManagerOptions
@@ -86,6 +87,7 @@ func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 		"A bootstrap user list whose cluster registration requests can be automatically approved.")
 	fs.StringSliceVar(&m.AutoApprovedARNPatterns, "auto-approved-arn-patterns", m.AutoApprovedARNPatterns,
 		"A list of AWS EKS ARN patterns such that an EKS cluster will be auto approved if its ARN matches with any of the patterns")
+	fs.StringSliceVar(&m.AwsResourceTags, "tags", m.AwsResourceTags, "A list of tags to apply to AWS resources created through the OCM controllers")
 	m.ImportOption.AddFlags(fs)
 }
 
@@ -179,7 +181,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 			}
 			drivers = append(drivers, csrDriver)
 		case "awsirsa":
-			awsIRSAHubDriver, err := awsirsa.NewAWSIRSAHubDriver(ctx, m.HubClusterArn, m.AutoApprovedARNPatterns)
+			awsIRSAHubDriver, err := awsirsa.NewAWSIRSAHubDriver(ctx, m.HubClusterArn, m.AutoApprovedARNPatterns, m.AwsResourceTags)
 			if err != nil {
 				return err
 			}

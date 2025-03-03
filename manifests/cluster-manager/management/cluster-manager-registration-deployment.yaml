@@ -76,6 +76,9 @@ spec:
            {{ if .AutoApprovedARNPatterns }}
           - "--auto-approved-arn-patterns={{ .AutoApprovedARNPatterns }}"
           {{ end }}
+          {{if .AwsResourceTags}}
+          - "--aws-resource-tags={{ .AwsResourceTags }}"
+          {{end}}
         env:
           - name: POD_NAME
             valueFrom:
