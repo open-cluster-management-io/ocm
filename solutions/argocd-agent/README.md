@@ -25,6 +25,7 @@ leveraging [OCM Addons](https://open-cluster-management.io/docs/concepts/addon/)
 and automate lifecycle management of its components.
 Once set up, it will also guide you through deploying applications using the configured environment.
 
+![OCM with Argo CD Agent Architecture](./assets/argocd-agent-ocm-architecture.drawio.png)
 
 ## Benefits of Using the OCM Argo CD Agent AddOn
 
