@@ -56,7 +56,16 @@ func (a *AWSIRSAHubDriver) Accept(cluster *clusterv1.ManagedCluster) bool {
 
 // Cleanup is run when the cluster is deleting or hubAcceptClient is set false
 func (c *AWSIRSAHubDriver) Cleanup(ctx context.Context, managedCluster *clusterv1.ManagedCluster) error {
+	_, isManagedClusterIamRoleSuffixPresent :=
+		managedCluster.Annotations["agent.open-cluster-management.io/managed-cluster-iam-role-suffix"]
+	_, isManagedClusterArnPresent := managedCluster.Annotations["agent.open-cluster-management.io/managed-cluster-arn"]
+
 	logger := klog.FromContext(ctx)
+
+	if !isManagedClusterArnPresent && !isManagedClusterIamRoleSuffixPresent {
+		logger.V(4).Info("No Op Cleanup since managedcluster annotations are not present for awsirsa.")
+		return nil
+	}
 
 	roleName, _, roleArn, policyArn, err := getRoleAndPolicyArn(ctx, managedCluster, c.cfg)
 	if err != nil {
