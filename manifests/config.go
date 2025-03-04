@@ -36,7 +36,7 @@ type HubConfig struct {
 	HubClusterArn                     string
 	EnabledRegistrationDrivers        string
 	AutoApprovedCSRUsers              []string
-	AutoApprovedARNPatterns           []string
+	AutoApprovedARNPatterns           string
 }
 
 type Webhook struct {
