@@ -10,7 +10,6 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
-	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
@@ -347,7 +346,7 @@ func TestReconcile(t *testing.T) {
 				fakeAddonClient,
 				addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 				addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
-				utils.ManagedBySelf(map[string]agent.AgentAddon{"test": nil}),
+				utils.ManagedByAddonManager,
 				recorder,
 			)
 
