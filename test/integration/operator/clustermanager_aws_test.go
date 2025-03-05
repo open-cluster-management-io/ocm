@@ -98,7 +98,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode with aws registration", fun
 
 func findMatchingArg(args []string, pattern string) (string, bool) {
 	for _, commandLineArg := range args {
-		if strings.Contains(commandLineArg, pattern) {
+		if strings.SplitN(commandLineArg, "=", 2)[0] == pattern {
 			return commandLineArg, true
 		}
 	}
