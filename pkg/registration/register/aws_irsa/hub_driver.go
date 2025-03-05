@@ -25,6 +25,11 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
+const (
+	errNoSuchEntity        = "NoSuchEntity"
+	errEntityAlreadyExists = "EntityAlreadyExists"
+)
+
 type AWSIRSAHubDriver struct {
 	hubClusterArn           string
 	cfg                     aws.Config
@@ -50,8 +55,36 @@ func (a *AWSIRSAHubDriver) Accept(cluster *clusterv1.ManagedCluster) bool {
 }
 
 // Cleanup is run when the cluster is deleting or hubAcceptClient is set false
-func (c *AWSIRSAHubDriver) Cleanup(_ context.Context, _ *clusterv1.ManagedCluster) error {
-	// noop
+func (c *AWSIRSAHubDriver) Cleanup(ctx context.Context, managedCluster *clusterv1.ManagedCluster) error {
+	_, isManagedClusterIamRoleSuffixPresent :=
+		managedCluster.Annotations["agent.open-cluster-management.io/managed-cluster-iam-role-suffix"]
+	_, isManagedClusterArnPresent := managedCluster.Annotations["agent.open-cluster-management.io/managed-cluster-arn"]
+
+	logger := klog.FromContext(ctx)
+
+	if !isManagedClusterArnPresent && !isManagedClusterIamRoleSuffixPresent {
+		logger.V(4).Info("No Op Cleanup since managedcluster annotations are not present for awsirsa.")
+		return nil
+	}
+
+	roleName, _, roleArn, policyArn, err := getRoleAndPolicyArn(ctx, managedCluster, c.cfg)
+	if err != nil {
+		logger.V(4).Error(err, "Failed to getRoleAndPolicyArn")
+		return err
+	}
+
+	err = deleteIAMRoleAndPolicy(ctx, c.cfg, roleName, policyArn)
+	if err != nil {
+		return err
+	}
+
+	eksClient := eks.NewFromConfig(c.cfg)
+	_, hubClusterName := commonhelpers.GetAwsAccountIdAndClusterName(c.hubClusterArn)
+	err = deleteAccessEntry(ctx, eksClient, roleArn, hubClusterName)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -106,18 +139,14 @@ func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 		managedCluster.Annotations["agent.open-cluster-management.io/managed-cluster-iam-role-suffix"]
 	managedClusterArn, isManagedClusterArnPresent := managedCluster.Annotations["agent.open-cluster-management.io/managed-cluster-arn"]
 
-	roleName := fmt.Sprintf("ocm-hub-%s", managedClusterIamRoleSuffix)
-	policyName := roleName
-	creds, err := cfg.Credentials.Retrieve(ctx)
-	if err != nil {
-		klog.Errorf("Failed to get IAM Credentials")
-		return hubClusterName, "", err
-	}
-	awsAccountId := creds.AccountID
-	roleArn := fmt.Sprintf("arn:aws:iam::%s:role/%s", awsAccountId, roleName)
-	policyArn := fmt.Sprintf("arn:aws:iam::%s:policy/%s", awsAccountId, policyName)
 	hubAccountId, hubClusterName = commonhelpers.GetAwsAccountIdAndClusterName(hubClusterArn)
 	managedClusterAccountId, managedClusterName = commonhelpers.GetAwsAccountIdAndClusterName(managedClusterArn)
+
+	roleName, policyName, roleArn, policyArn, err := getRoleAndPolicyArn(ctx, managedCluster, cfg)
+	if err != nil {
+		logger.V(4).Error(err, "Failed to getRoleAndPolicyArn")
+		return hubClusterName, roleArn, err
+	}
 
 	if hubClusterArn != "" && isManagedClusterIamRoleSuffixPresent && isManagedClusterArnPresent {
 
@@ -149,7 +178,7 @@ func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 		})
 		if err != nil {
 			// Ignore error when role already exists as we will always create the same role
-			if !(strings.Contains(err.Error(), "EntityAlreadyExists")) {
+			if !(strings.Contains(err.Error(), errEntityAlreadyExists)) {
 				logger.V(4).Error(err, "Failed to create IAM role %s for ManagedCluster", "IAMRole", roleName, "ManagedCluster", managedClusterName)
 				return hubClusterName, roleArn, err
 			} else {
@@ -164,7 +193,7 @@ func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 			PolicyName:     aws.String(policyName),
 		})
 		if err != nil {
-			if !(strings.Contains(err.Error(), "EntityAlreadyExists")) {
+			if !(strings.Contains(err.Error(), errEntityAlreadyExists)) {
 				logger.V(4).Error(err, "Failed to create IAM Policy for ManagedCluster", "IAMPolicy", policyName, "ManagedCluster", managedClusterName)
 				return hubClusterName, roleArn, err
 			} else {
@@ -246,6 +275,90 @@ func createAccessEntry(ctx context.Context, eksClient *eks.Client, roleArn strin
 		logger.V(4).Info("Access entry created successfully for managed cluster",
 			"AccessEntry", *createAccessEntryOutput.AccessEntry.AccessEntryArn, "ManagedCluster", managedClusterName)
 	}
+	return nil
+}
+
+func deleteIAMRoleAndPolicy(ctx context.Context, cfg aws.Config, roleName string, policyArn string) error {
+	logger := klog.FromContext(ctx)
+
+	iamClient := iam.NewFromConfig(cfg)
+
+	_, err := iamClient.DetachRolePolicy(ctx, &iam.DetachRolePolicyInput{
+		RoleName:  &roleName,
+		PolicyArn: &policyArn,
+	})
+	if err != nil {
+		if !strings.Contains(err.Error(), errNoSuchEntity) {
+			logger.V(4).Error(err, "Failed to detach Policy from Role", "Policy", policyArn, "Role", roleName)
+			return err
+		}
+	} else {
+		logger.V(4).Info("Policy detached successfully from Role", "Policy", policyArn, "Role", roleName)
+	}
+
+	_, err = iamClient.DeletePolicy(ctx, &iam.DeletePolicyInput{
+		PolicyArn: &policyArn,
+	})
+	if err != nil {
+		if !strings.Contains(err.Error(), errNoSuchEntity) {
+			logger.V(4).Error(err, "Failed to delete Policy", "Policy", policyArn)
+			return err
+		}
+	} else {
+		logger.V(4).Info("Policy deleted successfully", "Policy", policyArn)
+	}
+
+	_, err = iamClient.DeleteRole(ctx, &iam.DeleteRoleInput{
+		RoleName: &roleName,
+	})
+	if err != nil {
+		if !strings.Contains(err.Error(), errNoSuchEntity) {
+			logger.V(4).Error(err, "Failed to delete Role", "Role", roleName)
+			return err
+		}
+	} else {
+		logger.V(4).Info("Role deleted successfully", "Role", roleName)
+	}
+
+	return nil
+}
+
+func getRoleAndPolicyArn(ctx context.Context, managedCluster *v1.ManagedCluster, cfg aws.Config) (string, string, string, string, error) {
+	logger := klog.FromContext(ctx)
+
+	managedClusterIamRoleSuffix :=
+		managedCluster.Annotations["agent.open-cluster-management.io/managed-cluster-iam-role-suffix"]
+
+	roleName := fmt.Sprintf("ocm-hub-%s", managedClusterIamRoleSuffix)
+	policyName := roleName
+
+	creds, err := cfg.Credentials.Retrieve(ctx)
+	if err != nil {
+		logger.V(4).Error(err, "Failed to get IAM Credentials")
+		return "", "", "", "", err
+	}
+	awsAccountId := creds.AccountID
+	roleArn := fmt.Sprintf("arn:aws:iam::%s:role/%s", awsAccountId, roleName)
+	policyArn := fmt.Sprintf("arn:aws:iam::%s:policy/%s", awsAccountId, policyName)
+	return roleName, policyName, roleArn, policyArn, err
+}
+
+func deleteAccessEntry(ctx context.Context, eksClient *eks.Client, roleArn string, hubClusterName string) error {
+	logger := klog.FromContext(ctx)
+
+	params := &eks.DeleteAccessEntryInput{
+		ClusterName:  aws.String(hubClusterName),
+		PrincipalArn: aws.String(roleArn),
+	}
+
+	_, err := eksClient.DeleteAccessEntry(ctx, params)
+	if err != nil {
+		logger.V(4).Error(err, "Failed to delete Access Entry for HubClusterName", "HubClusterName", hubClusterName)
+		return err
+	} else {
+		logger.V(4).Info("Access Entry deleted successfully for HubClusterName", "HubClusterName", hubClusterName)
+	}
+
 	return nil
 }
 
