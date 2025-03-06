@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -123,7 +124,7 @@ func TestAccept(t *testing.T) {
 		[]string{
 			"arn:aws:eks:us-west-2:123456789012:cluster/.*",
 			"arn:aws:eks:us-west-1:123456789012:cluster/.*",
-		},
+		}, []string{},
 	)
 
 	if err != nil {
@@ -144,7 +145,7 @@ func TestNewDriverValidation(t *testing.T) {
 	// Test with an invalid manager cluster approval pattern
 	_, err := NewAWSIRSAHubDriver(context.Background(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster", []string{
 		"arn:(aws:eks:us-west-2:123456789012:cluster/.*", // bad pattern
-	})
+	}, []string{})
 	if err == nil {
 		t.Errorf("Error expected")
 	}
@@ -568,7 +569,7 @@ func TestCleanup(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			awsIrsaHubDriver, err := NewAWSIRSAHubDriver(context.Background(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster", []string{})
+			awsIrsaHubDriver, err := NewAWSIRSAHubDriver(context.Background(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster", []string{}, []string{})
 			if err != nil {
 				t.Errorf("error creating AWSIRSAHubDriver")
 				return
@@ -939,8 +940,9 @@ func TestCreateIAMRoleAndPolicy(t *testing.T) {
 
 			managedCluster := testinghelpers.NewManagedCluster()
 			managedCluster.Annotations = tt.managedClusterAnnotations
+			tags := []string{}
 
-			_, _, err = createIAMRoleAndPolicy(tt.args.ctx, HubClusterArn, managedCluster, cfg)
+			_, _, err = createIAMRoleAndPolicy(tt.args.ctx, HubClusterArn, managedCluster, cfg, tags)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("error = %#v, wantErr %#v", err, tt.wantErr)
 				return
@@ -1045,14 +1047,262 @@ func TestCreateAccessEntries(t *testing.T) {
 
 			managedCluster := testinghelpers.NewManagedCluster()
 			managedCluster.Annotations = tt.managedClusterAnnotations
+			tags := []string{}
 
-			err = createAccessEntry(tt.args.ctx, eksClient, principalArn, hubClusterName, managedClusterName)
+			err = createAccessEntry(tt.args.ctx, eksClient, principalArn, hubClusterName, managedClusterName, tags)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("error = %#v, wantErr %#v", err, tt.wantErr)
 				return
 			}
 			if tt.wantErr && err.Error() != tt.want.Error() {
 				t.Errorf("err = %#v, want %#v", err, tt.want)
+			}
+		})
+	}
+}
+func TestCreateTags(t *testing.T) {
+	type args struct {
+		ctx                context.Context
+		withAPIOptionsFunc func(*middleware.Stack) error
+	}
+
+	cases := []struct {
+		name                      string
+		args                      args
+		managedClusterAnnotations map[string]string
+		want                      error
+		wantErr                   bool
+		tags                      []string
+	}{
+		{
+			name: "test create IAM Role and Policy with Tags",
+			args: args{
+				ctx: context.Background(),
+				withAPIOptionsFunc: func(stack *middleware.Stack) error {
+					return stack.Finalize.Add(
+						middleware.FinalizeMiddlewareFunc(
+							"CreateRoleAndPolicyWithTagsMock",
+							func(ctx context.Context, input middleware.FinalizeInput, handler middleware.FinalizeHandler) (middleware.FinalizeOutput, middleware.Metadata, error) {
+								operationName := middleware.GetOperationName(ctx)
+								if operationName == "CreateRole" {
+									return middleware.FinalizeOutput{
+										Result: &iam.CreateRoleOutput{Role: &iamtypes.Role{
+											RoleName: aws.String("TestRole"),
+											Arn:      aws.String("arn:aws:iam::123456789012:role/TestRole"),
+											Tags: []iamtypes.Tag{
+												{
+													Key:   aws.String("product:v1:tenant:app-name"),
+													Value: aws.String("My-App"),
+												},
+												{
+													Key:   aws.String("product:v1:tenant:created-by"),
+													Value: aws.String("Team-1"),
+												},
+											},
+										},
+										},
+									}, middleware.Metadata{}, nil
+								}
+								if operationName == "CreatePolicy" {
+									return middleware.FinalizeOutput{
+										Result: &iam.CreatePolicyOutput{Policy: &iamtypes.Policy{
+											PolicyName: aws.String("TestPolicy"),
+											Arn:        aws.String("arn:aws:iam::123456789012:role/TestPolicy"),
+											Tags: []iamtypes.Tag{
+												{
+													Key:   aws.String("product:v1:tenant:app-name"),
+													Value: aws.String("My-App"),
+												},
+												{
+													Key:   aws.String("product:v1:tenant:created-by"),
+													Value: aws.String("Team-1"),
+												},
+											},
+										},
+										},
+									}, middleware.Metadata{}, nil
+								}
+								if operationName == "AttachRolePolicy" {
+									return middleware.FinalizeOutput{
+										Result: &iam.AttachRolePolicyOutput{},
+									}, middleware.Metadata{}, nil
+								}
+								return middleware.FinalizeOutput{}, middleware.Metadata{}, nil
+							},
+						),
+						middleware.Before,
+					)
+				},
+			},
+			managedClusterAnnotations: map[string]string{
+				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
+				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+			},
+			want:    nil,
+			wantErr: false,
+			tags:    []string{"product:v1:tenant:app-name=My-App", "product:v1:tenant:created-by=Team-1"},
+		},
+		{
+			name: "test create IAM Role and Policy with invalid Tag with key beginning with aws",
+			args: args{
+				ctx: context.Background(),
+				withAPIOptionsFunc: func(stack *middleware.Stack) error {
+					return stack.Finalize.Add(
+						middleware.FinalizeMiddlewareFunc(
+							"CreateRoleWithInvalidTagBeginsAwsMock",
+							func(ctx context.Context, input middleware.FinalizeInput, handler middleware.FinalizeHandler) (middleware.FinalizeOutput, middleware.Metadata, error) {
+								operationName := middleware.GetOperationName(ctx)
+								if operationName == "CreateRole" {
+									return middleware.FinalizeOutput{
+										Result: nil,
+									}, middleware.Metadata{}, fmt.Errorf("failed to create IAM role")
+								}
+								return middleware.FinalizeOutput{}, middleware.Metadata{}, nil
+							},
+						),
+						middleware.Before,
+					)
+				},
+			},
+			managedClusterAnnotations: map[string]string{
+				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
+				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+			},
+			want:    fmt.Errorf("operation error IAM: CreateRole, failed to create IAM role"),
+			wantErr: true,
+			tags:    []string{"aws:invalid:tag=invalid-tag"},
+		},
+		{
+			name: "test create IAM Role and Policy with invalid Tag with empty key",
+			args: args{
+				ctx: context.Background(),
+				withAPIOptionsFunc: func(stack *middleware.Stack) error {
+					return stack.Finalize.Add(
+						middleware.FinalizeMiddlewareFunc(
+							"CreateRoleWithInvalidTagEmptyKeyMock",
+							func(ctx context.Context, input middleware.FinalizeInput, handler middleware.FinalizeHandler) (middleware.FinalizeOutput, middleware.Metadata, error) {
+								operationName := middleware.GetOperationName(ctx)
+								if operationName == "CreateRole" {
+									return middleware.FinalizeOutput{
+										Result: nil,
+									}, middleware.Metadata{}, fmt.Errorf("failed to create IAM role")
+								}
+								return middleware.FinalizeOutput{}, middleware.Metadata{}, nil
+							},
+						),
+						middleware.Before,
+					)
+				},
+			},
+			managedClusterAnnotations: map[string]string{
+				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
+				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+			},
+			want:    fmt.Errorf("operation error IAM: CreateRole, failed to create IAM role"),
+			wantErr: true,
+			tags:    []string{"=emptykey"},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			os.Setenv("AWS_ACCESS_KEY_ID", "test")
+			os.Setenv("AWS_SECRET_ACCESS_KEY", "test")
+			os.Setenv("AWS_ACCOUNT_ID", "test")
+
+			cfg, err := config.LoadDefaultConfig(
+				tt.args.ctx,
+				config.WithAPIOptions([]func(*middleware.Stack) error{tt.args.withAPIOptionsFunc}),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			HubClusterArn := "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster"
+
+			managedCluster := testinghelpers.NewManagedCluster()
+			managedCluster.Annotations = tt.managedClusterAnnotations
+
+			_, _, err = createIAMRoleAndPolicy(tt.args.ctx, HubClusterArn, managedCluster, cfg, tt.tags)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("error = %#v, wantErr %#v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && err.Error() != tt.want.Error() {
+				t.Errorf("err = %#v, want %#v", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseTagsForRolesAndPolicies(t *testing.T) {
+	cases := []struct {
+		name   string
+		tags   []string
+		result []iamtypes.Tag
+		err    error
+	}{
+		{
+			name: "Test Parsing Tags Correctly",
+			tags: []string{"product:v1:tenant:app-name=My-App"},
+			result: []iamtypes.Tag{
+				{
+					Key:   &[]string{"product:v1:tenant:app-name"}[0],
+					Value: &[]string{"My-App"}[0],
+				},
+			},
+			err: nil,
+		},
+		{
+			name:   "Test Parsing Tags Incorrectly",
+			tags:   []string{"product:v1:tenant:app-nameMy-App"},
+			result: nil,
+			err:    fmt.Errorf("missing value from tag"),
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			output, err := parseTagsForRolesAndPolicies(tt.tags)
+
+			if !reflect.DeepEqual(output, tt.result) && err != tt.err {
+				for idx := range output {
+					t.Errorf("Expected error to be %#v, but got %#v", tt.err, err)
+					t.Errorf("Expected {Key: %s, Value: %s}, but got {Key: %s, Value: %s}", *tt.result[idx].Key, *tt.result[idx].Value, *output[idx].Key, *output[idx].Value)
+				}
+			}
+		})
+	}
+}
+
+func TestParseTagsForAccessEntries(t *testing.T) {
+	cases := []struct {
+		name   string
+		tags   []string
+		result map[string]string
+		err    error
+	}{
+		{
+			name:   "Test Parsing Tags Correctly for access entries",
+			tags:   []string{"product:v1:tenant:app-name=My-App"},
+			result: map[string]string{"product:v1:tenant:app-name": "My-App"},
+			err:    nil,
+		},
+		{
+			name:   "Test Parsing Tags Incorrectly  access entries",
+			tags:   []string{"product:v1:tenant:app-nameMy-App"},
+			result: nil,
+			err:    fmt.Errorf("missing value in the tag"),
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			output, err := parseTagsForAccessEntry(tt.tags)
+
+			if !reflect.DeepEqual(output, tt.result) && err != tt.err {
+				for key := range output {
+					t.Errorf("Expected error to be %#v, but got %#v", tt.err, err)
+					t.Errorf("Expected {Key: %s, Value: %s}, but got {Key: %s, Value: %s}", key, tt.result[key], key, output[key])
+				}
 			}
 		})
 	}

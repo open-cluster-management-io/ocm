@@ -125,16 +125,36 @@ type RegistrationDriverHub struct {
 	// +kubebuilder:validation:Enum=csr;awsirsa
 	AuthType string `json:"authType,omitempty"`
 
+	// CSR represents the configuration for csr driver.
+	// +optional
+	CSR *CSRConfig `json:"csr,omitempty"`
+
+	// AwsIrsa represents the configuration for awsisra driver.
+	// +optional
+	AwsIrsa *AwsIrsaConfig `json:"awsisra,omitempty"`
+}
+
+type CSRConfig struct {
+	// AutoApprovedIdentities represent a list of approved users
+	// +optional
+	AutoApprovedIdentities []string `json:"autoApprovedIdentities,omitempty"`
+}
+
+type AwsIrsaConfig struct {
 	// This represents the hub cluster ARN
 	// Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1
 	// +optional
 	// +kubebuilder:validation:Pattern=`^arn:aws:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$`
 	HubClusterArn string `json:"hubClusterArn,omitempty"`
 
-	// For csr authentication type, AutoApprovedIdentities represent a list of approved users
-	// For awsirsa authentication type, AutoApprovedIdentities represent a list of approved arn patterns
+	// AutoApprovedIdentities represent a list of approved arn patterns
 	// +optional
 	AutoApprovedIdentities []string `json:"autoApprovedIdentities,omitempty"`
+
+	// List of tags to be added to AWS resources created by hub while processing awsirsa registration request
+	// Example - "product:v1:tenant:app-name=My-App"
+	// +optional
+	Tags []string `json:"tags,omitempty"`
 }
 
 type WorkConfiguration struct {
