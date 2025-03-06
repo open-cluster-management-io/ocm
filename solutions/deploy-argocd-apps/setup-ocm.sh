@@ -15,7 +15,7 @@ kind create cluster --name "${c2}" --config cluster2-config.yaml
 
 kubectl config use ${hubctx}
 echo "Initialize the ocm hub cluster"
-joincmd=$(clusteradm init --use-bootstrap-token | grep clusteradm)
+joincmd=$(clusteradm init --use-bootstrap-token --wait | grep clusteradm)
 
 kubectl config use ${c1ctx}
 echo "Join cluster1 to hub"
