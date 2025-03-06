@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"reflect"
 	"regexp"
 	"testing"
 
@@ -49,6 +50,7 @@ func TestClusterManagerConfig(t *testing.T) {
 			namespace: "open-cluster-management",
 			chartConfig: func() *ClusterManagerChartConfig {
 				config := NewDefaultClusterManagerChartConfig()
+				config.NodeSelector = map[string]string{"kubernetes.io/os": "linux"}
 				return config
 			},
 			expectedObjCnt: 6,
@@ -168,6 +170,9 @@ func TestClusterManagerConfig(t *testing.T) {
 					if object.Spec.Template.Spec.Containers[0].Image != fmt.Sprintf("%s/registration-operator:%s", registry, version) {
 						t.Errorf("failed to render operator image")
 					}
+					if !reflect.DeepEqual(object.Spec.Template.Spec.NodeSelector, config.NodeSelector) {
+						t.Errorf("failed to render node selector")
+					}
 
 				case *apiextensionsv1.CustomResourceDefinition:
 					if object.Name != "clustermanagers.operator.open-cluster-management.io" {
@@ -234,6 +239,7 @@ func TestKlusterletConfig(t *testing.T) {
 			namespace: "open-cluster-management",
 			chartConfig: func() *KlusterletChartConfig {
 				config := NewDefaultKlusterletChartConfig()
+				config.NodeSelector = map[string]string{"kubernetes.io/os": "linux"}
 				config.Klusterlet.ClusterName = "testCluster"
 				config.Klusterlet.Mode = operatorv1.InstallModeSingleton
 				return config
@@ -357,6 +363,9 @@ func TestKlusterletConfig(t *testing.T) {
 						t.Errorf("failed to render operator image")
 					}
 
+					if !reflect.DeepEqual(object.Spec.Template.Spec.NodeSelector, config.NodeSelector) {
+						t.Errorf("failed to render node selector")
+					}
 				case *apiextensionsv1.CustomResourceDefinition:
 					if object.Name != "klusterlets.operator.open-cluster-management.io" {
 						t.Errorf(" got CRD name %s", object.Name)
