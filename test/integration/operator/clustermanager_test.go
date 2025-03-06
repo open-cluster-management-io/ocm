@@ -1155,8 +1155,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				}
 				clusterManager.Spec.RegistrationConfiguration.RegistrationDrivers = []operatorapiv1.RegistrationDriverHub{
 					{
-						AuthType:               "csr",
-						AutoApprovedIdentities: []string{"user3", "user4"},
+						AuthType: "csr",
+						CSR: &operatorapiv1.CSRConfig{
+							AutoApprovedIdentities: []string{"user3", "user4"},
+						},
 					},
 				}
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})

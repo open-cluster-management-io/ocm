@@ -569,7 +569,7 @@ func TestCleanup(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			awsIrsaHubDriver, err := NewAWSIRSAHubDriver(context.Background(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster", []string{})
+			awsIrsaHubDriver, err := NewAWSIRSAHubDriver(context.Background(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster", []string{}, []string{})
 			if err != nil {
 				t.Errorf("error creating AWSIRSAHubDriver")
 				return

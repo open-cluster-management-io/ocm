@@ -16,7 +16,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode with aws registration", fun
 	var cancel context.CancelFunc
 	var hubRegistrationSA = "registration-controller-sa"
 	var hubClusterArn = "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster"
-	var tags = "[product:v1:tenant:app-name=My-App product:v1:tenant:created-by=Team-1]"
+	var tags = "product:v1:tenant:app-name=My-App,product:v1:tenant:created-by=Team-1"
 
 	ginkgo.BeforeEach(func() {
 		var ctx context.Context
@@ -53,8 +53,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode with aws registration", fun
 									"product:v1:tenant:app-name=My-App",
 									"product:v1:tenant:created-by=Team-1",
 								},
+								AutoApprovedIdentities: []string{"arn:aws:eks:us-west-2:123456789013:cluster/.*", "arn:aws:eks:us-west-2:123456789012:cluster/.*"},
 							},
-							AutoApprovedIdentities: []string{"arn:aws:eks:us-west-2:123456789013:cluster/.*", "arn:aws:eks:us-west-2:123456789012:cluster/.*"},
 						},
 					}
 				}
@@ -112,7 +112,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode with aws registration", fun
 				commandLineArgs := registrationControllerDeployment.Spec.Template.Spec.Containers[0].Args
 				tagsArg, present := findMatchingArg(commandLineArgs, "--aws-resource-tags")
 
-				return present && strings.Split(tagsArg, "=")[1] == tags
+				return present && strings.SplitN(tagsArg, "=", 2)[1] == tags
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 		})
 		ginkgo.It("should have auto approved arn patterns separated by comma with awsirsa", func() {
