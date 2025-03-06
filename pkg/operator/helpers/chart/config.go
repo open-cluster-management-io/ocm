@@ -20,7 +20,7 @@ type ClusterManagerChartConfig struct {
 	// Resources is the resource requirements of the operator deployment
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 	// NodeSelector is the nodeSelector of the operator deployment
-	NodeSelector *corev1.NodeSelector `json:"nodeSelector,omitempty"`
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 	// Tolerations is the tolerations of the operator deployment
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 	// Affinity is the affinity of the operator deployment
@@ -47,7 +47,7 @@ type KlusterletChartConfig struct {
 	// Resources is the resource requirements of the operator deployment
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 	// NodeSelector is the nodeSelector of the operator deployment
-	NodeSelector *corev1.NodeSelector `json:"nodeSelector,omitempty"`
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 	// Tolerations is the tolerations of the operator deployment
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 	// Affinity is the affinity of the operator deployment
