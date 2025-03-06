@@ -1141,6 +1141,43 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 		})
 
+		ginkgo.It("should have auto approved csr users set on registration-controller if csr driver is present", func() {
+			// Update cluster manager configuration
+			gomega.Eventually(func() error {
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				// Check addon manager enabled mode
+				if clusterManager.Spec.RegistrationConfiguration == nil {
+					clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{}
+				}
+				clusterManager.Spec.RegistrationConfiguration.RegistrationDrivers = []operatorapiv1.RegistrationDriverHub{
+					{
+						AuthType:               "csr",
+						AutoApprovedIdentities: []string{"user3", "user4"},
+					},
+				}
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			gomega.Eventually(func() error {
+				actual, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
+				for _, arg := range actual.Spec.Template.Spec.Containers[0].Args {
+					if arg == "--auto-approved-csr-users=user3,user4" {
+						return nil
+					}
+				}
+				return fmt.Errorf("do not find the auto-approved-csr-users args, got %v", actual.Spec.Template.Spec.Containers[0].Args)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+		})
+
 	})
 
 	ginkgo.Context("Cluster manager statuses", func() {
