@@ -79,12 +79,9 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 			enabledRegistrationDrivers = append(enabledRegistrationDrivers, registrationDriver.AuthType)
 			if registrationDriver.AuthType == "awsirsa" {
 				config.HubClusterArn = registrationDriver.HubClusterArn
-				var AutoApprovedIdentities = registrationDriver.AutoApprovedIdentities
-				if AutoApprovedIdentities != nil {
-					config.AutoApprovedARNPatterns = strings.Join(AutoApprovedIdentities, ",")
-				}
+				config.AutoApprovedARNPatterns = strings.Join(registrationDriver.AutoApprovedIdentities, ",")
 			} else if registrationDriver.AuthType == "csr" {
-				config.AutoApprovedCSRUsers = registrationDriver.AutoApprovedIdentities
+				config.AutoApprovedCSRUsers = strings.Join(registrationDriver.AutoApprovedIdentities, ",")
 			}
 		}
 		config.EnabledRegistrationDrivers = strings.Join(enabledRegistrationDrivers, ",")
