@@ -133,9 +133,6 @@ While the implementation of this feature is in progress, in the hub and spoke si
    ```shell
    sed -e "s/ROLE_NAME/$SPOKE_ROLE_NAME/g" -e "s/SPOKE_ACCOUNT_ID/$SPOKE_ACCOUNT_ID/g" -e "s/HUB_ACCOUNT_ID/$HUB_ACCOUNT_ID/g" -e "s/HUB_CLUSTER_NAME/$HUB_CLUSTER_NAME/g" -e "s/SPOKE_CLUSTER_NAME/$SPOKE_CLUSTER_NAME/g" templates/Template-Hub-Role-Trust-Policy.json > templates/Hub-Role-Trust-Policy.json
    aws iam create-role --role-name $HUB_ROLE_NAME --assume-role-policy-document file://templates/Hub-Role-Trust-Policy.json
-   
-   sed -e "s/REGION/$HUB_REGION/g" -e "s/ACCOUNT_ID/$HUB_ACCOUNT_ID/g" -e "s/CLUSTER_NAME/$HUB_CLUSTER_NAME/g" templates/Template-Hub-Role-Permission-Policy.json > templates/Hub-Role-Permission-Policy.json
-   aws iam put-role-policy --role-name $HUB_ROLE_NAME --policy-name $HUB_POLICY_NAME --policy-document file://templates/Hub-Role-Permission-Policy.json
    ```
 
 7. Accept the ManagedCluster registration request on hub cluster:

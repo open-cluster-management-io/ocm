@@ -20,6 +20,7 @@ import (
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	v1 "open-cluster-management.io/api/cluster/v1"
+	operatorv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/manifests"
 	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
@@ -27,8 +28,9 @@ import (
 )
 
 const (
-	errNoSuchEntity        = "NoSuchEntity"
-	errEntityAlreadyExists = "EntityAlreadyExists"
+	errNoSuchEntity         = "NoSuchEntity"
+	errEntityAlreadyExists  = "EntityAlreadyExists"
+	trustPolicyTemplatePath = "managed-cluster-policy/TrustPolicy.tmpl"
 )
 
 type AWSIRSAHubDriver struct {
@@ -46,7 +48,7 @@ func (a *AWSIRSAHubDriver) Accept(cluster *clusterv1.ManagedCluster) bool {
 		return true
 	}
 
-	managedClusterArn := cluster.Annotations["agent.open-cluster-management.io/managed-cluster-arn"]
+	managedClusterArn := cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterArn]
 	for _, p := range a.autoApprovedARNPatterns {
 		// Ensure the pattern matches the entire managed cluster ARN
 		if p.FindString(managedClusterArn) == managedClusterArn && len(managedClusterArn) > 0 {
@@ -59,8 +61,8 @@ func (a *AWSIRSAHubDriver) Accept(cluster *clusterv1.ManagedCluster) bool {
 // Cleanup is run when the cluster is deleting or hubAcceptClient is set false
 func (c *AWSIRSAHubDriver) Cleanup(ctx context.Context, managedCluster *clusterv1.ManagedCluster) error {
 	_, isManagedClusterIamRoleSuffixPresent :=
-		managedCluster.Annotations["agent.open-cluster-management.io/managed-cluster-iam-role-suffix"]
-	_, isManagedClusterArnPresent := managedCluster.Annotations["agent.open-cluster-management.io/managed-cluster-arn"]
+		managedCluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterIAMRoleSuffix]
+	_, isManagedClusterArnPresent := managedCluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterArn]
 
 	logger := klog.FromContext(ctx)
 
@@ -69,13 +71,13 @@ func (c *AWSIRSAHubDriver) Cleanup(ctx context.Context, managedCluster *clusterv
 		return nil
 	}
 
-	roleName, _, roleArn, policyArn, err := getRoleAndPolicyArn(ctx, managedCluster, c.cfg)
+	roleName, roleArn, err := getRoleNameAndArn(ctx, managedCluster, c.cfg)
 	if err != nil {
-		logger.V(4).Error(err, "Failed to getRoleAndPolicyArn")
+		logger.V(4).Error(err, "Failed to getRoleNameAndArn")
 		return err
 	}
 
-	err = deleteIAMRoleAndPolicy(ctx, c.cfg, roleName, policyArn)
+	err = deleteIAMRoleAndPolicy(ctx, c.cfg, roleName)
 	if err != nil {
 		return err
 	}
@@ -95,8 +97,8 @@ func (c *AWSIRSAHubDriver) Run(_ context.Context, _ int) {
 }
 
 func (a *AWSIRSAHubDriver) allows(cluster *clusterv1.ManagedCluster) bool {
-	_, isManagedClusterArnPresent := cluster.Annotations["agent.open-cluster-management.io/managed-cluster-arn"]
-	_, isManagedClusterIAMRoleSuffixPresent := cluster.Annotations["agent.open-cluster-management.io/managed-cluster-iam-role-suffix"]
+	_, isManagedClusterArnPresent := cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterArn]
+	_, isManagedClusterIAMRoleSuffixPresent := cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterIAMRoleSuffix]
 	return isManagedClusterArnPresent && isManagedClusterIAMRoleSuffixPresent
 }
 
@@ -123,7 +125,7 @@ func (a *AWSIRSAHubDriver) CreatePermissions(ctx context.Context, cluster *clust
 }
 
 // This function creates:
-// 1. IAM Role and Policy in the hub cluster IAM
+// 1. IAM Role and Trust Policy in the hub cluster IAM
 // 2. Returns the hubClusterName and the roleArn to be used for Access Entry creation
 func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCluster *v1.ManagedCluster, cfg aws.Config,
 	awsResourceTags []string) (string, string, error) {
@@ -139,15 +141,15 @@ func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 	iamClient := iam.NewFromConfig(cfg)
 
 	managedClusterIamRoleSuffix, isManagedClusterIamRoleSuffixPresent :=
-		managedCluster.Annotations["agent.open-cluster-management.io/managed-cluster-iam-role-suffix"]
-	managedClusterArn, isManagedClusterArnPresent := managedCluster.Annotations["agent.open-cluster-management.io/managed-cluster-arn"]
+		managedCluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterIAMRoleSuffix]
+	managedClusterArn, isManagedClusterArnPresent := managedCluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterArn]
 
 	hubAccountId, hubClusterName = commonhelpers.GetAwsAccountIdAndClusterName(hubClusterArn)
 	managedClusterAccountId, managedClusterName = commonhelpers.GetAwsAccountIdAndClusterName(managedClusterArn)
 
-	roleName, policyName, roleArn, policyArn, err := getRoleAndPolicyArn(ctx, managedCluster, cfg)
+	roleName, roleArn, err := getRoleNameAndArn(ctx, managedCluster, cfg)
 	if err != nil {
-		logger.V(4).Error(err, "Failed to getRoleAndPolicyArn")
+		logger.V(4).Error(err, "Failed to getRoleNameAndArn")
 		return hubClusterName, roleArn, err
 	}
 
@@ -160,7 +162,6 @@ func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 			return hubClusterName, roleArn, err
 		}
 
-		templateFiles := []string{"managed-cluster-policy/AccessPolicy.tmpl", "managed-cluster-policy/TrustPolicy.tmpl"}
 		data := map[string]interface{}{
 			"hubClusterArn":               hubClusterArn,
 			"managedClusterAccountId":     managedClusterAccountId,
@@ -169,9 +170,9 @@ func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 			"hubClusterName":              hubClusterName,
 			"managedClusterName":          managedClusterName,
 		}
-		renderedTemplates, err := renderTemplates(templateFiles, data)
+		trustPolicy, err := renderTemplate(trustPolicyTemplatePath, data)
 		if err != nil {
-			logger.V(4).Error(err, "Failed to render templates while creating IAM role and policy for ManagedCluster", "ManagedCluster", managedClusterName)
+			logger.V(4).Error(err, "Failed to render template while creating IAM role and policy for ManagedCluster", "ManagedCluster", managedClusterName)
 			return hubClusterName, roleArn, err
 		}
 
@@ -184,7 +185,7 @@ func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 
 		createRoleOutput, err = iamClient.CreateRole(ctx, &iam.CreateRoleInput{
 			RoleName:                 aws.String(roleName),
-			AssumeRolePolicyDocument: aws.String(renderedTemplates[1]),
+			AssumeRolePolicyDocument: aws.String(trustPolicy),
 			Tags:                     parsedTags,
 		})
 		if err != nil {
@@ -198,62 +199,29 @@ func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 		} else {
 			logger.V(4).Info("Role created successfully for ManagedCluster", "IAMRole", *createRoleOutput.Role.Arn, "ManagedCluster", managedClusterName)
 		}
-
-		createPolicyResult, err := iamClient.CreatePolicy(ctx, &iam.CreatePolicyInput{
-			PolicyDocument: aws.String(renderedTemplates[0]),
-			PolicyName:     aws.String(policyName),
-		})
-		if err != nil {
-			if !(strings.Contains(err.Error(), errEntityAlreadyExists)) {
-				logger.V(4).Error(err, "Failed to create IAM Policy for ManagedCluster", "IAMPolicy", policyName, "ManagedCluster", managedClusterName)
-				return hubClusterName, roleArn, err
-			} else {
-				logger.V(4).Info("Ignore IAM policy creation error for ManagedCluster as it already exists", "IAMPolicy", policyName, "ManagedCluster", managedClusterName)
-			}
-		} else {
-			logger.V(4).Info("Policy created successfully for ManagedCluster", "IAMPolicy", *createPolicyResult.Policy.Arn, "ManagedCluster", managedClusterName)
-		}
-
-		_, err = iamClient.AttachRolePolicy(ctx, &iam.AttachRolePolicyInput{
-			PolicyArn: aws.String(policyArn),
-			RoleName:  aws.String(roleName),
-		})
-		if err != nil {
-			logger.V(4).Error(err, "Unable to attach policy to role for ManagedCluster",
-				"IAMPolicy", policyName, "IAMRole", roleName, "ManagedCluster", managedClusterName)
-			return hubClusterName, roleArn, err
-		} else {
-			logger.V(4).Info("Successfully attached IAM Policy to Role for ManagedCluster",
-				"IAMPolicy", policyName, "IAMRole", roleName, "ManagedCluster", managedClusterName)
-		}
 	}
 	return hubClusterName, roleArn, nil
 }
 
-func renderTemplates(argTemplates []string, data interface{}) (args []string, err error) {
+func renderTemplate(argTemplate string, data interface{}) (args string, err error) {
 	var t *template.Template
 	var filebytes []byte
-	for _, arg := range argTemplates {
-		filebytes, err = manifests.ManagedClusterPolicyManifestFiles.ReadFile(arg)
-		if err != nil {
-			args = nil
-			return
-		}
-		contents := string(filebytes)
-		t, err = template.New(contents).Parse(contents)
-		if err != nil {
-			args = nil
-			return
-		}
-
-		buf := &bytes.Buffer{}
-		err = t.Execute(buf, data)
-		if err != nil {
-			args = nil
-			return
-		}
-		args = append(args, buf.String())
+	filebytes, err = manifests.ManagedClusterPolicyManifestFiles.ReadFile(argTemplate)
+	if err != nil {
+		return
 	}
+	contents := string(filebytes)
+	t, err = template.New(contents).Parse(contents)
+	if err != nil {
+		return
+	}
+
+	buf := &bytes.Buffer{}
+	err = t.Execute(buf, data)
+	if err != nil {
+		return
+	}
+	args = buf.String()
 
 	return
 }
@@ -297,37 +265,12 @@ func createAccessEntry(ctx context.Context, eksClient *eks.Client, roleArn strin
 	return nil
 }
 
-func deleteIAMRoleAndPolicy(ctx context.Context, cfg aws.Config, roleName string, policyArn string) error {
+func deleteIAMRoleAndPolicy(ctx context.Context, cfg aws.Config, roleName string) error {
 	logger := klog.FromContext(ctx)
 
 	iamClient := iam.NewFromConfig(cfg)
 
-	_, err := iamClient.DetachRolePolicy(ctx, &iam.DetachRolePolicyInput{
-		RoleName:  &roleName,
-		PolicyArn: &policyArn,
-	})
-	if err != nil {
-		if !strings.Contains(err.Error(), errNoSuchEntity) {
-			logger.V(4).Error(err, "Failed to detach Policy from Role", "Policy", policyArn, "Role", roleName)
-			return err
-		}
-	} else {
-		logger.V(4).Info("Policy detached successfully from Role", "Policy", policyArn, "Role", roleName)
-	}
-
-	_, err = iamClient.DeletePolicy(ctx, &iam.DeletePolicyInput{
-		PolicyArn: &policyArn,
-	})
-	if err != nil {
-		if !strings.Contains(err.Error(), errNoSuchEntity) {
-			logger.V(4).Error(err, "Failed to delete Policy", "Policy", policyArn)
-			return err
-		}
-	} else {
-		logger.V(4).Info("Policy deleted successfully", "Policy", policyArn)
-	}
-
-	_, err = iamClient.DeleteRole(ctx, &iam.DeleteRoleInput{
+	_, err := iamClient.DeleteRole(ctx, &iam.DeleteRoleInput{
 		RoleName: &roleName,
 	})
 	if err != nil {
@@ -342,24 +285,22 @@ func deleteIAMRoleAndPolicy(ctx context.Context, cfg aws.Config, roleName string
 	return nil
 }
 
-func getRoleAndPolicyArn(ctx context.Context, managedCluster *v1.ManagedCluster, cfg aws.Config) (string, string, string, string, error) {
+func getRoleNameAndArn(ctx context.Context, managedCluster *v1.ManagedCluster, cfg aws.Config) (string, string, error) {
 	logger := klog.FromContext(ctx)
 
 	managedClusterIamRoleSuffix :=
-		managedCluster.Annotations["agent.open-cluster-management.io/managed-cluster-iam-role-suffix"]
+		managedCluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterIAMRoleSuffix]
 
 	roleName := fmt.Sprintf("ocm-hub-%s", managedClusterIamRoleSuffix)
-	policyName := roleName
 
 	creds, err := cfg.Credentials.Retrieve(ctx)
 	if err != nil {
 		logger.V(4).Error(err, "Failed to get IAM Credentials")
-		return "", "", "", "", err
+		return "", "", err
 	}
 	awsAccountId := creds.AccountID
 	roleArn := fmt.Sprintf("arn:aws:iam::%s:role/%s", awsAccountId, roleName)
-	policyArn := fmt.Sprintf("arn:aws:iam::%s:policy/%s", awsAccountId, policyName)
-	return roleName, policyName, roleArn, policyArn, err
+	return roleName, roleArn, err
 }
 
 func deleteAccessEntry(ctx context.Context, eksClient *eks.Client, roleArn string, hubClusterName string) error {

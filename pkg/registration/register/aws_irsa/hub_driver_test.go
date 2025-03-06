@@ -20,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	operatorv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/manifests"
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
@@ -38,8 +39,8 @@ func TestAccept(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "managed-cluster1",
 					Annotations: map[string]string{
-						"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
-						"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "7f8141296c75f2871e3d030f85c35692",
+						operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
+						operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "7f8141296c75f2871e3d030f85c35692",
 					},
 				},
 			},
@@ -51,8 +52,8 @@ func TestAccept(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "managed-cluster2",
 					Annotations: map[string]string{
-						"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster2",
-						"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "7f8141296c75f2871e3d030f85c35692",
+						operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster2",
+						operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "7f8141296c75f2871e3d030f85c35692",
 					},
 				},
 			},
@@ -64,8 +65,8 @@ func TestAccept(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "managed-cluster3",
 					Annotations: map[string]string{
-						"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-1:123456789012:cluster/managed-cluster3",
-						"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "7f8141296c75f2871e3d030f85c35692",
+						operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-1:123456789012:cluster/managed-cluster3",
+						operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "7f8141296c75f2871e3d030f85c35692",
 					},
 				},
 			},
@@ -77,8 +78,8 @@ func TestAccept(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "managed-cluster4",
 					Annotations: map[string]string{
-						"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:999999999999:cluster/managed-cluster4",
-						"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "7f8141296c75f2871e3d030f85c35692",
+						operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:999999999999:cluster/managed-cluster4",
+						operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "7f8141296c75f2871e3d030f85c35692",
 					},
 				},
 			},
@@ -90,8 +91,8 @@ func TestAccept(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "managed-cluster5",
 					Annotations: map[string]string{
-						"agent.open-cluster-management.io/managed-cluster-arn":             "XXXXXXarn:aws:eks:us-west-2:123456789012:cluster/managed-cluster5",
-						"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "7f8141296c75f2871e3d030f85c35692",
+						operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "XXXXXXarn:aws:eks:us-west-2:123456789012:cluster/managed-cluster5",
+						operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "7f8141296c75f2871e3d030f85c35692",
 					},
 				},
 			},
@@ -103,8 +104,8 @@ func TestAccept(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "managed-cluster6",
 					Annotations: map[string]string{
-						"agent.open-cluster-management.io/managed-cluster-arn":             "",
-						"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "7f8141296c75f2871e3d030f85c35692",
+						operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "",
+						operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "7f8141296c75f2871e3d030f85c35692",
 					},
 				},
 			},
@@ -151,8 +152,7 @@ func TestNewDriverValidation(t *testing.T) {
 	}
 }
 
-func TestRenderTemplates(t *testing.T) {
-	templateFiles := []string{"managed-cluster-policy/AccessPolicy.tmpl", "managed-cluster-policy/TrustPolicy.tmpl"}
+func TestRenderTemplate(t *testing.T) {
 	data := map[string]interface{}{
 		"hubClusterArn":               "arn:aws:iam::123456789012:cluster/hub-cluster",
 		"managedClusterAccountId":     "123456789013",
@@ -167,17 +167,9 @@ func TestRenderTemplates(t *testing.T) {
 		data["managedClusterAccountId"].(string),
 		data["managedClusterName"].(string),
 	)
-	renderedTemplates, _ := renderTemplates(templateFiles, data)
+	trustPolicy, _ := renderTemplate(trustPolicyTemplatePath, data)
 
-	APfilebuf, APerr := manifests.ManagedClusterPolicyManifestFiles.ReadFile("managed-cluster-policy/AccessPolicy.tmpl")
-	if APerr != nil {
-		t.Errorf("Templates not rendered as expected")
-		return
-	}
-	contents := string(APfilebuf)
-	AccessPolicy := strings.Replace(contents, "{{.hubClusterArn}}", data["hubClusterArn"].(string), 1)
-
-	TPfilebuf, TPerr := manifests.ManagedClusterPolicyManifestFiles.ReadFile("managed-cluster-policy/TrustPolicy.tmpl")
+	TPfilebuf, TPerr := manifests.ManagedClusterPolicyManifestFiles.ReadFile(trustPolicyTemplatePath)
 	if TPerr != nil {
 		t.Errorf("Templates not rendered as expected")
 		return
@@ -193,17 +185,7 @@ func TestRenderTemplates(t *testing.T) {
 
 	TrustPolicy := replacer.Replace(contentstrust)
 
-	if len(renderedTemplates) != 2 {
-		t.Errorf("Templates not rendered as expected")
-		return
-	}
-
-	if renderedTemplates[0] != AccessPolicy {
-		t.Errorf("AccessPolicy not rendered as expected")
-		return
-	}
-
-	if renderedTemplates[1] != TrustPolicy {
+	if trustPolicy != TrustPolicy {
 		t.Errorf("TrustPolicy not rendered as expected")
 		return
 	}
@@ -229,74 +211,8 @@ func TestDeleteIAMRoleAndPolicy(t *testing.T) {
 				withAPIOptionsFunc: mockSuccessfulDeletionBehaviour,
 			},
 			managedClusterAnnotations: map[string]string{
-				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
-				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
-			},
-			want:    nil,
-			wantErr: false,
-		},
-		{
-			name: "test delete IAM Role and policy with NoSuchEntity in DeleteRole",
-			args: args{
-				ctx: context.Background(),
-				withAPIOptionsFunc: func(stack *middleware.Stack) error {
-					err := mockSuccessfulDeletionBehaviour(stack)
-					if err != nil {
-						return err
-					}
-
-					return stack.Finalize.Add(
-						middleware.FinalizeMiddlewareFunc(
-							"DeleteRoleOrDeletePolicyOrDetachPolicyMock3",
-							func(ctx context.Context, input middleware.FinalizeInput, next middleware.FinalizeHandler) (middleware.FinalizeOutput, middleware.Metadata, error) {
-								if middleware.GetOperationName(ctx) == "DetachRolePolicy" {
-									return middleware.FinalizeOutput{
-										Result: &iam.DetachRolePolicyOutput{},
-									}, middleware.Metadata{}, fmt.Errorf("failed to detach IAM policy from role, NoSuchEntity")
-								}
-								return next.HandleFinalize(ctx, input)
-							},
-						),
-						middleware.Before,
-					)
-				},
-			},
-			managedClusterAnnotations: map[string]string{
-				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
-				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
-			},
-			want:    nil,
-			wantErr: false,
-		},
-		{
-			name: "test delete IAM Role and policy with NoSuchEntity in DeletePolicy",
-			args: args{
-				ctx: context.Background(),
-				withAPIOptionsFunc: func(stack *middleware.Stack) error {
-					err := mockSuccessfulDeletionBehaviour(stack)
-					if err != nil {
-						return err
-					}
-
-					return stack.Finalize.Add(
-						middleware.FinalizeMiddlewareFunc(
-							"DeleteRoleOrDeletePolicyOrDetachPolicyMock3",
-							func(ctx context.Context, input middleware.FinalizeInput, next middleware.FinalizeHandler) (middleware.FinalizeOutput, middleware.Metadata, error) {
-								if middleware.GetOperationName(ctx) == "DeletePolicy" {
-									return middleware.FinalizeOutput{
-										Result: nil,
-									}, middleware.Metadata{}, fmt.Errorf("failed to delete IAM policy, NoSuchEntity")
-								}
-								return next.HandleFinalize(ctx, input)
-							},
-						),
-						middleware.Before,
-					)
-				},
-			},
-			managedClusterAnnotations: map[string]string{
-				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
-				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
 			},
 			want:    nil,
 			wantErr: false,
@@ -328,8 +244,8 @@ func TestDeleteIAMRoleAndPolicy(t *testing.T) {
 				},
 			},
 			managedClusterAnnotations: map[string]string{
-				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
-				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
 			},
 			want:    nil,
 			wantErr: false,
@@ -353,12 +269,12 @@ func TestDeleteIAMRoleAndPolicy(t *testing.T) {
 			managedCluster := testinghelpers.NewManagedCluster()
 			managedCluster.Annotations = tt.managedClusterAnnotations
 
-			roleName, _, _, policyArn, err := getRoleAndPolicyArn(tt.args.ctx, managedCluster, cfg)
+			roleName, _, err := getRoleNameAndArn(tt.args.ctx, managedCluster, cfg)
 			if err != nil {
-				t.Errorf("Error getting role and policy Arn.")
+				t.Errorf("Error getting role name")
 				return
 			}
-			err = deleteIAMRoleAndPolicy(tt.args.ctx, cfg, roleName, policyArn)
+			err = deleteIAMRoleAndPolicy(tt.args.ctx, cfg, roleName)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("error = %#v, wantErr %#v", err, tt.wantErr)
 				return
@@ -546,8 +462,8 @@ func TestCleanup(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "managed-cluster",
 					Annotations: map[string]string{
-						"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
-						"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "7f8141296c75f2871e3d030f85c35692",
+						operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
+						operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "7f8141296c75f2871e3d030f85c35692",
 					},
 				},
 			},
@@ -642,8 +558,8 @@ func TestCreateIAMRoleAndPolicy(t *testing.T) {
 				},
 			},
 			managedClusterAnnotations: map[string]string{
-				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
-				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
 			},
 			want:    nil,
 			wantErr: false,
@@ -689,8 +605,8 @@ func TestCreateIAMRoleAndPolicy(t *testing.T) {
 				},
 			},
 			managedClusterAnnotations: map[string]string{
-				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "test",
-				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "test",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
 			},
 			want:    fmt.Errorf("HubClusterARN provided during join by ManagedCluster spoke-cluster is different from the current hub cluster"),
 			wantErr: true,
@@ -741,8 +657,8 @@ func TestCreateIAMRoleAndPolicy(t *testing.T) {
 				},
 			},
 			managedClusterAnnotations: map[string]string{
-				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
-				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
 			},
 			want:    nil,
 			wantErr: false,
@@ -770,8 +686,8 @@ func TestCreateIAMRoleAndPolicy(t *testing.T) {
 				},
 			},
 			managedClusterAnnotations: map[string]string{
-				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
-				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
 			},
 			want:    fmt.Errorf("operation error IAM: CreateRole, failed to create IAM role"),
 			wantErr: true,
@@ -829,8 +745,8 @@ func TestCreateIAMRoleAndPolicy(t *testing.T) {
 				},
 			},
 			managedClusterAnnotations: map[string]string{
-				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
-				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
 			},
 			want:    nil,
 			wantErr: false,
@@ -867,8 +783,8 @@ func TestCreateIAMRoleAndPolicy(t *testing.T) {
 				},
 			},
 			managedClusterAnnotations: map[string]string{
-				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
-				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
 			},
 			want:    fmt.Errorf("operation error IAM: CreatePolicy, failed to create IAM policy"),
 			wantErr: true,
@@ -914,8 +830,8 @@ func TestCreateIAMRoleAndPolicy(t *testing.T) {
 				},
 			},
 			managedClusterAnnotations: map[string]string{
-				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
-				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
 			},
 			want:    fmt.Errorf("operation error IAM: AttachRolePolicy, failed to attach policy to role"),
 			wantErr: true,
@@ -993,8 +909,8 @@ func TestCreateAccessEntries(t *testing.T) {
 				},
 			},
 			managedClusterAnnotations: map[string]string{
-				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
-				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
 			},
 			want:    nil,
 			wantErr: false,
@@ -1022,8 +938,8 @@ func TestCreateAccessEntries(t *testing.T) {
 				},
 			},
 			managedClusterAnnotations: map[string]string{
-				"agent.open-cluster-management.io/managed-cluster-iam-role-suffix": "960c4e56c25ba0b571ddcdaa7edc943e",
-				"agent.open-cluster-management.io/managed-cluster-arn":             "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
 			},
 			want:    fmt.Errorf("operation error EKS: CreateAccessEntry, failed to create access entry"),
 			wantErr: true,
