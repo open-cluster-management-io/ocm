@@ -1,6 +1,6 @@
 module open-cluster-management.io/ocm
 
-go 1.22.5
+go 1.23.7
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.35.0
