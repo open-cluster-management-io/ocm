@@ -17,6 +17,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/internal"
 	sourceclient "open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/client"
 	sourcelister "open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/lister"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/statushash"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/store"
 )
 
@@ -43,7 +44,7 @@ func (h *ClientHolder) ManifestWorks(namespace string) workv1client.ManifestWork
 type ClientHolderBuilder struct {
 	config       any
 	watcherStore store.WorkClientWatcherStore
-	codecs       []generic.Codec[*workv1.ManifestWork]
+	codec        generic.Codec[*workv1.ManifestWork]
 	sourceID     string
 	clusterName  string
 	clientID     string
@@ -83,9 +84,9 @@ func (b *ClientHolderBuilder) WithClusterName(clusterName string) *ClientHolderB
 	return b
 }
 
-// WithCodecs add codecs when building a manifestwork client based on cloudevents.
-func (b *ClientHolderBuilder) WithCodecs(codecs ...generic.Codec[*workv1.ManifestWork]) *ClientHolderBuilder {
-	b.codecs = codecs
+// WithCodec add codec when building a manifestwork client based on cloudevents.
+func (b *ClientHolderBuilder) WithCodec(codec generic.Codec[*workv1.ManifestWork]) *ClientHolderBuilder {
+	b.codec = codec
 	return b
 }
 
@@ -127,8 +128,8 @@ func (b *ClientHolderBuilder) NewSourceClientHolder(ctx context.Context) (*Clien
 		ctx,
 		options,
 		sourcelister.NewWatcherStoreLister(b.watcherStore),
-		ManifestWorkStatusHash,
-		b.codecs...,
+		statushash.ManifestWorkStatusHash,
+		b.codec,
 	)
 	if err != nil {
 		return nil, err
@@ -200,8 +201,8 @@ func (b *ClientHolderBuilder) NewAgentClientHolder(ctx context.Context) (*Client
 		ctx,
 		options,
 		agentlister.NewWatcherStoreLister(b.watcherStore),
-		ManifestWorkStatusHash,
-		b.codecs...,
+		statushash.ManifestWorkStatusHash,
+		b.codec,
 	)
 	if err != nil {
 		return nil, err

@@ -45,7 +45,7 @@ func (l *ConfigLoader) LoadConfig() (string, any, error) {
 			return "", nil, err
 		}
 
-		return grpcOptions.URL, grpcOptions, nil
+		return grpcOptions.Dialer.URL, grpcOptions, nil
 
 	case constants.ConfigTypeKafka:
 		kafkaOptions, err := kafka.BuildKafkaOptionsFromFlags(l.configPath)

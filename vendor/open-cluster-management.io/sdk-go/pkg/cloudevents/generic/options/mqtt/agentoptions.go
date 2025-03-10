@@ -82,7 +82,7 @@ func (o *mqttAgentOptions) WithContext(ctx context.Context, evtCtx cloudevents.E
 	return cloudeventscontext.WithTopic(ctx, eventsTopic), nil
 }
 
-func (o *mqttAgentOptions) Protocol(ctx context.Context) (options.CloudEventsProtocol, error) {
+func (o *mqttAgentOptions) Protocol(ctx context.Context, dataType types.CloudEventsDataType) (options.CloudEventsProtocol, error) {
 	subscribe := &paho.Subscribe{
 		Subscriptions: []paho.SubscribeOptions{
 			{

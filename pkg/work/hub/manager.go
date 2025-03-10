@@ -99,7 +99,7 @@ func (c *WorkHubManagerConfig) RunWorkHubManager(ctx context.Context, controller
 		clientHolder, err := work.NewClientHolderBuilder(config).
 			WithClientID(c.workOptions.CloudEventsClientID).
 			WithSourceID(sourceID).
-			WithCodecs(codec.NewManifestBundleCodec()).
+			WithCodec(codec.NewManifestBundleCodec()).
 			WithWorkClientWatcherStore(watcherStore).
 			NewSourceClientHolder(ctx)
 		if err != nil {

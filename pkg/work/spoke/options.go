@@ -7,9 +7,6 @@ import (
 )
 
 const (
-	manifestBundleCodecName = "manifestbundle"
-	manifestCodecName       = "manifest"
-
 	defaultUserAgent = "work-agent"
 )
 

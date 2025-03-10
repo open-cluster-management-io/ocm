@@ -18,7 +18,6 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
-	workv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/work"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/codec"
@@ -194,20 +193,6 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 	return nil
 }
 
-func buildCodecs(codecNames []string, restMapper meta.RESTMapper) []generic.Codec[*workv1.ManifestWork] {
-	var codecs []generic.Codec[*workv1.ManifestWork]
-	for _, name := range codecNames {
-		if name == manifestBundleCodecName {
-			codecs = append(codecs, codec.NewManifestBundleCodec())
-		}
-
-		if name == manifestCodecName {
-			codecs = append(codecs, codec.NewManifestCodec(restMapper))
-		}
-	}
-	return codecs
-}
-
 func (o *WorkAgentConfig) newWorkClientAndInformer(
 	ctx context.Context,
 	restMapper meta.RESTMapper,
@@ -244,7 +229,7 @@ func (o *WorkAgentConfig) newWorkClientAndInformer(
 		clientHolder, err := cloudeventswork.NewClientHolderBuilder(config).
 			WithClientID(o.workOptions.CloudEventsClientID).
 			WithClusterName(o.agentOptions.SpokeClusterName).
-			WithCodecs(buildCodecs(o.workOptions.CloudEventsClientCodecs, restMapper)...).
+			WithCodec(codec.NewManifestBundleCodec()).
 			WithWorkClientWatcherStore(watcherStore).
 			NewAgentClientHolder(ctx)
 		if err != nil {

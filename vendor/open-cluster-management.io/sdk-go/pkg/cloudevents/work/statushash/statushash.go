@@ -1,4 +1,4 @@
-package work
+package statushash
 
 import (
 	"crypto/sha256"

@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"os"
 	"reflect"
 	"sync"
 	"time"
@@ -211,4 +213,60 @@ func CachingCertificateLoader(certFile, keyFile string) func() (*tls.Certificate
 
 		return current.cert, current.err
 	}
+}
+
+// AutoLoadTLSConfig returns a TLS configuration for the given CA, client certificate, key files
+// that can be used to establish a TLS connection.
+// If CA is not provided, the system cert pool will be used.
+// If client certificate and key are provided, they will be used for client authentication.
+// And a goroutine will be started to periodically refresh client certificates for this connection.
+func AutoLoadTLSConfig(caFile, certFile, keyFile string, conn Connection) (*tls.Config, error) {
+	var tlsConfig *tls.Config
+	if caFile != "" {
+		certPool, err := rootCAs(caFile)
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig = &tls.Config{
+			RootCAs:    certPool,
+			MinVersion: tls.VersionTLS13,
+			MaxVersion: tls.VersionTLS13,
+		}
+		if certFile != "" && keyFile != "" {
+			// Set client certificate and key getter for tls config
+			tlsConfig.GetClientCertificate = func(cri *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+				return CachingCertificateLoader(certFile, keyFile)()
+			}
+			// Start a goroutine to periodically refresh client certificates for this connection
+			StartClientCertRotating(tlsConfig.GetClientCertificate, conn)
+		}
+	}
+
+	return tlsConfig, nil
+}
+
+// rootCAs returns a cert pool to verify the TLS connection.
+// If the caFile is not provided, the default system certificate pool will be returned
+// If the caFile is provided, the provided CA will be appended to the system certificate pool
+func rootCAs(caFile string) (*x509.CertPool, error) {
+	certPool, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(caFile) == 0 {
+		klog.Warningf("CA file is not provided, TLS connection will be verified with the system cert pool")
+		return certPool, nil
+	}
+
+	caPEM, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, err
+	}
+
+	if ok := certPool.AppendCertsFromPEM(caPEM); !ok {
+		return nil, fmt.Errorf("invalid CA %s", caFile)
+	}
+
+	return certPool, nil
 }
