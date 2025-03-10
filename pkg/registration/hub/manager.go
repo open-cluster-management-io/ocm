@@ -64,7 +64,7 @@ func NewHubManagerOptions() *HubManagerOptions {
 		GCResourceList: []string{"addon.open-cluster-management.io/v1alpha1/managedclusteraddons",
 			"work.open-cluster-management.io/v1/manifestworks"},
 		ImportOption:               importeroptions.New(),
-		EnabledRegistrationDrivers: []string{"csr"},
+		EnabledRegistrationDrivers: []string{commonhelpers.CSRAuthType},
 	}
 }
 
@@ -170,7 +170,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	var drivers []register.HubDriver
 	for _, enabledRegistrationDriver := range m.EnabledRegistrationDrivers {
 		switch enabledRegistrationDriver {
-		case "csr":
+		case commonhelpers.CSRAuthType:
 			autoApprovedCSRUsers := m.ClusterAutoApprovalUsers
 			if len(m.AutoApprovedCSRUsers) > 0 {
 				autoApprovedCSRUsers = m.AutoApprovedCSRUsers
@@ -180,7 +180,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 				return err
 			}
 			drivers = append(drivers, csrDriver)
-		case "awsirsa":
+		case commonhelpers.AwsIrsaAuthType:
 			awsIRSAHubDriver, err := awsirsa.NewAWSIRSAHubDriver(ctx, m.HubClusterArn, m.AutoApprovedARNPatterns, m.AwsResourceTags)
 			if err != nil {
 				return err

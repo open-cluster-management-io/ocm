@@ -1,6 +1,10 @@
 package helpers
 
-import "strings"
+import (
+	"crypto/md5" // #nosec G501
+	"encoding/hex"
+	"strings"
+)
 
 // GetAwsAccountIdAndClusterName Parses aws accountId and cluster-name from clusterArn
 // e.g. if clusterArn is arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1
@@ -18,4 +22,9 @@ func GetAwsAccountIdAndClusterName(clusterArn string) (string, string) {
 func GetAwsRegion(clusterArn string) string {
 	clusterStringParts := strings.Split(clusterArn, ":")
 	return clusterStringParts[3]
+}
+
+func Md5HashSuffix(hubClusterAccountId string, hubClusterName string, managedClusterAccountId string, managedClusterName string) string {
+	hash := md5.Sum([]byte(strings.Join([]string{hubClusterAccountId, hubClusterName, managedClusterAccountId, managedClusterName}, "#"))) // #nosec G401
+	return hex.EncodeToString(hash[:])
 }

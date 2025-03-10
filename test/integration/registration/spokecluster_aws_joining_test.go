@@ -42,7 +42,7 @@ var _ = ginkgo.Describe("Joining Process for aws flow", func() {
 
 			// run registration agent
 			agentOptions := &spoke.SpokeAgentOptions{
-				RegistrationAuth:         spoke.AwsIrsaAuthType,
+				RegistrationAuth:         helpers.AwsIrsaAuthType,
 				HubClusterArn:            hubClusterArn,
 				ManagedClusterArn:        managedClusterArn,
 				ManagedClusterRoleSuffix: managedClusterRoleSuffix,
@@ -168,7 +168,7 @@ var _ = ginkgo.Describe("Joining Process for aws flow", func() {
 
 			// run registration agent
 			agentOptions := &spoke.SpokeAgentOptions{
-				RegistrationAuth:         spoke.AwsIrsaAuthType,
+				RegistrationAuth:         helpers.AwsIrsaAuthType,
 				HubClusterArn:            hubClusterArn,
 				ManagedClusterArn:        managedClusterArn,
 				ManagedClusterRoleSuffix: managedClusterRoleSuffix,
@@ -201,7 +201,7 @@ var _ = ginkgo.Describe("Joining Process for aws flow", func() {
 
 			// run registration agent
 			agentOptions := &spoke.SpokeAgentOptions{
-				RegistrationAuth:         spoke.AwsIrsaAuthType,
+				RegistrationAuth:         helpers.AwsIrsaAuthType,
 				HubClusterArn:            hubClusterArn,
 				ManagedClusterArn:        managedClusterArn,
 				ManagedClusterRoleSuffix: managedClusterRoleSuffix,
