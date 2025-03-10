@@ -43,9 +43,6 @@ const (
 
 	defaultWebhookPort       = int32(9443)
 	clusterManagerReSyncTime = 5 * time.Second
-
-	AwsIrsaAuthType = "awsirsa"
-	CSRAuthType     = "csr"
 )
 
 type clusterManagerController struct {
@@ -430,7 +427,7 @@ func (n *clusterManagerController) getImagePullSecret(ctx context.Context) (stri
 func getIdentityCreatorRoleAndTags(cm operatorapiv1.ClusterManager) string {
 	if cm.Spec.RegistrationConfiguration != nil {
 		for _, registrationDriver := range cm.Spec.RegistrationConfiguration.RegistrationDrivers {
-			if registrationDriver.AuthType == AwsIrsaAuthType && registrationDriver.AwsIrsa != nil {
+			if registrationDriver.AuthType == commonhelper.AwsIrsaAuthType && registrationDriver.AwsIrsa != nil {
 				hubClusterArn := registrationDriver.AwsIrsa.HubClusterArn
 				hubClusterAccountId, hubClusterName := commonhelper.GetAwsAccountIdAndClusterName(hubClusterArn)
 				return "arn:aws:iam::" + hubClusterAccountId + ":role/" + hubClusterName + "_managed-cluster-identity-creator"

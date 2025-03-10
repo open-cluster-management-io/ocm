@@ -46,11 +46,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 )
 
-const (
-	AwsIrsaAuthType = "awsirsa"
-	CSRAuthType     = "csr"
-)
-
 // HubManagerOptions holds configuration for hub manager controller
 type HubManagerOptions struct {
 	ClusterAutoApprovalUsers   []string
@@ -69,7 +64,7 @@ func NewHubManagerOptions() *HubManagerOptions {
 		GCResourceList: []string{"addon.open-cluster-management.io/v1alpha1/managedclusteraddons",
 			"work.open-cluster-management.io/v1/manifestworks"},
 		ImportOption:               importeroptions.New(),
-		EnabledRegistrationDrivers: []string{CSRAuthType},
+		EnabledRegistrationDrivers: []string{commonhelpers.CSRAuthType},
 	}
 }
 
@@ -175,7 +170,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	var drivers []register.HubDriver
 	for _, enabledRegistrationDriver := range m.EnabledRegistrationDrivers {
 		switch enabledRegistrationDriver {
-		case CSRAuthType:
+		case commonhelpers.CSRAuthType:
 			autoApprovedCSRUsers := m.ClusterAutoApprovalUsers
 			if len(m.AutoApprovedCSRUsers) > 0 {
 				autoApprovedCSRUsers = m.AutoApprovedCSRUsers
@@ -185,7 +180,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 				return err
 			}
 			drivers = append(drivers, csrDriver)
-		case AwsIrsaAuthType:
+		case commonhelpers.AwsIrsaAuthType:
 			awsIRSAHubDriver, err := awsirsa.NewAWSIRSAHubDriver(ctx, m.HubClusterArn, m.AutoApprovedARNPatterns, m.AwsResourceTags)
 			if err != nil {
 				return err

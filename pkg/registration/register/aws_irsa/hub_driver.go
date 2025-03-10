@@ -77,7 +77,7 @@ func (c *AWSIRSAHubDriver) Cleanup(ctx context.Context, managedCluster *clusterv
 		return err
 	}
 
-	err = deleteIAMRoleAndPolicy(ctx, c.cfg, roleName)
+	err = deleteIAMRole(ctx, c.cfg, roleName)
 	if err != nil {
 		return err
 	}
@@ -265,7 +265,7 @@ func createAccessEntry(ctx context.Context, eksClient *eks.Client, roleArn strin
 	return nil
 }
 
-func deleteIAMRoleAndPolicy(ctx context.Context, cfg aws.Config, roleName string) error {
+func deleteIAMRole(ctx context.Context, cfg aws.Config, roleName string) error {
 	logger := klog.FromContext(ctx)
 
 	iamClient := iam.NewFromConfig(cfg)
