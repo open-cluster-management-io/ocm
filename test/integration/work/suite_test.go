@@ -146,7 +146,7 @@ var _ = ginkgo.BeforeSuite(func() {
 		sourceClient, err := work.NewClientHolderBuilder(util.NewMQTTSourceOptions(sourceID)).
 			WithClientID(fmt.Sprintf("%s-%s", sourceID, rand.String(5))).
 			WithSourceID(sourceID).
-			WithCodecs(sourcecodec.NewManifestBundleCodec()).
+			WithCodec(sourcecodec.NewManifestBundleCodec()).
 			WithWorkClientWatcherStore(watcherStore).
 			NewSourceClientHolder(envCtx)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())

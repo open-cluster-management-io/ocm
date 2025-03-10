@@ -4,11 +4,8 @@ package kafka
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
-	cloudeventscontext "github.com/cloudevents/sdk-go/v2/context"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 
 	confluent "github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2"
@@ -43,36 +40,13 @@ func NewSourceOptions(kafkaOptions *KafkaOptions, sourceID string) *options.Clou
 func (o *kafkaSourceOptions) WithContext(ctx context.Context,
 	evtCtx cloudevents.EventContext,
 ) (context.Context, error) {
-	eventType, err := types.ParseCloudEventsType(evtCtx.GetType())
-	if err != nil {
-		return nil, err
-	}
-
-	clusterName, err := evtCtx.GetExtension(types.ExtensionClusterName)
-	if err != nil {
-		return nil, err
-	}
-
-	if eventType.Action == types.ResyncRequestAction && clusterName == types.ClusterAll {
-		// source request to get resources status from all agents
-		topic := strings.Replace(sourceBroadcastTopic, "*", o.sourceID, 1)
-		return confluent.WithMessageKey(cloudeventscontext.WithTopic(ctx, topic), o.sourceID), nil
-	}
-
-	// source publishes event to source topic to send the resource spec to a specified cluster
-	messageKey := fmt.Sprintf("%s@%s", o.sourceID, clusterName)
-	topic := strings.Replace(sourceEventsTopic, "*", o.sourceID, 1)
-	topic = strings.Replace(topic, "*", fmt.Sprintf("%s", clusterName), 1)
-	return confluent.WithMessageKey(cloudeventscontext.WithTopic(ctx, topic), messageKey), nil
+	return ctx, nil
 }
 
-func (o *kafkaSourceOptions) Protocol(ctx context.Context) (options.CloudEventsProtocol, error) {
+func (o *kafkaSourceOptions) Protocol(ctx context.Context, dataType types.CloudEventsDataType) (options.CloudEventsProtocol, error) {
 	protocol, err := confluent.New(confluent.WithConfigMap(&o.KafkaOptions.ConfigMap),
-		confluent.WithReceiverTopics([]string{
-			fmt.Sprintf("^%s", strings.Replace(agentEventsTopic, "*", o.sourceID, 1)),
-			fmt.Sprintf("^%s", agentBroadcastTopic),
-		}),
-		confluent.WithSenderTopic("sourceevents"),
+		confluent.WithReceiverTopics([]string{agentEventsTopic}),
+		confluent.WithSenderTopic(sourceEventsTopic),
 		confluent.WithErrorHandler(func(ctx context.Context, err kafka.Error) {
 			o.errorChan <- err
 		}))

@@ -70,7 +70,7 @@ func (o *mqttSourceOptions) WithContext(ctx context.Context, evtCtx cloudevents.
 	return cloudeventscontext.WithTopic(ctx, eventsTopic), nil
 }
 
-func (o *mqttSourceOptions) Protocol(ctx context.Context) (options.CloudEventsProtocol, error) {
+func (o *mqttSourceOptions) Protocol(ctx context.Context, dataType types.CloudEventsDataType) (options.CloudEventsProtocol, error) {
 	topicSource, err := getSourceFromEventsTopic(o.Topics.AgentEvents)
 	if err != nil {
 		return nil, err
