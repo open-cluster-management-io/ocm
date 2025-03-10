@@ -10,6 +10,7 @@ import (
 
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
@@ -27,7 +28,7 @@ var _ = ginkgo.Describe("Cluster Annotations for aws", func() {
 		managedClusterRoleSuffix := "7f8141296c75f2871e3d030f85c35692"
 		hubClusterArn := "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
 		agentOptions := &spoke.SpokeAgentOptions{
-			RegistrationAuth:         spoke.AwsIrsaAuthType,
+			RegistrationAuth:         commonhelpers.AwsIrsaAuthType,
 			HubClusterArn:            hubClusterArn,
 			ManagedClusterArn:        managedClusterArn,
 			ManagedClusterRoleSuffix: managedClusterRoleSuffix,

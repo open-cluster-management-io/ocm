@@ -274,7 +274,7 @@ func TestDeleteIAMRoleAndPolicy(t *testing.T) {
 				t.Errorf("Error getting role name")
 				return
 			}
-			err = deleteIAMRoleAndPolicy(tt.args.ctx, cfg, roleName)
+			err = deleteIAMRole(tt.args.ctx, cfg, roleName)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("error = %#v, wantErr %#v", err, tt.wantErr)
 				return

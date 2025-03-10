@@ -121,10 +121,6 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
-          {{if eq .RegistrationDriver.AuthType "awsirsa"}}
-          - name: PATH
-            value: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/awscli/dist
-          {{end}}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

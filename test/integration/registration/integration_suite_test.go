@@ -25,6 +25,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/hub"
@@ -210,7 +211,7 @@ var _ = ginkgo.BeforeSuite(func() {
 			defer ginkgo.GinkgoRecover()
 			m := hub.NewHubManagerOptions()
 			m.ImportOption.APIServerURL = cfg.Host
-			m.EnabledRegistrationDrivers = []string{"csr", "awsirsa"}
+			m.EnabledRegistrationDrivers = []string{helpers.CSRAuthType, helpers.AwsIrsaAuthType}
 			m.HubClusterArn = "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
 			m.ClusterAutoApprovalUsers = []string{util.AutoApprovalBootstrapUser}
 			m.AutoApprovedARNPatterns = []string{"arn:aws:eks:us-west-2:123456789012:cluster/.*"}

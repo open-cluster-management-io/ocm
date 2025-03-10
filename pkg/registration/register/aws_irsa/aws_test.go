@@ -58,7 +58,7 @@ func TestBuildKubeconfig(t *testing.T) {
 			server: "https://127.0.0.1:6443",
 			AuthInfoExec: &clientcmdapi.ExecConfig{
 				APIVersion: "client.authentication.k8s.io/v1beta1",
-				Command:    "aws",
+				Command:    "/awscli/dist/aws",
 				Args: []string{
 					"--region",
 					"us-west-2",

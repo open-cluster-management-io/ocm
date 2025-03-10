@@ -10,6 +10,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 )
 
 var _ = ginkgo.Describe("ClusterManager Default Mode with aws registration", func() {
@@ -46,7 +48,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode with aws registration", fun
 					clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{}
 					clusterManager.Spec.RegistrationConfiguration.RegistrationDrivers = []operatorapiv1.RegistrationDriverHub{
 						{
-							AuthType: "awsirsa",
+							AuthType: helpers.AwsIrsaAuthType,
 							AwsIrsa: &operatorapiv1.AwsIrsaConfig{
 								HubClusterArn: hubClusterArn,
 								Tags: []string{
@@ -143,7 +145,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode with aws registration", fun
 					clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{}
 					clusterManager.Spec.RegistrationConfiguration.RegistrationDrivers = []operatorapiv1.RegistrationDriverHub{
 						{
-							AuthType: "awsirsa",
+							AuthType: helpers.AwsIrsaAuthType,
 							AwsIrsa: &operatorapiv1.AwsIrsaConfig{
 								HubClusterArn: hubClusterArn,
 							},
