@@ -1,7 +1,5 @@
 # Open Cluster Management Self-Assessment
 
-Project Maintainers: Jian Qiu (@qiujian16)
-
 This document evaluates the security posture of the Open Cluster Management (OCM) project, identifying current practices and areas for improvement to ensure robust security measures.
 
 ## Table of Contents
@@ -65,6 +63,7 @@ So there are the following actors:
   3. placement-controller: dynamically selects managed clusters based on the Placement CR.
   4. addon-manager(global): a global addon manager that manages automatic installation and rolling updates of addons. Also manages the deployment and registration of all template type addons.
   5. addon-managers: each non-template type addon has a dedicated addon manager, which is used to manage the deployment and registration of the addon.
+
 - Managed cluster
   1. klusterlet-operator: a operator runs on the managed cluster, watches the Klusterket resource, and installs OCM components(registration-agent, work-agent) on the managed cluster.
   2. registration-agent: register a managed cluster and addons to the hub, requests certificates to connect to the hub for the registration/work and addons agents.
@@ -105,7 +104,15 @@ Detaching a managed cluster is a unilateral action, either the hub or the manage
 
 #### Workload distribution
 
-TODO:
+Distribute workload to selected managed clusters.
+
+- Actors: hub-cluster-admin, placement-controller, work-agent
+- Workflow:
+  - hub-cluster-admin creates a `Placement` CR to describe the target managed clusters' attributes;
+  - placement-controller selects all clusters that meet the attributes;
+  - hub-cluster-admin creates `Manifestwork` containing the workload to selected clusters' namespace;
+  - work-agents on managed clusters watch the `Manifestwork` created, apply the workload on the managed cluster
+- Security Checks: Pull mode, the hub cluster does not access the managed clusters; Manifestwork for each managed cluster is isolated in its own namespace.
 
 ### Goals
 
@@ -120,7 +127,7 @@ TODO:
 
 - Managed clusters isolation: Components running on a managed cluster are restricted to accessing only their own resources on the hub, preventing unauthorized interactions between clusters.
 - Managed clusters credential free: The hub cluster does not need/store the managed clusters credentials.
-- Double Opt-In Handshake for Cluster Registration: A mutual authentication process during cluster registration, requiring explicit approval from both the hub and the managed cluster, ensuring that both parties consent to the connection.
+- Double Opt-In Handshake for Cluster Registration: A mutual authentication process during cluster registration, requiring explicit approval from both the hub and the managed cluster.
 
 ### Non-Goals
 
@@ -148,10 +155,10 @@ This document is intended to be used by the OCM team to identify areas of improv
 | Managed clusters isolation | Critical | In OCM, for each of the managed cluster we will be provisioning a dedicated namespace for the managed cluster and grants RBAC permissions so that the klusterlet can persist data in the hub cluster. This dedicated namespace is the "cluster namespace" which can not be access by other managed clusters. |
 | Managed clusters credential free | Critical | Benefiting from the merit of "hub-spoke" architecture, in abstraction OCM de-couples most of the multi-cluster operations generally into (1) computation/decision and (2) execution, and the actual execution against the target cluster will be completely off-loaded into the managed cluster. The hub cluster won’t directly request against the managed clusters, instead it just persists its prescriptions declaratively for each cluster, and the klusterlet will be actively pulling the prescriptions from the hub and doing the execution. So no managed cluster credential are required. |
 | Minimal Permissions | Critical | OCM applies the principle of least privilege by granting managed clusters only the essential permissions necessary for their operation. |
-| Double Opt-In Handshake for Cluster Registration | Critical | TODO: mTLS |
+| Double Opt-In Handshake for Cluster Registration | Critical | Registration requires both hub cluster admin and managed cluster admin consent to the connection. |
+| mTLS connection | Critical | The registration process ensures all connections between the managed clusters and the hub are mTLS, and the certificates rotate automatically as well. |
 | Feature-Gate Auto Approve | Relevant | Auto approve cluster joining request created by a certain user, using a white list to configure the allowed users. This feature is disabled by default, can be enabled by a feature gate. |
 | Work executor subject | Relevant | All manifests in ManifestWork are applied by the work-agent using the mounted service account to raise requests against the managed cluster by default. And the work agent has very high permission to access the managed cluster which means that any hub user with write access to the ManifestWork resources will be able to dispatch any resources that the work-agent can manipulate to the managed cluster. We have an executor subject feature provides a way to clarify the owner identity(executor) of the ManifestWork before it takes effect so that we can explicitly check whether the executor has sufficient permission in the managed cluster. This feature is Disabled by default, should consider enabling it by default in the future. |
-| Registration driver awsirsa(TBD) | Relevant | OCM uses a CSR based mechanism for registering managed clusters with the hub cluster by default, but also provides an AWS IAM based registration mechanism so that OCM can support EKS-based hub clusters natively. |
 | Logs and Events | Relevant | All operations on the clusters(hub and managed) are recored by logs and events. |
 
 ## Project Compliance
@@ -216,10 +223,11 @@ Patches will be made to the most recent three minor releases. Information will b
   - All apoters can be found at [adopters-list](https://github.com/open-cluster-management-io/ocm/blob/main/ADOPTERS.md).
   - TODO: Add 2 examples
 - Related Projects / Vendors
-  - **Karmada**: Karmada (Kubernetes Armada) is a Kubernetes management system that can manage cloud-native applications across multiple Kubernetes clusters and clouds, with no changes to the applications.
+  - **Karmada**: [Karmada](https://karmada.io/) (Kubernetes Armada) is a Kubernetes management system that can manage cloud-native applications across multiple Kubernetes clusters and clouds, with no changes to the applications.
     - [Difference between OCM and Karmada](https://www.cncf.io/blog/2022/09/26/karmada-and-open-cluster-management-two-new-approaches-to-the-multicluster-fleet-management-challenge/):
       - Both projects are ready to take up the challenge of managing fleets of clusters across the hybrid and multi-cloud landscape, but they have different philosophies when it comes to solving it.
       - Karmada provides a more complete full stack end to end solution.
       - OCM provides a robust modular framework and APIs that enable other Kubernetes ecosystem projects to integrate with it, to unlock multicluster capabilities.
     - In the future, there will be many use cases where both Karmada and OCM can be complementary to each other. There is already an ongoing collaboration between both project maintainers in the Kubernetes SIG-Multicluster community to standardize the Work API, which is a project that distributes Kubernetes objects between clusters.
-  - **KubeFleet**: TODO
+  - **KubeVela**: [KubeVela](https://kubevela.io/) is a modern application delivery platform that makes deploying and operating applications across today's hybrid, multi-cloud environments easier, faster and more reliable. OCM is available as an [vela addon](https://github.com/kubevela/catalog/tree/master/addons/ocm-hub-control-plane) in KubeVela.
+  - **ArgoCD**: [Argo CD](https://argo-cd.readthedocs.io/en/stable/) is a declarative, GitOps continuous delivery tool for Kubernetes. OCM provides an [argo cd agent](https://argocd-agent.readthedocs.io/latest/getting-started/ocm-io/) which enables a scalable "hub and spokes" GitOps architecture by offloading compute intensive parts of Argo CD (application controller, repository server) to workload/spoke/managed clusters while maintaining centralized/hub control and observability.
