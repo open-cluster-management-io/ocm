@@ -198,10 +198,11 @@ func (i *Importer) reconcile(
 			return cluster, err
 		}
 	}
-	rawManifests, err := chart.RenderKlusterletChart(klusterletChartConfig, kluterletNamespace)
+	crdObjs, rawObjs, err := chart.RenderKlusterletChart(klusterletChartConfig, kluterletNamespace)
 	if err != nil {
 		return cluster, err
 	}
+	rawManifests := append(crdObjs, rawObjs...)
 
 	clientHolder := resourceapply.NewKubeClientHolder(clients.KubeClient).
 		WithAPIExtensionsClient(clients.APIExtClient).WithDynamicClient(clients.DynamicClient)

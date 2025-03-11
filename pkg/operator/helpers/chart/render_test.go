@@ -53,7 +53,7 @@ func TestClusterManagerConfig(t *testing.T) {
 				config.NodeSelector = map[string]string{"kubernetes.io/os": "linux"}
 				return config
 			},
-			expectedObjCnt: 6,
+			expectedObjCnt: 5,
 		},
 		{
 			name:      "enable bootstrap token",
@@ -63,7 +63,7 @@ func TestClusterManagerConfig(t *testing.T) {
 				config.CreateBootstrapToken = true
 				return config
 			},
-			expectedObjCnt: 9,
+			expectedObjCnt: 8,
 		},
 		{
 			name:      "enable bootstrap sa",
@@ -73,7 +73,7 @@ func TestClusterManagerConfig(t *testing.T) {
 				config.CreateBootstrapSA = true
 				return config
 			},
-			expectedObjCnt: 9,
+			expectedObjCnt: 8,
 		},
 		{
 			name:      "change images config",
@@ -92,7 +92,7 @@ func TestClusterManagerConfig(t *testing.T) {
 				}
 				return config
 			},
-			expectedObjCnt: 7,
+			expectedObjCnt: 6,
 		},
 		{
 			name:      "change images config dockerConfigJson",
@@ -110,7 +110,7 @@ func TestClusterManagerConfig(t *testing.T) {
 				}
 				return config
 			},
-			expectedObjCnt: 7,
+			expectedObjCnt: 6,
 		},
 		{
 			name:      "create namespace",
@@ -121,7 +121,7 @@ func TestClusterManagerConfig(t *testing.T) {
 				config.CreateNamespace = true
 				return config
 			},
-			expectedObjCnt: 10,
+			expectedObjCnt: 9,
 		},
 	}
 
@@ -138,14 +138,18 @@ func TestClusterManagerConfig(t *testing.T) {
 				version = config.Images.Tag
 			}
 
-			objects, err := RenderClusterManagerChart(config, c.namespace)
+			crdObjs, rawObjs, err := RenderClusterManagerChart(config, c.namespace)
 			if err != nil {
 				t.Errorf("error rendering chart: %v", err)
 			}
-			if len(objects) != c.expectedObjCnt {
-				t.Errorf("expected %d objects, got %d", c.expectedObjCnt, len(objects))
+			if len(crdObjs) != 1 {
+				t.Errorf("expected 1 crd object, got %d", len(crdObjs))
+			}
+			if len(rawObjs) != c.expectedObjCnt {
+				t.Errorf("expected %d objects, got %d", c.expectedObjCnt, len(rawObjs))
 			}
 
+			objects := append(crdObjs, rawObjs...)
 			// output is for debug
 			if outputDebug {
 				output(t, c.name, objects)
@@ -157,8 +161,8 @@ func TestClusterManagerConfig(t *testing.T) {
 				}
 				switch object := obj.(type) {
 				case *corev1.Namespace:
-					if i != 0 {
-						t.Errorf("the first object is not namespace")
+					if i != 1 {
+						t.Errorf("the second object is not namespace")
 					}
 					if object.Name != c.namespace {
 						t.Errorf("expected namespace %s, got %s", c.namespace, object.Name)
@@ -244,7 +248,7 @@ func TestKlusterletConfig(t *testing.T) {
 				config.Klusterlet.Mode = operatorv1.InstallModeSingleton
 				return config
 			},
-			expectedObjCnt: 6,
+			expectedObjCnt: 5,
 		},
 		{
 			name:      "use bootstrapHubKubeConfig",
@@ -256,7 +260,7 @@ func TestKlusterletConfig(t *testing.T) {
 				config.BootstrapHubKubeConfig = "kubeconfig"
 				return config
 			},
-			expectedObjCnt: 8,
+			expectedObjCnt: 7,
 		},
 
 		{
@@ -278,7 +282,7 @@ func TestKlusterletConfig(t *testing.T) {
 				config.Klusterlet.Mode = operatorv1.InstallModeSingleton
 				return config
 			},
-			expectedObjCnt: 7,
+			expectedObjCnt: 6,
 		},
 		{
 			name:      "hosted mode",
@@ -291,7 +295,7 @@ func TestKlusterletConfig(t *testing.T) {
 				config.Klusterlet.Mode = operatorv1.InstallModeSingletonHosted
 				return config
 			},
-			expectedObjCnt: 2,
+			expectedObjCnt: 1,
 		},
 		{
 			name:      "noOperator",
@@ -304,7 +308,7 @@ func TestKlusterletConfig(t *testing.T) {
 				config.Klusterlet.ClusterName = "testCluster"
 				return config
 			},
-			expectedObjCnt: 2,
+			expectedObjCnt: 1,
 		},
 		{
 			name:      "create namespace",
@@ -316,7 +320,7 @@ func TestKlusterletConfig(t *testing.T) {
 				config.CreateNamespace = true
 				return config
 			},
-			expectedObjCnt: 7,
+			expectedObjCnt: 6,
 		},
 	}
 
@@ -332,14 +336,19 @@ func TestKlusterletConfig(t *testing.T) {
 				version = config.Images.Tag
 			}
 
-			objects, err := RenderKlusterletChart(config, c.namespace)
+			crdObjs, rawObjs, err := RenderKlusterletChart(config, c.namespace)
 			if err != nil {
 				t.Errorf("error rendering chart: %v", err)
 			}
-			if len(objects) != c.expectedObjCnt {
-				t.Errorf("expected %d objects, got %d", c.expectedObjCnt, len(objects))
+
+			if len(crdObjs) != 1 {
+				t.Errorf("expected 1 crd object, got %d", len(crdObjs))
+			}
+			if len(rawObjs) != c.expectedObjCnt {
+				t.Errorf("expected %d objects, got %d", c.expectedObjCnt, len(rawObjs))
 			}
 
+			objects := append(crdObjs, rawObjs...)
 			// output is for debug
 			if outputDebug {
 				output(t, c.name, objects)
