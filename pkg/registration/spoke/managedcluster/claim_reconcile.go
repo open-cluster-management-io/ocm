@@ -3,6 +3,7 @@ package managedcluster
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sort"
 	"strings"
 
@@ -69,7 +70,7 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 		}
 		if matchReservedClaims(reservedClaimNames, reservedClaimSuffixes, managedClusterClaim) {
 			reservedClaims = append(reservedClaims, managedClusterClaim)
-			reservedClaimNames[clusterClaim.Name] = true
+			reservedClaimNames.Insert(clusterClaim.Name)
 			continue
 		}
 		customClaims = append(customClaims, managedClusterClaim)
