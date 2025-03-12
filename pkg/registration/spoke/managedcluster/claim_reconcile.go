@@ -7,14 +7,16 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/util/sets"
 
 	clusterv1alpha1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	ocmfeature "open-cluster-management.io/api/feature"
+	aboutv1alpha1 "sigs.k8s.io/about-api/pkg/apis/v1alpha1"
+	aboutv1alpha1listers "sigs.k8s.io/about-api/pkg/generated/listers/apis/v1alpha1"
 
 	"open-cluster-management.io/ocm/pkg/features"
 )
@@ -24,6 +26,7 @@ const labelCustomizedOnly = "open-cluster-management.io/spoke-only"
 type claimReconcile struct {
 	recorder               events.Recorder
 	claimLister            clusterv1alpha1listers.ClusterClaimLister
+	aboutLister            aboutv1alpha1listers.ClusterPropertyLister
 	maxCustomClusterClaims int
 }
 
@@ -55,14 +58,55 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 		return fmt.Errorf("unable to list cluster claims: %w", err)
 	}
 
-	reservedClaimNames := sets.NewString(clusterv1alpha1.ReservedClusterClaimNames[:]...)
+	clusterProperties, err := r.aboutLister.List(selector)
+	if err != nil {
+		return fmt.Errorf("unable to list cluster properties: %w", err)
+	}
+
+	propertiesMap := map[string]*aboutv1alpha1.ClusterProperty{}
+	for _, property := range clusterProperties {
+		propertiesMap[property.Name] = property
+	}
+	// convert claim to properties
+	for _, clusterClaim := range clusterClaims {
+		// if the claim has the same name with the property, ignore it.
+		if _, ok := propertiesMap[clusterClaim.Name]; !ok {
+			propertiesMap[clusterClaim.Name] = &aboutv1alpha1.ClusterProperty{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterClaim.Name,
+				},
+				Spec: aboutv1alpha1.ClusterPropertySpec{
+					Value: clusterClaim.Spec.Value,
+				},
+			}
+		}
+	}
+
+	reservedClaimNames := make(map[string]bool)
+	for _, name := range clusterv1alpha1.ReservedClusterClaimNames {
+		reservedClaimNames[name] = false
+	}
+	for _, property := range propertiesMap {
+		managedClusterClaim := clusterv1.ManagedClusterClaim{
+			Name:  property.Name,
+			Value: property.Spec.Value,
+		}
+		if _, ok := reservedClaimNames[property.Name]; ok {
+			reservedClaims = append(reservedClaims, managedClusterClaim)
+			reservedClaimNames[property.Name] = true
+			continue
+		}
+		customClaims = append(customClaims, managedClusterClaim)
+	}
+
 	for _, clusterClaim := range clusterClaims {
 		managedClusterClaim := clusterv1.ManagedClusterClaim{
 			Name:  clusterClaim.Name,
 			Value: clusterClaim.Spec.Value,
 		}
-		if reservedClaimNames.Has(clusterClaim.Name) {
+		if val, ok := reservedClaimNames[clusterClaim.Name]; ok && !val {
 			reservedClaims = append(reservedClaims, managedClusterClaim)
+			reservedClaimNames[clusterClaim.Name] = true
 			continue
 		}
 		customClaims = append(customClaims, managedClusterClaim)
