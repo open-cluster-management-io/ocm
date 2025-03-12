@@ -10,12 +10,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/util/sets"
 
 	clusterv1alpha1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	ocmfeature "open-cluster-management.io/api/feature"
+	aboutv1alpha1listers "sigs.k8s.io/about-api/pkg/generated/listers/apis/v1alpha1"
 
 	"open-cluster-management.io/ocm/pkg/features"
 )
@@ -25,6 +25,7 @@ const labelCustomizedOnly = "open-cluster-management.io/spoke-only"
 type claimReconcile struct {
 	recorder                     events.Recorder
 	claimLister                  clusterv1alpha1listers.ClusterClaimLister
+	aboutLister                  aboutv1alpha1listers.ClusterPropertyLister
 	maxCustomClusterClaims       int
 	reservedClusterClaimSuffixes []string
 }
@@ -66,9 +67,9 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 			Name:  clusterClaim.Name,
 			Value: clusterClaim.Spec.Value,
 		}
-
 		if matchReservedClaims(reservedClaimNames, reservedClaimSuffixes, managedClusterClaim) {
 			reservedClaims = append(reservedClaims, managedClusterClaim)
+			reservedClaimNames[clusterClaim.Name] = true
 			continue
 		}
 		customClaims = append(customClaims, managedClusterClaim)

@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/discovery"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	kevents "k8s.io/client-go/tools/events"
+	aboutv1alpha1informer "sigs.k8s.io/about-api/pkg/generated/informers/externalversions/apis/v1alpha1"
 
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
@@ -52,6 +53,7 @@ func NewManagedClusterStatusController(
 	hubClusterInformer clusterv1informer.ManagedClusterInformer,
 	managedClusterDiscoveryClient discovery.DiscoveryInterface,
 	claimInformer clusterv1alpha1informer.ClusterClaimInformer,
+	propertyInformer aboutv1alpha1informer.ClusterPropertyInformer,
 	nodeInformer corev1informers.NodeInformer,
 	maxCustomClusterClaims int,
 	reservedClusterClaimSuffixes []string,
@@ -64,6 +66,7 @@ func NewManagedClusterStatusController(
 		hubClusterInformer,
 		managedClusterDiscoveryClient,
 		claimInformer,
+		propertyInformer,
 		nodeInformer,
 		maxCustomClusterClaims,
 		reservedClusterClaimSuffixes,
@@ -72,7 +75,7 @@ func NewManagedClusterStatusController(
 	)
 
 	return factory.New().
-		WithInformers(hubClusterInformer.Informer(), nodeInformer.Informer(), claimInformer.Informer()).
+		WithInformers(hubClusterInformer.Informer(), nodeInformer.Informer(), claimInformer.Informer(), propertyInformer.Informer()).
 		WithSync(c.sync).
 		ResyncEvery(resyncInterval).
 		ToController("ManagedClusterStatusController", recorder)
@@ -84,6 +87,7 @@ func newManagedClusterStatusController(
 	hubClusterInformer clusterv1informer.ManagedClusterInformer,
 	managedClusterDiscoveryClient discovery.DiscoveryInterface,
 	claimInformer clusterv1alpha1informer.ClusterClaimInformer,
+	propertyInformer aboutv1alpha1informer.ClusterPropertyInformer,
 	nodeInformer corev1informers.NodeInformer,
 	maxCustomClusterClaims int,
 	reservedClusterClaimSuffixes []string,
@@ -98,7 +102,10 @@ func newManagedClusterStatusController(
 			&joiningReconcile{recorder: recorder},
 			&resoureReconcile{managedClusterDiscoveryClient: managedClusterDiscoveryClient, nodeLister: nodeInformer.Lister()},
 			&claimReconcile{claimLister: claimInformer.Lister(), recorder: recorder,
-				maxCustomClusterClaims: maxCustomClusterClaims, reservedClusterClaimSuffixes: reservedClusterClaimSuffixes},
+				maxCustomClusterClaims:       maxCustomClusterClaims,
+				reservedClusterClaimSuffixes: reservedClusterClaimSuffixes,
+				aboutLister:                  propertyInformer.Lister(),
+			},
 		},
 		hubClusterLister: hubClusterInformer.Lister(),
 		hubEventRecorder: hubEventRecorder,

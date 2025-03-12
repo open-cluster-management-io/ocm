@@ -20,6 +20,8 @@ import (
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	ocmfeature "open-cluster-management.io/api/feature"
+	aboutclient "sigs.k8s.io/about-api/pkg/generated/clientset/versioned"
+	aboutinformers "sigs.k8s.io/about-api/pkg/generated/informers/externalversions"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
@@ -129,6 +131,11 @@ func (o *SpokeAgentConfig) RunSpokeAgent(ctx context.Context, controllerContext 
 		return err
 	}
 
+	aboutClusterClient, err := aboutclient.NewForConfig(spokeClientConfig)
+	if err != nil {
+		return err
+	}
+
 	return o.RunSpokeAgentWithSpokeInformers(
 		ctx,
 		kubeConfig,
@@ -136,6 +143,7 @@ func (o *SpokeAgentConfig) RunSpokeAgent(ctx context.Context, controllerContext 
 		spokeKubeClient,
 		informers.NewSharedInformerFactory(spokeKubeClient, 10*time.Minute),
 		clusterv1informers.NewSharedInformerFactory(spokeClusterClient, 10*time.Minute),
+		aboutinformers.NewSharedInformerFactory(aboutClusterClient, 10*time.Minute),
 		controllerContext.EventRecorder,
 	)
 }
@@ -145,6 +153,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	spokeKubeClient kubernetes.Interface,
 	spokeKubeInformerFactory informers.SharedInformerFactory,
 	spokeClusterInformerFactory clusterv1informers.SharedInformerFactory,
+	aboutinformers aboutinformers.SharedInformerFactory,
 	recorder events.Recorder) error {
 	logger := klog.FromContext(ctx)
 	logger.Info("Cluster name and agent ID", "clusterName", o.agentOptions.SpokeClusterName, "agentID", o.agentOptions.AgentID)
@@ -356,6 +365,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		hubClient.ClusterInformer,
 		spokeKubeClient.Discovery(),
 		spokeClusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
+		aboutinformers.About().V1alpha1().ClusterProperties(),
 		spokeKubeInformerFactory.Core().V1().Nodes(),
 		o.registrationOption.MaxCustomClusterClaims,
 		o.registrationOption.ReservedClusterClaimSuffixes,
@@ -429,6 +439,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	go spokeKubeInformerFactory.Start(ctx.Done())
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
 		go spokeClusterInformerFactory.Start(ctx.Done())
+		go aboutinformers.Start(ctx.Done())
 	}
 
 	go secretController.Run(ctx, 1)
