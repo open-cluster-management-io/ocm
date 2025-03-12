@@ -114,7 +114,7 @@ func (c *csrV1Approver) approve(ctx context.Context, csr *certificatesv1.Certifi
 	return func(kubeClient kubernetes.Interface) error {
 		csrCopy := csr.DeepCopy()
 		// Auto approve the spoke cluster csr
-		csrCopy.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
+		csrCopy.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{ //nolint:gocritic
 			Type:    certificatesv1.CertificateApproved,
 			Status:  corev1.ConditionTrue,
 			Reason:  "AutoApprovedByHubCSRApprovingController",
@@ -143,7 +143,7 @@ func (c *csrV1beta1Approver) approve(ctx context.Context, csr *certificatesv1bet
 	return func(kubeClient kubernetes.Interface) error {
 		csrCopy := csr.DeepCopy()
 		// Auto approve the spoke cluster csr
-		csrCopy.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
+		csrCopy.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{ //nolint:gocritic
 			Type:    certificatesv1beta1.CertificateApproved,
 			Status:  corev1.ConditionTrue,
 			Reason:  "AutoApprovedByHubCSRApprovingController",

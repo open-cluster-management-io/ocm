@@ -474,7 +474,7 @@ func BuildResourceMeta(
 	object runtime.Object,
 	restMapper meta.RESTMapper) (workapiv1.ManifestResourceMeta, schema.GroupVersionResource, error) {
 	resourceMeta := workapiv1.ManifestResourceMeta{
-		Ordinal: int32(index),
+		Ordinal: int32(index), //nolint:gosec
 	}
 
 	if object == nil || reflect.ValueOf(object).IsNil() {

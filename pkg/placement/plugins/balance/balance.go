@@ -66,7 +66,7 @@ func (b *Balance) Score(ctx context.Context, placement *clusterapiv1beta1.Placem
 			continue
 		}
 		for _, d := range decision.Status.Decisions {
-			decisionCount[d.ClusterName] = decisionCount[d.ClusterName] + 1
+			decisionCount[d.ClusterName]++
 			if decisionCount[d.ClusterName] > maxCount {
 				maxCount = decisionCount[d.ClusterName]
 			}

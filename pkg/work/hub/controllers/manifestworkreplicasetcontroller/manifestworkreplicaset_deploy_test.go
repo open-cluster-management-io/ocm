@@ -409,7 +409,7 @@ func TestDeployWithMultiPlacementsReconcileAsExpected(t *testing.T) {
 		},
 	}
 	for _, plcSummary := range mwrSet.Status.PlacementsSummary {
-		if plcSummary.Name == placement1.Name {
+		if plcSummary.Name == placement1.Name { //nolint:gocritic
 			assert.Equal(t, plcSummary, expectPlcSummary1)
 		} else if plcSummary.Name == placement2.Name {
 			assert.Equal(t, plcSummary, expectPlcSummary2)

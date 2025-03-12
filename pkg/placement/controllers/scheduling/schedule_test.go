@@ -569,7 +569,7 @@ func TestSchedule(t *testing.T) {
 				c.placement,
 				c.clusters,
 			)
-			//TODO
+			// TODO
 			if status.Message() != c.expectedStatus.Message() && status.Code() != c.expectedStatus.Code() {
 				t.Errorf("unexpected err: %v", status.AsError())
 			}

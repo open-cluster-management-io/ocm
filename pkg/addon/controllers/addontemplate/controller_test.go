@@ -134,7 +134,7 @@ func TestReconcile(t *testing.T) {
 		increaseCount := func() {
 			lock.Lock()
 			defer lock.Unlock()
-			count = count + 1
+			count++
 		}
 
 		for range c.syncKeys {
@@ -145,7 +145,7 @@ func TestReconcile(t *testing.T) {
 			increaseCount()
 			return nil
 		}
-		obj := append(c.clusterManagementAddon, c.managedClusteraddon...)
+		obj := append(c.clusterManagementAddon, c.managedClusteraddon...) //nolint:gocritic
 		fakeAddonClient := fakeaddon.NewSimpleClientset(obj...)
 
 		addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)

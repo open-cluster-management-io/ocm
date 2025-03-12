@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/utils/clock"
 
 	ocmfeature "open-cluster-management.io/api/feature"
 
@@ -24,7 +25,7 @@ func NewKlusterletOperatorCmd() *cobra.Command {
 	opts := commonoptions.NewOptions()
 	klOptions := klusterlet.Options{}
 	cmdConfig := opts.
-		NewControllerCommandConfig("klusterlet", version.Get(), klOptions.RunKlusterletOperator)
+		NewControllerCommandConfig("klusterlet", version.Get(), klOptions.RunKlusterletOperator, clock.RealClock{})
 	cmd := cmdConfig.NewCommandWithContext(context.TODO())
 	cmd.Use = "klusterlet"
 	cmd.Short = "Start the klusterlet operator"
@@ -62,7 +63,7 @@ func NewKlusterletAgentCmd() *cobra.Command {
 
 	agentConfig := singletonspoke.NewAgentConfig(commonOptions, registrationOption, workOptions, cancel)
 	cmdConfig := commonOptions.CommonOpts.
-		NewControllerCommandConfig("klusterlet-agent", version.Get(), agentConfig.RunSpokeAgent).
+		NewControllerCommandConfig("klusterlet-agent", version.Get(), agentConfig.RunSpokeAgent, clock.RealClock{}).
 		WithHealthChecks(agentConfig.HealthCheckers()...)
 	cmd := cmdConfig.NewCommandWithContext(ctx)
 	cmd.Use = agentCmdName
