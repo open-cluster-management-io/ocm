@@ -41,33 +41,37 @@ func NewDefaultKlusterletChartConfig() *KlusterletChartConfig {
 	}
 }
 
-func RenderClusterManagerChart(config *ClusterManagerChartConfig, namespace string) ([][]byte, error) {
+// RenderClusterManagerChart renders the ClusterManager objects to be created on the hub.
+// It returns three values: CRD objects(which usually should be created before other objects), other Kubernetes objects, error.
+func RenderClusterManagerChart(config *ClusterManagerChartConfig, namespace string) ([][]byte, [][]byte, error) {
 	if namespace == "" {
-		return nil, fmt.Errorf("cluster manager chart namespace is required")
+		return nil, nil, fmt.Errorf("cluster manager chart namespace is required")
 	}
 	return renderChart(config, namespace, config.CreateNamespace,
 		clustermanagerchart.ChartName, clustermanagerchart.ChartFiles)
 }
 
-func RenderKlusterletChart(config *KlusterletChartConfig, namespace string) ([][]byte, error) {
+// RenderKlusterletChart renders the Klusterlet objects to be created on the managed cluster.
+// It returns three values: CRD objects(which usually should be created before other objects), other Kubernetes objects, error.
+func RenderKlusterletChart(config *KlusterletChartConfig, namespace string) ([][]byte, [][]byte, error) {
 	if namespace == "" {
-		return nil, fmt.Errorf("klusterlet chart namespace is required")
+		return nil, nil, fmt.Errorf("klusterlet chart namespace is required")
 	}
 	return renderChart(config, namespace, config.CreateNamespace,
 		klusterletchart.ChartName, klusterletchart.ChartFiles)
 }
 
 func renderChart[T *ClusterManagerChartConfig | *KlusterletChartConfig](config T,
-	namespace string, createNamespace bool, chartName string, fs embed.FS) ([][]byte, error) {
+	namespace string, createNamespace bool, chartName string, fs embed.FS) ([][]byte, [][]byte, error) {
 	// chartName is the prefix of chart path here
 	operatorChart, err := LoadChart(fs, chartName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load %s chart: %w", chartName, err)
+		return nil, nil, fmt.Errorf("failed to load %s chart: %w", chartName, err)
 	}
 
 	configValues, err := JsonStructToValues(config)
 	if err != nil {
-		return nil, fmt.Errorf("error generating values for chartConfig: %v", err)
+		return nil, nil, fmt.Errorf("error generating values for chartConfig: %v", err)
 	}
 
 	releaseOptions := chartutil.ReleaseOptions{
@@ -79,12 +83,12 @@ func renderChart[T *ClusterManagerChartConfig | *KlusterletChartConfig](config T
 		releaseOptions, &chartutil.Capabilities{})
 	if err != nil {
 		klog.Errorf("failed to render helm chart with values %v. err:%v", values, err)
-		return nil, err
+		return nil, nil, err
 	}
 
-	rawObjects, err := renderManifests(operatorChart, values)
+	crdObjects, rawObjects, err := renderManifests(operatorChart, values)
 	if err != nil {
-		return nil, fmt.Errorf("error rendering cluster manager chart: %v", err)
+		return nil, nil, fmt.Errorf("error rendering cluster manager chart: %v", err)
 	}
 
 	// make sure the ns object is at the top of slice when createNamespace is true.
@@ -92,13 +96,13 @@ func renderChart[T *ClusterManagerChartConfig | *KlusterletChartConfig](config T
 	if createNamespace {
 		nsObj, err := newNamespaceRawObject(namespace)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		rstObjects = [][]byte{nsObj}
 	}
 	rstObjects = append(rstObjects, rawObjects...)
 
-	return rstObjects, nil
+	return crdObjects, rstObjects, nil
 }
 
 func getFiles(manifestFS embed.FS) ([]string, error) {
@@ -168,14 +172,14 @@ func JsonStructToValues(a interface{}) (chartutil.Values, error) {
 	return vals, nil
 }
 
-func renderManifests(chart *chart.Chart, values chartutil.Values) ([][]byte, error) {
-	var rawObjects [][]byte
+func renderManifests(chart *chart.Chart, values chartutil.Values) ([][]byte, [][]byte, error) {
+	var rawCRDObjects, rawObjects [][]byte
 
 	// make sure the CRDs are at the top.
 	crds := chart.CRDObjects()
 	for _, crd := range crds {
 		klog.V(4).Infof("%v/n", crd.File.Data)
-		rawObjects = append(rawObjects, crd.File.Data)
+		rawCRDObjects = append(rawCRDObjects, crd.File.Data)
 	}
 
 	helmEngine := engine.Engine{
@@ -185,7 +189,7 @@ func renderManifests(chart *chart.Chart, values chartutil.Values) ([][]byte, err
 
 	templates, err := helmEngine.Render(chart, values)
 	if err != nil {
-		return rawObjects, err
+		return rawCRDObjects, rawObjects, err
 	}
 
 	namespaceObjects := [][]byte{}
@@ -197,7 +201,7 @@ func renderManifests(chart *chart.Chart, values chartutil.Values) ([][]byte, err
 		// remove invalid template
 		unstructuredObj := &unstructured.Unstructured{}
 		if err = yaml.Unmarshal([]byte(data), unstructuredObj); err != nil {
-			return nil, fmt.Errorf("error unmarshalling template: %v", err)
+			return nil, nil, fmt.Errorf("error unmarshalling template: %v", err)
 		}
 		kind := unstructuredObj.GetKind()
 		if kind == "" {
@@ -215,9 +219,9 @@ func renderManifests(chart *chart.Chart, values chartutil.Values) ([][]byte, err
 	// so need make sure namespaces are at the top of slice.
 	if len(namespaceObjects) != 0 {
 		result := append(namespaceObjects, rawObjects...)
-		return result, nil
+		return rawCRDObjects, result, nil
 	}
-	return rawObjects, nil
+	return rawCRDObjects, rawObjects, nil
 }
 
 func newNamespaceRawObject(namespace string) ([]byte, error) {
