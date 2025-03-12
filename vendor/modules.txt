@@ -1819,8 +1819,10 @@ open-cluster-management.io/sdk-go/pkg/patcher
 ## explicit; go 1.22
 sigs.k8s.io/about-api/pkg/apis/v1alpha1
 sigs.k8s.io/about-api/pkg/generated/clientset/versioned
+sigs.k8s.io/about-api/pkg/generated/clientset/versioned/fake
 sigs.k8s.io/about-api/pkg/generated/clientset/versioned/scheme
 sigs.k8s.io/about-api/pkg/generated/clientset/versioned/typed/apis/v1alpha1
+sigs.k8s.io/about-api/pkg/generated/clientset/versioned/typed/apis/v1alpha1/fake
 sigs.k8s.io/about-api/pkg/generated/informers/externalversions
 sigs.k8s.io/about-api/pkg/generated/informers/externalversions/apis
 sigs.k8s.io/about-api/pkg/generated/informers/externalversions/apis/v1alpha1

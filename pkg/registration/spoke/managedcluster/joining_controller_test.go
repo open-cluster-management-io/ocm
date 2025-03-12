@@ -13,6 +13,8 @@ import (
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	aboutclusterfake "sigs.k8s.io/about-api/pkg/generated/clientset/versioned/fake"
+	aboutinformers "sigs.k8s.io/about-api/pkg/generated/informers/externalversions"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
@@ -73,10 +75,16 @@ func TestSyncManagedCluster(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.startingObjects...)
+			aboutClusterClient := aboutclusterfake.NewSimpleClientset(c.startingObjects...)
+			clusterPropertyInformerFactory := aboutinformers.NewSharedInformerFactory(aboutClusterClient, time.Minute*10)
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
+			clusterPropertyStore := clusterPropertyInformerFactory.About().V1alpha1().ClusterProperties().Informer().GetStore()
 			clusterStore := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore()
 			for _, cluster := range c.startingObjects {
 				if err := clusterStore.Add(cluster); err != nil {
+					t.Fatal(err)
+				}
+				if err := clusterPropertyStore.Add(cluster); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -94,6 +102,7 @@ func TestSyncManagedCluster(t *testing.T) {
 				clusterInformerFactory.Cluster().V1().ManagedClusters(),
 				discoveryClient,
 				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
+				clusterPropertyInformerFactory.About().V1alpha1().ClusterProperties(),
 				kubeInformerFactory.Core().V1().Nodes(),
 				20,
 				eventstesting.NewTestingEventRecorder(t),

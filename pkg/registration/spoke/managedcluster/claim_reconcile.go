@@ -65,7 +65,14 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 
 	propertiesMap := map[string]*aboutv1alpha1.ClusterProperty{}
 	for _, property := range clusterProperties {
-		propertiesMap[property.Name] = property
+		propertiesMap[property.Name] = &aboutv1alpha1.ClusterProperty{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: property.Name,
+			},
+			Spec: aboutv1alpha1.ClusterPropertySpec{
+				Value: property.Spec.Value,
+			},
+		}
 	}
 	// convert claim to properties
 	for _, clusterClaim := range clusterClaims {
