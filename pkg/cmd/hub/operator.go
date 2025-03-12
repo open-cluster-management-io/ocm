@@ -4,18 +4,19 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
+	"k8s.io/utils/clock"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager"
 	"open-cluster-management.io/ocm/pkg/version"
 )
 
-// NewHubOperatorCmd generatee a command to start hub operator
+// NewHubOperatorCmd generate a command to start hub operator
 func NewHubOperatorCmd() *cobra.Command {
 	opts := commonoptions.NewOptions()
 	cmOptions := clustermanager.Options{}
 	cmd := opts.
-		NewControllerCommandConfig("clustermanager", version.Get(), cmOptions.RunClusterManagerOperator).
+		NewControllerCommandConfig("clustermanager", version.Get(), cmOptions.RunClusterManagerOperator, clock.RealClock{}).
 		NewCommandWithContext(context.TODO())
 	cmd.Use = "hub"
 	cmd.Short = "Start the cluster manager operator"

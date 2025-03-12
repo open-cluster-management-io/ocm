@@ -3,6 +3,7 @@ package registration_test
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -21,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
+	clocktesting "k8s.io/utils/clock/testing"
 
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -60,7 +62,7 @@ var _ = ginkgo.Describe("Cluster Auto Importer", func() {
 		crdObjs, rawObjs, err := chart.RenderClusterManagerChart(clusterManagerConfig, "open-cluster-management")
 		manifests := append(crdObjs, rawObjs...)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		recorder := events.NewInMemoryRecorder("importer-testing")
+		recorder := events.NewInMemoryRecorder("importer-testing", clocktesting.NewFakePassiveClock(time.Now()))
 		for _, manifest := range manifests {
 			requiredObj, _, err := genericCodec.Decode(manifest, nil, nil)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
