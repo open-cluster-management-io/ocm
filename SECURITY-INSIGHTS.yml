@@ -1,0 +1,52 @@
+header:
+  schema-version: 1.0.0
+  last-updated: '2025-03-12'
+  last-reviewed: '2025-03-12'
+  expiration-date: '2026-03-12T01:00:00.000Z'
+  project-url: https://github.com/open-cluster-management-io/ocm
+  project-release: '0.15.2'
+  changelog: 'https://github.com/open-cluster-management-io/ocm/releases'
+  license: 'https://github.com/open-cluster-management-io/ocm/blob/main/LICENSE'
+project-lifecycle:
+  stage: active
+  bug-fixes-only: false
+  core-maintainers:
+  - 'https://github.com/open-cluster-management-io/community/blob/main/MAINTAINERS.md'
+  roadmap: 'https://github.com/orgs/open-cluster-management-io/projects/2'
+  release-process: 'https://github.com/open-cluster-management-io/community/blob/main/RELEASE.md'
+contribution-policy:
+  accepts-pull-requests: true
+  accepts-automated-pull-requests: true
+  code-of-conduct: https://openssf.org/community/code-of-conduct
+documentation:
+- https://github.com/ossf/security-insights-spec/blob/main/specification.md
+distribution-points:
+- https://github.com/ossf/security-insights-spec
+security-artifacts:
+  threat-model:
+    threat-model-created: true
+    evidence-url:
+    - https://github.com/ossf/security-insights-spec/blob/main/docs/threat-model.md
+security-testing:
+- tool-type: sca
+  tool-name: Dependabot
+  tool-version: latest
+  integration:
+    ad-hoc: false
+    ci: true
+    before-release: true
+  comment: |
+    Dependabot is enabled for this repo.
+security-contacts:
+- type: email
+  value: security@openssf.org
+vulnerability-reporting:
+  accepts-vulnerability-reports: true
+  security-policy: https://github.com/ossf/security-insights-spec/security/policy
+  email-contact: security@openssf.org
+  comment: |
+    The first and best way to report a vulnerability is by using private security issues in GitHub.
+dependencies:
+  third-party-packages: true
+  dependencies-lists:
+  - https://github.com/ossf/security-insights-spec/blob/main/validators/python/requirements.txt
