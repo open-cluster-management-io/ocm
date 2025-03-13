@@ -1,4 +1,4 @@
-# Manually join Hub and Spoke using AWS-based authentication
+# Join Hub and Spoke using AWS-based authentication
 
 This guide provides list of steps to join AWS EKS clusters as Hub and Spoke using OCM.
 
