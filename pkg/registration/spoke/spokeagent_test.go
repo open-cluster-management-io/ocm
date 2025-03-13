@@ -20,6 +20,7 @@ import (
 
 	ocmfeature "open-cluster-management.io/api/feature"
 
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/features"
@@ -46,7 +47,7 @@ func TestValidate(t *testing.T) {
 	defaultCompletedOptions := NewSpokeAgentOptions()
 	defaultCompletedOptions.BootstrapKubeconfig = "/spoke/bootstrap/kubeconfig"
 	awsCompletedOptionsHubArnMissing := *defaultCompletedOptions
-	awsCompletedOptionsHubArnMissing.RegistrationAuth = AwsIrsaAuthType
+	awsCompletedOptionsHubArnMissing.RegistrationAuth = commonhelpers.AwsIrsaAuthType
 	awsDefaultCompletedOptions := awsCompletedOptionsHubArnMissing
 	awsDefaultCompletedOptions.HubClusterArn = "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
 

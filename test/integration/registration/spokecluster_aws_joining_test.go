@@ -42,7 +42,7 @@ var _ = ginkgo.Describe("Joining Process for aws flow", func() {
 
 			// run registration agent
 			agentOptions := &spoke.SpokeAgentOptions{
-				RegistrationAuth:         spoke.AwsIrsaAuthType,
+				RegistrationAuth:         helpers.AwsIrsaAuthType,
 				HubClusterArn:            hubClusterArn,
 				ManagedClusterArn:        managedClusterArn,
 				ManagedClusterRoleSuffix: managedClusterRoleSuffix,
@@ -107,10 +107,10 @@ var _ = ginkgo.Describe("Joining Process for aws flow", func() {
 					return fmt.Errorf("user pointed to by the current-context is missing")
 				}
 				if hubUser.Exec.APIVersion != "client.authentication.k8s.io/v1beta1" {
-					return fmt.Errorf("user exec plugun apiVersion is invalid")
+					return fmt.Errorf("user exec plugin apiVersion is invalid")
 				}
-				if hubUser.Exec.Command != "aws" {
-					return fmt.Errorf("user exec plugun command is invalid")
+				if hubUser.Exec.Command != "/awscli/dist/aws" {
+					return fmt.Errorf("user exec plugin command is invalid")
 				}
 
 				hubClusterAccountId, hubClusterName := helpers.GetAwsAccountIdAndClusterName(hubClusterArn)
@@ -168,7 +168,7 @@ var _ = ginkgo.Describe("Joining Process for aws flow", func() {
 
 			// run registration agent
 			agentOptions := &spoke.SpokeAgentOptions{
-				RegistrationAuth:         spoke.AwsIrsaAuthType,
+				RegistrationAuth:         helpers.AwsIrsaAuthType,
 				HubClusterArn:            hubClusterArn,
 				ManagedClusterArn:        managedClusterArn,
 				ManagedClusterRoleSuffix: managedClusterRoleSuffix,
@@ -201,7 +201,7 @@ var _ = ginkgo.Describe("Joining Process for aws flow", func() {
 
 			// run registration agent
 			agentOptions := &spoke.SpokeAgentOptions{
-				RegistrationAuth:         spoke.AwsIrsaAuthType,
+				RegistrationAuth:         helpers.AwsIrsaAuthType,
 				HubClusterArn:            hubClusterArn,
 				ManagedClusterArn:        managedClusterArn,
 				ManagedClusterRoleSuffix: managedClusterRoleSuffix,
