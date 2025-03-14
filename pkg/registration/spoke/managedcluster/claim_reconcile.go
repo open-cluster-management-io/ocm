@@ -3,6 +3,7 @@ package managedcluster
 import (
 	"context"
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	aboutv1alpha1 "sigs.k8s.io/about-api/pkg/apis/v1alpha1"
 	"sort"
@@ -56,7 +57,6 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 	requirement, _ := labels.NewRequirement(labelCustomizedOnly, selection.DoesNotExist, []string{})
 	selector := labels.NewSelector().Add(*requirement)
 	clusterClaims, err := r.claimLister.List(selector)
-	fmt.Printf("clusterClaims: %+v \n and err: %+v", clusterClaims, err)
 	if err != nil {
 		return fmt.Errorf("unable to list cluster claims: %w", err)
 	}
@@ -69,7 +69,6 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 	// when ClusterProperties feature is not enabled, the informer will not be started and the lister will
 	// return an empty list, so we do not need to check featuregate here.
 	clusterProperties, err := r.aboutLister.List(selector)
-	fmt.Printf("clusterProperties: %+v \n and err: %+v", clusterProperties, err)
 	if err != nil {
 		return fmt.Errorf("unable to list cluster properties: %w", err)
 	}
@@ -80,16 +79,32 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 	}
 	// convert claim to properties
 	for _, clusterClaim := range clusterClaims {
+		// if the claim has the same name with the property, ignore it.
+		if _, ok := propertiesMap[clusterClaim.Name]; ok {
+			continue
+		}
+		propertiesMap[clusterClaim.Name] = &aboutv1alpha1.ClusterProperty{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: clusterClaim.Name,
+			},
+			Spec: aboutv1alpha1.ClusterPropertySpec{
+				Value: clusterClaim.Spec.Value,
+			},
+		}
+	}
+
+	for _, property := range propertiesMap {
 		managedClusterClaim := clusterv1.ManagedClusterClaim{
-			Name:  clusterClaim.Name,
-			Value: clusterClaim.Spec.Value,
+			Name:  property.Name,
+			Value: property.Spec.Value,
 		}
 		if matchReservedClaims(reservedClaimNames, reservedClaimSuffixes, managedClusterClaim) {
 			reservedClaims = append(reservedClaims, managedClusterClaim)
-			reservedClaimNames.Insert(clusterClaim.Name)
+			reservedClaimNames.Insert(property.Name)
 			continue
 		}
 		customClaims = append(customClaims, managedClusterClaim)
+
 	}
 
 	// sort claims by name
