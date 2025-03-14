@@ -54,11 +54,13 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 	requirement, _ := labels.NewRequirement(labelCustomizedOnly, selection.DoesNotExist, []string{})
 	selector := labels.NewSelector().Add(*requirement)
 	clusterClaims, err := r.claimLister.List(selector)
+	fmt.Printf("clusterClaims: %+v \n and err: %+v", clusterClaims, err)
 	if err != nil {
 		return fmt.Errorf("unable to list cluster claims: %w", err)
 	}
 
 	clusterProperties, err := r.aboutLister.List(selector)
+	fmt.Printf("clusterProperties: %+v \n and err: %+v", clusterProperties, err)
 	if err != nil {
 		return fmt.Errorf("unable to list cluster properties: %w", err)
 	}

@@ -16,7 +16,6 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	aboutv1alpha1 "sigs.k8s.io/about-api/pkg/apis/v1alpha1"
-	aboutclusterfake "sigs.k8s.io/about-api/pkg/generated/clientset/versioned/fake"
 	aboutinformers "sigs.k8s.io/about-api/pkg/generated/informers/externalversions"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -29,6 +28,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/features"
+	aboutapifakeclientset "open-cluster-management.io/ocm/pkg/registration/helpers"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
@@ -115,7 +115,7 @@ func TestSync(t *testing.T) {
 			}
 
 			clusterClient := clusterfake.NewSimpleClientset(objects...)
-			aboutClusterClient := aboutclusterfake.NewSimpleClientset(objects...)
+			aboutClusterClient := aboutapifakeclientset.NewFakeClientset(objects...)
 			clusterPropertyInformerFactory := aboutinformers.NewSharedInformerFactory(aboutClusterClient, time.Minute*10)
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
 			if c.cluster != nil {
@@ -310,6 +310,32 @@ func TestExposeClaims(t *testing.T) {
 			},
 		},
 		{
+			name: "remove properties from managed cluster",
+			cluster: newManagedClusterWithProperties([]aboutv1alpha1.ClusterProperty{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "a",
+					},
+					Spec: aboutv1alpha1.ClusterPropertySpec{
+						Value: "b",
+					},
+				},
+			}),
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				cluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, cluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				actual := cluster.Status.ClusterClaims
+				if len(actual) > 0 {
+					t.Errorf("expected no cluster claim but got: %v", actual)
+				}
+			},
+		},
+		{
 			name: "remove claims from managed cluster",
 			cluster: newManagedCluster([]clusterv1.ManagedClusterClaim{
 				{
@@ -328,6 +354,48 @@ func TestExposeClaims(t *testing.T) {
 				actual := cluster.Status.ClusterClaims
 				if len(actual) > 0 {
 					t.Errorf("expected no cluster claim but got: %v", actual)
+				}
+			},
+		},
+		{
+			name:    "sync non-customized-only properties into status of the managed cluster",
+			cluster: testinghelpers.NewJoinedManagedCluster(),
+			properties: []*aboutv1alpha1.ClusterProperty{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "a",
+						Labels: map[string]string{labelCustomizedOnly: ""},
+					},
+					Spec: aboutv1alpha1.ClusterPropertySpec{
+						Value: "b",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "c",
+					},
+					Spec: aboutv1alpha1.ClusterPropertySpec{
+						Value: "d",
+					},
+				},
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				cluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, cluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				expected := []clusterv1.ManagedClusterClaim{
+					{
+						Name:  "c",
+						Value: "d",
+					},
+				}
+				actual := cluster.Status.ClusterClaims
+				if !reflect.DeepEqual(actual, expected) {
+					t.Errorf("expected cluster claim %v but got: %v", expected, actual)
 				}
 			},
 		},
@@ -388,7 +456,7 @@ func TestExposeClaims(t *testing.T) {
 			}
 
 			clusterClient := clusterfake.NewSimpleClientset(objects...)
-			aboutClusterClient := aboutclusterfake.NewSimpleClientset(objects...)
+			aboutClusterClient := aboutapifakeclientset.NewFakeClientset(objects...)
 			clusterPropertyInformerFactory := aboutinformers.NewSharedInformerFactory(aboutClusterClient, time.Minute*10)
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
 			if c.cluster != nil {
@@ -446,6 +514,19 @@ func TestExposeClaims(t *testing.T) {
 
 func newManagedCluster(claims []clusterv1.ManagedClusterClaim) *clusterv1.ManagedCluster {
 	cluster := testinghelpers.NewJoinedManagedCluster()
+	cluster.Status.ClusterClaims = claims
+	return cluster
+}
+
+func newManagedClusterWithProperties(properties []aboutv1alpha1.ClusterProperty) *clusterv1.ManagedCluster {
+	cluster := testinghelpers.NewJoinedManagedCluster()
+	claims := make([]clusterv1.ManagedClusterClaim, len(properties))
+	for _, property := range properties {
+		claims = append(claims, clusterv1.ManagedClusterClaim{
+			Name:  property.Name,
+			Value: property.Spec.Value,
+		})
+	}
 	cluster.Status.ClusterClaims = claims
 	return cluster
 }

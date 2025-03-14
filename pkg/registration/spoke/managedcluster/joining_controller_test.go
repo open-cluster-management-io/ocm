@@ -13,7 +13,6 @@ import (
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	aboutclusterfake "sigs.k8s.io/about-api/pkg/generated/clientset/versioned/fake"
 	aboutinformers "sigs.k8s.io/about-api/pkg/generated/informers/externalversions"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -23,6 +22,7 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	aboutapifakeclientset "open-cluster-management.io/ocm/pkg/registration/helpers"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
@@ -75,7 +75,7 @@ func TestSyncManagedCluster(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.startingObjects...)
-			aboutClusterClient := aboutclusterfake.NewSimpleClientset(c.startingObjects...)
+			aboutClusterClient := aboutapifakeclientset.NewFakeClientset(c.startingObjects...)
 			clusterPropertyInformerFactory := aboutinformers.NewSharedInformerFactory(aboutClusterClient, time.Minute*10)
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
 			clusterPropertyStore := clusterPropertyInformerFactory.About().V1alpha1().ClusterProperties().Informer().GetStore()

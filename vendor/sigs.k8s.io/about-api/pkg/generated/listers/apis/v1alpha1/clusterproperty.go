@@ -19,6 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
@@ -49,7 +50,10 @@ func NewClusterPropertyLister(indexer cache.Indexer) ClusterPropertyLister {
 
 // List lists all ClusterProperties in the indexer.
 func (s *clusterPropertyLister) List(selector labels.Selector) (ret []*v1alpha1.ClusterProperty, err error) {
+	fmt.Printf("ClusterPropertyLister: %+v\n", selector)
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		fmt.Printf("Indexer: %+v\n", s.indexer)
+		fmt.Printf("ClusterProperty Interface: %+v\n", m)
 		ret = append(ret, m.(*v1alpha1.ClusterProperty))
 	})
 	return ret, err
