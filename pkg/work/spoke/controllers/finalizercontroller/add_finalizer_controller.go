@@ -45,7 +45,7 @@ func NewAddFinalizerController(
 
 func (m *AddFinalizerController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	manifestWorkName := controllerContext.QueueKey()
-	klog.V(4).Infof("Reconciling ManifestWork %q", manifestWorkName)
+	klog.V(5).Infof("Reconciling ManifestWork %q", manifestWorkName)
 
 	manifestWork, err := m.manifestWorkLister.Get(manifestWorkName)
 	if errors.IsNotFound(err) {
