@@ -54,13 +54,11 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 	requirement, _ := labels.NewRequirement(labelCustomizedOnly, selection.DoesNotExist, []string{})
 	selector := labels.NewSelector().Add(*requirement)
 	clusterClaims, err := r.claimLister.List(selector)
-	fmt.Printf("clusterClaims: %+v \n and err: %+v", clusterClaims, err)
 	if err != nil {
 		return fmt.Errorf("unable to list cluster claims: %w", err)
 	}
 
 	clusterProperties, err := r.aboutLister.List(selector)
-	fmt.Printf("clusterProperties: %+v \n and err: %+v", clusterProperties, err)
 	if err != nil {
 		return fmt.Errorf("unable to list cluster properties: %w", err)
 	}
@@ -92,6 +90,7 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 	}
 
 	reservedClaimNames := make(map[string]bool)
+	customClaimsNames := make(map[string]bool)
 	for _, name := range clusterv1alpha1.ReservedClusterClaimNames {
 		reservedClaimNames[name] = false
 	}
@@ -105,7 +104,11 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 			reservedClaimNames[property.Name] = true
 			continue
 		}
-		customClaims = append(customClaims, managedClusterClaim)
+		if _, ok := customClaimsNames[property.Name]; !ok {
+			customClaims = append(customClaims, managedClusterClaim)
+			customClaimsNames[property.Name] = true
+			continue
+		}
 	}
 
 	for _, clusterClaim := range clusterClaims {
@@ -118,7 +121,11 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 			reservedClaimNames[clusterClaim.Name] = true
 			continue
 		}
-		customClaims = append(customClaims, managedClusterClaim)
+		if _, ok := customClaimsNames[clusterClaim.Name]; !ok {
+			customClaims = append(customClaims, managedClusterClaim)
+			customClaimsNames[clusterClaim.Name] = true
+			continue
+		}
 	}
 
 	// sort claims by name

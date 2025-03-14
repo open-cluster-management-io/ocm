@@ -299,13 +299,9 @@ func TestHealthCheck(t *testing.T) {
 			aboutClusterClient := aboutapifakeclientset.NewFakeClientset(c.clusters...)
 			clusterPropertyInformerFactory := aboutinformers.NewSharedInformerFactory(aboutClusterClient, time.Minute*10)
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
-			clusterPropertyStore := clusterPropertyInformerFactory.About().V1alpha1().ClusterProperties().Informer().GetStore()
 			clusterStore := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore()
 			for _, cluster := range c.clusters {
 				if err := clusterStore.Add(cluster); err != nil {
-					t.Fatal(err)
-				}
-				if err := clusterPropertyStore.Add(cluster); err != nil {
 					t.Fatal(err)
 				}
 			}

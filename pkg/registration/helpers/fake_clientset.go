@@ -1,8 +1,6 @@
 package helpers
 
 import (
-	"fmt"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/watch"
@@ -36,7 +34,6 @@ func init() {
 func NewFakeClientset(objects ...runtime.Object) *Clientset {
 	o := testing.NewObjectTracker(scheme, codecs.UniversalDecoder())
 	for _, obj := range objects {
-		fmt.Printf("Obj: %+v\n", obj)
 		if err := o.Add(obj); err != nil {
 			panic(err)
 		}

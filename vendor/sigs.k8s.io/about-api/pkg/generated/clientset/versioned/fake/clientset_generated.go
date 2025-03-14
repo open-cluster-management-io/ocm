@@ -19,8 +19,6 @@ limitations under the License.
 package fake
 
 import (
-	"fmt"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -38,7 +36,6 @@ import (
 func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	o := testing.NewObjectTracker(scheme, codecs.UniversalDecoder())
 	for _, obj := range objects {
-		fmt.Printf("Obj: %+v\n", obj)
 		if err := o.Add(obj); err != nil {
 			panic(err)
 		}

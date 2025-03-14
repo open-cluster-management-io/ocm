@@ -86,12 +86,12 @@ func TestSync(t *testing.T) {
 				}
 				expected := []clusterv1.ManagedClusterClaim{
 					{
-						Name:  "name",
-						Value: "tests",
-					},
-					{
 						Name:  "a",
 						Value: "b",
+					},
+					{
+						Name:  "name",
+						Value: "test",
 					},
 				}
 				actual := cluster.Status.ClusterClaims
@@ -120,9 +120,6 @@ func TestSync(t *testing.T) {
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
 			if c.cluster != nil {
 				if err := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore().Add(c.cluster); err != nil {
-					t.Fatal(err)
-				}
-				if err := clusterPropertyInformerFactory.About().V1alpha1().ClusterProperties().Informer().GetStore().Add(c.cluster); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -461,9 +458,6 @@ func TestExposeClaims(t *testing.T) {
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
 			if c.cluster != nil {
 				if err := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore().Add(c.cluster); err != nil {
-					t.Fatal(err)
-				}
-				if err := clusterPropertyInformerFactory.About().V1alpha1().ClusterProperties().Informer().GetStore().Add(c.cluster); err != nil {
 					t.Fatal(err)
 				}
 			}
