@@ -16,7 +16,6 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	aboutv1alpha1 "sigs.k8s.io/about-api/pkg/apis/v1alpha1"
-	aboutclusterfake "sigs.k8s.io/about-api/pkg/generated/clientset/versioned/fake"
 	aboutinformers "sigs.k8s.io/about-api/pkg/generated/informers/externalversions"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -487,6 +486,48 @@ func TestExposeClaims(t *testing.T) {
 			},
 		},
 		{
+			name:    "sync non-customized-only properties into status of the managed cluster",
+			cluster: testinghelpers.NewJoinedManagedCluster(),
+			properties: []*aboutv1alpha1.ClusterProperty{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "a",
+						Labels: map[string]string{labelCustomizedOnly: ""},
+					},
+					Spec: aboutv1alpha1.ClusterPropertySpec{
+						Value: "b",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "c",
+					},
+					Spec: aboutv1alpha1.ClusterPropertySpec{
+						Value: "d",
+					},
+				},
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				cluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, cluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				expected := []clusterv1.ManagedClusterClaim{
+					{
+						Name:  "c",
+						Value: "d",
+					},
+				}
+				actual := cluster.Status.ClusterClaims
+				if !reflect.DeepEqual(actual, expected) {
+					t.Errorf("expected cluster claim %v but got: %v", expected, actual)
+				}
+			},
+		},
+		{
 			name:    "sync non-customized-only claims into status of the managed cluster",
 			cluster: testinghelpers.NewJoinedManagedCluster(),
 			claims: []*clusterv1alpha1.ClusterClaim{
@@ -599,6 +640,19 @@ func TestExposeClaims(t *testing.T) {
 
 func newManagedCluster(claims []clusterv1.ManagedClusterClaim) *clusterv1.ManagedCluster {
 	cluster := testinghelpers.NewJoinedManagedCluster()
+	cluster.Status.ClusterClaims = claims
+	return cluster
+}
+
+func newManagedClusterWithProperties(properties []aboutv1alpha1.ClusterProperty) *clusterv1.ManagedCluster {
+	cluster := testinghelpers.NewJoinedManagedCluster()
+	claims := make([]clusterv1.ManagedClusterClaim, len(properties))
+	for _, property := range properties {
+		claims = append(claims, clusterv1.ManagedClusterClaim{
+			Name:  property.Name,
+			Value: property.Spec.Value,
+		})
+	}
 	cluster.Status.ClusterClaims = claims
 	return cluster
 }

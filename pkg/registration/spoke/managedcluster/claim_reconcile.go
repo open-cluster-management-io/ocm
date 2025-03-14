@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"k8s.io/apimachinery/pkg/util/sets"
+	aboutv1alpha1 "sigs.k8s.io/about-api/pkg/apis/v1alpha1"
 	"sort"
 	"strings"
 
@@ -55,6 +56,7 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 	requirement, _ := labels.NewRequirement(labelCustomizedOnly, selection.DoesNotExist, []string{})
 	selector := labels.NewSelector().Add(*requirement)
 	clusterClaims, err := r.claimLister.List(selector)
+	fmt.Printf("clusterClaims: %+v \n and err: %+v", clusterClaims, err)
 	if err != nil {
 		return fmt.Errorf("unable to list cluster claims: %w", err)
 	}
@@ -63,6 +65,20 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 	// if so, it will be treated as a reserved claim and will always be exposed.
 	reservedClaimNames := sets.New(clusterv1alpha1.ReservedClusterClaimNames[:]...)
 	reservedClaimSuffixes := sets.New(r.reservedClusterClaimSuffixes...)
+
+	// when ClusterProperties feature is not enabled, the informer will not be started and the lister will
+	// return an empty list, so we do not need to check featuregate here.
+	clusterProperties, err := r.aboutLister.List(selector)
+	fmt.Printf("clusterProperties: %+v \n and err: %+v", clusterProperties, err)
+	if err != nil {
+		return fmt.Errorf("unable to list cluster properties: %w", err)
+	}
+
+	propertiesMap := map[string]*aboutv1alpha1.ClusterProperty{}
+	for _, property := range clusterProperties {
+		propertiesMap[property.Name] = property
+	}
+	// convert claim to properties
 	for _, clusterClaim := range clusterClaims {
 		managedClusterClaim := clusterv1.ManagedClusterClaim{
 			Name:  clusterClaim.Name,

@@ -19,7 +19,6 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
-	aboutclusterfake "sigs.k8s.io/about-api/pkg/generated/clientset/versioned/fake"
 	aboutinformers "sigs.k8s.io/about-api/pkg/generated/informers/externalversions"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
