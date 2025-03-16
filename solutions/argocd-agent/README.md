@@ -195,7 +195,7 @@ argocd-agent-principal   LoadBalancer   10.96.149.226   172.18.255.201   443:321
 ```   
 
 3. For details on operational modes and guidance on selecting the appropriate `agent.mode` (e.g., `managed` or `autonomous`),
-refer to the [Argo CD Agent operational variants](https://github.com/argoproj-labs/argocd-agent?tab=readme-ov-file#operational-variants).
+refer to the [Argo CD Agent website](https://argocd-agent.readthedocs.io/latest/concepts/agent-modes/).
 
 **Important:** 
 The default Argo CD Agent authentication scheme requires a principal user credentials store on the hub cluster
@@ -223,11 +223,11 @@ for an example of how to create user credentials.
 
 ### Managed Mode
 
-Refer to the [Argo CD Agent operational variants](https://github.com/argoproj-labs/argocd-agent?tab=readme-ov-file#operational-variants)
+Refer to the [Argo CD Agent website](https://argocd-agent.readthedocs.io/latest/concepts/agent-modes/)
 for more details about the `managed` mode.
 
 To deploy an Argo CD Application in `managed` mode using the Argo CD Agent,
-create the application on the hub cluster:
+create the application on the `hub` cluster:
 
 ```shell
 # kubectl config use-context <hub-cluster>
@@ -276,11 +276,11 @@ guestbook   Synced        Healthy
 
 ### Autonomous Mode
 
-Refer to the [Argo CD Agent operational variants](https://github.com/argoproj-labs/argocd-agent?tab=readme-ov-file#operational-variants)
-for more details about the `managed` mode.
+Refer to the [Argo CD Agent website](https://argocd-agent.readthedocs.io/latest/concepts/agent-modes/)
+for more details about the `autonomous` mode.
 
 To deploy an Argo CD Application in `autonomous` mode using the Argo CD Agent,
-create the application on the managed cluster:
+create the application on the `managed` cluster:
 
 ```shell
 # kubectl config use-context <managed-cluster>
