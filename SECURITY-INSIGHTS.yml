@@ -1,10 +1,10 @@
 header:
   schema-version: '1.0.0'
-  last-updated: '2025-03-12'
-  last-reviewed: '2025-03-12'
-  expiration-date: '2026-03-12T01:00:00.000Z'
+  last-updated: '2025-03-17'
+  last-reviewed: '2025-03-17'
+  expiration-date: '2026-03-17T01:00:00.000Z'
   project-url: 'https://github.com/open-cluster-management-io/ocm'
-  project-release: '0.15.2'
+  project-release: '0.16.0'
   changelog: 'https://github.com/open-cluster-management-io/ocm/releases'
   license: 'https://github.com/open-cluster-management-io/ocm/blob/main/LICENSE'
 project-lifecycle:
