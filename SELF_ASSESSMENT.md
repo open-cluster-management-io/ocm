@@ -195,7 +195,7 @@ All code is maintained on [Github](https://github.com/open-cluster-management-io
 
 ### Communication Channels
 
-Internal communications among OCM maintainers and contributors are handled through the public [Slack channel](https://kubernetes.slack.com/archives/C01GE7YSUUF) and direct messages. Inbound communications are accepted through [GitHub Issues](https://github.com/open-cluster-management-io/ocm/issues) or the public [Slack channel](https://kubernetes.slack.com/archives/C01GE7YSUUF) and direct messages. Outbound messages to users are made primarily via documentation or release notes, and secondarily via the public [Slack channel](https://kubernetes.slack.com/archives/C01GE7YSUUF).
+Internal communications among OCM maintainers and contributors are handled through the public [Slack channel](https://kubernetes.slack.com/channels/open-cluster-mgmt) and direct messages. Inbound communications are accepted through [GitHub Issues](https://github.com/open-cluster-management-io/ocm/issues) or the public [Slack channel](https://kubernetes.slack.com/channels/open-cluster-mgmt) and direct messages. Outbound messages to users are made primarily via documentation or release notes, and secondarily via the public [Slack channel](https://kubernetes.slack.com/channels/open-cluster-mgmt).
 
 ## Security Issue Resolution
 
