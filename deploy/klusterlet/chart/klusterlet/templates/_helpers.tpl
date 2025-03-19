@@ -43,3 +43,24 @@ Create secret to access docker registry
 {{- printf "%s/registration-operator:%s" .Values.images.registry .Chart.AppVersion }}
 {{- end }}
 {{- end }}
+
+{{- define "agentNamespace" }}
+{{- if .Values.klusterlet.namespace }}
+{{- printf "%s" .Values.klusterlet.namespace }}
+{{- else if  or ( eq .Values.klusterlet.mode "Hosted") (eq .Values.klusterlet.mode "SingletonHosted") }}
+{{- printf "open-cluster-management-%s" .Values.klusterlet.clusterName }}
+{{- else }}
+{{- printf "open-cluster-management-agent" }}
+{{- end }}
+{{- end }}
+
+
+{{- define "klusterletName" }}
+{{- if .Values.klusterlet.name }}
+{{- printf "%s" .Values.klusterlet.name }}
+{{- else if  or ( eq .Values.klusterlet.mode "Hosted") (eq .Values.klusterlet.mode "SingletonHosted") }}
+{{- printf "klusterlet-%s" .Values.klusterlet.clusterName }}
+{{- else }}
+{{- printf "klusterlet" }}
+{{- end }}
+{{- end }}

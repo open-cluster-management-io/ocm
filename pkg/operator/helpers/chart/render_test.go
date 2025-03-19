@@ -262,6 +262,22 @@ func TestKlusterletConfig(t *testing.T) {
 			},
 			expectedObjCnt: 7,
 		},
+		{
+			name:      "use multiHubBootstrapHubKubeConfigs",
+			namespace: "open-cluster-management",
+			chartConfig: func() *KlusterletChartConfig {
+				config := NewDefaultKlusterletChartConfig()
+				config.Klusterlet.ClusterName = "testCluster"
+				config.Klusterlet.Mode = operatorv1.InstallModeSingleton
+				config.Klusterlet.ClusterName = "multiHubCluster-agent"
+				config.MultiHubBootstrapHubKubeConfigs = []BootStrapKubeConfig{
+					{Name: "bootStrap1", KubeConfig: "kubeconfig1"},
+					{Name: "bootStrap2", KubeConfig: "kubeconfig2"},
+				}
+				return config
+			},
+			expectedObjCnt: 8,
+		},
 
 		{
 			name:      "change images config",
@@ -397,37 +413,38 @@ func TestKlusterletConfig(t *testing.T) {
 						if config.Klusterlet.Mode != "" && object.Spec.DeployOption.Mode != config.Klusterlet.Mode {
 							t.Errorf(" expected %s, got %s", config.Klusterlet.Mode, object.Spec.DeployOption.Mode)
 						}
-						switch config.Klusterlet.Name {
-						case "":
-							if object.Name != "klusterlet" {
-								t.Errorf(" expected klusterlet, got %s", object.Name)
-							}
-						default:
-							if object.Name != config.Klusterlet.Name {
-								t.Errorf(" expected %s, got %s", config.Klusterlet.Name, object.Name)
-							}
+						if config.Klusterlet.Name == "" && object.Name != "klusterlet" {
+							t.Errorf(" expected klusterlet, got %s", object.Name)
 						}
-						switch config.Klusterlet.Namespace {
-						case "":
-							if object.Spec.Namespace != "open-cluster-management-agent" {
-								t.Errorf(" expected open-cluster-management-agent, got %s", object.Spec.Namespace)
-							}
-						default:
-							if object.Spec.Namespace != config.Klusterlet.Namespace {
-								t.Errorf(" expected %s, got %s", config.Klusterlet.Namespace, object.Spec.Namespace)
-							}
+						if config.Klusterlet.Name != "" && object.Name != config.Klusterlet.Name {
+							t.Errorf(" expected %s, got %s", config.Klusterlet.Name, object.Name)
 						}
+						if config.Klusterlet.Namespace == "" && object.Spec.Namespace != "open-cluster-management-agent" {
+							t.Errorf(" expected open-cluster-management-agent, got %s", object.Spec.Namespace)
+						}
+						if config.Klusterlet.Namespace != "" && object.Spec.Namespace != config.Klusterlet.Namespace {
+							t.Errorf(" expected %s, got %s", config.Klusterlet.Namespace, object.Spec.Namespace)
+						}
+
 					case operatorv1.InstallModeSingletonHosted, operatorv1.InstallModeHosted:
 						if object.Spec.DeployOption.Mode != config.Klusterlet.Mode {
 							t.Errorf(" expected %s, got %s", config.Klusterlet.Mode, object.Spec.DeployOption.Mode)
 						}
-						if object.Name != fmt.Sprintf("klusterlet-%s", object.Spec.ClusterName) {
+						if config.Klusterlet.Name == "" &&
+							object.Name != fmt.Sprintf("klusterlet-%s", object.Spec.ClusterName) {
 							t.Errorf(" expected %s, got %s",
 								fmt.Sprintf("klusterlet-%s", object.Spec.ClusterName), object.Name)
 						}
-						if object.Spec.Namespace != fmt.Sprintf("open-cluster-management-%s", object.Spec.ClusterName) {
+						if config.Klusterlet.Name != "" && object.Name != config.Klusterlet.Name {
+							t.Errorf(" expected %s, got %s", config.Klusterlet.Name, object.Name)
+						}
+						if config.Klusterlet.Namespace == "" &&
+							object.Spec.Namespace != fmt.Sprintf("open-cluster-management-%s", object.Spec.ClusterName) {
 							t.Errorf(" expected %s, got %s",
 								fmt.Sprintf("open-cluster-management-%s", object.Spec.ClusterName), object.Spec.Namespace)
+						}
+						if config.Klusterlet.Namespace != "" && object.Spec.Namespace != config.Klusterlet.Namespace {
+							t.Errorf(" expected %s, got %s", config.Klusterlet.Namespace, object.Spec.Namespace)
 						}
 					}
 				case *corev1.Secret:
