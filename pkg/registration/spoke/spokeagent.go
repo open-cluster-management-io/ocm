@@ -440,7 +440,8 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
 		go spokeClusterInformerFactory.Start(ctx.Done())
 	}
-	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.AddonManagement) {
+
+	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterProperty) {
 		go aboutinformers.Start(ctx.Done())
 	}
 
