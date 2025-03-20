@@ -58,7 +58,7 @@ func NewAppliedManifestWorkFinalizeController(
 
 func (m *AppliedManifestWorkFinalizeController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	appliedManifestWorkName := controllerContext.QueueKey()
-	klog.V(4).Infof("Reconciling AppliedManifestWork %q", appliedManifestWorkName)
+	klog.V(5).Infof("Reconciling AppliedManifestWork %q", appliedManifestWorkName)
 
 	appliedManifestWork, err := m.appliedManifestWorkLister.Get(appliedManifestWorkName)
 	if errors.IsNotFound(err) {

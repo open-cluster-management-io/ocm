@@ -64,7 +64,7 @@ func (c *AWSIRSADriver) BuildKubeConfigFromTemplate(kubeConfig *clientcmdapi.Con
 	kubeConfig.AuthInfos = map[string]*clientcmdapi.AuthInfo{register.DefaultKubeConfigAuth: {
 		Exec: &clientcmdapi.ExecConfig{
 			APIVersion: "client.authentication.k8s.io/v1beta1",
-			Command:    "aws",
+			Command:    "/awscli/dist/aws",
 			Args: []string{
 				"--region",
 				awsRegion,

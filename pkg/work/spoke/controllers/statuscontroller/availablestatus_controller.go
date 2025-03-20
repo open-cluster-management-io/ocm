@@ -88,7 +88,7 @@ func (c *AvailableStatusController) sync(ctx context.Context, controllerContext 
 	}
 
 	// resync all manifestworks
-	klog.V(4).Infof("Resync all ManifestWorks by adding them to the queue")
+	klog.V(5).Infof("Resync all ManifestWorks by adding them to the queue")
 	manifestWorks, err := c.manifestWorkLister.List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("unable to list manifestworks: %w", err)
@@ -102,7 +102,7 @@ func (c *AvailableStatusController) sync(ctx context.Context, controllerContext 
 }
 
 func (c *AvailableStatusController) syncManifestWork(ctx context.Context, originalManifestWork *workapiv1.ManifestWork) error {
-	klog.V(4).Infof("Reconciling ManifestWork %q", originalManifestWork.Name)
+	klog.V(5).Infof("Reconciling ManifestWork %q", originalManifestWork.Name)
 	manifestWork := originalManifestWork.DeepCopy()
 
 	// do nothing when finalizer is not added.
