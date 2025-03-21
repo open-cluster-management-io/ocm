@@ -3,6 +3,7 @@ package controllercmd
 import (
 	"context"
 	"fmt"
+	"k8s.io/utils/clock"
 	"os"
 	"strings"
 	"sync"
@@ -40,6 +41,9 @@ type StartFunc func(context.Context, *ControllerContext) error
 type ControllerContext struct {
 	ComponentConfig *unstructured.Unstructured
 
+	// Clock is a potentially fake clock that must be used to run controllers.
+	Clock clock.Clock
+
 	// KubeConfig provides the REST config with no content type (it will default to JSON).
 	// Use this config for CR resources.
 	KubeConfig *rest.Config
@@ -71,6 +75,7 @@ type ControllerBuilder struct {
 	fileObserverReactorFn   func(file string, action fileobserver.ActionType) error
 	eventRecorderOptions    record.CorrelatorOptions
 	componentOwnerReference *corev1.ObjectReference
+	clock                   clock.Clock
 
 	startFunc          StartFunc
 	componentName      string
@@ -121,10 +126,11 @@ func (i infrastructureStatusTopologyDetector) DetectTopology(ctx context.Context
 var _ TopologyDetector = (*infrastructureStatusTopologyDetector)(nil)
 
 // NewController returns a builder struct for constructing the command you want to run
-func NewController(componentName string, startFunc StartFunc) *ControllerBuilder {
+func NewController(componentName string, startFunc StartFunc, clock clock.Clock) *ControllerBuilder {
 	return &ControllerBuilder{
 		startFunc:        startFunc,
 		componentName:    componentName,
+		clock:            clock,
 		observerInterval: defaultObserverInterval,
 		nonZeroExitFn: func(args ...interface{}) {
 			klog.Warning(args...)
@@ -266,7 +272,7 @@ func (b *ControllerBuilder) Run(ctx context.Context, config *unstructured.Unstru
 			klog.Warningf("unable to get owner reference (falling back to namespace): %v", err)
 		}
 	}
-	eventRecorder := events.NewKubeRecorderWithOptions(kubeClient.CoreV1().Events(namespace), b.eventRecorderOptions, b.componentName, controllerRef)
+	eventRecorder := events.NewKubeRecorderWithOptions(kubeClient.CoreV1().Events(namespace), b.eventRecorderOptions, b.componentName, controllerRef, b.clock)
 
 	utilruntime.PanicHandlers = append(utilruntime.PanicHandlers, func(c context.Context, r interface{}) {
 		eventRecorder.Warningf(fmt.Sprintf("%sPanic", strings.Title(b.componentName)), "Panic observed: %v", r)
@@ -336,6 +342,7 @@ func (b *ControllerBuilder) Run(ctx context.Context, config *unstructured.Unstru
 
 	controllerContext := &ControllerContext{
 		ComponentConfig:   config,
+		Clock:             b.clock,
 		KubeConfig:        clientConfig,
 		ProtoKubeConfig:   protoConfig,
 		EventRecorder:     eventRecorder,

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/openshift/library-go/pkg/assets"
@@ -30,6 +31,7 @@ import (
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 	"k8s.io/component-base/featuregate"
 	fakeapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
+	clocktesting "k8s.io/utils/clock/testing"
 
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
@@ -1477,7 +1479,7 @@ func TestSyncSecret(t *testing.T) {
 			clientTarget := fakekube.NewSimpleClientset()
 			secret, changed, err := SyncSecret(
 				context.TODO(), client.CoreV1(), clientTarget.CoreV1(),
-				events.NewInMemoryRecorder("test"), tc.sourceNamespace, tc.sourceName,
+				events.NewInMemoryRecorder("test", clocktesting.NewFakePassiveClock(time.Now())), tc.sourceNamespace, tc.sourceName,
 				tc.targetNamespace, tc.targetName, tc.ownerRefs, nil)
 
 			if (err == nil && len(tc.expectedErr) != 0) || (err != nil && err.Error() != tc.expectedErr) {
