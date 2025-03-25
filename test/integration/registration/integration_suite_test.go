@@ -70,14 +70,13 @@ var hubOption *hub.HubManagerOptions
 
 var CRDPaths = []string{
 	// hub
-	"./manifests/cluster-manager/hub/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml",
-	"./manifests/cluster-manager/hub/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml",
-	"./manifests/cluster-manager/hub/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml",
-	"./manifests/cluster-manager/hub/0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml",
-	"./manifests/cluster-manager/hub/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml",
+	"./vendor/open-cluster-management.io/api/cluster/v1/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml",
+	"./vendor/open-cluster-management.io/api/work/v1/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml",
+	"./vendor/open-cluster-management.io/api/addon/v1alpha1/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml",
+	"./vendor/open-cluster-management.io/api/cluster/v1beta2/0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml",
+	"./vendor/open-cluster-management.io/api/cluster/v1beta2/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml",
 	// spoke
-	"./manifests/klusterlet/managed/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml",
-	"./manifests/klusterlet/managed/clusterproperties.crd.yaml",
+	"./vendor/open-cluster-management.io/api/cluster/v1alpha1/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml",
 	// external API deps
 	"./test/integration/testdeps/capi/cluster.x-k8s.io_clusters.yaml",
 }
