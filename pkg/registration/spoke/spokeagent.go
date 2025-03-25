@@ -45,8 +45,6 @@ import (
 // TODO if we register the lease informer to the lease controller, we need to increase this time
 var AddOnLeaseControllerSyncInterval = 30 * time.Second
 
-const AwsIrsaAuthType = "awsirsa"
-
 type SpokeAgentConfig struct {
 	agentOptions       *commonoptions.AgentOptions
 	registrationOption *SpokeAgentOptions
@@ -199,7 +197,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 	// initiate registration driver
 	var registerDriver register.RegisterDriver
-	if o.registrationOption.RegistrationAuth == AwsIrsaAuthType {
+	if o.registrationOption.RegistrationAuth == helpers.AwsIrsaAuthType {
 		registerDriver = awsIrsa.NewAWSIRSADriver(o.registrationOption.ManagedClusterArn,
 			o.registrationOption.ManagedClusterRoleSuffix,
 			o.registrationOption.HubClusterArn,
@@ -584,7 +582,7 @@ func (o *SpokeAgentConfig) newRestirationAuthOption(
 	clusterInformers clusterv1informers.SharedInformerFactory,
 	clusterClient clusterv1client.Interface,
 ) (any, error) {
-	if o.registrationOption.RegistrationAuth == AwsIrsaAuthType {
+	if o.registrationOption.RegistrationAuth == helpers.AwsIrsaAuthType {
 		if o.registrationOption.HubClusterArn != "" {
 			return awsIrsa.NewAWSOption(
 				secretOption,

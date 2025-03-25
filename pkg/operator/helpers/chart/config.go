@@ -63,12 +63,22 @@ type KlusterletChartConfig struct {
 	// BootstrapHubKubeConfig should be the kubeConfig file of the hub cluster via setting --set-file=<the kubeConfig file of hub cluster> optional
 	BootstrapHubKubeConfig string `json:"bootstrapHubKubeConfig,omitempty"`
 
+	// when MultipleHubs feature gate in klusterlet.registrationConfiguration is enabled, need to set multiple bootstrap hub kubeConfigs here.
+	MultiHubBootstrapHubKubeConfigs []BootStrapKubeConfig `json:"multiHubBootstrapHubKubeConfigs,omitempty"`
+
 	// ExternalManagedKubeConfig should be the kubeConfig file of the managed cluster via setting --set-file=<the kubeConfig file of managed cluster>
 	// only need to set in the hosted mode. optional
 	ExternalManagedKubeConfig string `json:"externalManagedKubeConfig,omitempty"`
 
 	// NoOperator is to only deploy the klusterlet CR if set true.
 	NoOperator bool `json:"noOperator,omitempty"`
+}
+
+type BootStrapKubeConfig struct {
+	// the boostStrap secret name
+	Name string `json:"name,omitempty"`
+	// the kubeConfig file of the hub cluster
+	KubeConfig string `json:"kubeConfig,omitempty"`
 }
 
 type ImagesConfig struct {

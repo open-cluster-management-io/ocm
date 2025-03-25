@@ -42,7 +42,6 @@ const (
 	klusterletFinalizer                   = "operator.open-cluster-management.io/klusterlet-cleanup"
 	managedResourcesEvictionTimestampAnno = "operator.open-cluster-management.io/managed-resources-eviction-timestamp"
 	klusterletNamespaceLabelKey           = "operator.open-cluster-management.io/klusterlet"
-	AwsIrsaAuthType                       = "awsirsa"
 )
 
 type klusterletController struct {
@@ -346,7 +345,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		config.RegistrationKubeAPIBurst = klusterlet.Spec.RegistrationConfiguration.KubeAPIBurst
 		// Configuring Registration driver depending on registration auth
 		if &klusterlet.Spec.RegistrationConfiguration.RegistrationDriver != nil &&
-			klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType == AwsIrsaAuthType {
+			klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType == commonhelpers.AwsIrsaAuthType {
 
 			hubClusterArn := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.HubClusterArn
 			managedClusterArn := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.ManagedClusterArn

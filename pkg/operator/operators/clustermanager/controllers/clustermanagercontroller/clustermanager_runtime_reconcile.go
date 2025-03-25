@@ -21,6 +21,7 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/manifests"
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
@@ -77,11 +78,11 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 		var enabledRegistrationDrivers []string
 		for _, registrationDriver := range cm.Spec.RegistrationConfiguration.RegistrationDrivers {
 			enabledRegistrationDrivers = append(enabledRegistrationDrivers, registrationDriver.AuthType)
-			if registrationDriver.AuthType == "awsirsa" && registrationDriver.AwsIrsa != nil {
+			if registrationDriver.AuthType == commonhelpers.AwsIrsaAuthType && registrationDriver.AwsIrsa != nil {
 				config.HubClusterArn = registrationDriver.AwsIrsa.HubClusterArn
 				config.AutoApprovedARNPatterns = strings.Join(registrationDriver.AwsIrsa.AutoApprovedIdentities, ",")
 				config.AwsResourceTags = strings.Join(registrationDriver.AwsIrsa.Tags, ",")
-			} else if registrationDriver.AuthType == "csr" && registrationDriver.CSR != nil {
+			} else if registrationDriver.AuthType == commonhelpers.CSRAuthType && registrationDriver.CSR != nil {
 				config.AutoApprovedCSRUsers = strings.Join(registrationDriver.CSR.AutoApprovedIdentities, ",")
 			}
 		}

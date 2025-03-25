@@ -1,0 +1,22 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "eks:CreateAccessEntry",
+        "iam:DeleteRole",
+        "eks:DeleteAccessEntry",
+        "iam:TagRole",
+        "eks:TagResource"
+      ],
+      "Resource": [
+        "arn:aws:iam::HUB_ACCOUNT_ID:role/ocm-hub-*",
+        "arn:aws:iam::HUB_ACCOUNT_ID:policy/ocm-hub-*",
+        "arn:aws:eks:HUB_REGION:HUB_ACCOUNT_ID:cluster/*",
+        "arn:aws:eks:HUB_REGION:HUB_ACCOUNT_ID:access-entry/*"
+      ]
+    }
+  ]
+}

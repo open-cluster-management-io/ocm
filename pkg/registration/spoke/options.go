@@ -9,6 +9,7 @@ import (
 
 	ocmfeature "open-cluster-management.io/api/feature"
 
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 )
@@ -119,7 +120,7 @@ func (o *SpokeAgentOptions) Validate() error {
 		return errors.New("client certificate expiration seconds must greater or qual to 3600")
 	}
 
-	if (o.RegistrationAuth == AwsIrsaAuthType) && (o.HubClusterArn == "") {
+	if (o.RegistrationAuth == commonhelpers.AwsIrsaAuthType) && (o.HubClusterArn == "") {
 		return errors.New("EksHubClusterArn cannot be empty if RegistrationAuth is awsirsa")
 	}
 
