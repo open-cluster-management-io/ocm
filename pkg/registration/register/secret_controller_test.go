@@ -141,7 +141,7 @@ func TestSync(t *testing.T) {
 			c.option.ManagementSecretInformer = informerFactory.Core().V1().Secrets().Informer()
 			updater := &fakeStatusUpdater{}
 			ctrl := NewSecretController(
-				c.option, nil, c.driver, updater.update, syncCtx.Recorder(), "test")
+				c.option, c.driver, updater.update, syncCtx.Recorder(), "test")
 			err := ctrl.Sync(context.Background(), syncCtx)
 			if err != nil {
 				t.Fatal(err)
@@ -185,16 +185,20 @@ func (f *fakeDriver) BuildKubeConfigFromTemplate(config *clientcmdapi.Config) *c
 	return config
 }
 
+func (f *fakeDriver) BuildClients(ctx context.Context, secretOption SecretOption, bootstrap bool) (*Clients, error) {
+	return &Clients{}, nil
+}
+
 func (f *fakeDriver) Process(
 	_ context.Context,
 	_ string,
 	_ *corev1.Secret,
 	_ map[string][]byte,
-	_ events.Recorder, _ any) (*corev1.Secret, *metav1.Condition, error) {
+	_ events.Recorder) (*corev1.Secret, *metav1.Condition, error) {
 	return f.secret, f.cond, f.err
 }
 
-func (f *fakeDriver) InformerHandler(_ any) (cache.SharedIndexInformer, factory.EventFilterFunc) {
+func (f *fakeDriver) InformerHandler() (cache.SharedIndexInformer, factory.EventFilterFunc) {
 	return nil, nil
 }
 

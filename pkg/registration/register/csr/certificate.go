@@ -148,10 +148,11 @@ func GetClusterAgentNamesFromCertificate(certData []byte) (clusterName, agentNam
 	return "", "", nil
 }
 
+// CSRControl is an interface that driver can optionally support for csr based registration for addons.
 type CSRControl interface {
-	create(ctx context.Context, recorder events.Recorder, objMeta metav1.ObjectMeta, csrData []byte, signerName string, expirationSeconds *int32) (string, error)
-	isApproved(name string) (bool, error)
-	getIssuedCertificate(name string) ([]byte, error)
+	Create(ctx context.Context, recorder events.Recorder, objMeta metav1.ObjectMeta, csrData []byte, signerName string, expirationSeconds *int32) (string, error)
+	IsApproved(name string) (bool, error)
+	GetIssuedCertificate(name string) ([]byte, error)
 
 	// Informer is public so we can add indexer outside
 	Informer() cache.SharedIndexInformer
@@ -165,7 +166,7 @@ type v1CSRControl struct {
 	hubCSRClient   csrclient.CertificateSigningRequestInterface
 }
 
-func (v *v1CSRControl) isApproved(name string) (bool, error) {
+func (v *v1CSRControl) IsApproved(name string) (bool, error) {
 	csr, err := v.get(name)
 	if err != nil {
 		return false, err
@@ -182,7 +183,7 @@ func (v *v1CSRControl) isApproved(name string) (bool, error) {
 	return approved, nil
 }
 
-func (v *v1CSRControl) getIssuedCertificate(name string) ([]byte, error) {
+func (v *v1CSRControl) GetIssuedCertificate(name string) ([]byte, error) {
 	csr, err := v.get(name)
 	if err != nil {
 		return nil, err
@@ -191,7 +192,7 @@ func (v *v1CSRControl) getIssuedCertificate(name string) ([]byte, error) {
 	return v1CSR.Status.Certificate, nil
 }
 
-func (v *v1CSRControl) create(ctx context.Context, recorder events.Recorder, objMeta metav1.ObjectMeta, csrData []byte,
+func (v *v1CSRControl) Create(ctx context.Context, recorder events.Recorder, objMeta metav1.ObjectMeta, csrData []byte,
 	signerName string, expirationSeconds *int32) (string, error) {
 	csr := &certificates.CertificateSigningRequest{
 		ObjectMeta: objMeta,

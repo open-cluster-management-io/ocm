@@ -24,6 +24,7 @@ import (
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
+	registerfactory "open-cluster-management.io/ocm/pkg/registration/register/factory"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
@@ -46,6 +47,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			BootstrapKubeconfig:      bootstrapKubeconfig,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
+			RegisterDriverOption:     registerfactory.NewOptions(),
 		}
 
 		commOptions := commonoptions.NewAgentOptions()

@@ -55,11 +55,11 @@ func TestProcess(t *testing.T) {
 				register.AgentNameFile:   []byte(testAgentName),
 			}
 
-			awsOption := &AWSOption{
-				AWSIRSAControl: ctrl,
-			}
+			awsOption := &AWSOption{}
 
-			driver := &AWSIRSADriver{}
+			driver := &AWSIRSADriver{
+				awsIRSAControl: ctrl,
+			}
 
 			if c.approvedIrsaRequest != nil {
 				driver.name = testIrsaName
@@ -230,13 +230,13 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			driver := NewAWSIRSADriver("", "", "", "")
 			secretOption := register.SecretOption{
 				ClusterName:       c.clusterName,
 				AgentName:         c.agentName,
 				HubKubeconfigDir:  tempDir,
 				HubKubeconfigFile: path.Join(tempDir, "kubeconfig"),
 			}
+			driver := NewAWSIRSADriver(NewAWSOption(), secretOption)
 			if c.kubeconfig != nil {
 				testinghelpers.WriteFile(path.Join(tempDir, "kubeconfig"), c.kubeconfig)
 			}

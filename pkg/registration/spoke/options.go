@@ -9,12 +9,10 @@ import (
 
 	ocmfeature "open-cluster-management.io/api/feature"
 
-	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
+	registerfactory "open-cluster-management.io/ocm/pkg/registration/register/factory"
 )
-
-var ClientCertHealthCheckInterval = 30 * time.Second
 
 // SpokeAgentOptions holds configuration for spoke cluster agent
 type SpokeAgentOptions struct {
@@ -32,16 +30,13 @@ type SpokeAgentOptions struct {
 	// See more details in: https://github.com/open-cluster-management-io/ocm/pull/443#discussion_r1610868646
 	HubConnectionTimeoutSeconds int32
 
-	HubKubeconfigSecret         string
-	SpokeExternalServerURLs     []string
-	ClusterHealthCheckPeriod    time.Duration
-	MaxCustomClusterClaims      int
-	ClientCertExpirationSeconds int32
-	ClusterAnnotations          map[string]string
-	RegistrationAuth            string
-	HubClusterArn               string
-	ManagedClusterArn           string
-	ManagedClusterRoleSuffix    string
+	HubKubeconfigSecret      string
+	SpokeExternalServerURLs  []string
+	ClusterHealthCheckPeriod time.Duration
+	MaxCustomClusterClaims   int
+	ClusterAnnotations       map[string]string
+
+	RegisterDriverOption *registerfactory.Options
 }
 
 func NewSpokeAgentOptions() *SpokeAgentOptions {
@@ -51,6 +46,8 @@ func NewSpokeAgentOptions() *SpokeAgentOptions {
 		ClusterHealthCheckPeriod:    1 * time.Minute,
 		MaxCustomClusterClaims:      20,
 		HubConnectionTimeoutSeconds: 600, // by default, the timeout is 10 minutes
+
+		RegisterDriverOption: registerfactory.NewOptions(),
 	}
 
 	return options
@@ -74,20 +71,10 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 		"The period to check managed cluster kube-apiserver health")
 	fs.IntVar(&o.MaxCustomClusterClaims, "max-custom-cluster-claims", o.MaxCustomClusterClaims,
 		"The max number of custom cluster claims to expose.")
-	fs.Int32Var(&o.ClientCertExpirationSeconds, "client-cert-expiration-seconds", o.ClientCertExpirationSeconds,
-		"The requested duration in seconds of validity of the issued client certificate. If this is not set, "+
-			"the value of --cluster-signing-duration command-line flag of the kube-controller-manager will be used.")
 	fs.StringToStringVar(&o.ClusterAnnotations, "cluster-annotations", o.ClusterAnnotations, `the annotations with the reserve
 	 prefix "agent.open-cluster-management.io" set on ManagedCluster when creating only, other actors can update it afterwards.`)
-	//Consider grouping these flags for driverOption in a new Option struct and add the flags using function driverOptions.AddFlags(fs).
-	fs.StringVar(&o.RegistrationAuth, "registration-auth", o.RegistrationAuth,
-		"The type of authentication to use to authenticate with hub.")
-	fs.StringVar(&o.HubClusterArn, "hub-cluster-arn", o.HubClusterArn,
-		"The ARN of the EKS based hub cluster.")
-	fs.StringVar(&o.ManagedClusterArn, "managed-cluster-arn", o.ManagedClusterArn,
-		"The ARN of the EKS based managed cluster.")
-	fs.StringVar(&o.ManagedClusterRoleSuffix, "managed-cluster-role-suffix", o.ManagedClusterRoleSuffix,
-		"The suffix of the managed cluster IAM role.")
+
+	o.RegisterDriverOption.AddFlags(fs)
 }
 
 // Validate verifies the inputs.
@@ -116,12 +103,8 @@ func (o *SpokeAgentOptions) Validate() error {
 		return errors.New("cluster healthcheck period must greater than zero")
 	}
 
-	if o.ClientCertExpirationSeconds != 0 && o.ClientCertExpirationSeconds < 3600 {
-		return errors.New("client certificate expiration seconds must greater or qual to 3600")
-	}
-
-	if (o.RegistrationAuth == commonhelpers.AwsIrsaAuthType) && (o.HubClusterArn == "") {
-		return errors.New("EksHubClusterArn cannot be empty if RegistrationAuth is awsirsa")
+	if err := o.RegisterDriverOption.Validate(); err != nil {
+		return err
 	}
 
 	return nil

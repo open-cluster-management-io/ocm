@@ -9,11 +9,14 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	certificates "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -21,9 +24,12 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
+	"open-cluster-management.io/ocm/pkg/registration/hub/user"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
@@ -35,6 +41,13 @@ const (
 
 	// ClusterCertificateRotatedCondition is a condition type that client certificate is rotated
 	ClusterCertificateRotatedCondition = "ClusterCertificateRotated"
+
+	indexByCluster = "indexByCluster"
+	indexByAddon   = "indexByAddon"
+
+	// TODO(qiujian16) expose it if necessary in the future.
+	clusterCSRThreshold = 10
+	addonCSRThreshold   = 10
 )
 
 type CSRDriver struct {
@@ -49,16 +62,21 @@ type CSRDriver struct {
 	//   3. csrName set, keyData set: we are waiting for a new cert to be signed.
 	//   4. csrName empty, keydata set: the CSR failed to create, this shouldn't happen, it's a bug.
 	keyData []byte
+
+	csrControl CSRControl
+
+	// HaltCSRCreation halt the csr creation
+	haltCSRCreation func() bool
+
+	opt *Option
+
+	csrOption *CSROption
 }
 
 func (c *CSRDriver) Process(
 	ctx context.Context, controllerName string, secret *corev1.Secret, additionalSecretData map[string][]byte,
-	recorder events.Recorder, opt any) (*corev1.Secret, *metav1.Condition, error) {
+	recorder events.Recorder) (*corev1.Secret, *metav1.Condition, error) {
 	logger := klog.FromContext(ctx)
-	csrOption, ok := opt.(*CSROption)
-	if !ok {
-		return nil, nil, fmt.Errorf("option type is not correct")
-	}
 
 	// reconcile pending csr if exists
 	if len(c.csrName) > 0 {
@@ -70,7 +88,7 @@ func (c *CSRDriver) Process(
 			}
 
 			// skip if csr is not approved yet
-			isApproved, err := csrOption.CSRControl.isApproved(c.csrName)
+			isApproved, err := c.csrControl.IsApproved(c.csrName)
 			if err != nil {
 				return nil, err
 			}
@@ -79,7 +97,7 @@ func (c *CSRDriver) Process(
 			}
 
 			// skip if csr is not issued
-			certData, err := csrOption.CSRControl.getIssuedCertificate(c.csrName)
+			certData, err := c.csrControl.GetIssuedCertificate(c.csrName)
 			if err != nil {
 				return nil, err
 			}
@@ -154,7 +172,7 @@ func (c *CSRDriver) Process(
 		controllerName,
 		secret,
 		recorder,
-		csrOption.Subject,
+		c.csrOption.Subject,
 		additionalSecretData)
 	if err != nil {
 		return secret, nil, err
@@ -163,7 +181,7 @@ func (c *CSRDriver) Process(
 		return nil, nil, nil
 	}
 
-	shouldHalt := csrOption.HaltCSRCreation()
+	shouldHalt := c.haltCSRCreation()
 	if shouldHalt {
 		recorder.Eventf("ClientCertificateCreationHalted",
 			"Stop creating csr since there are too many csr created already on hub", controllerName)
@@ -186,12 +204,18 @@ func (c *CSRDriver) Process(
 		if err != nil {
 			return keyData, "", fmt.Errorf("invalid private key for certificate request: %w", err)
 		}
-		csrData, err := certutil.MakeCSR(privateKey, csrOption.Subject, csrOption.DNSNames, nil)
+		csrData, err := certutil.MakeCSR(privateKey, c.csrOption.Subject, c.csrOption.DNSNames, nil)
 		if err != nil {
 			return keyData, "", fmt.Errorf("unable to generate certificate request: %w", err)
 		}
-		createdCSRName, err := csrOption.CSRControl.create(
-			ctx, recorder, csrOption.ObjectMeta, csrData, csrOption.SignerName, csrOption.ExpirationSeconds)
+
+		// do not set expiration second if it is 0
+		expirationSeconds := pointer.Int32(c.opt.ExpirationSeconds)
+		if *expirationSeconds == 0 {
+			expirationSeconds = nil
+		}
+		createdCSRName, err := c.csrControl.Create(
+			ctx, recorder, c.csrOption.ObjectMeta, csrData, c.csrOption.SignerName, expirationSeconds)
 		if err != nil {
 			return keyData, "", err
 		}
@@ -225,12 +249,8 @@ func (c *CSRDriver) BuildKubeConfigFromTemplate(kubeConfig *clientcmdapi.Config)
 	return kubeConfig
 }
 
-func (c *CSRDriver) InformerHandler(option any) (cache.SharedIndexInformer, factory.EventFilterFunc) {
-	csrOption, ok := option.(*CSROption)
-	if !ok {
-		utilruntime.Must(fmt.Errorf("option type is not correct"))
-	}
-	return csrOption.CSRControl.Informer(), csrOption.EventFilterFunc
+func (c *CSRDriver) InformerHandler() (cache.SharedIndexInformer, factory.EventFilterFunc) {
+	return c.csrControl.Informer(), c.csrOption.EventFilterFunc
 }
 
 func (c *CSRDriver) IsHubKubeConfigValid(ctx context.Context, secretOption register.SecretOption) (bool, error) {
@@ -272,8 +292,108 @@ func (c *CSRDriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluster) *
 	return cluster
 }
 
-func NewCSRDriver() register.RegisterDriver {
-	return &CSRDriver{}
+func (c *CSRDriver) Fork(addonName string, secretOption register.SecretOption) register.RegisterDriver {
+	csrOption := &CSROption{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: fmt.Sprintf("addon-%s-%s-", secretOption.ClusterName, addonName),
+			Labels: map[string]string{
+				// the labels are only hints. Anyone could set/modify them.
+				clusterv1.ClusterNameLabelKey: secretOption.ClusterName,
+				addonv1alpha1.AddonLabelKey:   addonName,
+			},
+		},
+		Subject:         secretOption.Subject,
+		DNSNames:        []string{fmt.Sprintf("%s.addon.open-cluster-management.io", addonName)},
+		SignerName:      secretOption.Signer,
+		EventFilterFunc: createCSREventFilterFunc(secretOption.ClusterName, addonName, secretOption.Signer),
+	}
+
+	driver := &CSRDriver{
+		csrOption:       csrOption,
+		opt:             c.opt,
+		csrControl:      c.csrControl,
+		haltCSRCreation: haltAddonCSRCreationFunc(c.csrControl.Informer().GetIndexer(), secretOption.ClusterName, addonName),
+	}
+
+	return driver
+}
+
+func (c *CSRDriver) BuildClients(ctx context.Context, secretOption register.SecretOption, bootstrap bool) (*register.Clients, error) {
+	logger := klog.FromContext(ctx)
+	clients, err := register.BuildClientsFromSecretOption(secretOption, bootstrap)
+	if err != nil {
+		return nil, err
+	}
+	csrControl, err := NewCSRControl(logger, clients.KubeInformerFactory.Certificates(), clients.KubeClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create CSR control: %w", err)
+	}
+
+	err = csrControl.Informer().AddIndexers(cache.Indexers{
+		indexByCluster: indexByClusterFunc,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	err = csrControl.Informer().AddIndexers(cache.Indexers{
+		indexByAddon: indexByAddonFunc,
+	})
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
+
+	c.csrControl = csrControl
+	c.haltCSRCreation = haltCSRCreationFunc(csrControl.Informer().GetIndexer(), secretOption.ClusterName)
+	return clients, nil
+}
+
+var _ register.RegisterDriver = &CSRDriver{}
+var _ register.AddonDriver = &CSRDriver{}
+
+func NewCSRDriver(opt *Option, secretOpts register.SecretOption) *CSRDriver {
+	driver := &CSRDriver{
+		opt: opt,
+	}
+	driver.csrOption = &CSROption{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: fmt.Sprintf("%s-", secretOpts.ClusterName),
+			Labels: map[string]string{
+				// the label is only an hint for cluster name. Anyone could set/modify it.
+				clusterv1.ClusterNameLabelKey: secretOpts.ClusterName,
+			},
+		},
+		Subject: &pkix.Name{
+			Organization: []string{
+				fmt.Sprintf("%s%s", user.SubjectPrefix, secretOpts.ClusterName),
+				user.ManagedClustersGroup,
+			},
+			CommonName: fmt.Sprintf("%s%s:%s", user.SubjectPrefix, secretOpts.ClusterName, secretOpts.AgentName),
+		},
+		SignerName: certificates.KubeAPIServerClientSignerName,
+		EventFilterFunc: func(obj interface{}) bool {
+			accessor, err := meta.Accessor(obj)
+			if err != nil {
+				return false
+			}
+			labels := accessor.GetLabels()
+			// only enqueue csr from a specific managed cluster
+			if labels[clusterv1.ClusterNameLabelKey] != secretOpts.ClusterName {
+				return false
+			}
+
+			// should not contain addon key
+			_, ok := labels[addonv1alpha1.AddonLabelKey]
+			if ok {
+				return false
+			}
+
+			// only enqueue csr whose name starts with the cluster name
+			return strings.HasPrefix(accessor.GetName(), fmt.Sprintf("%s-", secretOpts.ClusterName))
+		},
+	}
+
+	return driver
 }
 
 func shouldCreateCSR(
@@ -345,4 +465,73 @@ func jitter(percentage float64, maxFactor float64) float64 {
 	}
 	newPercentage := percentage + percentage*rand.Float64()*maxFactor //#nosec G404
 	return newPercentage
+}
+
+func indexByAddonFunc(obj interface{}) ([]string, error) {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	cluster, ok := accessor.GetLabels()[clusterv1.ClusterNameLabelKey]
+	if !ok {
+		return []string{}, nil
+	}
+
+	addon, ok := accessor.GetLabels()[addonv1alpha1.AddonLabelKey]
+	if !ok {
+		return []string{}, nil
+	}
+
+	return []string{fmt.Sprintf("%s/%s", cluster, addon)}, nil
+}
+
+func indexByClusterFunc(obj interface{}) ([]string, error) {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	cluster, ok := accessor.GetLabels()[clusterv1.ClusterNameLabelKey]
+	if !ok {
+		return []string{}, nil
+	}
+
+	// should not contain addon key
+	if _, ok := accessor.GetLabels()[addonv1alpha1.AddonLabelKey]; ok {
+		return []string{}, nil
+	}
+
+	return []string{cluster}, nil
+}
+
+func createCSREventFilterFunc(clusterName, addOnName, signerName string) factory.EventFilterFunc {
+	return func(obj interface{}) bool {
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			return false
+		}
+		labels := accessor.GetLabels()
+		// only enqueue csr from a specific managed cluster
+		if labels[clusterv1.ClusterNameLabelKey] != clusterName {
+			return false
+		}
+		// only enqueue csr created for a specific addon
+		if labels[addonv1alpha1.AddonLabelKey] != addOnName {
+			return false
+		}
+
+		// only enqueue csr with a specific signer name
+		csr, ok := obj.(*certificates.CertificateSigningRequest)
+		if !ok {
+			return false
+		}
+		if len(csr.Spec.SignerName) == 0 {
+			return false
+		}
+		if csr.Spec.SignerName != signerName {
+			return false
+		}
+		return true
+	}
 }
