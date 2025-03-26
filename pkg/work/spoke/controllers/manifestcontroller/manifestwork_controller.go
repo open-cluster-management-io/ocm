@@ -29,6 +29,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
+	"open-cluster-management.io/ocm/pkg/work/spoke/conditions"
 )
 
 var (
@@ -85,9 +86,10 @@ func NewManifestWorkController(
 		agentID:                   agentID,
 		reconcilers: []workReconcile{
 			&manifestworkReconciler{
-				restMapper: restMapper,
-				appliers:   apply.NewAppliers(spokeDynamicClient, spokeKubeClient, spokeAPIExtensionClient),
-				validator:  validator,
+				restMapper:      restMapper,
+				appliers:        apply.NewAppliers(spokeDynamicClient, spokeKubeClient, spokeAPIExtensionClient),
+				validator:       validator,
+				conditionReader: conditions.NewConditionReader(),
 			},
 			&appliedManifestWorkReconciler{
 				spokeDynamicClient: spokeDynamicClient,
