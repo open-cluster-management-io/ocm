@@ -610,6 +610,8 @@ const (
 const (
 	// ConditionRuleTrue is set when a rule is evaluated without error
 	ConditionRuleEvaluated string = "ConditionRuleEvaluated"
+	// ConditionRuleInvalid is set when a rule is invalid and cannot be evaluated
+	ConditionRuleInvalid string = "ConditionRuleInvalid"
 	// ConditionRuleExpressionError is set when a rule fails due to an invalid expression
 	ConditionRuleExpressionError string = "ConditionRuleExpressionError"
 	// ConditionRuleInternalError is set when rule evaluation results in an error not caused by the expression
