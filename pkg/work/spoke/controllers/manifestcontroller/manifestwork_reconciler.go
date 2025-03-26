@@ -212,6 +212,8 @@ func (m *manifestworkReconciler) applyOneManifest(
 	result.Result, result.Error = applier.Apply(ctx, gvr, required, requiredOwner, option, recorder)
 
 	if result.Result != nil && result.Error == nil && option != nil && len(option.ConditionRules) > 0 {
+		// TODO: Not sure that error on condition evaluation should be set as result error.
+		// 		 Definitely not when caused by bad expressions.
 		result.Conditions, result.Error = m.getStatusConditions(result.Result, option.ConditionRules)
 	}
 
