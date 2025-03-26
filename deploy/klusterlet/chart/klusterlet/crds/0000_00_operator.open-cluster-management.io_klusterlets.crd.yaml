@@ -43,6 +43,24 @@ spec:
             description: Spec represents the desired deployment configuration of Klusterlet
               agent.
             properties:
+              clusterClaimConfiguration:
+                description: |-
+                  ClusterClaimConfiguration represents the configuration of ClusterClaim
+                  Effective only when the `ClusterClaim` feature gate is enabled.
+                properties:
+                  maxCustomClusterClaims:
+                    default: 20
+                    description: Maximum number of custom ClusterClaims allowed.
+                    format: int32
+                    type: integer
+                  reservedClusterClaimSuffixes:
+                    description: Custom suffixes for reserved ClusterClaims.
+                    items:
+                      type: string
+                    type: array
+                required:
+                - maxCustomClusterClaims
+                type: object
               clusterName:
                 description: |-
                   ClusterName is the name of the managed cluster to be created on hub.
