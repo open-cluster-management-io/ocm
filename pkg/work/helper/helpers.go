@@ -379,6 +379,9 @@ func FindManifestConfiguration(resourceMeta workapiv1.ManifestResourceMeta,
 			continue
 		}
 
+		if len(rstOption.ConditionRules) == 0 && len(option.ConditionRules) != 0 {
+			rstOption.ConditionRules = option.ConditionRules
+		}
 		if len(rstOption.FeedbackRules) == 0 && len(option.FeedbackRules) != 0 {
 			rstOption.FeedbackRules = option.FeedbackRules
 		}
@@ -545,4 +548,17 @@ func wildcardMatch(resource, target string) bool {
 	}
 
 	return re.MatchString(resource)
+}
+
+func ToUnstructured(obj runtime.Object) (*unstructured.Unstructured, error) {
+	switch o := obj.(type) {
+	case *unstructured.Unstructured:
+		return o, nil
+	default:
+		object, err := runtime.DefaultUnstructuredConverter.ToUnstructured(o)
+		if err != nil {
+			return nil, err
+		}
+		return &unstructured.Unstructured{Object: object}, nil
+	}
 }
