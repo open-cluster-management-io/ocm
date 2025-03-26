@@ -226,18 +226,21 @@ func (m *manifestworkReconciler) getStatusConditions(runtimeObj runtime.Object, 
 		return nil, err
 	}
 
-	var conditions []metav1.Condition
+	var conditionResults []metav1.Condition
 	var errs []error
 	for _, rule := range rules {
 		condition, err := m.conditionReader.GetConditionByRule(obj, rule)
 		if err != nil {
-			errs = append(errs, err)
-		} else {
-			conditions = append(conditions, condition)
+			// Errors from rule evaluation are not returned since they don't impact resource apply
+			// The error will be set in condition message for users to handle
+			klog.Errorf("failed to evaluate condition rule: %s", err.Error())
+		}
+		if condition.Type != "" && condition.Status != "" {
+			conditionResults = append(conditionResults, condition)
 		}
 	}
 
-	return conditions, utilerrors.NewAggregate(errs)
+	return conditionResults, utilerrors.NewAggregate(errs)
 }
 
 // allInCondition checks status of conditions with a particular type in ManifestCondition array.
