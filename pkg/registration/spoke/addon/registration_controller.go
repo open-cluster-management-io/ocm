@@ -14,7 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -34,7 +33,7 @@ import (
 type addOnRegistrationController struct {
 	clusterName          string
 	agentName            string
-	kubeconfig           *clientcmdapi.Config
+	kubeconfigFile       string
 	managementKubeClient kubernetes.Interface // in-cluster local management kubeClient
 	spokeKubeClient      kubernetes.Interface
 	hubAddOnLister       addonlisterv1alpha1.ManagedClusterAddOnLister
@@ -54,7 +53,7 @@ type addOnRegistrationController struct {
 func NewAddOnRegistrationController(
 	clusterName string,
 	agentName string,
-	kubeconfig *clientcmdapi.Config,
+	kubeconfigFile string,
 	addOnClient addonclient.Interface,
 	managementKubeClient kubernetes.Interface,
 	managedKubeClient kubernetes.Interface,
@@ -65,7 +64,7 @@ func NewAddOnRegistrationController(
 	c := &addOnRegistrationController{
 		clusterName:          clusterName,
 		agentName:            agentName,
-		kubeconfig:           kubeconfig,
+		kubeconfigFile:       kubeconfigFile,
 		managementKubeClient: managementKubeClient,
 		spokeKubeClient:      managedKubeClient,
 		hubAddOnLister:       hubAddOnInformers.Lister(),
@@ -203,7 +202,7 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 	}
 
 	if config.registration.SignerName == certificatesv1.KubeAPIServerClientSignerName {
-		secretOption.BootStrapKubeConfig = c.kubeconfig
+		secretOption.BootStrapKubeConfigFile = c.kubeconfigFile
 	}
 	driver := c.addonDriver.Fork(config.addOnName, secretOption)
 	controllerName := fmt.Sprintf("ClientCertController@addon:%s:signer:%s", config.addOnName, config.registration.SignerName)

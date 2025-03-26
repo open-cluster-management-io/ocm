@@ -21,7 +21,6 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2/ktesting"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -419,11 +418,11 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 				testinghelpers.WriteFile(path.Join(tempDir, "tls.crt"), c.tlsCert)
 			}
 			if c.bootstapKubeconfig != nil {
-				bootstrapKubeconfig, err := clientcmd.Load(c.bootstapKubeconfig)
+				testinghelpers.WriteFile(path.Join(tempDir, "bootstrap-kubeconfig"), c.bootstapKubeconfig)
 				if err != nil {
 					t.Fatal(err)
 				}
-				secretOption.BootStrapKubeConfig = bootstrapKubeconfig
+				secretOption.BootStrapKubeConfigFile = path.Join(tempDir, "bootstrap-kubeconfig")
 			}
 
 			valid, err := register.IsHubKubeConfigValidFunc(driver, secretOption)(context.TODO())
@@ -752,11 +751,8 @@ func TestBuildClient(t *testing.T) {
 				secretOpts.HubKubeconfigFile = path.Join(tempDir, "kubeconfig")
 			}
 			if tt.bootstrapKubeconfig != nil {
-				bootstrapKubeconfig, err := clientcmd.Load(tt.bootstrapKubeconfig)
-				if err != nil {
-					t.Fatal(err)
-				}
-				secretOpts.BootStrapKubeConfig = bootstrapKubeconfig
+				testinghelpers.WriteFile(path.Join(tempDir, "bootstrap-kubeconfig"), tt.bootstrapKubeconfig)
+				secretOpts.BootStrapKubeConfigFile = path.Join(tempDir, "bootstrap-kubeconfig")
 			}
 			driver := NewCSRDriver(NewCSROption(), secretOpts)
 			_, err := driver.BuildClients(context.TODO(), secretOpts, tt.bootstrap)

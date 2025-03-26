@@ -2,6 +2,8 @@ package register
 
 import (
 	"context"
+	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -25,6 +28,31 @@ import (
 
 func TestSync(t *testing.T) {
 	commonName := "test"
+	tempDir, err := os.MkdirTemp("", "testvalidhubclientconfig")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	bootstrapKubeconfig := &clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{"test-cluster": {
+			Server:                "localhost",
+			InsecureSkipTLSVerify: true,
+		}},
+		Contexts: map[string]*clientcmdapi.Context{"test-context": {
+			Cluster:  "test-cluster",
+			AuthInfo: "test-user",
+		}},
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"test-user": {
+				Token: "test-token",
+			},
+		},
+		CurrentContext: "test-context",
+	}
+	err = clientcmd.WriteToFile(*bootstrapKubeconfig, path.Join(tempDir, "bootstrap-kubeconfig"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
 	testCases := []struct {
 		name          string
 		option        SecretOption
@@ -88,26 +116,11 @@ func TestSync(t *testing.T) {
 		{
 			name: "addition secret data",
 			option: SecretOption{
-				SecretName:      "test",
-				SecretNamespace: "test",
-				ClusterName:     "cluster1",
-				AgentName:       "agent1",
-				BootStrapKubeConfig: &clientcmdapi.Config{
-					Clusters: map[string]*clientcmdapi.Cluster{"test-cluster": {
-						Server:                "localhost",
-						InsecureSkipTLSVerify: true,
-					}},
-					Contexts: map[string]*clientcmdapi.Context{"test-context": {
-						Cluster:  "test-cluster",
-						AuthInfo: "test-user",
-					}},
-					AuthInfos: map[string]*clientcmdapi.AuthInfo{
-						"test-user": {
-							Token: "test-token",
-						},
-					},
-					CurrentContext: "test-context",
-				},
+				SecretName:              "test",
+				SecretNamespace:         "test",
+				ClusterName:             "cluster1",
+				AgentName:               "agent1",
+				BootStrapKubeConfigFile: path.Join(tempDir, "bootstrap-kubeconfig"),
 			},
 			secrets: []runtime.Object{},
 			driver: newFakeDriver(testinghelpers.NewHubKubeconfigSecret(

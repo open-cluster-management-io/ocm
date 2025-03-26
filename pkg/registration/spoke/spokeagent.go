@@ -14,7 +14,6 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
@@ -206,11 +205,6 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		o.currentBootstrapKubeConfig = o.registrationOption.BootstrapKubeconfig
 	}
 
-	kubeconfig, err := clientcmd.LoadFromFile(o.currentBootstrapKubeConfig)
-	if err != nil {
-		return err
-	}
-
 	// build up the secretOption
 	secretOption := register.SecretOption{
 		SecretNamespace:          o.agentOptions.ComponentNamespace,
@@ -221,7 +215,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		ManagementCoreClient:     managementKubeClient.CoreV1(),
 		HubKubeconfigFile:        o.agentOptions.HubKubeconfigFile,
 		HubKubeconfigDir:         o.agentOptions.HubKubeconfigDir,
-		BootStrapKubeConfig:      kubeconfig,
+		BootStrapKubeConfigFile:  o.currentBootstrapKubeConfig,
 	}
 
 	// initiate registration driver
@@ -375,7 +369,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 			addOnRegistrationController = addon.NewAddOnRegistrationController(
 				o.agentOptions.SpokeClusterName,
 				o.agentOptions.AgentID,
-				kubeconfig,
+				o.currentBootstrapKubeConfig,
 				hubClient.AddonClient,
 				managementKubeClient,
 				spokeKubeClient,

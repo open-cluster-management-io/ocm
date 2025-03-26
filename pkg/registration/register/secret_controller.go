@@ -39,8 +39,12 @@ func NewSecretController(
 	controllerName string,
 ) factory.Controller {
 	additionalSecretData := map[string][]byte{}
-	if secretOption.BootStrapKubeConfig != nil {
-		kubeConfigTemplate, err := BaseKubeConfigFromBootStrap(secretOption.BootStrapKubeConfig)
+	if secretOption.BootStrapKubeConfigFile != "" {
+		bootstrapKubeCfg, err := clientcmd.LoadFromFile(secretOption.BootStrapKubeConfigFile)
+		if err != nil {
+			utilruntime.Must(err)
+		}
+		kubeConfigTemplate, err := BaseKubeConfigFromBootStrap(bootstrapKubeCfg)
 		if err != nil {
 			utilruntime.Must(err)
 		}

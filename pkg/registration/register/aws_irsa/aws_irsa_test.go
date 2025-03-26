@@ -13,7 +13,6 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
@@ -247,11 +246,8 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 				testinghelpers.WriteFile(path.Join(tempDir, "tls.crt"), c.tlsCert)
 			}
 			if c.bootstapKubeconfig != nil {
-				bootstrapKubeconfig, err := clientcmd.Load(c.bootstapKubeconfig)
-				if err != nil {
-					t.Fatal(err)
-				}
-				secretOption.BootStrapKubeConfig = bootstrapKubeconfig
+				testinghelpers.WriteFile(path.Join(tempDir, "bootstrap-kubeconfig"), c.bootstapKubeconfig)
+				secretOption.BootStrapKubeConfigFile = path.Join(tempDir, "bootstrap-kubeconfig")
 			}
 
 			valid, err := register.IsHubKubeConfigValidFunc(driver, secretOption)(context.TODO())

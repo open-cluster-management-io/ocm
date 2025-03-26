@@ -339,11 +339,8 @@ func TestBuildClientFromSecretOptions(t *testing.T) {
 				secretOpts.HubKubeconfigFile = path.Join(tempDir, "kubeconfig")
 			}
 			if tt.bootstrapKubeconfig != nil {
-				bootstrapKubeconfig, err := clientcmd.Load(tt.bootstrapKubeconfig)
-				if err != nil {
-					t.Fatal(err)
-				}
-				secretOpts.BootStrapKubeConfig = bootstrapKubeconfig
+				testinghelpers.WriteFile(path.Join(tempDir, "bootstrap-kubeconfig"), tt.bootstrapKubeconfig)
+				secretOpts.BootStrapKubeConfigFile = path.Join(tempDir, "bootstrap-kubeconfig")
 			}
 			_, err := BuildClientsFromSecretOption(secretOpts, tt.bootstrap)
 			if (err != nil) != tt.expectErr {

@@ -127,8 +127,12 @@ func IsHubKubeConfigValidFunc(driver RegisterDriver, secretOption SecretOption) 
 			return false, err
 		}
 
-		if secretOption.BootStrapKubeConfig != nil {
-			if valid, err := IsHubKubeconfigValid(secretOption.BootStrapKubeConfig, hubKubeconfig); !valid || err != nil {
+		if secretOption.BootStrapKubeConfigFile != "" {
+			bootStrapConfig, err := clientcmd.LoadFromFile(secretOption.BootStrapKubeConfigFile)
+			if err != nil {
+				return false, err
+			}
+			if valid, err := IsHubKubeconfigValid(bootStrapConfig, hubKubeconfig); !valid || err != nil {
 				return valid, err
 			}
 		}
@@ -251,10 +255,11 @@ func BuildClientsFromSecretOption(s SecretOption, bootstrap bool) (*Clients, err
 	var kubeConfig *rest.Config
 	var err error
 	if bootstrap {
-		if s.BootStrapKubeConfig == nil {
+		if s.BootStrapKubeConfigFile == "" {
 			return nil, fmt.Errorf("no bootstrap kubeconfig found")
 		}
-		kubeConfig, err = clientcmd.NewDefaultClientConfig(*s.BootStrapKubeConfig, nil).ClientConfig()
+
+		kubeConfig, err = clientcmd.BuildConfigFromFlags("", s.BootStrapKubeConfigFile)
 		if err != nil {
 			return nil, fmt.Errorf("unable to load bootstrap kubeconfig: %w", err)
 		}
