@@ -390,7 +390,7 @@ func FindManifestConfiguration(resourceMeta workapiv1.ManifestResourceMeta,
 		}
 	}
 
-	if len(rstOption.FeedbackRules) == 0 && rstOption.UpdateStrategy == nil {
+	if len(rstOption.FeedbackRules) == 0 && len(rstOption.ConditionRules) == 0 && rstOption.UpdateStrategy == nil {
 		return nil
 	}
 
