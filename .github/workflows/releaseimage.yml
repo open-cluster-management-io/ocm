@@ -6,7 +6,7 @@ on:
       - 'v*.*.*'
 env:
   # Common versions
-  GO_VERSION: '1.22'
+  GO_VERSION: '1.23'
   GO_REQUIRED_MIN_VERSION: ''
   GOPATH: '/home/runner/work/ocm/ocm/go'
   GITHUB_REF: ${{ github.ref }}

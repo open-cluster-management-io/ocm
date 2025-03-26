@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/utils/clock"
 
 	ocmfeature "open-cluster-management.io/api/feature"
 
@@ -20,7 +21,7 @@ func NewWorkAgent() *cobra.Command {
 	agentOption := spoke.NewWorkloadAgentOptions()
 	cfg := spoke.NewWorkAgentConfig(commonOptions, agentOption)
 	cmdConfig := commonOptions.CommonOpts.
-		NewControllerCommandConfig("work-agent", version.Get(), cfg.RunWorkloadAgent)
+		NewControllerCommandConfig("work-agent", version.Get(), cfg.RunWorkloadAgent, clock.RealClock{})
 	cmd := cmdConfig.NewCommandWithContext(context.TODO())
 	cmd.Use = agentCmdName
 	cmd.Short = "Start the Work Agent"

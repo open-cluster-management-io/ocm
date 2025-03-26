@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/utils/clock"
 
 	ocmfeature "open-cluster-management.io/api/feature"
 
@@ -20,7 +21,7 @@ func NewRegistrationAgent() *cobra.Command {
 	commonOptions := commonoptions.NewAgentOptions()
 	cfg := spoke.NewSpokeAgentConfig(commonOptions, agentOptions, cancel)
 	cmdConfig := commonOptions.CommonOpts.
-		NewControllerCommandConfig("registration-agent", version.Get(), cfg.RunSpokeAgent).
+		NewControllerCommandConfig("registration-agent", version.Get(), cfg.RunSpokeAgent, clock.RealClock{}).
 		WithHealthChecks(cfg.HealthCheckers()...)
 
 	cmd := cmdConfig.NewCommandWithContext(ctx)
