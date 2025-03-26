@@ -7,11 +7,7 @@ import (
 )
 
 type WellKnownConditionRuleResolver interface {
-	GetConditionRuleByKind(gvk schema.GroupVersionKind, condition string) workapiv1.ConditionRule
-}
-
-type DefaultWellKnownConditionResolver struct {
-	rules map[schema.GroupVersionKind]map[string]workapiv1.ConditionRule
+	GetRuleByKindCondition(gvk schema.GroupVersionKind, condition string) workapiv1.ConditionRule
 }
 
 var jobCompleteRule = workapiv1.ConditionRule{
@@ -38,8 +34,8 @@ var podCompleteRule = workapiv1.ConditionRule{
 	MessageExpression: `"Pod is in phase " + object.status.phase`,
 }
 
-func DefaultWellKnownConditionRule() WellKnownConditionRuleResolver {
-	return &DefaultWellKnownConditionResolver{
+func DefaultWellKnownConditionResolver() WellKnownConditionRuleResolver {
+	return &defaultWellKnownConditionResolver{
 		rules: map[schema.GroupVersionKind]map[string]workapiv1.ConditionRule{
 			{Group: "batch", Version: "v1", Kind: "Job"}: {workapiv1.ManifestComplete: jobCompleteRule},
 			{Group: "", Version: "v1", Kind: "Pod"}:      {workapiv1.ManifestComplete: podCompleteRule},
@@ -47,7 +43,11 @@ func DefaultWellKnownConditionRule() WellKnownConditionRuleResolver {
 	}
 }
 
-func (w *DefaultWellKnownConditionResolver) GetConditionRuleByKind(gvk schema.GroupVersionKind, condition string) workapiv1.ConditionRule {
+type defaultWellKnownConditionResolver struct {
+	rules map[schema.GroupVersionKind]map[string]workapiv1.ConditionRule
+}
+
+func (w *defaultWellKnownConditionResolver) GetRuleByKindCondition(gvk schema.GroupVersionKind, condition string) workapiv1.ConditionRule {
 	if conditionRules, ok := w.rules[gvk]; ok {
 		return conditionRules[condition]
 	}
