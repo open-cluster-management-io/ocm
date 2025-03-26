@@ -25,14 +25,14 @@ type ConditionReader struct {
 
 func NewConditionReader() *ConditionReader {
 	return &ConditionReader{
-		wellKnownConditions: rules.DefaultWellKnownConditionRule(),
+		wellKnownConditions: rules.DefaultWellKnownConditionResolver(),
 	}
 }
 
 func (s *ConditionReader) GetConditionByRule(obj *unstructured.Unstructured, rule workapiv1.ConditionRule) (metav1.Condition, error) {
 	switch rule.Type {
 	case workapiv1.WellKnownCompletionsType:
-		r := s.wellKnownConditions.GetConditionRuleByKind(obj.GroupVersionKind(), workapiv1.ManifestComplete)
+		r := s.wellKnownConditions.GetRuleByKindCondition(obj.GroupVersionKind(), workapiv1.ManifestComplete)
 		if len(r.CelExpressions) == 0 {
 			return metav1.Condition{}, fmt.Errorf("cannot find the wellknown conditions for resource with gvk %s", obj.GroupVersionKind().String())
 		}
@@ -176,7 +176,7 @@ func (s *ConditionReader) celEnv(opts ...cel.EnvOption) (*cel.Env, error) {
 		library.IP(),
 		library.CIDR(),
 		library.Format(),
-		// TODO
+		// TODO: Requires update to at least 1.32
 		// library.SemverLib(),
 		cel.Function("hasConditions", cel.Overload(
 			"status_has_conditions",
