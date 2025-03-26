@@ -34,7 +34,13 @@ func (s *ConditionReader) GetConditionByRule(obj *unstructured.Unstructured, rul
 	case workapiv1.WellKnownCompletionsType:
 		r := s.wellKnownConditions.GetRuleByKindCondition(obj.GroupVersionKind(), workapiv1.ManifestComplete)
 		if len(r.CelExpressions) == 0 {
-			return metav1.Condition{}, fmt.Errorf("cannot find the wellknown conditions for resource with gvk %s", obj.GroupVersionKind().String())
+			err := fmt.Errorf("cannot find the wellknown conditions for resource with gvk %s", obj.GroupVersionKind().String())
+			return metav1.Condition{
+				Type:    rule.Condition,
+				Status:  metav1.ConditionUnknown,
+				Reason:  workapiv1.ConditionRuleInvalid,
+				Message: err.Error(),
+			}, err
 		}
 
 		// Check for supported overrides in rule
@@ -51,7 +57,13 @@ func (s *ConditionReader) GetConditionByRule(obj *unstructured.Unstructured, rul
 	case workapiv1.CelConditionExpressionsType:
 		return s.getConditionByCelRule(obj, rule)
 	default:
-		return metav1.Condition{}, fmt.Errorf("unrecognized condition rule type %s", rule.Type)
+		err := fmt.Errorf("unrecognized condition rule type %s", rule.Type)
+		return metav1.Condition{
+			Type:    rule.Condition,
+			Status:  metav1.ConditionUnknown,
+			Reason:  workapiv1.ConditionRuleInvalid,
+			Message: err.Error(),
+		}, err
 	}
 }
 
