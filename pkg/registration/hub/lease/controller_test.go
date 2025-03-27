@@ -171,7 +171,7 @@ func TestSync(t *testing.T) {
 
 			ctx := context.TODO()
 			syncCtx := testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName)
-			mcEventRecorder, err := helpers.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient, "test")
+			mcEventRecorder, err := helpers.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient.EventsV1(), "test")
 			if err != nil {
 				t.Fatal(err)
 			}

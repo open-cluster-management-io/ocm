@@ -134,7 +134,7 @@ func TestLeaseUpdater(t *testing.T) {
 	initRenewTime := time.Now()
 	hubClient := kubefake.NewSimpleClientset(testinghelpers.NewManagedClusterLease("managed-cluster-lease", initRenewTime))
 	leaseUpdater := &leaseUpdater{
-		hubClient:   hubClient,
+		leaseClient: hubClient.CoordinationV1().Leases(testinghelpers.TestManagedClusterName),
 		clusterName: testinghelpers.TestManagedClusterName,
 		leaseName:   "managed-cluster-lease",
 		recorder:    eventstesting.NewTestingEventRecorder(t),
