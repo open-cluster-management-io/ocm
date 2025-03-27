@@ -27,11 +27,20 @@ import (
 const (
 	// Private value keys that are used internally by the addon template controller, should not be exposed to users.
 	// All private value keys should begin with "__"
-	NodePlacementPrivateValueKey    = "__NODE_PLACEMENT"
-	RegistriesPrivateValueKey       = "__REGISTRIES"
-	InstallNamespacePrivateValueKey = "__INSTALL_NAMESPACE"
-	ProxyPrivateValueKey            = "__PROXY"
+	NodePlacementPrivateValueKey        = "__NODE_PLACEMENT"
+	RegistriesPrivateValueKey           = "__REGISTRIES"
+	InstallNamespacePrivateValueKey     = "__INSTALL_NAMESPACE"
+	ProxyPrivateValueKey                = "__PROXY"
+	ResourceRequirementsPrivateValueKey = "__RESOURCE_REQUIREMENTS"
 )
+
+var PrivateValuesKeys = map[string]struct{}{
+	NodePlacementPrivateValueKey:        {},
+	RegistriesPrivateValueKey:           {},
+	InstallNamespacePrivateValueKey:     {},
+	ProxyPrivateValueKey:                {},
+	ResourceRequirementsPrivateValueKey: {},
+}
 
 // templateBuiltinValues includes the built-in values for crd template agentAddon.
 // the values for template config should begin with an uppercase letter, so we need
