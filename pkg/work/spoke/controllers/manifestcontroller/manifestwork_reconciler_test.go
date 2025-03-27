@@ -29,6 +29,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/basic"
+	"open-cluster-management.io/ocm/pkg/work/spoke/conditions"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
