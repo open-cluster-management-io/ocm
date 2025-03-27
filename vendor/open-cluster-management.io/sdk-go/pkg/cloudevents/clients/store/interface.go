@@ -16,6 +16,15 @@ import (
 
 const syncedPollPeriod = 100 * time.Millisecond
 
+// ResourceList is a collection of resources.
+type ResourceList[T generic.ResourceObject] struct {
+	// ListMeta describes list metadata
+	metav1.ListMeta
+
+	// Items is a list of resources.
+	Items []T
+}
+
 // StoreInitiated is a function that can be used to determine if a store has initiated.
 type StoreInitiated func() bool
 
@@ -40,7 +49,7 @@ type ClientWatcherStore[T generic.ResourceObject] interface {
 	Delete(resource runtime.Object) error
 
 	// List returns the resources from store for a given namespace with list options
-	List(namespace string, opts metav1.ListOptions) ([]T, error)
+	List(namespace string, opts metav1.ListOptions) (*ResourceList[T], error)
 
 	// ListAll list all of the resources from store
 	ListAll() ([]T, error)

@@ -20,7 +20,7 @@ type BaseClientWatchStore[T generic.ResourceObject] struct {
 }
 
 // List the resources from the store with the list options
-func (s *BaseClientWatchStore[T]) List(namespace string, opts metav1.ListOptions) ([]T, error) {
+func (s *BaseClientWatchStore[T]) List(namespace string, opts metav1.ListOptions) (*ResourceList[T], error) {
 	s.RLock()
 	defer s.RUnlock()
 
@@ -29,7 +29,7 @@ func (s *BaseClientWatchStore[T]) List(namespace string, opts metav1.ListOptions
 		return nil, err
 	}
 
-	return resources, nil
+	return &ResourceList[T]{Items: resources}, nil
 }
 
 // Get a resource from the store

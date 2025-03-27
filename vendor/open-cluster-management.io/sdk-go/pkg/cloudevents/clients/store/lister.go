@@ -34,7 +34,7 @@ func (l *AgentWatcherStoreLister[T]) List(options types.ListOptions) ([]T, error
 		return nil, err
 	}
 
-	return list, nil
+	return list.Items, nil
 }
 
 // SourceWatcherStoreLister list the resources from a ClientWatcherStore on a source.
@@ -55,5 +55,5 @@ func (l *SourceWatcherStoreLister[T]) List(options types.ListOptions) ([]T, erro
 		return nil, err
 	}
 
-	return list, nil
+	return list.Items, nil
 }
