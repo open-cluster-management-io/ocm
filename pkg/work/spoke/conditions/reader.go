@@ -91,7 +91,7 @@ func (s *ConditionReader) getConditionByCelRule(obj *unstructured.Unstructured, 
 func (s *ConditionReader) evaluateCelExpressions(obj *unstructured.Unstructured, expressions []workapiv1.CelConditionExpressions) (metav1.ConditionStatus, string, error) {
 	env, err := s.celEnv(cel.Variable("object", cel.DynType))
 	if err != nil {
-		return metav1.ConditionFalse, workapiv1.ConditionRuleInternalError, err
+		return metav1.ConditionUnknown, workapiv1.ConditionRuleInternalError, err
 	}
 
 	for _, expression := range expressions {
@@ -103,7 +103,7 @@ func (s *ConditionReader) evaluateCelExpressions(obj *unstructured.Unstructured,
 
 		prg, err := env.Program(ast)
 		if err != nil {
-			return metav1.ConditionFalse, workapiv1.ConditionRuleInternalError, err
+			return metav1.ConditionUnknown, workapiv1.ConditionRuleInternalError, err
 		}
 
 		out, _, err := prg.Eval(map[string]any{
