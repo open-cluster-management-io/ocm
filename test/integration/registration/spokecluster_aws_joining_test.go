@@ -15,6 +15,8 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/register"
+	awsirsa "open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
+	registerfactory "open-cluster-management.io/ocm/pkg/registration/register/factory"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
@@ -42,10 +44,14 @@ var _ = ginkgo.Describe("Joining Process for aws flow", func() {
 
 			// run registration agent
 			agentOptions := &spoke.SpokeAgentOptions{
-				RegistrationAuth:         helpers.AwsIrsaAuthType,
-				HubClusterArn:            hubClusterArn,
-				ManagedClusterArn:        managedClusterArn,
-				ManagedClusterRoleSuffix: managedClusterRoleSuffix,
+				RegisterDriverOption: &registerfactory.Options{
+					RegistrationAuth: helpers.AwsIrsaAuthType,
+					AWSISRAOption: &awsirsa.AWSOption{
+						HubClusterArn:            hubClusterArn,
+						ManagedClusterArn:        managedClusterArn,
+						ManagedClusterRoleSuffix: managedClusterRoleSuffix,
+					},
+				},
 				BootstrapKubeconfig:      bootstrapKubeconfig,
 				HubKubeconfigSecret:      hubKubeconfigSecret,
 				ClusterHealthCheckPeriod: 1 * time.Minute,
@@ -168,10 +174,14 @@ var _ = ginkgo.Describe("Joining Process for aws flow", func() {
 
 			// run registration agent
 			agentOptions := &spoke.SpokeAgentOptions{
-				RegistrationAuth:         helpers.AwsIrsaAuthType,
-				HubClusterArn:            hubClusterArn,
-				ManagedClusterArn:        managedClusterArn,
-				ManagedClusterRoleSuffix: managedClusterRoleSuffix,
+				RegisterDriverOption: &registerfactory.Options{
+					RegistrationAuth: helpers.AwsIrsaAuthType,
+					AWSISRAOption: &awsirsa.AWSOption{
+						HubClusterArn:            hubClusterArn,
+						ManagedClusterArn:        managedClusterArn,
+						ManagedClusterRoleSuffix: managedClusterRoleSuffix,
+					},
+				},
 				BootstrapKubeconfig:      bootstrapKubeconfig,
 				HubKubeconfigSecret:      hubKubeconfigSecret,
 				ClusterHealthCheckPeriod: 1 * time.Minute,
@@ -201,10 +211,14 @@ var _ = ginkgo.Describe("Joining Process for aws flow", func() {
 
 			// run registration agent
 			agentOptions := &spoke.SpokeAgentOptions{
-				RegistrationAuth:         helpers.AwsIrsaAuthType,
-				HubClusterArn:            hubClusterArn,
-				ManagedClusterArn:        managedClusterArn,
-				ManagedClusterRoleSuffix: managedClusterRoleSuffix,
+				RegisterDriverOption: &registerfactory.Options{
+					RegistrationAuth: helpers.AwsIrsaAuthType,
+					AWSISRAOption: &awsirsa.AWSOption{
+						HubClusterArn:            hubClusterArn,
+						ManagedClusterArn:        managedClusterArn,
+						ManagedClusterRoleSuffix: managedClusterRoleSuffix,
+					},
+				},
 				BootstrapKubeconfig:      bootstrapKubeconfig,
 				HubKubeconfigSecret:      hubKubeconfigSecret,
 				ClusterHealthCheckPeriod: 1 * time.Minute,

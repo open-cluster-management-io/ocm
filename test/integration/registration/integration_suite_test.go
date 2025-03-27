@@ -119,7 +119,6 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	// crank up the addon lease sync and udpate speed
 	spoke.AddOnLeaseControllerSyncInterval = 5 * time.Second
-	spoke.ClientCertHealthCheckInterval = 5 * time.Second
 	addon.AddOnLeaseControllerLeaseDurationSeconds = 1
 
 	// install cluster CRD and start a local kube-apiserver

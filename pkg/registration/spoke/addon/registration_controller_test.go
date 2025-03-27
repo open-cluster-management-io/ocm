@@ -7,7 +7,6 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
-	certificates "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
@@ -16,60 +15,9 @@ import (
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
-
-func TestFilterCSREvents(t *testing.T) {
-	clusterName := "cluster1"
-	signerName := "signer1"
-
-	cases := []struct {
-		name     string
-		csr      *certificates.CertificateSigningRequest
-		expected bool
-	}{
-		{
-			name: "csr not from the managed cluster",
-			csr:  &certificates.CertificateSigningRequest{},
-		},
-		{
-			name: "csr not for the addon",
-			csr:  &certificates.CertificateSigningRequest{},
-		},
-		{
-			name: "csr with different signer name",
-			csr:  &certificates.CertificateSigningRequest{},
-		},
-		{
-			name: "valid csr",
-			csr: &certificates.CertificateSigningRequest{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						// the labels are only hints. Anyone could set/modify them.
-						clusterv1.ClusterNameLabelKey: clusterName,
-						addonv1alpha1.AddonLabelKey:   addOnName,
-					},
-				},
-				Spec: certificates.CertificateSigningRequestSpec{
-					SignerName: signerName,
-				},
-			},
-			expected: true,
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			filterFunc := createCSREventFilterFunc(clusterName, addOnName, signerName)
-			actual := filterFunc(c.csr)
-			if actual != c.expected {
-				t.Errorf("Expected %v but got %v", c.expected, actual)
-			}
-		})
-	}
-}
 
 func TestRegistrationSync(t *testing.T) {
 	clusterName := "cluster1"
@@ -356,8 +304,8 @@ func TestRegistrationSync(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			kubeClient := kubefake.NewSimpleClientset()
-			managementClient := kubefake.NewSimpleClientset()
+			kubeClient := kubefake.NewClientset()
+			managementClient := kubefake.NewClientset()
 			var addons []runtime.Object
 			if c.addOn != nil {
 				addons = append(addons, c.addOn)

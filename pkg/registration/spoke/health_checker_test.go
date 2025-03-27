@@ -57,13 +57,13 @@ func TestHubKubeConfigHealthChecker(t *testing.T) {
 				testinghelpers.WriteFile(path.Join(testDir, "tls.crt"), c.tlsCert)
 			}
 
-			driver := csr.NewCSRDriver()
 			secretOption := register.SecretOption{
 				ClusterName:       "cluster1",
 				AgentName:         "agent1",
 				HubKubeconfigDir:  testDir,
 				HubKubeconfigFile: path.Join(testDir, "kubeconfig"),
 			}
+			driver := csr.NewCSRDriver(csr.NewCSROption(), secretOption)
 
 			hc := &hubKubeConfigHealthChecker{
 				checkFunc:    register.IsHubKubeConfigValidFunc(driver, secretOption),

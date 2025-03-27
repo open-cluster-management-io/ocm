@@ -2,6 +2,8 @@ package register
 
 import (
 	"context"
+	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -25,6 +28,31 @@ import (
 
 func TestSync(t *testing.T) {
 	commonName := "test"
+	tempDir, err := os.MkdirTemp("", "testvalidhubclientconfig")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	bootstrapKubeconfig := &clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{"test-cluster": {
+			Server:                "localhost",
+			InsecureSkipTLSVerify: true,
+		}},
+		Contexts: map[string]*clientcmdapi.Context{"test-context": {
+			Cluster:  "test-cluster",
+			AuthInfo: "test-user",
+		}},
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"test-user": {
+				Token: "test-token",
+			},
+		},
+		CurrentContext: "test-context",
+	}
+	err = clientcmd.WriteToFile(*bootstrapKubeconfig, path.Join(tempDir, "bootstrap-kubeconfig"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
 	testCases := []struct {
 		name          string
 		option        SecretOption
@@ -88,26 +116,11 @@ func TestSync(t *testing.T) {
 		{
 			name: "addition secret data",
 			option: SecretOption{
-				SecretName:      "test",
-				SecretNamespace: "test",
-				ClusterName:     "cluster1",
-				AgentName:       "agent1",
-				BootStrapKubeConfig: &clientcmdapi.Config{
-					Clusters: map[string]*clientcmdapi.Cluster{"test-cluster": {
-						Server:                "localhost",
-						InsecureSkipTLSVerify: true,
-					}},
-					Contexts: map[string]*clientcmdapi.Context{"test-context": {
-						Cluster:  "test-cluster",
-						AuthInfo: "test-user",
-					}},
-					AuthInfos: map[string]*clientcmdapi.AuthInfo{
-						"test-user": {
-							Token: "test-token",
-						},
-					},
-					CurrentContext: "test-context",
-				},
+				SecretName:              "test",
+				SecretNamespace:         "test",
+				ClusterName:             "cluster1",
+				AgentName:               "agent1",
+				BootStrapKubeConfigFile: path.Join(tempDir, "bootstrap-kubeconfig"),
 			},
 			secrets: []runtime.Object{},
 			driver: newFakeDriver(testinghelpers.NewHubKubeconfigSecret(
@@ -141,7 +154,7 @@ func TestSync(t *testing.T) {
 			c.option.ManagementSecretInformer = informerFactory.Core().V1().Secrets().Informer()
 			updater := &fakeStatusUpdater{}
 			ctrl := NewSecretController(
-				c.option, nil, c.driver, updater.update, syncCtx.Recorder(), "test")
+				c.option, c.driver, updater.update, syncCtx.Recorder(), "test")
 			err := ctrl.Sync(context.Background(), syncCtx)
 			if err != nil {
 				t.Fatal(err)
@@ -185,16 +198,20 @@ func (f *fakeDriver) BuildKubeConfigFromTemplate(config *clientcmdapi.Config) *c
 	return config
 }
 
+func (f *fakeDriver) BuildClients(ctx context.Context, secretOption SecretOption, bootstrap bool) (*Clients, error) {
+	return &Clients{}, nil
+}
+
 func (f *fakeDriver) Process(
 	_ context.Context,
 	_ string,
 	_ *corev1.Secret,
 	_ map[string][]byte,
-	_ events.Recorder, _ any) (*corev1.Secret, *metav1.Condition, error) {
+	_ events.Recorder) (*corev1.Secret, *metav1.Condition, error) {
 	return f.secret, f.cond, f.err
 }
 
-func (f *fakeDriver) InformerHandler(_ any) (cache.SharedIndexInformer, factory.EventFilterFunc) {
+func (f *fakeDriver) InformerHandler() (cache.SharedIndexInformer, factory.EventFilterFunc) {
 	return nil, nil
 }
 

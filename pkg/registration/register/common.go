@@ -5,17 +5,26 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
 
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
+	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	hubclusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
@@ -118,8 +127,12 @@ func IsHubKubeConfigValidFunc(driver RegisterDriver, secretOption SecretOption) 
 			return false, err
 		}
 
-		if secretOption.BootStrapKubeConfig != nil {
-			if valid, err := IsHubKubeconfigValid(secretOption.BootStrapKubeConfig, hubKubeconfig); !valid || err != nil {
+		if secretOption.BootStrapKubeConfigFile != "" {
+			bootStrapConfig, err := clientcmd.LoadFromFile(secretOption.BootStrapKubeConfigFile)
+			if err != nil {
+				return false, err
+			}
+			if valid, err := IsHubKubeconfigValid(bootStrapConfig, hubKubeconfig); !valid || err != nil {
 				return valid, err
 			}
 		}
@@ -226,4 +239,69 @@ func (a *AggregatedHubDriver) Cleanup(ctx context.Context, cluster *clusterv1.Ma
 		}
 	}
 	return errors.NewAggregate(errs)
+}
+
+// Clients hold all client needed to connect to hub
+type Clients struct {
+	ClusterClient         clusterv1client.Interface
+	KubeClient            kubernetes.Interface
+	AddonClient           addonclient.Interface
+	ClusterInfomerFactory clusterv1informers.SharedInformerFactory
+	KubeInformerFactory   informers.SharedInformerFactory
+	AddonInformerFactory  addoninformers.SharedInformerFactory
+}
+
+func BuildClientsFromSecretOption(s SecretOption, bootstrap bool) (*Clients, error) {
+	var kubeConfig *rest.Config
+	var err error
+	if bootstrap {
+		if s.BootStrapKubeConfigFile == "" {
+			return nil, fmt.Errorf("no bootstrap kubeconfig found")
+		}
+
+		kubeConfig, err = clientcmd.BuildConfigFromFlags("", s.BootStrapKubeConfigFile)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load bootstrap kubeconfig: %w", err)
+		}
+	} else {
+		kubeConfig, err = clientcmd.BuildConfigFromFlags("", s.HubKubeconfigFile)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load hub kubeconfig from file %q: %w", s.HubKubeconfigFile, err)
+		}
+	}
+
+	clients := &Clients{}
+	clients.KubeClient, err = kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		return nil, err
+	}
+	clients.ClusterClient, err = clusterv1client.NewForConfig(kubeConfig)
+	if err != nil {
+		return nil, err
+	}
+	clients.AddonClient, err = addonclient.NewForConfig(kubeConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	clients.KubeInformerFactory = informers.NewSharedInformerFactoryWithOptions(
+		clients.KubeClient,
+		10*time.Minute,
+		informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
+			listOptions.LabelSelector = fmt.Sprintf("%s=%s", clusterv1.ClusterNameLabelKey, s.ClusterName)
+		}),
+	)
+	clients.ClusterInfomerFactory = clusterv1informers.NewSharedInformerFactoryWithOptions(
+		clients.ClusterClient,
+		10*time.Minute,
+		clusterv1informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
+			listOptions.FieldSelector = fields.OneTermEqualSelector("metadata.name", s.ClusterName).String()
+		}),
+	)
+	clients.AddonInformerFactory = addoninformers.NewSharedInformerFactoryWithOptions(
+		clients.AddonClient,
+		10*time.Minute,
+		addoninformers.WithNamespace(s.ClusterName),
+	)
+	return clients, nil
 }

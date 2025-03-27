@@ -63,11 +63,11 @@ func TestV1beta1CSRControlApprovedAndIssued(t *testing.T) {
 				hubCSRClient: client.CertificatesV1beta1().CertificateSigningRequests(),
 			}
 
-			actualApproved, err := ctrl.isApproved(c.csrName)
+			actualApproved, err := ctrl.IsApproved(c.csrName)
 			assert.NoError(t, err)
 			assert.Equal(t, c.isApproved, actualApproved)
 
-			issuedCertData, err := ctrl.getIssuedCertificate(c.csrName)
+			issuedCertData, err := ctrl.GetIssuedCertificate(c.csrName)
 			assert.NoError(t, err)
 			assert.Equal(t, c.isIssued, len(issuedCertData) > 0)
 		})
