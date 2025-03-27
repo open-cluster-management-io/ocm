@@ -24,19 +24,22 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/basic"
+	"open-cluster-management.io/ocm/pkg/work/spoke/conditions"
 )
 
 type applyResult struct {
-	Result runtime.Object
-	Error  error
+	Result     runtime.Object
+	Conditions []metav1.Condition
+	Error      error
 
 	resourceMeta workapiv1.ManifestResourceMeta
 }
 
 type manifestworkReconciler struct {
-	restMapper meta.RESTMapper
-	appliers   *apply.Appliers
-	validator  auth.ExecutorValidator
+	restMapper      meta.RESTMapper
+	appliers        *apply.Appliers
+	validator       auth.ExecutorValidator
+	conditionReader *conditions.ConditionReader
 }
 
 func (m *manifestworkReconciler) reconcile(
@@ -76,6 +79,9 @@ func (m *manifestworkReconciler) reconcile(
 
 		// Add applied status condition
 		manifestCondition.Conditions = append(manifestCondition.Conditions, buildAppliedStatusCondition(result))
+
+		// Add result conditions
+		manifestCondition.Conditions = append(manifestCondition.Conditions, result.Conditions...)
 
 		newManifestConditions = append(newManifestConditions, manifestCondition)
 
@@ -205,7 +211,36 @@ func (m *manifestworkReconciler) applyOneManifest(
 	applier := m.appliers.GetApplier(strategy.Type)
 	result.Result, result.Error = applier.Apply(ctx, gvr, required, requiredOwner, option, recorder)
 
+	if result.Result != nil && result.Error == nil && option != nil && len(option.ConditionRules) > 0 {
+		// TODO: Not sure that error on condition evaluation should be set as result error.
+		// 		 Definitely not when caused by bad expressions.
+		result.Conditions, result.Error = m.getStatusConditions(result.Result, option.ConditionRules)
+	}
+
 	return result
+}
+
+func (m *manifestworkReconciler) getStatusConditions(runtimeObj runtime.Object, rules []workapiv1.ConditionRule) ([]metav1.Condition, error) {
+	obj, err := helper.ToUnstructured(runtimeObj)
+	if err != nil {
+		return nil, err
+	}
+
+	var conditionResults []metav1.Condition
+	var errs []error
+	for _, rule := range rules {
+		condition, err := m.conditionReader.GetConditionByRule(obj, rule)
+		if err != nil {
+			// Errors from rule evaluation are not returned since they don't impact resource apply
+			// The error will be set in condition message for users to handle
+			klog.Errorf("failed to evaluate condition rule: %s", err.Error())
+		}
+		if condition.Type != "" && condition.Status != "" {
+			conditionResults = append(conditionResults, condition)
+		}
+	}
+
+	return conditionResults, utilerrors.NewAggregate(errs)
 }
 
 // allInCondition checks status of conditions with a particular type in ManifestCondition array.
