@@ -44,7 +44,7 @@ func RunControllerManagerWithInformers(
 	clusterClient clusterclient.Interface,
 	clusterInformers clusterinformers.SharedInformerFactory,
 ) error {
-	recorder, err := helpers.NewEventRecorder(ctx, clusterscheme.Scheme, kubeClient, "placement-controller")
+	recorder, err := helpers.NewEventRecorder(ctx, clusterscheme.Scheme, kubeClient.EventsV1(), "placement-controller")
 	if err != nil {
 		return err
 	}

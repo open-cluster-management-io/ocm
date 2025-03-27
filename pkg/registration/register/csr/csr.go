@@ -19,6 +19,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
@@ -320,11 +322,28 @@ func (c *CSRDriver) Fork(addonName string, secretOption register.SecretOption) r
 
 func (c *CSRDriver) BuildClients(ctx context.Context, secretOption register.SecretOption, bootstrap bool) (*register.Clients, error) {
 	logger := klog.FromContext(ctx)
-	clients, err := register.BuildClientsFromSecretOption(secretOption, bootstrap)
+
+	kubeConfig, err := register.KubeConfigFromSecretOption(secretOption, bootstrap)
 	if err != nil {
 		return nil, err
 	}
-	csrControl, err := NewCSRControl(logger, clients.KubeInformerFactory.Certificates(), clients.KubeClient)
+	clients, err := register.BuildClientsFromConfig(kubeConfig, secretOption.ClusterName)
+	if err != nil {
+		return nil, err
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		return nil, err
+	}
+	kubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(
+		kubeClient,
+		10*time.Minute,
+		informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
+			listOptions.LabelSelector = fmt.Sprintf("%s=%s", clusterv1.ClusterNameLabelKey, secretOption.ClusterName)
+		}),
+	)
+	csrControl, err := NewCSRControl(logger, kubeInformerFactory.Certificates(), kubeClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CSR control: %w", err)
 	}

@@ -101,7 +101,7 @@ func (c *AWSIRSADriver) BuildClients(_ context.Context, secretOption register.Se
 	if err != nil {
 		return nil, err
 	}
-	c.awsIRSAControl, err = NewAWSIRSAControl(clients.ClusterInfomerFactory.Cluster(), clients.ClusterClient)
+	c.awsIRSAControl, err = NewAWSIRSAControl(clients.ClusterInformer, clients.ClusterClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create AWS IRSA control: %w", err)
 	}

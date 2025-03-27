@@ -224,6 +224,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	if err != nil {
 		return err
 	}
+	driverInformer, _ := o.driver.InformerHandler()
 
 	secretInformer := namespacedManagementKubeInformerFactory.Core().V1().Secrets()
 	// Register BootstrapKubeconfigEventHandler as an event handler of secret informer,
@@ -282,8 +283,10 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		secretController := register.NewSecretController(
 			secretOption, o.driver, register.GenerateBootstrapStatusUpdater(), recorder, controllerName)
 
-		go bootstrapClients.ClusterInfomerFactory.Start(bootstrapCtx.Done())
-		go bootstrapClients.KubeInformerFactory.Start(bootstrapCtx.Done())
+		go bootstrapClients.ClusterInformer.Informer().Run(bootstrapCtx.Done())
+		if driverInformer != nil {
+			go driverInformer.Run(bootstrapCtx.Done())
+		}
 		go spokeClusterCreatingController.Run(bootstrapCtx, 1)
 		go secretController.Run(bootstrapCtx, 1)
 
@@ -315,6 +318,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	if err != nil {
 		return err
 	}
+	hubDriverInformer, _ := o.driver.InformerHandler()
 
 	recorder.Event("HubClientConfigReady", "Client config for hub is ready.")
 	// create another RegisterController for registration credential rotation
@@ -322,18 +326,18 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	secretController := register.NewSecretController(
 		secretOption, o.driver, register.GenerateStatusUpdater(
 			hubClient.ClusterClient,
-			hubClient.ClusterInfomerFactory.Cluster().V1().ManagedClusters().Lister(),
+			hubClient.ClusterInformer.Lister(),
 			o.agentOptions.SpokeClusterName), recorder, controllerName)
 
 	// create ManagedClusterLeaseController to keep the spoke cluster heartbeat
 	managedClusterLeaseController := lease.NewManagedClusterLeaseController(
 		o.agentOptions.SpokeClusterName,
-		hubClient.KubeClient,
-		hubClient.ClusterInfomerFactory.Cluster().V1().ManagedClusters(),
+		hubClient.LeaseClient,
+		hubClient.ClusterInformer,
 		recorder,
 	)
 
-	hubEventRecorder, err := helpers.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient.KubeClient, "klusterlet-agent")
+	hubEventRecorder, err := helpers.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient.EventsClient, "klusterlet-agent")
 	if err != nil {
 		return fmt.Errorf("failed to create event recorder: %w", err)
 	}
@@ -341,7 +345,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	managedClusterHealthCheckController := managedcluster.NewManagedClusterStatusController(
 		o.agentOptions.SpokeClusterName,
 		hubClient.ClusterClient,
-		hubClient.ClusterInfomerFactory.Cluster().V1().ManagedClusters(),
+		hubClient.ClusterInformer,
 		spokeKubeClient.Discovery(),
 		spokeClusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
 		spokeKubeInformerFactory.Core().V1().Nodes(),
@@ -357,7 +361,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		addOnLeaseController = addon.NewManagedClusterAddOnLeaseController(
 			o.agentOptions.SpokeClusterName,
 			hubClient.AddonClient,
-			hubClient.AddonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
+			hubClient.AddonInformer,
 			managementKubeClient.CoordinationV1(),
 			spokeKubeClient.CoordinationV1(),
 			AddOnLeaseControllerSyncInterval, //TODO: this interval time should be allowed to change from outside
@@ -374,7 +378,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 				managementKubeClient,
 				spokeKubeClient,
 				addonDriver,
-				hubClient.AddonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
+				hubClient.AddonInformer,
 				recorder,
 			)
 		}
@@ -384,7 +388,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.MultipleHubs) {
 		hubAcceptController = registration.NewHubAcceptController(
 			o.agentOptions.SpokeClusterName,
-			hubClient.ClusterInfomerFactory.Cluster().V1().ManagedClusters(),
+			hubClient.ClusterInformer,
 			func(ctx context.Context) error {
 				logger.Info("Failed to connect to hub because of hubAcceptClient set to false, restart agent to reselect a new bootstrap kubeconfig")
 				o.agentStopFunc()
@@ -395,7 +399,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 		hubTimeoutController = registration.NewHubTimeoutController(
 			o.agentOptions.SpokeClusterName,
-			hubClient.KubeClient,
+			hubClient.LeaseClient,
 			o.registrationOption.HubConnectionTimeoutSeconds,
 			func(ctx context.Context) error {
 				logger.Info("Failed to connect to hub because of lease out-of-date, restart agent to reselect a new bootstrap kubeconfig")
@@ -406,10 +410,12 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		)
 	}
 
-	go hubClient.KubeInformerFactory.Start(ctx.Done())
-	go hubClient.ClusterInfomerFactory.Start(ctx.Done())
+	if hubDriverInformer != nil {
+		go hubDriverInformer.Run(ctx.Done())
+	}
+	go hubClient.ClusterInformer.Informer().Run(ctx.Done())
 	go namespacedManagementKubeInformerFactory.Start(ctx.Done())
-	go hubClient.AddonInformerFactory.Start(ctx.Done())
+	go hubClient.AddonInformer.Informer().Run(ctx.Done())
 
 	go spokeKubeInformerFactory.Start(ctx.Done())
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {

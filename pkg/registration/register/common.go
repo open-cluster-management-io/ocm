@@ -13,8 +13,9 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	leasev1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
+	eventsv1 "k8s.io/client-go/kubernetes/typed/events/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -22,9 +23,11 @@ import (
 
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
+	addonv1alpha1informers "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	hubclusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
-	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
@@ -243,15 +246,15 @@ func (a *AggregatedHubDriver) Cleanup(ctx context.Context, cluster *clusterv1.Ma
 
 // Clients hold all client needed to connect to hub
 type Clients struct {
-	ClusterClient         clusterv1client.Interface
-	KubeClient            kubernetes.Interface
-	AddonClient           addonclient.Interface
-	ClusterInfomerFactory clusterv1informers.SharedInformerFactory
-	KubeInformerFactory   informers.SharedInformerFactory
-	AddonInformerFactory  addoninformers.SharedInformerFactory
+	ClusterClient   clusterv1client.Interface
+	LeaseClient     leasev1client.LeaseInterface
+	AddonClient     addonclient.Interface
+	EventsClient    eventsv1.EventsV1Interface
+	ClusterInformer clusterv1informer.ManagedClusterInformer
+	AddonInformer   addonv1alpha1informers.ManagedClusterAddOnInformer
 }
 
-func BuildClientsFromSecretOption(s SecretOption, bootstrap bool) (*Clients, error) {
+func KubeConfigFromSecretOption(s SecretOption, bootstrap bool) (*rest.Config, error) {
 	var kubeConfig *rest.Config
 	var err error
 	if bootstrap {
@@ -269,12 +272,17 @@ func BuildClientsFromSecretOption(s SecretOption, bootstrap bool) (*Clients, err
 			return nil, fmt.Errorf("unable to load hub kubeconfig from file %q: %w", s.HubKubeconfigFile, err)
 		}
 	}
+	return kubeConfig, nil
+}
 
+func BuildClientsFromConfig(kubeConfig *rest.Config, clusterName string) (*Clients, error) {
 	clients := &Clients{}
-	clients.KubeClient, err = kubernetes.NewForConfig(kubeConfig)
+	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
 		return nil, err
 	}
+	clients.LeaseClient = kubeClient.CoordinationV1().Leases(clusterName)
+	clients.EventsClient = kubeClient.EventsV1()
 	clients.ClusterClient, err = clusterv1client.NewForConfig(kubeConfig)
 	if err != nil {
 		return nil, err
@@ -284,24 +292,25 @@ func BuildClientsFromSecretOption(s SecretOption, bootstrap bool) (*Clients, err
 		return nil, err
 	}
 
-	clients.KubeInformerFactory = informers.NewSharedInformerFactoryWithOptions(
-		clients.KubeClient,
-		10*time.Minute,
-		informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
-			listOptions.LabelSelector = fmt.Sprintf("%s=%s", clusterv1.ClusterNameLabelKey, s.ClusterName)
-		}),
-	)
-	clients.ClusterInfomerFactory = clusterv1informers.NewSharedInformerFactoryWithOptions(
+	clients.ClusterInformer = clusterinformers.NewSharedInformerFactoryWithOptions(
 		clients.ClusterClient,
 		10*time.Minute,
-		clusterv1informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
-			listOptions.FieldSelector = fields.OneTermEqualSelector("metadata.name", s.ClusterName).String()
+		clusterinformers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
+			listOptions.FieldSelector = fields.OneTermEqualSelector("metadata.name", clusterName).String()
 		}),
-	)
-	clients.AddonInformerFactory = addoninformers.NewSharedInformerFactoryWithOptions(
+	).Cluster().V1().ManagedClusters()
+	clients.AddonInformer = addoninformers.NewSharedInformerFactoryWithOptions(
 		clients.AddonClient,
 		10*time.Minute,
-		addoninformers.WithNamespace(s.ClusterName),
-	)
+		addoninformers.WithNamespace(clusterName),
+	).Addon().V1alpha1().ManagedClusterAddOns()
 	return clients, nil
+}
+
+func BuildClientsFromSecretOption(s SecretOption, bootstrap bool) (*Clients, error) {
+	kubeConfig, err := KubeConfigFromSecretOption(s, bootstrap)
+	if err != nil {
+		return nil, err
+	}
+	return BuildClientsFromConfig(kubeConfig, s.ClusterName)
 }
