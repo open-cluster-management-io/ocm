@@ -97,6 +97,8 @@ const (
 	AMITypesCustom                  AMITypes = "CUSTOM"
 	AMITypesBottlerocketArm64       AMITypes = "BOTTLEROCKET_ARM_64"
 	AMITypesBottlerocketX8664       AMITypes = "BOTTLEROCKET_x86_64"
+	AMITypesBottlerocketArm64Fips   AMITypes = "BOTTLEROCKET_ARM_64_FIPS"
+	AMITypesBottlerocketX8664Fips   AMITypes = "BOTTLEROCKET_x86_64_FIPS"
 	AMITypesBottlerocketArm64Nvidia AMITypes = "BOTTLEROCKET_ARM_64_NVIDIA"
 	AMITypesBottlerocketX8664Nvidia AMITypes = "BOTTLEROCKET_x86_64_NVIDIA"
 	AMITypesWindowsCore2019X8664    AMITypes = "WINDOWS_CORE_2019_x86_64"
@@ -121,6 +123,8 @@ func (AMITypes) Values() []AMITypes {
 		"CUSTOM",
 		"BOTTLEROCKET_ARM_64",
 		"BOTTLEROCKET_x86_64",
+		"BOTTLEROCKET_ARM_64_FIPS",
+		"BOTTLEROCKET_x86_64_FIPS",
 		"BOTTLEROCKET_ARM_64_NVIDIA",
 		"BOTTLEROCKET_x86_64_NVIDIA",
 		"WINDOWS_CORE_2019_x86_64",
@@ -918,5 +922,26 @@ func (UpdateType) Values() []UpdateType {
 		"UpgradePolicyUpdate",
 		"ZonalShiftConfigUpdate",
 		"AutoModeUpdate",
+	}
+}
+
+type VersionStatus string
+
+// Enum values for VersionStatus
+const (
+	VersionStatusUnsupported     VersionStatus = "UNSUPPORTED"
+	VersionStatusStandardSupport VersionStatus = "STANDARD_SUPPORT"
+	VersionStatusExtendedSupport VersionStatus = "EXTENDED_SUPPORT"
+)
+
+// Values returns all known values for VersionStatus. Note that this can be
+// expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (VersionStatus) Values() []VersionStatus {
+	return []VersionStatus{
+		"UNSUPPORTED",
+		"STANDARD_SUPPORT",
+		"EXTENDED_SUPPORT",
 	}
 }
