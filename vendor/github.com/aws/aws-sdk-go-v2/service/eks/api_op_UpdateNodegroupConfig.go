@@ -13,9 +13,11 @@ import (
 
 // Updates an Amazon EKS managed node group configuration. Your node group
 // continues to function during the update. The response output includes an update
-// ID that you can use to track the status of your node group update with the DescribeUpdateAPI
-// operation. You can update the Kubernetes labels and taints for a node group and
-// the scaling and version update configuration.
+// ID that you can use to track the status of your node group update with the [DescribeUpdate]
+// DescribeUpdate API operation. You can update the Kubernetes labels and taints
+// for a node group and the scaling and version update configuration.
+//
+// [DescribeUpdate]: https://docs.aws.amazon.com/eks/latest/APIReference/API_DescribeUpdate.html
 func (c *Client) UpdateNodegroupConfig(ctx context.Context, params *UpdateNodegroupConfigInput, optFns ...func(*Options)) (*UpdateNodegroupConfigOutput, error) {
 	if params == nil {
 		params = &UpdateNodegroupConfigInput{}
@@ -141,6 +143,9 @@ func (c *Client) addOperationUpdateNodegroupConfigMiddlewares(stack *middleware.
 		return err
 	}
 	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
+	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addIdempotencyToken_opUpdateNodegroupConfigMiddleware(stack, options); err != nil {
