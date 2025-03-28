@@ -23,6 +23,10 @@ const (
 	// itself to avoid impact to users.
 	ClusterClaim featuregate.Feature = "ClusterClaim"
 
+	// ClusterProperty is a feature gate on hub controller and spoke-agent. When it is enabled on the
+	// spoke agent, it will use the claim controller to manage the managed cluster property
+	ClusterProperty featuregate.Feature = "ClusterProperty"
+
 	// AddonManagement is a feature gate on hub controller and spoke-agent. When it is enabled on the
 	//spoke agent, it will start a new controllers to manage the managed cluster addons
 	// registration and maintains the status of managed cluster addons through watching their leases.
@@ -90,6 +94,7 @@ const (
 // add it here.
 var DefaultSpokeRegistrationFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	ClusterClaim:               {Default: true, PreRelease: featuregate.Beta},
+	ClusterProperty:            {Default: false, PreRelease: featuregate.Alpha},
 	AddonManagement:            {Default: true, PreRelease: featuregate.Beta},
 	V1beta1CSRAPICompatibility: {Default: false, PreRelease: featuregate.Alpha},
 	MultipleHubs:               {Default: false, PreRelease: featuregate.Alpha},
