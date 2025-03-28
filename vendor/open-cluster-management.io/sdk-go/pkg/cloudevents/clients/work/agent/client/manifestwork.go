@@ -103,11 +103,11 @@ func (c *ManifestWorkAgentClient) List(ctx context.Context, opts metav1.ListOpti
 
 	generic.IncreaseWorkProcessedCounter("list", metav1.StatusSuccess)
 	items := []workv1.ManifestWork{}
-	for _, work := range works {
+	for _, work := range works.Items {
 		items = append(items, *work)
 	}
 
-	return &workv1.ManifestWorkList{Items: items}, nil
+	return &workv1.ManifestWorkList{ListMeta: works.ListMeta, Items: items}, nil
 }
 
 func (c *ManifestWorkAgentClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
