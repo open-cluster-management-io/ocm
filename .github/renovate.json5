@@ -1,0 +1,66 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "baseBranches": [
+        "main",
+        "/^backplane-.*/"
+    ],
+    "packageRules": [
+        {
+            "matchManagers": [
+                "dockerfile"
+            ],
+            "matchFileNames": [
+                "build/Dockerfile.addon",
+                "build/Dockerfile.addon.rhtap",
+                "build/Dockerfile.placement",
+                "build/Dockerfile.placement.rhtap",
+                "build/Dockerfile.registration",
+                "build/Dockerfile.registration.rhtap",
+                "build/Dockerfile.registration-operator",
+                "build/Dockerfile.registration-operator.rhtap",
+                "build/Dockerfile.work",
+                "build/Dockerfile.work.rhtap",
+            ],
+            "enabled": true
+        },
+        {
+            "matchBaseBranches": [
+                "backplane-2.8",
+                "backplane-2.7",
+                "backplane-2.6",
+                "backplane-2.5"
+            ],
+            "matchManagers": [
+                "gomod",
+                "dockerfile"
+            ],
+            "enabled": true,
+            "addLabels": [
+                "approved"
+            ]
+        },
+        {
+            "matchBaseBranches": [
+                "main", // should not update main branch for upstream repos
+                "backplane-2.9", // should not update current release branch
+            ],
+            "matchManagers": [
+                "gomod",
+                "dockerfile"
+            ],
+            "enabled": false,
+        },
+        {
+            "matchBaseBranches": [
+                "backplane-2.4",
+            ],
+            "enabled": false
+        }
+    ],
+    "rebaseWhen": "behind-base-branch",
+    "recreateWhen": "never",
+    "addLabels": [
+        "ok-to-test"
+    ],
+    "schedule": "at any time"
+}
