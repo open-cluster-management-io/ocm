@@ -23,7 +23,6 @@ var ControllerResyncInterval = 5 * time.Minute
 // secretController run process in driver to get credential and keeps the defeined secret in secretOption update-to-date
 type secretController struct {
 	SecretOption
-	option               any
 	driver               RegisterDriver
 	controllerName       string
 	statusUpdater        StatusUpdateFunc
@@ -34,15 +33,18 @@ type secretController struct {
 // NewSecretController return an instance of secretController
 func NewSecretController(
 	secretOption SecretOption,
-	option any,
 	driver RegisterDriver,
 	statusUpdater StatusUpdateFunc,
 	recorder events.Recorder,
 	controllerName string,
 ) factory.Controller {
 	additionalSecretData := map[string][]byte{}
-	if secretOption.BootStrapKubeConfig != nil {
-		kubeConfigTemplate, err := BaseKubeConfigFromBootStrap(secretOption.BootStrapKubeConfig)
+	if secretOption.BootStrapKubeConfigFile != "" {
+		bootstrapKubeCfg, err := clientcmd.LoadFromFile(secretOption.BootStrapKubeConfigFile)
+		if err != nil {
+			utilruntime.Must(err)
+		}
+		kubeConfigTemplate, err := BaseKubeConfigFromBootStrap(bootstrapKubeCfg)
 		if err != nil {
 			utilruntime.Must(err)
 		}
@@ -70,7 +72,6 @@ func NewSecretController(
 		controllerName:       controllerName,
 		statusUpdater:        statusUpdater,
 		additionalSecretData: additionalSecretData,
-		option:               option,
 	}
 
 	f := factory.New().
@@ -88,11 +89,13 @@ func NewSecretController(
 			return false
 		}, secretOption.ManagementSecretInformer)
 
-	driverInformer, driverFilter := driver.InformerHandler(option)
+	driverInformer, driverFilter := driver.InformerHandler()
 	if driverInformer != nil && driverFilter != nil {
 		f = f.WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
 			return factory.DefaultQueueKey
 		}, driverFilter, driverInformer)
+	} else if driverInformer != nil {
+		f = f.WithInformers(driverInformer)
 	}
 
 	return f.WithSync(c.sync).
@@ -120,7 +123,7 @@ func (c *secretController) sync(ctx context.Context, syncCtx factory.SyncContext
 	}
 
 	if c.secretToSave == nil {
-		secret, cond, err := c.driver.Process(ctx, c.controllerName, secret, c.additionalSecretData, syncCtx.Recorder(), c.option)
+		secret, cond, err := c.driver.Process(ctx, c.controllerName, secret, c.additionalSecretData, syncCtx.Recorder())
 		if cond != nil {
 			if updateErr := c.statusUpdater(ctx, *cond); updateErr != nil {
 				return updateErr

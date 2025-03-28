@@ -54,7 +54,7 @@ func TestIsCSRApproved(t *testing.T) {
 			ctrl := &v1CSRControl{
 				hubCSRLister: lister,
 			}
-			csrApproved, err := ctrl.isApproved(c.csr.Name)
+			csrApproved, err := ctrl.IsApproved(c.csr.Name)
 			assert.NoError(t, err)
 			if csrApproved != c.csrApproved {
 				t.Errorf("expected %t, but got %t", c.csrApproved, csrApproved)

@@ -18,10 +18,11 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
+	cloudeventsoptions "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options"
+	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/agent/codec"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/store"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
-	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/work"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/codec"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/store"
 
 	"open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
@@ -226,12 +227,11 @@ func (o *WorkAgentConfig) newWorkClientAndInformer(
 			return "", nil, nil, err
 		}
 
-		clientHolder, err := cloudeventswork.NewClientHolderBuilder(config).
-			WithClientID(o.workOptions.CloudEventsClientID).
+		clientOptions := cloudeventsoptions.NewGenericClientOptions(
+			config, codec.NewManifestBundleCodec(), o.workOptions.CloudEventsClientID).
 			WithClusterName(o.agentOptions.SpokeClusterName).
-			WithCodec(codec.NewManifestBundleCodec()).
-			WithWorkClientWatcherStore(watcherStore).
-			NewAgentClientHolder(ctx)
+			WithClientWatcherStore(watcherStore)
+		clientHolder, err := cloudeventswork.NewAgentClientHolder(ctx, clientOptions)
 		if err != nil {
 			return "", nil, nil, err
 		}

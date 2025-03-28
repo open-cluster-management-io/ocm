@@ -8,7 +8,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
@@ -35,18 +34,15 @@ type AWSIRSADriver struct {
 	managedClusterArn        string
 	hubClusterArn            string
 	managedClusterRoleSuffix string
+
+	awsIRSAControl AWSIRSAControl
 }
 
 func (c *AWSIRSADriver) Process(
 	ctx context.Context, controllerName string, secret *corev1.Secret, additionalSecretData map[string][]byte,
-	recorder events.Recorder, opt any) (*corev1.Secret, *metav1.Condition, error) {
+	recorder events.Recorder) (*corev1.Secret, *metav1.Condition, error) {
 
-	awsOption, ok := opt.(*AWSOption)
-	if !ok {
-		return nil, nil, fmt.Errorf("option type is not correct")
-	}
-
-	isApproved, err := awsOption.AWSIRSAControl.isApproved(c.name)
+	isApproved, err := c.awsIRSAControl.isApproved(c.name)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -82,12 +78,8 @@ func (c *AWSIRSADriver) BuildKubeConfigFromTemplate(kubeConfig *clientcmdapi.Con
 	return kubeConfig
 }
 
-func (c *AWSIRSADriver) InformerHandler(option any) (cache.SharedIndexInformer, factory.EventFilterFunc) {
-	awsOption, ok := option.(*AWSOption)
-	if !ok {
-		utilruntime.Must(fmt.Errorf("option type is not correct"))
-	}
-	return awsOption.AWSIRSAControl.Informer(), awsOption.EventFilterFunc
+func (c *AWSIRSADriver) InformerHandler() (cache.SharedIndexInformer, factory.EventFilterFunc) {
+	return c.awsIRSAControl.Informer(), nil
 }
 
 func (c *AWSIRSADriver) IsHubKubeConfigValid(ctx context.Context, secretOption register.SecretOption) (bool, error) {
@@ -104,11 +96,23 @@ func (c *AWSIRSADriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluste
 	return cluster
 }
 
-func NewAWSIRSADriver(managedClusterArn string, managedClusterRoleSuffix string, hubClusterArn string, name string) register.RegisterDriver {
+func (c *AWSIRSADriver) BuildClients(_ context.Context, secretOption register.SecretOption, bootstrap bool) (*register.Clients, error) {
+	clients, err := register.BuildClientsFromSecretOption(secretOption, bootstrap)
+	if err != nil {
+		return nil, err
+	}
+	c.awsIRSAControl, err = NewAWSIRSAControl(clients.ClusterInformer, clients.ClusterClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AWS IRSA control: %w", err)
+	}
+	return clients, nil
+}
+
+func NewAWSIRSADriver(opt *AWSOption, secretOption register.SecretOption) register.RegisterDriver {
 	return &AWSIRSADriver{
-		managedClusterArn:        managedClusterArn,
-		managedClusterRoleSuffix: managedClusterRoleSuffix,
-		hubClusterArn:            hubClusterArn,
-		name:                     name,
+		managedClusterArn:        opt.ManagedClusterArn,
+		managedClusterRoleSuffix: opt.ManagedClusterRoleSuffix,
+		hubClusterArn:            opt.HubClusterArn,
+		name:                     secretOption.ClusterName,
 	}
 }

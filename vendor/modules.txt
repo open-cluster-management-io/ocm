@@ -1777,7 +1777,7 @@ open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v0.16.0
+# open-cluster-management.io/sdk-go v0.16.1-0.20250327091909-6bd6228a47ad
 ## explicit; go 1.22.0
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
@@ -1788,6 +1788,20 @@ open-cluster-management.io/sdk-go/pkg/apis/work/v1/validator
 open-cluster-management.io/sdk-go/pkg/basecontroller/events
 open-cluster-management.io/sdk-go/pkg/basecontroller/factory
 open-cluster-management.io/sdk-go/pkg/certrotation
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/common
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/errors
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/statushash
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/store
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/utils
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/agent/client
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/agent/codec
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/internal
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/payload
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/source/client
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/source/codec
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/store
 open-cluster-management.io/sdk-go/pkg/cloudevents/constants
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options
@@ -1799,20 +1813,6 @@ open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/kafka
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types
-open-cluster-management.io/sdk-go/pkg/cloudevents/work
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/client
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/codec
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/lister
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/common
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/errors
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/internal
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/client
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/codec
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/lister
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/statushash
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/store
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/utils
 open-cluster-management.io/sdk-go/pkg/helpers
 open-cluster-management.io/sdk-go/pkg/patcher
 # sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"reflect"
 	"testing"
 	"time"
@@ -275,6 +276,75 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 			}
 			if c.isValid != valid {
 				t.Errorf("expect %t, but %t", c.isValid, valid)
+			}
+		})
+	}
+}
+
+func TestBuildClientFromSecretOptions(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "testvalidhubclientconfig")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	cert1 := testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second)
+	defer os.RemoveAll(tempDir)
+
+	kubeconfig := testinghelpers.NewKubeconfig(
+		"cluster1", "https://127.0.0.1:6001", "", "", nil, cert1.Key, cert1.Cert)
+
+	cases := []struct {
+		name                string
+		kubeconfig          []byte
+		bootstrapKubeconfig []byte
+		bootstrap           bool
+		expectErr           bool
+	}{
+		{
+			name:       "bootstrap is not set",
+			kubeconfig: kubeconfig,
+			bootstrap:  true,
+			expectErr:  true,
+		},
+		{
+			name:                "bootstrap is set",
+			kubeconfig:          nil,
+			bootstrapKubeconfig: kubeconfig,
+			bootstrap:           true,
+			expectErr:           false,
+		},
+		{
+			name:                "bootstrap is false",
+			kubeconfig:          nil,
+			bootstrapKubeconfig: kubeconfig,
+			bootstrap:           false,
+			expectErr:           true,
+		},
+		{
+			name:                "bootstrap is false with correct kubeconfig",
+			kubeconfig:          kubeconfig,
+			bootstrapKubeconfig: nil,
+			bootstrap:           false,
+			expectErr:           false,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			secretOpts := SecretOption{
+				ClusterName: "cluster1",
+				AgentName:   "agent1",
+			}
+			if tt.kubeconfig != nil {
+				testinghelpers.WriteFile(path.Join(tempDir, "kubeconfig"), tt.kubeconfig)
+				secretOpts.HubKubeconfigFile = path.Join(tempDir, "kubeconfig")
+			}
+			if tt.bootstrapKubeconfig != nil {
+				testinghelpers.WriteFile(path.Join(tempDir, "bootstrap-kubeconfig"), tt.bootstrapKubeconfig)
+				secretOpts.BootStrapKubeConfigFile = path.Join(tempDir, "bootstrap-kubeconfig")
+			}
+			_, err := BuildClientsFromSecretOption(secretOpts, tt.bootstrap)
+			if (err != nil) != tt.expectErr {
+				t.Errorf("expected error %v but got %v", tt.expectErr, err)
 			}
 		})
 	}

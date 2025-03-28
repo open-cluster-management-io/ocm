@@ -16,6 +16,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
+	registerfactory "open-cluster-management.io/ocm/pkg/registration/register/factory"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
@@ -37,6 +38,7 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
+			RegisterDriverOption:     registerfactory.NewOptions(),
 		}
 		commOptions := commonoptions.NewAgentOptions()
 		commOptions.HubKubeconfigDir = hubKubeconfigDir
@@ -56,6 +58,7 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
+			RegisterDriverOption:     registerfactory.NewOptions(),
 		}
 		commOptions := commonoptions.NewAgentOptions()
 		commOptions.HubKubeconfigDir = hubKubeconfigDir
@@ -76,6 +79,7 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
+			RegisterDriverOption:     registerfactory.NewOptions(),
 		}
 		commOptions = commonoptions.NewAgentOptions()
 		commOptions.HubKubeconfigDir = hubKubeconfigDir
@@ -94,6 +98,7 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
+			RegisterDriverOption:     registerfactory.NewOptions(),
 		}
 		commOptions := commonoptions.NewAgentOptions()
 		commOptions.HubKubeconfigDir = hubKubeconfigDir
@@ -145,6 +150,7 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
+			RegisterDriverOption:     registerfactory.NewOptions(),
 		}
 		commOptions := commonoptions.NewAgentOptions()
 		commOptions.HubKubeconfigDir = hubKubeconfigDir
@@ -172,6 +178,7 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
+			RegisterDriverOption:     registerfactory.NewOptions(),
 		}
 		commOptions := commonoptions.NewAgentOptions()
 		commOptions.HubKubeconfigDir = hubKubeconfigDir

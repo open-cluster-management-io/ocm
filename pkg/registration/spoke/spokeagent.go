@@ -9,22 +9,16 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 
-	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
-	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 	aboutclient "sigs.k8s.io/about-api/pkg/generated/clientset/versioned"
 	aboutinformers "sigs.k8s.io/about-api/pkg/generated/informers/externalversions"
@@ -33,8 +27,6 @@ import (
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/register"
-	awsIrsa "open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
-	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/addon"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/lease"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/managedcluster"
@@ -195,19 +187,6 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 
-	// initiate registration driver
-	var registerDriver register.RegisterDriver
-	if o.registrationOption.RegistrationAuth == helpers.AwsIrsaAuthType {
-		registerDriver = awsIrsa.NewAWSIRSADriver(o.registrationOption.ManagedClusterArn,
-			o.registrationOption.ManagedClusterRoleSuffix,
-			o.registrationOption.HubClusterArn,
-			o.agentOptions.SpokeClusterName)
-	} else {
-		registerDriver = csr.NewCSRDriver()
-	}
-
-	o.driver = registerDriver
-
 	// get spoke cluster CA bundle
 	spokeClusterCABundle, err := o.getSpokeClusterCABundle(spokeClientConfig)
 	if err != nil {
@@ -235,32 +214,26 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		o.currentBootstrapKubeConfig = o.registrationOption.BootstrapKubeconfig
 	}
 
-	// load bootstrap client config and create bootstrap clients
-	bootstrapClientConfig, err := clientcmd.BuildConfigFromFlags("", o.currentBootstrapKubeConfig)
-	if err != nil {
-		return fmt.Errorf("unable to load bootstrap kubeconfig from file %q: %w", o.currentBootstrapKubeConfig, err)
-	}
-	bootstrapKubeClient, err := kubernetes.NewForConfig(bootstrapClientConfig)
-	if err != nil {
-		return err
-	}
-	bootstrapClusterClient, err := clusterv1client.NewForConfig(bootstrapClientConfig)
-	if err != nil {
-		return err
+	// build up the secretOption
+	secretOption := register.SecretOption{
+		SecretNamespace:          o.agentOptions.ComponentNamespace,
+		SecretName:               o.registrationOption.HubKubeconfigSecret,
+		ClusterName:              o.agentOptions.SpokeClusterName,
+		AgentName:                o.agentOptions.AgentID,
+		ManagementSecretInformer: namespacedManagementKubeInformerFactory.Core().V1().Secrets().Informer(),
+		ManagementCoreClient:     managementKubeClient.CoreV1(),
+		HubKubeconfigFile:        o.agentOptions.HubKubeconfigFile,
+		HubKubeconfigDir:         o.agentOptions.HubKubeconfigDir,
+		BootStrapKubeConfigFile:  o.currentBootstrapKubeConfig,
 	}
 
-	// start a SpokeClusterCreatingController to make sure there is a spoke cluster on hub cluster
-	spokeClusterCreatingController := registration.NewManagedClusterCreatingController(
-		o.agentOptions.SpokeClusterName,
-		[]registration.ManagedClusterDecorator{
-			registration.AnnotationDecorator(o.registrationOption.ClusterAnnotations),
-			registration.ClientConfigDecorator(o.registrationOption.SpokeExternalServerURLs, spokeClusterCABundle),
-			o.driver.ManagedClusterDecorator,
-		},
-		bootstrapClusterClient,
-		recorder,
-	)
-	go spokeClusterCreatingController.Run(ctx, 1)
+	// initiate registration driver
+	o.driver = o.registrationOption.RegisterDriverOption.Driver(secretOption)
+	bootstrapClients, err := o.driver.BuildClients(ctx, secretOption, true)
+	if err != nil {
+		return err
+	}
+	driverInformer, _ := o.driver.InformerHandler()
 
 	secretInformer := namespacedManagementKubeInformerFactory.Core().V1().Secrets()
 	// Register BootstrapKubeconfigEventHandler as an event handler of secret informer,
@@ -288,21 +261,6 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	go namespacedManagementKubeInformerFactory.Start(ctx.Done())
 
 	// check if there already exists a valid client config for hub
-	kubeconfig, err := clientcmd.LoadFromFile(o.currentBootstrapKubeConfig)
-	if err != nil {
-		return err
-	}
-	secretOption := register.SecretOption{
-		SecretNamespace:          o.agentOptions.ComponentNamespace,
-		SecretName:               o.registrationOption.HubKubeconfigSecret,
-		ClusterName:              o.agentOptions.SpokeClusterName,
-		AgentName:                o.agentOptions.AgentID,
-		ManagementSecretInformer: namespacedManagementKubeInformerFactory.Core().V1().Secrets().Informer(),
-		ManagementCoreClient:     managementKubeClient.CoreV1(),
-		HubKubeconfigFile:        o.agentOptions.HubKubeconfigFile,
-		HubKubeconfigDir:         o.agentOptions.HubKubeconfigDir,
-		BootStrapKubeConfig:      kubeconfig,
-	}
 	o.internalHubConfigValidFunc = register.IsHubKubeConfigValidFunc(o.driver, secretOption)
 	ok, err := o.internalHubConfigValidFunc(ctx)
 	if err != nil {
@@ -317,30 +275,28 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	if !ok {
 		// create a ClientCertForHubController for spoke agent bootstrap
 		// the bootstrap informers are supposed to be terminated after completing the bootstrap process.
-		bootstrapInformerFactory := informers.NewSharedInformerFactory(bootstrapKubeClient, 10*time.Minute)
-
-		bootstrapClusterInformerFactory := clusterv1informers.NewSharedInformerFactory(bootstrapClusterClient, 10*time.Minute)
-
-		// TODO: Generate csrOption or awsOption based on the value of --registration-auth may be move it under registerdriver as well
-		registrationAuthOption, err := o.newRestirationAuthOption(
-			logger,
-			secretOption,
-			bootstrapInformerFactory,
-			bootstrapKubeClient,
-			bootstrapClusterInformerFactory,
-			bootstrapClusterClient,
+		bootstrapCtx, stopBootstrap := context.WithCancel(ctx)
+		// start a SpokeClusterCreatingController to make sure there is a spoke cluster on hub cluster
+		spokeClusterCreatingController := registration.NewManagedClusterCreatingController(
+			o.agentOptions.SpokeClusterName,
+			[]registration.ManagedClusterDecorator{
+				registration.AnnotationDecorator(o.registrationOption.ClusterAnnotations),
+				registration.ClientConfigDecorator(o.registrationOption.SpokeExternalServerURLs, spokeClusterCABundle),
+				o.driver.ManagedClusterDecorator,
+			},
+			bootstrapClients.ClusterClient,
+			recorder,
 		)
-		if err != nil {
-			return err
-		}
 
 		controllerName := fmt.Sprintf("BootstrapController@cluster:%s", o.agentOptions.SpokeClusterName)
-		bootstrapCtx, stopBootstrap := context.WithCancel(ctx)
 		secretController := register.NewSecretController(
-			secretOption, registrationAuthOption, o.driver, register.GenerateBootstrapStatusUpdater(), recorder, controllerName)
+			secretOption, o.driver, register.GenerateBootstrapStatusUpdater(), recorder, controllerName)
 
-		go bootstrapInformerFactory.Start(bootstrapCtx.Done())
-		go bootstrapClusterInformerFactory.Start(bootstrapCtx.Done())
+		go bootstrapClients.ClusterInformer.Informer().Run(bootstrapCtx.Done())
+		if driverInformer != nil {
+			go driverInformer.Run(bootstrapCtx.Done())
+		}
+		go spokeClusterCreatingController.Run(bootstrapCtx, 1)
 		go secretController.Run(bootstrapCtx, 1)
 
 		// Wait for the hub client config is ready.
@@ -366,87 +322,39 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		stopBootstrap()
 	}
 
-	// create hub clients and shared informer factories from hub kube config
-	hubClientConfig, err := clientcmd.BuildConfigFromFlags("", o.agentOptions.HubKubeconfigFile)
-	if err != nil {
-		return fmt.Errorf("unable to load hub kubeconfig from file %q: %w", o.agentOptions.HubKubeconfigFile, err)
-	}
-
-	hubKubeClient, err := kubernetes.NewForConfig(hubClientConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create hub kube client: %w", err)
-	}
-
-	hubClusterClient, err := clusterv1client.NewForConfig(hubClientConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create hub cluster client: %w", err)
-	}
-
-	addOnClient, err := addonclient.NewForConfig(hubClientConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create addon client: %w", err)
-	}
-
-	hubKubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(
-		hubKubeClient,
-		10*time.Minute,
-		informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
-			listOptions.LabelSelector = fmt.Sprintf("%s=%s", clusterv1.ClusterNameLabelKey, o.agentOptions.SpokeClusterName)
-		}),
-	)
-	addOnInformerFactory := addoninformers.NewSharedInformerFactoryWithOptions(
-		addOnClient,
-		10*time.Minute,
-		addoninformers.WithNamespace(o.agentOptions.SpokeClusterName),
-	)
-	// create a cluster informer factory with name field selector because we just need to handle the current spoke cluster
-	hubClusterInformerFactory := clusterv1informers.NewSharedInformerFactoryWithOptions(
-		hubClusterClient,
-		10*time.Minute,
-		clusterv1informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
-			listOptions.FieldSelector = fields.OneTermEqualSelector("metadata.name", o.agentOptions.SpokeClusterName).String()
-		}),
-	)
-
-	recorder.Event("HubClientConfigReady", "Client config for hub is ready.")
-
-	registrationAuthOption, err := o.newRestirationAuthOption(
-		logger,
-		secretOption,
-		hubKubeInformerFactory,
-		hubKubeClient,
-		hubClusterInformerFactory,
-		hubClusterClient,
-	)
+	// reset clients from driver
+	hubClient, err := o.driver.BuildClients(ctx, secretOption, false)
 	if err != nil {
 		return err
 	}
+	hubDriverInformer, _ := o.driver.InformerHandler()
 
+	recorder.Event("HubClientConfigReady", "Client config for hub is ready.")
 	// create another RegisterController for registration credential rotation
 	controllerName := fmt.Sprintf("RegisterController@cluster:%s", o.agentOptions.SpokeClusterName)
 	secretController := register.NewSecretController(
-		secretOption, registrationAuthOption, o.driver, register.GenerateStatusUpdater(
-			hubClusterClient,
-			hubClusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
+		secretOption, o.driver, register.GenerateStatusUpdater(
+			hubClient.ClusterClient,
+			hubClient.ClusterInformer.Lister(),
 			o.agentOptions.SpokeClusterName), recorder, controllerName)
 
 	// create ManagedClusterLeaseController to keep the spoke cluster heartbeat
 	managedClusterLeaseController := lease.NewManagedClusterLeaseController(
 		o.agentOptions.SpokeClusterName,
-		hubKubeClient,
-		hubClusterInformerFactory.Cluster().V1().ManagedClusters(),
+		hubClient.LeaseClient,
+		hubClient.ClusterInformer,
 		recorder,
 	)
 
-	hubEventRecorder, err := helpers.NewEventRecorder(ctx, clusterscheme.Scheme, hubKubeClient, "klusterlet-agent")
+	hubEventRecorder, err := helpers.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient.EventsClient, "klusterlet-agent")
 	if err != nil {
 		return fmt.Errorf("failed to create event recorder: %w", err)
 	}
 	// create NewManagedClusterStatusController to update the spoke cluster status
 	managedClusterHealthCheckController := managedcluster.NewManagedClusterStatusController(
 		o.agentOptions.SpokeClusterName,
-		hubClusterClient,
-		hubClusterInformerFactory.Cluster().V1().ManagedClusters(),
+		hubClient.ClusterClient,
+		hubClient.ClusterInformer,
 		spokeKubeClient.Discovery(),
 		spokeClusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
 		aboutinformers.About().V1alpha1().ClusterProperties(),
@@ -462,9 +370,8 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.AddonManagement) {
 		addOnLeaseController = addon.NewManagedClusterAddOnLeaseController(
 			o.agentOptions.SpokeClusterName,
-			addOnClient,
-			addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
-			hubKubeClient.CoordinationV1(),
+			hubClient.AddonClient,
+			hubClient.AddonInformer,
 			managementKubeClient.CoordinationV1(),
 			spokeKubeClient.CoordinationV1(),
 			AddOnLeaseControllerSyncInterval, //TODO: this interval time should be allowed to change from outside
@@ -472,16 +379,16 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		)
 
 		// addon registration only enabled when the registration driver is csr.
-		if csrOption, ok := registrationAuthOption.(*csr.CSROption); ok {
+		if addonDriver, ok := o.driver.(register.AddonDriver); ok {
 			addOnRegistrationController = addon.NewAddOnRegistrationController(
 				o.agentOptions.SpokeClusterName,
 				o.agentOptions.AgentID,
-				kubeconfig,
-				addOnClient,
+				o.currentBootstrapKubeConfig,
+				hubClient.AddonClient,
 				managementKubeClient,
 				spokeKubeClient,
-				csrOption.CSRControl,
-				addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
+				addonDriver,
+				hubClient.AddonInformer,
 				recorder,
 			)
 		}
@@ -491,7 +398,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.MultipleHubs) {
 		hubAcceptController = registration.NewHubAcceptController(
 			o.agentOptions.SpokeClusterName,
-			hubClusterInformerFactory.Cluster().V1().ManagedClusters(),
+			hubClient.ClusterInformer,
 			func(ctx context.Context) error {
 				logger.Info("Failed to connect to hub because of hubAcceptClient set to false, restart agent to reselect a new bootstrap kubeconfig")
 				o.agentStopFunc()
@@ -502,7 +409,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 		hubTimeoutController = registration.NewHubTimeoutController(
 			o.agentOptions.SpokeClusterName,
-			hubKubeClient,
+			hubClient.LeaseClient,
 			o.registrationOption.HubConnectionTimeoutSeconds,
 			func(ctx context.Context) error {
 				logger.Info("Failed to connect to hub because of lease out-of-date, restart agent to reselect a new bootstrap kubeconfig")
@@ -513,10 +420,12 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		)
 	}
 
-	go hubKubeInformerFactory.Start(ctx.Done())
-	go hubClusterInformerFactory.Start(ctx.Done())
+	if hubDriverInformer != nil {
+		go hubDriverInformer.Run(ctx.Done())
+	}
+	go hubClient.ClusterInformer.Informer().Run(ctx.Done())
 	go namespacedManagementKubeInformerFactory.Start(ctx.Done())
-	go addOnInformerFactory.Start(ctx.Done())
+	go hubClient.AddonInformer.Informer().Run(ctx.Done())
 
 	go spokeKubeInformerFactory.Start(ctx.Done())
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
@@ -533,7 +442,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.AddonManagement) {
 		go addOnLeaseController.Run(ctx, 1)
 		// addon controller will only run when the registration driver is csr.
-		if _, ok := registrationAuthOption.(*csr.CSROption); ok {
+		if _, ok := o.driver.(register.AddonDriver); ok {
 			go addOnRegistrationController.Run(ctx, 1)
 		}
 	}
@@ -572,30 +481,4 @@ func (o *SpokeAgentConfig) getSpokeClusterCABundle(kubeConfig *rest.Config) ([]b
 		return nil, err
 	}
 	return data, nil
-}
-
-func (o *SpokeAgentConfig) newRestirationAuthOption(
-	logger klog.Logger,
-	secretOption register.SecretOption,
-	kubeInformers informers.SharedInformerFactory,
-	kubeClient kubernetes.Interface,
-	clusterInformers clusterv1informers.SharedInformerFactory,
-	clusterClient clusterv1client.Interface,
-) (any, error) {
-	if o.registrationOption.RegistrationAuth == helpers.AwsIrsaAuthType {
-		if o.registrationOption.HubClusterArn != "" {
-			return awsIrsa.NewAWSOption(
-				secretOption,
-				clusterInformers.Cluster(),
-				clusterClient)
-		} else {
-			return nil, fmt.Errorf("please provide EKS Hub Cluster ARN for the awsirsa based authentication")
-		}
-	} else {
-		return csr.NewCSROption(logger,
-			secretOption,
-			o.registrationOption.ClientCertExpirationSeconds,
-			kubeInformers.Certificates(),
-			kubeClient)
-	}
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clientset "k8s.io/client-go/kubernetes"
+	leasev1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -17,7 +17,7 @@ const leaseName = "managed-cluster-lease"
 // TODO: it should finally be part of the lease controller. @xuezhaojun
 type hubTimeoutController struct {
 	clusterName        string
-	hubClient          clientset.Interface
+	leaseClient        leasev1client.LeaseInterface
 	timeoutSeconds     int32
 	lastLeaseRenewTime time.Time
 	handleTimeout      func(ctx context.Context) error
@@ -25,7 +25,7 @@ type hubTimeoutController struct {
 
 func NewHubTimeoutController(
 	clusterName string,
-	hubClient clientset.Interface,
+	leaseClient leasev1client.LeaseInterface,
 	timeoutSeconds int32,
 	handleTimeout func(ctx context.Context) error,
 	recorder events.Recorder,
@@ -34,7 +34,7 @@ func NewHubTimeoutController(
 		clusterName:    clusterName,
 		timeoutSeconds: timeoutSeconds,
 		handleTimeout:  handleTimeout,
-		hubClient:      hubClient,
+		leaseClient:    leaseClient,
 	}
 	return factory.New().WithSync(c.sync).ResyncEvery(time.Minute).
 		ToController("HubTimeoutController", recorder)
@@ -46,7 +46,7 @@ func (c *hubTimeoutController) sync(ctx context.Context, syncCtx factory.SyncCon
 		return nil
 	}
 
-	lease, err := c.hubClient.CoordinationV1().Leases(c.clusterName).Get(ctx, leaseName, metav1.GetOptions{})
+	lease, err := c.leaseClient.Get(ctx, leaseName, metav1.GetOptions{})
 	if err != nil {
 		logger.Error(err, "Failed to get lease", "cluster", c.clusterName, "lease", leaseName)
 		// This means to handle the case which the hub is not connectable from the beginning.

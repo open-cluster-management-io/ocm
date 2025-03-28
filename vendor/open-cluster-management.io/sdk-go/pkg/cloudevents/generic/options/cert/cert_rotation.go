@@ -222,24 +222,22 @@ func CachingCertificateLoader(certFile, keyFile string) func() (*tls.Certificate
 // And a goroutine will be started to periodically refresh client certificates for this connection.
 func AutoLoadTLSConfig(caFile, certFile, keyFile string, conn Connection) (*tls.Config, error) {
 	var tlsConfig *tls.Config
-	if caFile != "" {
-		certPool, err := rootCAs(caFile)
-		if err != nil {
-			return nil, err
+	certPool, err := rootCAs(caFile)
+	if err != nil {
+		return nil, err
+	}
+	tlsConfig = &tls.Config{
+		RootCAs:    certPool,
+		MinVersion: tls.VersionTLS13,
+		MaxVersion: tls.VersionTLS13,
+	}
+	if certFile != "" && keyFile != "" {
+		// Set client certificate and key getter for tls config
+		tlsConfig.GetClientCertificate = func(cri *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			return CachingCertificateLoader(certFile, keyFile)()
 		}
-		tlsConfig = &tls.Config{
-			RootCAs:    certPool,
-			MinVersion: tls.VersionTLS13,
-			MaxVersion: tls.VersionTLS13,
-		}
-		if certFile != "" && keyFile != "" {
-			// Set client certificate and key getter for tls config
-			tlsConfig.GetClientCertificate = func(cri *tls.CertificateRequestInfo) (*tls.Certificate, error) {
-				return CachingCertificateLoader(certFile, keyFile)()
-			}
-			// Start a goroutine to periodically refresh client certificates for this connection
-			StartClientCertRotating(tlsConfig.GetClientCertificate, conn)
-		}
+		// Start a goroutine to periodically refresh client certificates for this connection
+		StartClientCertRotating(tlsConfig.GetClientCertificate, conn)
 	}
 
 	return tlsConfig, nil
