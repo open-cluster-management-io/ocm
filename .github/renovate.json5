@@ -7,21 +7,25 @@
     "packageRules": [
         {
             "matchManagers": [
-                "dockerfile"
+                "dockerfile",
             ],
-            "matchFileNames": [
-                "build/Dockerfile.addon",
-                "build/Dockerfile.addon.rhtap",
-                "build/Dockerfile.placement",
-                "build/Dockerfile.placement.rhtap",
-                "build/Dockerfile.registration",
-                "build/Dockerfile.registration.rhtap",
-                "build/Dockerfile.registration-operator",
-                "build/Dockerfile.registration-operator.rhtap",
-                "build/Dockerfile.work",
-                "build/Dockerfile.work.rhtap",
+            "enabled": false, // disable dockerfile update
+        },
+        {
+            "matchBaseBranches": [
+                "backplane-2.9", // disable all update for the current release, otherwise fast forward will fail
+                "backplane-2.4", // disable all update for the old releases
             ],
-            "enabled": true
+            "enabled": false
+        },
+        {
+            "matchBaseBranches": [
+                "main", // disable gomod update for the main branch(upstream repo), only tekton update allowed for main
+            ],
+            "matchManagers": [
+                "gomod",
+            ],
+            "enabled": false,
         },
         {
             "matchBaseBranches": [
@@ -32,35 +36,18 @@
             ],
             "matchManagers": [
                 "gomod",
-                "dockerfile"
             ],
-            "enabled": true,
+            "enabled": true, // enable gomod update for z stream releases
             "addLabels": [
-                "approved"
+                "lgtm"
             ]
         },
-        {
-            "matchBaseBranches": [
-                "main", // should not update main branch for upstream repos
-                "backplane-2.9", // should not update current release branch
-            ],
-            "matchManagers": [
-                "gomod",
-                "dockerfile"
-            ],
-            "enabled": false,
-        },
-        {
-            "matchBaseBranches": [
-                "backplane-2.4",
-            ],
-            "enabled": false
-        }
     ],
     "rebaseWhen": "behind-base-branch",
     "recreateWhen": "never",
     "addLabels": [
-        "ok-to-test"
+        "ok-to-test",
+        "approved",
     ],
     "schedule": "at any time"
 }
