@@ -180,7 +180,7 @@ In order to change Custom Resource Definitions and the API in [ocm](https://gith
     In order to use the new API, you'll have to sync them to your ocm repository. In your ocm repository, go to your go.mod file and replace `open-cluster-management.io/api` with your own updated version. This can be done by using the `replace` directive. At the end of the go.mod file, add:
 
     ```go
-    replace open-cluster-management.io/api v0.16.1 => /home/<user>/api //path to my local api repo w/ changes
+    go mod edit -replace open-cluster-management.io/api=/home/<user>/api #path to my local api repo w/ changes
     ```
 
     _Note: Only use the replace directive during development/debugging. Make sure to remove it before making a PR to [ocm](https://github.com/open-cluster-management-io/ocm) and once changes to the upstream [api repo](https://github.com/open-cluster-management-io/api) are merged._
