@@ -183,7 +183,8 @@ func (d *daemonSetDecorator) decorate(obj *unstructured.Unstructured) (*unstruct
 
 type podTemplateSpecDecorator interface {
 	// decorate modifies the pod template in place
-	decorate(name string, pod *corev1.PodTemplateSpec) error
+	//   resourceName is the name of the resource, could be a deployment name or a daemonset name
+	decorate(resourceName string, pod *corev1.PodTemplateSpec) error
 }
 
 type environmentDecorator struct {
@@ -527,6 +528,7 @@ type resourceRequirementsDecorator struct {
 func newResourceRequirementsDecorator(logger klog.Logger, resource supportResource,
 	privateValues addonfactory.Values) podTemplateSpecDecorator {
 	return &resourceRequirementsDecorator{
+		resource:      resource,
 		privateValues: privateValues,
 	}
 }
@@ -557,6 +559,7 @@ func (d *resourceRequirementsDecorator) decorate(name string, pod *corev1.PodTem
 			}
 
 			pod.Spec.Containers[i].Resources = regexRequirements[j].ResourcesRaw
+			break
 		}
 	}
 
