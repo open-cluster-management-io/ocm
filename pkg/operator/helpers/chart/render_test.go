@@ -327,6 +327,20 @@ func TestKlusterletConfig(t *testing.T) {
 			expectedObjCnt: 1,
 		},
 		{
+			name:      "noOperator with priority cluster",
+			namespace: "ocm",
+			chartConfig: func() *KlusterletChartConfig {
+				config := NewDefaultKlusterletChartConfig()
+				config.NoOperator = true
+				config.Klusterlet.Name = "klusterlet2"
+				config.Klusterlet.Namespace = "open-cluster-management-test"
+				config.Klusterlet.ClusterName = "testCluster"
+				config.PriorityClassName = "klusterlet-critical"
+				return config
+			},
+			expectedObjCnt: 1,
+		},
+		{
 			name:      "noOperator with image pull secret",
 			namespace: "ocm",
 			chartConfig: func() *KlusterletChartConfig {
@@ -335,6 +349,7 @@ func TestKlusterletConfig(t *testing.T) {
 				config.Klusterlet.Name = "klusterlet2"
 				config.Klusterlet.Namespace = "open-cluster-management-test"
 				config.Klusterlet.ClusterName = "testCluster"
+				config.PriorityClassName = "klusterlet-critical"
 				config.Images = ImagesConfig{
 					ImageCredentials: ImageCredentials{
 						CreateImageCredentials: true,
@@ -452,6 +467,9 @@ func TestKlusterletConfig(t *testing.T) {
 
 					if object.Spec.ClusterName != config.Klusterlet.ClusterName {
 						t.Errorf(" expected %s, got %s", config.Klusterlet.ClusterName, object.Spec.ClusterName)
+					}
+					if object.Spec.PriorityClassName != config.PriorityClassName {
+						t.Errorf(" expected %s, got %s", config.PriorityClassName, object.Spec.PriorityClassName)
 					}
 					switch config.Klusterlet.Mode {
 					case "", operatorv1.InstallModeSingleton, operatorv1.InstallModeDefault:
