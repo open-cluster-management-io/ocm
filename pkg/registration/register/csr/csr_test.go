@@ -75,7 +75,7 @@ func TestProcess(t *testing.T) {
 			validateActions: func(t *testing.T, hubActions []clienttesting.Action, secret *corev1.Secret) {
 				logger, _ := ktesting.NewTestContext(t)
 				testingcommon.AssertActions(t, hubActions, "get", "get")
-				valid, err := isCertificateValid(logger, secret.Data[TLSCertFile], testSubject)
+				valid, err := IsCertificateValid(logger, secret.Data[TLSCertFile], testSubject)
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}

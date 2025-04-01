@@ -147,7 +147,7 @@ func TestIsCertificateValid(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			isValid, _ := isCertificateValid(logger, c.testCert.Cert, c.subject)
+			isValid, _ := IsCertificateValid(logger, c.testCert.Cert, c.subject)
 			if isValid != c.isValid {
 				t.Errorf("expected %t, but got %t", c.isValid, isValid)
 			}
