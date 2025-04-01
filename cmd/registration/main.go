@@ -17,6 +17,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/cmd/spoke"
 	"open-cluster-management.io/ocm/pkg/cmd/webhook"
 	"open-cluster-management.io/ocm/pkg/features"
+	"open-cluster-management.io/ocm/pkg/server/grpc"
 	"open-cluster-management.io/ocm/pkg/version"
 )
 
@@ -62,6 +63,7 @@ func newRegistrationCommand() *cobra.Command {
 	cmd.AddCommand(hub.NewRegistrationController())
 	cmd.AddCommand(spoke.NewRegistrationAgent())
 	cmd.AddCommand(webhook.NewRegistrationWebhook())
+	cmd.AddCommand(grpc.NewGRPCServer())
 
 	return cmd
 }

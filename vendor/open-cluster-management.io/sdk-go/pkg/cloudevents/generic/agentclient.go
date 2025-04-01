@@ -122,10 +122,6 @@ func (c *CloudEventAgentClient[T]) Publish(ctx context.Context, eventType types.
 		return fmt.Errorf("unsupported cloudevent data type %s", eventType.CloudEventsDataType)
 	}
 
-	if eventType.SubResource != types.SubResourceStatus {
-		return fmt.Errorf("unsupported event eventType %s", eventType)
-	}
-
 	evt, err := c.codec.Encode(c.agentID, eventType, obj)
 	if err != nil {
 		return err

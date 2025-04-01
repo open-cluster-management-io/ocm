@@ -1,0 +1,47 @@
+package csr
+
+import (
+	"context"
+	"time"
+
+	certificatev1 "k8s.io/api/certificates/v1"
+	"k8s.io/client-go/tools/cache"
+
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/store"
+)
+
+// ClientHolder holds a csr client that implements the CSRInterface based on different configuration
+//
+// ClientHolder also implements the CertificateSigningRequestsGetter interface.
+type ClientHolder struct {
+	informer cache.SharedIndexInformer
+	client   *CSRClient
+}
+
+func (h *ClientHolder) Informer() cache.SharedIndexInformer {
+	return h.informer
+}
+
+func (h *ClientHolder) Clients() *CSRClient {
+	return h.client
+}
+
+// NewAgentClientHolder returns a ClientHolder for an agent
+func NewAgentClientHolder(ctx context.Context, opt *options.GenericClientOptions[*certificatev1.CertificateSigningRequest]) (*ClientHolder, error) {
+	cloudEventsClient, err := opt.AgentClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	csrClient := NewCSRClient(cloudEventsClient, opt.WatcherStore(), opt.ClusterName())
+
+	csrInformer := cache.NewSharedIndexInformer(
+		csrClient, &certificatev1.CertificateSigningRequest{}, 30*time.Second,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+	opt.WatcherStore().(*store.AgentInformerWatcherStore[*certificatev1.CertificateSigningRequest]).
+		SetInformer(csrInformer)
+
+	return &ClientHolder{client: csrClient, informer: csrInformer}, nil
+}

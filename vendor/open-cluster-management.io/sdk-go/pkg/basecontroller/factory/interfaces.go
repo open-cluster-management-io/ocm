@@ -33,7 +33,7 @@ type Controller interface {
 type SyncContext interface {
 	// Queue gives access to controller queue. This can be used for manual requeue, although if a Sync() function return
 	// an error, the object is automatically re-queued. Use with caution.
-	Queue() workqueue.RateLimitingInterface
+	Queue() workqueue.RateLimitingInterface // nolint:staticcheck // SA1019
 }
 
 // SyncFunc is a function that contain main controller logic.
