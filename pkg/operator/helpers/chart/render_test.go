@@ -327,6 +327,27 @@ func TestKlusterletConfig(t *testing.T) {
 			expectedObjCnt: 1,
 		},
 		{
+			name:      "noOperator with image pull secret",
+			namespace: "ocm",
+			chartConfig: func() *KlusterletChartConfig {
+				config := NewDefaultKlusterletChartConfig()
+				config.NoOperator = true
+				config.Klusterlet.Name = "klusterlet2"
+				config.Klusterlet.Namespace = "open-cluster-management-test"
+				config.Klusterlet.ClusterName = "testCluster"
+				config.Images = ImagesConfig{
+					ImageCredentials: ImageCredentials{
+						CreateImageCredentials: true,
+						UserName:               "test",
+						Password:               "test",
+					},
+				}
+				return config
+			},
+
+			expectedObjCnt: 2,
+		},
+		{
 			name:      "create namespace",
 			namespace: "open-cluster-management",
 			chartConfig: func() *KlusterletChartConfig {
@@ -337,6 +358,33 @@ func TestKlusterletConfig(t *testing.T) {
 				return config
 			},
 			expectedObjCnt: 6,
+		},
+		{
+			name:      "create namespace with bootstrap secret",
+			namespace: "open-cluster-management",
+			chartConfig: func() *KlusterletChartConfig {
+				config := NewDefaultKlusterletChartConfig()
+				config.Klusterlet.ClusterName = "testCluster"
+				config.Klusterlet.Mode = operatorv1.InstallModeSingleton
+				config.CreateNamespace = true
+				config.BootstrapHubKubeConfig = "kubeconfig"
+
+				return config
+			},
+			expectedObjCnt: 8,
+		},
+		{
+			name:      "create namespace with bootstrap secret and release.Namespace is the agent namespace",
+			namespace: "open-cluster-management-agent",
+			chartConfig: func() *KlusterletChartConfig {
+				config := NewDefaultKlusterletChartConfig()
+				config.Klusterlet.ClusterName = "testCluster"
+				config.Klusterlet.Mode = operatorv1.InstallModeSingleton
+				config.CreateNamespace = true
+				config.BootstrapHubKubeConfig = "kubeconfig"
+				return config
+			},
+			expectedObjCnt: 7,
 		},
 	}
 
