@@ -1,0 +1,21 @@
+package authn
+
+import "context"
+
+// Context key type defined to avoid collisions in other pkgs using context
+// See https://golang.org/pkg/context/#WithValue
+type contextKey string
+
+const (
+	contextUserKey   contextKey = "user"
+	contextGroupsKey contextKey = "groups"
+)
+
+type Authenticator interface {
+	Authenticate(ctx context.Context) (context.Context, error)
+}
+
+func newContextWithIdentity(ctx context.Context, user string, groups []string) context.Context {
+	ctx = context.WithValue(ctx, contextUserKey, user)
+	return context.WithValue(ctx, contextGroupsKey, groups)
+}

@@ -290,6 +290,8 @@ github.com/prometheus/common v0.62.0 h1:xasJaQlnWAeyHdUBeGjXmutelfJHWMRr+Fg4QszZ
 github.com/prometheus/common v0.62.0/go.mod h1:vyBcEuLSvWos9B1+CyL7JZ2up+uFzXhkqml0W5zIY1I=
 github.com/prometheus/procfs v0.15.1 h1:YagwOFzUgYfKKHX6Dr+sHT7km/hxC76UB0learggepc=
 github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoGhij/e3PBqk=
+github.com/qiujian16/sdk-go v0.0.0-20250422082049-69544ab90357 h1:kC2IYIxqsFT8Kx3EOf4dLnmS/ds2iyBug4nM2NPycgY=
+github.com/qiujian16/sdk-go v0.0.0-20250422082049-69544ab90357/go.mod h1:FtOYjn5dL8e9S1gzNb8cBNsFzHJ1F3cpmCo+qrltido=
 github.com/robfig/cron v1.2.0 h1:ZjScXvvxeQ63Dbyxy76Fj3AT3Ut0aKsyd2/tl3DTMuQ=
 github.com/robfig/cron v1.2.0/go.mod h1:JGuDeoQd7Z6yL4zQhZ3OPEVHB7fL6Ka6skscFHfmt2k=
 github.com/rogpeppe/go-internal v1.12.0 h1:exVL4IDcn6na9z1rAb56Vxr+CgyK3nn3O+epU5NdKM8=
@@ -489,8 +491,6 @@ open-cluster-management.io/addon-framework v0.12.1-0.20250407131028-9d436ffc2da7
 open-cluster-management.io/addon-framework v0.12.1-0.20250407131028-9d436ffc2da7/go.mod h1:7AEw1Sq9UEWpQGTU8zV1XPNkFRBYPbyBh8tfhISV++s=
 open-cluster-management.io/api v0.16.2-0.20250422072120-cadf714c3055 h1:D2vT3nnMS/To3ptz8LLg1zfJm/pL8XIaO1g7Qbyc/5o=
 open-cluster-management.io/api v0.16.2-0.20250422072120-cadf714c3055/go.mod h1:/OeqXycNBZQoe3WG6ghuWsMgsKGuMZrK8ZpsU6gWL0Y=
-open-cluster-management.io/sdk-go v0.16.1-0.20250411154302-3a424961ead4 h1:PT6kDaKjDi0EaQyNzIWzYAYeK4QpBHbm+/7VPrpJEkY=
-open-cluster-management.io/sdk-go v0.16.1-0.20250411154302-3a424961ead4/go.mod h1:FtOYjn5dL8e9S1gzNb8cBNsFzHJ1F3cpmCo+qrltido=
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.0 h1:CPT0ExVicCzcpeN4baWEV2ko2Z/AsiZgEdwgcfwLgMo=
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.0/go.mod h1:Ve9uj1L+deCXFrPOk1LpFXqTg7LCFzFso6PA48q/XZw=
 sigs.k8s.io/cluster-inventory-api v0.0.0-20240730014211-ef0154379848 h1:WYPi2PdQyZwZkHG648v2jQl6deyCgyjJ0fkLYgUJ618=
