@@ -35,7 +35,7 @@ This document evaluates the security posture of the Open Cluster Management (OCM
 | Security Provider? | No. OCM is designed to enable end-to-end visibility and control across multiple Kubernetes clusters. Security is not the primary objective.|
 | Languages | Go, Shell, Python, Makefile, Dockerfile |
 | Software Bill of Materials | [FOSSA Scan](https://app.fossa.com/projects/git%2Bgithub.com%2Fopen-cluster-management-io%2Focm/refs/branch/main/c05247840ad6e69cad82f7d42e2217b953181dff/preview) |
-| Security Links | [Security Report](https://open-cluster-management.io/docs/security/)<br>Creation of a security-insights.yml is planned and will be addressed in upcoming releases. |
+| Security Links | [Security Report](https://open-cluster-management.io/docs/security/)<br>[Security Insights](./SECURITY-INSIGHTS.yml) |
 
 ## Overview
 
@@ -205,8 +205,6 @@ The OCM security policy is maintained in the website [Security page](https://ope
 
 The OCM project accepts vulnerability reports through the email [OCM-security@googlegroups.com](mailto:OCM-security@googlegroups.com), a maintainer will collaborate directly with the reporter through the email or Slack direct message until it is resolved.
 
-TODO: Consider [enabling the GitHub private vulnerability reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability).
-
 ### Incident Response
 
 In the event that a vulnerability is reported, the maintainer team will collaborate to determine the validity and criticality of the report. Based on these findings, the fix will be triaged and the maintainer team will work to issue a patch in a timely manner.
@@ -220,7 +218,7 @@ Patches will be made to the most recent three minor releases. Information will b
 - OpenSSF Best Practices
   - OCM has attained the Open Source Security Foundation(OpenSSF) Best Practices Badge, refer to https://bestpractices.coreinfrastructure.org/projects/5376.
 - Case Studies
-  - All apoters can be found at [adopters-list](https://github.com/open-cluster-management-io/ocm/blob/main/ADOPTERS.md).
+  - All adopters can be found at [adopters-list](https://github.com/open-cluster-management-io/ocm/blob/main/ADOPTERS.md).
   - TODO: Add 2 examples
 - Related Projects / Vendors
   - **Karmada**: [Karmada](https://karmada.io/) (Kubernetes Armada) is a Kubernetes management system that can manage cloud-native applications across multiple Kubernetes clusters and clouds, with no changes to the applications.
