@@ -29,6 +29,8 @@ import (
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon"
@@ -36,6 +38,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
 	eventce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
 	leasece "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/lease"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/payload"
 	grpcserver "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
@@ -192,6 +195,11 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 	if err != nil {
 		return err
 	}
+	workClient, err := workclientset.NewForConfig(controllerContext.KubeConfig)
+	if err != nil {
+		return err
+	}
+
 	addonInformers := addoninformers.NewSharedInformerFactory(addonClient, 10*time.Minute)
 	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 30*time.Minute)
 	kubeInformers := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, 30*time.Minute,
@@ -206,6 +214,7 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 			}
 			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
 		}))
+	workInformers := workinformers.NewSharedInformerFactoryWithOptions(workClient, 30*time.Minute)
 
 	grpcEventServer.RegisterService(
 		cluster.ManagedClusterEventDataType,
@@ -215,20 +224,21 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 		services.NewCSRService(kubeClient, kubeInformers.Certificates().V1().CertificateSigningRequests()))
 	grpcEventServer.RegisterService(
 		addonce.ManagedClusterAddOnEventDataType,
-		services.NewAddonService(addonClient, addonInformers.Addon().V1alpha1().ManagedClusterAddOns()),
-	)
+		services.NewAddonService(addonClient, addonInformers.Addon().V1alpha1().ManagedClusterAddOns()))
 	grpcEventServer.RegisterService(
 		eventce.EventEventDataType,
-		services.NewEventService(kubeClient),
-	)
+		services.NewEventService(kubeClient))
 	grpcEventServer.RegisterService(
 		leasece.LeaseEventDataType,
-		services.NewLeaseService(kubeClient, kubeInformers.Coordination().V1().Leases()),
-	)
+		services.NewLeaseService(kubeClient, kubeInformers.Coordination().V1().Leases()))
+	grpcEventServer.RegisterService(
+		payload.ManifestBundleEventDataType,
+		services.NewWorkService(workClient, workInformers.Work().V1().ManifestWorks()))
 
 	go clusterInformers.Start(ctx.Done())
 	go kubeInformers.Start(ctx.Done())
 	go addonInformers.Start(ctx.Done())
+	go workInformers.Start(ctx.Done())
 	go grpcEventServer.Start(ctx)
 
 	<-ctx.Done()

@@ -22,6 +22,7 @@ const (
 	source                    = "kube"
 	createRequestAction       = "create_request"
 	updateRequestAction       = "update_request"
+	deleteRequestAction       = "delete_request"
 	updateStatusRequestAction = "update_status_request"
 )
 

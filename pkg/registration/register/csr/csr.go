@@ -80,7 +80,7 @@ func (c *CSRDriver) Process(
 	recorder events.Recorder) (*corev1.Secret, *metav1.Condition, error) {
 	logger := klog.FromContext(ctx)
 
-	logger.Info("exisint csr name", "csr", c.csrName)
+	logger.Info("existing csr name", "csr", c.csrName)
 	// reconcile pending csr if exists
 	if len(c.csrName) > 0 {
 		// build a secret data map if the csr is approved
