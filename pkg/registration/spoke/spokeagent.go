@@ -207,15 +207,13 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 	// build up the secretOption
 	secretOption := register.SecretOption{
-		SecretNamespace:          o.agentOptions.ComponentNamespace,
-		SecretName:               o.registrationOption.HubKubeconfigSecret,
-		ClusterName:              o.agentOptions.SpokeClusterName,
-		AgentName:                o.agentOptions.AgentID,
-		ManagementSecretInformer: namespacedManagementKubeInformerFactory.Core().V1().Secrets().Informer(),
-		ManagementCoreClient:     managementKubeClient.CoreV1(),
-		HubKubeconfigFile:        o.agentOptions.HubKubeconfigFile,
-		HubKubeconfigDir:         o.agentOptions.HubKubeconfigDir,
-		BootStrapKubeConfigFile:  o.currentBootstrapKubeConfig,
+		SecretNamespace:         o.agentOptions.ComponentNamespace,
+		SecretName:              o.registrationOption.HubKubeconfigSecret,
+		ClusterName:             o.agentOptions.SpokeClusterName,
+		AgentName:               o.agentOptions.AgentID,
+		HubKubeconfigFile:       o.agentOptions.HubKubeconfigFile,
+		HubKubeconfigDir:        o.agentOptions.HubKubeconfigDir,
+		BootStrapKubeConfigFile: o.currentBootstrapKubeConfig,
 	}
 
 	// initiate registration driver
@@ -281,7 +279,10 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 		controllerName := fmt.Sprintf("BootstrapController@cluster:%s", o.agentOptions.SpokeClusterName)
 		secretController := register.NewSecretController(
-			secretOption, o.driver, register.GenerateBootstrapStatusUpdater(), recorder, controllerName)
+			secretOption, o.driver, register.GenerateBootstrapStatusUpdater(),
+			managementKubeClient.CoreV1(),
+			namespacedManagementKubeInformerFactory.Core().V1().Secrets().Informer(),
+			recorder, controllerName)
 
 		go bootstrapClients.ClusterInformer.Informer().Run(bootstrapCtx.Done())
 		if driverInformer != nil {
@@ -327,7 +328,10 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		secretOption, o.driver, register.GenerateStatusUpdater(
 			hubClient.ClusterClient,
 			hubClient.ClusterInformer.Lister(),
-			o.agentOptions.SpokeClusterName), recorder, controllerName)
+			o.agentOptions.SpokeClusterName),
+		managementKubeClient.CoreV1(),
+		namespacedManagementKubeInformerFactory.Core().V1().Secrets().Informer(),
+		recorder, controllerName)
 
 	// create ManagedClusterLeaseController to keep the spoke cluster heartbeat
 	managedClusterLeaseController := lease.NewManagedClusterLeaseController(

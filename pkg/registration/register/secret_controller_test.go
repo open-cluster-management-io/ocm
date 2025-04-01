@@ -149,12 +149,13 @@ func TestSync(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			syncCtx := testingcommon.NewFakeSyncContext(t, "test")
 			kubeClient := kubefake.NewClientset(c.secrets...)
-			c.option.ManagementCoreClient = kubeClient.CoreV1()
 			informerFactory := informers.NewSharedInformerFactory(kubeClient, 10*time.Minute)
-			c.option.ManagementSecretInformer = informerFactory.Core().V1().Secrets().Informer()
 			updater := &fakeStatusUpdater{}
 			ctrl := NewSecretController(
-				c.option, c.driver, updater.update, syncCtx.Recorder(), "test")
+				c.option, c.driver, updater.update,
+				kubeClient.CoreV1(),
+				informerFactory.Core().V1().Secrets().Informer(),
+				syncCtx.Recorder(), "test")
 			err := ctrl.Sync(context.Background(), syncCtx)
 			if err != nil {
 				t.Fatal(err)
