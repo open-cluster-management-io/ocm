@@ -192,13 +192,11 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 		kubeClient, 10*time.Minute, informers.WithNamespace(config.InstallationNamespace))
 
 	secretOption := register.SecretOption{
-		SecretNamespace:          config.InstallationNamespace,
-		SecretName:               config.secretName,
-		ManagementCoreClient:     kubeClient.CoreV1(),
-		ManagementSecretInformer: kubeInformerFactory.Core().V1().Secrets().Informer(),
-		Subject:                  config.x509Subject(c.clusterName, c.agentName),
-		Signer:                   config.registration.SignerName,
-		ClusterName:              c.clusterName,
+		SecretNamespace: config.InstallationNamespace,
+		SecretName:      config.secretName,
+		Subject:         config.x509Subject(c.clusterName, c.agentName),
+		Signer:          config.registration.SignerName,
+		ClusterName:     c.clusterName,
 	}
 
 	if config.registration.SignerName == certificatesv1.KubeAPIServerClientSignerName {
@@ -207,7 +205,11 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 	driver := c.addonDriver.Fork(config.addOnName, secretOption)
 	controllerName := fmt.Sprintf("ClientCertController@addon:%s:signer:%s", config.addOnName, config.registration.SignerName)
 	statusUpdater := c.generateStatusUpdate(c.clusterName, config.addOnName)
-	secretController := register.NewSecretController(secretOption, driver, statusUpdater, c.recorder, controllerName)
+	secretController := register.NewSecretController(
+		secretOption, driver, statusUpdater,
+		kubeClient.CoreV1(),
+		kubeInformerFactory.Core().V1().Secrets().Informer(),
+		c.recorder, controllerName)
 
 	go kubeInformerFactory.Start(ctx.Done())
 	go secretController.Run(ctx, 1)
