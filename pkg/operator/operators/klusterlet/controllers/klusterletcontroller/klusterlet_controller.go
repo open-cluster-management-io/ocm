@@ -181,6 +181,8 @@ type klusterletConfig struct {
 	ExternalManagedKubeConfigAgentSecret        string
 	InstallMode                                 operatorapiv1.InstallMode
 
+	MaxCustomClusterClaims       int
+	ReservedClusterClaimSuffixes []string
 	// PriorityClassName is the name of the PriorityClass used by the deployed agents
 	PriorityClassName string
 
@@ -391,6 +393,10 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		if klusterlet.Spec.WorkConfiguration.StatusSyncInterval != nil {
 			config.WorkStatusSyncInterval = klusterlet.Spec.WorkConfiguration.StatusSyncInterval.Duration.String()
 		}
+	}
+
+	if klusterlet.Spec.ClusterClaimConfiguration != nil {
+		config.MaxCustomClusterClaims = int(klusterlet.Spec.ClusterClaimConfiguration.MaxCustomClusterClaims)
 	}
 
 	config.WorkFeatureGates, workFeatureMsgs = helpers.ConvertToFeatureGateFlags("Work", workFeatureGates, ocmfeature.DefaultSpokeWorkFeatureGates)
