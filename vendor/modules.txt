@@ -1786,7 +1786,7 @@ open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v1.0.0
+# open-cluster-management.io/sdk-go v1.0.1-0.20250625085922-ea1d007ca6a1
 ## explicit; go 1.23.6
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
@@ -1799,8 +1799,13 @@ open-cluster-management.io/sdk-go/pkg/basecontroller/factory
 open-cluster-management.io/sdk-go/pkg/cel/common
 open-cluster-management.io/sdk-go/pkg/cel/library
 open-cluster-management.io/sdk-go/pkg/certrotation
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/common
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/errors
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/lease
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/statushash
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/store
@@ -1824,6 +1829,12 @@ open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/kafka
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types
+open-cluster-management.io/sdk-go/pkg/cloudevents/server
+open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc
+open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authn
+open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authz
+open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authz/kube
+open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/options
 open-cluster-management.io/sdk-go/pkg/helpers
 open-cluster-management.io/sdk-go/pkg/patcher
 # sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03

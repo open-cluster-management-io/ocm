@@ -16,7 +16,7 @@ rules:
   # TODO for backward compatible, we do not limit the resource name
   # remove this after we no longer support lower versions kubernetes (less than 1.14)
   #resourceNames: ["managed-cluster-lease"]
-  verbs: ["get", "update"]
+  verbs: ["get", "list", "watch", "update"]
 # Allow agent to get/list/watch managed cluster addons
 - apiGroups: ["addon.open-cluster-management.io"]
   resources: ["managedclusteraddons"]
@@ -28,4 +28,4 @@ rules:
 # Allow agent to send events to the hub
 - apiGroups: ["events.k8s.io"]
   resources: ["events"]
-  verbs: ["create"]
+  verbs: ["list", "watch", "create"]

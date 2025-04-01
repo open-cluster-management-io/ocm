@@ -46,6 +46,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	awsirsa "open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
+	"open-cluster-management.io/ocm/pkg/registration/register/grpc"
 )
 
 // HubManagerOptions holds configuration for hub manager controller
@@ -59,6 +60,8 @@ type HubManagerOptions struct {
 	AutoApprovedARNPatterns    []string
 	AwsResourceTags            []string
 	Labels                     string
+	GRPCCAFile                 string
+	GRPCCAKeyFile              string
 }
 
 // NewHubManagerOptions returns a HubManagerOptions
@@ -93,6 +96,10 @@ func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&m.AwsResourceTags, "aws-resource-tags", m.AwsResourceTags, "A list of tags to apply to AWS resources created through the OCM controllers")
 	fs.StringVar(&m.Labels, "labels", m.Labels,
 		"Labels to be added to the resources created by registration controller. The format is key1=value1,key2=value2.")
+	fs.StringVar(&m.GRPCCAFile, "grpc-ca-file", m.GRPCCAFile,
+		"ca file to sign client cert for grpc")
+	fs.StringVar(&m.GRPCCAKeyFile, "grpc-key-file", m.GRPCCAKeyFile,
+		"ca key file to sign client cert for grpc")
 	m.ImportOption.AddFlags(fs)
 }
 
@@ -195,6 +202,13 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 				return err
 			}
 			drivers = append(drivers, awsIRSAHubDriver)
+		case commonhelpers.GRPCCAuthType:
+			grpcHubDriver, err := grpc.NewGRPCHubDriver(
+				kubeClient, kubeInformers, m.GRPCCAKeyFile, m.GRPCCAFile, 720*time.Hour, controllerContext.EventRecorder)
+			if err != nil {
+				return err
+			}
+			drivers = append(drivers, grpcHubDriver)
 		}
 	}
 	hubDriver := register.NewAggregatedHubDriver(drivers...)

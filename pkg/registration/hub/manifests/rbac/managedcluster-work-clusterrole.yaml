@@ -13,7 +13,7 @@ rules:
 # Allow work agent to send event to hub
 - apiGroups: ["", "events.k8s.io"]
   resources: ["events"]
-  verbs: ["create", "patch", "update"]
+  verbs: ["list", "watch", "create", "patch", "update"]
 # Allow work agent to get/list/watch/update manifestworks
 - apiGroups: ["work.open-cluster-management.io"]
   resources: ["manifestworks"]
