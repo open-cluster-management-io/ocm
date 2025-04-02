@@ -28,6 +28,7 @@ import (
 	cloudeventsevent "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
 	cloudeventslease "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/lease"
 	cloudeventoptions "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options"
+	cestore "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/store"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 
 	"open-cluster-management.io/ocm/pkg/registration/register"
@@ -44,6 +45,7 @@ var _ register.RegisterDriver = &GRPCDriver{}
 var _ register.AddonDriver = &GRPCDriver{}
 
 func NewGRPCDriver(opt *Option, csrOption *csr.Option, secretOption register.SecretOption) register.RegisterDriver {
+	secretOption.Signer = "open-cluster-management.io/signer"
 	return &GRPCDriver{
 		csrDriver: csr.NewCSRDriver(csrOption, secretOption),
 		opt:       opt,
@@ -72,16 +74,23 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 		}
 	}
 
+	clusterWatchStore := cestore.NewAgentInformerWatcherStore[*clusterv1.ManagedCluster]()
 	clusterClientHolder, err := cloudeventscluster.NewClientHolder(
 		ctx,
 		cloudeventoptions.NewGenericClientOptions[*clusterv1.ManagedCluster](
 			config,
 			cloudeventscluster.NewManagedClusterCodec(),
 			secretOption.ClusterName,
-		))
+		).
+			WithClusterName(secretOption.ClusterName).
+			WithClientWatcherStore(clusterWatchStore))
 	if err != nil {
 		return nil, err
 	}
+	clusterClient := clusterClientHolder.ClusterInterface()
+	clusterInformers := clusterinformers.NewSharedInformerFactory(
+		clusterClient, 10*time.Minute).Cluster().V1().ManagedClusters()
+	clusterWatchStore.SetInformer(clusterInformers.Informer())
 
 	leaseClient, err := cloudeventslease.NewLeaseClient(
 		ctx,
@@ -89,7 +98,7 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 			config,
 			cloudeventslease.NewManagedClusterAddOnCodec(),
 			secretOption.ClusterName,
-		),
+		).WithClusterName(secretOption.ClusterName),
 		secretOption.ClusterName,
 	)
 
@@ -97,44 +106,50 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 		ctx,
 		cloudeventoptions.NewGenericClientOptions[*eventsv1.Event](
 			config,
-			cloudeventsevent.NewManagedClusterAddOnCodec(),
+			cloudeventsevent.NewEventCodec(),
 			secretOption.ClusterName,
-		),
+		).WithClusterName(secretOption.ClusterName),
 	)
 
+	addonWatchStore := cestore.NewAgentInformerWatcherStore[*addonapiv1alpha1.ManagedClusterAddOn]()
 	addonClientHolder, err := cloudeventsaddon.NewClientHolder(
 		ctx,
 		cloudeventoptions.NewGenericClientOptions[*addonapiv1alpha1.ManagedClusterAddOn](
 			config,
 			cloudeventsaddon.NewManagedClusterAddOnCodec(),
 			secretOption.ClusterName,
-		))
+		).WithClusterName(secretOption.ClusterName).WithClientWatcherStore(addonWatchStore))
+	addonClient := addonClientHolder.ClusterInterface()
+	addonInformer := addoninformers.NewSharedInformerFactory(
+		addonClient, 10*time.Minute).Addon().V1alpha1().ManagedClusterAddOns()
+	addonWatchStore.SetInformer(addonInformer.Informer())
 
+	csrWatchStore := cestore.NewAgentInformerWatcherStore[*certificates.CertificateSigningRequest]()
 	csrClientHolder, err := cloudeventscsr.NewAgentClientHolder(ctx,
 		cloudeventoptions.NewGenericClientOptions[*certificates.CertificateSigningRequest](
 			config,
 			cloudeventscsr.NewCSRCodec(),
 			secretOption.ClusterName,
-		),
+		).WithClusterName(secretOption.ClusterName).WithClientWatcherStore(csrWatchStore),
 	)
 	if err != nil {
 		return nil, err
 	}
+	csrWatchStore.SetInformer(csrClientHolder.Informer())
 	certControl := &csrControl{csrClientHolder: csrClientHolder}
 	err = d.csrDriver.SetCSRControl(certControl, secretOption.ClusterName)
 	if err != nil {
 		return nil, err
 	}
+	d.control = certControl
 
 	clients := &register.Clients{
-		ClusterClient: clusterClientHolder.ClusterInterface(),
-		ClusterInformer: clusterinformers.NewSharedInformerFactory(
-			clusterClientHolder.ClusterInterface(), 10*time.Minute).Cluster().V1().ManagedClusters(),
-		AddonClient: addonClientHolder.ClusterInterface(),
-		AddonInformer: addoninformers.NewSharedInformerFactory(
-			addonClientHolder.ClusterInterface(), 10*time.Minute).Addon().V1alpha1().ManagedClusterAddOns(),
-		LeaseClient:  leaseClient,
-		EventsClient: eventClient,
+		ClusterClient:   clusterClient,
+		ClusterInformer: clusterInformers,
+		AddonClient:     addonClient,
+		AddonInformer:   addonInformer,
+		LeaseClient:     leaseClient,
+		EventsClient:    eventClient,
 	}
 	return clients, nil
 }

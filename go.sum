@@ -291,8 +291,8 @@ github.com/prometheus/common v0.55.0 h1:KEi6DK7lXW/m7Ig5i47x0vRzuBsHuvJdi5ee6Y3G
 github.com/prometheus/common v0.55.0/go.mod h1:2SECS4xJG1kd8XF9IcM1gMX6510RAEL65zxzNImwdc8=
 github.com/prometheus/procfs v0.15.1 h1:YagwOFzUgYfKKHX6Dr+sHT7km/hxC76UB0learggepc=
 github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoGhij/e3PBqk=
-github.com/qiujian16/sdk-go v0.0.0-20250401062857-2c1e3b8c9c6b h1:jpIFO9RkBWKhIGXHdPCW5bmJTyVVLlw8yYnT+CrubAE=
-github.com/qiujian16/sdk-go v0.0.0-20250401062857-2c1e3b8c9c6b/go.mod h1:TyOjZC5YxyM5BRNgwTmLuTbHXX6xXqzYBXllrfoVp9w=
+github.com/qiujian16/sdk-go v0.0.0-20250402125401-54c88e048a81 h1:OgsdPSc70V8JApFoCjnjMx3p2+5NpUXFL9Y2+26z5+g=
+github.com/qiujian16/sdk-go v0.0.0-20250402125401-54c88e048a81/go.mod h1:TyOjZC5YxyM5BRNgwTmLuTbHXX6xXqzYBXllrfoVp9w=
 github.com/robfig/cron v1.2.0 h1:ZjScXvvxeQ63Dbyxy76Fj3AT3Ut0aKsyd2/tl3DTMuQ=
 github.com/robfig/cron v1.2.0/go.mod h1:JGuDeoQd7Z6yL4zQhZ3OPEVHB7fL6Ka6skscFHfmt2k=
 github.com/rogpeppe/go-internal v1.12.0 h1:exVL4IDcn6na9z1rAb56Vxr+CgyK3nn3O+epU5NdKM8=

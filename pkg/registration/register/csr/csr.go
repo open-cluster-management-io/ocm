@@ -79,6 +79,7 @@ func (c *CSRDriver) Process(
 	recorder events.Recorder) (*corev1.Secret, *metav1.Condition, error) {
 	logger := klog.FromContext(ctx)
 
+	logger.Info("exisint csr name", "csr", c.csrName)
 	// reconcile pending csr if exists
 	if len(c.csrName) > 0 {
 		// build a secret data map if the csr is approved
@@ -231,6 +232,8 @@ func (c *CSRDriver) Process(
 		}, err
 	}
 
+	logger.Info("set csr name to", "csr", createdCSRName)
+
 	c.keyData = keyData
 	c.csrName = createdCSRName
 	return nil, nil, nil
@@ -380,6 +383,11 @@ func NewCSRDriver(opt *Option, secretOpts register.SecretOption) *CSRDriver {
 	driver := &CSRDriver{
 		opt: opt,
 	}
+
+	signer := certificates.KubeAPIServerClientSignerName
+	if secretOpts.Signer != "" {
+		signer = secretOpts.Signer
+	}
 	driver.csrOption = &CSROption{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("%s-", secretOpts.ClusterName),
@@ -395,7 +403,7 @@ func NewCSRDriver(opt *Option, secretOpts register.SecretOption) *CSRDriver {
 			},
 			CommonName: fmt.Sprintf("%s%s:%s", user.SubjectPrefix, secretOpts.ClusterName, secretOpts.AgentName),
 		},
-		SignerName: certificates.KubeAPIServerClientSignerName,
+		SignerName: signer,
 		EventFilterFunc: func(obj interface{}) bool {
 			accessor, err := meta.Accessor(obj)
 			if err != nil {

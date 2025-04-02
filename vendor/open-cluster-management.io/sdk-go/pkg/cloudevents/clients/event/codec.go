@@ -18,7 +18,7 @@ var EventEventDataType = types.CloudEventsDataType{
 // ManagedClusterCodec is a codec to encode/decode a ManagedCluster/cloudevent for an agent.
 type EventCodec struct{}
 
-func NewManagedClusterAddOnCodec() *EventCodec {
+func NewEventCodec() *EventCodec {
 	return &EventCodec{}
 }
 

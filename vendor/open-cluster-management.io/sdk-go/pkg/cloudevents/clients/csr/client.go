@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/klog/v2"
 
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/common"
 	cloudeventserrors "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/errors"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/store"
@@ -43,6 +44,11 @@ func NewCSRClient(
 }
 
 func (c *CSRClient) Create(ctx context.Context, csr *certificatev1.CertificateSigningRequest, opts metav1.CreateOptions) (*certificatev1.CertificateSigningRequest, error) {
+	// generate csr name if name is not set
+	if csr.Name == "" && csr.GenerateName != "" {
+		csr.Name = csr.GenerateName + utilrand.String(5)
+		csr.GenerateName = ""
+	}
 	klog.V(4).Infof("creating CSR %s", csr.Name)
 	_, exists, err := c.watcherStore.Get("", csr.Name)
 	if err != nil {
