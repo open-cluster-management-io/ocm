@@ -471,6 +471,9 @@ func TestKlusterletConfig(t *testing.T) {
 					if object.Spec.PriorityClassName != config.PriorityClassName {
 						t.Errorf(" expected %s, got %s", config.PriorityClassName, object.Spec.PriorityClassName)
 					}
+					if object.Spec.ResourceRequirement != nil && object.Spec.ResourceRequirement.Type == "" {
+						t.Errorf(" expected resource requirement type, got invalid type")
+					}
 					switch config.Klusterlet.Mode {
 					case "", operatorv1.InstallModeSingleton, operatorv1.InstallModeDefault:
 						if config.Klusterlet.Mode == "" && object.Spec.DeployOption.Mode != operatorv1.InstallModeSingleton {

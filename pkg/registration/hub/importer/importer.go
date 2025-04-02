@@ -180,7 +180,7 @@ func (i *Importer) reconcile(
 		Klusterlet: chart.KlusterletConfig{
 			Create:      true,
 			ClusterName: cluster.Name,
-			ResourceRequirement: operatorv1.ResourceRequirement{
+			ResourceRequirement: &operatorv1.ResourceRequirement{
 				Type: operatorv1.ResourceQosClassDefault,
 			},
 		},
