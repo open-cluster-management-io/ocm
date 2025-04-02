@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,13 +34,14 @@ import (
 )
 
 const (
-	nodePlacementDeploymentConfigName = "node-placement-deploy-config"
-	imageOverrideDeploymentConfigName = "image-override-deploy-config"
-	namespaceOverrideConfigName       = "namespace-override-config"
-	proxyDeploymentConfigName         = "proxy-deploy-config"
-	originalImageValue                = "quay.io/open-cluster-management/addon-examples:latest"
-	overrideImageValue                = "quay.io/ocm/addon-examples:latest"
-	customSignerName                  = "example.com/signer-name"
+	nodePlacementDeploymentConfigName        = "node-placement-deploy-config"
+	imageOverrideDeploymentConfigName        = "image-override-deploy-config"
+	namespaceOverrideConfigName              = "namespace-override-config"
+	proxyDeploymentConfigName                = "proxy-deploy-config"
+	resourceRequirementsDeploymentConfigName = "resource-requirements-deploy-config"
+	originalImageValue                       = "quay.io/open-cluster-management/addon-examples:latest"
+	overrideImageValue                       = "quay.io/ocm/addon-examples:latest"
+	customSignerName                         = "example.com/signer-name"
 	//#nosec G101
 	customSignerSecretName = "addon-signer-secret"
 )
@@ -58,6 +60,16 @@ var (
 		HTTPSProxy: "http://proxy.example.com",
 		NoProxy:    "localhost",
 		CABundle:   []byte("test-ca-bundle"),
+	}
+	resourceRequirementsConfig = []addonapiv1alpha1.ContainerResourceRequirements{
+		{
+			ContainerID: "*:*:helloworld-agent",
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("64Mi"),
+				},
+			},
+		},
 	}
 )
 
@@ -744,6 +756,71 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		gomega.Expect(cm.Data["ca-bundle.crt"]).To(gomega.Equal(string(proxyConfig.CABundle)))
 	})
 
+	ginkgo.It("Template type addon should be configured by addon deployment config for resource requirement", func() {
+		ginkgo.By("Prepare a AddOnDeploymentConfig for addon resource requirement config")
+		gomega.Eventually(func() error {
+			return prepareResourceRequirementsAddOnDeploymentConfig(universalClusterName, addonInstallNamespace)
+		}).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Add the configs to ManagedClusterAddOn")
+		gomega.Eventually(func() error {
+			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
+				context.Background(), addOnName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			newAddon := addon.DeepCopy()
+			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+				{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						Group:    "addon.open-cluster-management.io",
+						Resource: "addondeploymentconfigs",
+					},
+					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+						Namespace: universalClusterName,
+						Name:      resourceRequirementsDeploymentConfigName,
+					},
+				},
+			}
+			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
+				context.Background(), newAddon, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
+			return nil
+		}).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Make sure addon is configured")
+		gomega.Eventually(func() error {
+			agentDeploy, err := spoke.KubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
+				context.Background(), "hello-template-agent", metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			for _, container := range agentDeploy.Spec.Template.Spec.Containers {
+				if container.Name == "helloworld-agent" {
+					if !equality.Semantic.DeepEqual(container.Resources, resourceRequirementsConfig[0].Resources) {
+						return fmt.Errorf("unexpected resource requirements for deployment: %v", container.Resources)
+					}
+				}
+			}
+
+			agentDaemonset, err := spoke.KubeClient.AppsV1().DaemonSets(addonInstallNamespace).Get(
+				context.Background(), "hello-template-agent-ds", metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			for _, container := range agentDaemonset.Spec.Template.Spec.Containers {
+				if container.Name == "helloworld-agent" {
+					if !equality.Semantic.DeepEqual(container.Resources, resourceRequirementsConfig[0].Resources) {
+						return fmt.Errorf("unexpected resource requirements for daemonset: %v", container.Resources)
+					}
+				}
+			}
+			return nil
+		}).ShouldNot(gomega.HaveOccurred())
+	})
 })
 
 func prepareInstallNamespace(namespace, installNamespace string) error {
@@ -847,6 +924,34 @@ func prepareProxyAddOnDeploymentConfig(namespace, installNamespace string) error
 					},
 					AgentInstallNamespace: installNamespace,
 					ProxyConfig:           proxyConfig,
+				},
+			},
+			metav1.CreateOptions{},
+		); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	return err
+}
+
+func prepareResourceRequirementsAddOnDeploymentConfig(namespace, installNamespace string) error {
+	_, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
+		context.Background(), resourceRequirementsDeploymentConfigName, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		if _, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Create(
+			context.Background(),
+			&addonapiv1alpha1.AddOnDeploymentConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      resourceRequirementsDeploymentConfigName,
+					Namespace: namespace,
+				},
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					AgentInstallNamespace: installNamespace,
+					ProxyConfig:           proxyConfig,
+					ResourceRequirements:  resourceRequirementsConfig,
 				},
 			},
 			metav1.CreateOptions{},

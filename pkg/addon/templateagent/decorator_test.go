@@ -6,6 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -249,7 +250,177 @@ func TestProxyDecorator(t *testing.T) {
 			ctx := context.TODO()
 			logger := klog.FromContext(ctx)
 			d := newProxyHandler(logger, "addon1", values)
-			err = d.decorate(tc.pod)
+			err = d.decorate("", tc.pod)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tc.validateObject(t, tc.pod)
+		})
+	}
+
+}
+
+func TestResourceRequirementsDecorator(t *testing.T) {
+	tests := []struct {
+		name            string
+		config          addonapiv1alpha1.AddOnDeploymentConfig
+		resourceName    string
+		pod             *corev1.PodTemplateSpec
+		supportResource supportResource
+		validateObject  func(t *testing.T, pod *corev1.PodTemplateSpec)
+	}{
+		{
+			name: "deployment",
+			pod: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "c1",
+							Image: "test",
+						},
+						{
+							Name:  "c2",
+							Image: "test",
+						},
+					},
+				},
+			},
+			resourceName:    "d1",
+			supportResource: supportResourceDeployment,
+			config: addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					ResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+						{
+							ContainerID: "deployments:d1:c1",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("128Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			validateObject: func(t *testing.T, pod *corev1.PodTemplateSpec) {
+				for _, c := range pod.Spec.Containers {
+					if c.Name == "c1" {
+						if c.Resources.Requests.Memory() == nil || c.Resources.Requests.Memory().String() != "128Mi" {
+							t.Errorf("memory request for c1 is not corrent, got %v", c.Resources)
+						}
+					} else {
+						if c.Resources.Requests.Memory() != nil && c.Resources.Requests.Memory().String() != "0" {
+							t.Errorf("memory request for other containers should not be set, got %v", c.Resources)
+						}
+					}
+				}
+			},
+		},
+		{
+			name: "daemonset",
+			pod: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "c1",
+							Image: "test",
+						},
+						{
+							Name:  "c2",
+							Image: "test",
+						},
+					},
+				},
+			},
+			resourceName:    "d1",
+			supportResource: supportResourceDaemonset,
+			config: addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					ResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+						{
+							ContainerID: "daemonsets:d1:c1",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("128Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			validateObject: func(t *testing.T, pod *corev1.PodTemplateSpec) {
+				for _, c := range pod.Spec.Containers {
+					if c.Name == "c1" {
+						if c.Resources.Requests.Memory() == nil || c.Resources.Requests.Memory().String() != "128Mi" {
+							t.Errorf("memory request for c1 is not corrent, got %v", c.Resources)
+						}
+					} else {
+						if c.Resources.Requests.Memory() != nil && c.Resources.Requests.Memory().String() != "0" {
+							t.Errorf("memory request for other containers should not be set, got %v", c.Resources)
+						}
+					}
+				}
+			},
+		},
+		{
+			name: "regex match",
+			pod: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "c1",
+							Image: "test",
+						},
+						{
+							Name:  "c2",
+							Image: "test",
+						},
+					},
+				},
+			},
+			resourceName:    "d1",
+			supportResource: supportResourceDeployment,
+			config: addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					ResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+						{
+							ContainerID: "deployments:d1:c1",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("128Mi"),
+								},
+							},
+						},
+						{
+							ContainerID: "*:*:*",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			validateObject: func(t *testing.T, pod *corev1.PodTemplateSpec) {
+				for _, c := range pod.Spec.Containers {
+					if c.Resources.Requests.Memory() == nil || c.Resources.Requests.Memory().String() != "256Mi" {
+						t.Errorf("memory request for c1 is not corrent, got %v", c.Resources)
+					}
+				}
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			values, err := ToAddOnResourceRequirementsPrivateValues(tc.config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx := context.TODO()
+			logger := klog.FromContext(ctx)
+			d := newResourceRequirementsDecorator(logger, tc.supportResource, values)
+			err = d.decorate(tc.resourceName, tc.pod)
 			if err != nil {
 				t.Fatal(err)
 			}
