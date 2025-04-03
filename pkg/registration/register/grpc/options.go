@@ -34,7 +34,7 @@ func (o *Option) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (o *Option) Validate() error {
-	if o.ConfigFile != "" && o.BootstrapConfigFile != "" {
+	if o.ConfigFile == "" && o.BootstrapConfigFile == "" {
 		return errors.New("config file should be set")
 	}
 	return nil

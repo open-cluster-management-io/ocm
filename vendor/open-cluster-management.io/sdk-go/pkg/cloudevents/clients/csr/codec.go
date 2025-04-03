@@ -35,9 +35,17 @@ func (c *CSRCodec) Encode(source string, eventType types.CloudEventsType, csr *c
 		return nil, fmt.Errorf("unsupported cloudevents data type %s", eventType.CloudEventsDataType)
 	}
 
+	if len(csr.Labels) == 0 {
+		return nil, fmt.Errorf("no CSR labels found for CSR")
+	}
+	cluster, ok := csr.Labels["open-cluster-management.io/cluster-name"]
+	if !ok {
+		return nil, fmt.Errorf("no cluster name found for CSR")
+	}
+
 	evt := types.NewEventBuilder(source, eventType).
 		WithResourceID(csr.Name).
-		WithClusterName(csr.Name).
+		WithClusterName(cluster).
 		NewEvent()
 
 	if csr.ResourceVersion != "" {

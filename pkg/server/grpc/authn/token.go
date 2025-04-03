@@ -2,7 +2,6 @@ package authn
 
 import (
 	"context"
-	"k8s.io/klog/v2"
 	"strings"
 
 	"google.golang.org/grpc/codes"
@@ -37,9 +36,6 @@ func (t *TokenAuthenticator) Authenticate(ctx context.Context) (context.Context,
 	}
 
 	token := strings.TrimPrefix(authorization[0], "Bearer ")
-	logger := klog.FromContext(ctx)
-	logger.Info("get token from request", "token", token)
-
 	tr, err := t.client.AuthenticationV1().TokenReviews().Create(ctx, &authenticationv1.TokenReview{
 		Spec: authenticationv1.TokenReviewSpec{
 			Token: token,

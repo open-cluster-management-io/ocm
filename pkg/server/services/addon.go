@@ -41,7 +41,7 @@ func (c *AddonService) Get(_ context.Context, resourceID string) (*cloudevents.E
 		return nil, err
 	}
 
-	evt, err := c.codec.Encode(source, types.CloudEventsType{}, addon)
+	evt, err := c.codec.Encode(source, types.CloudEventsType{CloudEventsDataType: addonce.ManagedClusterAddOnEventDataType}, addon)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (c *AddonService) List(listOpts types.ListOptions) ([]*cloudevents.Event, e
 		return nil, err
 	}
 	for _, addon := range addons {
-		evt, err := c.codec.Encode(source, types.CloudEventsType{}, addon)
+		evt, err := c.codec.Encode(source, types.CloudEventsType{CloudEventsDataType: addonce.ManagedClusterAddOnEventDataType}, addon)
 		if err != nil {
 			return nil, err
 		}

@@ -13,7 +13,7 @@ import (
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	informerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	listerv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
+	clusterce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server"
 )
@@ -29,7 +29,7 @@ type ClusterService struct {
 	clusterClient   clusterclient.Interface
 	clusterLister   listerv1.ManagedClusterLister
 	clusterInformer informerv1.ManagedClusterInformer
-	codec           *cluster.ManagedClusterCodec
+	codec           *clusterce.ManagedClusterCodec
 }
 
 func NewClusterService(clusterClient clusterclient.Interface, clusterInformer informerv1.ManagedClusterInformer) server.Service {
@@ -37,7 +37,7 @@ func NewClusterService(clusterClient clusterclient.Interface, clusterInformer in
 		clusterClient:   clusterClient,
 		clusterLister:   clusterInformer.Lister(),
 		clusterInformer: clusterInformer,
-		codec:           cluster.NewManagedClusterCodec(),
+		codec:           clusterce.NewManagedClusterCodec(),
 	}
 }
 
@@ -47,7 +47,7 @@ func (c *ClusterService) Get(_ context.Context, resourceID string) (*cloudevents
 		return nil, err
 	}
 
-	evt, err := c.codec.Encode(source, types.CloudEventsType{}, cluster)
+	evt, err := c.codec.Encode(source, types.CloudEventsType{CloudEventsDataType: clusterce.ManagedClusterEventDataType}, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func (c *ClusterService) List(listOpts types.ListOptions) ([]*cloudevents.Event,
 		return nil, err
 	}
 
-	evt, err := c.codec.Encode(source, types.CloudEventsType{}, cluster)
+	evt, err := c.codec.Encode(source, types.CloudEventsType{CloudEventsDataType: clusterce.ManagedClusterEventDataType}, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -107,13 +107,13 @@ func (c *ClusterService) RegisterHandler(handler server.EventHandler) {
 	c.clusterInformer.Informer().AddEventHandler(&cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			accessor, _ := meta.Accessor(obj)
-			if err := handler.OnCreate(context.Background(), cluster.ManagedClusterEventDataType, accessor.GetName()); err != nil {
+			if err := handler.OnCreate(context.Background(), clusterce.ManagedClusterEventDataType, accessor.GetName()); err != nil {
 				klog.Error(err)
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			accessor, _ := meta.Accessor(newObj)
-			if err := handler.OnUpdate(context.Background(), cluster.ManagedClusterEventDataType, accessor.GetName()); err != nil {
+			if err := handler.OnUpdate(context.Background(), clusterce.ManagedClusterEventDataType, accessor.GetName()); err != nil {
 				klog.Error(err)
 			}
 		},
