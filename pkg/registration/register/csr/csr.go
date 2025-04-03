@@ -18,7 +18,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -80,6 +79,7 @@ func (c *CSRDriver) Process(
 	recorder events.Recorder) (*corev1.Secret, *metav1.Condition, error) {
 	logger := klog.FromContext(ctx)
 
+	logger.Info("exisint csr name", "csr", c.csrName)
 	// reconcile pending csr if exists
 	if len(c.csrName) > 0 {
 		// build a secret data map if the csr is approved
@@ -232,6 +232,8 @@ func (c *CSRDriver) Process(
 		}, err
 	}
 
+	logger.Info("set csr name to", "csr", createdCSRName)
+
 	c.keyData = keyData
 	c.csrName = createdCSRName
 	return nil, nil, nil
@@ -287,7 +289,7 @@ func (c *CSRDriver) IsHubKubeConfigValid(ctx context.Context, secretOption regis
 		}
 	}
 
-	return isCertificateValid(logger, certData, nil)
+	return IsCertificateValid(logger, certData, nil)
 }
 
 func (c *CSRDriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
@@ -348,23 +350,30 @@ func (c *CSRDriver) BuildClients(ctx context.Context, secretOption register.Secr
 		return nil, fmt.Errorf("failed to create CSR control: %w", err)
 	}
 
-	err = csrControl.Informer().AddIndexers(cache.Indexers{
+	err = c.SetCSRControl(csrControl, secretOption.ClusterName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set CSR control: %w", err)
+	}
+	return clients, nil
+}
+
+func (c *CSRDriver) SetCSRControl(control CSRControl, clusterName string) error {
+	c.csrControl = control
+	err := control.Informer().AddIndexers(cache.Indexers{
 		indexByCluster: indexByClusterFunc,
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = csrControl.Informer().AddIndexers(cache.Indexers{
+	err = control.Informer().AddIndexers(cache.Indexers{
 		indexByAddon: indexByAddonFunc,
 	})
 	if err != nil {
-		utilruntime.HandleError(err)
+		return err
 	}
-
-	c.csrControl = csrControl
-	c.haltCSRCreation = haltCSRCreationFunc(csrControl.Informer().GetIndexer(), secretOption.ClusterName)
-	return clients, nil
+	c.haltCSRCreation = haltCSRCreationFunc(control.Informer().GetIndexer(), clusterName)
+	return nil
 }
 
 var _ register.RegisterDriver = &CSRDriver{}
@@ -373,6 +382,11 @@ var _ register.AddonDriver = &CSRDriver{}
 func NewCSRDriver(opt *Option, secretOpts register.SecretOption) *CSRDriver {
 	driver := &CSRDriver{
 		opt: opt,
+	}
+
+	signer := certificates.KubeAPIServerClientSignerName
+	if secretOpts.Signer != "" {
+		signer = secretOpts.Signer
 	}
 	driver.csrOption = &CSROption{
 		ObjectMeta: metav1.ObjectMeta{
@@ -389,7 +403,7 @@ func NewCSRDriver(opt *Option, secretOpts register.SecretOption) *CSRDriver {
 			},
 			CommonName: fmt.Sprintf("%s%s:%s", user.SubjectPrefix, secretOpts.ClusterName, secretOpts.AgentName),
 		},
-		SignerName: certificates.KubeAPIServerClientSignerName,
+		SignerName: signer,
 		EventFilterFunc: func(obj interface{}) bool {
 			accessor, err := meta.Accessor(obj)
 			if err != nil {
@@ -424,7 +438,7 @@ func shouldCreateCSR(
 	additionalSecretData map[string][]byte) (bool, error) {
 	// create a csr to request new client certificate if
 	// a.there is no valid client certificate issued for the current cluster/agent
-	valid, err := isCertificateValid(logger, secret.Data[TLSCertFile], subject)
+	valid, err := IsCertificateValid(logger, secret.Data[TLSCertFile], subject)
 	if err != nil {
 		recorder.Eventf("CertificateValidationFailed", "Failed to validate client certificate for %s: %v", controllerName, err)
 		return true, nil
@@ -471,8 +485,8 @@ func hasAdditionalSecretData(additionalSecretData map[string][]byte, secret *cor
 		}
 
 		if !reflect.DeepEqual(v, value) {
-			return fmt.Errorf("key %q in secret %q does not match the expected value",
-				k, secret.Namespace+"/"+secret.Name)
+			return fmt.Errorf("key %q in secret %q does not match the expected value, %v, %v",
+				k, secret.Namespace+"/"+secret.Name, v, value)
 		}
 	}
 	return nil
