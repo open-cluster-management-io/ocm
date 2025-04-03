@@ -80,10 +80,12 @@ func (c *AddonService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.
 
 	// only create and update action
 	switch eventType.Action {
-	case updateStatusRequestAction:
-		_, err := c.addonClient.AddonV1alpha1().ManagedClusterAddOns(addon.Namespace).UpdateStatus(ctx, addon, metav1.UpdateOptions{})
-		if err != nil {
-			return err
+	case updateRequestAction:
+		if eventType.SubResource == types.SubResourceStatus {
+			_, err := c.addonClient.AddonV1alpha1().ManagedClusterAddOns(addon.Namespace).UpdateStatus(ctx, addon, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil

@@ -245,10 +245,6 @@ func (bkr *GRPCBroker) respondResyncSpecRequest(ctx context.Context, eventDataTy
 	}
 
 	for _, obj := range objs {
-		// only respond with the resource of the resync type
-		if obj.Type() != eventDataType.String() {
-			continue
-		}
 		// respond with the deleting resource regardless of the resource version
 		if _, ok := obj.Extensions()[types.ExtensionDeletionTimestamp]; ok {
 			err = bkr.handleRes(ctx, obj, eventDataType, "delete_request")
@@ -259,8 +255,7 @@ func (bkr *GRPCBroker) respondResyncSpecRequest(ctx context.Context, eventDataTy
 		}
 
 		lastResourceVersion := findResourceVersion(obj.ID(), resourceVersions.Versions)
-		rv := obj.Extensions()[types.ExtensionResourceVersion].(string)
-		currentResourceVersion, err := strconv.ParseInt(rv, 10, 64)
+		currentResourceVersion, err := strconv.ParseInt(obj.Extensions()[types.ExtensionResourceVersion].(string), 10, 64)
 		if err != nil {
 			log.V(4).Info("ignore the obj %v since it has a invalid resourceVersion, %v", obj, err)
 			continue

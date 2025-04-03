@@ -2,10 +2,8 @@ package addon
 
 import (
 	"fmt"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	"strconv"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
@@ -41,11 +39,7 @@ func (c *ManagedClusterAddOnCodec) Encode(source string, eventType types.CloudEv
 		NewEvent()
 
 	if addon.ResourceVersion != "" {
-		resourceVersion, err := strconv.ParseInt(addon.ResourceVersion, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse the resourceversion for managedcluster %s, %v", addon.Name, err)
-		}
-		evt.SetExtension(types.ExtensionResourceVersion, resourceVersion)
+		evt.SetExtension(types.ExtensionResourceVersion, addon.ResourceVersion)
 	}
 
 	newAddon := addon.DeepCopy()

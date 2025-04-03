@@ -2,8 +2,6 @@ package csr
 
 import (
 	"fmt"
-	"strconv"
-
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -49,11 +47,7 @@ func (c *CSRCodec) Encode(source string, eventType types.CloudEventsType, csr *c
 		NewEvent()
 
 	if csr.ResourceVersion != "" {
-		resourceVersion, err := strconv.ParseInt(csr.ResourceVersion, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse the resourceversion for csr %s, %v", csr.Name, err)
-		}
-		evt.SetExtension(types.ExtensionResourceVersion, resourceVersion)
+		evt.SetExtension(types.ExtensionResourceVersion, csr.ResourceVersion)
 	}
 
 	newCSR := csr.DeepCopy()

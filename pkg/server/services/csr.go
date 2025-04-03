@@ -99,14 +99,12 @@ func (c *CSRService) RegisterHandler(handler server.EventHandler) {
 	c.csrInformer.Informer().AddEventHandler(&cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			accessor, _ := meta.Accessor(obj)
-			klog.Infof("Add csr %s/%s", accessor.GetNamespace(), accessor.GetName())
 			if err := handler.OnCreate(context.Background(), csrce.CSREventDataType, accessor.GetName()); err != nil {
 				klog.Error(err)
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			accessor, _ := meta.Accessor(newObj)
-			klog.Infof("Update csr %s/%s", accessor.GetNamespace(), accessor.GetName())
 			if err := handler.OnUpdate(context.Background(), csrce.CSREventDataType, accessor.GetName()); err != nil {
 				klog.Error(err)
 			}

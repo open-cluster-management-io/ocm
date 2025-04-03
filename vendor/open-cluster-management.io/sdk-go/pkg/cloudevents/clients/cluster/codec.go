@@ -2,8 +2,6 @@ package cluster
 
 import (
 	"fmt"
-	"strconv"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -42,11 +40,7 @@ func (c *ManagedClusterCodec) Encode(source string, eventType types.CloudEventsT
 		NewEvent()
 
 	if cluster.ResourceVersion != "" {
-		resourceVersion, err := strconv.ParseInt(cluster.ResourceVersion, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse the resourceversion for managedcluster %s, %v", cluster.Name, err)
-		}
-		evt.SetExtension(types.ExtensionResourceVersion, resourceVersion)
+		evt.SetExtension(types.ExtensionResourceVersion, cluster.ResourceVersion)
 	}
 
 	newCluster := cluster.DeepCopy()

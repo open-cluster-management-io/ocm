@@ -41,7 +41,7 @@ type GRPCDriver struct {
 	csrDriver      *csr.CSRDriver
 	control        *csrControl
 	opt            *Option
-	configTemplate *grpc.GRPCConfig
+	configTemplate []byte
 }
 
 var _ register.RegisterDriver = &GRPCDriver{}
@@ -77,13 +77,18 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 		if err := yaml.Unmarshal(configData, bootstrapConfig); err != nil {
 			return nil, err
 		}
-		d.configTemplate = &grpc.GRPCConfig{
+		configTemplate := &grpc.GRPCConfig{
 			URL:             bootstrapConfig.URL,
 			CAFile:          bootstrapConfig.CAFile,
 			KeepAliveConfig: bootstrapConfig.KeepAliveConfig,
 			ClientKeyFile:   path.Join(secretOption.HubKubeconfigDir, csr.TLSKeyFile),
 			ClientCertFile:  path.Join(secretOption.HubKubeconfigDir, csr.TLSCertFile),
 		}
+		configData, err = yaml.Marshal(configTemplate)
+		if err != nil {
+			return nil, err
+		}
+		d.configTemplate = configData
 	} else {
 		_, config, err = generic.NewConfigLoader("grpc", d.opt.ConfigFile).
 			LoadConfig()
@@ -113,6 +118,7 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 	clusterWatchStore.SetInformer(clusterInformers.Informer())
 
 	leaseWatchStore := cestore.NewAgentInformerWatcherStore[*coordv1.Lease]()
+	leaseWatchStore.Store = cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 	leaseClient, err := cloudeventslease.NewLeaseClient(
 		ctx,
 		cloudeventoptions.NewGenericClientOptions[*coordv1.Lease](
@@ -124,6 +130,7 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 	)
 
 	eventWatchStore := cestore.NewAgentInformerWatcherStore[*eventsv1.Event]()
+	eventWatchStore.Store = cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 	eventClient, err := cloudeventsevent.NewClientHolder(
 		ctx,
 		cloudeventoptions.NewGenericClientOptions[*eventsv1.Event](
@@ -188,11 +195,7 @@ func (c *GRPCDriver) Fork(addonName string, secretOption register.SecretOption) 
 func (c *GRPCDriver) Process(
 	ctx context.Context, controllerName string, secret *corev1.Secret, additionalSecretData map[string][]byte,
 	recorder events.Recorder) (*corev1.Secret, *metav1.Condition, error) {
-	configData, err := yaml.Marshal(c.configTemplate)
-	if err != nil {
-		return nil, nil, err
-	}
-	additionalSecretData["config.yaml"] = configData
+	additionalSecretData["config.yaml"] = c.configTemplate
 	return c.csrDriver.Process(ctx, controllerName, secret, additionalSecretData, recorder)
 }
 

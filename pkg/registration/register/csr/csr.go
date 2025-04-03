@@ -485,8 +485,8 @@ func hasAdditionalSecretData(additionalSecretData map[string][]byte, secret *cor
 		}
 
 		if !reflect.DeepEqual(v, value) {
-			return fmt.Errorf("key %q in secret %q does not match the expected value",
-				k, secret.Namespace+"/"+secret.Name)
+			return fmt.Errorf("key %q in secret %q does not match the expected value, %v, %v",
+				k, secret.Namespace+"/"+secret.Name, v, value)
 		}
 	}
 	return nil

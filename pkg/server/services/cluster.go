@@ -89,16 +89,19 @@ func (c *ClusterService) HandleStatusUpdate(ctx context.Context, evt *cloudevent
 		if err != nil {
 			return err
 		}
-	case updateStatusRequestAction:
-		_, err := c.clusterClient.ClusterV1().ManagedClusters().UpdateStatus(ctx, cluster, metav1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
 	case updateRequestAction:
-		_, err := c.clusterClient.ClusterV1().ManagedClusters().Update(ctx, cluster, metav1.UpdateOptions{})
-		if err != nil {
-			return err
+		if eventType.SubResource == types.SubResourceStatus {
+			_, err := c.clusterClient.ClusterV1().ManagedClusters().UpdateStatus(ctx, cluster, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
+		} else {
+			_, err := c.clusterClient.ClusterV1().ManagedClusters().Update(ctx, cluster, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
 		}
+
 	}
 	return nil
 }

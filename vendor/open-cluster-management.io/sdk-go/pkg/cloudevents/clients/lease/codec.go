@@ -6,7 +6,6 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
-	"strconv"
 )
 
 var LeaseEventDataType = types.CloudEventsDataType{
@@ -39,11 +38,7 @@ func (c *LeaseCodec) Encode(source string, eventType types.CloudEventsType, leas
 		NewEvent()
 
 	if lease.ResourceVersion != "" {
-		resourceVersion, err := strconv.ParseInt(lease.ResourceVersion, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse the resourceversion for lease %s, %v", lease.Name, err)
-		}
-		evt.SetExtension(types.ExtensionResourceVersion, resourceVersion)
+		evt.SetExtension(types.ExtensionResourceVersion, lease.ResourceVersion)
 	}
 
 	newLease := lease.DeepCopy()
