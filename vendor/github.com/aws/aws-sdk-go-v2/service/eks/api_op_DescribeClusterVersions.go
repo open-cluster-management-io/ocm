@@ -47,8 +47,16 @@ type DescribeClusterVersionsInput struct {
 	// Pagination token for the next set of results.
 	NextToken *string
 
+	// This field is deprecated. Use versionStatus instead, as that field matches for
+	// input and output of this action.
+	//
 	// Filter versions by their current status.
+	//
+	// Deprecated: status has been replaced by versionStatus
 	Status types.ClusterVersionStatus
+
+	// Filter versions by their current status.
+	VersionStatus types.VersionStatus
 
 	noSmithyDocumentSerde
 }
@@ -129,6 +137,9 @@ func (c *Client) addOperationDescribeClusterVersionsMiddlewares(stack *middlewar
 		return err
 	}
 	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
+	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opDescribeClusterVersions(options.Region), middleware.Before); err != nil {

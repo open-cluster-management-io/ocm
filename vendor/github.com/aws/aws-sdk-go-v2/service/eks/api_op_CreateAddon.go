@@ -83,7 +83,7 @@ type CreateAddonInput struct {
 	//   of the add-on is installed on your cluster Amazon EKS doesn't change the add-on
 	//   resource properties. Creation of the add-on might fail if conflicts are
 	//   detected. This option works differently during the update operation. For more
-	//   information, see [UpdateAddon].
+	//   information, see [UpdateAddon]UpdateAddon .
 	//
 	// If you don't currently have the self-managed version of the add-on installed on
 	// your cluster, the Amazon EKS add-on is installed. Amazon EKS sets all values to
@@ -189,6 +189,9 @@ func (c *Client) addOperationCreateAddonMiddlewares(stack *middleware.Stack, opt
 		return err
 	}
 	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
+	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addIdempotencyToken_opCreateAddonMiddleware(stack, options); err != nil {
