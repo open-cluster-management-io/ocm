@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ .Release.Name }}-test-addon-template"
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  containers:
+    - name: kubectl
+      image: bitnami/kubectl:latest
+      command: 
+        - /bin/sh
+        - -c
+        - |
+          kubectl get addontemplate {{ .Values.addon.name }} -o json | jq -e '.spec.addonName == "{{ .Values.addon.name }}"' || exit 1
+          
+          # Check if the deployment is properly configured
+          kubectl get addontemplate {{ .Values.addon.name }} -o json | jq -e '.spec.agentSpec.workload.manifests[] | select(.kind == "Deployment") | .metadata.name == "{{ .Values.addon.name }}-agent"' || exit 1
+          kubectl get addontemplate {{ .Values.addon.name }} -o json | jq -e '.spec.agentSpec.workload.manifests[] | select(.kind == "Deployment") | .spec.replicas == {{ .Values.agent.replicas }}' || exit 1
+          kubectl get addontemplate {{ .Values.addon.name }} -o json | jq -e '.spec.agentSpec.workload.manifests[] | select(.kind == "Deployment") | .spec.template.spec.containers[0].image == "{{ .Values.global.image.repository }}:{{ .Values.global.image.tag }}"' || exit 1
+          
+          # Check if the service account is properly configured
+          kubectl get addontemplate {{ .Values.addon.name }} -o json | jq -e '.spec.agentSpec.workload.manifests[] | select(.kind == "ServiceAccount") | .metadata.name == "{{ .Values.addon.name }}-agent-sa"' || exit 1
+          
+          # Check if the cluster role is properly configured
+          kubectl get addontemplate {{ .Values.addon.name }} -o json | jq -e '.spec.agentSpec.workload.manifests[] | select(.kind == "ClusterRole") | .metadata.name == "{{ .Values.addon.name }}-agent"' || exit 1
+          
+          echo "AddOnTemplate test passed"
+  restartPolicy: Never
+  serviceAccountName: {{ .Values.addon.name }}-test-sa 

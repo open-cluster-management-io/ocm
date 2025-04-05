@@ -1,0 +1,30 @@
+# Test values for resource-usage-collect-addon
+global:
+  image:
+    repository: quay.io/open-cluster-management/resource-usage-collect-addon
+    tag: latest
+    pullPolicy: Always
+
+addon:
+  name: resource-usage-collect
+  displayName: resource-usage-collect
+  namespace: open-cluster-management-agent-addon
+
+placement:
+  name: placement-all
+  namespace: default
+
+agent:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+rbac:
+  create: true
+  clusterRoleName: open-cluster-management:resource-usage-collect:agent
+  clusterRoleBindingName: open-cluster-management-addon-manager-resource-usage-collect 

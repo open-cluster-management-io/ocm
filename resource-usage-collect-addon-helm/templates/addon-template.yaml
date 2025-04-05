@@ -1,0 +1,74 @@
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: AddOnTemplate
+metadata:
+  name: {{ .Values.addon.name }}
+spec:
+  addonName: {{ .Values.addon.name }}
+  agentSpec:
+    workload:
+      manifests:
+        - kind: ClusterRole
+          apiVersion: rbac.authorization.k8s.io/v1
+          metadata:
+            name: {{ .Values.addon.name }}-agent
+          rules:
+            - apiGroups: [ "" ]
+              resources: [ "nodes","configmaps", "pods", "events" ]
+              verbs: [ "get", "list", "watch", "create", "update", "delete", "deletecollection", "patch" ]
+            - apiGroups: [ "coordination.k8s.io" ]
+              resources: [ "leases" ]
+              verbs: [ "create", "get", "list", "update", "watch", "patch" ]
+        - kind: ClusterRoleBinding
+          apiVersion: rbac.authorization.k8s.io/v1
+          metadata:
+            name: {{ .Values.addon.name }}-agent
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: {{ .Values.addon.name }}-agent
+          subjects:
+            - kind: ServiceAccount
+              name: {{ .Values.addon.name }}-agent-sa
+              namespace: {{ .Values.addon.namespace }}
+        - kind: Deployment
+          apiVersion: apps/v1
+          metadata:
+            name: {{ .Values.addon.name }}-agent
+            namespace: {{ .Values.addon.namespace }}
+            labels:
+              app: {{ .Values.addon.name }}-agent
+          spec:
+            replicas: {{ .Values.agent.replicas }}
+            selector:
+              matchLabels:
+                app: {{ .Values.addon.name }}-agent
+            template:
+              metadata:
+                labels:
+                  app: {{ .Values.addon.name }}-agent
+              spec:
+                serviceAccount: {{ .Values.addon.name }}-agent-sa
+                containers:
+                  - name: {{ .Values.addon.name }}-agent
+                    image: "{{ .Values.global.image.repository }}:{{ .Values.global.image.tag }}"
+                    imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+                    args:
+                      - "/addon"
+                      - "agent"
+                      - "--hub-kubeconfig={{HUB_KUBECONFIG}}"
+                      - "--cluster-name={{CLUSTER_NAME}}"
+                      - "--addon-namespace={{ .Values.addon.namespace }}"
+                    resources:
+                      {{- toYaml .Values.agent.resources | nindent 22 }}
+        - kind: ServiceAccount
+          apiVersion: v1
+          metadata:
+            name: {{ .Values.addon.name }}-agent-sa
+            namespace: {{ .Values.addon.namespace }}
+  registration:
+    - type: KubeClient
+      kubeClient:
+        hubPermissions:
+          - type: CurrentCluster
+            currentCluster:
+              clusterRoleName: {{ .Values.rbac.clusterRoleName }} 
