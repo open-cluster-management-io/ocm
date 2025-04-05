@@ -1,0 +1,17 @@
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ClusterManagementAddOn
+metadata:
+  name: {{ .Values.addon.name }}
+spec:
+  addOnMeta:
+    displayName: {{ .Values.addon.displayName }}
+  supportedConfigs:
+    - group: addon.open-cluster-management.io
+      resource: addontemplates
+      defaultConfig:
+        name: {{ .Values.addon.name }}
+  installStrategy:
+    type: Placements
+    placements:
+      - name: {{ .Values.placement.name }}
+        namespace: {{ .Values.placement.namespace }} 

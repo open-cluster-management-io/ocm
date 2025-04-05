@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ .Release.Name }}-test-cluster-management-addon"
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  containers:
+    - name: kubectl
+      image: bitnami/kubectl:latest
+      command: 
+        - /bin/sh
+        - -c
+        - |
+          kubectl get clustermanagementaddon {{ .Values.addon.name }} -o json | jq -e '.spec.addOnMeta.displayName == "{{ .Values.addon.displayName }}"' || exit 1
+          kubectl get clustermanagementaddon {{ .Values.addon.name }} -o json | jq -e '.spec.installStrategy.type == "Placements"' || exit 1
+          kubectl get clustermanagementaddon {{ .Values.addon.name }} -o json | jq -e '.spec.installStrategy.placements[0].name == "{{ .Values.placement.name }}"' || exit 1
+          kubectl get clustermanagementaddon {{ .Values.addon.name }} -o json | jq -e '.spec.installStrategy.placements[0].namespace == "{{ .Values.placement.namespace }}"' || exit 1
+          echo "ClusterManagementAddOn test passed"
+  restartPolicy: Never
+  serviceAccountName: {{ .Values.addon.name }}-test-sa 

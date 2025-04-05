@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ .Release.Name }}-test-agent-deployment"
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  containers:
+    - name: kubectl
+      image: "{{ .Values.global.image.repository }}/kubectl:latest"
+      command:
+        - /bin/sh
+        - -c
+        - |
+          kubectl get deployment {{ .Values.addon.name }}-agent -n {{ .Values.addon.namespace }} -o jsonpath='{.metadata.name}' | grep -q "{{ .Values.addon.name }}-agent"
+          kubectl get deployment {{ .Values.addon.name }}-agent -n {{ .Values.addon.namespace }} -o jsonpath='{.spec.replicas}' | grep -q "{{ .Values.agent.replicas }}"
+  restartPolicy: Never
+  serviceAccountName: {{ .Release.Name }}-test 
