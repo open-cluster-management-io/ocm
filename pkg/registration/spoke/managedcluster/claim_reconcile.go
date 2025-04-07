@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	clusterv1alpha1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
+	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	ocmfeature "open-cluster-management.io/api/feature"
@@ -24,6 +25,7 @@ const labelCustomizedOnly = "open-cluster-management.io/spoke-only"
 type claimReconcile struct {
 	recorder               events.Recorder
 	claimLister            clusterv1alpha1listers.ClusterClaimLister
+	klusterletLister       operatorlister.KlusterletLister
 	maxCustomClusterClaims int
 }
 
@@ -55,7 +57,16 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 		return fmt.Errorf("unable to list cluster claims: %w", err)
 	}
 
-	reservedClaimNames := sets.NewString(clusterv1alpha1.ReservedClusterClaimNames[:]...)
+	klusterlet, err := r.klusterletLister.Get("klusterlet")
+
+	if err != nil {
+		return fmt.Errorf("unable to get klusterlet: %w", err)
+	}
+
+	reservedClusterClaimSuffixes := klusterlet.Spec.ClusterClaimConfiguration.DeepCopy().ReservedClusterClaimSuffixes
+
+	reservedSuffixes := append(reservedClusterClaimSuffixes, clusterv1alpha1.ReservedClusterClaimNames[:]...)
+	reservedClaimNames := sets.NewString(reservedSuffixes...)
 	for _, clusterClaim := range clusterClaims {
 		managedClusterClaim := clusterv1.ManagedClusterClaim{
 			Name:  clusterClaim.Name,
