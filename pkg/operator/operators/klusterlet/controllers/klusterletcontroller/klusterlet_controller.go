@@ -179,8 +179,8 @@ type klusterletConfig struct {
 	ExternalManagedKubeConfigAgentSecret        string
 	InstallMode                                 operatorapiv1.InstallMode
 	AppliedManifestWorkEvictionGracePeriod      string
-	MaxCustomClusterClaims						int
-	ReservedClusterClaimSuffixes				[]string
+	MaxCustomClusterClaims                      int
+	ReservedClusterClaimSuffixes                []string
 	// PriorityClassName is the name of the PriorityClass used by the deployed agents
 	PriorityClassName string
 

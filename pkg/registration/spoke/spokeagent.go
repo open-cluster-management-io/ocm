@@ -20,10 +20,12 @@ import (
 	"k8s.io/klog/v2"
 
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
+	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 
@@ -137,6 +139,11 @@ func (o *SpokeAgentConfig) RunSpokeAgent(ctx context.Context, controllerContext 
 		return err
 	}
 
+	someOperatorClient, err := operatorclient.NewForConfig(spokeClientConfig)
+	if err != nil {
+		return err
+	}
+
 	return o.RunSpokeAgentWithSpokeInformers(
 		ctx,
 		kubeConfig,
@@ -144,6 +151,7 @@ func (o *SpokeAgentConfig) RunSpokeAgent(ctx context.Context, controllerContext 
 		spokeKubeClient,
 		informers.NewSharedInformerFactory(spokeKubeClient, 10*time.Minute),
 		clusterv1informers.NewSharedInformerFactory(spokeClusterClient, 10*time.Minute),
+		operatorinformer.NewSharedInformerFactory(someOperatorClient, 10*time.Minute),
 		controllerContext.EventRecorder,
 	)
 }
@@ -153,6 +161,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	spokeKubeClient kubernetes.Interface,
 	spokeKubeInformerFactory informers.SharedInformerFactory,
 	spokeClusterInformerFactory clusterv1informers.SharedInformerFactory,
+	klusterletInformerFactory operatorinformer.SharedInformerFactory,
 	recorder events.Recorder) error {
 	logger := klog.FromContext(ctx)
 	logger.Info("Cluster name and agent ID", "clusterName", o.agentOptions.SpokeClusterName, "agentID", o.agentOptions.AgentID)
@@ -440,8 +449,10 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		hubClusterInformerFactory.Cluster().V1().ManagedClusters(),
 		spokeKubeClient.Discovery(),
 		spokeClusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
+		klusterletInformerFactory.Operator().V1().Klusterlets(),
 		spokeKubeInformerFactory.Core().V1().Nodes(),
 		o.registrationOption.MaxCustomClusterClaims,
+		o.registrationOption.ReservedClusterClaimSuffixes,
 		o.registrationOption.ClusterHealthCheckPeriod,
 		recorder,
 		hubEventRecorder,

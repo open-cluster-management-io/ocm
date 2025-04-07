@@ -330,6 +330,7 @@ func TestHealthCheck(t *testing.T) {
 				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
 				kubeInformerFactory.Core().V1().Nodes(),
 				20,
+				[]string{},
 				eventstesting.NewTestingEventRecorder(t),
 				hubEventRecorder,
 			)

@@ -32,16 +32,17 @@ type SpokeAgentOptions struct {
 	// See more details in: https://github.com/open-cluster-management-io/ocm/pull/443#discussion_r1610868646
 	HubConnectionTimeoutSeconds int32
 
-	HubKubeconfigSecret         string
-	SpokeExternalServerURLs     []string
-	ClusterHealthCheckPeriod    time.Duration
-	MaxCustomClusterClaims      int
-	ClientCertExpirationSeconds int32
-	ClusterAnnotations          map[string]string
-	RegistrationAuth            string
-	HubClusterArn               string
-	ManagedClusterArn           string
-	ManagedClusterRoleSuffix    string
+	HubKubeconfigSecret          string
+	SpokeExternalServerURLs      []string
+	ClusterHealthCheckPeriod     time.Duration
+	MaxCustomClusterClaims       int
+	ReservedClusterClaimSuffixes []string
+	ClientCertExpirationSeconds  int32
+	ClusterAnnotations           map[string]string
+	RegistrationAuth             string
+	HubClusterArn                string
+	ManagedClusterArn            string
+	ManagedClusterRoleSuffix     string
 }
 
 func NewSpokeAgentOptions() *SpokeAgentOptions {
