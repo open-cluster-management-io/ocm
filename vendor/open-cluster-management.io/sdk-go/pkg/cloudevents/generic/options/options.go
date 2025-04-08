@@ -5,6 +5,7 @@ import (
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/cloudevents/sdk-go/v2/protocol"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
 // CloudEventsOptions provides cloudevents clients to send/receive cloudevents based on different event protocol.
@@ -19,8 +20,8 @@ type CloudEventsOptions interface {
 	// the MQTT topic, for Kafka, the context should contain the message key, etc.
 	WithContext(ctx context.Context, evtContext cloudevents.EventContext) (context.Context, error)
 
-	// Protocol returns a specific protocol to initialize the cloudevents client
-	Protocol(ctx context.Context) (CloudEventsProtocol, error)
+	// Protocol returns a specific protocol to initialize the cloudevents client.
+	Protocol(ctx context.Context, dataType types.CloudEventsDataType) (CloudEventsProtocol, error)
 
 	// ErrorChan returns a chan which will receive the cloudevents connection error. The source/agent client will try to
 	// reconnect the when this error occurs.

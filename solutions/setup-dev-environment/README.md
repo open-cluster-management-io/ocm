@@ -57,7 +57,7 @@ To solve this, try increasing your `max_user_instances` and `max_user_watches`:
 Once you've increased the limits, delete the clusters already created and try again:
 ```
 $ kind delete clusters hub cluster1 cluster2
-$ ./setup-ocm.sh
+$ ./local-up.sh
 ```
 
 

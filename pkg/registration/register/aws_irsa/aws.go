@@ -11,7 +11,7 @@ import (
 
 	cluster "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	managedclusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1"
-	managedclusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster"
+	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	managedclusterv1lister "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	v1 "open-cluster-management.io/api/cluster/v1"
 )
@@ -72,10 +72,12 @@ func (v *v1AWSIRSAControl) get(name string) (metav1.Object, error) {
 	return managedcluster, nil
 }
 
-func NewAWSIRSAControl(hubManagedClusterInformer managedclusterinformers.Interface, hubManagedClusterClient cluster.Interface) (AWSIRSAControl, error) {
+func NewAWSIRSAControl(
+	hubManagedClusterInformer clusterv1informer.ManagedClusterInformer,
+	hubManagedClusterClient cluster.Interface) (AWSIRSAControl, error) {
 	return &v1AWSIRSAControl{
-		hubManagedClusterInformer: hubManagedClusterInformer.V1().ManagedClusters().Informer(),
-		hubManagedClusterLister:   hubManagedClusterInformer.V1().ManagedClusters().Lister(),
+		hubManagedClusterInformer: hubManagedClusterInformer.Informer(),
+		hubManagedClusterLister:   hubManagedClusterInformer.Lister(),
 		hubManagedClusterClient:   hubManagedClusterClient.ClusterV1().ManagedClusters(),
 	}, nil
 }

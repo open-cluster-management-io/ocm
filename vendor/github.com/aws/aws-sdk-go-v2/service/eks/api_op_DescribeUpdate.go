@@ -13,7 +13,7 @@ import (
 
 // Describes an update to an Amazon EKS resource.
 //
-// When the status of the update is Succeeded , the update is complete. If an
+// When the status of the update is Successful , the update is complete. If an
 // update fails, the status is Failed , and an error detail explains the reason for
 // the failure.
 func (c *Client) DescribeUpdate(ctx context.Context, params *DescribeUpdateInput, optFns ...func(*Options)) (*DescribeUpdateOutput, error) {
@@ -130,6 +130,9 @@ func (c *Client) addOperationDescribeUpdateMiddlewares(stack *middleware.Stack, 
 		return err
 	}
 	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
+	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpDescribeUpdateValidationMiddleware(stack); err != nil {

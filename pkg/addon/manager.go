@@ -27,7 +27,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/addon/controllers/addonprogressing"
 	"open-cluster-management.io/ocm/pkg/addon/controllers/addontemplate"
 	"open-cluster-management.io/ocm/pkg/addon/controllers/cmainstallprogression"
-	"open-cluster-management.io/ocm/pkg/addon/controllers/cmamanagedby"
 	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 )
 
@@ -169,15 +168,6 @@ func RunControllerManagerWithInformers(
 		controllerContext.EventRecorder,
 	)
 
-	// This controller is used during migrating addons to be managed by addon-manager.
-	// This should be removed when the migration is done.
-	// The migration plan refer to https://github.com/open-cluster-management-io/ocm/issues/355.
-	managementAddonController := cmamanagedby.NewCMAManagedByController(
-		hubAddOnClient,
-		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
-		controllerContext.EventRecorder,
-	)
-
 	mgmtAddonInstallProgressionController := cmainstallprogression.NewCMAInstallProgressionController(
 		hubAddOnClient,
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
@@ -204,7 +194,6 @@ func RunControllerManagerWithInformers(
 	go addonConfigurationController.Run(ctx, 2)
 	go addonOwnerController.Run(ctx, 2)
 	go addonProgressingController.Run(ctx, 2)
-	go managementAddonController.Run(ctx, 2)
 	go mgmtAddonInstallProgressionController.Run(ctx, 2)
 	// There should be only one instance of addonTemplateController running, since the addonTemplateController will
 	// start a goroutine for each template-type addon it watches.

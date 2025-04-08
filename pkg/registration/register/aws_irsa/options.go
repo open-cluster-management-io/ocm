@@ -1,52 +1,34 @@
 package aws_irsa
 
 import (
-	"fmt"
+	"errors"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"k8s.io/apimachinery/pkg/api/meta"
-
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	hubclusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
-	managedclusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster"
-
-	"open-cluster-management.io/ocm/pkg/registration/register"
+	"github.com/spf13/pflag"
 )
 
 // AWSOption includes options that is used to monitor ManagedClusters
 type AWSOption struct {
-	EventFilterFunc factory.EventFilterFunc
-	AWSIRSAControl  AWSIRSAControl
+	HubClusterArn            string
+	ManagedClusterArn        string
+	ManagedClusterRoleSuffix string
 }
 
-func NewAWSOption(
-	secretOption register.SecretOption,
-	hubManagedClusterInformer managedclusterinformers.Interface,
-	hubClusterClientSet hubclusterclientset.Interface) (*AWSOption, error) {
-	awsIrsaControl, err := NewAWSIRSAControl(hubManagedClusterInformer, hubClusterClientSet)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create AWS IRSA control: %w", err)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &AWSOption{
-		EventFilterFunc: func(obj interface{}) bool {
-			accessor, err := meta.Accessor(obj)
-			if err != nil {
-				return false
-			}
-			labels := accessor.GetLabels()
+func NewAWSOption() *AWSOption {
+	return &AWSOption{}
+}
 
-			// should not contain addon key
-			_, ok := labels[addonv1alpha1.AddonLabelKey]
-			if ok {
-				return false
-			}
+func (o *AWSOption) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&o.HubClusterArn, "hub-cluster-arn", o.HubClusterArn,
+		"The ARN of the EKS based hub cluster.")
+	fs.StringVar(&o.ManagedClusterArn, "managed-cluster-arn", o.ManagedClusterArn,
+		"The ARN of the EKS based managed cluster.")
+	fs.StringVar(&o.ManagedClusterRoleSuffix, "managed-cluster-role-suffix", o.ManagedClusterRoleSuffix,
+		"The suffix of the managed cluster IAM role.")
+}
 
-			// only enqueue csr whose name starts with the cluster name
-			return accessor.GetName() == secretOption.ClusterName
-		},
-		AWSIRSAControl: awsIrsaControl,
-	}, nil
+func (o *AWSOption) Validate() error {
+	if o.HubClusterArn == "" {
+		return errors.New("EksHubClusterArn cannot be empty if RegistrationAuth is awsirsa")
+	}
+	return nil
 }

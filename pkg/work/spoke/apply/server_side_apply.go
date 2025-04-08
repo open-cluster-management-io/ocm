@@ -103,7 +103,9 @@ func (c *ServerSideApply) Apply(
 			// skip the apply operation when the hash of the existing resource matches the required hash
 			existingHash := existing.GetAnnotations()[workapiv1.ManifestConfigSpecHashAnnotationKey]
 			if requiredHash == existingHash {
-				return existing, nil
+				// still needs to apply ownerref since it might be changed due to deleteoption update.
+				err := helper.ApplyOwnerReferences(ctx, c.client, gvr, existing, owner)
+				return existing, err
 			}
 		}
 	}
@@ -171,7 +173,6 @@ func hashOfResourceStruct(o interface{}) string {
 func removeCreationTimeFromMetadata(obj map[string]interface{}, logger klog.Logger) {
 	if metadata, found := obj["metadata"]; found {
 		if metaObj, ok := metadata.(map[string]interface{}); ok {
-			klog.V(4).Infof("remove `metadata.creationTimestamp`")
 			creationTimestamp, ok := metaObj["creationTimestamp"]
 			if ok && creationTimestamp == nil {
 				unstructured.RemoveNestedField(metaObj, "creationTimestamp")
@@ -179,14 +180,12 @@ func removeCreationTimeFromMetadata(obj map[string]interface{}, logger klog.Logg
 		}
 	}
 
-	for k, v := range obj {
+	for _, v := range obj {
 		switch val := v.(type) {
 		case map[string]interface{}:
-			logger.V(4).Info("remove `metadata.creationTimestamp` from %s", "key", k)
 			removeCreationTimeFromMetadata(val, logger)
 		case []interface{}:
-			for index, item := range val {
-				logger.V(4).Info("remove `metadata.creationTimestamp`", "key", k, "index", index)
+			for _, item := range val {
 				if itemObj, ok := item.(map[string]interface{}); ok {
 					removeCreationTimeFromMetadata(itemObj, logger)
 				}

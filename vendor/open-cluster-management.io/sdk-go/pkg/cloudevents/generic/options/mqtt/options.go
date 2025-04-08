@@ -3,7 +3,6 @@ package mqtt
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"net"
 	"os"
@@ -16,7 +15,6 @@ import (
 	"github.com/eclipse/paho.golang/paho"
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/klog/v2"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/cert"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
@@ -162,34 +160,20 @@ func BuildMQTTOptionsFromFlags(configPath string) (*MQTTOptions, error) {
 		dialTimeout = *config.DialTimeout
 	}
 
-	if config.ClientCertFile != "" && config.ClientKeyFile != "" {
-		certPool, err := rootCAs(config.CAFile)
-		if err != nil {
-			return nil, err
-		}
-
-		tlsConfig := &tls.Config{
-			RootCAs: certPool,
-			GetClientCertificate: func(cri *tls.CertificateRequestInfo) (*tls.Certificate, error) {
-				return cert.CachingCertificateLoader(config.ClientCertFile, config.ClientKeyFile)()
-			},
-		}
-
-		options.Dialer = &MQTTDialer{
-			BrokerHost: config.BrokerHost,
-			TLSConfig:  tlsConfig,
-			Timeout:    dialTimeout,
-		}
-
-		// start a goroutine to periodically refresh client certificates for this connection
-		cert.StartClientCertRotating(tlsConfig.GetClientCertificate, options.Dialer)
-		return options, nil
-	}
-
 	options.Dialer = &MQTTDialer{
 		BrokerHost: config.BrokerHost,
 		Timeout:    dialTimeout,
 	}
+
+	if config.ClientCertFile != "" && config.ClientKeyFile != "" {
+		// Set up TLS configuration for the MQTT connection if the client certificate and key are provided.
+		// the certificates will be reloaded periodically.
+		options.Dialer.TLSConfig, err = cert.AutoLoadTLSConfig(config.CAFile, config.ClientCertFile, config.ClientKeyFile, options.Dialer)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return options, nil
 }
 
@@ -333,30 +317,4 @@ func getAgentPubTopic(ctx context.Context) (*PubTopic, error) {
 	}
 
 	return nil, fmt.Errorf("invalid agent pub topic")
-}
-
-// rootCAs returns a cert pool to verify the TLS connection.
-// If the caFile is not provided, the default system certificate pool will be returned
-// If the caFile is provided, the provided CA will be appended to the system certificate pool
-func rootCAs(caFile string) (*x509.CertPool, error) {
-	certPool, err := x509.SystemCertPool()
-	if err != nil {
-		return nil, err
-	}
-
-	if len(caFile) == 0 {
-		klog.Warningf("CA file is not provided, TLS connection will be verified with the system cert pool")
-		return certPool, nil
-	}
-
-	caPEM, err := os.ReadFile(caFile)
-	if err != nil {
-		return nil, err
-	}
-
-	if ok := certPool.AppendCertsFromPEM(caPEM); !ok {
-		return nil, fmt.Errorf("invalid CA %s", caFile)
-	}
-
-	return certPool, nil
 }

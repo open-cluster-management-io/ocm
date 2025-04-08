@@ -110,7 +110,7 @@ func NewManifestWorkController(
 // 2. Resources defined in manifest changed on spoke
 func (m *ManifestWorkController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	manifestWorkName := controllerContext.QueueKey()
-	klog.V(4).Infof("Reconciling ManifestWork %q", manifestWorkName)
+	klog.V(5).Infof("Reconciling ManifestWork %q", manifestWorkName)
 
 	oldManifestWork, err := m.manifestWorkLister.Get(manifestWorkName)
 	if apierrors.IsNotFound(err) {

@@ -28,16 +28,16 @@ func selectBootstrapKubeConfigs(ctx context.Context,
 	for index, fp := range bootstrapKubeConfigFilePaths {
 		equal, err := compareServerEndpoint(fp, hubKubeConfigFilePath)
 		if err != nil {
-			logger.Error(err, "failed to compare hub and bootstrap kubeconfigs", "index", index)
+			logger.Error(err, "failed to compare hub and bootstrap kubeconfigs", "bootstrapKubeConfig", fp)
 			continue
 		}
 		if equal {
 			err := checkBootstrapKubeConfigValid(ctx, managedCluster, fp)
 			if err != nil {
-				logger.Error(err, "failed to check matched bootstrap kubeconfig", "index", index)
+				logger.Error(err, "failed to check matched bootstrap kubeconfig", "bootstrapKubeConfig", fp)
 				break
 			}
-			logger.Info("found matched bootstrap kubeconfig and it's valid, no need to reselect another one", "index", index)
+			logger.Info("found matched bootstrap kubeconfig and it's valid, no need to reselect another one", "bootstrapKubeConfig", fp)
 			return index, nil
 		}
 	}
@@ -45,7 +45,7 @@ func selectBootstrapKubeConfigs(ctx context.Context,
 	for index, fp := range bootstrapKubeConfigFilePaths {
 		err := checkBootstrapKubeConfigValid(ctx, managedCluster, fp)
 		if err != nil {
-			logger.Error(err, "failed to check bootstrap kubeconfig", "index", index)
+			logger.Error(err, "failed to check bootstrap kubeconfig", "bootstrapKubeConfig", fp)
 			continue
 		}
 		return index, nil

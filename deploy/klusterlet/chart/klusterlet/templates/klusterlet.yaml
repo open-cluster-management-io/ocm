@@ -2,23 +2,15 @@
 apiVersion: operator.open-cluster-management.io/v1
 kind: Klusterlet
 metadata:
-  {{- if or ( eq .Values.klusterlet.mode "Hosted") (eq .Values.klusterlet.mode "SingletonHosted") }}
-  name: "klusterlet-{{ .Values.klusterlet.clusterName }}"
-  {{- else }}
-  name: {{ .Values.klusterlet.name | default "klusterlet" }}
-  {{- end }}
+  name: "{{ template "klusterletName" . }}"
 spec:
   deployOption:
     mode: {{ .Values.klusterlet.mode | default "Singleton" }}
   registrationImagePullSpec: "{{ template "registrationImage" . }}"
   workImagePullSpec: "{{ template "workImage" . }}"
   imagePullSpec: "{{ template "operatorImage" . }}"
-  clusterName: {{ .Values.klusterlet.clusterName }}
-  {{- if or ( eq .Values.klusterlet.mode "Hosted") (eq .Values.klusterlet.mode "SingletonHosted") }}
-  namespace: "open-cluster-management-{{ .Values.klusterlet.clusterName }}"
-  {{- else }}
-  namespace: {{ .Values.klusterlet.namespace | default "open-cluster-management-agent" }}
-  {{- end }}
+  clusterName: "{{ .Values.klusterlet.clusterName }}"
+  namespace: "{{ template "klusterletNamespace" . }}"
   {{- with .Values.klusterlet.externalServerURLs }}
   externalServerURLs:
     {{- toYaml . | nindent 4 }}

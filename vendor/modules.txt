@@ -28,9 +28,10 @@ github.com/antlr4-go/antlr/v4
 # github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
 ## explicit; go 1.13
 github.com/asaskevich/govalidator
-# github.com/aws/aws-sdk-go-v2 v1.35.0
-## explicit; go 1.21
+# github.com/aws/aws-sdk-go-v2 v1.36.3
+## explicit; go 1.22
 github.com/aws/aws-sdk-go-v2/aws
+github.com/aws/aws-sdk-go-v2/aws/arn
 github.com/aws/aws-sdk-go-v2/aws/defaults
 github.com/aws/aws-sdk-go-v2/aws/middleware
 github.com/aws/aws-sdk-go-v2/aws/protocol/query
@@ -70,17 +71,17 @@ github.com/aws/aws-sdk-go-v2/credentials/stscreds
 ## explicit; go 1.21
 github.com/aws/aws-sdk-go-v2/feature/ec2/imds
 github.com/aws/aws-sdk-go-v2/feature/ec2/imds/internal/config
-# github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.30
-## explicit; go 1.21
+# github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.34
+## explicit; go 1.22
 github.com/aws/aws-sdk-go-v2/internal/configsources
-# github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.30
-## explicit; go 1.21
+# github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.34
+## explicit; go 1.22
 github.com/aws/aws-sdk-go-v2/internal/endpoints/v2
 # github.com/aws/aws-sdk-go-v2/internal/ini v1.8.1
 ## explicit; go 1.21
 github.com/aws/aws-sdk-go-v2/internal/ini
-# github.com/aws/aws-sdk-go-v2/service/eks v1.57.1
-## explicit; go 1.21
+# github.com/aws/aws-sdk-go-v2/service/eks v1.63.1
+## explicit; go 1.22
 github.com/aws/aws-sdk-go-v2/service/eks
 github.com/aws/aws-sdk-go-v2/service/eks/internal/endpoints
 github.com/aws/aws-sdk-go-v2/service/eks/types
@@ -347,9 +348,6 @@ github.com/imdario/mergo
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
-# github.com/jmespath/go-jmespath v0.4.0
-## explicit; go 1.14
-github.com/jmespath/go-jmespath
 # github.com/josharian/intern v1.0.0
 ## explicit; go 1.5
 github.com/josharian/intern
@@ -1691,7 +1689,7 @@ k8s.io/utils/pointer
 k8s.io/utils/ptr
 k8s.io/utils/strings/slices
 k8s.io/utils/trace
-# open-cluster-management.io/addon-framework v0.11.1-0.20250218075422-4329ebea390c
+# open-cluster-management.io/addon-framework v0.12.1-0.20250401143304-75b65b5f45e0
 ## explicit; go 1.22.0
 open-cluster-management.io/addon-framework/pkg/addonfactory
 open-cluster-management.io/addon-framework/pkg/addonmanager
@@ -1707,7 +1705,7 @@ open-cluster-management.io/addon-framework/pkg/agent
 open-cluster-management.io/addon-framework/pkg/assets
 open-cluster-management.io/addon-framework/pkg/index
 open-cluster-management.io/addon-framework/pkg/utils
-# open-cluster-management.io/api v0.15.1-0.20250116010516-3a595d6a4e40
+# open-cluster-management.io/api v0.16.1
 ## explicit; go 1.22.0
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/client/addon/clientset/versioned
@@ -1773,12 +1771,10 @@ open-cluster-management.io/api/cluster/v1beta2
 open-cluster-management.io/api/crdsv1beta1
 open-cluster-management.io/api/feature
 open-cluster-management.io/api/operator/v1
-open-cluster-management.io/api/utils/work/v1/utils
 open-cluster-management.io/api/utils/work/v1/workapplier
-open-cluster-management.io/api/utils/work/v1/workvalidator
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v0.15.1-0.20241125015855-1536c3970f8f
+# open-cluster-management.io/sdk-go v0.16.1-0.20250327091909-6bd6228a47ad
 ## explicit; go 1.22.0
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
@@ -1789,6 +1785,20 @@ open-cluster-management.io/sdk-go/pkg/apis/work/v1/validator
 open-cluster-management.io/sdk-go/pkg/basecontroller/events
 open-cluster-management.io/sdk-go/pkg/basecontroller/factory
 open-cluster-management.io/sdk-go/pkg/certrotation
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/common
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/errors
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/statushash
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/store
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/utils
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/agent/client
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/agent/codec
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/internal
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/payload
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/source/client
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/source/codec
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/store
 open-cluster-management.io/sdk-go/pkg/cloudevents/constants
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options
@@ -1800,19 +1810,6 @@ open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/kafka
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types
-open-cluster-management.io/sdk-go/pkg/cloudevents/work
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/client
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/codec
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/lister
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/common
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/errors
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/internal
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/client
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/codec
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/lister
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/store
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/utils
 open-cluster-management.io/sdk-go/pkg/helpers
 open-cluster-management.io/sdk-go/pkg/patcher
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.30.3

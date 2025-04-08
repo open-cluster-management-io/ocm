@@ -7,6 +7,7 @@ import (
 
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protocol"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
 type gRPCSourceOptions struct {
@@ -31,14 +32,15 @@ func (o *gRPCSourceOptions) WithContext(ctx context.Context, evtCtx cloudevents.
 	return ctx, nil
 }
 
-func (o *gRPCSourceOptions) Protocol(ctx context.Context) (options.CloudEventsProtocol, error) {
+func (o *gRPCSourceOptions) Protocol(ctx context.Context, dataType types.CloudEventsDataType) (options.CloudEventsProtocol, error) {
 	receiver, err := o.GetCloudEventsProtocol(
 		ctx,
 		func(err error) {
 			o.errorChan <- err
 		},
 		protocol.WithSubscribeOption(&protocol.SubscribeOption{
-			Source: o.sourceID,
+			Source:   o.sourceID,
+			DataType: dataType.String(),
 		}),
 	)
 	if err != nil {

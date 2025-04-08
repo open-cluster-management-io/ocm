@@ -78,6 +78,14 @@ enableSyncLabels: false
 # should be the kubeConfig file of the hub cluster via setting --set-file=<the kubeConfig file of hub cluster> optional
 bootstrapHubKubeConfig: ""
 
+# when MultipleHubs feature gate in klusterlet.registrationConfiguration is enabled, could set multiple bootstrap hub kubeConfigs here.
+# otherwise can create these kubeConfig secret in the klusterlet.namespace manually on the managed cluster.
+multiHubBootstrapHubKubeConfigs:
+#  - name: xxx
+#    kubeConfig: xxx
+#  - name: xxx
+#    kubeConfig: xxx
+
 # should be the kubeConfig file of the managed cluster via setting --set-file=<the kubeConfig file of managed cluster>
 # only need to set in the hosted mode. optional
 externalManagedKubeConfig: ""
@@ -93,8 +101,12 @@ klusterlet:
   create: true
   # mode can be Default, Hosted, Singleton or SingletonHosted.
   mode: Singleton
+  # when Default or Singleton mode, the name is klusterlet by default.
+  # when in Hosted or SingletonHosted mode, the name will be klusterlet-<cluster name> if name is empty.
   name: "klusterlet"
   clusterName: cluster1
+  # when Default or Singleton mode, the namespace is open-cluster-management-agent by default.
+  # when in Hosted or SingletonHosted mode, the namespace is open-cluster-management-<cluster name> if namespace is empty.
   namespace: ""
   externalServerURLs: []
 #   - url: ""

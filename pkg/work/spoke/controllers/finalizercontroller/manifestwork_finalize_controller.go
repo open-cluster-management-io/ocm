@@ -65,7 +65,7 @@ func NewManifestWorkFinalizeController(
 func (m *ManifestWorkFinalizeController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	manifestWorkName := controllerContext.QueueKey()
 	appliedManifestWorkName := fmt.Sprintf("%s-%s", m.hubHash, manifestWorkName)
-	klog.V(4).Infof("Reconciling ManifestWork %q", manifestWorkName)
+	klog.V(5).Infof("Reconciling ManifestWork %q", manifestWorkName)
 
 	manifestWork, err := m.manifestWorkLister.Get(manifestWorkName)
 

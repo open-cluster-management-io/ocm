@@ -58,6 +58,19 @@ func ToAddOnProxyPrivateValues(config addonapiv1alpha1.AddOnDeploymentConfig) (a
 	}, nil
 }
 
+func ToAddOnResourceRequirementsPrivateValues(config addonapiv1alpha1.AddOnDeploymentConfig) (addonfactory.Values, error) {
+	if config.Spec.ResourceRequirements == nil {
+		return nil, nil
+	}
+	requirements, err := addonfactory.GetRegexResourceRequirements(config.Spec.ResourceRequirements)
+	if err != nil {
+		return nil, err
+	}
+	return addonfactory.Values{
+		ResourceRequirementsPrivateValueKey: requirements,
+	}, nil
+}
+
 type keyValuePair struct {
 	name  string
 	value string
@@ -84,13 +97,6 @@ func (a *CRDTemplateAgentAddon) getValues(
 	}
 	overrideValues = addonfactory.MergeValues(defaultValues, overrideValues)
 
-	privateValuesKeys := map[string]struct{}{
-		NodePlacementPrivateValueKey:    {},
-		RegistriesPrivateValueKey:       {},
-		InstallNamespacePrivateValueKey: {},
-		ProxyPrivateValueKey:            {},
-	}
-
 	for i := 0; i < len(a.getValuesFuncs); i++ {
 		if a.getValuesFuncs[i] != nil {
 			userValues, err := a.getValuesFuncs[i](cluster, addon)
@@ -100,7 +106,7 @@ func (a *CRDTemplateAgentAddon) getValues(
 
 			publicValues := map[string]interface{}{}
 			for k, v := range userValues {
-				if _, ok := privateValuesKeys[k]; ok {
+				if _, ok := PrivateValuesKeys[k]; ok {
 					privateValues[k] = v
 					continue
 				}

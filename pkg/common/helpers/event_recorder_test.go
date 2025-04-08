@@ -52,8 +52,8 @@ func TestNewEventRecorder(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
-			kubeClient := fakekube.NewSimpleClientset()
-			recorder, err := NewEventRecorder(ctx, tt.scheme, kubeClient, "test")
+			kubeClient := fakekube.NewClientset()
+			recorder, err := NewEventRecorder(ctx, tt.scheme, kubeClient.EventsV1(), "test")
 			if err != nil {
 				t.Errorf("NewEventRecorder() error = %v", err)
 				return

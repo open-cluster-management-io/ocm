@@ -60,6 +60,9 @@ const (
 
 	// ExtensionOriginalSource is the cloud event extension key of the original source.
 	ExtensionOriginalSource = "originalsource"
+
+	// ExtensionStatusHash is the cloud event extension key of the status hash.
+	ExtensionStatusHash = "statushash"
 )
 
 // ResourceAction represents an action on a resource object on the source or agent.

@@ -1,12 +1,11 @@
-{{- if or .Values.bootstrapHubKubeConfig .Values.externalManagedKubeConfig }}
+{{- $generatedNamespace := include "agentNamespace" . }}
+{{- if ne $generatedNamespace .Release.Namespace }}
+{{- if or .Values.bootstrapHubKubeConfig .Values.externalManagedKubeConfig .Values.multiHubBootstrapHubKubeConfigs }}
 apiVersion: v1
 kind: Namespace
 metadata:
   annotations:
     workload.openshift.io/allowed: "management"
-{{- if or ( eq .Values.klusterlet.mode "Hosted") (eq .Values.klusterlet.mode "HostedSingleton") }}
-  name: "klusterlet-{{ .Values.klusterlet.clusterName }}"
-{{- else }}
-  name: {{ .Values.klusterlet.namespace | default "open-cluster-management-agent" }}
+  name: "{{ template "agentNamespace" . }}"
 {{- end }}
 {{- end }}

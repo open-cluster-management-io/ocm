@@ -101,9 +101,11 @@ kubectl patch clustermanagementaddon managed-serviceaccount --type='json' -p="$(
 echo "Install cluster-permission"
 git clone git@github.com:open-cluster-management-io/cluster-permission.git || true
 cd cluster-permission
-kubectl apply -f config/crds
-kubectl apply -f config/rbac
-kubectl apply -f config/deploy
+helm install cluster-permission chart/cluster-permission/ \
+  --namespace open-cluster-management-addon \
+  --create-namespace \
+  --set global.imageOverrides.cluster_permission=quay.io/open-cluster-management/cluster-permission:latest \
+  --set global.pullPolicy=Always
 cd -
 rm -rf cluster-permission
 

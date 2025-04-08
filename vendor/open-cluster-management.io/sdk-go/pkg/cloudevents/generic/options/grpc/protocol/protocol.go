@@ -105,15 +105,16 @@ func (p *Protocol) OpenInbound(ctx context.Context) error {
 	subClient, err := p.client.Subscribe(ctx, &pbv1.SubscriptionRequest{
 		Source:      p.subscribeOption.Source,
 		ClusterName: p.subscribeOption.ClusterName,
+		DataType:    p.subscribeOption.DataType,
 	})
 	if err != nil {
 		return err
 	}
 
 	if p.subscribeOption.Source != "" {
-		logger.Infof("subscribing events for: %v", p.subscribeOption.Source)
+		logger.Infof("subscribing events for: %v with data types: %v", p.subscribeOption.Source, p.subscribeOption.DataType)
 	} else {
-		logger.Infof("subscribing events for cluster: %v", p.subscribeOption.ClusterName)
+		logger.Infof("subscribing events for cluster: %v with data types: %v", p.subscribeOption.ClusterName, p.subscribeOption.DataType)
 	}
 
 	go func() {
