@@ -3,7 +3,7 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,15 +12,15 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 	versioned "open-cluster-management.io/api/client/operator/clientset/versioned"
 	internalinterfaces "open-cluster-management.io/api/client/operator/informers/externalversions/internalinterfaces"
-	v1 "open-cluster-management.io/api/client/operator/listers/operator/v1"
-	operatorv1 "open-cluster-management.io/api/operator/v1"
+	operatorv1 "open-cluster-management.io/api/client/operator/listers/operator/v1"
+	apioperatorv1 "open-cluster-management.io/api/operator/v1"
 )
 
 // KlusterletInformer provides access to a shared informer and lister for
 // Klusterlets.
 type KlusterletInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.KlusterletLister
+	Lister() operatorv1.KlusterletLister
 }
 
 type klusterletInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredKlusterletInformer(client versioned.Interface, resyncPeriod time
 				return client.OperatorV1().Klusterlets().Watch(context.TODO(), options)
 			},
 		},
-		&operatorv1.Klusterlet{},
+		&apioperatorv1.Klusterlet{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *klusterletInformer) defaultInformer(client versioned.Interface, resyncP
 }
 
 func (f *klusterletInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&operatorv1.Klusterlet{}, f.defaultInformer)
+	return f.factory.InformerFor(&apioperatorv1.Klusterlet{}, f.defaultInformer)
 }
 
-func (f *klusterletInformer) Lister() v1.KlusterletLister {
-	return v1.NewKlusterletLister(f.Informer().GetIndexer())
+func (f *klusterletInformer) Lister() operatorv1.KlusterletLister {
+	return operatorv1.NewKlusterletLister(f.Informer().GetIndexer())
 }

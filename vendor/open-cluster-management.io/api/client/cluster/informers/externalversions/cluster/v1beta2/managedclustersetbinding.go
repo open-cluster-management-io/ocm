@@ -3,7 +3,7 @@
 package v1beta2
 
 import (
-	"context"
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,15 +12,15 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 	versioned "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	internalinterfaces "open-cluster-management.io/api/client/cluster/informers/externalversions/internalinterfaces"
-	v1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
-	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+	clusterv1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
+	apiclusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
 // ManagedClusterSetBindingInformer provides access to a shared informer and lister for
 // ManagedClusterSetBindings.
 type ManagedClusterSetBindingInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta2.ManagedClusterSetBindingLister
+	Lister() clusterv1beta2.ManagedClusterSetBindingLister
 }
 
 type managedClusterSetBindingInformer struct {
@@ -55,7 +55,7 @@ func NewFilteredManagedClusterSetBindingInformer(client versioned.Interface, nam
 				return client.ClusterV1beta2().ManagedClusterSetBindings(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&clusterv1beta2.ManagedClusterSetBinding{},
+		&apiclusterv1beta2.ManagedClusterSetBinding{},
 		resyncPeriod,
 		indexers,
 	)
@@ -66,9 +66,9 @@ func (f *managedClusterSetBindingInformer) defaultInformer(client versioned.Inte
 }
 
 func (f *managedClusterSetBindingInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&clusterv1beta2.ManagedClusterSetBinding{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiclusterv1beta2.ManagedClusterSetBinding{}, f.defaultInformer)
 }
 
-func (f *managedClusterSetBindingInformer) Lister() v1beta2.ManagedClusterSetBindingLister {
-	return v1beta2.NewManagedClusterSetBindingLister(f.Informer().GetIndexer())
+func (f *managedClusterSetBindingInformer) Lister() clusterv1beta2.ManagedClusterSetBindingLister {
+	return clusterv1beta2.NewManagedClusterSetBindingLister(f.Informer().GetIndexer())
 }

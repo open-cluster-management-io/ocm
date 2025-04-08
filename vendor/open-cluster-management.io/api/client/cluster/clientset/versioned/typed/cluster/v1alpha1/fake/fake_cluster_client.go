@@ -13,11 +13,11 @@ type FakeClusterV1alpha1 struct {
 }
 
 func (c *FakeClusterV1alpha1) AddOnPlacementScores(namespace string) v1alpha1.AddOnPlacementScoreInterface {
-	return &FakeAddOnPlacementScores{c, namespace}
+	return newFakeAddOnPlacementScores(c, namespace)
 }
 
 func (c *FakeClusterV1alpha1) ClusterClaims() v1alpha1.ClusterClaimInterface {
-	return &FakeClusterClaims{c}
+	return newFakeClusterClaims(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

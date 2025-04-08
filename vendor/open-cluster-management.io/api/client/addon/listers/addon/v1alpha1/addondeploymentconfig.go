@@ -3,10 +3,10 @@
 package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
-	v1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
 // AddOnDeploymentConfigLister helps list AddOnDeploymentConfigs.
@@ -14,7 +14,7 @@ import (
 type AddOnDeploymentConfigLister interface {
 	// List lists all AddOnDeploymentConfigs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.AddOnDeploymentConfig, err error)
+	List(selector labels.Selector) (ret []*addonv1alpha1.AddOnDeploymentConfig, err error)
 	// AddOnDeploymentConfigs returns an object that can list and get AddOnDeploymentConfigs.
 	AddOnDeploymentConfigs(namespace string) AddOnDeploymentConfigNamespaceLister
 	AddOnDeploymentConfigListerExpansion
@@ -22,25 +22,17 @@ type AddOnDeploymentConfigLister interface {
 
 // addOnDeploymentConfigLister implements the AddOnDeploymentConfigLister interface.
 type addOnDeploymentConfigLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*addonv1alpha1.AddOnDeploymentConfig]
 }
 
 // NewAddOnDeploymentConfigLister returns a new AddOnDeploymentConfigLister.
 func NewAddOnDeploymentConfigLister(indexer cache.Indexer) AddOnDeploymentConfigLister {
-	return &addOnDeploymentConfigLister{indexer: indexer}
-}
-
-// List lists all AddOnDeploymentConfigs in the indexer.
-func (s *addOnDeploymentConfigLister) List(selector labels.Selector) (ret []*v1alpha1.AddOnDeploymentConfig, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.AddOnDeploymentConfig))
-	})
-	return ret, err
+	return &addOnDeploymentConfigLister{listers.New[*addonv1alpha1.AddOnDeploymentConfig](indexer, addonv1alpha1.Resource("addondeploymentconfig"))}
 }
 
 // AddOnDeploymentConfigs returns an object that can list and get AddOnDeploymentConfigs.
 func (s *addOnDeploymentConfigLister) AddOnDeploymentConfigs(namespace string) AddOnDeploymentConfigNamespaceLister {
-	return addOnDeploymentConfigNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return addOnDeploymentConfigNamespaceLister{listers.NewNamespaced[*addonv1alpha1.AddOnDeploymentConfig](s.ResourceIndexer, namespace)}
 }
 
 // AddOnDeploymentConfigNamespaceLister helps list and get AddOnDeploymentConfigs.
@@ -48,36 +40,15 @@ func (s *addOnDeploymentConfigLister) AddOnDeploymentConfigs(namespace string) A
 type AddOnDeploymentConfigNamespaceLister interface {
 	// List lists all AddOnDeploymentConfigs in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.AddOnDeploymentConfig, err error)
+	List(selector labels.Selector) (ret []*addonv1alpha1.AddOnDeploymentConfig, err error)
 	// Get retrieves the AddOnDeploymentConfig from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.AddOnDeploymentConfig, error)
+	Get(name string) (*addonv1alpha1.AddOnDeploymentConfig, error)
 	AddOnDeploymentConfigNamespaceListerExpansion
 }
 
 // addOnDeploymentConfigNamespaceLister implements the AddOnDeploymentConfigNamespaceLister
 // interface.
 type addOnDeploymentConfigNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all AddOnDeploymentConfigs in the indexer for a given namespace.
-func (s addOnDeploymentConfigNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.AddOnDeploymentConfig, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.AddOnDeploymentConfig))
-	})
-	return ret, err
-}
-
-// Get retrieves the AddOnDeploymentConfig from the indexer for a given namespace and name.
-func (s addOnDeploymentConfigNamespaceLister) Get(name string) (*v1alpha1.AddOnDeploymentConfig, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("addondeploymentconfig"), name)
-	}
-	return obj.(*v1alpha1.AddOnDeploymentConfig), nil
+	listers.ResourceIndexer[*addonv1alpha1.AddOnDeploymentConfig]
 }

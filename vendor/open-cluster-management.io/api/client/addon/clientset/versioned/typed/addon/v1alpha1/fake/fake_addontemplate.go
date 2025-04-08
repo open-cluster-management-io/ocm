@@ -3,103 +3,34 @@
 package fake
 
 import (
-	"context"
-
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
 	v1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1alpha1 "open-cluster-management.io/api/client/addon/clientset/versioned/typed/addon/v1alpha1"
 )
 
-// FakeAddOnTemplates implements AddOnTemplateInterface
-type FakeAddOnTemplates struct {
+// fakeAddOnTemplates implements AddOnTemplateInterface
+type fakeAddOnTemplates struct {
+	*gentype.FakeClientWithList[*v1alpha1.AddOnTemplate, *v1alpha1.AddOnTemplateList]
 	Fake *FakeAddonV1alpha1
 }
 
-var addontemplatesResource = v1alpha1.SchemeGroupVersion.WithResource("addontemplates")
-
-var addontemplatesKind = v1alpha1.SchemeGroupVersion.WithKind("AddOnTemplate")
-
-// Get takes name of the addOnTemplate, and returns the corresponding addOnTemplate object, and an error if there is any.
-func (c *FakeAddOnTemplates) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.AddOnTemplate, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(addontemplatesResource, name), &v1alpha1.AddOnTemplate{})
-	if obj == nil {
-		return nil, err
+func newFakeAddOnTemplates(fake *FakeAddonV1alpha1) addonv1alpha1.AddOnTemplateInterface {
+	return &fakeAddOnTemplates{
+		gentype.NewFakeClientWithList[*v1alpha1.AddOnTemplate, *v1alpha1.AddOnTemplateList](
+			fake.Fake,
+			"",
+			v1alpha1.SchemeGroupVersion.WithResource("addontemplates"),
+			v1alpha1.SchemeGroupVersion.WithKind("AddOnTemplate"),
+			func() *v1alpha1.AddOnTemplate { return &v1alpha1.AddOnTemplate{} },
+			func() *v1alpha1.AddOnTemplateList { return &v1alpha1.AddOnTemplateList{} },
+			func(dst, src *v1alpha1.AddOnTemplateList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.AddOnTemplateList) []*v1alpha1.AddOnTemplate {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.AddOnTemplateList, items []*v1alpha1.AddOnTemplate) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.AddOnTemplate), err
-}
-
-// List takes label and field selectors, and returns the list of AddOnTemplates that match those selectors.
-func (c *FakeAddOnTemplates) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.AddOnTemplateList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(addontemplatesResource, addontemplatesKind, opts), &v1alpha1.AddOnTemplateList{})
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.AddOnTemplateList{ListMeta: obj.(*v1alpha1.AddOnTemplateList).ListMeta}
-	for _, item := range obj.(*v1alpha1.AddOnTemplateList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested addOnTemplates.
-func (c *FakeAddOnTemplates) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(addontemplatesResource, opts))
-}
-
-// Create takes the representation of a addOnTemplate and creates it.  Returns the server's representation of the addOnTemplate, and an error, if there is any.
-func (c *FakeAddOnTemplates) Create(ctx context.Context, addOnTemplate *v1alpha1.AddOnTemplate, opts v1.CreateOptions) (result *v1alpha1.AddOnTemplate, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(addontemplatesResource, addOnTemplate), &v1alpha1.AddOnTemplate{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.AddOnTemplate), err
-}
-
-// Update takes the representation of a addOnTemplate and updates it. Returns the server's representation of the addOnTemplate, and an error, if there is any.
-func (c *FakeAddOnTemplates) Update(ctx context.Context, addOnTemplate *v1alpha1.AddOnTemplate, opts v1.UpdateOptions) (result *v1alpha1.AddOnTemplate, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(addontemplatesResource, addOnTemplate), &v1alpha1.AddOnTemplate{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.AddOnTemplate), err
-}
-
-// Delete takes name of the addOnTemplate and deletes it. Returns an error if one occurs.
-func (c *FakeAddOnTemplates) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(addontemplatesResource, name, opts), &v1alpha1.AddOnTemplate{})
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeAddOnTemplates) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(addontemplatesResource, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.AddOnTemplateList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched addOnTemplate.
-func (c *FakeAddOnTemplates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.AddOnTemplate, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(addontemplatesResource, name, pt, data, subresources...), &v1alpha1.AddOnTemplate{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.AddOnTemplate), err
 }

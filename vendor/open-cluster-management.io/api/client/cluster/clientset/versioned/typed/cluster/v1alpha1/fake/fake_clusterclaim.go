@@ -3,103 +3,34 @@
 package fake
 
 import (
-	"context"
-
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
+	clusterv1alpha1 "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1alpha1"
 	v1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 )
 
-// FakeClusterClaims implements ClusterClaimInterface
-type FakeClusterClaims struct {
+// fakeClusterClaims implements ClusterClaimInterface
+type fakeClusterClaims struct {
+	*gentype.FakeClientWithList[*v1alpha1.ClusterClaim, *v1alpha1.ClusterClaimList]
 	Fake *FakeClusterV1alpha1
 }
 
-var clusterclaimsResource = v1alpha1.SchemeGroupVersion.WithResource("clusterclaims")
-
-var clusterclaimsKind = v1alpha1.SchemeGroupVersion.WithKind("ClusterClaim")
-
-// Get takes name of the clusterClaim, and returns the corresponding clusterClaim object, and an error if there is any.
-func (c *FakeClusterClaims) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ClusterClaim, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(clusterclaimsResource, name), &v1alpha1.ClusterClaim{})
-	if obj == nil {
-		return nil, err
+func newFakeClusterClaims(fake *FakeClusterV1alpha1) clusterv1alpha1.ClusterClaimInterface {
+	return &fakeClusterClaims{
+		gentype.NewFakeClientWithList[*v1alpha1.ClusterClaim, *v1alpha1.ClusterClaimList](
+			fake.Fake,
+			"",
+			v1alpha1.SchemeGroupVersion.WithResource("clusterclaims"),
+			v1alpha1.SchemeGroupVersion.WithKind("ClusterClaim"),
+			func() *v1alpha1.ClusterClaim { return &v1alpha1.ClusterClaim{} },
+			func() *v1alpha1.ClusterClaimList { return &v1alpha1.ClusterClaimList{} },
+			func(dst, src *v1alpha1.ClusterClaimList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.ClusterClaimList) []*v1alpha1.ClusterClaim {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.ClusterClaimList, items []*v1alpha1.ClusterClaim) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.ClusterClaim), err
-}
-
-// List takes label and field selectors, and returns the list of ClusterClaims that match those selectors.
-func (c *FakeClusterClaims) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ClusterClaimList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(clusterclaimsResource, clusterclaimsKind, opts), &v1alpha1.ClusterClaimList{})
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.ClusterClaimList{ListMeta: obj.(*v1alpha1.ClusterClaimList).ListMeta}
-	for _, item := range obj.(*v1alpha1.ClusterClaimList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested clusterClaims.
-func (c *FakeClusterClaims) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(clusterclaimsResource, opts))
-}
-
-// Create takes the representation of a clusterClaim and creates it.  Returns the server's representation of the clusterClaim, and an error, if there is any.
-func (c *FakeClusterClaims) Create(ctx context.Context, clusterClaim *v1alpha1.ClusterClaim, opts v1.CreateOptions) (result *v1alpha1.ClusterClaim, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(clusterclaimsResource, clusterClaim), &v1alpha1.ClusterClaim{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.ClusterClaim), err
-}
-
-// Update takes the representation of a clusterClaim and updates it. Returns the server's representation of the clusterClaim, and an error, if there is any.
-func (c *FakeClusterClaims) Update(ctx context.Context, clusterClaim *v1alpha1.ClusterClaim, opts v1.UpdateOptions) (result *v1alpha1.ClusterClaim, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(clusterclaimsResource, clusterClaim), &v1alpha1.ClusterClaim{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.ClusterClaim), err
-}
-
-// Delete takes name of the clusterClaim and deletes it. Returns an error if one occurs.
-func (c *FakeClusterClaims) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(clusterclaimsResource, name, opts), &v1alpha1.ClusterClaim{})
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeClusterClaims) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(clusterclaimsResource, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.ClusterClaimList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched clusterClaim.
-func (c *FakeClusterClaims) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterClaim, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clusterclaimsResource, name, pt, data, subresources...), &v1alpha1.ClusterClaim{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.ClusterClaim), err
 }

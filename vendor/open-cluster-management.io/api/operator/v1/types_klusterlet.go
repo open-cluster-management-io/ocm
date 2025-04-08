@@ -224,7 +224,7 @@ type BootstrapKubeConfigs struct {
 	// LocalSecretsConfig include a list of secrets that contains the kubeconfigs for ordered bootstrap kubeconifigs.
 	// The secrets must be in the same namespace where the agent controller runs.
 	// +optional
-	LocalSecrets LocalSecretsConfig `json:"localSecretsConfig,omitempty"`
+	LocalSecrets *LocalSecretsConfig `json:"localSecretsConfig,omitempty"`
 }
 
 type LocalSecretsConfig struct {

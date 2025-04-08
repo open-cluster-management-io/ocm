@@ -3,10 +3,10 @@
 package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
-	v1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
 // ClusterManagementAddOnLister helps list ClusterManagementAddOns.
@@ -14,39 +14,19 @@ import (
 type ClusterManagementAddOnLister interface {
 	// List lists all ClusterManagementAddOns in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.ClusterManagementAddOn, err error)
+	List(selector labels.Selector) (ret []*addonv1alpha1.ClusterManagementAddOn, err error)
 	// Get retrieves the ClusterManagementAddOn from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.ClusterManagementAddOn, error)
+	Get(name string) (*addonv1alpha1.ClusterManagementAddOn, error)
 	ClusterManagementAddOnListerExpansion
 }
 
 // clusterManagementAddOnLister implements the ClusterManagementAddOnLister interface.
 type clusterManagementAddOnLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*addonv1alpha1.ClusterManagementAddOn]
 }
 
 // NewClusterManagementAddOnLister returns a new ClusterManagementAddOnLister.
 func NewClusterManagementAddOnLister(indexer cache.Indexer) ClusterManagementAddOnLister {
-	return &clusterManagementAddOnLister{indexer: indexer}
-}
-
-// List lists all ClusterManagementAddOns in the indexer.
-func (s *clusterManagementAddOnLister) List(selector labels.Selector) (ret []*v1alpha1.ClusterManagementAddOn, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.ClusterManagementAddOn))
-	})
-	return ret, err
-}
-
-// Get retrieves the ClusterManagementAddOn from the index for a given name.
-func (s *clusterManagementAddOnLister) Get(name string) (*v1alpha1.ClusterManagementAddOn, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("clustermanagementaddon"), name)
-	}
-	return obj.(*v1alpha1.ClusterManagementAddOn), nil
+	return &clusterManagementAddOnLister{listers.New[*addonv1alpha1.ClusterManagementAddOn](indexer, addonv1alpha1.Resource("clustermanagementaddon"))}
 }

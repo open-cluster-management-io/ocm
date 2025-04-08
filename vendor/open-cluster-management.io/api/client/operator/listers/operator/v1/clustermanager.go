@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
-	v1 "open-cluster-management.io/api/operator/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
+	operatorv1 "open-cluster-management.io/api/operator/v1"
 )
 
 // ClusterManagerLister helps list ClusterManagers.
@@ -14,39 +14,19 @@ import (
 type ClusterManagerLister interface {
 	// List lists all ClusterManagers in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ClusterManager, err error)
+	List(selector labels.Selector) (ret []*operatorv1.ClusterManager, err error)
 	// Get retrieves the ClusterManager from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.ClusterManager, error)
+	Get(name string) (*operatorv1.ClusterManager, error)
 	ClusterManagerListerExpansion
 }
 
 // clusterManagerLister implements the ClusterManagerLister interface.
 type clusterManagerLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*operatorv1.ClusterManager]
 }
 
 // NewClusterManagerLister returns a new ClusterManagerLister.
 func NewClusterManagerLister(indexer cache.Indexer) ClusterManagerLister {
-	return &clusterManagerLister{indexer: indexer}
-}
-
-// List lists all ClusterManagers in the indexer.
-func (s *clusterManagerLister) List(selector labels.Selector) (ret []*v1.ClusterManager, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.ClusterManager))
-	})
-	return ret, err
-}
-
-// Get retrieves the ClusterManager from the index for a given name.
-func (s *clusterManagerLister) Get(name string) (*v1.ClusterManager, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("clustermanager"), name)
-	}
-	return obj.(*v1.ClusterManager), nil
+	return &clusterManagerLister{listers.New[*operatorv1.ClusterManager](indexer, operatorv1.Resource("clustermanager"))}
 }
