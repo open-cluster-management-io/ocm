@@ -1,3 +1,4 @@
+{{- if or ( eq .Values.klusterlet.mode "Singleton") (eq .Values.klusterlet.mode "Default") }}
 {{- if not .Values.noOperator }}
 kind: Deployment
 apiVersion: apps/v1
@@ -74,4 +75,5 @@ spec:
       {{- if .Values.priorityClassName }}
       priorityClassName: {{ .Values.priorityClassName }}
       {{- end }}
+{{- end }}
 {{- end }}

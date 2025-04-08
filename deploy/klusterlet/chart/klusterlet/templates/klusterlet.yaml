@@ -9,8 +9,8 @@ spec:
   registrationImagePullSpec: "{{ template "registrationImage" . }}"
   workImagePullSpec: "{{ template "workImage" . }}"
   imagePullSpec: "{{ template "operatorImage" . }}"
-  clusterName: {{ .Values.klusterlet.clusterName }}
-  namespace: "{{ template "agentNamespace" . }}"
+  clusterName: "{{ .Values.klusterlet.clusterName }}"
+  namespace: "{{ template "klusterletNamespace" . }}"
   {{- with .Values.klusterlet.externalServerURLs }}
   externalServerURLs:
     {{- toYaml . | nindent 4 }}

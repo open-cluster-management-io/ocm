@@ -301,17 +301,29 @@ func TestKlusterletConfig(t *testing.T) {
 			expectedObjCnt: 6,
 		},
 		{
-			name:      "hosted mode",
+			name:      "hosted mode without bootstrap",
 			namespace: "ocm",
 			chartConfig: func() *KlusterletChartConfig {
 				config := NewDefaultKlusterletChartConfig()
-				config.NoOperator = true
 				config.Klusterlet.Name = "klusterlet2"
 				config.Klusterlet.ClusterName = "testCluster"
 				config.Klusterlet.Mode = operatorv1.InstallModeSingletonHosted
 				return config
 			},
 			expectedObjCnt: 1,
+		},
+		{
+			name:      "hosted mode with bootstrap",
+			namespace: "ocm",
+			chartConfig: func() *KlusterletChartConfig {
+				config := NewDefaultKlusterletChartConfig()
+				config.Klusterlet.Name = "klusterlet2"
+				config.Klusterlet.ClusterName = "testCluster"
+				config.Klusterlet.Mode = operatorv1.InstallModeSingletonHosted
+				config.BootstrapHubKubeConfig = "kubeconfig"
+				return config
+			},
+			expectedObjCnt: 3,
 		},
 		{
 			name:      "noOperator",
@@ -440,8 +452,20 @@ func TestKlusterletConfig(t *testing.T) {
 				}
 				switch object := obj.(type) {
 				case *corev1.Namespace:
-					if object.Name != c.namespace && object.Name != "open-cluster-management-agent" {
-						t.Errorf("expected namespace %s, got %s", c.namespace, object.Name)
+					if object.Name != c.namespace {
+						if config.Klusterlet.Mode == operatorv1.InstallModeSingletonHosted ||
+							config.Klusterlet.Mode == operatorv1.InstallModeHosted {
+							if object.Name != config.Klusterlet.Name {
+								t.Errorf(" expected namespace %s, got %s", config.Klusterlet.Name, object.Name)
+							}
+						} else {
+							if config.Klusterlet.Namespace == "" && object.Name != "open-cluster-management-agent" {
+								t.Errorf(" expected namespace open-cluster-management-agent, got %s", object.Name)
+							}
+							if config.Klusterlet.Namespace != "" && object.Name != config.Klusterlet.Name {
+								t.Errorf(" expected %s, got %s", config.Klusterlet.Namespace, object.Name)
+							}
+						}
 					}
 				case *appsv1.Deployment:
 					if object.Namespace != c.namespace {
@@ -519,6 +543,9 @@ func TestKlusterletConfig(t *testing.T) {
 				case *corev1.Secret:
 					switch object.Name {
 					case "open-cluster-management-image-pull-credentials":
+						if object.Namespace != c.namespace {
+							t.Errorf(" expected namespace %s, got %s", c.namespace, object.Namespace)
+						}
 						data := object.Data[corev1.DockerConfigJsonKey]
 						if len(data) == 0 {
 							t.Errorf("failed to get image pull secret")
@@ -527,6 +554,19 @@ func TestKlusterletConfig(t *testing.T) {
 							t.Errorf("failed to render image pull secret")
 						}
 					case "bootstrap-hub-kubeconfig", "external-managed-kubeconfig":
+						if config.Klusterlet.Mode == operatorv1.InstallModeSingletonHosted ||
+							config.Klusterlet.Mode == operatorv1.InstallModeHosted {
+							if object.Namespace != config.Klusterlet.Name {
+								t.Errorf(" expected namespace %s, got %s", config.Klusterlet.Name, object.Namespace)
+							}
+						} else {
+							if config.Klusterlet.Namespace == "" && object.Namespace != "open-cluster-management-agent" {
+								t.Errorf(" expected namespace open-cluster-management-agent, got %s", object.Namespace)
+							}
+							if config.Klusterlet.Namespace != "" && object.Namespace != config.Klusterlet.Namespace {
+								t.Errorf(" expected %s, got %s", config.Klusterlet.Namespace, object.Namespace)
+							}
+						}
 						data := object.Data["kubeconfig"]
 						if base64.StdEncoding.EncodeToString(data) == "" {
 							t.Errorf("failed to render kubeconfig")

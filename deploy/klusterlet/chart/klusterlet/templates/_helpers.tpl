@@ -44,11 +44,16 @@ Create secret to access docker registry
 {{- end }}
 {{- end }}
 
+{{/*
+ agentNamespace is the klusterlet name in hosted mode.
+ agentNamespace is the klusterlet.namespace in default mode.
+ agentNamespace is open-cluster-management-agent if klusterlet.namespace is empty in default mode.
+*/}}
 {{- define "agentNamespace" }}
-{{- if .Values.klusterlet.namespace }}
+{{- if or ( eq .Values.klusterlet.mode "Hosted") (eq .Values.klusterlet.mode "SingletonHosted") }}
+{{- printf "%s" .Values.klusterlet.name }}
+{{- else if .Values.klusterlet.namespace }}
 {{- printf "%s" .Values.klusterlet.namespace }}
-{{- else if  or ( eq .Values.klusterlet.mode "Hosted") (eq .Values.klusterlet.mode "SingletonHosted") }}
-{{- printf "open-cluster-management-%s" .Values.klusterlet.clusterName }}
 {{- else }}
 {{- printf "open-cluster-management-agent" }}
 {{- end }}
@@ -62,5 +67,15 @@ Create secret to access docker registry
 {{- printf "klusterlet-%s" .Values.klusterlet.clusterName }}
 {{- else }}
 {{- printf "klusterlet" }}
+{{- end }}
+{{- end }}
+
+{{- define "klusterletNamespace" }}
+{{- if .Values.klusterlet.namespace }}
+{{- printf "%s" .Values.klusterlet.namespace }}
+{{- else if  or ( eq .Values.klusterlet.mode "Hosted") (eq .Values.klusterlet.mode "SingletonHosted") }}
+{{- printf "open-cluster-management-%s" .Values.klusterlet.clusterName }}
+{{- else }}
+{{- printf "open-cluster-management-agent" }}
 {{- end }}
 {{- end }}
