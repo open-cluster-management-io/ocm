@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509/pkix"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -287,7 +288,7 @@ func (c *CSRDriver) IsHubKubeConfigValid(ctx context.Context, secretOption regis
 		}
 	}
 
-	return isCertificateValid(logger, certData, nil)
+	return IsCertificateValid(logger, certData, nil)
 }
 
 func (c *CSRDriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
@@ -370,7 +371,15 @@ func (c *CSRDriver) BuildClients(ctx context.Context, secretOption register.Secr
 var _ register.RegisterDriver = &CSRDriver{}
 var _ register.AddonDriver = &CSRDriver{}
 
-func NewCSRDriver(opt *Option, secretOpts register.SecretOption) *CSRDriver {
+func NewCSRDriver(opt *Option, secretOpts register.SecretOption) (*CSRDriver, error) {
+	if len(secretOpts.BootStrapKubeConfigFile) == 0 {
+		return nil, errors.New("bootstrap-kubeconfig is required")
+	}
+
+	signer := certificates.KubeAPIServerClientSignerName
+	if secretOpts.Signer != "" {
+		signer = secretOpts.Signer
+	}
 	driver := &CSRDriver{
 		opt: opt,
 	}
@@ -389,7 +398,7 @@ func NewCSRDriver(opt *Option, secretOpts register.SecretOption) *CSRDriver {
 			},
 			CommonName: fmt.Sprintf("%s%s:%s", user.SubjectPrefix, secretOpts.ClusterName, secretOpts.AgentName),
 		},
-		SignerName: certificates.KubeAPIServerClientSignerName,
+		SignerName: signer,
 		EventFilterFunc: func(obj interface{}) bool {
 			accessor, err := meta.Accessor(obj)
 			if err != nil {
@@ -412,7 +421,7 @@ func NewCSRDriver(opt *Option, secretOpts register.SecretOption) *CSRDriver {
 		},
 	}
 
-	return driver
+	return driver, nil
 }
 
 func shouldCreateCSR(
@@ -424,7 +433,7 @@ func shouldCreateCSR(
 	additionalSecretData map[string][]byte) (bool, error) {
 	// create a csr to request new client certificate if
 	// a.there is no valid client certificate issued for the current cluster/agent
-	valid, err := isCertificateValid(logger, secret.Data[TLSCertFile], subject)
+	valid, err := IsCertificateValid(logger, secret.Data[TLSCertFile], subject)
 	if err != nil {
 		recorder.Eventf("CertificateValidationFailed", "Failed to validate client certificate for %s: %v", controllerName, err)
 		return true, nil

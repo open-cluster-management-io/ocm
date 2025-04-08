@@ -83,7 +83,9 @@ func (c *AWSIRSADriver) InformerHandler() (cache.SharedIndexInformer, factory.Ev
 }
 
 func (c *AWSIRSADriver) IsHubKubeConfigValid(ctx context.Context, secretOption register.SecretOption) (bool, error) {
-	// TODO: implement the logic to validate the kubeconfig
+	if secretOption.BootStrapKubeConfigFile == "" {
+		return false, nil
+	}
 	return true, nil
 }
 
