@@ -75,7 +75,7 @@ func TestProcess(t *testing.T) {
 			validateActions: func(t *testing.T, hubActions []clienttesting.Action, secret *corev1.Secret) {
 				logger, _ := ktesting.NewTestContext(t)
 				testingcommon.AssertActions(t, hubActions, "get", "get")
-				valid, err := isCertificateValid(logger, secret.Data[TLSCertFile], testSubject)
+				valid, err := IsCertificateValid(logger, secret.Data[TLSCertFile], testSubject)
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
@@ -316,24 +316,27 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 			isValid: false,
 		},
 		{
-			name:       "no tls key",
-			kubeconfig: kubeconfig,
-			isValid:    false,
+			name:               "no tls key",
+			kubeconfig:         kubeconfig,
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", "/etc/ca.crt", nil, nil, nil),
+			isValid:            false,
 		},
 		{
-			name:       "no tls cert",
-			kubeconfig: kubeconfig,
-			tlsKey:     cert1.Key,
-			isValid:    false,
+			name:               "no tls cert",
+			kubeconfig:         kubeconfig,
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", "/etc/ca.crt", nil, nil, nil),
+			tlsKey:             cert1.Key,
+			isValid:            false,
 		},
 		{
-			name:        "cert is not issued for cluster1:agent1",
-			clusterName: "cluster1",
-			agentName:   "agent1",
-			kubeconfig:  kubeconfig,
-			tlsKey:      cert2.Key,
-			tlsCert:     cert2.Cert,
-			isValid:     false,
+			name:               "cert is not issued for cluster1:agent1",
+			clusterName:        "cluster1",
+			agentName:          "agent1",
+			kubeconfig:         kubeconfig,
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", "/etc/ca.crt", nil, nil, nil),
+			tlsKey:             cert2.Key,
+			tlsCert:            cert2.Cert,
+			isValid:            false,
 		},
 		{
 			name:               "context cluster changes",
@@ -404,7 +407,7 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 				HubKubeconfigDir:  tempDir,
 				HubKubeconfigFile: path.Join(tempDir, "kubeconfig"),
 			}
-			driver := NewCSRDriver(NewCSROption(), secretOption)
+			driver, _ := NewCSRDriver(NewCSROption(), secretOption)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -586,7 +589,15 @@ func TestNewCSRDriver(t *testing.T) {
 		ClusterName: "cluster1",
 		AgentName:   "agent1",
 	}
-	driver := NewCSRDriver(NewCSROption(), secretOpts)
+	driver, err := NewCSRDriver(NewCSROption(), secretOpts)
+	if err == nil {
+		t.Errorf("expect error, but got nil")
+	}
+	secretOpts.BootStrapKubeConfigFile = "bootstrap-kubeconfig"
+	driver, err = NewCSRDriver(NewCSROption(), secretOpts)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if driver.csrOption.Subject.CommonName != fmt.Sprintf("%scluster1:agent1", user.SubjectPrefix) {
 		t.Errorf("common name is not set correctly, got %s", driver.csrOption.Subject.CommonName)
 	}
@@ -743,8 +754,9 @@ func TestBuildClient(t *testing.T) {
 			}
 
 			secretOpts := register.SecretOption{
-				ClusterName: "cluster1",
-				AgentName:   "agent1",
+				ClusterName:             "cluster1",
+				AgentName:               "agent1",
+				BootStrapKubeConfigFile: "boostrap.yaml",
 			}
 			if tt.kubeconfig != nil {
 				testinghelpers.WriteFile(path.Join(tempDir, "kubeconfig"), tt.kubeconfig)
@@ -754,7 +766,7 @@ func TestBuildClient(t *testing.T) {
 				testinghelpers.WriteFile(path.Join(tempDir, "bootstrap-kubeconfig"), tt.bootstrapKubeconfig)
 				secretOpts.BootStrapKubeConfigFile = path.Join(tempDir, "bootstrap-kubeconfig")
 			}
-			driver := NewCSRDriver(NewCSROption(), secretOpts)
+			driver, _ := NewCSRDriver(NewCSROption(), secretOpts)
 			_, err := driver.BuildClients(context.TODO(), secretOpts, tt.bootstrap)
 			if (err != nil) != tt.expectErr {
 				t.Errorf("expected error %v but got %v", tt.expectErr, err)

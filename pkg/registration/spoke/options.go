@@ -84,10 +84,6 @@ func (o *SpokeAgentOptions) Validate() error {
 		if len(o.BootstrapKubeconfigs) < 2 {
 			return errors.New("expect at least 2 bootstrap kubeconfigs")
 		}
-	} else if !features.SpokeMutableFeatureGate.Enabled(ocmfeature.MultipleHubs) {
-		if o.BootstrapKubeconfig == "" {
-			return errors.New("bootstrap-kubeconfig is required")
-		}
 	}
 
 	// if SpokeExternalServerURLs is specified we validate every URL in it, we expect the spoke external server URL is https
