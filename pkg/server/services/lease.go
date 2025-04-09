@@ -3,7 +3,9 @@ package services
 import (
 	"context"
 	"fmt"
+
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	leasev1 "k8s.io/client-go/informers/coordination/v1"
@@ -11,7 +13,8 @@ import (
 	leaselister "k8s.io/client-go/listers/coordination/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	csrce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
+
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	leasece "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/lease"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server"
@@ -40,7 +43,11 @@ func (l LeaseService) List(listOpts types.ListOptions) ([]*cloudevents.Event, er
 	if len(listOpts.ClusterName) == 0 {
 		return nil, fmt.Errorf("cluster name is empty")
 	}
-	leases, err := l.lister.Leases(listOpts.ClusterName).List(labels.Everything())
+
+	selector := labels.SelectorFromSet(labels.Set{
+		clusterv1.ClusterNameLabelKey: listOpts.ClusterName,
+	})
+	leases, err := l.lister.Leases(listOpts.ClusterName).List(selector)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +93,7 @@ func (l LeaseService) RegisterHandler(handler server.EventHandler) {
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			key, _ := cache.MetaNamespaceKeyFunc(newObj)
-			if err := handler.OnUpdate(context.Background(), csrce.CSREventDataType, key); err != nil {
+			if err := handler.OnUpdate(context.Background(), leasece.LeaseEventDataType, key); err != nil {
 				klog.Error(err)
 			}
 		},

@@ -5,31 +5,37 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"google.golang.org/grpc/credentials"
-	"k8s.io/klog/v2"
 	"math"
 	"net"
-	eventce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
-	leasece "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/lease"
 	"os"
 	"time"
+
+	"google.golang.org/grpc/credentials"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
+
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
 	addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
+	eventce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
+	leasece "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/lease"
 	grpcserver "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
@@ -42,7 +48,7 @@ func NewGRPCServer() *cobra.Command {
 	opts := commonoptions.NewOptions()
 	grpcServerOpts := NewGRPCServerOptions()
 	cmdConfig := opts.
-		NewControllerCommandConfig("grpc-server", version.Get(), grpcServerOpts.Run)
+		NewControllerCommandConfig("grpc-server", version.Get(), grpcServerOpts.Run, clock.RealClock{})
 	cmd := cmdConfig.NewCommandWithContext(context.TODO())
 	cmd.Use = "grpc-server"
 	cmd.Short = "Start the gRPC Server"
@@ -188,7 +194,19 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 	}
 	addonInformers := addoninformers.NewSharedInformerFactory(addonClient, 10*time.Minute)
 	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 30*time.Minute)
-	kubeInformers := kubeinformers.NewSharedInformerFactory(kubeClient, 30*time.Minute)
+	kubeInformers := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, 30*time.Minute,
+		kubeinformers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
+			selector := &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      clusterv1.ClusterNameLabelKey,
+						Operator: metav1.LabelSelectorOpExists,
+					},
+				},
+			}
+			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
+		}))
+
 	grpcEventServer.RegisterService(
 		cluster.ManagedClusterEventDataType,
 		services.NewClusterService(clusterClient, clusterInformers.Cluster().V1().ManagedClusters()))
@@ -207,6 +225,7 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 		leasece.LeaseEventDataType,
 		services.NewLeaseService(kubeClient, kubeInformers.Coordination().V1().Leases()),
 	)
+
 	go clusterInformers.Start(ctx.Done())
 	go kubeInformers.Start(ctx.Done())
 	go addonInformers.Start(ctx.Done())
