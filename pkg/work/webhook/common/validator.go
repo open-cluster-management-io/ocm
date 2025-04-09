@@ -26,7 +26,7 @@ func (m *Validator) ValidateManifests(manifests []workv1.Manifest) error {
 
 	totalSize := 0
 	for _, manifest := range manifests {
-		totalSize = totalSize + manifest.Size()
+		totalSize += manifest.Size()
 	}
 
 	if totalSize > m.limit {

@@ -73,10 +73,10 @@ func (d *statusReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 		mwrSet.Status.PlacementsSummary[id].Summary.Available = available
 		mwrSet.Status.PlacementsSummary[id].Summary.Degraded = degrad
 		// Set the manifestWorkReplicaSet count
-		appliedCount = appliedCount + applied
-		processingCount = processingCount + processing
-		availableCount = availableCount + available
-		degradCount = degradCount + degrad
+		appliedCount += applied
+		processingCount += processing
+		availableCount += available
+		degradCount += degrad
 	}
 
 	mwrSet.Status.Summary.Available = availableCount
@@ -84,7 +84,7 @@ func (d *statusReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 	mwrSet.Status.Summary.Progressing = processingCount
 	mwrSet.Status.Summary.Applied = appliedCount
 
-	if mwrSet.Status.Summary.Available == mwrSet.Status.Summary.Total &&
+	if mwrSet.Status.Summary.Available == mwrSet.Status.Summary.Total && //nolint:gocritic
 		mwrSet.Status.Summary.Progressing == 0 && mwrSet.Status.Summary.Degraded == 0 {
 		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetManifestworkApplied(workapiv1alpha1.ReasonAsExpected, ""))
 	} else if mwrSet.Status.Summary.Progressing > 0 && mwrSet.Status.Summary.Degraded == 0 {

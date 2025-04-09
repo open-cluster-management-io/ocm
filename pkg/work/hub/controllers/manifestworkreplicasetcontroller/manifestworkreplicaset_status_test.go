@@ -201,7 +201,7 @@ func TestStatusReconcileNotAsExpected(t *testing.T) {
 		cond := getCondition(workv1.WorkApplied, "", "", metav1.ConditionTrue)
 		apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 
-		if id%2 == 0 {
+		if id%2 == 0 { //nolint:gocritic
 			cond = getCondition(workv1.WorkAvailable, "", "", metav1.ConditionTrue)
 			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 			avaCount++
@@ -273,7 +273,7 @@ func TestStatusWithMultiPlacementsReconcileAsExpected(t *testing.T) {
 			Summary: workapiv1alpha1.ManifestWorkReplicaSetSummary{
 				Total: len(clusters),
 			}})
-		count = count + len(clusters)
+		count += len(clusters)
 		for _, cls := range clusters {
 			mw := helpertest.CreateTestManifestWork(mwrSetTest.Name, mwrSetTest.Namespace, plcName, cls)
 			err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw)

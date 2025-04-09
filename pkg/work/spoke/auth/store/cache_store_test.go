@@ -87,7 +87,7 @@ func TestBasic(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		dimensionNameAccumulate = dimensionNameAccumulate + dn
+		dimensionNameAccumulate += dn
 		return nil
 	})
 

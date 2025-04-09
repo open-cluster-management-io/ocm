@@ -535,9 +535,9 @@ func ensureObject(t *testing.T, object runtime.Object, klusterlet *operatorapiv1
 	}
 
 	namespace := helpers.AgentNamespace(klusterlet)
-	switch o := object.(type) {
+	switch o := object.(type) { //nolint:gocritic
 	case *appsv1.Deployment:
-		if strings.Contains(access.GetName(), "registration") {
+		if strings.Contains(access.GetName(), "registration") { //nolint:gocritic
 			testingcommon.AssertEqualNameNamespace(
 				t, access.GetName(), access.GetNamespace(),
 				fmt.Sprintf("%s-registration-agent", klusterlet.Name), namespace)
