@@ -44,7 +44,7 @@ var _ = Describe("Deploy Klusterlet with Multiplehubs enabled", func() {
 					},
 					BootstrapKubeConfigs: operatorapiv1.BootstrapKubeConfigs{
 						Type: operatorapiv1.LocalSecrets,
-						LocalSecrets: operatorapiv1.LocalSecretsConfig{
+						LocalSecrets: &operatorapiv1.LocalSecretsConfig{
 							KubeConfigSecrets: []operatorapiv1.KubeConfigSecret{
 								{
 									Name: boostrapKubeConfigSecretHub1,

@@ -94,7 +94,7 @@ func (w *workCache) safeToSkipApply(required, existing *workapiv1.ManifestWork) 
 func hashOfResourceStruct(o interface{}) string {
 	oString, _ := json.Marshal(o)
 	h := md5.New()
-	if _, err := io.WriteString(h, string(oString)); err != nil {
+	if _, err := io.Writer.Write(h, oString); err != nil {
 		klog.Errorf("failed to hash object: %v", err)
 	}
 	rval := fmt.Sprintf("%x", h.Sum(nil))

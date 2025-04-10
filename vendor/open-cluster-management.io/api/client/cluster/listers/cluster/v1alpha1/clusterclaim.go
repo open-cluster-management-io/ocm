@@ -3,10 +3,10 @@
 package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
-	v1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
+	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 )
 
 // ClusterClaimLister helps list ClusterClaims.
@@ -14,39 +14,19 @@ import (
 type ClusterClaimLister interface {
 	// List lists all ClusterClaims in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.ClusterClaim, err error)
+	List(selector labels.Selector) (ret []*clusterv1alpha1.ClusterClaim, err error)
 	// Get retrieves the ClusterClaim from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.ClusterClaim, error)
+	Get(name string) (*clusterv1alpha1.ClusterClaim, error)
 	ClusterClaimListerExpansion
 }
 
 // clusterClaimLister implements the ClusterClaimLister interface.
 type clusterClaimLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*clusterv1alpha1.ClusterClaim]
 }
 
 // NewClusterClaimLister returns a new ClusterClaimLister.
 func NewClusterClaimLister(indexer cache.Indexer) ClusterClaimLister {
-	return &clusterClaimLister{indexer: indexer}
-}
-
-// List lists all ClusterClaims in the indexer.
-func (s *clusterClaimLister) List(selector labels.Selector) (ret []*v1alpha1.ClusterClaim, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.ClusterClaim))
-	})
-	return ret, err
-}
-
-// Get retrieves the ClusterClaim from the index for a given name.
-func (s *clusterClaimLister) Get(name string) (*v1alpha1.ClusterClaim, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("clusterclaim"), name)
-	}
-	return obj.(*v1alpha1.ClusterClaim), nil
+	return &clusterClaimLister{listers.New[*clusterv1alpha1.ClusterClaim](indexer, clusterv1alpha1.Resource("clusterclaim"))}
 }

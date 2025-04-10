@@ -2,6 +2,8 @@ module open-cluster-management.io/ocm
 
 go 1.23.6
 
+replace open-cluster-management.io/sdk-go => github.com/haoqing0110/sdk-go v0.0.0-20250409093155-5da53ef5156d
+
 require (
 	github.com/aws/aws-sdk-go-v2 v1.36.3
 	github.com/aws/aws-sdk-go-v2/config v1.28.11
@@ -11,6 +13,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/evanphx/json-patch v5.9.0+incompatible
 	github.com/ghodss/yaml v1.0.0
+	github.com/google/cel-go v0.22.0
 	github.com/google/go-cmp v0.6.0
 	github.com/mochi-mqtt/server/v2 v2.6.6
 	github.com/onsi/ginkgo/v2 v2.22.0
@@ -36,16 +39,16 @@ require (
 	k8s.io/kube-aggregator v0.32.1
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 	open-cluster-management.io/addon-framework v0.12.1-0.20250401143304-75b65b5f45e0
-	open-cluster-management.io/api v0.16.1
+	open-cluster-management.io/api v0.16.2-0.20250409021335-2458a27a0686
 	open-cluster-management.io/sdk-go v0.16.1-0.20250327091909-6bd6228a47ad
 	sigs.k8s.io/cluster-inventory-api v0.0.0-20240730014211-ef0154379848
-	sigs.k8s.io/controller-runtime v0.19.3
+	sigs.k8s.io/controller-runtime v0.20.2
 	sigs.k8s.io/kube-storage-version-migrator v0.0.6-0.20230721195810-5c8923c5ff96
 	sigs.k8s.io/yaml v1.4.0
 )
 
 require (
-	cel.dev/expr v0.18.0 // indirect
+	cel.dev/expr v0.19.1 // indirect
 	cloud.google.com/go/compute/metadata v0.5.0 // indirect
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect
@@ -81,7 +84,7 @@ require (
 	github.com/docker/docker v27.1.2+incompatible // indirect
 	github.com/eclipse/paho.golang v0.21.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
-	github.com/evanphx/json-patch/v5 v5.9.0 // indirect
+	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/felixge/fgprof v0.9.4 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -97,8 +100,7 @@ require (
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/google/btree v1.0.1 // indirect
-	github.com/google/cel-go v0.22.0 // indirect
+	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20241029153458-d1b30febd7db // indirect

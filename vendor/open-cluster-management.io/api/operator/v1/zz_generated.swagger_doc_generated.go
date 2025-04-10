@@ -143,7 +143,7 @@ func (NodePlacement) SwaggerDoc() map[string]string {
 var map_RegistrationDriverHub = map[string]string{
 	"authType": "Type of the authentication used by hub to initialize the Hub cluster. Possible values are csr and awsirsa.",
 	"csr":      "CSR represents the configuration for csr driver.",
-	"awsisra":  "AwsIrsa represents the configuration for awsisra driver.",
+	"awsirsa":  "AwsIrsa represents the configuration for awsirsa driver.",
 }
 
 func (RegistrationDriverHub) SwaggerDoc() map[string]string {

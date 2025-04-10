@@ -3,7 +3,7 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,15 +12,15 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 	versioned "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	internalinterfaces "open-cluster-management.io/api/client/cluster/informers/externalversions/internalinterfaces"
-	v1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	clusterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	apiclusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 // ManagedClusterInformer provides access to a shared informer and lister for
 // ManagedClusters.
 type ManagedClusterInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ManagedClusterLister
+	Lister() clusterv1.ManagedClusterLister
 }
 
 type managedClusterInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredManagedClusterInformer(client versioned.Interface, resyncPeriod 
 				return client.ClusterV1().ManagedClusters().Watch(context.TODO(), options)
 			},
 		},
-		&clusterv1.ManagedCluster{},
+		&apiclusterv1.ManagedCluster{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *managedClusterInformer) defaultInformer(client versioned.Interface, res
 }
 
 func (f *managedClusterInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&clusterv1.ManagedCluster{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiclusterv1.ManagedCluster{}, f.defaultInformer)
 }
 
-func (f *managedClusterInformer) Lister() v1.ManagedClusterLister {
-	return v1.NewManagedClusterLister(f.Informer().GetIndexer())
+func (f *managedClusterInformer) Lister() clusterv1.ManagedClusterLister {
+	return clusterv1.NewManagedClusterLister(f.Informer().GetIndexer())
 }

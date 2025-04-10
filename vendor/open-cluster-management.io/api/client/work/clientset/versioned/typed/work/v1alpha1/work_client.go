@@ -3,11 +3,11 @@
 package v1alpha1
 
 import (
-	"net/http"
+	http "net/http"
 
 	rest "k8s.io/client-go/rest"
-	"open-cluster-management.io/api/client/work/clientset/versioned/scheme"
-	v1alpha1 "open-cluster-management.io/api/work/v1alpha1"
+	scheme "open-cluster-management.io/api/client/work/clientset/versioned/scheme"
+	workv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 )
 
 type WorkV1alpha1Interface interface {
@@ -69,10 +69,10 @@ func New(c rest.Interface) *WorkV1alpha1Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1alpha1.SchemeGroupVersion
+	gv := workv1alpha1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	config.NegotiatedSerializer = rest.CodecFactoryForGeneratedClient(scheme.Scheme, scheme.Codecs).WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

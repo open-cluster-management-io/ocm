@@ -12,11 +12,15 @@ import (
 )
 
 func TestMatches(t *testing.T) {
+	env, err := NewEnv(nil)
+	if err != nil {
+		t.Fatalf("failed to create CEL environment: %v", err)
+	}
+
 	cases := []struct {
 		name            string
 		clusterselector clusterapiv1beta1.ClusterSelector
-		clusterlabels   map[string]string
-		clusterclaims   map[string]string
+		cluster         *clusterapiv1.ManagedCluster
 		expectedMatch   bool
 	}{
 		{
@@ -28,8 +32,7 @@ func TestMatches(t *testing.T) {
 					},
 				},
 			},
-			clusterlabels: map[string]string{"cloud": "Amazon"},
-			clusterclaims: map[string]string{},
+			cluster:       testinghelpers.NewManagedCluster("test").WithLabel("cloud", "Amazon").Build(),
 			expectedMatch: true,
 		},
 		{
@@ -41,8 +44,7 @@ func TestMatches(t *testing.T) {
 					},
 				},
 			},
-			clusterlabels: map[string]string{"cloud": "Google"},
-			clusterclaims: map[string]string{},
+			cluster:       testinghelpers.NewManagedCluster("test").WithLabel("cloud", "Google").Build(),
 			expectedMatch: false,
 		},
 		{
@@ -58,8 +60,7 @@ func TestMatches(t *testing.T) {
 					},
 				},
 			},
-			clusterlabels: map[string]string{},
-			clusterclaims: map[string]string{"cloud": "Amazon"},
+			cluster:       testinghelpers.NewManagedCluster("test").WithClaim("cloud", "Amazon").Build(),
 			expectedMatch: true,
 		},
 		{
@@ -75,8 +76,7 @@ func TestMatches(t *testing.T) {
 					},
 				},
 			},
-			clusterlabels: map[string]string{},
-			clusterclaims: map[string]string{"cloud": "Google"},
+			cluster:       testinghelpers.NewManagedCluster("test").WithClaim("cloud", "Google").Build(),
 			expectedMatch: false,
 		},
 		{
@@ -97,8 +97,7 @@ func TestMatches(t *testing.T) {
 					},
 				},
 			},
-			clusterlabels: map[string]string{"cloud": "Amazon"},
-			clusterclaims: map[string]string{"region": "us-east-1"},
+			cluster:       testinghelpers.NewManagedCluster("test").WithLabel("cloud", "Amazon").WithClaim("region", "us-east-1").Build(),
 			expectedMatch: true,
 		},
 		{
@@ -119,19 +118,89 @@ func TestMatches(t *testing.T) {
 					},
 				},
 			},
-			clusterlabels: map[string]string{"region": "us-east-1"},
-			clusterclaims: map[string]string{"cloud": "Amazon"},
+			cluster:       testinghelpers.NewManagedCluster("test").WithLabel("region", "us-east-1").WithClaim("cloud", "Amazon").Build(),
+			expectedMatch: false,
+		},
+		{
+			name: "match with CEL expression",
+			clusterselector: clusterapiv1beta1.ClusterSelector{
+				CelSelector: clusterapiv1beta1.ClusterCelSelector{
+					CelExpressions: []string{
+						`managedCluster.metadata.labels["env"] == "prod"`,
+					},
+				},
+			},
+			cluster:       testinghelpers.NewManagedCluster("test").WithLabel("env", "prod").Build(),
+			expectedMatch: true,
+		},
+		{
+			name: "not match with CEL expression",
+			clusterselector: clusterapiv1beta1.ClusterSelector{
+				CelSelector: clusterapiv1beta1.ClusterCelSelector{
+					CelExpressions: []string{
+						`managedCluster.metadata.labels["env"] == "prod"`,
+					},
+				},
+			},
+			cluster:       testinghelpers.NewManagedCluster("test").WithLabel("env", "dev").Build(),
+			expectedMatch: false,
+		},
+		{
+			name: "match with CEL expression and label",
+			clusterselector: clusterapiv1beta1.ClusterSelector{
+				LabelSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"cloud": "Amazon",
+					},
+				},
+				CelSelector: clusterapiv1beta1.ClusterCelSelector{
+					CelExpressions: []string{
+						`managedCluster.metadata.labels["env"] == "prod"`,
+					},
+				},
+			},
+			cluster:       testinghelpers.NewManagedCluster("test").WithLabel("cloud", "Amazon").WithLabel("env", "prod").Build(),
+			expectedMatch: true,
+		},
+		{
+			name: "not match with CEL expression and label",
+			clusterselector: clusterapiv1beta1.ClusterSelector{
+				LabelSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"cloud": "Amazon",
+					},
+				},
+				CelSelector: clusterapiv1beta1.ClusterCelSelector{
+					CelExpressions: []string{
+						`managedCluster.metadata.labels["env"] == "prod"`,
+					},
+				},
+			},
+			cluster:       testinghelpers.NewManagedCluster("test").WithLabel("cloud", "Amazon").WithLabel("env", "dev").Build(),
+			expectedMatch: false,
+		},
+		{
+			name: "invalid CEL expression",
+			clusterselector: clusterapiv1beta1.ClusterSelector{
+				CelSelector: clusterapiv1beta1.ClusterCelSelector{
+					CelExpressions: []string{
+						`invalid.expression`,
+					},
+				},
+			},
+			cluster:       testinghelpers.NewManagedCluster("test").Build(),
 			expectedMatch: false,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			clusterSelector, err := NewClusterSelector(c.clusterselector)
+			clusterSelector, err := NewClusterSelector(c.clusterselector, env)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}
-			result := clusterSelector.Matches(c.clusterlabels, c.clusterclaims)
+			clusterSelector.Compile()
+			result := clusterSelector.Matches(c.cluster)
 			if c.expectedMatch != result {
 				t.Errorf("expected match to be %v but get : %v", c.expectedMatch, result)
 			}

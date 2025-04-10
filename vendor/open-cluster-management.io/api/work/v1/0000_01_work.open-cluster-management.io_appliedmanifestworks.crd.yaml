@@ -57,6 +57,9 @@ spec:
                 description: ManifestWorkName represents the name of the related manifestwork
                   on the hub.
                 type: string
+            required:
+            - hubHash
+            - manifestWorkName
             type: object
           status:
             description: Status represents the current status of AppliedManifestWork.

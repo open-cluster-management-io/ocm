@@ -66,7 +66,7 @@ func NewSourceLocalWatcherStore(ctx context.Context, listFunc ListLocalWorksFunc
 
 			// A queue to save the received work events, it helps us retry events
 			// where errors occurred while processing
-			receivedWorks: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "local-watcher-store"),
+			receivedWorks: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "local-watcher-store"), // nolint:staticcheck // SA1019
 		},
 
 		watcher: store.NewWatcher(),

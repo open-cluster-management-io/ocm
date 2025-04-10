@@ -81,7 +81,7 @@ func (d *GRPCDialer) Dial() (*grpc.ClientConn, error) {
 		}
 
 		// Establish a TLS connection to the gRPC server.
-		conn, err := grpc.Dial(d.URL, dialOpts...)
+		conn, err := grpc.NewClient(d.URL, dialOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to grpc server %s, %v", d.URL, err)
 		}
@@ -93,7 +93,7 @@ func (d *GRPCDialer) Dial() (*grpc.ClientConn, error) {
 
 	// Insecure connection option; should not be used in production.
 	dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	conn, err := grpc.Dial(d.URL, dialOpts...)
+	conn, err := grpc.NewClient(d.URL, dialOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to grpc server %s, %v", d.URL, err)
 	}
