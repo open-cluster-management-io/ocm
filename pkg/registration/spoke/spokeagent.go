@@ -439,6 +439,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	go spokeKubeInformerFactory.Start(ctx.Done())
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
 		go spokeClusterInformerFactory.Start(ctx.Done())
+		go klusterletInformerFactory.Start(ctx.Done())
 	}
 
 	go secretController.Run(ctx, 1)
