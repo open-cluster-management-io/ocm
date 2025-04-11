@@ -24,10 +24,10 @@ import (
 const labelCustomizedOnly = "open-cluster-management.io/spoke-only"
 
 type claimReconcile struct {
-	recorder                     events.Recorder
-	claimLister                  clusterv1alpha1listers.ClusterClaimLister
-	klusterletLister           	operatorlister.KlusterletLister
-	maxCustomClusterClaims       int
+	recorder               events.Recorder
+	claimLister            clusterv1alpha1listers.ClusterClaimLister
+	klusterletLister       operatorlister.KlusterletLister
+	maxCustomClusterClaims int
 }
 
 func (r *claimReconcile) reconcile(ctx context.Context, cluster *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error) {

@@ -16,13 +16,11 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
-	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
-	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
-	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
-	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
+	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
 	ocmfeature "open-cluster-management.io/api/feature"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
@@ -441,6 +439,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	go spokeKubeInformerFactory.Start(ctx.Done())
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
 		go spokeClusterInformerFactory.Start(ctx.Done())
+		go klusterletInformerFactory.Start(ctx.Done())
 	}
 
 	go secretController.Run(ctx, 1)
