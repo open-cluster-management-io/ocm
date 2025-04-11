@@ -75,7 +75,7 @@ func NewManagedClusterStatusController(
 	)
 
 	return factory.New().
-		WithInformers(hubClusterInformer.Informer(), nodeInformer.Informer(), claimInformer.Informer()).
+		WithInformers(hubClusterInformer.Informer(), nodeInformer.Informer(), claimInformer.Informer(), klusterletInformer.Informer()).
 		WithSync(c.sync).
 		ResyncEvery(resyncInterval).
 		ToController("ManagedClusterStatusController", recorder)
@@ -101,7 +101,7 @@ func newManagedClusterStatusController(
 		reconcilers: []statusReconcile{
 			&joiningReconcile{recorder: recorder},
 			&resoureReconcile{managedClusterDiscoveryClient: managedClusterDiscoveryClient, nodeLister: nodeInformer.Lister()},
-			&claimReconcile{claimLister: claimInformer.Lister(), klusterletLister:klusterletInformer.Lister() , recorder: recorder, maxCustomClusterClaims: maxCustomClusterClaims},
+			&claimReconcile{claimLister: claimInformer.Lister(), klusterletLister: klusterletInformer.Lister(), recorder: recorder, maxCustomClusterClaims: maxCustomClusterClaims},
 		},
 		hubClusterLister: hubClusterInformer.Lister(),
 		hubEventRecorder: hubEventRecorder,
