@@ -34,13 +34,13 @@ func TestHubTimeoutController_Sync(t *testing.T) {
 			var leaseRenewTime = time.Now()
 
 			lease := testinghelpers.NewManagedClusterLease("managed-cluster-lease", leaseRenewTime)
-			leaseClient := kubefake.NewSimpleClientset(lease)
+			leaseClient := kubefake.NewClientset(lease)
 
 			time.Sleep(time.Second * time.Duration(c.waitSeconds))
 
 			handled := false
 			controller := &hubTimeoutController{
-				hubClient: leaseClient,
+				leaseClient: leaseClient.CoordinationV1().Leases(testinghelpers.TestManagedClusterName),
 				handleTimeout: func(ctx context.Context) error {
 					handled = true
 					return nil

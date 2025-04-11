@@ -180,7 +180,7 @@ func (i *Importer) reconcile(
 		Klusterlet: chart.KlusterletConfig{
 			Create:      true,
 			ClusterName: cluster.Name,
-			ResourceRequirement: operatorv1.ResourceRequirement{
+			ResourceRequirement: &operatorv1.ResourceRequirement{
 				Type: operatorv1.ResourceQosClassDefault,
 			},
 		},
@@ -202,7 +202,7 @@ func (i *Importer) reconcile(
 	if err != nil {
 		return cluster, err
 	}
-	rawManifests := append(crdObjs, rawObjs...)
+	rawManifests := append(crdObjs, rawObjs...) //nolint:gocritic
 
 	clientHolder := resourceapply.NewKubeClientHolder(clients.KubeClient).
 		WithAPIExtensionsClient(clients.APIExtClient).WithDynamicClient(clients.DynamicClient)

@@ -25,6 +25,8 @@ import (
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/features"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
+	"open-cluster-management.io/ocm/pkg/registration/register/csr"
+	registerfactory "open-cluster-management.io/ocm/pkg/registration/register/factory"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
@@ -44,24 +46,12 @@ func init() {
 }
 
 func TestValidate(t *testing.T) {
-	defaultCompletedOptions := NewSpokeAgentOptions()
-	defaultCompletedOptions.BootstrapKubeconfig = "/spoke/bootstrap/kubeconfig"
-	awsCompletedOptionsHubArnMissing := *defaultCompletedOptions
-	awsCompletedOptionsHubArnMissing.RegistrationAuth = commonhelpers.AwsIrsaAuthType
-	awsDefaultCompletedOptions := awsCompletedOptionsHubArnMissing
-	awsDefaultCompletedOptions.HubClusterArn = "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
-
 	cases := []struct {
 		name        string
 		options     *SpokeAgentOptions
 		pre         func()
 		expectedErr string
 	}{
-		{
-			name:        "no bootstrap kubeconfig",
-			options:     &SpokeAgentOptions{},
-			expectedErr: "bootstrap-kubeconfig is required",
-		},
 		{
 			name: "invalid external server URLs",
 			options: &SpokeAgentOptions{
@@ -79,50 +69,77 @@ func TestValidate(t *testing.T) {
 			expectedErr: "cluster healthcheck period must greater than zero",
 		},
 		{
-			name:        "default completed options",
-			options:     defaultCompletedOptions,
+			name: "default completed options",
+			options: func() *SpokeAgentOptions {
+				defaultCompletedOptions := NewSpokeAgentOptions()
+				defaultCompletedOptions.BootstrapKubeconfig = "/spoke/bootstrap/kubeconfig"
+				return defaultCompletedOptions
+			}(),
 			expectedErr: "",
 		},
 		{
-			name:        "default completed options for aws flow",
-			options:     &awsDefaultCompletedOptions,
+			name: "default completed options for aws flow",
+			options: func() *SpokeAgentOptions {
+				awsDefaultCompletedOptions := NewSpokeAgentOptions()
+				awsDefaultCompletedOptions.BootstrapKubeconfig = "/spoke/bootstrap/kubeconfig"
+				awsDefaultCompletedOptions.RegisterDriverOption.RegistrationAuth = commonhelpers.AwsIrsaAuthType
+				awsDefaultCompletedOptions.RegisterDriverOption.AWSISRAOption.HubClusterArn = "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
+				return awsDefaultCompletedOptions
+			}(),
 			expectedErr: "",
 		},
 		{
-			name:        "default completed options without HubClusterArn for aws flow",
-			options:     &awsCompletedOptionsHubArnMissing,
+			name: "default completed options without HubClusterArn for aws flow",
+			options: func() *SpokeAgentOptions {
+				awsCompletedOptionsHubArnMissing := NewSpokeAgentOptions()
+				awsCompletedOptionsHubArnMissing.BootstrapKubeconfig = "/spoke/bootstrap/kubeconfig"
+				awsCompletedOptionsHubArnMissing.RegisterDriverOption.RegistrationAuth = commonhelpers.AwsIrsaAuthType
+				return awsCompletedOptionsHubArnMissing
+			}(),
 			expectedErr: "EksHubClusterArn cannot be empty if RegistrationAuth is awsirsa",
 		},
 		{
 			name: "default completed options",
 			options: &SpokeAgentOptions{
-				HubKubeconfigSecret:         "hub-kubeconfig-secret",
-				ClusterHealthCheckPeriod:    1 * time.Minute,
-				MaxCustomClusterClaims:      20,
-				BootstrapKubeconfig:         "/spoke/bootstrap/kubeconfig",
-				ClientCertExpirationSeconds: 3599,
+				HubKubeconfigSecret:      "hub-kubeconfig-secret",
+				ClusterHealthCheckPeriod: 1 * time.Minute,
+				MaxCustomClusterClaims:   20,
+				BootstrapKubeconfig:      "/spoke/bootstrap/kubeconfig",
+				RegisterDriverOption: &registerfactory.Options{
+					CSROption: &csr.Option{
+						ExpirationSeconds: 3599,
+					},
+				},
 			},
 			expectedErr: "client certificate expiration seconds must greater or qual to 3600",
 		},
 		{
 			name: "default completed options",
 			options: &SpokeAgentOptions{
-				HubKubeconfigSecret:         "hub-kubeconfig-secret",
-				ClusterHealthCheckPeriod:    1 * time.Minute,
-				MaxCustomClusterClaims:      20,
-				BootstrapKubeconfig:         "/spoke/bootstrap/kubeconfig",
-				ClientCertExpirationSeconds: 3600,
+				HubKubeconfigSecret:      "hub-kubeconfig-secret",
+				ClusterHealthCheckPeriod: 1 * time.Minute,
+				MaxCustomClusterClaims:   20,
+				BootstrapKubeconfig:      "/spoke/bootstrap/kubeconfig",
+				RegisterDriverOption: &registerfactory.Options{
+					CSROption: &csr.Option{
+						ExpirationSeconds: 3600,
+					},
+				},
 			},
 			expectedErr: "",
 		},
 		{
 			name: "MultipleHubs enabled, but bootstrapkubeconfigs is empty",
 			options: &SpokeAgentOptions{
-				HubKubeconfigSecret:         "hub-kubeconfig-secret",
-				ClusterHealthCheckPeriod:    1 * time.Minute,
-				MaxCustomClusterClaims:      20,
-				BootstrapKubeconfigs:        []string{},
-				ClientCertExpirationSeconds: 3600,
+				HubKubeconfigSecret:      "hub-kubeconfig-secret",
+				ClusterHealthCheckPeriod: 1 * time.Minute,
+				MaxCustomClusterClaims:   20,
+				BootstrapKubeconfigs:     []string{},
+				RegisterDriverOption: &registerfactory.Options{
+					CSROption: &csr.Option{
+						ExpirationSeconds: 3600,
+					},
+				},
 			},
 			pre: func() {
 				_ = features.SpokeMutableFeatureGate.SetFromMap(map[string]bool{
@@ -141,7 +158,11 @@ func TestValidate(t *testing.T) {
 					"/spoke/bootstrap/kubeconfig-hub1",
 					"/spoke/bootstrap/kubeconfig-hub2",
 				},
-				ClientCertExpirationSeconds: 3600,
+				RegisterDriverOption: &registerfactory.Options{
+					CSROption: &csr.Option{
+						ExpirationSeconds: 3600,
+					},
+				},
 			},
 			pre: func() {
 				_ = features.SpokeMutableFeatureGate.SetFromMap(map[string]bool{

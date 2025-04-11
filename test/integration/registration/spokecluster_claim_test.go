@@ -18,6 +18,7 @@ import (
 
 	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
+	registerfactory "open-cluster-management.io/ocm/pkg/registration/register/factory"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
@@ -55,6 +56,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 			MaxCustomClusterClaims:   maxCustomClusterClaims,
+			RegisterDriverOption:     registerfactory.NewOptions(),
 		}
 		commOptions := commonoptions.NewAgentOptions()
 		commOptions.HubKubeconfigDir = hubKubeconfigDir

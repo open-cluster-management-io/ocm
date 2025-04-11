@@ -1,0 +1,62 @@
+header:
+  schema-version: '1.0.0'
+  last-updated: '2025-03-17'
+  last-reviewed: '2025-03-17'
+  expiration-date: '2026-03-17T01:00:00.000Z'
+  project-url: 'https://github.com/open-cluster-management-io/ocm'
+  project-release: '0.16.0'
+  changelog: 'https://github.com/open-cluster-management-io/ocm/releases'
+  license: 'https://github.com/open-cluster-management-io/ocm/blob/main/LICENSE'
+project-lifecycle:
+  status: active
+  bug-fixes-only: false
+  core-maintainers:
+  - 'https://github.com/open-cluster-management-io/community/blob/main/MAINTAINERS.md'
+  roadmap: 'https://open-cluster-management.io/docs/roadmap'
+  release-process: 'https://github.com/open-cluster-management-io/community/blob/main/RELEASE.md'
+contribution-policy:
+  accepts-pull-requests: true
+  accepts-automated-pull-requests: true
+  code-of-conduct: 'https://github.com/open-cluster-management-io/community/blob/main/CODE_OF_CONDUCT.md'
+  contributing-policy: 'https://open-cluster-management.io/docs/contribution-guidelines'
+documentation:
+- 'https://open-cluster-management.io'
+distribution-points:
+- 'https://github.com/open-cluster-management-io/ocm/releases'
+- 'https://quay.io/organization/open-cluster-management'
+- 'https://open-cluster-management.io/helm-charts'
+security-artifacts:
+  self-assessment:
+    self-assessment-created: true
+    evidence-url:
+    - 'https://github.com/open-cluster-management-io/ocm/blob/main/SELF_ASSESSMENT.md'
+security-testing:
+- tool-type: sca
+  tool-name: Dependabot
+  tool-version: '2'
+  tool-url: 'https://github.com/open-cluster-management-io/ocm/blob/main/.github/dependabot.yml'
+  integration:
+    ad-hoc: false
+    ci: true
+    before-release: true
+- tool-type: sca
+  tool-name: Dependency-Review
+  tool-version: 'v4.5.0'
+  tool-url: 'https://github.com/open-cluster-management-io/ocm/blob/main/.github/workflows/dependency-review.yml'
+  integration:
+    ad-hoc: false
+    ci: true
+    before-release: true
+  comment: |
+    Dependency Review checks the dependencies for every PRs.
+security-contacts:
+- type: email
+  value: 'OCM-security@googlegroups.com'
+vulnerability-reporting:
+  accepts-vulnerability-reports: true
+  security-policy: 'https://open-cluster-management.io/docs/security'
+  email-contact: 'OCM-security@googlegroups.com'
+dependencies:
+  third-party-packages: true
+  dependencies-lists:
+  - 'https://github.com/open-cluster-management-io/ocm/blob/main/go.mod'

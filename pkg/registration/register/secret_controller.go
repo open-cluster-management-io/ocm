@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -23,26 +24,32 @@ var ControllerResyncInterval = 5 * time.Minute
 // secretController run process in driver to get credential and keeps the defeined secret in secretOption update-to-date
 type secretController struct {
 	SecretOption
-	option               any
 	driver               RegisterDriver
 	controllerName       string
 	statusUpdater        StatusUpdateFunc
 	additionalSecretData map[string][]byte
 	secretToSave         *corev1.Secret
+
+	managementCoreClient corev1client.CoreV1Interface
 }
 
 // NewSecretController return an instance of secretController
 func NewSecretController(
 	secretOption SecretOption,
-	option any,
 	driver RegisterDriver,
 	statusUpdater StatusUpdateFunc,
+	managementCoreClient corev1client.CoreV1Interface,
+	managementSecretInformer cache.SharedIndexInformer,
 	recorder events.Recorder,
 	controllerName string,
 ) factory.Controller {
 	additionalSecretData := map[string][]byte{}
-	if secretOption.BootStrapKubeConfig != nil {
-		kubeConfigTemplate, err := BaseKubeConfigFromBootStrap(secretOption.BootStrapKubeConfig)
+	if secretOption.BootStrapKubeConfigFile != "" {
+		bootstrapKubeCfg, err := clientcmd.LoadFromFile(secretOption.BootStrapKubeConfigFile)
+		if err != nil {
+			utilruntime.Must(err)
+		}
+		kubeConfigTemplate, err := BaseKubeConfigFromBootStrap(bootstrapKubeCfg)
 		if err != nil {
 			utilruntime.Must(err)
 		}
@@ -70,7 +77,7 @@ func NewSecretController(
 		controllerName:       controllerName,
 		statusUpdater:        statusUpdater,
 		additionalSecretData: additionalSecretData,
-		option:               option,
+		managementCoreClient: managementCoreClient,
 	}
 
 	f := factory.New().
@@ -86,13 +93,15 @@ func NewSecretController(
 				return true
 			}
 			return false
-		}, secretOption.ManagementSecretInformer)
+		}, managementSecretInformer)
 
-	driverInformer, driverFilter := driver.InformerHandler(option)
+	driverInformer, driverFilter := driver.InformerHandler()
 	if driverInformer != nil && driverFilter != nil {
 		f = f.WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
 			return factory.DefaultQueueKey
 		}, driverFilter, driverInformer)
+	} else if driverInformer != nil {
+		f = f.WithInformers(driverInformer)
 	}
 
 	return f.WithSync(c.sync).
@@ -102,7 +111,7 @@ func NewSecretController(
 
 func (c *secretController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	// get secret containing client certificate
-	secret, err := c.ManagementCoreClient.Secrets(c.SecretNamespace).Get(ctx, c.SecretName, metav1.GetOptions{})
+	secret, err := c.managementCoreClient.Secrets(c.SecretNamespace).Get(ctx, c.SecretName, metav1.GetOptions{})
 	switch {
 	case apierrors.IsNotFound(err):
 		secret = &corev1.Secret{
@@ -120,7 +129,7 @@ func (c *secretController) sync(ctx context.Context, syncCtx factory.SyncContext
 	}
 
 	if c.secretToSave == nil {
-		secret, cond, err := c.driver.Process(ctx, c.controllerName, secret, c.additionalSecretData, syncCtx.Recorder(), c.option)
+		secret, cond, err := c.driver.Process(ctx, c.controllerName, secret, c.additionalSecretData, syncCtx.Recorder())
 		if cond != nil {
 			if updateErr := c.statusUpdater(ctx, *cond); updateErr != nil {
 				return updateErr
@@ -143,7 +152,7 @@ func (c *secretController) sync(ctx context.Context, syncCtx factory.SyncContext
 	}
 
 	// save the changes into secret
-	if err := saveSecret(c.ManagementCoreClient, c.SecretNamespace, c.secretToSave); err != nil {
+	if err := saveSecret(c.managementCoreClient, c.SecretNamespace, c.secretToSave); err != nil {
 		return err
 	}
 	syncCtx.Recorder().Eventf("SecretSave", "Secret %s/%s for %s is updated",

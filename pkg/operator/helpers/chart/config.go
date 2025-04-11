@@ -168,5 +168,5 @@ type KlusterletConfig struct {
 	// ResourceRequirement specify QoS classes of deployments managed by clustermanager.
 	// It applies to all the containers in the deployments.
 	// +optional
-	ResourceRequirement operatorv1.ResourceRequirement `json:"resourceRequirement,omitempty"`
+	ResourceRequirement *operatorv1.ResourceRequirement `json:"resourceRequirement,omitempty"`
 }

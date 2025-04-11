@@ -229,22 +229,7 @@ func ConvertToDeployment(obj runtime.Object) (*appsv1.Deployment, error) {
 		return deployment, nil
 	}
 
-	if obj.GetObjectKind().GroupVersionKind().Group != appsv1.GroupName ||
-		obj.GetObjectKind().GroupVersionKind().Kind != "Deployment" {
-		return nil, fmt.Errorf("not deployment object, %v", obj.GetObjectKind())
-	}
-
-	deployment := &appsv1.Deployment{}
-	uobj, ok := obj.(*unstructured.Unstructured)
-	if !ok {
-		return deployment, fmt.Errorf("not unstructured object, %v", obj.GetObjectKind())
-	}
-
-	err := runtime.DefaultUnstructuredConverter.FromUnstructured(uobj.Object, deployment)
-	if err != nil {
-		return nil, err
-	}
-	return deployment, nil
+	return ConvertTo[appsv1.Deployment](obj, appsv1.GroupName, "Deployment")
 }
 
 func DeploymentWellKnowManifestConfig(namespace, name string) workapiv1.ManifestConfigOption {
@@ -284,24 +269,29 @@ func ConvertToDaemonSet(obj runtime.Object) (*appsv1.DaemonSet, error) {
 		return daemonSet, nil
 	}
 
-	if obj.GetObjectKind().GroupVersionKind().Group != appsv1.GroupName ||
-		obj.GetObjectKind().GroupVersionKind().Kind != "DaemonSet" {
-		return nil, fmt.Errorf("not daemonset object, %v", obj.GetObjectKind())
-	}
-
-	daemonSet := &appsv1.DaemonSet{}
-	uobj, ok := obj.(*unstructured.Unstructured)
-	if !ok {
-		return daemonSet, fmt.Errorf("not unstructured object, %v", obj.GetObjectKind())
-	}
-
-	err := runtime.DefaultUnstructuredConverter.FromUnstructured(uobj.Object, daemonSet)
-	if err != nil {
-		return nil, err
-	}
-	return daemonSet, nil
+	return ConvertTo[appsv1.DaemonSet](obj, appsv1.GroupName, "DaemonSet")
 }
 
 func DaemonSetWellKnowManifestConfig(namespace, name string) workapiv1.ManifestConfigOption {
 	return WellKnowManifestConfig(appsv1.GroupName, "daemonsets", namespace, name)
+}
+func ConvertTo[T any](obj runtime.Object, group, kind string) (*T, error) {
+	// Verify GroupVersionKind matches expected values
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	if gvk.Group != group || gvk.Kind != kind {
+		return nil, fmt.Errorf("not %s object, %v", kind, obj.GetObjectKind())
+	}
+
+	// Handle unstructured conversion
+	uobj, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return nil, fmt.Errorf("not unstructured object, %v", obj.GetObjectKind())
+	}
+
+	// Create new instance of target type and convert
+	target := new(T)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(uobj.Object, target); err != nil {
+		return nil, err
+	}
+	return target, nil
 }

@@ -12,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	clientset "k8s.io/client-go/kubernetes"
+	leasev1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
 
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
@@ -32,14 +32,14 @@ type managedClusterLeaseController struct {
 // NewManagedClusterLeaseController creates a new managed cluster lease controller on the managed cluster.
 func NewManagedClusterLeaseController(
 	clusterName string,
-	hubClient clientset.Interface,
+	leaseClient leasev1client.LeaseInterface,
 	hubClusterInformer clusterv1informer.ManagedClusterInformer,
 	recorder events.Recorder) factory.Controller {
 	c := &managedClusterLeaseController{
 		clusterName:      clusterName,
 		hubClusterLister: hubClusterInformer.Lister(),
 		leaseUpdater: &leaseUpdater{
-			hubClient:   hubClient,
+			leaseClient: leaseClient,
 			clusterName: clusterName,
 			leaseName:   "managed-cluster-lease",
 			recorder:    recorder,
@@ -92,7 +92,7 @@ type leaseUpdaterInterface interface {
 
 // leaseUpdater periodically updates the lease of a managed cluster
 type leaseUpdater struct {
-	hubClient   clientset.Interface
+	leaseClient leasev1client.LeaseInterface
 	clusterName string
 	leaseName   string
 	lock        sync.Mutex
@@ -130,14 +130,14 @@ func (u *leaseUpdater) stop() {
 
 // update the lease of a given managed cluster.
 func (u *leaseUpdater) update(ctx context.Context) {
-	lease, err := u.hubClient.CoordinationV1().Leases(u.clusterName).Get(ctx, u.leaseName, metav1.GetOptions{})
+	lease, err := u.leaseClient.Get(ctx, u.leaseName, metav1.GetOptions{})
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to get cluster lease %q on hub cluster: %w", u.leaseName, err))
 		return
 	}
 
 	lease.Spec.RenewTime = &metav1.MicroTime{Time: time.Now()}
-	if _, err = u.hubClient.CoordinationV1().Leases(u.clusterName).Update(ctx, lease, metav1.UpdateOptions{}); err != nil {
+	if _, err = u.leaseClient.Update(ctx, lease, metav1.UpdateOptions{}); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to update cluster lease %q on hub cluster: %w", u.leaseName, err))
 	}
 }

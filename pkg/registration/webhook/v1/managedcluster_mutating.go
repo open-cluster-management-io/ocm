@@ -47,13 +47,13 @@ func (r *ManagedClusterWebhook) Default(ctx context.Context, obj runtime.Object)
 		return apierrors.NewBadRequest("Request cluster obj format is not right")
 	}
 
-	//Generate taints
+	// Generate taints
 	err = r.processTaints(managedCluster, oldManagedCluster)
 	if err != nil {
 		return err
 	}
 
-	//Set default clusterset label
+	// Set default clusterset label
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
 		r.addDefaultClusterSetLabel(managedCluster)
 	}

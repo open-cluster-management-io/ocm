@@ -2,12 +2,12 @@ package register
 
 import (
 	"context"
+	"crypto/x509/pkix"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
@@ -33,7 +33,7 @@ type SecretOption struct {
 
 	// BootStrapKubeConfig is the kubeconfig to generate hubkubeconfig, if set, create kubeconfig value
 	// in the secret.
-	BootStrapKubeConfig *clientcmdapi.Config
+	BootStrapKubeConfigFile string
 
 	// ClusterName is the cluster name, and it is set as a secret value if it is set.
 	ClusterName string
@@ -43,8 +43,10 @@ type SecretOption struct {
 	HubKubeconfigFile string
 	HubKubeconfigDir  string
 
-	ManagementSecretInformer cache.SharedIndexInformer
-	ManagementCoreClient     corev1client.CoreV1Interface
+	// subject of the agent, only used for addon
+	Subject *pkix.Name
+	// csr signer for the addon
+	Signer string
 }
 
 // StatusUpdateFunc is A function to update the condition of the corresponding object.
@@ -66,14 +68,22 @@ type RegisterDriver interface {
 		name string,
 		secret *corev1.Secret,
 		additionalSecretData map[string][]byte,
-		recorder events.Recorder, opt any) (*corev1.Secret, *metav1.Condition, error)
+		recorder events.Recorder) (*corev1.Secret, *metav1.Condition, error)
 
 	// InformerHandler returns informer of the related object. If no object needs to be watched, the func could
 	// return nil, nil.
-	InformerHandler(option any) (cache.SharedIndexInformer, factory.EventFilterFunc)
+	InformerHandler() (cache.SharedIndexInformer, factory.EventFilterFunc)
 
 	// ManagedClusterDecorator is to change managed cluster metadata or spec during registration process.
 	ManagedClusterDecorator(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster
+
+	// BuildClients setup clients for the driver based on the secretOption and return
+	BuildClients(ctx context.Context, secretOption SecretOption, bootstrap bool) (*Clients, error)
+}
+
+// AddonDriver is an interface for the driver to fork a driver for addons registration
+type AddonDriver interface {
+	Fork(addonName string, secretOption SecretOption) RegisterDriver
 }
 
 // HubDriver interface is used to implement operations required to complete aws-irsa registration and csr registration.

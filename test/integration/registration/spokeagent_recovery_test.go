@@ -15,6 +15,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
+	registerfactory "open-cluster-management.io/ocm/pkg/registration/register/factory"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
@@ -40,6 +41,7 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 			BootstrapKubeconfig:      bootstrapFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
+			RegisterDriverOption:     registerfactory.NewOptions(),
 		}
 		commOptions := commonoptions.NewAgentOptions()
 		commOptions.HubKubeconfigDir = hubKubeconfigDir
@@ -54,7 +56,7 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 			_, err = util.GetManagedCluster(clusterClient, managedClusterName)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(errors.IsNotFound(err)).Should(gomega.BeTrue())
-			retryToGetSpokeClusterTimes = retryToGetSpokeClusterTimes + 1
+			retryToGetSpokeClusterTimes++
 			return retryToGetSpokeClusterTimes
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNumerically(">=", 3))
 
@@ -63,7 +65,7 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 		gomega.Eventually(func() int {
 			_, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName)
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			retryToGetSpokeCSRTimes = retryToGetSpokeCSRTimes + 1
+			retryToGetSpokeCSRTimes++
 			return retryToGetSpokeCSRTimes
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNumerically(">=", 3))
 
@@ -129,6 +131,7 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
+			RegisterDriverOption:     registerfactory.NewOptions(),
 		}
 		commOptions := commonoptions.NewAgentOptions()
 		commOptions.HubKubeconfigDir = hubKubeconfigDir

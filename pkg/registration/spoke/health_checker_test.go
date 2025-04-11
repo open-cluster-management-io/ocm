@@ -57,12 +57,16 @@ func TestHubKubeConfigHealthChecker(t *testing.T) {
 				testinghelpers.WriteFile(path.Join(testDir, "tls.crt"), c.tlsCert)
 			}
 
-			driver := csr.NewCSRDriver()
 			secretOption := register.SecretOption{
-				ClusterName:       "cluster1",
-				AgentName:         "agent1",
-				HubKubeconfigDir:  testDir,
-				HubKubeconfigFile: path.Join(testDir, "kubeconfig"),
+				ClusterName:             "cluster1",
+				AgentName:               "agent1",
+				BootStrapKubeConfigFile: path.Join(testDir, "kubeconfig"),
+				HubKubeconfigDir:        testDir,
+				HubKubeconfigFile:       path.Join(testDir, "kubeconfig"),
+			}
+			driver, err := csr.NewCSRDriver(csr.NewCSROption(), secretOption)
+			if err != nil {
+				t.Fatal(err)
 			}
 
 			hc := &hubKubeConfigHealthChecker{
@@ -70,7 +74,7 @@ func TestHubKubeConfigHealthChecker(t *testing.T) {
 				bootstrapped: true,
 			}
 
-			err := hc.Check(nil)
+			err = hc.Check(nil)
 			if c.unhealthy && err == nil {
 				t.Errorf("expected error, but got nil")
 			}

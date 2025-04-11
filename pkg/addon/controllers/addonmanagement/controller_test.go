@@ -220,7 +220,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			clusterObj := append(c.placements, c.placementDecisions...)
+			clusterObj := append(c.placements, c.placementDecisions...) //nolint:gocritic
 			fakeClusterClient := fakecluster.NewSimpleClientset(clusterObj...)
 			fakeAddonClient := fakeaddon.NewSimpleClientset(c.managedClusteraddon...)
 

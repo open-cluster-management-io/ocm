@@ -18,6 +18,7 @@ import (
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/taint"
+	registerfactory "open-cluster-management.io/ocm/pkg/registration/register/factory"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
@@ -41,6 +42,7 @@ var _ = ginkgo.Describe("ManagedCluster Taints Update", func() {
 				BootstrapKubeconfig:      bootstrapKubeConfigFile,
 				HubKubeconfigSecret:      hubKubeconfigSecret,
 				ClusterHealthCheckPeriod: 1 * time.Minute,
+				RegisterDriverOption:     registerfactory.NewOptions(),
 			}
 			commOptions := commonoptions.NewAgentOptions()
 			commOptions.HubKubeconfigDir = hubKubeconfigDir

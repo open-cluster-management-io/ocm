@@ -10,5 +10,4 @@ var ManagedClusterPolicyManifestFiles embed.FS
 
 //go:embed klusterlet/management
 //go:embed klusterlet/managed
-//go:embed klusterletkube111
 var KlusterletManifestFiles embed.FS

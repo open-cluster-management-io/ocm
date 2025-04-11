@@ -134,7 +134,7 @@ func TestReconcile(t *testing.T) {
 		increaseCount := func() {
 			lock.Lock()
 			defer lock.Unlock()
-			count = count + 1
+			count++
 		}
 
 		for range c.syncKeys {
@@ -145,7 +145,7 @@ func TestReconcile(t *testing.T) {
 			increaseCount()
 			return nil
 		}
-		obj := append(c.clusterManagementAddon, c.managedClusteraddon...)
+		obj := append(c.clusterManagementAddon, c.managedClusteraddon...) //nolint:gocritic
 		fakeAddonClient := fakeaddon.NewSimpleClientset(obj...)
 
 		addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
@@ -233,7 +233,7 @@ func TestRunController(t *testing.T) {
 		{
 			name:        "fake kubeconfig",
 			addonName:   "test",
-			expectedErr: `Get "http://localhost/api": dial tcp [::1]:80: connect: connection refused`,
+			expectedErr: `connect: connection refused`,
 		},
 	}
 
@@ -261,9 +261,10 @@ func TestRunController(t *testing.T) {
 		ctx := context.TODO()
 
 		err := controller.runController(ctx, c.addonName)
-		if len(c.expectedErr) == 0 {
-			assert.NoError(t, err)
+		if err == nil {
+			assert.Empty(t, c.expectedErr)
+		} else {
+			assert.Contains(t, err.Error(), c.expectedErr, "name : %s, expected error %v, but got %v", c.name, c.expectedErr, err)
 		}
-		assert.EqualErrorf(t, err, c.expectedErr, "name : %s, expected error %v, but got %v", c.name, c.expectedErr, err)
 	}
 }

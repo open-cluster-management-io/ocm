@@ -85,7 +85,7 @@ func TestSync(t *testing.T) {
 
 	for _, tc := range testcases {
 		recorder := eventstesting.NewTestingEventRecorder(t)
-		objs := append(tc.objects, tc.namespaces...)
+		objs := append(tc.objects, tc.namespaces...) //nolint:gocritic
 		kubeClient := kubefake.NewSimpleClientset(objs...)
 		kubeInformer := informers.NewSharedInformerFactory(kubeClient, 5*time.Minute)
 		namespceStore := kubeInformer.Core().V1().Namespaces().Informer().GetStore()

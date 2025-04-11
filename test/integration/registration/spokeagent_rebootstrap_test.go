@@ -462,14 +462,14 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 			}
 		})
 
-		ginkgo.It("should join the hub once the bootstrap kubeconfig becomes vaid", func() {
+		ginkgo.It("should join the hub once the bootstrap kubeconfig becomes valid", func() {
 			// the spoke cluster should not be created
-			gomega.Consistently(func() bool {
+			gomega.Consistently(func() error {
 				if _, err := util.GetManagedCluster(clusterClient, managedClusterName); apierrors.IsNotFound(err) {
-					return true
+					return nil
 				}
-				return false
-			}, 15, 3).Should(gomega.BeTrue())
+				return fmt.Errorf("managed cluster should not be created")
+			}, 15, 3).Should(gomega.Succeed())
 
 			ginkgo.By("Replace the bootstrap kubeconfig with a valid one")
 			err := authn.CreateBootstrapKubeConfigWithCertAge(bootstrapFile, serverCertFile, securePort, 10*time.Minute)

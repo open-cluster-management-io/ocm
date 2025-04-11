@@ -49,7 +49,7 @@ import (
 const (
 	schedulingControllerName = "SchedulingController"
 	maxNumOfClusterDecisions = 100
-	maxEventMessageLength    = 1000 //the event message can have at most 1024 characters, use 1000 as limitation here to keep some buffer
+	maxEventMessageLength    = 1000 // the event message can have at most 1024 characters, use 1000 as limitation here to keep some buffer
 )
 
 // decisionGroups groups the cluster decisions by group strategy
@@ -276,7 +276,8 @@ func (c *schedulingController) syncPlacement(ctx context.Context, syncCtx factor
 	}
 
 	// update placement status if necessary to signal no bindings
-	if err := c.updateStatus(ctx, placement, groupStatus, int32(len(scheduleResult.Decisions())), misconfiguredCondition, satisfiedCondition); err != nil {
+	if err := c.updateStatus(
+		ctx, placement, groupStatus, int32(len(scheduleResult.Decisions())), misconfiguredCondition, satisfiedCondition); err != nil { // nolint:gosec
 		return err
 	}
 
@@ -335,7 +336,7 @@ func (c *schedulingController) getAvailableClusters(clusterSetNames []string) ([
 	if len(clusterSetNames) == 0 {
 		return nil, nil
 	}
-	//all available clusters
+	// all available clusters
 	availableClusters := map[string]*clusterapiv1.ManagedCluster{}
 
 	for _, name := range clusterSetNames {
@@ -598,10 +599,10 @@ func (c *schedulingController) generateDecision(
 	}
 
 	decisionGroupStatus := &clusterapiv1beta1.DecisionGroupStatus{
-		DecisionGroupIndex: int32(decisionGroupIndex),
+		DecisionGroupIndex: int32(decisionGroupIndex), //nolint:gosec
 		DecisionGroupName:  clusterDecisionGroup.decisionGroupName,
 		Decisions:          placementDecisionNames,
-		ClustersCount:      int32(len(clusterDecisionGroup.clusterDecisions)),
+		ClustersCount:      int32(len(clusterDecisionGroup.clusterDecisions)), //nolint:gosec
 	}
 
 	return placementDecisions, decisionGroupStatus

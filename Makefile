@@ -25,7 +25,10 @@ HELM?=$(PERMANENT_TMP_GOPATH)/bin/helm
 HELM_VERSION?=v3.14.0
 helm_gen_dir:=$(dir $(HELM))
 
-# RELEASED_CSV_VERSION is used to generate a released CSV manifests
+# RELEASED_CSV_VERSION indicates the last released operator version.
+# can find the released operator version from
+# https://github.com/k8s-operatorhub/community-operators/tree/main/operators/cluster-manager
+# https://github.com/k8s-operatorhub/community-operators/tree/main/operators/klusterlet
 RELEASED_CSV_VERSION?=0.14.0
 export RELEASED_CSV_VERSION
 
@@ -79,23 +82,11 @@ test-unit: ensure-kubebuilder-tools
 update-csv: ensure-operator-sdk ensure-helm
 	bash -x hack/update-csv.sh
 
-	# update the replaces to released version in csv
-	$(SED_CMD) -i 's/cluster-manager\.v[0-9]\+\.[0-9]\+\.[0-9]\+/cluster-manager\.v$(RELEASED_CSV_VERSION)/g' deploy/cluster-manager/config/manifests/bases/cluster-manager.clusterserviceversion.yaml
-	$(SED_CMD) -i 's/klusterlet\.v[0-9]\+\.[0-9]\+\.[0-9]\+/klusterlet\.v$(RELEASED_CSV_VERSION)/g' deploy/klusterlet/config/manifests/bases/klusterlet.clusterserviceversion.yaml
-
-	# generate current csv bundle files
-	cd deploy/cluster-manager && ../../$(OPERATOR_SDK) generate bundle --version $(CSV_VERSION) --package cluster-manager --channels stable --default-channel stable --input-dir config --output-dir olm-catalog/latest
-	cd deploy/klusterlet && ../../$(OPERATOR_SDK) generate bundle --version $(CSV_VERSION) --package klusterlet --channels stable --default-channel stable --input-dir config --output-dir olm-catalog/latest
-
-	# delete bundle.Dockerfile since we do not use it to build image.
-	rm ./deploy/cluster-manager/bundle.Dockerfile
-	rm ./deploy/klusterlet/bundle.Dockerfile
-
 verify-crds:
 	bash -x hack/verify-crds.sh $(YAML_PATCH)
 
 verify-gocilint:
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.6
 	golangci-lint run --timeout=5m --modules-download-mode vendor ./...
 
 install-golang-gci:

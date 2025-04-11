@@ -24,9 +24,10 @@ import (
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work"
-	sourcecodec "open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/codec"
-	workstore "open-cluster-management.io/sdk-go/pkg/cloudevents/work/store"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work"
+	sourcecodec "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/source/codec"
+	workstore "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/store"
 
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/helper"
@@ -143,12 +144,12 @@ var _ = ginkgo.BeforeSuite(func() {
 		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		sourceClient, err := work.NewClientHolderBuilder(util.NewMQTTSourceOptions(sourceID)).
-			WithClientID(fmt.Sprintf("%s-%s", sourceID, rand.String(5))).
-			WithSourceID(sourceID).
-			WithCodec(sourcecodec.NewManifestBundleCodec()).
-			WithWorkClientWatcherStore(watcherStore).
-			NewSourceClientHolder(envCtx)
+		clientOptions := options.NewGenericClientOptions(
+			util.NewMQTTSourceOptions(sourceID),
+			sourcecodec.NewManifestBundleCodec(),
+			fmt.Sprintf("%s-%s", sourceID, rand.String(5)),
+		).WithSourceID(sourceID).WithClientWatcherStore(watcherStore)
+		sourceClient, err := work.NewSourceClientHolder(envCtx, clientOptions)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		hubWorkClient = sourceClient.WorkInterface()

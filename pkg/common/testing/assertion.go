@@ -103,7 +103,7 @@ func AssertDelete(t *testing.T, actual clienttesting.Action, resource, namespace
 // AssertUpdateActions asserts the actions are get-then-update action
 func AssertUpdateActions(t *testing.T, actions []clienttesting.Action) {
 	t.Helper()
-	for i := 0; i < len(actions); i = i + 2 {
+	for i := 0; i < len(actions); i += 2 {
 		if actions[i].GetVerb() != "get" {
 			t.Errorf("expected action %d is get, but %v", i, actions[i])
 		}

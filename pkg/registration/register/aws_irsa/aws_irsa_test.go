@@ -13,7 +13,6 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
@@ -55,11 +54,11 @@ func TestProcess(t *testing.T) {
 				register.AgentNameFile:   []byte(testAgentName),
 			}
 
-			awsOption := &AWSOption{
-				AWSIRSAControl: ctrl,
-			}
+			awsOption := &AWSOption{}
 
-			driver := &AWSIRSADriver{}
+			driver := &AWSIRSADriver{
+				awsIRSAControl: ctrl,
+			}
 
 			if c.approvedIrsaRequest != nil {
 				driver.name = testIrsaName
@@ -149,7 +148,7 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	cert1 := testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second)
-	//cert2 := testinghelpers.NewTestCert("test", 60*time.Second)
+	// cert2 := testinghelpers.NewTestCert("test", 60*time.Second)
 
 	kubeconfig := testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", "", nil, nil, nil)
 
@@ -230,13 +229,13 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			driver := NewAWSIRSADriver("", "", "", "")
 			secretOption := register.SecretOption{
 				ClusterName:       c.clusterName,
 				AgentName:         c.agentName,
 				HubKubeconfigDir:  tempDir,
 				HubKubeconfigFile: path.Join(tempDir, "kubeconfig"),
 			}
+			driver := NewAWSIRSADriver(NewAWSOption(), secretOption)
 			if c.kubeconfig != nil {
 				testinghelpers.WriteFile(path.Join(tempDir, "kubeconfig"), c.kubeconfig)
 			}
@@ -247,11 +246,8 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 				testinghelpers.WriteFile(path.Join(tempDir, "tls.crt"), c.tlsCert)
 			}
 			if c.bootstapKubeconfig != nil {
-				bootstrapKubeconfig, err := clientcmd.Load(c.bootstapKubeconfig)
-				if err != nil {
-					t.Fatal(err)
-				}
-				secretOption.BootStrapKubeConfig = bootstrapKubeconfig
+				testinghelpers.WriteFile(path.Join(tempDir, "bootstrap-kubeconfig"), c.bootstapKubeconfig)
+				secretOption.BootStrapKubeConfigFile = path.Join(tempDir, "bootstrap-kubeconfig")
 			}
 
 			valid, err := register.IsHubKubeConfigValidFunc(driver, secretOption)(context.TODO())

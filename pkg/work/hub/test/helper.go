@@ -152,7 +152,7 @@ func CreateTestPlacementWithDecisionStrategy(name string, ns string, clsPerDecis
 	}
 
 	groupStrategy := clusterv1beta1.GroupStrategy{
-		ClustersPerDecisionGroup: intstr.FromInt32(int32(clsPerDecisionGroup)),
+		ClustersPerDecisionGroup: intstr.FromInt32(int32(clsPerDecisionGroup)), //nolint:gosec
 	}
 	decisionStrategy := clusterv1beta1.DecisionStrategy{
 		GroupStrategy: groupStrategy,
@@ -193,16 +193,16 @@ func CreateTestPlacementWithDecisionStrategy(name string, ns string, clsPerDecis
 		plcDecisions = append(plcDecisions, placementDecision)
 
 		decisionGroupStatus := clusterv1beta1.DecisionGroupStatus{
-			DecisionGroupIndex: int32(i),
+			DecisionGroupIndex: int32(i), //nolint:gosec
 			DecisionGroupName:  "",
 			Decisions:          []string{plcDecisionName},
-			ClustersCount:      int32(len(clsGroup)),
+			ClustersCount:      int32(len(clsGroup)), //nolint:gosec
 		}
 
 		decisionGroups = append(decisionGroups, decisionGroupStatus)
 	}
 
-	placement.Status.NumberOfSelectedClusters = int32(len(clusters))
+	placement.Status.NumberOfSelectedClusters = int32(len(clusters)) //nolint:gosec
 	placement.Status.DecisionGroups = decisionGroups
 
 	return placement, plcDecisions
@@ -217,7 +217,7 @@ func getClusterGroups(clusters []string, clsPerDecisionGroup int) [][]string {
 
 	decisionGroupCount := len(clusters) / clsPerDecisionGroup
 	if len(clusters)%clsPerDecisionGroup > 0 {
-		decisionGroupCount = decisionGroupCount + 1
+		decisionGroupCount++
 	}
 
 	for i := 0; i < decisionGroupCount; i++ {

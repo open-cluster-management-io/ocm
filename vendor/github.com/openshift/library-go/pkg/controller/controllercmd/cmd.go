@@ -3,6 +3,7 @@ package controllercmd
 import (
 	"context"
 	"fmt"
+	"k8s.io/utils/clock"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -41,6 +42,7 @@ type ControllerCommandConfig struct {
 	componentName string
 	startFunc     StartFunc
 	version       version.Info
+	clock         clock.Clock
 
 	basicFlags *ControllerFlags
 
@@ -76,11 +78,12 @@ type ControllerCommandConfig struct {
 
 // NewControllerConfig returns a new ControllerCommandConfig which can be used to wire up all the boiler plate of a controller
 // TODO add more methods around wiring health checks and the like
-func NewControllerCommandConfig(componentName string, version version.Info, startFunc StartFunc) *ControllerCommandConfig {
+func NewControllerCommandConfig(componentName string, version version.Info, startFunc StartFunc, clock clock.Clock) *ControllerCommandConfig {
 	return &ControllerCommandConfig{
 		startFunc:     startFunc,
 		componentName: componentName,
 		version:       version,
+		clock:         clock,
 
 		basicFlags: NewControllerFlags(),
 
@@ -322,7 +325,7 @@ func (c *ControllerCommandConfig) StartController(ctx context.Context) error {
 	config.LeaderElection.RenewDeadline = c.RenewDeadline
 	config.LeaderElection.RetryPeriod = c.RetryPeriod
 
-	builder := NewController(c.componentName, c.startFunc).
+	builder := NewController(c.componentName, c.startFunc, c.clock).
 		WithKubeConfigFile(c.basicFlags.KubeConfigFile, nil).
 		WithComponentNamespace(c.basicFlags.Namespace).
 		WithLeaderElection(config.LeaderElection, c.basicFlags.Namespace, c.componentName+"-lock").

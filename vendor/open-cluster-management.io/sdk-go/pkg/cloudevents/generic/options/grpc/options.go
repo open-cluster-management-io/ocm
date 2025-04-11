@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -30,7 +31,8 @@ type GRPCDialer struct {
 	KeepAliveOptions KeepAliveOptions
 	TLSConfig        *tls.Config
 	TokenFile        string
-	conn             *grpc.ClientConn
+	mu               sync.Mutex       // Mutex to protect the connection.
+	conn             *grpc.ClientConn // Cached gRPC client connection.
 }
 
 // KeepAliveOptions holds the keepalive options for the gRPC client.
@@ -43,6 +45,15 @@ type KeepAliveOptions struct {
 
 // Dial connects to the gRPC server and returns a gRPC client connection.
 func (d *GRPCDialer) Dial() (*grpc.ClientConn, error) {
+	// Return the cached connection if it exists and is ready.
+	// Should not return a nil or unready connection, otherwise the caller (cloudevents client)
+	// will not use the connection for sending and receiving events in reconnect scenarios.
+	// lock the connection to ensure the connnection is not created by multiple goroutines concurrently.
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.conn != nil && (d.conn.GetState() == connectivity.Connecting || d.conn.GetState() == connectivity.Ready) {
+		return d.conn, nil
+	}
 	// Prepare gRPC dial options.
 	dialOpts := []grpc.DialOption{}
 	if d.KeepAliveOptions.Enable {
@@ -94,6 +105,8 @@ func (d *GRPCDialer) Dial() (*grpc.ClientConn, error) {
 
 // Close closes the gRPC client connection.
 func (d *GRPCDialer) Close() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	if d.conn != nil {
 		return d.conn.Close()
 	}
@@ -192,10 +205,12 @@ func BuildGRPCOptionsFromFlags(configPath string) (*GRPCOptions, error) {
 	// Set the keepalive options
 	options.Dialer.KeepAliveOptions = keepAliveOptions
 
-	// Set up TLS configuration for the gRPC connection, the certificates will be reloaded periodically.
-	options.Dialer.TLSConfig, err = cert.AutoLoadTLSConfig(config.CAFile, config.ClientCertFile, config.ClientKeyFile, options.Dialer)
-	if err != nil {
-		return nil, err
+	if config.CAFile != "" {
+		// Set up TLS configuration for the gRPC connection, the certificates will be reloaded periodically.
+		options.Dialer.TLSConfig, err = cert.AutoLoadTLSConfig(config.CAFile, config.ClientCertFile, config.ClientKeyFile, options.Dialer)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return options, nil
