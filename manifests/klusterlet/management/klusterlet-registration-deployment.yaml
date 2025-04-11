@@ -94,6 +94,9 @@ spec:
           {{if gt .RegistrationKubeAPIBurst 0}}
           - "--kube-api-burst={{ .RegistrationKubeAPIBurst }}"
           {{end}}
+          {{if .MaxCustomClusterClaims}}
+          - "--max-custom-cluster-claims={{ .MaxCustomClusterClaims }}"
+          {{end}}
           {{if eq .RegistrationDriver.AuthType "awsirsa"}}
           - "--registration-auth={{ .RegistrationDriver.AuthType }}"
           - "--hub-cluster-arn={{ .RegistrationDriver.AwsIrsa.HubClusterArn }}"
