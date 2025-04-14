@@ -395,8 +395,8 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		}
 	}
 
-	if klusterlet.Spec.ClusterClaimConfiguration != nil {
-		config.MaxCustomClusterClaims = int(klusterlet.Spec.ClusterClaimConfiguration.MaxCustomClusterClaims)
+	if klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration != nil {
+		config.MaxCustomClusterClaims = int(klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration.MaxCustomClusterClaims)
 	}
 
 	config.WorkFeatureGates, workFeatureMsgs = helpers.ConvertToFeatureGateFlags("Work", workFeatureGates, ocmfeature.DefaultSpokeWorkFeatureGates)
