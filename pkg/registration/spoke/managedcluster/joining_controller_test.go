@@ -17,9 +17,9 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorclientfake "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
