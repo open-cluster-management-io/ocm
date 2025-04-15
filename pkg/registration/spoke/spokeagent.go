@@ -217,12 +217,10 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	}
 
 	// initiate registration driver
-	o.driver = o.registrationOption.RegisterDriverOption.Driver(secretOption)
-	bootstrapClients, err := o.driver.BuildClients(ctx, secretOption, true)
+	o.driver, err = o.registrationOption.RegisterDriverOption.Driver(secretOption)
 	if err != nil {
 		return err
 	}
-	driverInformer, _ := o.driver.InformerHandler()
 
 	secretInformer := namespacedManagementKubeInformerFactory.Core().V1().Secrets()
 	// Register BootstrapKubeconfigEventHandler as an event handler of secret informer,
@@ -265,6 +263,12 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		// create a ClientCertForHubController for spoke agent bootstrap
 		// the bootstrap informers are supposed to be terminated after completing the bootstrap process.
 		bootstrapCtx, stopBootstrap := context.WithCancel(ctx)
+		bootstrapClients, err := o.driver.BuildClients(bootstrapCtx, secretOption, true)
+		if err != nil {
+			stopBootstrap()
+			return err
+		}
+		driverInformer, _ := o.driver.InformerHandler()
 		// start a SpokeClusterCreatingController to make sure there is a spoke cluster on hub cluster
 		spokeClusterCreatingController := registration.NewManagedClusterCreatingController(
 			o.agentOptions.SpokeClusterName,

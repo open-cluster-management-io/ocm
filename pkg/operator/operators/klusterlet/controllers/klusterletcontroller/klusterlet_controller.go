@@ -402,7 +402,6 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	reconcilers := []klusterletReconcile{
 		&crdReconcile{
 			managedClusterClients: managedClusterClients,
-			kubeVersion:           n.kubeVersion,
 			recorder:              controllerContext.Recorder(),
 			cache:                 n.cache},
 		&managedReconcile{

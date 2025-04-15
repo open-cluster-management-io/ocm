@@ -2433,6 +2433,10 @@ func awsRestjson1_serializeOpHttpBindingsDescribeClusterVersionsInput(v *Describ
 		encoder.SetQuery("status").String(string(v.Status))
 	}
 
+	if len(v.VersionStatus) > 0 {
+		encoder.SetQuery("versionStatus").String(string(v.VersionStatus))
+	}
+
 	return nil
 }
 
@@ -4898,6 +4902,13 @@ func awsRestjson1_serializeOpDocumentUpdateClusterConfigInput(v *UpdateClusterCo
 		}
 	}
 
+	if v.RemoteNetworkConfig != nil {
+		ok := object.Key("remoteNetworkConfig")
+		if err := awsRestjson1_serializeDocumentRemoteNetworkConfigRequest(v.RemoteNetworkConfig, ok); err != nil {
+			return err
+		}
+	}
+
 	if v.ResourcesVpcConfig != nil {
 		ok := object.Key("resourcesVpcConfig")
 		if err := awsRestjson1_serializeDocumentVpcConfigRequest(v.ResourcesVpcConfig, ok); err != nil {
@@ -5018,6 +5029,11 @@ func awsRestjson1_serializeOpDocumentUpdateClusterVersionInput(v *UpdateClusterV
 	if v.ClientRequestToken != nil {
 		ok := object.Key("clientRequestToken")
 		ok.String(*v.ClientRequestToken)
+	}
+
+	if v.Force {
+		ok := object.Key("force")
+		ok.Boolean(v.Force)
 	}
 
 	if v.Version != nil {

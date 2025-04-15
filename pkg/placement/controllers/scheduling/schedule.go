@@ -274,7 +274,7 @@ func (s *pluginScheduler) Schedule(
 		// A higher weight indicates that the prioritizer weights more in the cluster selection,
 		// while 0 weight indicate that the prioritizer is disabled.
 		for name, val := range score {
-			scoreSum[name] = scoreSum[name] + val*int64(weight)
+			scoreSum[name] += val * int64(weight)
 		}
 
 	}

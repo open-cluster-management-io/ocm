@@ -66,14 +66,14 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			clusterResources[1] = []string{"7", "10", "90", "100"}
 			clusterResources[2] = []string{"9", "10", "80", "100"}
 
-			//Creating the clusters with resources
+			// Creating the clusters with resources
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			clusterNames := assertCreatingClusters(clusterSet1Name, 3)
 			for i, name := range clusterNames {
 				assertPatchingClusterStatusWithResources(name, clusterResources[i])
 			}
 
-			//Checking the result of the placement
+			// Checking the result of the placement
 			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(2).Build()
 			assertCreatingPlacementWithDecision(placement, 2, 1)
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[0], clusterNames[1]})
@@ -86,14 +86,14 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			clusterResources[1] = []string{"7", "10", "90", "100"}
 			clusterResources[2] = []string{"9", "10", "80", "100"}
 
-			//Creating the clusters with resources
+			// Creating the clusters with resources
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			clusterNames := assertCreatingClusters(clusterSet1Name, 3)
 			for i, name := range clusterNames {
 				assertPatchingClusterStatusWithResources(name, clusterResources[i])
 			}
 
-			//Checking the result of the placement
+			// Checking the result of the placement
 			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(2).
 				WithPrioritizerPolicy(clusterapiv1beta1.PrioritizerPolicyModeExact).
 				WithPrioritizerConfig("ResourceAllocatableCPU", 1).
@@ -110,14 +110,14 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			clusterResources[1] = []string{"7", "10", "90", "100"}
 			clusterResources[2] = []string{"9", "10", "80", "100"}
 
-			//Creating the clusters with resources
+			// Creating the clusters with resources
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			clusterNames := assertCreatingClusters(clusterSet1Name, 3)
 			for i, name := range clusterNames {
 				assertPatchingClusterStatusWithResources(name, clusterResources[i])
 			}
 
-			//Checking the result of the placement
+			// Checking the result of the placement
 			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(2).
 				WithPrioritizerPolicy(clusterapiv1beta1.PrioritizerPolicyModeAdditive).
 				WithPrioritizerConfig("Steady", 3).
@@ -134,7 +134,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			newClusters := assertCreatingClusters(clusterSet1Name, 1)
 			assertPatchingClusterStatusWithResources(newClusters[0], newClusterResources)
 
-			//Checking the result of the placement
+			// Checking the result of the placement
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[0], clusterNames[2]})
 		})
 
@@ -145,7 +145,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			clusterResources[1] = []string{"7", "10", "90", "100"}
 			clusterResources[2] = []string{"9", "10", "80", "100"}
 
-			//Creating the clusters with resources
+			// Creating the clusters with resources
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			clusterNames := assertCreatingClusters(clusterSet1Name, 3)
 			for i, name := range clusterNames {
@@ -155,7 +155,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			ginkgo.By("Adding fake placement decisions")
 			assertCreatingPlacementDecision("fake-1", namespace, []string{clusterNames[0]})
 
-			//Checking the result of the placement
+			// Checking the result of the placement
 			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(2).
 				WithPrioritizerPolicy(clusterapiv1beta1.PrioritizerPolicyModeExact).
 				WithPrioritizerConfig("Balance", 2).
@@ -171,14 +171,14 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			clusterResources[1] = []string{"7", "10", "90", "100"}
 			clusterResources[2] = []string{"9", "10", "80", "100"}
 
-			//Creating the clusters with resources
+			// Creating the clusters with resources
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			clusterNames := assertCreatingClusters(clusterSet1Name, 3)
 			for i, name := range clusterNames {
 				assertPatchingClusterStatusWithResources(name, clusterResources[i])
 			}
 
-			//Checking the result of the placement
+			// Checking the result of the placement
 			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(2).
 				WithPrioritizerPolicy(clusterapiv1beta1.PrioritizerPolicyModeExact).
 				WithPrioritizerConfig("ResourceAllocatableCPU", 1).
@@ -192,13 +192,13 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			newClusters := assertCreatingClusters(clusterSet1Name, 1)
 			assertPatchingClusterStatusWithResources(newClusters[0], newClusterResources)
 
-			//Checking the result of the placement
+			// Checking the result of the placement
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[2], newClusters[0]})
 
 			ginkgo.By("Deleting the cluster")
 			assertDeletingClusters(newClusters[0])
 
-			//Checking the result of the placement
+			// Checking the result of the placement
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[0], clusterNames[2]})
 		})
 	})
@@ -207,14 +207,14 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 		ginkgo.It("Should schedule successfully based on AddOnPlacementScore", func() {
 			// cluster settings
 
-			//Creating the clusters with resources
+			// Creating the clusters with resources
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			clusterNames := assertCreatingClusters(clusterSet1Name, 3)
 			assertCreatingAddOnPlacementScores(clusterNames[0], "demo", "demo", 80)
 			assertCreatingAddOnPlacementScores(clusterNames[1], "demo", "demo", 90)
 			assertCreatingAddOnPlacementScores(clusterNames[2], "demo", "demo", 100)
 
-			//Checking the result of the placement
+			// Checking the result of the placement
 			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(2).
 				WithPrioritizerPolicy(clusterapiv1beta1.PrioritizerPolicyModeExact).
 				WithScoreCoordinateAddOn("demo", "demo", 1).Build()
@@ -223,33 +223,33 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 		})
 
 		ginkgo.It("Should reschedule every ResyncInterval and update desicion when AddOnPlacementScore changes", func() {
-			//Creating the clusters with resources
+			// Creating the clusters with resources
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			clusterNames := assertCreatingClusters(clusterSet1Name, 3)
 
-			//Creating the placement
+			// Creating the placement
 			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(2).
 				WithPrioritizerPolicy(clusterapiv1beta1.PrioritizerPolicyModeExact).
 				WithScoreCoordinateAddOn("demo", "demo", 1).Build()
 			assertCreatingPlacementWithDecision(placement, 2, 1)
 
-			//Checking the result of the placement when no AddOnPlacementScores
+			// Checking the result of the placement when no AddOnPlacementScores
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[0], clusterNames[1]})
 
-			//Creating the AddOnPlacementScores
+			// Creating the AddOnPlacementScores
 			assertCreatingAddOnPlacementScores(clusterNames[0], "demo", "demo", 80)
 			assertCreatingAddOnPlacementScores(clusterNames[1], "demo", "demo", 90)
 			assertCreatingAddOnPlacementScores(clusterNames[2], "demo", "demo", 100)
 
-			//Checking the result of the placement when AddOnPlacementScores added
+			// Checking the result of the placement when AddOnPlacementScores added
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[1], clusterNames[2]})
 
-			//update the AddOnPlacementScores
+			// update the AddOnPlacementScores
 			assertCreatingAddOnPlacementScores(clusterNames[0], "demo", "demo", 100)
 			assertCreatingAddOnPlacementScores(clusterNames[1], "demo", "demo", 90)
 			assertCreatingAddOnPlacementScores(clusterNames[2], "demo", "demo", 100)
 
-			//Checking the result of the placement when AddOnPlacementScores updated
+			// Checking the result of the placement when AddOnPlacementScores updated
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[0], clusterNames[2]})
 
 		})

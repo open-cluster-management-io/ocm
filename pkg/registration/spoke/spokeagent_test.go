@@ -53,11 +53,6 @@ func TestValidate(t *testing.T) {
 		expectedErr string
 	}{
 		{
-			name:        "no bootstrap kubeconfig",
-			options:     &SpokeAgentOptions{},
-			expectedErr: "bootstrap-kubeconfig is required",
-		},
-		{
 			name: "invalid external server URLs",
 			options: &SpokeAgentOptions{
 				BootstrapKubeconfig:     "/spoke/bootstrap/kubeconfig",

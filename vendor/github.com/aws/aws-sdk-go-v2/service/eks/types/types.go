@@ -428,8 +428,8 @@ type Cluster struct {
 	// [Amazon EKS local cluster platform versions]: https://docs.aws.amazon.com/eks/latest/userguide/eks-outposts-platform-versions.html
 	PlatformVersion *string
 
-	// The configuration in the cluster for EKS Hybrid Nodes. You can't change or
-	// update this configuration after the cluster is created.
+	// The configuration in the cluster for EKS Hybrid Nodes. You can add, change, or
+	// remove this configuration after the cluster is created.
 	RemoteNetworkConfig *RemoteNetworkConfigResponse
 
 	// The VPC configuration used by the cluster control plane. Amazon EKS VPC
@@ -527,8 +527,14 @@ type ClusterVersionInformation struct {
 	// The release date of this cluster version.
 	ReleaseDate *time.Time
 
+	// This field is deprecated. Use versionStatus instead, as that field matches for
+	// input and output of this action.
+	//
 	// Current status of this cluster version.
 	Status ClusterVersionStatus
+
+	// Current status of this cluster version.
+	VersionStatus VersionStatus
 
 	noSmithyDocumentSerde
 }
@@ -735,6 +741,10 @@ type EksAnywhereSubscription struct {
 	// the CLUSTER license type, each license covers support for a single EKS Anywhere
 	// cluster.
 	LicenseType EksAnywhereSubscriptionLicenseType
+
+	// Includes all of the claims in the license token necessary to validate the
+	// license for extended support.
+	Licenses []License
 
 	// The status of a subscription.
 	Status *string
@@ -1260,18 +1270,33 @@ type LaunchTemplateSpecification struct {
 	// The ID of the launch template.
 	//
 	// You must specify either the launch template ID or the launch template name in
-	// the request, but not both.
+	// the request, but not both. After node group creation, you cannot use a different
+	// ID.
 	Id *string
 
 	// The name of the launch template.
 	//
 	// You must specify either the launch template name or the launch template ID in
-	// the request, but not both.
+	// the request, but not both. After node group creation, you cannot use a different
+	// name.
 	Name *string
 
 	// The version number of the launch template to use. If no version is specified,
-	// then the template's default version is used.
+	// then the template's default version is used. You can use a different version for
+	// node group updates.
 	Version *string
+
+	noSmithyDocumentSerde
+}
+
+// An EKS Anywhere license associated with a subscription.
+type License struct {
+
+	// An id associated with an EKS Anywhere subscription license.
+	Id *string
+
+	// An optional license token that can be used for extended support verification.
+	Token *string
 
 	noSmithyDocumentSerde
 }
@@ -1504,7 +1529,7 @@ type NodegroupUpdateConfig struct {
 
 	// The configuration for the behavior to follow during a node group version update
 	// of this managed node group. You choose between two possible strategies for
-	// replacing nodes during an [UpdateNodegroupVersion]action.
+	// replacing nodes during an [UpdateNodegroupVersion]UpdateNodegroupVersion action.
 	//
 	// An Amazon EKS managed node group updates by replacing nodes with new nodes of
 	// newer AMI versions in parallel. The update strategy changes the managed node
@@ -1516,7 +1541,7 @@ type NodegroupUpdateConfig struct {
 	// constrained to resources or costs (for example, with hardware accelerators such
 	// as GPUs).
 	//
-	// [UpdateNodegroupVersion]: https://docs.aws.amazon.com/latest/APIReference/API_UpdateNodegroupVersion.html
+	// [UpdateNodegroupVersion]: https://docs.aws.amazon.com/eks/latest/APIReference/API_UpdateNodegroupVersion.html
 	UpdateStrategy NodegroupUpdateStrategies
 
 	noSmithyDocumentSerde
@@ -1791,7 +1816,8 @@ type PodIdentityAssociation struct {
 
 // The summarized description of the association.
 //
-// Each summary is simplified by removing these fields compared to the full PodIdentityAssociation:
+// Each summary is simplified by removing these fields compared to the full [PodIdentityAssociation]
+// PodIdentityAssociation :
 //
 //   - The IAM role: roleArn
 //
@@ -1800,6 +1826,8 @@ type PodIdentityAssociation struct {
 //   - The most recent timestamp that the association was modified at:. modifiedAt
 //
 //   - The tags on the association: tags
+//
+// [PodIdentityAssociation]: https://docs.aws.amazon.com/eks/latest/APIReference/API_PodIdentityAssociation.html
 type PodIdentityAssociationSummary struct {
 
 	// The Amazon Resource Name (ARN) of the association.
@@ -1867,8 +1895,8 @@ type RemoteAccessConfig struct {
 	noSmithyDocumentSerde
 }
 
-// The configuration in the cluster for EKS Hybrid Nodes. You can't change or
-// update this configuration after the cluster is created.
+// The configuration in the cluster for EKS Hybrid Nodes. You can add, change, or
+// remove this configuration after the cluster is created.
 type RemoteNetworkConfigRequest struct {
 
 	// The list of network CIDRs that can contain hybrid nodes.
@@ -1927,8 +1955,8 @@ type RemoteNetworkConfigRequest struct {
 	noSmithyDocumentSerde
 }
 
-// The configuration in the cluster for EKS Hybrid Nodes. You can't change or
-// update this configuration after the cluster is created.
+// The configuration in the cluster for EKS Hybrid Nodes. You can add, change, or
+// remove this configuration after the cluster is created.
 type RemoteNetworkConfigResponse struct {
 
 	// The list of network CIDRs that can contain hybrid nodes.

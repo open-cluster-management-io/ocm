@@ -61,7 +61,7 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 
 	ginkgo.Context("TaintToleration", func() {
 		ginkgo.It("Should schedule successfully when taint/toleration matches", func() {
-			//Cluster settings
+			// Cluster settings
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			clusterNames := assertCreatingClusters(clusterSet1Name, 3)
 
@@ -81,7 +81,7 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 				Effect: clusterapiv1.TaintEffectNoSelect,
 			})
 
-			//Checking the result of the placement
+			// Checking the result of the placement
 			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(3).AddToleration(&clusterapiv1beta1.Toleration{
 				Key:      "key1",
 				Operator: clusterapiv1beta1.TolerationOpExists,
@@ -95,7 +95,7 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 		})
 
 		ginkgo.It("Should schedule when taint/toleration effect matches", func() {
-			//Cluster settings
+			// Cluster settings
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			clusterNames := assertCreatingClusters(clusterSet1Name, 4)
 
@@ -115,7 +115,7 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 				Effect: clusterapiv1.TaintEffectPreferNoSelect,
 			})
 
-			//Taint/toleration matches, effect not match
+			// Taint/toleration matches, effect not match
 			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(4).AddToleration(&clusterapiv1beta1.Toleration{
 				Key:      "key1",
 				Operator: clusterapiv1beta1.TolerationOpExists,
@@ -134,10 +134,10 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 				Effect:   clusterapiv1.TaintEffectNoSelect,
 			}).Build()
 			assertCreatingPlacementWithDecision(placement, 2, 1)
-			//Checking the result of the placement
+			// Checking the result of the placement
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[2], clusterNames[3]})
 
-			//Taint effect is NoSelectIfNew, tolerations doesn't match, cluster is in decision
+			// Taint effect is NoSelectIfNew, tolerations doesn't match, cluster is in decision
 			assertPatchingClusterSpecWithTaint(clusterNames[3], &clusterapiv1.Taint{
 				Key:    "key4",
 				Value:  "value4",
@@ -152,7 +152,7 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 			tolerationSeconds_10 := int64(10)
 			tolerationSeconds_20 := int64(20)
 
-			//Cluster settings
+			// Cluster settings
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			clusterNames := assertCreatingClusters(clusterSet1Name, 4)
 
@@ -175,7 +175,7 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 				TimeAdded: metav1.NewTime(addedTime_60),
 			})
 
-			//Checking the result of the placement
+			// Checking the result of the placement
 			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(4).AddToleration(&clusterapiv1beta1.Toleration{
 				Key:               "key1",
 				Operator:          clusterapiv1beta1.TolerationOpExists,
@@ -188,11 +188,11 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 			assertCreatingPlacementWithDecision(placement, 3, 1)
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[0], clusterNames[1], clusterNames[3]})
 
-			//Check placement requeue, clusterNames[0] should be removed when TolerationSeconds expired.
+			// Check placement requeue, clusterNames[0] should be removed when TolerationSeconds expired.
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[1], clusterNames[3]})
-			//Check placement requeue, clusterNames[1] should be removed when TolerationSeconds expired.
+			// Check placement requeue, clusterNames[1] should be removed when TolerationSeconds expired.
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[3]})
-			//Check placement update, clusterNames[3] should be removed when new taint added.
+			// Check placement update, clusterNames[3] should be removed when new taint added.
 			assertPatchingClusterSpecWithTaint(clusterNames[3], &clusterapiv1.Taint{
 				Key:       "key3",
 				Value:     "value3",

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"testing"
+	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
@@ -12,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
+	clocktesting "k8s.io/utils/clock/testing"
 
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/register"
@@ -213,7 +215,7 @@ func TestNewOptions(t *testing.T) {
 
 	opts.NewControllerCommandConfig("test", version.Get(), func(ctx context.Context, controllerCtx *controllercmd.ControllerContext) error {
 		return nil
-	})
+	}, clocktesting.NewFakeClock(time.Now()))
 
 	opts.AddFlags(cmd.Flags())
 	if err := cmd.Flags().Set("kube-api-qps", "10"); err != nil {

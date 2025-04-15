@@ -58,7 +58,7 @@ func TestReconcile(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			obj := append(c.clusterManagementAddon, c.managedClusteraddon...)
+			obj := append(c.clusterManagementAddon, c.managedClusteraddon...) //nolint:gocritic
 			fakeAddonClient := fakeaddon.NewSimpleClientset(obj...)
 
 			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
