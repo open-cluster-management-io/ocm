@@ -3,24 +3,24 @@
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	apiaddonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	versioned "open-cluster-management.io/api/client/addon/clientset/versioned"
 	internalinterfaces "open-cluster-management.io/api/client/addon/informers/externalversions/internalinterfaces"
-	v1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addonv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 )
 
 // AddOnDeploymentConfigInformer provides access to a shared informer and lister for
 // AddOnDeploymentConfigs.
 type AddOnDeploymentConfigInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.AddOnDeploymentConfigLister
+	Lister() addonv1alpha1.AddOnDeploymentConfigLister
 }
 
 type addOnDeploymentConfigInformer struct {
@@ -55,7 +55,7 @@ func NewFilteredAddOnDeploymentConfigInformer(client versioned.Interface, namesp
 				return client.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&addonv1alpha1.AddOnDeploymentConfig{},
+		&apiaddonv1alpha1.AddOnDeploymentConfig{},
 		resyncPeriod,
 		indexers,
 	)
@@ -66,9 +66,9 @@ func (f *addOnDeploymentConfigInformer) defaultInformer(client versioned.Interfa
 }
 
 func (f *addOnDeploymentConfigInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&addonv1alpha1.AddOnDeploymentConfig{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiaddonv1alpha1.AddOnDeploymentConfig{}, f.defaultInformer)
 }
 
-func (f *addOnDeploymentConfigInformer) Lister() v1alpha1.AddOnDeploymentConfigLister {
-	return v1alpha1.NewAddOnDeploymentConfigLister(f.Informer().GetIndexer())
+func (f *addOnDeploymentConfigInformer) Lister() addonv1alpha1.AddOnDeploymentConfigLister {
+	return addonv1alpha1.NewAddOnDeploymentConfigLister(f.Informer().GetIndexer())
 }

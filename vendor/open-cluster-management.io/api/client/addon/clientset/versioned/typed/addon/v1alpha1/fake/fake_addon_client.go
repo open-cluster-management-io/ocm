@@ -13,19 +13,19 @@ type FakeAddonV1alpha1 struct {
 }
 
 func (c *FakeAddonV1alpha1) AddOnDeploymentConfigs(namespace string) v1alpha1.AddOnDeploymentConfigInterface {
-	return &FakeAddOnDeploymentConfigs{c, namespace}
+	return newFakeAddOnDeploymentConfigs(c, namespace)
 }
 
 func (c *FakeAddonV1alpha1) AddOnTemplates() v1alpha1.AddOnTemplateInterface {
-	return &FakeAddOnTemplates{c}
+	return newFakeAddOnTemplates(c)
 }
 
 func (c *FakeAddonV1alpha1) ClusterManagementAddOns() v1alpha1.ClusterManagementAddOnInterface {
-	return &FakeClusterManagementAddOns{c}
+	return newFakeClusterManagementAddOns(c)
 }
 
 func (c *FakeAddonV1alpha1) ManagedClusterAddOns(namespace string) v1alpha1.ManagedClusterAddOnInterface {
-	return &FakeManagedClusterAddOns{c, namespace}
+	return newFakeManagedClusterAddOns(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

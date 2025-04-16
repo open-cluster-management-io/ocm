@@ -110,7 +110,7 @@ type Taint struct {
 	Effect TaintEffect `json:"effect"`
 	// TimeAdded represents the time at which the taint was added.
 	// +nullable
-	// +required
+	// +optional
 	TimeAdded metav1.Time `json:"timeAdded"`
 }
 

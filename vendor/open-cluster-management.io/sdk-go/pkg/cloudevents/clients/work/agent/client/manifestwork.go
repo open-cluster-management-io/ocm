@@ -174,7 +174,7 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 		// publish the status update event to source, source will check the resource version
 		// and reject the update if it's status update is outdated.
 		if err := c.cloudEventsClient.Publish(ctx, eventType, newWork); err != nil {
-			returnErr := cloudeventserrors.NewPublishError(common.ManifestWorkGR, name, err)
+			returnErr := cloudeventserrors.ToStatusError(common.ManifestWorkGR, name, err)
 			generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
 			return nil, returnErr
 		}
@@ -236,7 +236,7 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 
 		eventType.Action = common.DeleteRequestAction
 		if err := c.cloudEventsClient.Publish(ctx, eventType, newWork); err != nil {
-			returnErr := cloudeventserrors.NewPublishError(common.ManifestWorkGR, name, err)
+			returnErr := cloudeventserrors.ToStatusError(common.ManifestWorkGR, name, err)
 			generic.IncreaseWorkProcessedCounter("delete", string(returnErr.ErrStatus.Reason))
 			return nil, returnErr
 		}

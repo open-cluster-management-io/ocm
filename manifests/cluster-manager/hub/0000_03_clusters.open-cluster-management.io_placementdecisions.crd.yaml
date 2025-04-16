@@ -19,12 +19,10 @@ spec:
           PlacementDecision indicates a decision from a placement.
           PlacementDecision must have a cluster.open-cluster-management.io/placement={placement name} label to reference a certain placement.
 
-
           If a placement has spec.numberOfClusters specified, the total number of decisions contained in
           the status.decisions of PlacementDecisions must be the same as NumberOfClusters. Otherwise, the
           total number of decisions must equal the number of ManagedClusters that
           match the placement requirements.
-
 
           Some of the decisions might be empty when there are not enough ManagedClusters to meet the placement requirements.
         properties:

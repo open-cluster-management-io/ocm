@@ -22,7 +22,6 @@ spec:
            2. clusterset.k8s.io, it contains an identifier that relates the cluster
               to the ClusterSet in which it belongs.
 
-
           ClusterClaims created on a managed cluster will be collected and saved into
           the status of the corresponding ManagedCluster on hub.
         properties:

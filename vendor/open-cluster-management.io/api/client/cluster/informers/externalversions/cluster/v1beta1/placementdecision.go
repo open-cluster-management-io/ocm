@@ -3,7 +3,7 @@
 package v1beta1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,15 +12,15 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 	versioned "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	internalinterfaces "open-cluster-management.io/api/client/cluster/informers/externalversions/internalinterfaces"
-	v1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
+	apiclusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
 // PlacementDecisionInformer provides access to a shared informer and lister for
 // PlacementDecisions.
 type PlacementDecisionInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.PlacementDecisionLister
+	Lister() clusterv1beta1.PlacementDecisionLister
 }
 
 type placementDecisionInformer struct {
@@ -55,7 +55,7 @@ func NewFilteredPlacementDecisionInformer(client versioned.Interface, namespace 
 				return client.ClusterV1beta1().PlacementDecisions(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&clusterv1beta1.PlacementDecision{},
+		&apiclusterv1beta1.PlacementDecision{},
 		resyncPeriod,
 		indexers,
 	)
@@ -66,9 +66,9 @@ func (f *placementDecisionInformer) defaultInformer(client versioned.Interface, 
 }
 
 func (f *placementDecisionInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&clusterv1beta1.PlacementDecision{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiclusterv1beta1.PlacementDecision{}, f.defaultInformer)
 }
 
-func (f *placementDecisionInformer) Lister() v1beta1.PlacementDecisionLister {
-	return v1beta1.NewPlacementDecisionLister(f.Informer().GetIndexer())
+func (f *placementDecisionInformer) Lister() clusterv1beta1.PlacementDecisionLister {
+	return clusterv1beta1.NewPlacementDecisionLister(f.Informer().GetIndexer())
 }
