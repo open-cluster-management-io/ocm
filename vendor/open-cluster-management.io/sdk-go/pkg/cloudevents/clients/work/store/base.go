@@ -24,7 +24,7 @@ type baseSourceStore struct {
 	store.BaseClientWatchStore[*workv1.ManifestWork]
 
 	// a queue to save the received work events
-	receivedWorks workqueue.RateLimitingInterface
+	receivedWorks workqueue.RateLimitingInterface // nolint:staticcheck // SA1019
 }
 
 func (bs *baseSourceStore) HandleReceivedResource(action types.ResourceAction, work *workv1.ManifestWork) error {
@@ -39,11 +39,11 @@ func (bs *baseSourceStore) HandleReceivedResource(action types.ResourceAction, w
 
 // workProcessor process the received works from given work queue with a specific store
 type workProcessor struct {
-	works workqueue.RateLimitingInterface
+	works workqueue.RateLimitingInterface // nolint:staticcheck // SA1019
 	store store.ClientWatcherStore[*workv1.ManifestWork]
 }
 
-func newWorkProcessor(works workqueue.RateLimitingInterface, store store.ClientWatcherStore[*workv1.ManifestWork]) *workProcessor {
+func newWorkProcessor(works workqueue.RateLimitingInterface, store store.ClientWatcherStore[*workv1.ManifestWork]) *workProcessor { // nolint:staticcheck // SA1019
 	return &workProcessor{
 		works: works,
 		store: store,

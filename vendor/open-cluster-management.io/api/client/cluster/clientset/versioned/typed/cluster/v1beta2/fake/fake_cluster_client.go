@@ -13,11 +13,11 @@ type FakeClusterV1beta2 struct {
 }
 
 func (c *FakeClusterV1beta2) ManagedClusterSets() v1beta2.ManagedClusterSetInterface {
-	return &FakeManagedClusterSets{c}
+	return newFakeManagedClusterSets(c)
 }
 
 func (c *FakeClusterV1beta2) ManagedClusterSetBindings(namespace string) v1beta2.ManagedClusterSetBindingInterface {
-	return &FakeManagedClusterSetBindings{c, namespace}
+	return newFakeManagedClusterSetBindings(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

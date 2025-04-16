@@ -3,7 +3,7 @@
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,15 +12,15 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 	versioned "open-cluster-management.io/api/client/work/clientset/versioned"
 	internalinterfaces "open-cluster-management.io/api/client/work/informers/externalversions/internalinterfaces"
-	v1alpha1 "open-cluster-management.io/api/client/work/listers/work/v1alpha1"
-	workv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
+	workv1alpha1 "open-cluster-management.io/api/client/work/listers/work/v1alpha1"
+	apiworkv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 )
 
 // ManifestWorkReplicaSetInformer provides access to a shared informer and lister for
 // ManifestWorkReplicaSets.
 type ManifestWorkReplicaSetInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.ManifestWorkReplicaSetLister
+	Lister() workv1alpha1.ManifestWorkReplicaSetLister
 }
 
 type manifestWorkReplicaSetInformer struct {
@@ -55,7 +55,7 @@ func NewFilteredManifestWorkReplicaSetInformer(client versioned.Interface, names
 				return client.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&workv1alpha1.ManifestWorkReplicaSet{},
+		&apiworkv1alpha1.ManifestWorkReplicaSet{},
 		resyncPeriod,
 		indexers,
 	)
@@ -66,9 +66,9 @@ func (f *manifestWorkReplicaSetInformer) defaultInformer(client versioned.Interf
 }
 
 func (f *manifestWorkReplicaSetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&workv1alpha1.ManifestWorkReplicaSet{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiworkv1alpha1.ManifestWorkReplicaSet{}, f.defaultInformer)
 }
 
-func (f *manifestWorkReplicaSetInformer) Lister() v1alpha1.ManifestWorkReplicaSetLister {
-	return v1alpha1.NewManifestWorkReplicaSetLister(f.Informer().GetIndexer())
+func (f *manifestWorkReplicaSetInformer) Lister() workv1alpha1.ManifestWorkReplicaSetLister {
+	return workv1alpha1.NewManifestWorkReplicaSetLister(f.Informer().GetIndexer())
 }

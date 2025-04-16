@@ -3,24 +3,24 @@
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	apiaddonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	versioned "open-cluster-management.io/api/client/addon/clientset/versioned"
 	internalinterfaces "open-cluster-management.io/api/client/addon/informers/externalversions/internalinterfaces"
-	v1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addonv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 )
 
 // AddOnTemplateInformer provides access to a shared informer and lister for
 // AddOnTemplates.
 type AddOnTemplateInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.AddOnTemplateLister
+	Lister() addonv1alpha1.AddOnTemplateLister
 }
 
 type addOnTemplateInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredAddOnTemplateInformer(client versioned.Interface, resyncPeriod t
 				return client.AddonV1alpha1().AddOnTemplates().Watch(context.TODO(), options)
 			},
 		},
-		&addonv1alpha1.AddOnTemplate{},
+		&apiaddonv1alpha1.AddOnTemplate{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *addOnTemplateInformer) defaultInformer(client versioned.Interface, resy
 }
 
 func (f *addOnTemplateInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&addonv1alpha1.AddOnTemplate{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiaddonv1alpha1.AddOnTemplate{}, f.defaultInformer)
 }
 
-func (f *addOnTemplateInformer) Lister() v1alpha1.AddOnTemplateLister {
-	return v1alpha1.NewAddOnTemplateLister(f.Informer().GetIndexer())
+func (f *addOnTemplateInformer) Lister() addonv1alpha1.AddOnTemplateLister {
+	return addonv1alpha1.NewAddOnTemplateLister(f.Informer().GetIndexer())
 }

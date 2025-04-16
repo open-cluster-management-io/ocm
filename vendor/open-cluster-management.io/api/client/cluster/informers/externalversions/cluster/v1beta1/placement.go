@@ -3,7 +3,7 @@
 package v1beta1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,15 +12,15 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 	versioned "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	internalinterfaces "open-cluster-management.io/api/client/cluster/informers/externalversions/internalinterfaces"
-	v1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
+	apiclusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
 // PlacementInformer provides access to a shared informer and lister for
 // Placements.
 type PlacementInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.PlacementLister
+	Lister() clusterv1beta1.PlacementLister
 }
 
 type placementInformer struct {
@@ -55,7 +55,7 @@ func NewFilteredPlacementInformer(client versioned.Interface, namespace string, 
 				return client.ClusterV1beta1().Placements(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&clusterv1beta1.Placement{},
+		&apiclusterv1beta1.Placement{},
 		resyncPeriod,
 		indexers,
 	)
@@ -66,9 +66,9 @@ func (f *placementInformer) defaultInformer(client versioned.Interface, resyncPe
 }
 
 func (f *placementInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&clusterv1beta1.Placement{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiclusterv1beta1.Placement{}, f.defaultInformer)
 }
 
-func (f *placementInformer) Lister() v1beta1.PlacementLister {
-	return v1beta1.NewPlacementLister(f.Informer().GetIndexer())
+func (f *placementInformer) Lister() clusterv1beta1.PlacementLister {
+	return clusterv1beta1.NewPlacementLister(f.Informer().GetIndexer())
 }

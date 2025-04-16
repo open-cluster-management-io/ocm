@@ -23,7 +23,7 @@ var templateFuncs = map[string]interface{}{
 
 func indent(indention int, v []byte) string {
 	newline := "\n" + strings.Repeat(" ", indention)
-	return strings.Replace(string(v), "\n", newline, -1)
+	return strings.Replace(string(v), "\n", newline, -1) //nolint:gocritic
 }
 
 func base64encode(v []byte) string {

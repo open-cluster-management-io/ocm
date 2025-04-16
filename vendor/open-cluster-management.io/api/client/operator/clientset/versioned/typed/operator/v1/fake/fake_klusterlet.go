@@ -3,114 +3,30 @@
 package fake
 
 import (
-	"context"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
+	operatorv1 "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
 	v1 "open-cluster-management.io/api/operator/v1"
 )
 
-// FakeKlusterlets implements KlusterletInterface
-type FakeKlusterlets struct {
+// fakeKlusterlets implements KlusterletInterface
+type fakeKlusterlets struct {
+	*gentype.FakeClientWithList[*v1.Klusterlet, *v1.KlusterletList]
 	Fake *FakeOperatorV1
 }
 
-var klusterletsResource = v1.SchemeGroupVersion.WithResource("klusterlets")
-
-var klusterletsKind = v1.SchemeGroupVersion.WithKind("Klusterlet")
-
-// Get takes name of the klusterlet, and returns the corresponding klusterlet object, and an error if there is any.
-func (c *FakeKlusterlets) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Klusterlet, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(klusterletsResource, name), &v1.Klusterlet{})
-	if obj == nil {
-		return nil, err
+func newFakeKlusterlets(fake *FakeOperatorV1) operatorv1.KlusterletInterface {
+	return &fakeKlusterlets{
+		gentype.NewFakeClientWithList[*v1.Klusterlet, *v1.KlusterletList](
+			fake.Fake,
+			"",
+			v1.SchemeGroupVersion.WithResource("klusterlets"),
+			v1.SchemeGroupVersion.WithKind("Klusterlet"),
+			func() *v1.Klusterlet { return &v1.Klusterlet{} },
+			func() *v1.KlusterletList { return &v1.KlusterletList{} },
+			func(dst, src *v1.KlusterletList) { dst.ListMeta = src.ListMeta },
+			func(list *v1.KlusterletList) []*v1.Klusterlet { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1.KlusterletList, items []*v1.Klusterlet) { list.Items = gentype.FromPointerSlice(items) },
+		),
+		fake,
 	}
-	return obj.(*v1.Klusterlet), err
-}
-
-// List takes label and field selectors, and returns the list of Klusterlets that match those selectors.
-func (c *FakeKlusterlets) List(ctx context.Context, opts metav1.ListOptions) (result *v1.KlusterletList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(klusterletsResource, klusterletsKind, opts), &v1.KlusterletList{})
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1.KlusterletList{ListMeta: obj.(*v1.KlusterletList).ListMeta}
-	for _, item := range obj.(*v1.KlusterletList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested klusterlets.
-func (c *FakeKlusterlets) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(klusterletsResource, opts))
-}
-
-// Create takes the representation of a klusterlet and creates it.  Returns the server's representation of the klusterlet, and an error, if there is any.
-func (c *FakeKlusterlets) Create(ctx context.Context, klusterlet *v1.Klusterlet, opts metav1.CreateOptions) (result *v1.Klusterlet, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(klusterletsResource, klusterlet), &v1.Klusterlet{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1.Klusterlet), err
-}
-
-// Update takes the representation of a klusterlet and updates it. Returns the server's representation of the klusterlet, and an error, if there is any.
-func (c *FakeKlusterlets) Update(ctx context.Context, klusterlet *v1.Klusterlet, opts metav1.UpdateOptions) (result *v1.Klusterlet, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(klusterletsResource, klusterlet), &v1.Klusterlet{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1.Klusterlet), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeKlusterlets) UpdateStatus(ctx context.Context, klusterlet *v1.Klusterlet, opts metav1.UpdateOptions) (*v1.Klusterlet, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(klusterletsResource, "status", klusterlet), &v1.Klusterlet{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1.Klusterlet), err
-}
-
-// Delete takes name of the klusterlet and deletes it. Returns an error if one occurs.
-func (c *FakeKlusterlets) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(klusterletsResource, name, opts), &v1.Klusterlet{})
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeKlusterlets) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(klusterletsResource, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1.KlusterletList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched klusterlet.
-func (c *FakeKlusterlets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Klusterlet, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(klusterletsResource, name, pt, data, subresources...), &v1.Klusterlet{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1.Klusterlet), err
 }

@@ -13,11 +13,11 @@ type FakeWorkV1 struct {
 }
 
 func (c *FakeWorkV1) AppliedManifestWorks() v1.AppliedManifestWorkInterface {
-	return &FakeAppliedManifestWorks{c}
+	return newFakeAppliedManifestWorks(c)
 }
 
 func (c *FakeWorkV1) ManifestWorks(namespace string) v1.ManifestWorkInterface {
-	return &FakeManifestWorks{c, namespace}
+	return newFakeManifestWorks(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

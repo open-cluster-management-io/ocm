@@ -13,7 +13,7 @@ type FakeClusterV1 struct {
 }
 
 func (c *FakeClusterV1) ManagedClusters() v1.ManagedClusterInterface {
-	return &FakeManagedClusters{c}
+	return newFakeManagedClusters(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate
