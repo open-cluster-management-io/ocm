@@ -63,7 +63,7 @@ func (p *Predicate) Filter(
 	// prebuild label/claim/cel selectors for each predicate
 	clusterSelectors := []*helpers.ClusterSelector{}
 	for _, predicate := range placement.Spec.Predicates {
-		clusterSelector, err := helpers.NewClusterSelector(predicate.RequiredClusterSelector, env)
+		clusterSelector, err := helpers.NewClusterSelector(predicate.RequiredClusterSelector, env, p.handle.MetricsRecorder())
 		if err != nil {
 			return plugins.PluginFilterResult{}, framework.NewStatus(
 				p.Name(),

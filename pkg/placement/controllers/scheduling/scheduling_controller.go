@@ -785,7 +785,7 @@ func filterClustersBySelector(
 ) ([]clusterapiv1beta1.ClusterDecision, *framework.Status) {
 	var matched []clusterapiv1beta1.ClusterDecision
 	// set CEL env to nil since placement decision groups do not support CEL expressions.
-	clusterSelector, err := helpers.NewClusterSelector(selector, nil)
+	clusterSelector, err := helpers.NewClusterSelector(selector, nil, nil)
 	if err != nil {
 		status := framework.NewStatus("", framework.Misconfigured, err.Error())
 		return matched, status

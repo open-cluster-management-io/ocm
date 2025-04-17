@@ -196,7 +196,7 @@ func TestMatches(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			clusterSelector, err := NewClusterSelector(c.clusterselector, env)
+			clusterSelector, err := NewClusterSelector(c.clusterselector, env, nil)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}
