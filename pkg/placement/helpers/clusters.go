@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"github.com/google/cel-go/cel"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -11,9 +12,10 @@ import (
 type ClusterSelector struct {
 	labelSelector labels.Selector
 	claimSelector labels.Selector
+	celSelector   *CELSelector
 }
 
-func NewClusterSelector(selector clusterapiv1beta1.ClusterSelector) (*ClusterSelector, error) {
+func NewClusterSelector(selector clusterapiv1beta1.ClusterSelector, env *cel.Env) (*ClusterSelector, error) {
 	// build label selector
 	labelSelector, err := convertLabelSelector(&selector.LabelSelector)
 	if err != nil {
@@ -24,21 +26,46 @@ func NewClusterSelector(selector clusterapiv1beta1.ClusterSelector) (*ClusterSel
 	if err != nil {
 		return nil, err
 	}
+	// build cel selector
+	celSelector := NewCELSelector(env, selector.CelSelector.CelExpressions)
 	return &ClusterSelector{
 		labelSelector: labelSelector,
 		claimSelector: claimSelector,
+		celSelector:   celSelector,
 	}, nil
 }
 
-func (c *ClusterSelector) Matches(clusterlabels, clusterclaims map[string]string) bool {
+// Compile compiles all the CEL expressions if a CEL selector exists.
+// This method must be called before Matches() if CEL expressions are used.
+// If not called, the CEL expressions will not be evaluated.
+func (c *ClusterSelector) Compile() []CompilationResult {
+	if c.celSelector != nil {
+		return c.celSelector.Compile()
+	}
+	return nil
+}
+
+// Matches evaluates whether a cluster matches all selectors.
+// Note: If CEL expressions are used, Compile() must be called before this method.
+// If Compile() has not been called, CEL expressions will not be evaluated.
+func (c *ClusterSelector) Matches(cluster *clusterapiv1.ManagedCluster) bool {
 	// match with label selector
-	if ok := c.labelSelector.Matches(labels.Set(clusterlabels)); !ok {
+	if ok := c.labelSelector.Matches(labels.Set(cluster.Labels)); !ok {
 		return false
 	}
+
 	// match with claim selector
-	if ok := c.claimSelector.Matches(labels.Set(clusterclaims)); !ok {
+	if ok := c.claimSelector.Matches(labels.Set(GetClusterClaims(cluster))); !ok {
 		return false
 	}
+
+	// match with cel selector if exists
+	if c.celSelector != nil {
+		if ok := c.celSelector.Validate(cluster); !ok {
+			return false
+		}
+	}
+
 	return true
 }
 
