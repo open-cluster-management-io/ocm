@@ -27,13 +27,16 @@ type resourceRequirements struct {
 	Requests map[string]string `json:"requests,omitempty"`
 }
 
-// regexResourceRequirements defines a resource requirement rule for containers. A container is eligible for the
+// RegexResourceRequirements defines a resource requirement rule for containers. A container is eligible for the
 // specified resource requirements if its container ID matches the regular expression.
-type regexResourceRequirements struct {
+type RegexResourceRequirements struct {
 	// ContainerIDRegex is the regular expression used to match container IDs.
 	ContainerIDRegex string `json:"containerIDRegex"`
-	// Resources defines the resource requirements for matched containers
+	// Resources defines the resource requirements for matched containers, its resource value is plain string
 	Resources resourceRequirements `json:"resources"`
+
+	// ResourcesRaw defines the resource requirements for matched containers, its resource value is structure
+	ResourcesRaw corev1.ResourceRequirements `json:"resourcesRaw"`
 }
 
 // ToAddOnNodePlacementValues only transform the AddOnDeploymentConfig NodePlacement part into Values object that has
@@ -139,13 +142,13 @@ func ToAddOnResourceRequirementsValues(config addonapiv1alpha1.AddOnDeploymentCo
 		return nil, nil
 	}
 
-	resourceRequirements, err := getRegexResourceRequirements(config.Spec.ResourceRequirements)
+	resourceRequirements, err := GetRegexResourceRequirements(config.Spec.ResourceRequirements)
 	if err != nil {
 		return nil, err
 	}
 
 	type global struct {
-		ResourceRequirements []regexResourceRequirements `json:"resourceRequirements"`
+		ResourceRequirements []RegexResourceRequirements `json:"resourceRequirements"`
 	}
 
 	jsonStruct := struct {
@@ -221,8 +224,8 @@ func GetAddOnDeploymentConfigValues(
 	}
 }
 
-func getRegexResourceRequirements(requirements []addonapiv1alpha1.ContainerResourceRequirements) ([]regexResourceRequirements, error) {
-	newRequirements := []regexResourceRequirements{}
+func GetRegexResourceRequirements(requirements []addonapiv1alpha1.ContainerResourceRequirements) ([]RegexResourceRequirements, error) {
+	newRequirements := []RegexResourceRequirements{}
 	for _, item := range requirements {
 		// convert container ID to regex
 		parts := strings.Split(item.ContainerID, ":")
@@ -234,12 +237,13 @@ func getRegexResourceRequirements(requirements []addonapiv1alpha1.ContainerResou
 				parts[index] = ".+"
 			}
 		}
-		newRequirements = append(newRequirements, regexResourceRequirements{
+		newRequirements = append(newRequirements, RegexResourceRequirements{
 			ContainerIDRegex: fmt.Sprintf("^%s:%s:%s$", parts[0], parts[1], parts[2]),
 			Resources: resourceRequirements{
 				Requests: toStringResourceList(item.Resources.Requests),
 				Limits:   toStringResourceList(item.Resources.Limits),
 			},
+			ResourcesRaw: item.Resources,
 		})
 	}
 
@@ -294,7 +298,7 @@ func ToAddOnDeploymentConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig
 	}
 
 	// load ResourceRequirements settings
-	resourceRequirements, err := getRegexResourceRequirements(config.Spec.ResourceRequirements)
+	resourceRequirements, err := GetRegexResourceRequirements(config.Spec.ResourceRequirements)
 	if err != nil {
 		return nil, err
 	}

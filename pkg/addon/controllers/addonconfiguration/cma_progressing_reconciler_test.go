@@ -677,8 +677,8 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			obj := append(c.clusterManagementAddon, c.managedClusteraddon...)
-			clusterObj := append(c.placements, c.placementDecisions...)
+			obj := append(c.clusterManagementAddon, c.managedClusteraddon...) //nolint:gocritic
+			clusterObj := append(c.placements, c.placementDecisions...)       //nolint:gocritic
 			fakeClusterClient := fakecluster.NewSimpleClientset(clusterObj...)
 			fakeAddonClient := fakeaddon.NewSimpleClientset(obj...)
 

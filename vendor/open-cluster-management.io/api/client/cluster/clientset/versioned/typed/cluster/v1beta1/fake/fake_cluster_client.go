@@ -13,11 +13,11 @@ type FakeClusterV1beta1 struct {
 }
 
 func (c *FakeClusterV1beta1) Placements(namespace string) v1beta1.PlacementInterface {
-	return &FakePlacements{c, namespace}
+	return newFakePlacements(c, namespace)
 }
 
 func (c *FakeClusterV1beta1) PlacementDecisions(namespace string) v1beta1.PlacementDecisionInterface {
-	return &FakePlacementDecisions{c, namespace}
+	return newFakePlacementDecisions(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

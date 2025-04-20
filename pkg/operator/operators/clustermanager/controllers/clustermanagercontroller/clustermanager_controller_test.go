@@ -285,7 +285,7 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.Cl
 		t.Errorf("Unable to access objectmeta: %v", err)
 	}
 
-	switch o := object.(type) {
+	switch o := object.(type) { //nolint:gocritic
 	case *corev1.Namespace:
 		testingcommon.AssertEqualNameNamespace(t, access.GetName(), "", helpers.ClusterManagerNamespace(hubCore.Name, hubCore.Spec.DeployOption.Mode), "")
 	case *appsv1.Deployment:
@@ -549,7 +549,7 @@ func TestSyncDelete(t *testing.T) {
 	testingcommon.AssertEqualNumber(t, len(deleteCRDActions), 16)
 
 	for _, action := range deleteKubeActions {
-		switch action.Resource.Resource {
+		switch action.Resource.Resource { //nolint:gocritic
 		case "namespaces":
 			testingcommon.AssertEqualNameNamespace(t, action.Name, "", clusterManagerNamespace, "")
 		}
@@ -574,7 +574,7 @@ func TestDeleteCRD(t *testing.T) {
 	getCount := 0
 	tc.apiExtensionClient.PrependReactor("get", "customresourcedefinitions", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 		if getCount == 0 {
-			getCount = getCount + 1
+			getCount++
 			return true, crd, nil
 		}
 		return true, &apiextensionsv1.CustomResourceDefinition{}, errors.NewNotFound(

@@ -14,8 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
-	kasversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/kubernetes"
+	kasversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 
 	configv1 "github.com/openshift/api/config/v1"

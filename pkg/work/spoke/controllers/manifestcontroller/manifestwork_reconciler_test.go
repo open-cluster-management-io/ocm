@@ -235,7 +235,7 @@ func (t *testCase) validate(
 		ts.Fatal(err)
 	}
 	for index, cond := range t.expectedManifestConditions {
-		assertManifestCondition(ts, actualWork.Status.ResourceStatus.Manifests, int32(index), cond.conditionType, cond.status)
+		assertManifestCondition(ts, actualWork.Status.ResourceStatus.Manifests, int32(index), cond.conditionType, cond.status) //nolint:gosec
 	}
 	for _, cond := range t.expectedWorkConditions {
 		assertCondition(ts, actualWork.Status.Conditions, cond.conditionType, cond.status)

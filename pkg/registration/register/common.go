@@ -118,19 +118,19 @@ func IsHubKubeconfigValid(bootstrapKubeConfig, hubeKubeConfig *clientcmdapi.Conf
 
 func IsHubKubeConfigValidFunc(driver RegisterDriver, secretOption SecretOption) wait.ConditionWithContextFunc {
 	return func(ctx context.Context) (bool, error) {
-		logger := klog.FromContext(ctx)
-		if _, err := os.Stat(secretOption.HubKubeconfigFile); os.IsNotExist(err) {
-			logger.V(4).Info("Kubeconfig file not found", "kubeconfigPath", secretOption.HubKubeconfigFile)
-			return false, nil
-		}
-
-		// create a kubeconfig with references to the key/cert files in the same secret
-		hubKubeconfig, err := clientcmd.LoadFromFile(secretOption.HubKubeconfigFile)
-		if err != nil {
-			return false, err
-		}
-
 		if secretOption.BootStrapKubeConfigFile != "" {
+			logger := klog.FromContext(ctx)
+			if _, err := os.Stat(secretOption.HubKubeconfigFile); os.IsNotExist(err) {
+				logger.V(4).Info("Kubeconfig file not found", "kubeconfigPath", secretOption.HubKubeconfigFile)
+				return false, nil
+			}
+
+			// create a kubeconfig with references to the key/cert files in the same secret
+			hubKubeconfig, err := clientcmd.LoadFromFile(secretOption.HubKubeconfigFile)
+			if err != nil {
+				return false, err
+			}
+
 			bootStrapConfig, err := clientcmd.LoadFromFile(secretOption.BootStrapKubeConfigFile)
 			if err != nil {
 				return false, err

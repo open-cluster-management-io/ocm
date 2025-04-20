@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -28,6 +29,8 @@ type secretController struct {
 	statusUpdater        StatusUpdateFunc
 	additionalSecretData map[string][]byte
 	secretToSave         *corev1.Secret
+
+	managementCoreClient corev1client.CoreV1Interface
 }
 
 // NewSecretController return an instance of secretController
@@ -35,6 +38,8 @@ func NewSecretController(
 	secretOption SecretOption,
 	driver RegisterDriver,
 	statusUpdater StatusUpdateFunc,
+	managementCoreClient corev1client.CoreV1Interface,
+	managementSecretInformer cache.SharedIndexInformer,
 	recorder events.Recorder,
 	controllerName string,
 ) factory.Controller {
@@ -72,6 +77,7 @@ func NewSecretController(
 		controllerName:       controllerName,
 		statusUpdater:        statusUpdater,
 		additionalSecretData: additionalSecretData,
+		managementCoreClient: managementCoreClient,
 	}
 
 	f := factory.New().
@@ -87,7 +93,7 @@ func NewSecretController(
 				return true
 			}
 			return false
-		}, secretOption.ManagementSecretInformer)
+		}, managementSecretInformer)
 
 	driverInformer, driverFilter := driver.InformerHandler()
 	if driverInformer != nil && driverFilter != nil {
@@ -105,7 +111,7 @@ func NewSecretController(
 
 func (c *secretController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	// get secret containing client certificate
-	secret, err := c.ManagementCoreClient.Secrets(c.SecretNamespace).Get(ctx, c.SecretName, metav1.GetOptions{})
+	secret, err := c.managementCoreClient.Secrets(c.SecretNamespace).Get(ctx, c.SecretName, metav1.GetOptions{})
 	switch {
 	case apierrors.IsNotFound(err):
 		secret = &corev1.Secret{
@@ -146,7 +152,7 @@ func (c *secretController) sync(ctx context.Context, syncCtx factory.SyncContext
 	}
 
 	// save the changes into secret
-	if err := saveSecret(c.ManagementCoreClient, c.SecretNamespace, c.secretToSave); err != nil {
+	if err := saveSecret(c.managementCoreClient, c.SecretNamespace, c.secretToSave); err != nil {
 		return err
 	}
 	syncCtx.Recorder().Eventf("SecretSave", "Secret %s/%s for %s is updated",

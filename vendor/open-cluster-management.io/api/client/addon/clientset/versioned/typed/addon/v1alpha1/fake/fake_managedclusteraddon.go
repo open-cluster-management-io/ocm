@@ -3,123 +3,34 @@
 package fake
 
 import (
-	"context"
-
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
 	v1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1alpha1 "open-cluster-management.io/api/client/addon/clientset/versioned/typed/addon/v1alpha1"
 )
 
-// FakeManagedClusterAddOns implements ManagedClusterAddOnInterface
-type FakeManagedClusterAddOns struct {
+// fakeManagedClusterAddOns implements ManagedClusterAddOnInterface
+type fakeManagedClusterAddOns struct {
+	*gentype.FakeClientWithList[*v1alpha1.ManagedClusterAddOn, *v1alpha1.ManagedClusterAddOnList]
 	Fake *FakeAddonV1alpha1
-	ns   string
 }
 
-var managedclusteraddonsResource = v1alpha1.SchemeGroupVersion.WithResource("managedclusteraddons")
-
-var managedclusteraddonsKind = v1alpha1.SchemeGroupVersion.WithKind("ManagedClusterAddOn")
-
-// Get takes name of the managedClusterAddOn, and returns the corresponding managedClusterAddOn object, and an error if there is any.
-func (c *FakeManagedClusterAddOns) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ManagedClusterAddOn, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(managedclusteraddonsResource, c.ns, name), &v1alpha1.ManagedClusterAddOn{})
-
-	if obj == nil {
-		return nil, err
+func newFakeManagedClusterAddOns(fake *FakeAddonV1alpha1, namespace string) addonv1alpha1.ManagedClusterAddOnInterface {
+	return &fakeManagedClusterAddOns{
+		gentype.NewFakeClientWithList[*v1alpha1.ManagedClusterAddOn, *v1alpha1.ManagedClusterAddOnList](
+			fake.Fake,
+			namespace,
+			v1alpha1.SchemeGroupVersion.WithResource("managedclusteraddons"),
+			v1alpha1.SchemeGroupVersion.WithKind("ManagedClusterAddOn"),
+			func() *v1alpha1.ManagedClusterAddOn { return &v1alpha1.ManagedClusterAddOn{} },
+			func() *v1alpha1.ManagedClusterAddOnList { return &v1alpha1.ManagedClusterAddOnList{} },
+			func(dst, src *v1alpha1.ManagedClusterAddOnList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.ManagedClusterAddOnList) []*v1alpha1.ManagedClusterAddOn {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.ManagedClusterAddOnList, items []*v1alpha1.ManagedClusterAddOn) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.ManagedClusterAddOn), err
-}
-
-// List takes label and field selectors, and returns the list of ManagedClusterAddOns that match those selectors.
-func (c *FakeManagedClusterAddOns) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ManagedClusterAddOnList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(managedclusteraddonsResource, managedclusteraddonsKind, c.ns, opts), &v1alpha1.ManagedClusterAddOnList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.ManagedClusterAddOnList{ListMeta: obj.(*v1alpha1.ManagedClusterAddOnList).ListMeta}
-	for _, item := range obj.(*v1alpha1.ManagedClusterAddOnList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested managedClusterAddOns.
-func (c *FakeManagedClusterAddOns) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(managedclusteraddonsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a managedClusterAddOn and creates it.  Returns the server's representation of the managedClusterAddOn, and an error, if there is any.
-func (c *FakeManagedClusterAddOns) Create(ctx context.Context, managedClusterAddOn *v1alpha1.ManagedClusterAddOn, opts v1.CreateOptions) (result *v1alpha1.ManagedClusterAddOn, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(managedclusteraddonsResource, c.ns, managedClusterAddOn), &v1alpha1.ManagedClusterAddOn{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.ManagedClusterAddOn), err
-}
-
-// Update takes the representation of a managedClusterAddOn and updates it. Returns the server's representation of the managedClusterAddOn, and an error, if there is any.
-func (c *FakeManagedClusterAddOns) Update(ctx context.Context, managedClusterAddOn *v1alpha1.ManagedClusterAddOn, opts v1.UpdateOptions) (result *v1alpha1.ManagedClusterAddOn, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(managedclusteraddonsResource, c.ns, managedClusterAddOn), &v1alpha1.ManagedClusterAddOn{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.ManagedClusterAddOn), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeManagedClusterAddOns) UpdateStatus(ctx context.Context, managedClusterAddOn *v1alpha1.ManagedClusterAddOn, opts v1.UpdateOptions) (*v1alpha1.ManagedClusterAddOn, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(managedclusteraddonsResource, "status", c.ns, managedClusterAddOn), &v1alpha1.ManagedClusterAddOn{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.ManagedClusterAddOn), err
-}
-
-// Delete takes name of the managedClusterAddOn and deletes it. Returns an error if one occurs.
-func (c *FakeManagedClusterAddOns) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(managedclusteraddonsResource, c.ns, name, opts), &v1alpha1.ManagedClusterAddOn{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeManagedClusterAddOns) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(managedclusteraddonsResource, c.ns, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.ManagedClusterAddOnList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched managedClusterAddOn.
-func (c *FakeManagedClusterAddOns) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ManagedClusterAddOn, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(managedclusteraddonsResource, c.ns, name, pt, data, subresources...), &v1alpha1.ManagedClusterAddOn{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.ManagedClusterAddOn), err
 }

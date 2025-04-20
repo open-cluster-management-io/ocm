@@ -45,23 +45,24 @@ helm install klusterlet --version <version> ocm/klusterlet \
 
 ### Run klusterlet on Hosted mode
 
-Install the Chart on the hosting cluster without installing operator:
+Install the Chart on the hosting cluster:
 
 ```bash
-helm install <klusterlet name> --version <version> ocm/klusterlet \
-    --set klusterlet.clusterName=<cluster name>,klusterlet.mode=Hosted,noOperator=true \
+helm install <klusterlet release name> --version <version> ocm/klusterlet \
+    --set klusterlet.name=<klusterlet name>,klusterlet.clusterName=<cluster name>,klusterlet.mode=Hosted \
     --set-file bootstrapHubKubeConfig=<the bootstrap kubeconfig file of hub cluster>,\
       externalManagedKubeConfig=<the kubeconfig file of the managed cluster>
 ```
 
-Install the Chart on the hosting cluster with installing operator:
+### Run klusterlet without operator
+In this case, the klusterlet operator has been installed on the cluster.
 
 ```bash
-helm install <klusterlet name> --version <version> ocm/klusterlet \
-    --set klusterlet.clusterName=<cluster name>,klusterlet.mode=Hosted \
-    --set-file bootstrapHubKubeConfig=<the bootstrap kubeconfig file of hub cluster>,\
-      externalManagedKubeConfig=<the kubeconfig file of the managed cluster>
+    helm install <klusterlet release name> --version <version> ocm/klusterlet \
+    --set klusterlet.name=<klusterlet name>,klusterlet.clusterName=<cluster name>,klusterlet.namespace=<klusterlet namespace>,noOperator=true \
+    --set-file bootstrapHubKubeConfig=<the bootstrap kubeconfig file of hub cluster>
 ```
+
 
 > Note:
 > If the cluster is KinD cluster, the kubeconfig should be internal:: `kind get kubeconfig --name managed --internal`.

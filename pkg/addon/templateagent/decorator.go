@@ -3,6 +3,7 @@ package templateagent
 import (
 	"fmt"
 	"path"
+	"regexp"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -106,6 +107,7 @@ func newDeploymentDecorator(
 			newNodePlacementDecorator(privateValues),
 			newImageDecorator(privateValues),
 			newProxyHandler(logger, addonName, privateValues),
+			newResourceRequirementsDecorator(logger, supportResourceDeployment, privateValues),
 		},
 	}
 }
@@ -118,7 +120,7 @@ func (d *deploymentDecorator) decorate(obj *unstructured.Unstructured) (*unstruc
 	}
 
 	for _, decorator := range d.decorators {
-		err = decorator.decorate(&deployment.Spec.Template)
+		err = decorator.decorate(deployment.Name, &deployment.Spec.Template)
 		if err != nil {
 			return obj, err
 		}
@@ -152,6 +154,7 @@ func newDaemonSetDecorator(
 			newNodePlacementDecorator(privateValues),
 			newImageDecorator(privateValues),
 			newProxyHandler(logger, addonName, privateValues),
+			newResourceRequirementsDecorator(logger, supportResourceDaemonset, privateValues),
 		},
 	}
 }
@@ -164,7 +167,7 @@ func (d *daemonSetDecorator) decorate(obj *unstructured.Unstructured) (*unstruct
 	}
 
 	for _, decorator := range d.decorators {
-		err = decorator.decorate(&daemonSet.Spec.Template)
+		err = decorator.decorate(daemonSet.Name, &daemonSet.Spec.Template)
 		if err != nil {
 			return obj, err
 		}
@@ -180,7 +183,8 @@ func (d *daemonSetDecorator) decorate(obj *unstructured.Unstructured) (*unstruct
 
 type podTemplateSpecDecorator interface {
 	// decorate modifies the pod template in place
-	decorate(pod *corev1.PodTemplateSpec) error
+	//   resourceName is the name of the resource, could be a deployment name or a daemonset name
+	decorate(resourceName string, pod *corev1.PodTemplateSpec) error
 }
 
 type environmentDecorator struct {
@@ -192,7 +196,7 @@ func newEnvironmentDecorator(orderedValues orderedValues) podTemplateSpecDecorat
 		orderedValues: orderedValues,
 	}
 }
-func (d *environmentDecorator) decorate(pod *corev1.PodTemplateSpec) error {
+func (d *environmentDecorator) decorate(_ string, pod *corev1.PodTemplateSpec) error {
 	envVars := make([]corev1.EnvVar, len(d.orderedValues))
 	for index, value := range d.orderedValues {
 		envVars[index] = corev1.EnvVar{
@@ -222,7 +226,7 @@ func newVolumeDecorator(addonName string, template *addonapiv1alpha1.AddOnTempla
 	}
 }
 
-func (d *volumeDecorator) decorate(pod *corev1.PodTemplateSpec) error {
+func (d *volumeDecorator) decorate(_ string, pod *corev1.PodTemplateSpec) error {
 
 	volumeMounts := []corev1.VolumeMount{}
 	volumes := []corev1.Volume{}
@@ -289,7 +293,7 @@ func newNodePlacementDecorator(privateValues addonfactory.Values) podTemplateSpe
 	}
 }
 
-func (d *nodePlacementDecorator) decorate(pod *corev1.PodTemplateSpec) error {
+func (d *nodePlacementDecorator) decorate(_ string, pod *corev1.PodTemplateSpec) error {
 	nodePlacement, ok := d.privateValues[NodePlacementPrivateValueKey]
 	if !ok {
 		return nil
@@ -321,7 +325,7 @@ func newImageDecorator(privateValues addonfactory.Values) podTemplateSpecDecorat
 	}
 }
 
-func (d *imageDecorator) decorate(pod *corev1.PodTemplateSpec) error {
+func (d *imageDecorator) decorate(_ string, pod *corev1.PodTemplateSpec) error {
 	registries, ok := d.privateValues[RegistriesPrivateValueKey]
 	if !ok {
 		return nil
@@ -368,7 +372,7 @@ func newProxyHandler(logger klog.Logger, addonName string, privateValues addonfa
 	}
 }
 
-func (d *proxyHandler) decorate(pod *corev1.PodTemplateSpec) error {
+func (d *proxyHandler) decorate(name string, pod *corev1.PodTemplateSpec) error {
 	pc, ok := d.getProxyConfig()
 	if !ok {
 		return nil
@@ -398,7 +402,7 @@ func (d *proxyHandler) decorate(pod *corev1.PodTemplateSpec) error {
 		return nil
 	}
 
-	err := newEnvironmentDecorator(keyValues).decorate(pod)
+	err := newEnvironmentDecorator(keyValues).decorate(name, pod)
 	if err != nil {
 		return err
 	}
@@ -407,7 +411,7 @@ func (d *proxyHandler) decorate(pod *corev1.PodTemplateSpec) error {
 		return nil
 	}
 
-	return newCABundleDecorator(d.addonName, pc.CABundle).decorate(pod)
+	return newCABundleDecorator(d.addonName, pc.CABundle).decorate(name, pod)
 }
 
 func (d *proxyHandler) getProxyConfig() (addonapiv1alpha1.ProxyConfig, bool) {
@@ -474,8 +478,8 @@ func newCABundleDecorator(addonName string, caBundle []byte) podTemplateSpecDeco
 	}
 }
 
-func (d *caBundleDecorator) decorate(pod *corev1.PodTemplateSpec) error {
-	err := d.envDecorator.decorate(pod)
+func (d *caBundleDecorator) decorate(name string, pod *corev1.PodTemplateSpec) error {
+	err := d.envDecorator.decorate(name, pod)
 	if err != nil {
 		return err
 	}
@@ -505,6 +509,60 @@ func (d *caBundleDecorator) decorate(pod *corev1.PodTemplateSpec) error {
 	}
 
 	pod.Spec.Volumes = append(pod.Spec.Volumes, volumes...)
+	return nil
+}
+
+type supportResource string
+
+const (
+	supportResourceDeployment supportResource = "deployments"
+	supportResourceDaemonset  supportResource = "daemonsets"
+)
+
+type resourceRequirementsDecorator struct {
+	privateValues addonfactory.Values
+	resource      supportResource // only support daemonsets, deployments for now
+	logger        klog.Logger
+}
+
+func newResourceRequirementsDecorator(logger klog.Logger, resource supportResource,
+	privateValues addonfactory.Values) podTemplateSpecDecorator {
+	return &resourceRequirementsDecorator{
+		resource:      resource,
+		privateValues: privateValues,
+	}
+}
+
+func (d *resourceRequirementsDecorator) decorate(name string, pod *corev1.PodTemplateSpec) error {
+	requirements, ok := d.privateValues[ResourceRequirementsPrivateValueKey]
+	if !ok {
+		return nil
+	}
+
+	regexRequirements, ok := requirements.([]addonfactory.RegexResourceRequirements)
+	if !ok {
+		return fmt.Errorf("resource requirements value is invalid")
+	}
+
+	for i := range pod.Spec.Containers {
+		containerID := fmt.Sprintf("%s:%s:%s", d.resource, name, pod.Spec.Containers[i].Name)
+		// revese the requirements array to make the later elements in the array have higher priority
+		for j := len(regexRequirements) - 1; j >= 0; j-- {
+			matched, err := regexp.MatchString(regexRequirements[j].ContainerIDRegex, containerID)
+			if err != nil {
+				d.logger.Info("regex match container id failed", "pattern",
+					regexRequirements[j].ContainerIDRegex, "containerID", containerID)
+				continue
+			}
+			if !matched {
+				continue
+			}
+
+			pod.Spec.Containers[i].Resources = regexRequirements[j].ResourcesRaw
+			break
+		}
+	}
+
 	return nil
 }
 

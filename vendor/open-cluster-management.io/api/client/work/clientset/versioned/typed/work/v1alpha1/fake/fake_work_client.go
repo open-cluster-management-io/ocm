@@ -13,7 +13,7 @@ type FakeWorkV1alpha1 struct {
 }
 
 func (c *FakeWorkV1alpha1) ManifestWorkReplicaSets(namespace string) v1alpha1.ManifestWorkReplicaSetInterface {
-	return &FakeManifestWorkReplicaSets{c, namespace}
+	return newFakeManifestWorkReplicaSets(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

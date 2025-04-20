@@ -56,7 +56,7 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 			_, err = util.GetManagedCluster(clusterClient, managedClusterName)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(errors.IsNotFound(err)).Should(gomega.BeTrue())
-			retryToGetSpokeClusterTimes = retryToGetSpokeClusterTimes + 1
+			retryToGetSpokeClusterTimes++
 			return retryToGetSpokeClusterTimes
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNumerically(">=", 3))
 
@@ -65,7 +65,7 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 		gomega.Eventually(func() int {
 			_, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName)
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			retryToGetSpokeCSRTimes = retryToGetSpokeCSRTimes + 1
+			retryToGetSpokeCSRTimes++
 			return retryToGetSpokeCSRTimes
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNumerically(">=", 3))
 

@@ -1,3 +1,5 @@
+{{- if or ( eq .Values.klusterlet.mode "Singleton") (eq .Values.klusterlet.mode "Default") }}
+{{- if not .Values.noOperator }}
 {{- if .Values.priorityClassName }}
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
@@ -7,4 +9,6 @@ value: 1000000
 globalDefault: false
 description: "This priority class should be used for klusterlet agents only."
 preemptionPolicy: PreemptLowerPriority
+{{- end }}
+{{- end }}
 {{- end }}

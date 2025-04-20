@@ -48,6 +48,8 @@ kubectl get managedclusters --all-namespaces --context ${hubctx}
 for ctx in "${all_ctx[@]}"; do
     echo "Install Kueue, Jobset on $ctx"
     kubectl apply --server-side -f "$kueue_manifest" --context "$ctx"
+    echo "waiting for kueue-system pods to be ready"
+    kubectl wait --for=condition=Ready pods --all -n kueue-system --timeout=300s --context "$ctx"
     kubectl apply --server-side -f "$jobset_manifest" --context "$ctx"
 done
 
@@ -78,18 +80,16 @@ kubectl patch clustermanager cluster-manager --type=json -p='[
 
 # install addons
 echo "Install managed-serviceaccount"
-git clone git@github.com:open-cluster-management-io/managed-serviceaccount.git || true
-cd managed-serviceaccount
+helm repo add ocm https://open-cluster-management.io/helm-charts/
+helm repo update
 helm uninstall -n open-cluster-management-addon managed-serviceaccount || true
 helm install \
    -n open-cluster-management-addon --create-namespace \
-   managed-serviceaccount charts/managed-serviceaccount/ \
+   managed-serviceaccount ocm/managed-serviceaccount \
    --set tag=latest \
    --set featureGates.ephemeralIdentity=true \
    --set enableAddOnDeploymentConfig=true \
    --set hubDeployMode=AddOnTemplate
-cd -
-rm -rf managed-serviceaccount
 
 echo "Install managed-serviceaccount mca"
 clusteradm create clusterset spoke
@@ -101,9 +101,12 @@ kubectl patch clustermanagementaddon managed-serviceaccount --type='json' -p="$(
 echo "Install cluster-permission"
 git clone git@github.com:open-cluster-management-io/cluster-permission.git || true
 cd cluster-permission
-kubectl apply -f config/crds
-kubectl apply -f config/rbac
-kubectl apply -f config/deploy
+helm uninstall -n open-cluster-management cluster-permission || true
+helm install cluster-permission chart/ \
+  --namespace open-cluster-management \
+  --create-namespace \
+  --set global.imageOverrides.cluster_permission=quay.io/open-cluster-management/cluster-permission:latest \
+  --set global.pullPolicy=Always
 cd -
 rm -rf cluster-permission
 

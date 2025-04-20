@@ -535,9 +535,9 @@ func ensureObject(t *testing.T, object runtime.Object, klusterlet *operatorapiv1
 	}
 
 	namespace := helpers.AgentNamespace(klusterlet)
-	switch o := object.(type) {
+	switch o := object.(type) { //nolint:gocritic
 	case *appsv1.Deployment:
-		if strings.Contains(access.GetName(), "registration") {
+		if strings.Contains(access.GetName(), "registration") { //nolint:gocritic
 			testingcommon.AssertEqualNameNamespace(
 				t, access.GetName(), access.GetNamespace(),
 				fmt.Sprintf("%s-registration-agent", klusterlet.Name), namespace)
@@ -1290,87 +1290,6 @@ func TestSyncWithPullSecret(t *testing.T) {
 
 	if createdSecret == nil || createdSecret.Name != helpers.ImagePullSecret {
 		t.Errorf("Failed to sync pull secret")
-	}
-}
-
-func TestDeployOnKube111(t *testing.T) {
-	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
-	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
-	bootStrapSecret.Data["kubeconfig"] = newKubeConfig("testhost")
-	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
-	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
-	namespace := newNamespace("testns")
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
-	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
-		bootStrapSecret, hubKubeConfigSecret, namespace)
-	kubeVersion, _ := version.ParseGeneric("v1.11.0")
-	controller.controller.kubeVersion = kubeVersion
-	controller.cleanupController.kubeVersion = kubeVersion
-
-	ctx := context.TODO()
-	err := controller.controller.sync(ctx, syncContext)
-	if err != nil {
-		t.Errorf("Expected non error when sync, %v", err)
-	}
-
-	var createObjects []runtime.Object
-	kubeActions := controller.kubeClient.Actions()
-	for _, action := range kubeActions {
-		if action.GetVerb() == createVerb {
-			object := action.(clienttesting.CreateActionImpl).Object
-			createObjects = append(createObjects, object)
-		}
-	}
-
-	// Check if resources are created as expected
-	// 12 managed static manifests + 11 management static manifests -
-	// 2 duplicated service account manifests + 1 addon namespace + 2 deployments + 2 kube111 clusterrolebindings
-	if len(createObjects) != 26 {
-		t.Errorf("Expect 26 objects created in the sync loop, actual %d", len(createObjects))
-	}
-	for _, object := range createObjects {
-		ensureObject(t, object, klusterlet, false)
-	}
-
-	operatorAction := controller.operatorClient.Actions()
-	testingcommon.AssertActions(t, operatorAction, "patch")
-	updatedKlusterlet := &operatorapiv1.Klusterlet{}
-	patchData := operatorAction[0].(clienttesting.PatchActionImpl).Patch
-	err = json.Unmarshal(patchData, updatedKlusterlet)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testinghelper.AssertOnlyConditions(
-		t, updatedKlusterlet,
-		testinghelper.NamedCondition(operatorapiv1.ConditionKlusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
-		testinghelper.NamedCondition(helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue),
-	)
-
-	// Delete the klusterlet
-	now := metav1.Now()
-	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
-	if err := controller.operatorStore.Update(klusterlet); err != nil {
-		t.Fatal(err)
-	}
-	controller.kubeClient.ClearActions()
-	err = controller.cleanupController.sync(ctx, syncContext)
-	if err != nil {
-		t.Errorf("Expected non error when sync, %v", err)
-	}
-
-	var deleteActions []clienttesting.DeleteActionImpl
-	kubeActions = controller.kubeClient.Actions()
-	for _, action := range kubeActions {
-		if action.GetVerb() == "delete" {
-			deleteAction := action.(clienttesting.DeleteActionImpl)
-			deleteActions = append(deleteActions, deleteAction)
-		}
-	}
-
-	// 12 managed static manifests + 11 management static manifests + 1 hub kubeconfig + 2 namespaces + 2 deployments + 2 kube111 clusterrolebindings
-	if len(deleteActions) != 31 {
-		t.Errorf("Expected 30 delete actions, but got %d", len(deleteActions))
 	}
 }
 

@@ -154,7 +154,7 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 				return false
 			}
 
-			return placement.Status.NumberOfSelectedClusters == int32(numOfSelectedClusters)
+			return placement.Status.NumberOfSelectedClusters == int32(numOfSelectedClusters) //nolint:gosec
 		}).Should(gomega.BeTrue())
 	}
 
@@ -334,7 +334,7 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
-	//update this case when version upgrade
+	// update this case when version upgrade
 	ginkgo.It("Should support v1beta1 placement", func() {
 		ginkgo.By("Create v1beta1 placement with v1beta1 client")
 		placement := &clusterapiv1beta1.Placement{
@@ -357,6 +357,6 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 })
 
 func noc(n int) *int32 {
-	noc := int32(n)
+	noc := int32(n) //nolint:gosec
 	return &noc
 }

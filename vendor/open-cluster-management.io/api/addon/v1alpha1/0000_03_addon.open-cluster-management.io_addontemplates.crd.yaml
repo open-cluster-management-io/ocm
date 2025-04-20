@@ -24,7 +24,6 @@ spec:
           AddOnTemplate is the Custom Resource object, it is used to describe
           how to deploy the addon agent and how to register the addon.
 
-
           AddOnTemplate is a cluster-scoped resource, and will only be used
           on the hub cluster.
         properties:
@@ -414,6 +413,7 @@ spec:
                               type: string
                           type: object
                       required:
+                      - signerName
                       - signingCA
                       type: object
                     kubeClient:
