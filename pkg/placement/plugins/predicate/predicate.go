@@ -4,6 +4,8 @@ import (
 	"context"
 	"reflect"
 
+	"k8s.io/klog/v2"
+
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
@@ -16,10 +18,12 @@ var _ plugins.Filter = &Predicate{}
 
 const description = "Predicate filter filters the clusters based on predicate defined in placement"
 
-type Predicate struct{}
+type Predicate struct {
+	handle plugins.Handle
+}
 
 func New(handle plugins.Handle) *Predicate {
-	return &Predicate{}
+	return &Predicate{handle: handle}
 }
 
 func (p *Predicate) Name() string {
@@ -33,6 +37,7 @@ func (p *Predicate) Description() string {
 func (p *Predicate) Filter(
 	ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) (plugins.PluginFilterResult, *framework.Status) {
 	status := framework.NewStatus(p.Name(), framework.Success, "")
+	logger := klog.FromContext(ctx)
 
 	if len(placement.Spec.Predicates) == 0 {
 		return plugins.PluginFilterResult{
@@ -45,10 +50,20 @@ func (p *Predicate) Filter(
 		}, status
 	}
 
-	// prebuild label/claim selectors for each predicate
+	env, err := helpers.NewEnv(p.handle.ScoreLister())
+	if err != nil {
+		logger.Error(err, "Failed to new CEL environment")
+		return plugins.PluginFilterResult{}, framework.NewStatus(
+			p.Name(),
+			framework.Error,
+			err.Error(),
+		)
+	}
+
+	// prebuild label/claim/cel selectors for each predicate
 	clusterSelectors := []*helpers.ClusterSelector{}
 	for _, predicate := range placement.Spec.Predicates {
-		clusterSelector, err := helpers.NewClusterSelector(predicate.RequiredClusterSelector)
+		clusterSelector, err := helpers.NewClusterSelector(predicate.RequiredClusterSelector, env)
 		if err != nil {
 			return plugins.PluginFilterResult{}, framework.NewStatus(
 				p.Name(),
@@ -56,15 +71,24 @@ func (p *Predicate) Filter(
 				err.Error(),
 			)
 		}
+		compilationResults := clusterSelector.Compile()
+		for _, compiled := range compilationResults {
+			if compiled.Error != nil {
+				return plugins.PluginFilterResult{}, framework.NewStatus(
+					p.Name(),
+					framework.Misconfigured,
+					compiled.Error.Error(),
+				)
+			}
+		}
 		clusterSelectors = append(clusterSelectors, clusterSelector)
 	}
 
 	// match cluster with selectors one by one
 	matched := []*clusterapiv1.ManagedCluster{}
 	for _, cluster := range clusters {
-		claims := helpers.GetClusterClaims(cluster)
 		for _, cs := range clusterSelectors {
-			if ok := cs.Matches(cluster.Labels, claims); !ok {
+			if ok := cs.Matches(ctx, cluster); !ok {
 				continue
 			}
 			matched = append(matched, cluster)
