@@ -148,7 +148,7 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	cert1 := testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second)
-	//cert2 := testinghelpers.NewTestCert("test", 60*time.Second)
+	// cert2 := testinghelpers.NewTestCert("test", 60*time.Second)
 
 	kubeconfig := testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", "", nil, nil, nil)
 

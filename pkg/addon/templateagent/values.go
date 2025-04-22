@@ -131,7 +131,7 @@ func (a *CRDTemplateAgentAddon) getValues(
 		}
 	}
 
-	keys := append(defaultSortedKeys, builtinSortedKeys...)
+	keys := append(defaultSortedKeys, builtinSortedKeys...) //nolint:gocritic
 
 	for _, key := range keys {
 		presetValues = append(presetValues, keyValuePair{

@@ -175,7 +175,6 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 			reconcilers = append(reconcilers,
 				&crdReconcile{
 					managedClusterClients: managedClusterClients,
-					kubeVersion:           n.kubeVersion,
 					recorder:              controllerContext.Recorder(),
 				},
 				&managedReconcile{

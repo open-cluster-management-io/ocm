@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
+	"k8s.io/utils/clock"
 
 	"open-cluster-management.io/ocm/pkg/addon"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
@@ -14,7 +15,7 @@ import (
 func NewAddonManager() *cobra.Command {
 	opts := commonoptions.NewOptions()
 	cmdConfig := opts.
-		NewControllerCommandConfig("manager", version.Get(), addon.RunManager)
+		NewControllerCommandConfig("manager", version.Get(), addon.RunManager, clock.RealClock{})
 	cmd := cmdConfig.NewCommandWithContext(context.TODO())
 	cmd.Use = "manager"
 	cmd.Short = "Start the Addon Manager"

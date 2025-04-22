@@ -13,11 +13,11 @@ type FakeOperatorV1 struct {
 }
 
 func (c *FakeOperatorV1) ClusterManagers() v1.ClusterManagerInterface {
-	return &FakeClusterManagers{c}
+	return newFakeClusterManagers(c)
 }
 
 func (c *FakeOperatorV1) Klusterlets() v1.KlusterletInterface {
-	return &FakeKlusterlets{c}
+	return newFakeKlusterlets(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

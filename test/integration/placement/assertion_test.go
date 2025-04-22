@@ -106,7 +106,7 @@ func assertPlacementConditionSatisfied(placementName, namespace string, numOfSel
 		) {
 			return false
 		}
-		return placement.Status.NumberOfSelectedClusters == int32(numOfSelectedClusters)
+		return placement.Status.NumberOfSelectedClusters == int32(numOfSelectedClusters) //nolint:gosec
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }
 

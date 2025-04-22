@@ -3,7 +3,7 @@
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,15 +12,15 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 	versioned "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	internalinterfaces "open-cluster-management.io/api/client/cluster/informers/externalversions/internalinterfaces"
-	v1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
-	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
+	apiclusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 )
 
 // ClusterClaimInformer provides access to a shared informer and lister for
 // ClusterClaims.
 type ClusterClaimInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.ClusterClaimLister
+	Lister() clusterv1alpha1.ClusterClaimLister
 }
 
 type clusterClaimInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredClusterClaimInformer(client versioned.Interface, resyncPeriod ti
 				return client.ClusterV1alpha1().ClusterClaims().Watch(context.TODO(), options)
 			},
 		},
-		&clusterv1alpha1.ClusterClaim{},
+		&apiclusterv1alpha1.ClusterClaim{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *clusterClaimInformer) defaultInformer(client versioned.Interface, resyn
 }
 
 func (f *clusterClaimInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&clusterv1alpha1.ClusterClaim{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiclusterv1alpha1.ClusterClaim{}, f.defaultInformer)
 }
 
-func (f *clusterClaimInformer) Lister() v1alpha1.ClusterClaimLister {
-	return v1alpha1.NewClusterClaimLister(f.Informer().GetIndexer())
+func (f *clusterClaimInformer) Lister() clusterv1alpha1.ClusterClaimLister {
+	return clusterv1alpha1.NewClusterClaimLister(f.Informer().GetIndexer())
 }

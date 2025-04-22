@@ -239,7 +239,7 @@ func applyKubeconfigSecret(ctx context.Context, templateKubeconfig *rest.Config,
 
 func assembleClusterConfig(templateKubeconfig *rest.Config) (*clientcmdapi.Cluster, error) {
 	var c *clientcmdapi.Cluster
-	if len(templateKubeconfig.CAData) != 0 {
+	if len(templateKubeconfig.CAData) != 0 { //nolint:gocritic
 		c = &clientcmdapi.Cluster{
 			Server:                   templateKubeconfig.Host,
 			CertificateAuthorityData: templateKubeconfig.CAData,

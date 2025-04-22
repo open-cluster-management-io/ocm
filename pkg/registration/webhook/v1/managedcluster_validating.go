@@ -35,7 +35,7 @@ func (r *ManagedClusterWebhook) ValidateCreate(ctx context.Context, obj runtime.
 		return nil, apierrors.NewBadRequest(err.Error())
 	}
 
-	//Validate if Spec.ManagedClusterClientConfigs is Valid HTTPS URL
+	// Validate if Spec.ManagedClusterClientConfigs is Valid HTTPS URL
 	err = r.validateManagedClusterObj(*managedCluster)
 	if err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func (r *ManagedClusterWebhook) ValidateUpdate(ctx context.Context, oldObj, newO
 		return nil, apierrors.NewBadRequest(err.Error())
 	}
 
-	//Validate if Spec.ManagedClusterClientConfigs is Valid HTTPS URL
+	// Validate if Spec.ManagedClusterClientConfigs is Valid HTTPS URL
 	err = r.validateManagedClusterObj(*managedCluster)
 	if err != nil {
 		return nil, err

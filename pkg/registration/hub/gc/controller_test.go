@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	fakemetadataclient "k8s.io/client-go/metadata/fake"
 	clienttesting "k8s.io/client-go/testing"
+	clocktesting "k8s.io/utils/clock/testing"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeclusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -145,7 +146,7 @@ func TestGController(t *testing.T) {
 				clusterInformerFactory.Cluster().V1().ManagedClusters(),
 				clusterClient,
 				metadataClient,
-				events.NewInMemoryRecorder(""),
+				events.NewInMemoryRecorder("", clocktesting.NewFakePassiveClock(time.Now())),
 				[]string{"addon.open-cluster-management.io/v1alpha1/managedclusteraddons",
 					"work.open-cluster-management.io/v1/manifestworks"},
 			)
@@ -158,7 +159,7 @@ func TestGController(t *testing.T) {
 				clusterLister:         clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				clusterPatcher:        clusterPatcher,
 				gcResourcesController: newGCResourcesController(metadataClient, []schema.GroupVersionResource{addonGvr, workGvr}),
-				eventRecorder:         events.NewInMemoryRecorder(""),
+				eventRecorder:         events.NewInMemoryRecorder("", clocktesting.NewFakePassiveClock(time.Now())),
 			}
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, c.key)

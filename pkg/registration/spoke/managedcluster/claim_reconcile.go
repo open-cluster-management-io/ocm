@@ -86,7 +86,7 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 	}
 
 	// merge reserved claims and custom claims
-	claims := append(reservedClaims, customClaims...)
+	claims := append(reservedClaims, customClaims...) // nolint:gocritic
 	cluster.Status.ClusterClaims = claims
 	return nil
 }

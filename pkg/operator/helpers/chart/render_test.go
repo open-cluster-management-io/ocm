@@ -149,7 +149,7 @@ func TestClusterManagerConfig(t *testing.T) {
 				t.Errorf("expected %d objects, got %d", c.expectedObjCnt, len(rawObjs))
 			}
 
-			objects := append(crdObjs, rawObjs...)
+			objects := append(crdObjs, rawObjs...) //nolint:gocritic
 			// output is for debug
 			if outputDebug {
 				output(t, c.name, objects)
@@ -439,7 +439,7 @@ func TestKlusterletConfig(t *testing.T) {
 				t.Errorf("expected %d objects, got %d", c.expectedObjCnt, len(rawObjs))
 			}
 
-			objects := append(crdObjs, rawObjs...)
+			objects := append(crdObjs, rawObjs...) //nolint:gocritic
 			// output is for debug
 			if outputDebug {
 				output(t, c.name, objects)

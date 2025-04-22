@@ -283,7 +283,7 @@ func (a *HelmAgentAddon) getDefaultValues(
 		if len(hostingClusterName) > 0 {
 			hostingCluster, err := a.clusterClient.ClusterV1().ManagedClusters().
 				Get(context.TODO(), hostingClusterName, metav1.GetOptions{})
-			if err == nil {
+			if err == nil { //nolint:gocritic
 				defaultValues.HostingClusterCapabilities = *a.capabilities(hostingCluster, addon)
 			} else if errors.IsNotFound(err) {
 				klog.Infof("hostingCluster %s not found, skip providing default value hostingClusterCapabilities",

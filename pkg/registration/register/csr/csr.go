@@ -372,14 +372,16 @@ var _ register.RegisterDriver = &CSRDriver{}
 var _ register.AddonDriver = &CSRDriver{}
 
 func NewCSRDriver(opt *Option, secretOpts register.SecretOption) (*CSRDriver, error) {
-	if len(secretOpts.BootStrapKubeConfigFile) == 0 {
-		return nil, errors.New("bootstrap-kubeconfig is required")
-	}
-
 	signer := certificates.KubeAPIServerClientSignerName
 	if secretOpts.Signer != "" {
 		signer = secretOpts.Signer
 	}
+
+	// bootstrapKubeConfigFile is required when the signer is kubeclient
+	if signer == certificates.KubeAPIServerClientSignerName && len(secretOpts.BootStrapKubeConfigFile) == 0 {
+		return nil, errors.New("bootstrap-kubeconfig is required")
+	}
+
 	driver := &CSRDriver{
 		opt: opt,
 	}
