@@ -251,6 +251,24 @@ spec:
                       ClusterAnnotations is annotations with the reserve prefix "agent.open-cluster-management.io" set on
                       ManagedCluster when creating only, other actors can update it afterwards.
                     type: object
+                  clusterClaimConfiguration:
+                    description: |-
+                      ClusterClaimConfiguration represents the configuration of ClusterClaim
+                      Effective only when the `ClusterClaim` feature gate is enabled.
+                    properties:
+                      maxCustomClusterClaims:
+                        default: 20
+                        description: Maximum number of custom ClusterClaims allowed.
+                        format: int32
+                        type: integer
+                      reservedClusterClaimSuffixes:
+                        description: Custom suffixes for reserved ClusterClaims.
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - maxCustomClusterClaims
+                    type: object
                   featureGates:
                     description: "FeatureGates represents the list of feature gates
                       for registration\nIf it is set empty, default feature gates
