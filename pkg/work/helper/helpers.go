@@ -549,16 +549,3 @@ func wildcardMatch(resource, target string) bool {
 
 	return re.MatchString(resource)
 }
-
-func ToUnstructured(obj runtime.Object) (*unstructured.Unstructured, error) {
-	switch o := obj.(type) {
-	case *unstructured.Unstructured:
-		return o, nil
-	default:
-		object, err := runtime.DefaultUnstructuredConverter.ToUnstructured(o)
-		if err != nil {
-			return nil, err
-		}
-		return &unstructured.Unstructured{Object: object}, nil
-	}
-}
