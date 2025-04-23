@@ -1782,7 +1782,7 @@ open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v0.16.1-0.20250411154302-3a424961ead4
+# open-cluster-management.io/sdk-go v0.16.1-0.20250411154302-3a424961ead4 => github.com/qiujian16/sdk-go v0.0.0-20250422082049-69544ab90357
 ## explicit; go 1.23.6
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
@@ -1795,8 +1795,13 @@ open-cluster-management.io/sdk-go/pkg/basecontroller/factory
 open-cluster-management.io/sdk-go/pkg/cel/common
 open-cluster-management.io/sdk-go/pkg/cel/library
 open-cluster-management.io/sdk-go/pkg/certrotation
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/common
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/errors
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/lease
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/statushash
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/store
@@ -1820,6 +1825,8 @@ open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/kafka
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types
+open-cluster-management.io/sdk-go/pkg/cloudevents/server
+open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc
 open-cluster-management.io/sdk-go/pkg/helpers
 open-cluster-management.io/sdk-go/pkg/patcher
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.0
@@ -1917,3 +1924,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
 sigs.k8s.io/yaml/goyaml.v3
+# open-cluster-management.io/sdk-go => github.com/qiujian16/sdk-go v0.0.0-20250422082049-69544ab90357
