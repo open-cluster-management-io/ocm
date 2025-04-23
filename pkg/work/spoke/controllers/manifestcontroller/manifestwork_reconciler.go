@@ -18,6 +18,7 @@ import (
 	"k8s.io/klog/v2"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/cel/common"
 
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/work/helper"
@@ -221,7 +222,7 @@ func (m *manifestworkReconciler) applyOneManifest(
 }
 
 func (m *manifestworkReconciler) getStatusConditions(runtimeObj runtime.Object, rules []workapiv1.ConditionRule) ([]metav1.Condition, error) {
-	obj, err := helper.ToUnstructured(runtimeObj)
+	obj, err := common.ConvertObjectToUnstructured(runtimeObj)
 	if err != nil {
 		return nil, err
 	}

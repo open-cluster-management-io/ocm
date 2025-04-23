@@ -3,20 +3,20 @@ package conditions
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
-	"github.com/google/cel-go/ext"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apiserver/pkg/cel/library"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/ocm/pkg/work/spoke/conditions/rules"
+	"open-cluster-management.io/sdk-go/pkg/cel/common"
 )
 
 type ConditionReader struct {
@@ -177,25 +177,17 @@ func (s *ConditionReader) getConditionMessageByRule(obj *unstructured.Unstructur
 }
 
 func (s *ConditionReader) celEnv(opts ...cel.EnvOption) (*cel.Env, error) {
-	opts = append(
+	opts = slices.Concat(
 		opts,
-		cel.OptionalTypes(),
-		ext.Strings(),
-		library.Lists(),
-		library.Regex(),
-		library.URLs(),
-		library.Quantity(),
-		library.IP(),
-		library.CIDR(),
-		library.Format(),
-		// TODO: Requires update to at least 1.32
-		// library.SemverLib(),
-		cel.Function("hasConditions", cel.Overload(
-			"status_has_conditions",
-			[]*cel.Type{cel.DynType},
-			cel.BoolType,
-			cel.FunctionBinding(hasConditions),
-		)),
+		common.BaseEnvOpts,
+		[]cel.EnvOption{
+			cel.Function("hasConditions", cel.Overload(
+				"status_has_conditions",
+				[]*cel.Type{cel.DynType},
+				cel.BoolType,
+				cel.FunctionBinding(hasConditions),
+			)),
+		},
 	)
 	return cel.NewEnv(opts...)
 }
