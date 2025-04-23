@@ -62,14 +62,6 @@ func (AppliedManifestWorkStatus) SwaggerDoc() map[string]string {
 	return map_AppliedManifestWorkStatus
 }
 
-var map_CelConditionExpressions = map[string]string{
-	"expression": "Expression represents the CEL expression to be evaluated on the manifest. The expression must evaluate to a bool. If the expression evaluates to any other type, the condition's status will be False. Ref to https://kubernetes.io/docs/reference/using-api/cel/ on how to write CEL Variables: - object: The current instance of the manifest",
-}
-
-func (CelConditionExpressions) SwaggerDoc() map[string]string {
-	return map_CelConditionExpressions
-}
-
 var map_ConditionRule = map[string]string{
 	"condition":         "Condition is the type of condition that is set based on this rule. Any condition is supported, but certain special conditions can be used to to control higher level behaviors of the manifestwork. If the condition is Complete, the manifest will no longer be updated once completed. Required for CEL rules, WellKnownCompletions will default to the \"Complete\" condition",
 	"type":              "Type defines how a manifest should be evaluated for a condition. It can be CEL, or WellKnownCompletions. If the type is CEL, user should specify the celExpressions field If the type is WellKnownCompletions, certain common types in k8s.io/api will be considered completed as defined by hardcoded rules.",

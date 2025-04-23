@@ -138,7 +138,7 @@ type ConditionRule struct {
 	// CelExpressions defines the CEL expressions to be evaluated for the condition.
 	// Final result is the logical AND of all expressions.
 	// +optional
-	CelExpressions []CelConditionExpressions `json:"celExpressions"`
+	CelExpressions []string `json:"celExpressions"`
 
 	// Message is set on the condition created for this rule
 	// +optional
@@ -164,18 +164,6 @@ const (
 	// CelConditionExpressionsType enables user defined rules to set the status of the condition
 	CelConditionExpressionsType ConditionRuleType = "CEL"
 )
-
-type CelConditionExpressions struct {
-	// Expression represents the CEL expression to be evaluated on the manifest.
-	// The expression must evaluate to a bool.
-	// If the expression evaluates to any other type, the condition's status will be False.
-	// Ref to https://kubernetes.io/docs/reference/using-api/cel/ on how to write CEL
-	// Variables:
-	// - object: The current instance of the manifest
-	// +kubebuilder:validation:Required
-	// +required
-	Expression string `json:"expression"`
-}
 
 // ManifestWorkExecutor is the executor that applies the resources to the managed cluster. i.e. the
 // work agent.

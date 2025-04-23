@@ -172,19 +172,7 @@ spec:
                               CelExpressions defines the CEL expressions to be evaluated for the condition.
                               Final result is the logical AND of all expressions.
                             items:
-                              properties:
-                                expression:
-                                  description: |-
-                                    Expression represents the CEL expression to be evaluated on the manifest.
-                                    The expression must evaluate to a bool.
-                                    If the expression evaluates to any other type, the condition's status will be False.
-                                    Ref to https://kubernetes.io/docs/reference/using-api/cel/ on how to write CEL
-                                    Variables:
-                                    - object: The current instance of the manifest
-                                  type: string
-                              required:
-                              - expression
-                              type: object
+                              type: string
                             type: array
                           condition:
                             description: |-
