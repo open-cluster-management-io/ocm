@@ -180,7 +180,7 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 	}
 
 	certControl := &csrControl{csrClientHolder: csrClientHolder}
-	if err = d.csrDriver.SetCSRControl(certControl, secretOption.ClusterName); err != nil {
+	if err := d.csrDriver.SetCSRControl(certControl, secretOption.ClusterName); err != nil {
 		return nil, err
 	}
 
