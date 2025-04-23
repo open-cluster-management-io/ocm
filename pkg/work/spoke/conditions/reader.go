@@ -3,7 +3,6 @@ package conditions
 import (
 	"fmt"
 	"reflect"
-	"slices"
 	"strings"
 
 	"github.com/google/cel-go/cel"
@@ -12,11 +11,12 @@ import (
 	"github.com/google/cel-go/common/types/traits"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"slices"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/cel/common"
 
 	"open-cluster-management.io/ocm/pkg/work/spoke/conditions/rules"
-	"open-cluster-management.io/sdk-go/pkg/cel/common"
 )
 
 type ConditionReader struct {
@@ -88,14 +88,14 @@ func (s *ConditionReader) getConditionByCelRule(obj *unstructured.Unstructured, 
 	}, err
 }
 
-func (s *ConditionReader) evaluateCelExpressions(obj *unstructured.Unstructured, expressions []workapiv1.CelConditionExpressions) (metav1.ConditionStatus, string, error) {
+func (s *ConditionReader) evaluateCelExpressions(obj *unstructured.Unstructured, expressions []string) (metav1.ConditionStatus, string, error) {
 	env, err := s.celEnv(cel.Variable("object", cel.DynType))
 	if err != nil {
 		return metav1.ConditionUnknown, workapiv1.ConditionRuleInternalError, err
 	}
 
 	for _, expression := range expressions {
-		ast, iss := env.Compile(expression.Expression)
+		ast, iss := env.Compile(expression)
 		err = iss.Err()
 		if err != nil {
 			return metav1.ConditionFalse, workapiv1.ConditionRuleExpressionError, err

@@ -613,8 +613,8 @@ func TestConditionRules(t *testing.T) {
 	activeRule := workapiv1.ConditionRule{
 		Type:      workapiv1.CelConditionExpressionsType,
 		Condition: "Active",
-		CelExpressions: []workapiv1.CelConditionExpressions{
-			{Expression: "hasConditions(object.status) ? object.status.conditions.exists(c, c.type == 'Active' && c.status == 'True') : false"},
+		CelExpressions: []string{
+			"hasConditions(object.status) ? object.status.conditions.exists(c, c.type == 'Active' && c.status == 'True') : false",
 		},
 		MessageExpression: "result ? 'NewObject is active' : 'NewObject is not active'",
 	}
@@ -670,11 +670,9 @@ func TestConditionRules(t *testing.T) {
 					map[string]any{"spec": map[string]any{"key1": "val2"}})).
 			withManifestConfig(
 				newManifestConfigOption("", "newobjects", "ns1", "n1", nil, workapiv1.ConditionRule{
-					Type:      workapiv1.CelConditionExpressionsType,
-					Condition: "Active",
-					CelExpressions: []workapiv1.CelConditionExpressions{
-						{Expression: "object.invalid.key == 'Active'"},
-					},
+					Type:           workapiv1.CelConditionExpressionsType,
+					Condition:      "Active",
+					CelExpressions: []string{"object.invalid.key == 'Active'"},
 				}),
 			).
 			withExpectedWorkAction("patch").

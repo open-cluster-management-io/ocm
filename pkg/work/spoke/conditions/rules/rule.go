@@ -13,12 +13,10 @@ type WellKnownConditionRuleResolver interface {
 var jobCompleteRule = workapiv1.ConditionRule{
 	Condition: workapiv1.ManifestComplete,
 	Type:      workapiv1.CelConditionExpressionsType,
-	CelExpressions: []workapiv1.CelConditionExpressions{
-		{
-			Expression: `hasConditions(object.status)
-							? object.status.conditions.filter(c, c.type == 'Complete' || c.type == 'Failed').exists(c, c.status == 'True')
-							: false`,
-		},
+	CelExpressions: []string{
+		`hasConditions(object.status)
+			? object.status.conditions.filter(c, c.type == 'Complete' || c.type == 'Failed').exists(c, c.status == 'True')
+			: false`,
 	},
 	MessageExpression: `result ? "Job is finished" : "Job is not finished"`,
 }
@@ -26,10 +24,8 @@ var jobCompleteRule = workapiv1.ConditionRule{
 var podCompleteRule = workapiv1.ConditionRule{
 	Condition: workapiv1.ManifestComplete,
 	Type:      workapiv1.CelConditionExpressionsType,
-	CelExpressions: []workapiv1.CelConditionExpressions{
-		{
-			Expression: "object.status.phase in ['Succeeded', 'Failed']",
-		},
+	CelExpressions: []string{
+		"object.status.phase in ['Succeeded', 'Failed']",
 	},
 	MessageExpression: `"Pod is in phase " + object.status.phase`,
 }

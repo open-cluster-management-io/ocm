@@ -177,10 +177,8 @@ func TestConditionReader(t *testing.T) {
 			rule: workapiv1.ConditionRule{
 				Type:      workapiv1.CelConditionExpressionsType,
 				Condition: "Available",
-				CelExpressions: []workapiv1.CelConditionExpressions{
-					{
-						Expression: `object.status.conditions.exists(c, c.type == "Available" && c.status == "True")`,
-					},
+				CelExpressions: []string{
+					`object.status.conditions.exists(c, c.type == "Available" && c.status == "True")`,
 				},
 				MessageExpression: `result ? "Deployment available" : "Deployment unavailable"`,
 			},
@@ -198,10 +196,8 @@ func TestConditionReader(t *testing.T) {
 			rule: workapiv1.ConditionRule{
 				Type:      workapiv1.CelConditionExpressionsType,
 				Condition: "Available",
-				CelExpressions: []workapiv1.CelConditionExpressions{
-					{
-						Expression: `object.status.conditions.filter(c, c.type == "Available")[0].status`,
-					},
+				CelExpressions: []string{
+					`object.status.conditions.filter(c, c.type == "Available")[0].status`,
 				},
 			},
 			expectError: true,
@@ -216,13 +212,9 @@ func TestConditionReader(t *testing.T) {
 			name:   "invalid CEL",
 			object: unstrctureObject(deploymentJson),
 			rule: workapiv1.ConditionRule{
-				Type:      workapiv1.CelConditionExpressionsType,
-				Condition: "Available",
-				CelExpressions: []workapiv1.CelConditionExpressions{
-					{
-						Expression: `object.missing`,
-					},
-				},
+				Type:           workapiv1.CelConditionExpressionsType,
+				Condition:      "Available",
+				CelExpressions: []string{`object.missing`},
 			},
 			expectError: true,
 			expectedCondition: metav1.Condition{
@@ -236,13 +228,9 @@ func TestConditionReader(t *testing.T) {
 			name:   "invalid message CEL",
 			object: unstrctureObject(deploymentJson),
 			rule: workapiv1.ConditionRule{
-				Type:      workapiv1.CelConditionExpressionsType,
-				Condition: "Available",
-				CelExpressions: []workapiv1.CelConditionExpressions{
-					{
-						Expression: `true`,
-					},
-				},
+				Type:              workapiv1.CelConditionExpressionsType,
+				Condition:         "Available",
+				CelExpressions:    []string{`true`},
 				MessageExpression: `badcel`,
 			},
 			expectError: true,
@@ -259,16 +247,12 @@ func TestConditionReader(t *testing.T) {
 			rule: workapiv1.ConditionRule{
 				Type:      workapiv1.CelConditionExpressionsType,
 				Condition: "HasConditions",
-				CelExpressions: []workapiv1.CelConditionExpressions{
-					{
-						Expression: `
-							hasConditions(object.status)
-							&& !hasConditions({})
-							&& !hasConditions("badtype")
-							&& !hasConditions({"conditions": []})
-							&& !hasConditions({"conditions": null})
-						`,
-					},
+				CelExpressions: []string{
+					`hasConditions(object.status)
+						&& !hasConditions({})
+						&& !hasConditions("badtype")
+						&& !hasConditions({"conditions": []})
+						&& !hasConditions({"conditions": null})`,
 				},
 				Message: "should work",
 			},
