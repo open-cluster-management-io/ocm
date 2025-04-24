@@ -724,7 +724,9 @@ func TestConditionRules(t *testing.T) {
 	}
 }
 
-func newManifestConfigOption(group, resource, namespace, name string, strategy *workapiv1.UpdateStrategy, rules ...workapiv1.ConditionRule) workapiv1.ManifestConfigOption {
+func newManifestConfigOption(
+	group, resource, namespace, name string, strategy *workapiv1.UpdateStrategy, rules ...workapiv1.ConditionRule,
+) workapiv1.ManifestConfigOption {
 	return workapiv1.ManifestConfigOption{
 		ResourceIdentifier: workapiv1.ResourceIdentifier{
 			Resource:  resource,
