@@ -90,7 +90,7 @@ verify-gocilint:
 	golangci-lint run --timeout=5m --modules-download-mode vendor ./...
 
 install-golang-gci:
-	go install github.com/daixiang0/gci@v0.10.1
+	go install github.com/daixiang0/gci@v0.13.6
 
 fmt-imports: install-golang-gci
 	gci write --skip-generated -s standard -s default -s "prefix(open-cluster-management.io)" -s "prefix(open-cluster-management.io/ocm)" cmd pkg test dependencymagnet
