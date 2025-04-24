@@ -3,6 +3,7 @@ package conditions
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/google/cel-go/cel"
@@ -11,7 +12,6 @@ import (
 	"github.com/google/cel-go/common/types/traits"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"slices"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/cel/common"
