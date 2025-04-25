@@ -28,7 +28,7 @@ const (
 	ClusterProperty featuregate.Feature = "ClusterProperty"
 
 	// AddonManagement is a feature gate on hub controller and spoke-agent. When it is enabled on the
-	//spoke agent, it will start a new controllers to manage the managed cluster addons
+	// spoke agent, it will start a new controllers to manage the managed cluster addons
 	// registration and maintains the status of managed cluster addons through watching their leases.
 	// When it is enabled on hub controller, it will start a new controller to process addon automatic
 	// installation and rolling out.
@@ -107,7 +107,7 @@ var DefaultHubRegistrationFeatureGates = map[featuregate.Feature]featuregate.Fea
 	DefaultClusterSet:          {Default: true, PreRelease: featuregate.Alpha},
 	V1beta1CSRAPICompatibility: {Default: false, PreRelease: featuregate.Alpha},
 	ManagedClusterAutoApproval: {Default: false, PreRelease: featuregate.Alpha},
-	ResourceCleanup:            {Default: false, PreRelease: featuregate.Alpha},
+	ResourceCleanup:            {Default: true, PreRelease: featuregate.Beta},
 	ClusterProfile:             {Default: false, PreRelease: featuregate.Alpha},
 	ClusterImporter:            {Default: false, PreRelease: featuregate.Alpha},
 }
