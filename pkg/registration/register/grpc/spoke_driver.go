@@ -130,7 +130,7 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 		ctx,
 		cloudeventoptions.NewGenericClientOptions(
 			config,
-			cloudeventslease.NewManagedClusterAddOnCodec(),
+			cloudeventslease.NewLeaseCodec(),
 			secretOption.ClusterName,
 		).WithClusterName(secretOption.ClusterName).WithClientWatcherStore(leaseWatchStore),
 		secretOption.ClusterName,
@@ -153,7 +153,7 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 	}
 
 	addonWatchStore := cestore.NewAgentInformerWatcherStore[*addonapiv1alpha1.ManagedClusterAddOn]()
-	addonClientHolder, err := cloudeventsaddon.NewClientHolder(
+	addonClient, err := cloudeventsaddon.ManagedClusterAddOnInterface(
 		ctx,
 		cloudeventoptions.NewGenericClientOptions(
 			config,
@@ -163,9 +163,9 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 	if err != nil {
 		return nil, err
 	}
-	addonClient := addonClientHolder.ClusterInterface()
-	addonInformer := addoninformers.NewSharedInformerFactory(
-		addonClient, 10*time.Minute).Addon().V1alpha1().ManagedClusterAddOns()
+	addonInformer := addoninformers.NewSharedInformerFactoryWithOptions(
+		addonClient, 10*time.Minute, addoninformers.WithNamespace(secretOption.ClusterName)).
+		Addon().V1alpha1().ManagedClusterAddOns()
 	addonWatchStore.SetInformer(addonInformer.Informer())
 
 	csrClientHolder, err := cloudeventscsr.NewAgentClientHolder(ctx,
@@ -213,8 +213,12 @@ func (d *GRPCDriver) Process(
 	return d.csrDriver.Process(ctx, controllerName, secret, additionalSecretData, recorder)
 }
 
-func (d *GRPCDriver) BuildKubeConfigFromTemplate(_ *clientcmdapi.Config) *clientcmdapi.Config {
-	return nil
+func (d *GRPCDriver) BuildKubeConfigFromTemplate(kubeConfig *clientcmdapi.Config) *clientcmdapi.Config {
+	kubeConfig.AuthInfos = map[string]*clientcmdapi.AuthInfo{register.DefaultKubeConfigAuth: {
+		ClientCertificate: "tls.crt",
+		ClientKey:         "tls.key",
+	}}
+	return kubeConfig
 }
 
 func (d *GRPCDriver) InformerHandler() (cache.SharedIndexInformer, factory.EventFilterFunc) {

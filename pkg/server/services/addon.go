@@ -78,6 +78,8 @@ func (c *AddonService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.
 		return err
 	}
 
+	klog.V(4).Infof("addon status update (%s) %s/%s", eventType.Action, addon.Namespace, addon.Name)
+
 	// only create and update action
 	switch eventType.Action {
 	case updateRequestAction:

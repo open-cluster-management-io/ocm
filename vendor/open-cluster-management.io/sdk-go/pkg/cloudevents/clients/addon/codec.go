@@ -2,6 +2,7 @@ package addon
 
 import (
 	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 
@@ -15,19 +16,19 @@ var ManagedClusterAddOnEventDataType = types.CloudEventsDataType{
 	Resource: "managedclusteraddons",
 }
 
-// ManagedClusterCodec is a codec to encode/decode a ManagedCluster/cloudevent for an agent.
+// ManagedClusterAddOnCodec is a codec to encode/decode a ManagedClusterAddOn/cloudevent for an agent.
 type ManagedClusterAddOnCodec struct{}
 
 func NewManagedClusterAddOnCodec() *ManagedClusterAddOnCodec {
 	return &ManagedClusterAddOnCodec{}
 }
 
-// EventDataType always returns the event data type `io.open-cluster-management.cluster.v1.managedclusters`.
+// EventDataType always returns the event data type `io.open-cluster-management.addon.v1alpha1.managedclusteraddons`.
 func (c *ManagedClusterAddOnCodec) EventDataType() types.CloudEventsDataType {
 	return ManagedClusterAddOnEventDataType
 }
 
-// Encode the ManagedCluster to a cloudevent
+// Encode the ManagedClusterAddOn to a cloudevent
 func (c *ManagedClusterAddOnCodec) Encode(source string, eventType types.CloudEventsType, addon *addonapiv1alpha1.ManagedClusterAddOn) (*cloudevents.Event, error) {
 	if eventType.CloudEventsDataType != ManagedClusterAddOnEventDataType {
 		return nil, fmt.Errorf("unsupported cloudevents data type %s", eventType.CloudEventsDataType)
@@ -49,13 +50,13 @@ func (c *ManagedClusterAddOnCodec) Encode(source string, eventType types.CloudEv
 	}
 
 	if err := evt.SetData(cloudevents.ApplicationJSON, newAddon); err != nil {
-		return nil, fmt.Errorf("failed to encode managedcluster to a cloudevent: %v", err)
+		return nil, fmt.Errorf("failed to encode managedclusteraddon to a cloudevent: %v", err)
 	}
 
 	return &evt, nil
 }
 
-// Decode a cloudevent to a ManagedCluster
+// Decode a cloudevent to a ManagedClusterAddOn
 func (c *ManagedClusterAddOnCodec) Decode(evt *cloudevents.Event) (*addonapiv1alpha1.ManagedClusterAddOn, error) {
 	addon := &addonapiv1alpha1.ManagedClusterAddOn{}
 	if err := evt.DataAs(addon); err != nil {

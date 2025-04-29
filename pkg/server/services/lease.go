@@ -72,6 +72,8 @@ func (l LeaseService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.E
 		return err
 	}
 
+	klog.V(4).Infof("lease status update (%s) %s/%s", eventType.Action, lease.Namespace, lease.Name)
+
 	// only create and update action
 	switch eventType.Action {
 	case updateRequestAction:

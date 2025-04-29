@@ -83,7 +83,7 @@ func (c *ClusterService) HandleStatusUpdate(ctx context.Context, evt *cloudevent
 		return err
 	}
 
-	klog.Infof("Received event for cluster: %s, type: %s", cluster.Name, eventType)
+	klog.V(4).Infof("cluster status update (%s) %s", eventType.Action, cluster.Name)
 
 	// only create and update action
 	switch eventType.Action {
@@ -93,7 +93,6 @@ func (c *ClusterService) HandleStatusUpdate(ctx context.Context, evt *cloudevent
 			return err
 		}
 	case updateRequestAction:
-		klog.Infof("update cluster %s to %v", evt.Source(), eventType)
 		if eventType.SubResource == types.SubResourceStatus {
 			_, err := c.clusterClient.ClusterV1().ManagedClusters().UpdateStatus(ctx, cluster, metav1.UpdateOptions{})
 			if err != nil {

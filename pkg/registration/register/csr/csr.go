@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"os"
 	"path"
-	"reflect"
 	"strings"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	certificates "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
@@ -459,7 +459,7 @@ func shouldCreateCSR(
 
 	// b.client certificate is sensitive to the additional secret data and the data changes
 	if err := hasAdditionalSecretData(additionalSecretData, secret); err != nil {
-		recorder.Eventf("AdditonalSecretDataChanged", "The additional secret data is changed for %v. Re-create the client certificate for %s", err, controllerName)
+		recorder.Eventf("AdditionalSecretDataChanged", "The additional secret data is changed for %v. Re-create the client certificate for %s", err, controllerName)
 		return true, nil
 	}
 
@@ -493,7 +493,7 @@ func hasAdditionalSecretData(additionalSecretData map[string][]byte, secret *cor
 			return fmt.Errorf("key %q not found in secret %q", k, secret.Namespace+"/"+secret.Name)
 		}
 
-		if !reflect.DeepEqual(v, value) {
+		if !equality.Semantic.DeepEqual(v, value) {
 			return fmt.Errorf("key %q in secret %q does not match the expected value",
 				k, secret.Namespace+"/"+secret.Name)
 		}

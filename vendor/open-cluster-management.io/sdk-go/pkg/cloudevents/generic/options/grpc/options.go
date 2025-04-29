@@ -85,7 +85,7 @@ func (d *GRPCDialer) Dial() (*grpc.ClientConn, error) {
 		d.conn = conn
 		return d.conn, nil
 	}
-	
+
 	// Insecure connection option; should not be used in production.
 	dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	conn, err := grpc.NewClient(d.URL, dialOpts...)
