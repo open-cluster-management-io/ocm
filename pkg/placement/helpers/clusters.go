@@ -9,6 +9,8 @@ import (
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+
+	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 )
 
 type ClusterSelector struct {
@@ -17,7 +19,7 @@ type ClusterSelector struct {
 	celSelector   *CELSelector
 }
 
-func NewClusterSelector(selector clusterapiv1beta1.ClusterSelector, env *cel.Env) (*ClusterSelector, error) {
+func NewClusterSelector(selector clusterapiv1beta1.ClusterSelector, env *cel.Env, metricsRecorder *metrics.ScheduleMetrics) (*ClusterSelector, error) {
 	// build label selector
 	labelSelector, err := convertLabelSelector(&selector.LabelSelector)
 	if err != nil {
@@ -29,7 +31,7 @@ func NewClusterSelector(selector clusterapiv1beta1.ClusterSelector, env *cel.Env
 		return nil, err
 	}
 	// build cel selector
-	celSelector := NewCELSelector(env, selector.CelSelector.CelExpressions)
+	celSelector := NewCELSelector(env, selector.CelSelector.CelExpressions, metricsRecorder)
 	return &ClusterSelector{
 		labelSelector: labelSelector,
 		claimSelector: claimSelector,
@@ -63,7 +65,7 @@ func (c *ClusterSelector) Matches(ctx context.Context, cluster *clusterapiv1.Man
 
 	// match with cel selector if exists
 	if c.celSelector != nil {
-		if ok := c.celSelector.Validate(ctx, cluster); !ok {
+		if ok, _ := c.celSelector.Validate(ctx, cluster); !ok {
 			return false
 		}
 	}
