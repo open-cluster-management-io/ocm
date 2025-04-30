@@ -15,6 +15,7 @@ const (
 	SchedulingDurationKey = "scheduling_duration_seconds"
 	BindDurationKey       = "bind_duration_seconds"
 	PluginDurationKey     = "plugin_duration_seconds"
+	CelRuntimeDurationKey = "cel_runtime_duration_seconds"
 )
 
 // Metric histograms for tracking various durations.
@@ -43,8 +44,16 @@ var (
 		Buckets:        k8smetrics.ExponentialBuckets(10e-7, 10, 10),
 	}, []string{"name", "plugin_type", "plugin_name"})
 
+	CelDuration = k8smetrics.NewHistogramVec(&k8smetrics.HistogramOpts{
+		Subsystem:      SchedulingSubsystem,
+		Name:           CelRuntimeDurationKey,
+		StabilityLevel: k8smetrics.ALPHA,
+		Help:           "How long in seconds CEL expressions validation runs for a placement.",
+		Buckets:        k8smetrics.ExponentialBuckets(10e-7, 10, 10),
+	}, []string{"name"})
+
 	metrics = []k8smetrics.Registerable{
-		schedulingDuration, bindDuration, PluginDuration,
+		schedulingDuration, bindDuration, PluginDuration, CelDuration,
 	}
 )
 
