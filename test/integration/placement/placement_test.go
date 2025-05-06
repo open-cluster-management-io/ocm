@@ -311,7 +311,7 @@ var _ = ginkgo.Describe("Placement", func() {
 				DecisionGroups: []clusterapiv1beta1.DecisionGroup{
 					{
 						GroupName: "canary",
-						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+						ClusterSelector: clusterapiv1beta1.GroupClusterSelector{
 							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"vendor": "openShift"}},
 						},
 					},
