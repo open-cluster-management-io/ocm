@@ -89,6 +89,16 @@ func (DecisionStrategy) SwaggerDoc() map[string]string {
 	return map_DecisionStrategy
 }
 
+var map_GroupClusterSelector = map[string]string{
+	"":              "GroupClusterSelector represents the AND of the containing selectors for groupClusterSelector. An empty group cluster selector matches all objects. A null group cluster selector matches no objects.",
+	"labelSelector": "LabelSelector represents a selector of ManagedClusters by label",
+	"claimSelector": "ClaimSelector represents a selector of ManagedClusters by clusterClaims in status",
+}
+
+func (GroupClusterSelector) SwaggerDoc() map[string]string {
+	return map_GroupClusterSelector
+}
+
 var map_GroupStrategy = map[string]string{
 	"":                         "Group the created placementDecision into decision groups based on the number of clusters per decision group.",
 	"decisionGroups":           "DecisionGroups represents a list of predefined groups to put decision results. Decision groups will be constructed based on the DecisionGroups field at first. The clusters not included in the DecisionGroups will be divided to other decision groups afterwards. Each decision group should not have the number of clusters larger than the ClustersPerDecisionGroup.",

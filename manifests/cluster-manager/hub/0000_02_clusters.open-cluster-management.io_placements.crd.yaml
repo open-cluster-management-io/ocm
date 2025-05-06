@@ -121,16 +121,6 @@ spec:
                               description: LabelSelector to select clusters subset
                                 by label.
                               properties:
-                                celSelector:
-                                  description: CelSelector represents a selector of
-                                    ManagedClusters by CEL expressions on ManagedCluster
-                                    fields
-                                  properties:
-                                    celExpressions:
-                                      items:
-                                        type: string
-                                      type: array
-                                  type: object
                                 claimSelector:
                                   description: ClaimSelector represents a selector
                                     of ManagedClusters by clusterClaims in status
