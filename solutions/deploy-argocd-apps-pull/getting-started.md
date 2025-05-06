@@ -17,70 +17,43 @@
    curl -L https://raw.githubusercontent.com/open-cluster-management-io/OCM/main/solutions/setup-dev-environment/local-up.sh | bash
    ```
    
-   See [Open Cluster Management Quick Start](https://open-cluster-management.io/getting-started/quick-start/) for more details.
+   See [Open Cluster Management (OCM) Quick Start](https://open-cluster-management.io/getting-started/quick-start/) for more details.
 
-2. Install ArgoCD on the hub cluster and both managed clusters. 
-    ```
-    for i in "hub" "cluster1" "cluster2"
-    do
-      kubectl config use-context kind-$i
-      kubectl create namespace argocd
-      kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-    done
-    ```
-   See [ArgoCD website](https://argo-cd.readthedocs.io/en/stable/getting_started/) for more details.
-
-1. Install the Pull controller on the hub cluster:
+1. Install Argo CD on the Hub cluster.
     ```
     kubectl config use-context kind-hub
-    kubectl apply -f https://raw.githubusercontent.com/open-cluster-management-io/argocd-pull-integration/main/deploy/install.yaml
+    kubectl create namespace argocd
+    kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
     ```
+   See [Argo CD website](https://argo-cd.readthedocs.io/en/stable/getting_started/) for more details.
 
-2. If your controller starts successfully, you should see:
-    ```
-    $ kubectl config use-context kind-hub
-    $ kubectl -n open-cluster-management get deploy | grep pull
-    argocd-pull-integration-controller-manager   1/1     1            1           106s
-    ```
-
-3. On the Hub cluster, create ArgoCD cluster secrets that represent the managed clusters. This step can be automated with [OCM auto import controller](https://github.com/open-cluster-management-io/multicloud-integrations/).
-
+1. Install the OCM Argo CD add-on on the Hub cluster:
     ```
     kubectl config use-context kind-hub
-    for i in "cluster1" "cluster2"
-    do
-      cat <<EOF | kubectl apply -f -
-      apiVersion: v1
-      kind: Secret
-      metadata:
-        name: $i-secret # cluster1-secret
-        namespace: argocd
-        labels:
-          argocd.argoproj.io/secret-type: cluster
-      type: Opaque
-      stringData:
-        name: $i # cluster1
-        server: https://$i-control-plane:6443 # https://cluster1-control-plane:6443
-    EOF
-    done
+    clusteradm install hub-addon --names argocd
+    ```
+   If your hub controller starts successfully, you should see:
+    ```
+    $ kubectl -n argocd get deploy argocd-pull-integration
+    NAME                      READY   UP-TO-DATE   AVAILABLE   AGE
+    argocd-pull-integration   1/1     1            1           55s
     ```
 
-4. On the Hub cluster, apply the manifests in `example/hub`:
+1. Enable the add-on for your choice of managed clusters:
     ```
     kubectl config use-context kind-hub
-    kubectl apply -f example/hub
+    clusteradm addon enable --names argocd --clusters cluster1,cluster2
+    ```
+   Replace `cluster1` and `cluster2` with your managed cluster names.
+
+   If your add-on starts successfully, you should see:
+    ```
+    $ kubectl -n cluster1 get managedclusteraddon argocd
+    NAME     AVAILABLE   DEGRADED   PROGRESSING
+    argocd   True                   False
     ```
 
-5. On the managed clusters, apply the manifests in `example/managed`:
-    ```
-    for i in "cluster1" "cluster2"
-    do
-      kubectl config use-context kind-$i
-      kubectl apply -f example/managed
-    done
-    ```
-
-6. On the Hub cluster, apply the `guestbook-app-set` manifest:
+1. On the Hub cluster, apply the `guestbook-app-set` manifest:
     ```
     kubectl config use-context kind-hub
     kubectl apply -f example/guestbook-app-set.yaml
@@ -99,7 +72,7 @@
 
     The `ocm-managed-cluster` annotation is for the ApplicationSet to generate multiple Application based on each cluster generator targets.
 
-7.  When this guestbook ApplicationSet reconciles, it will generate an Application for the registered managed clusters. For example:
+1.  When this guestbook ApplicationSet reconciles, it will generate an Application for the registered managed clusters. For example:
     ```
     $ kubectl config use-context kind-hub
     $ kubectl -n argocd get appset
@@ -111,7 +84,7 @@
     cluster2-guestbook-app
     ```
 
-8.  On the Hub cluster, the pull controller will wrap the Application with a ManifestWork. For example:
+1.  On the Hub cluster, the pull controller will wrap the Application with a ManifestWork. For example:
     ```
     $ kubectl config use-context kind-hub
     $ kubectl -n cluster1 get manifestwork
@@ -119,7 +92,7 @@
     cluster1-guestbook-app-d0e5   2m41s
     ```
 
-9.  On a managed cluster, you should see that the Application is pulled down successfully. For example:
+1.  On a managed cluster, you should see that the Application is pulled down successfully. For example:
     ```
     $ kubectl config use-context kind-cluster1
     $ kubectl -n argocd get app
@@ -130,7 +103,7 @@
     guestbook-ui   1/1     1            1           7m36s
     ```
 
-10. On the Hub cluster, the status controller will sync the dormant Application with the ManifestWork status feedback. For example:
+1. On the Hub cluster, the status controller will sync the dormant Application with the ManifestWork status feedback. For example:
     ```
     $ kubectl config use-context kind-hub
     $ kubectl -n argocd get app
