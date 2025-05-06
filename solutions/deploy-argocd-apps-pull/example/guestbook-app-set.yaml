@@ -9,7 +9,7 @@ spec:
         configMapRef: ocm-placement-generator
         labelSelector:
           matchLabels:
-            cluster.open-cluster-management.io/placement: guestbook-app-placement
+            cluster.open-cluster-management.io/placement: app-placement
         requeueAfterSeconds: 30
   template:
     metadata:
