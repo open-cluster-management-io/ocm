@@ -11,6 +11,7 @@ const (
 	contextGroupsKey contextKey = "groups"
 )
 
+// Authenticator is the interface to authenticat for grpc server
 type Authenticator interface {
 	Authenticate(ctx context.Context) (context.Context, error)
 }

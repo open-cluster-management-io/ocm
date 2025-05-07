@@ -3,20 +3,15 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"gopkg.in/yaml.v2"
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/utils"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"os"
 	"path"
 	"time"
 
+	"gopkg.in/yaml.v2"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc"
+
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	certificates "k8s.io/api/certificates/v1"
 	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
@@ -68,50 +63,54 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 	// For cloudevents drivers, we build hub client based on different driver configuration.
 	var config any
 	var err error
+	var configFile string
 	if bootstrapped {
-		_, config, err = generic.NewConfigLoader("grpc", d.opt.BootstrapConfigFile).
-			LoadConfig()
+		_, config, err = generic.NewConfigLoader("grpc", d.opt.BootstrapConfigFile).LoadConfig()
 		if err != nil {
 			return nil, fmt.Errorf(
 				"failed to load hub bootstrap registration config from file %q: %w",
 				d.opt.BootstrapConfigFile, err)
 		}
 
-		configData, err := os.ReadFile(d.opt.BootstrapConfigFile)
-		if err != nil {
-			return nil, err
-		}
-
-		bootstrapConfig := &grpc.GRPCConfig{}
-		if err := yaml.Unmarshal(configData, bootstrapConfig); err != nil {
-			return nil, err
-		}
-		configTemplate := &grpc.GRPCConfig{
-			URL:             bootstrapConfig.URL,
-			CAFile:          bootstrapConfig.CAFile,
-			KeepAliveConfig: bootstrapConfig.KeepAliveConfig,
-			ClientKeyFile:   path.Join(secretOption.HubKubeconfigDir, csr.TLSKeyFile),
-			ClientCertFile:  path.Join(secretOption.HubKubeconfigDir, csr.TLSCertFile),
-		}
-		configData, err = yaml.Marshal(configTemplate)
-		if err != nil {
-			return nil, err
-		}
-		d.configTemplate = configData
+		configFile = d.opt.BootstrapConfigFile
 	} else {
-		_, config, err = generic.NewConfigLoader("grpc", d.opt.ConfigFile).
-			LoadConfig()
+		_, config, err = generic.NewConfigLoader("grpc", d.opt.ConfigFile).LoadConfig()
 		if err != nil {
 			return nil, fmt.Errorf(
 				"failed to load hub registration config from file %q: %w",
 				d.opt.ConfigFile, err)
 		}
+
+		configFile = d.opt.ConfigFile
 	}
+
+	configData, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil, err
+	}
+
+	grpcConfig := &grpc.GRPCConfig{}
+	if err := yaml.Unmarshal(configData, grpcConfig); err != nil {
+		return nil, err
+	}
+
+	configData, err = yaml.Marshal(&grpc.GRPCConfig{
+		URL:             grpcConfig.URL,
+		CAFile:          grpcConfig.CAFile,
+		KeepAliveConfig: grpcConfig.KeepAliveConfig,
+		ClientKeyFile:   path.Join(secretOption.HubKubeconfigDir, csr.TLSKeyFile),
+		ClientCertFile:  path.Join(secretOption.HubKubeconfigDir, csr.TLSCertFile),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	d.configTemplate = configData
 
 	clusterWatchStore := cestore.NewAgentInformerWatcherStore[*clusterv1.ManagedCluster]()
 	clusterClientHolder, err := cloudeventscluster.NewClientHolder(
 		ctx,
-		cloudeventoptions.NewGenericClientOptions[*clusterv1.ManagedCluster](
+		cloudeventoptions.NewGenericClientOptions(
 			config,
 			cloudeventscluster.NewManagedClusterCodec(),
 			secretOption.ClusterName,
@@ -126,61 +125,65 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 		clusterClient, 10*time.Minute).Cluster().V1().ManagedClusters()
 	clusterWatchStore.SetInformer(clusterInformers.Informer())
 
-	leaseWatchStore := &leaseStore{
-		cestore.BaseClientWatchStore[*coordv1.Lease]{
-			Store: cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)},
-	}
+	leaseWatchStore := cestore.NewSimpleStore[*coordv1.Lease]()
 	leaseClient, err := cloudeventslease.NewLeaseClient(
 		ctx,
-		cloudeventoptions.NewGenericClientOptions[*coordv1.Lease](
+		cloudeventoptions.NewGenericClientOptions(
 			config,
-			cloudeventslease.NewManagedClusterAddOnCodec(),
+			cloudeventslease.NewLeaseCodec(),
 			secretOption.ClusterName,
 		).WithClusterName(secretOption.ClusterName).WithClientWatcherStore(leaseWatchStore),
 		secretOption.ClusterName,
 	)
+	if err != nil {
+		return nil, err
+	}
 
-	eventWatchStore := cestore.NewAgentInformerWatcherStore[*eventsv1.Event]()
-	eventWatchStore.Store = cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
+	eventWatchStore := cestore.NewSimpleStore[*eventsv1.Event]()
 	eventClient, err := cloudeventsevent.NewClientHolder(
 		ctx,
-		cloudeventoptions.NewGenericClientOptions[*eventsv1.Event](
+		cloudeventoptions.NewGenericClientOptions(
 			config,
 			cloudeventsevent.NewEventCodec(),
 			secretOption.ClusterName,
 		).WithClusterName(secretOption.ClusterName).WithClientWatcherStore(eventWatchStore),
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	addonWatchStore := cestore.NewAgentInformerWatcherStore[*addonapiv1alpha1.ManagedClusterAddOn]()
-	addonClientHolder, err := cloudeventsaddon.NewClientHolder(
+	addonClient, err := cloudeventsaddon.ManagedClusterAddOnInterface(
 		ctx,
-		cloudeventoptions.NewGenericClientOptions[*addonapiv1alpha1.ManagedClusterAddOn](
+		cloudeventoptions.NewGenericClientOptions(
 			config,
 			cloudeventsaddon.NewManagedClusterAddOnCodec(),
 			secretOption.ClusterName,
 		).WithClusterName(secretOption.ClusterName).WithClientWatcherStore(addonWatchStore))
-	addonClient := addonClientHolder.ClusterInterface()
-	addonInformer := addoninformers.NewSharedInformerFactory(
-		addonClient, 10*time.Minute).Addon().V1alpha1().ManagedClusterAddOns()
+	if err != nil {
+		return nil, err
+	}
+	addonInformer := addoninformers.NewSharedInformerFactoryWithOptions(
+		addonClient, 10*time.Minute, addoninformers.WithNamespace(secretOption.ClusterName)).
+		Addon().V1alpha1().ManagedClusterAddOns()
 	addonWatchStore.SetInformer(addonInformer.Informer())
 
-	csrWatchStore := cestore.NewAgentInformerWatcherStore[*certificates.CertificateSigningRequest]()
 	csrClientHolder, err := cloudeventscsr.NewAgentClientHolder(ctx,
-		cloudeventoptions.NewGenericClientOptions[*certificates.CertificateSigningRequest](
+		cloudeventoptions.NewGenericClientOptions(
 			config,
 			cloudeventscsr.NewCSRCodec(),
 			secretOption.ClusterName,
-		).WithClusterName(secretOption.ClusterName).WithClientWatcherStore(csrWatchStore),
+		).WithClusterName(secretOption.ClusterName),
 	)
 	if err != nil {
 		return nil, err
 	}
-	csrWatchStore.SetInformer(csrClientHolder.Informer())
+
 	certControl := &csrControl{csrClientHolder: csrClientHolder}
-	err = d.csrDriver.SetCSRControl(certControl, secretOption.ClusterName)
-	if err != nil {
+	if err := d.csrDriver.SetCSRControl(certControl, secretOption.ClusterName); err != nil {
 		return nil, err
 	}
+
 	d.control = certControl
 
 	clients := &register.Clients{
@@ -194,31 +197,35 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 	return clients, nil
 }
 
-func (c *GRPCDriver) Fork(addonName string, secretOption register.SecretOption) register.RegisterDriver {
-	csrDriver := c.csrDriver.Fork(addonName, secretOption)
+func (d *GRPCDriver) Fork(addonName string, secretOption register.SecretOption) register.RegisterDriver {
+	csrDriver := d.csrDriver.Fork(addonName, secretOption)
 	return &GRPCDriver{
-		control:   c.control,
-		opt:       c.opt,
+		control:   d.control,
+		opt:       d.opt,
 		csrDriver: csrDriver.(*csr.CSRDriver),
 	}
 }
 
-func (c *GRPCDriver) Process(
+func (d *GRPCDriver) Process(
 	ctx context.Context, controllerName string, secret *corev1.Secret, additionalSecretData map[string][]byte,
 	recorder events.Recorder) (*corev1.Secret, *metav1.Condition, error) {
-	additionalSecretData["config.yaml"] = c.configTemplate
-	return c.csrDriver.Process(ctx, controllerName, secret, additionalSecretData, recorder)
+	additionalSecretData["config.yaml"] = d.configTemplate
+	return d.csrDriver.Process(ctx, controllerName, secret, additionalSecretData, recorder)
 }
 
-func (c *GRPCDriver) BuildKubeConfigFromTemplate(_ *clientcmdapi.Config) *clientcmdapi.Config {
-	return nil
+func (d *GRPCDriver) BuildKubeConfigFromTemplate(kubeConfig *clientcmdapi.Config) *clientcmdapi.Config {
+	kubeConfig.AuthInfos = map[string]*clientcmdapi.AuthInfo{register.DefaultKubeConfigAuth: {
+		ClientCertificate: "tls.crt",
+		ClientKey:         "tls.key",
+	}}
+	return kubeConfig
 }
 
-func (c *GRPCDriver) InformerHandler() (cache.SharedIndexInformer, factory.EventFilterFunc) {
-	return c.control.Informer(), nil
+func (d *GRPCDriver) InformerHandler() (cache.SharedIndexInformer, factory.EventFilterFunc) {
+	return d.control.Informer(), nil
 }
 
-func (c *GRPCDriver) IsHubKubeConfigValid(ctx context.Context, secretOption register.SecretOption) (bool, error) {
+func (d *GRPCDriver) IsHubKubeConfigValid(ctx context.Context, secretOption register.SecretOption) (bool, error) {
 	logger := klog.FromContext(ctx)
 	keyPath := path.Join(secretOption.HubKubeconfigDir, csr.TLSKeyFile)
 	if _, err := os.Stat(keyPath); os.IsNotExist(err) {
@@ -252,102 +259,6 @@ func (c *GRPCDriver) IsHubKubeConfigValid(ctx context.Context, secretOption regi
 	return csr.IsCertificateValid(logger, certData, nil)
 }
 
-func (c *GRPCDriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
+func (d *GRPCDriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
 	return cluster
 }
-
-type leaseStore struct {
-	cestore.BaseClientWatchStore[*coordv1.Lease]
-}
-
-func (l leaseStore) GetWatcher(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (l leaseStore) HandleReceivedResource(action types.ResourceAction, resource *coordv1.Lease) error {
-	switch action {
-	case types.Added:
-		newObj, err := utils.ToRuntimeObject(resource)
-		if err != nil {
-			return err
-		}
-
-		return l.Add(newObj)
-	case types.Modified:
-		newObj, err := meta.Accessor(resource)
-		if err != nil {
-			return err
-		}
-
-		lastObj, exists, err := l.Get(newObj.GetNamespace(), newObj.GetName())
-		if err != nil {
-			return err
-		}
-		if !exists {
-			return fmt.Errorf("the resource %s/%s does not exist", newObj.GetNamespace(), newObj.GetName())
-		}
-
-		// prevent the resource from being updated if it is deleting
-		if !lastObj.GetDeletionTimestamp().IsZero() {
-			klog.Warningf("the resource %s/%s is deleting, ignore the update", newObj.GetNamespace(), newObj.GetName())
-			return nil
-		}
-
-		updated, err := utils.ToRuntimeObject(resource)
-		if err != nil {
-			return err
-		}
-
-		return l.Update(updated)
-	case types.Deleted:
-		newObj, err := meta.Accessor(resource)
-		if err != nil {
-			return err
-		}
-
-		if newObj.GetDeletionTimestamp().IsZero() {
-			return nil
-		}
-
-		if len(newObj.GetFinalizers()) != 0 {
-			return nil
-		}
-
-		last, exists, err := l.Get(newObj.GetNamespace(), newObj.GetName())
-		if err != nil {
-			return err
-		}
-		if !exists {
-			return nil
-		}
-
-		deletingObj, err := utils.ToRuntimeObject(last)
-		if err != nil {
-			return err
-		}
-
-		return l.Delete(deletingObj)
-	default:
-		return fmt.Errorf("unsupported resource action %s", action)
-	}
-	return nil
-}
-
-func (l leaseStore) Add(resource runtime.Object) error {
-	return l.Store.Add(resource)
-}
-
-func (l leaseStore) Update(resource runtime.Object) error {
-	return l.Store.Update(resource)
-}
-
-func (l leaseStore) Delete(resource runtime.Object) error {
-	return l.Store.Delete(resource)
-}
-
-func (l leaseStore) HasInitiated() bool {
-	return true
-}
-
-var _ cestore.ClientWatcherStore[*coordv1.Lease] = &leaseStore{}

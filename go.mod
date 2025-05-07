@@ -41,14 +41,12 @@ require (
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 	open-cluster-management.io/addon-framework v0.12.1-0.20250407131028-9d436ffc2da7
 	open-cluster-management.io/api v0.16.2-0.20250422072120-cadf714c3055
-	open-cluster-management.io/sdk-go v0.16.1-0.20250411154302-3a424961ead4
+	open-cluster-management.io/sdk-go v0.16.1-0.20250429023724-062f078a8395
 	sigs.k8s.io/cluster-inventory-api v0.0.0-20240730014211-ef0154379848
 	sigs.k8s.io/controller-runtime v0.20.2
 	sigs.k8s.io/kube-storage-version-migrator v0.0.6-0.20230721195810-5c8923c5ff96
 	sigs.k8s.io/yaml v1.4.0
 )
-
-replace open-cluster-management.io/sdk-go => github.com/qiujian16/sdk-go v0.0.0-20250422082049-69544ab90357
 
 require (
 	cel.dev/expr v0.19.1 // indirect

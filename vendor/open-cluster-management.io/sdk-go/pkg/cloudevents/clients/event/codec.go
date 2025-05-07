@@ -6,6 +6,7 @@ import (
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 

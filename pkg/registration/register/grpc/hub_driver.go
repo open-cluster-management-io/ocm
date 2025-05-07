@@ -18,8 +18,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	certificateslisters "k8s.io/client-go/listers/certificates/v1"
 
-	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/helpers"
 
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
@@ -148,7 +148,7 @@ func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContex
 		return nil
 	}
 
-	signerFunc := addonutils.DefaultSignerWithExpiry(c.caKey, c.caData, c.duration)
+	signerFunc := helpers.CSRSignerWithExpiry(c.caKey, c.caData, c.duration)
 	csr.Status.Certificate = signerFunc(csr)
 	if len(csr.Status.Certificate) == 0 {
 		return fmt.Errorf("invalid client certificate generated for addon csr %q", csr.Name)

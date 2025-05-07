@@ -3,10 +3,14 @@ package services
 import (
 	"context"
 	"fmt"
+
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
+
 	eventce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server"
@@ -58,10 +62,17 @@ func (e EventService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.E
 		return err
 	}
 
+	klog.V(4).Infof("event status update (%s) %s/%s", eventType.Action, event.Namespace, event.Name)
+
 	// only create and update action
 	switch eventType.Action {
 	case createRequestAction:
 		_, err := e.client.EventsV1().Events(event.Namespace).Create(ctx, event, metav1.CreateOptions{})
+		if err != nil {
+			return err
+		}
+	case updateRequestAction:
+		_, err := e.client.EventsV1().Events(event.Namespace).Update(ctx, event, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}

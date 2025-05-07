@@ -20,7 +20,7 @@ var LeaseEventDataType = types.CloudEventsDataType{
 // LeaseCodec is a codec to encode/decode a lease/cloudevent for an agent.
 type LeaseCodec struct{}
 
-func NewManagedClusterAddOnCodec() *LeaseCodec {
+func NewLeaseCodec() *LeaseCodec {
 	return &LeaseCodec{}
 }
 

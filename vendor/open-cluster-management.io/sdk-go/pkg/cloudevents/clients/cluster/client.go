@@ -2,10 +2,7 @@ package cluster
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-	"strconv"
-	"sync"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,8 +24,6 @@ import (
 // ManagedClusterClient implements the ManagedClusterInterface. It sends the ManagedCluster status back to source by
 // CloudEventAgentClient.
 type ManagedClusterClient struct {
-	sync.RWMutex
-
 	cloudEventsClient *generic.CloudEventAgentClient[*clusterv1.ManagedCluster]
 	watcherStore      store.ClientWatcherStore[*clusterv1.ManagedCluster]
 }
@@ -66,11 +61,6 @@ func (c *ManagedClusterClient) Create(ctx context.Context, cluster *clusterv1.Ma
 
 	if err := c.cloudEventsClient.Publish(ctx, eventType, cluster); err != nil {
 		return nil, cloudeventserrors.ToStatusError(common.ManagedClusterGR, cluster.Name, err)
-	}
-
-	// add the new cluster to the local cache.
-	if err := c.watcherStore.Add(cluster); err != nil {
-		return nil, errors.NewInternalError(err)
 	}
 
 	return cluster.DeepCopy(), nil
@@ -153,70 +143,17 @@ func (c *ManagedClusterClient) Patch(ctx context.Context, name string, pt kubety
 
 	newCluster := patchedCluster.DeepCopy()
 
-	statusUpdated, err := isStatusUpdate(subresources)
-	if err != nil {
-		return nil, errors.NewGenericServerResponse(http.StatusMethodNotAllowed, "patch", common.ManagedClusterGR, name, err.Error(), 0, false)
+	if !utils.IsStatusPatch(subresources) {
+		msg := "subresources \"status\" is required"
+		return nil, errors.NewGenericServerResponse(http.StatusMethodNotAllowed, "patch", common.ManagedClusterGR, name, msg, 0, false)
 	}
 
-	if statusUpdated {
-		// avoid race conditions among the agent's go routines
-		c.Lock()
-		defer c.Unlock()
-
-		eventType.Action = common.UpdateRequestAction
-		// publish the status update event to source, source will check the resource version
-		// and reject the update if it's status update is outdated.
-		if err := c.cloudEventsClient.Publish(ctx, eventType, newCluster); err != nil {
-			return nil, cloudeventserrors.ToStatusError(common.ManagedClusterGR, name, err)
-		}
-
-		// Fetch the latest cluster from the store and verify the resource version to avoid updating the store
-		// with outdated cluster. Return a conflict error if the resource version is outdated.
-		// Due to the lack of read-modify-write guarantees in the store, race conditions may occur between
-		// this update operation and one from the agent informer after receiving the event from the source.
-		lastCluster, exists, err := c.watcherStore.Get("", name)
-		if err != nil {
-			return nil, errors.NewInternalError(err)
-		}
-		if !exists {
-			return nil, errors.NewNotFound(common.ManagedClusterGR, name)
-		}
-		lastResourceVersion, err := strconv.ParseInt(lastCluster.GetResourceVersion(), 10, 64)
-		if err != nil {
-			return nil, errors.NewInternalError(err)
-		}
-		newResourceVersion, err := strconv.ParseInt(newCluster.GetResourceVersion(), 10, 64)
-		if err != nil {
-			return nil, errors.NewInternalError(err)
-		}
-		// ensure the resource version of the cluster is not outdated
-		if newResourceVersion < lastResourceVersion {
-			// It's safe to return a conflict error here, even if the status update event
-			// has already been sent. The source may reject the update due to an outdated resource version.
-			return nil, errors.NewConflict(common.ManagedClusterGR, name, fmt.Errorf("the resource version of the cluster is outdated"))
-		}
-		if err := c.watcherStore.Update(newCluster); err != nil {
-			return nil, errors.NewInternalError(err)
-		}
-
-		return newCluster, nil
-	}
-
-	if err := c.watcherStore.Update(newCluster); err != nil {
-		return nil, errors.NewInternalError(err)
+	// publish the status update event to source, source will check the resource version
+	// and reject the update if it's status update is outdated.
+	eventType.Action = common.UpdateRequestAction
+	if err := c.cloudEventsClient.Publish(ctx, eventType, newCluster); err != nil {
+		return nil, cloudeventserrors.ToStatusError(common.ManagedClusterGR, name, err)
 	}
 
 	return newCluster, nil
-}
-
-func isStatusUpdate(subresources []string) (bool, error) {
-	if len(subresources) == 0 {
-		return false, nil
-	}
-
-	if len(subresources) == 1 && subresources[0] == "status" {
-		return true, nil
-	}
-
-	return false, fmt.Errorf("unsupported subresources %v", subresources)
 }

@@ -6,6 +6,7 @@ import (
 	eventv1 "k8s.io/api/events/v1"
 	eventv1client "k8s.io/client-go/kubernetes/typed/events/v1"
 	"k8s.io/client-go/rest"
+
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options"
 )
 

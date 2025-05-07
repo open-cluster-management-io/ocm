@@ -2,7 +2,6 @@ package csr
 
 import (
 	"context"
-	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -24,8 +23,6 @@ import (
 // CSRClient implements the CSRInterface. It sends the csr to source by
 // CloudEventAgentClient.
 type CSRClient struct {
-	sync.RWMutex
-
 	cloudEventsClient *generic.CloudEventAgentClient[*certificatev1.CertificateSigningRequest]
 	watcherStore      store.ClientWatcherStore[*certificatev1.CertificateSigningRequest]
 }
@@ -68,11 +65,6 @@ func (c *CSRClient) Create(ctx context.Context, csr *certificatev1.CertificateSi
 
 	if err := c.cloudEventsClient.Publish(ctx, eventType, csr); err != nil {
 		return nil, cloudeventserrors.ToStatusError(common.CSRGR, csr.Name, err)
-	}
-
-	// add the new csr to the local cache.
-	if err := c.watcherStore.Add(csr); err != nil {
-		return nil, errors.NewInternalError(err)
 	}
 
 	return csr.DeepCopy(), nil

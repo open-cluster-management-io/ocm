@@ -1,61 +1,68 @@
 package addon
 
 import (
+	"context"
+
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
+
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonclientset "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned/typed/addon/v1alpha1"
+
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options"
 )
 
-// ClusterClientSetWrapper wraps a cluster client that has a ManagedCluster client to a cluster
-// clientset interface, this wrapper will helps us to build ManagedCluster informer factory easily.
+// AddonClientSetWrapper wraps AddonV1Alpha1ClientWrapper to an addon clientset interface
 type AddonClientSetWrapper struct {
-	AddonV1Alpha1ClientWrapper *AddonV1Alpha1ClientWrapper
-}
-
-func (a AddonClientSetWrapper) Discovery() discovery.DiscoveryInterface {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (a AddonClientSetWrapper) AddonV1alpha1() addonv1alpha1client.AddonV1alpha1Interface {
-	//TODO implement me
-	return a.AddonV1Alpha1ClientWrapper
+	*AddonV1Alpha1ClientWrapper
 }
 
 var _ addonclientset.Interface = &AddonClientSetWrapper{}
 
-// ClusterV1ClientWrapper wraps a ManagedCluster client to a ClusterV1Interface
+func (a AddonClientSetWrapper) Discovery() discovery.DiscoveryInterface {
+	panic("Discovery is unsupported")
+}
+
+func (a AddonClientSetWrapper) AddonV1alpha1() addonv1alpha1client.AddonV1alpha1Interface {
+	return a.AddonV1Alpha1ClientWrapper
+}
+
+// AddonV1Alpha1ClientWrapper wraps ManagedClusterAddOnClient to AddonV1alpha1Interface
 type AddonV1Alpha1ClientWrapper struct {
-	ManagedClusterAddonClient addonv1alpha1client.ManagedClusterAddOnInterface
-	namespace                 string
-}
-
-func (c *AddonV1Alpha1ClientWrapper) AddOnDeploymentConfigs(namespace string) addonv1alpha1client.AddOnDeploymentConfigInterface {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c *AddonV1Alpha1ClientWrapper) AddOnTemplates() addonv1alpha1client.AddOnTemplateInterface {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c *AddonV1Alpha1ClientWrapper) ClusterManagementAddOns() addonv1alpha1client.ClusterManagementAddOnInterface {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c *AddonV1Alpha1ClientWrapper) ManagedClusterAddOns(namespace string) addonv1alpha1client.ManagedClusterAddOnInterface {
-	if agentManagedClusterClient, ok := c.ManagedClusterAddonClient.(*ManagedClusterAddOnClient); ok {
-		return agentManagedClusterClient.Namespace(namespace)
-	}
-
-	return nil
+	*ManagedClusterAddOnClient
 }
 
 var _ addonv1alpha1client.AddonV1alpha1Interface = &AddonV1Alpha1ClientWrapper{}
 
+func (c *AddonV1Alpha1ClientWrapper) AddOnDeploymentConfigs(namespace string) addonv1alpha1client.AddOnDeploymentConfigInterface {
+	panic("AddOnDeploymentConfigs is unsupported")
+}
+
+func (c *AddonV1Alpha1ClientWrapper) AddOnTemplates() addonv1alpha1client.AddOnTemplateInterface {
+	panic("AddOnTemplates is unsupported")
+}
+
+func (c *AddonV1Alpha1ClientWrapper) ClusterManagementAddOns() addonv1alpha1client.ClusterManagementAddOnInterface {
+	panic("ClusterManagementAddOns is unsupported")
+}
+
 func (c *AddonV1Alpha1ClientWrapper) RESTClient() rest.Interface {
-	return nil
+	panic("RESTClient is unsupported")
+}
+
+func (c *AddonV1Alpha1ClientWrapper) ManagedClusterAddOns(namespace string) addonv1alpha1client.ManagedClusterAddOnInterface {
+	return c.ManagedClusterAddOnClient.Namespace(namespace)
+}
+
+// ManagedClusterAddOnInterface returns a client for ManagedClusterAddOn
+func ManagedClusterAddOnInterface(ctx context.Context, opt *options.GenericClientOptions[*addonapiv1alpha1.ManagedClusterAddOn]) (addonclientset.Interface, error) {
+	cloudEventsClient, err := opt.AgentClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	addonClient := NewManagedClusterAddOnClient(cloudEventsClient, opt.WatcherStore())
+
+	return &AddonClientSetWrapper{&AddonV1Alpha1ClientWrapper{addonClient}}, nil
 }
