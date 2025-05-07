@@ -34,11 +34,19 @@ In addition, developers can leverage [Addon framework](https://github.com/open-c
 
 ### Application Lifecycle: Delivery, upgrade, and configuration of applications on Kubernetes clusters
 
-* Centrally create, update, and delete Kubernetes clusters across multiple private and public clouds.
-* Automatically deploy applications to specific clusters by subscribing to different workload (resource) channels, such as GitHub, Helm repository, ObjectStore, and resource templates.
+Leverage the [Argo CD](https://argo-cd.readthedocs.io/en/stable/)
+add-on for OCM to enable decentralized, pull based application deployment to managed clusters.
 
-The application model defines a Kubernetes-first way of describing the application. Your existing Kubernetes apps or `kustomized` apps can be adapted with the addition of a few new objects: [Channel](https://github.com/open-cluster-management-io/multicloud-operators-channel), and [Subscription](https://github.com/open-cluster-management-io/multicloud-operators-subscription). Changes made to the app are then easily delivered to managed clusters based on the dynamic placement engine. See [deploy a helm chart](solutions/deploy-a-helm-chart) on how
-to install application manager addon in OCM and deploy helm charts in multiple clusters.
+The OCM Argo CD add-on uses a hub-spoke architecture to deliver Argo CD Applications from the OCM hub cluster to registered managed clusters. Unlike traditional push-based deployment models, this pull mechanism provides several advantages:
+
+- Scalability: hub-spoke pattern may offers better scalability.
+- Security: cluster credentials doesn't have to be stored in a centralized environment may enhance security.
+- It may reduce the impact of a single point of centralized failure.
+
+Using OCM APIs and components,
+Argo CD Applications can be managed centrally while being pulled and applied locally at the managed cluster level.
+See [Argo CD OCM add-on](https://github.com/open-cluster-management-io/ocm/tree/main/solutions/deploy-argocd-apps-pull/)
+for details on installing the add-on and deploying applications across multiple clusters.
 
 ### GRC: Governance, Risk and Compliance across Kubernetes clusters
 
