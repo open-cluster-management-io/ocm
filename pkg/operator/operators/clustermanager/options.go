@@ -26,6 +26,7 @@ type Options struct {
 	SkipRemoveCRDs                bool
 	ControlPlaneNodeLabelSelector string
 	DeploymentReplicas            int32
+	EnableSyncLabels              bool
 }
 
 // RunClusterManagerOperator starts a new cluster manager operator
