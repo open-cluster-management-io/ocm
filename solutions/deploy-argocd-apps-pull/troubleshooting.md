@@ -1,7 +1,7 @@
 # Troubleshooting
 
-#### For ArgoCD components, check the following containers for logs:
-* argocd-pull-integration-* in the `open-cluster-management` namespace (only on the hub cluster)
+#### For Argo CD components, check the following containers for logs:
+* argocd-pull-integration-* in the `argocd` namespace (only on the hub cluster)
 * argocd-applicationset-controller in the `argocd` namespace
 * argocd-application-controller (only on managed clusters) in the `argocd` namespace
 

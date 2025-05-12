@@ -779,12 +779,16 @@ func calculateLength(intOrStr *intstr.IntOrString, total int) (int, *framework.S
 
 // filterClustersBySelector filters clusters based on the provided label selector and returns the matched clusters.
 func filterClustersBySelector(
-	selector clusterapiv1beta1.ClusterSelector,
+	groupSelector clusterapiv1beta1.GroupClusterSelector,
 	clusters []*clusterapiv1.ManagedCluster,
 	clusterNames sets.Set[string],
 ) ([]clusterapiv1beta1.ClusterDecision, *framework.Status) {
 	var matched []clusterapiv1beta1.ClusterDecision
 	// set CEL env to nil since placement decision groups do not support CEL expressions.
+	selector := clusterapiv1beta1.ClusterSelector{
+		LabelSelector: groupSelector.LabelSelector,
+		ClaimSelector: groupSelector.ClaimSelector,
+	}
 	clusterSelector, err := helpers.NewClusterSelector(selector, nil, nil)
 	if err != nil {
 		status := framework.NewStatus("", framework.Misconfigured, err.Error())
