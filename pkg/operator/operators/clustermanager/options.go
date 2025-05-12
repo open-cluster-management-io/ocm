@@ -81,6 +81,7 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		o.ControlPlaneNodeLabelSelector,
 		o.DeploymentReplicas,
 		controllerContext.OperatorNamespace,
+		o.EnableSyncLabels,
 	)
 
 	statusController := clustermanagerstatuscontroller.NewClusterManagerStatusController(

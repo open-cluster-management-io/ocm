@@ -226,6 +226,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	}
 
 	if n.enableSyncLabels {
+		fmt.Printf("get cluster manager labels: %v", helpers.GetClusterManagerLabels(clusterManager))
 		config.Labels = helpers.GetClusterManagerLabels(clusterManager)
 	}
 

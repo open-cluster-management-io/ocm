@@ -837,7 +837,7 @@ func GetClusterManagerLabels(cm *operatorapiv1.ClusterManager) map[string]string
 	if labels == nil {
 		labels = map[string]string{}
 	}
-	labels[ClusterManagerLabelKey] = cm.GetName()
+
 	return labels
 }
 

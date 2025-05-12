@@ -5,6 +5,11 @@ metadata:
   namespace: {{ .ClusterManagerNamespace }}
   labels:
     app: {{ .ClusterManagerName }}-work-controller
+    {{ if gt (len .Labels) 0 }}
+    {{ range $key, $value := .Labels }}
+    "{{ $key }}": "{{ $value }}"
+    {{ end }}
+    {{ end }}
 spec:
   replicas:  {{ .Replica }}
   selector:
