@@ -62,6 +62,7 @@ type managedClusterController struct {
 	patcher            patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
 	hubDriver          register.HubDriver
 	eventRecorder      events.Recorder
+	labels			   string
 }
 
 // NewManagedClusterController creates a new managed cluster controller
@@ -75,7 +76,7 @@ func NewManagedClusterController(
 	clusterRoleBindingInformer rbacv1informers.ClusterRoleBindingInformer,
 	manifestWorkInformer workinformers.ManifestWorkInformer,
 	hubDriver register.HubDriver,
-	recorder events.Recorder) factory.Controller {
+	recorder events.Recorder, labels string) factory.Controller {
 
 	c := &managedClusterController{
 		kubeClient:         kubeClient,
@@ -95,6 +96,7 @@ func NewManagedClusterController(
 			*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus](
 			clusterClient.ClusterV1().ManagedClusters()),
 		eventRecorder: recorder.WithComponentSuffix("managed-cluster-controller"),
+		labels:    labels,
 	}
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterInformer.Informer()).
@@ -158,7 +160,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		// Apply(Update) the cluster specific rbac resources for this spoke cluster with hubAcceptsClient=false.
 		var errs []error
 		applyResults := c.applier.Apply(ctx, syncCtx.Recorder(),
-			helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, managedClusterName, managedCluster.Spec.HubAcceptsClient),
+			helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, managedClusterName, managedCluster.Spec.HubAcceptsClient, c.labels),
 			manifests.ClusterSpecificRBACFiles...)
 		for _, result := range applyResults {
 			if result.Error != nil {
@@ -217,7 +219,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	}
 
 	resourceResults := c.applier.Apply(ctx, syncCtx.Recorder(),
-		helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, managedClusterName, managedCluster.Spec.HubAcceptsClient),
+		helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, managedClusterName, managedCluster.Spec.HubAcceptsClient, c.labels),
 		append(manifests.ClusterSpecificRBACFiles, manifests.ClusterSpecificRoleBindings...)...)
 	for _, result := range resourceResults {
 		if result.Error != nil {
@@ -280,7 +282,7 @@ func (c *managedClusterController) acceptCluster(ctx context.Context, managedClu
 // the finalizer on work roleBinding will be removed after there is no works in the ns.
 func (c *managedClusterController) removeClusterRbac(ctx context.Context, clusterName string, accepted bool) error {
 	var errs []error
-	assetFn := helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, clusterName, accepted)
+	assetFn := helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, clusterName, accepted, c.labels)
 	files := manifests.ClusterSpecificRoleBindings
 	if accepted {
 		files = append(files, manifests.ClusterSpecificRBACFiles...)

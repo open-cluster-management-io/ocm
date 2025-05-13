@@ -3,6 +3,7 @@ package helpers
 import (
 	"embed"
 	"net/url"
+	"strings"
 
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -76,14 +77,16 @@ func ManagedClusterAssetFn(fs embed.FS, managedClusterName string) resourceapply
 	}
 }
 
-func ManagedClusterAssetFnWithAccepted(fs embed.FS, managedClusterName string, accepted bool) resourceapply.AssetFunc {
+func ManagedClusterAssetFnWithAccepted(fs embed.FS, managedClusterName string, accepted bool, labels string) resourceapply.AssetFunc {
 	return func(name string) ([]byte, error) {
 		config := struct {
 			ManagedClusterName string
 			Accepted           bool
+			Labels             map[string]string
 		}{
 			ManagedClusterName: managedClusterName,
 			Accepted:           accepted,
+			Labels:             parseLabels(labels),
 		}
 
 		template, err := fs.ReadFile(name)
@@ -175,4 +178,22 @@ func IsCSRSupported(nativeClient kubernetes.Interface) (bool, bool, error) {
 		}
 	}
 	return v1CSRSupported, v1beta1CSRSupported, nil
+}
+
+
+func parseLabels(labels string) map[string]string {
+    parsedLabels := make(map[string]string)
+    if labels == "" {
+        return parsedLabels
+    }
+    // Split the labels by comma
+    labelsList := strings.Split(labels, ",")
+    // Iterate over each label and split by '='
+    for _, label := range labelsList {  
+        parts := strings.SplitN(label, "=", 2)
+        if len(parts) == 2 {
+            parsedLabels[parts[0]] = parts[1]
+        } 
+    }
+    return parsedLabels
 }

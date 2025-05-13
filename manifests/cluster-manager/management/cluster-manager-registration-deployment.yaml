@@ -84,6 +84,9 @@ spec:
           {{if .AwsResourceTags}}
           - "--aws-resource-tags={{ .AwsResourceTags }}"
           {{end}}
+          {{ if gt (len .Labels) 0 }}
+          - "--labels={{ .Labels }}"
+          {{ end }}
         env:
           - name: POD_NAME
             valueFrom:
