@@ -17,6 +17,7 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/common/apply"
 	"open-cluster-management.io/ocm/pkg/common/queue"
+	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/manifests"
 )
 
@@ -32,6 +33,7 @@ type clusterroleController struct {
 	applier       *apply.PermissionApplier
 	cache         resourceapply.ResourceCache
 	eventRecorder events.Recorder
+	labels        string
 }
 
 // NewManagedClusterClusterroleController creates a clusterrole controller on hub cluster.
@@ -39,7 +41,8 @@ func NewManagedClusterClusterroleController(
 	kubeClient kubernetes.Interface,
 	clusterInformer clusterv1informer.ManagedClusterInformer,
 	clusterRoleInformer rbacv1informers.ClusterRoleInformer,
-	recorder events.Recorder) factory.Controller {
+	recorder events.Recorder,
+	labels string) factory.Controller {
 	c := &clusterroleController{
 		kubeClient:    kubeClient,
 		clusterLister: clusterInformer.Lister(),
@@ -52,6 +55,7 @@ func NewManagedClusterClusterroleController(
 			nil,
 		),
 		eventRecorder: recorder.WithComponentSuffix("managed-cluster-clusterrole-controller"),
+		labels:        labels,
 	}
 	return factory.New().
 		WithFilteredEventsInformers(
@@ -90,7 +94,7 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 	results := c.applier.Apply(
 		ctx,
 		syncCtx.Recorder(),
-		manifests.RBACManifests.ReadFile,
+		helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, "", false, c.labels),
 		manifests.CommonClusterRoleFiles...,
 	)
 

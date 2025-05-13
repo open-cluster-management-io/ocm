@@ -263,7 +263,8 @@ func TestSyncManagedCluster(t *testing.T) {
 				),
 				patcher.NewPatcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus](clusterClient.ClusterV1().ManagedClusters()),
 				register.NewNoopHubDriver(),
-				eventstesting.NewTestingEventRecorder(t)}
+				eventstesting.NewTestingEventRecorder(t),
+				""}
 			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
 			if syncErr != nil && !errors.Is(syncErr, requeueError) {
 				t.Errorf("unexpected err: %v", syncErr)

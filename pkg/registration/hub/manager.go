@@ -2,7 +2,6 @@ package hub
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -95,7 +94,6 @@ func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 		"Labels to be added to the resources created by registration controller. The format is key1=value1,key2=value2.")
 	m.ImportOption.AddFlags(fs)
 }
-
 
 // RunControllerManager starts the controllers on hub to manage spoke cluster registration.
 func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
@@ -259,6 +257,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		kubeInformers.Rbac().V1().ClusterRoles(),
 		controllerContext.EventRecorder,
+		m.Labels,
 	)
 
 	addOnHealthCheckController := addon.NewManagedClusterAddOnHealthCheckController(
