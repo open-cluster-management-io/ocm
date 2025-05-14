@@ -33,6 +33,15 @@
             "enabled": false,
             "groupName": "go dependencies",
             "groupSlug": "go-deps"
+        },
+        {
+            "matchManagers": [
+                "gomod"
+            ],
+            "matchDepTypes": [
+                "indirect"
+            ],
+            "enabled": false
         }
     ],
     "rebaseWhen": "behind-base-branch",
