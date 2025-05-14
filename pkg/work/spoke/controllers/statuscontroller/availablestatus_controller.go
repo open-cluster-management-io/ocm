@@ -12,9 +12,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 
@@ -41,6 +41,7 @@ type AvailableStatusController struct {
 	manifestWorkLister worklister.ManifestWorkNamespaceLister
 	spokeDynamicClient dynamic.Interface
 	statusReader       *statusfeedback.StatusReader
+	syncInterval       time.Duration
 }
 
 // NewAvailableStatusController returns a AvailableStatusController
@@ -59,45 +60,34 @@ func NewAvailableStatusController(
 			manifestWorkClient),
 		manifestWorkLister: manifestWorkLister,
 		spokeDynamicClient: spokeDynamicClient,
+		syncInterval:       syncInterval,
 		statusReader:       statusfeedback.NewStatusReader().WithMaxJsonRawLength(maxJSONRawLength),
 	}
 
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, manifestWorkInformer.Informer()).
-		WithSync(controller.sync).ResyncEvery(syncInterval).ToController("AvailableStatusController", recorder)
+		WithSync(controller.sync).ToController("AvailableStatusController", recorder)
 }
 
 func (c *AvailableStatusController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	manifestWorkName := controllerContext.QueueKey()
-	if manifestWorkName != factory.DefaultQueueKey {
-		// sync a particular manifestwork
-		manifestWork, err := c.manifestWorkLister.Get(manifestWorkName)
-		if errors.IsNotFound(err) {
-			// work not found, could have been deleted, do nothing.
-			return nil
-		}
-		if err != nil {
-			return fmt.Errorf("unable to fetch manifestwork %q: %w", manifestWorkName, err)
-		}
-
-		err = c.syncManifestWork(ctx, manifestWork)
-		if err != nil {
-			return fmt.Errorf("unable to sync manifestwork %q: %w", manifestWork.Name, err)
-		}
+	// sync a particular manifestwork
+	manifestWork, err := c.manifestWorkLister.Get(manifestWorkName)
+	if errors.IsNotFound(err) {
+		// work not found, could have been deleted, do nothing.
 		return nil
 	}
-
-	// resync all manifestworks
-	klog.V(5).Infof("Resync all ManifestWorks by adding them to the queue")
-	manifestWorks, err := c.manifestWorkLister.List(labels.Everything())
 	if err != nil {
-		return fmt.Errorf("unable to list manifestworks: %w", err)
+		return fmt.Errorf("unable to fetch manifestwork %q: %w", manifestWorkName, err)
 	}
 
-	for _, manifestWork := range manifestWorks {
-		controllerContext.Queue().Add(manifestWork.Name)
+	err = c.syncManifestWork(ctx, manifestWork)
+	if err != nil {
+		return fmt.Errorf("unable to sync manifestwork %q: %w", manifestWork.Name, err)
 	}
 
+	// requeue with a certain jitter
+	controllerContext.Queue().AddAfter(manifestWorkName, wait.Jitter(c.syncInterval, 0.9))
 	return nil
 }
 
