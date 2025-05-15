@@ -242,7 +242,7 @@ func TestConditionReader(t *testing.T) {
 			},
 		},
 		{
-			name:   "custom function hasConditions",
+			name:   "cel lib function hasConditions",
 			object: unstrctureObject(deploymentJson),
 			rule: workapiv1.ConditionRule{
 				Type:      workapiv1.CelConditionExpressionsType,
