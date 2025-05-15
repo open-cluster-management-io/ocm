@@ -39,9 +39,10 @@ func (ManifestWorkReplicaSetList) SwaggerDoc() map[string]string {
 }
 
 var map_ManifestWorkReplicaSetSpec = map[string]string{
-	"":                     "ManifestWorkReplicaSetSpec defines the desired state of ManifestWorkReplicaSet",
-	"manifestWorkTemplate": "ManifestWorkTemplate is the ManifestWorkSpec that will be used to generate a per-cluster ManifestWork",
-	"placementRefs":        "PacementRefs is a list of the names of the Placement resource, from which a PlacementDecision will be found and used to distribute the ManifestWork.",
+	"":                      "ManifestWorkReplicaSetSpec defines the desired state of ManifestWorkReplicaSet",
+	"manifestWorkTemplate":  "ManifestWorkTemplate is the ManifestWorkSpec that will be used to generate a per-cluster ManifestWork",
+	"placementRefs":         "PacementRefs is a list of the names of the Placement resource, from which a PlacementDecision will be found and used to distribute the ManifestWork.",
+	"cascadeDeletionPolicy": "CascadeDeletionPolicy decides the manifestWorkReplicaSet is deleted before/after the related manifestWorks are gone. Acceptable values are: 'Background'- the manifestWorkReplicaSet is deleted without waiting for the related manifestWorks to be gone. 'Foreground'- the manifestWorkReplicaSet is deleted until the related manifestWorks are gone.",
 }
 
 func (ManifestWorkReplicaSetSpec) SwaggerDoc() map[string]string {
