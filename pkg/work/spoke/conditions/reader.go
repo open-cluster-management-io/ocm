@@ -7,14 +7,12 @@ import (
 	"strings"
 
 	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/cel/common"
+	"open-cluster-management.io/sdk-go/pkg/cel/library"
 
 	"open-cluster-management.io/ocm/pkg/work/spoke/conditions/rules"
 )
@@ -181,35 +179,8 @@ func (s *ConditionReader) celEnv(opts ...cel.EnvOption) (*cel.Env, error) {
 		opts,
 		common.BaseEnvOpts,
 		[]cel.EnvOption{
-			cel.Function("hasConditions", cel.Overload(
-				"status_has_conditions",
-				[]*cel.Type{cel.DynType},
-				cel.BoolType,
-				cel.FunctionBinding(hasConditions),
-			)),
+			library.ConditionsLib(),
 		},
 	)
 	return cel.NewEnv(opts...)
-}
-
-func hasConditions(values ...ref.Val) ref.Val {
-	if len(values) == 0 {
-		return types.Bool(false)
-	}
-
-	status, ok := values[0].(traits.Mapper)
-	if !ok {
-		return types.Bool(false)
-	}
-
-	conditions, ok := status.Find(types.String("conditions"))
-	if !ok {
-		return types.Bool(false)
-	}
-
-	if lister, ok := conditions.(traits.Lister); !ok || lister.Size() == types.Int(0) {
-		return types.Bool(false)
-	}
-
-	return types.Bool(true)
 }
