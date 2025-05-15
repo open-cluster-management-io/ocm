@@ -241,3 +241,15 @@ func EnsureResourceFinalizer(finalizers []string) []string {
 
 	return finalizers
 }
+
+func IsStatusPatch(subresources []string) bool {
+	if len(subresources) == 0 {
+		return false
+	}
+
+	if len(subresources) == 1 && subresources[0] == "status" {
+		return true
+	}
+
+	return false
+}
