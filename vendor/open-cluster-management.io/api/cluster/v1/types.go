@@ -59,7 +59,7 @@ type ManagedClusterSpec struct {
 	// the namespace to grant the permision of access from the agent on the managed cluster.
 	// When the value is set to false, the namespace representing the managed cluster is
 	// deleted.
-	// +required
+	// +optional
 	HubAcceptsClient bool `json:"hubAcceptsClient"`
 
 	// LeaseDurationSeconds is used to coordinate the lease update time of Klusterlet agents on the managed cluster.

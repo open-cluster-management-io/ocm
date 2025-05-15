@@ -1714,7 +1714,7 @@ open-cluster-management.io/addon-framework/pkg/agent
 open-cluster-management.io/addon-framework/pkg/assets
 open-cluster-management.io/addon-framework/pkg/index
 open-cluster-management.io/addon-framework/pkg/utils
-# open-cluster-management.io/api v0.16.2-0.20250425084048-6c5efe2ab15d => github.com/bhperry/ocm-api v0.0.0-20250423211541-970c24864638
+# open-cluster-management.io/api v0.16.2-0.20250506092504-9143e192a0a7 => github.com/bhperry/ocm-api v0.0.0-20250515164935-456e1399e27a
 ## explicit; go 1.23.6
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/client/addon/clientset/versioned
@@ -1930,4 +1930,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
 sigs.k8s.io/yaml/goyaml.v3
-# open-cluster-management.io/api => github.com/bhperry/ocm-api v0.0.0-20250423211541-970c24864638
+# open-cluster-management.io/api => github.com/bhperry/ocm-api v0.0.0-20250515164935-456e1399e27a
