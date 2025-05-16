@@ -151,6 +151,19 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		}
 
 		gomega.Eventually(func() error {
+			manifestWorks, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).List(
+				context.TODO(), metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", addonapiv1alpha1.AddonLabelKey, addOnName)})
+			if err != nil {
+				return err
+			}
+			if len(manifestWorks.Items) == 0 {
+				return nil
+			}
+
+			return fmt.Errorf("the addon manifestWork %#v should be deleted", manifestWorks.Items)
+		}).ShouldNot(gomega.HaveOccurred())
+
+		gomega.Eventually(func() error {
 			_, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
@@ -160,7 +173,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 				return err
 			}
 
-			return fmt.Errorf("the managedClusterAddon should be deleted")
+			return fmt.Errorf("the managedClusterAddon %s should be deleted", addOnName)
 		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By(fmt.Sprintf("delete addon template resources for cluster %v", universalClusterName))
@@ -308,6 +321,19 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			}
 
 			return fmt.Errorf("the configmap should be deleted")
+		}).ShouldNot(gomega.HaveOccurred())
+
+		gomega.Eventually(func() error {
+			manifestWorks, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).List(
+				context.TODO(), metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", addonapiv1alpha1.AddonLabelKey, addOnName)})
+			if err != nil {
+				return err
+			}
+			if len(manifestWorks.Items) == 0 {
+				return nil
+			}
+
+			return fmt.Errorf("the addon manifestWork %#v should be deleted", manifestWorks.Items)
 		}).ShouldNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
