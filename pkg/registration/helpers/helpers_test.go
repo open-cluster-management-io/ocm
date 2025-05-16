@@ -287,7 +287,7 @@ func TestParseLabels(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			actual := parseLabels(c.input)
+			actual := ParseLabels(c.input)
 			if !reflect.DeepEqual(actual, c.expected) {
 				t.Errorf("expected %v, got %v", c.expected, actual)
 			}

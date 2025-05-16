@@ -37,8 +37,12 @@ import (
 )
 
 const (
-	eventuallyTimeout  = 30 // seconds
-	eventuallyInterval = 1  // seconds
+	eventuallyTimeout     = 30 // seconds
+	eventuallyInterval    = 1  // seconds
+	testCustomLabel       = "custom-label"
+	testCustomLabelValue  = "custom-value"
+	testCustomLabel2      = "custom-label2"
+	testCustomLabelValue2 = "custom-value2"
 )
 
 var spokeCfg *rest.Config
@@ -215,6 +219,11 @@ var _ = ginkgo.BeforeSuite(func() {
 		go func() {
 			defer ginkgo.GinkgoRecover()
 			m.ImportOption.APIServerURL = cfg.Host
+			m.EnabledRegistrationDrivers = []string{helpers.CSRAuthType, helpers.AwsIrsaAuthType}
+			m.HubClusterArn = "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
+			m.ClusterAutoApprovalUsers = []string{util.AutoApprovalBootstrapUser}
+			m.AutoApprovedARNPatterns = []string{"arn:aws:eks:us-west-2:123456789012:cluster/.*"}
+			m.Labels = fmt.Sprintf("%s=%s,%s=%s", testCustomLabel, testCustomLabelValue, testCustomLabel2, testCustomLabelValue2)
 			err := m.RunControllerManager(ctx, &controllercmd.ControllerContext{
 				KubeConfig:    cfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("hub"),

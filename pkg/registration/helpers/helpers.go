@@ -86,7 +86,7 @@ func ManagedClusterAssetFnWithAccepted(fs embed.FS, managedClusterName string, a
 		}{
 			ManagedClusterName: managedClusterName,
 			Accepted:           accepted,
-			Labels:             parseLabels(labels),
+			Labels:             ParseLabels(labels),
 		}
 
 		template, err := fs.ReadFile(name)
@@ -180,20 +180,19 @@ func IsCSRSupported(nativeClient kubernetes.Interface) (bool, bool, error) {
 	return v1CSRSupported, v1beta1CSRSupported, nil
 }
 
-
-func parseLabels(labels string) map[string]string {
-    parsedLabels := make(map[string]string)
-    if labels == "" {
-        return parsedLabels
-    }
-    // Split the labels by comma
-    labelsList := strings.Split(labels, ",")
-    // Iterate over each label and split by '='
-    for _, label := range labelsList {  
-        parts := strings.SplitN(label, "=", 2)
-        if len(parts) == 2 {
-            parsedLabels[parts[0]] = parts[1]
-        } 
-    }
-    return parsedLabels
+func ParseLabels(labels string) map[string]string {
+	parsedLabels := make(map[string]string)
+	if labels == "" {
+		return parsedLabels
+	}
+	// Split the labels by comma
+	labelsList := strings.Split(labels, ",")
+	// Iterate over each label and split by '='
+	for _, label := range labelsList {
+		parts := strings.SplitN(label, "=", 2)
+		if len(parts) == 2 {
+			parsedLabels[parts[0]] = parts[1]
+		}
+	}
+	return parsedLabels
 }

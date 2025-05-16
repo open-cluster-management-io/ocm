@@ -20,7 +20,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	rbacv1listers "k8s.io/client-go/listers/rbac/v1"
 	"k8s.io/klog/v2"
-
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	informerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	listerv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
@@ -29,13 +28,13 @@ import (
 	v1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 	workv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/apply"
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/features"
-	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/manifests"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
@@ -197,10 +196,17 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: managedClusterName,
-			Labels: map[string]string{
-				v1.ClusterNameLabelKey: managedClusterName,
-			},
-		},
+			Labels: func() map[string]string {
+				labels := map[string]string{
+					v1.ClusterNameLabelKey: managedClusterName,
+				}
+				if c.labels != "" {
+					for k, v := range helpers.ParseLabels(c.labels) {
+						labels[k] = v
+					}
+				}
+				return labels
+			}()},
 	}
 
 	// Hub cluster-admin accepts the spoke cluster, we apply
@@ -208,7 +214,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	// 2. cluster specific rbac resources for this spoke cluster.(hubAcceptsClient=true)
 	// 3. cluster specific rolebinding(registration-agent and work-agent) for this spoke cluster.
 	var errs []error
-	_, _, err = resourceapply.ApplyNamespace(ctx, c.kubeClient.CoreV1(), syncCtx.Recorder(), namespace) //TODO: Pass labels here as well
+	_, _, err = resourceapply.ApplyNamespace(ctx, c.kubeClient.CoreV1(), syncCtx.Recorder(), namespace)
 	if err != nil {
 		errs = append(errs, err)
 	}

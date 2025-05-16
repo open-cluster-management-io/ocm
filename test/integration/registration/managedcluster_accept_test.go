@@ -45,24 +45,45 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Label
 			if len(clusterRole.Rules) != 4 {
 				return fmt.Errorf("expected 4 rules, got %d rules", len(clusterRole.Rules))
 			}
+			if clusterRole.Labels[testCustomLabel] != testCustomLabelValue || clusterRole.Labels[testCustomLabel2] != testCustomLabelValue {
+				return fmt.Errorf("clusterRole %s does not have expected labels", mclClusterRoleName(managedCluster.Name))
+			}
 
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 		Eventually(func() error {
-			_, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), mclClusterRoleBindingName(managedCluster.Name), metav1.GetOptions{})
-			return err
+			clusterRoleBinding, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), mclClusterRoleBindingName(managedCluster.Name), metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if clusterRoleBinding.Labels[testCustomLabel] != testCustomLabelValue || clusterRoleBinding.Labels[testCustomLabel2] != testCustomLabelValue {
+				return fmt.Errorf("clusterRoleBinding %s does not have expected labels", mclClusterRoleBindingName(managedCluster.Name))
+			}
+			return nil
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 		Eventually(func() error {
-			_, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).
+			registrationRoleBinding, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).
 				Get(context.Background(), registrationRoleBindingName(managedCluster.Name), metav1.GetOptions{})
-			return err
+			if err != nil {
+				return err
+			}
+			if registrationRoleBinding.Labels[testCustomLabel] != testCustomLabelValue || registrationRoleBinding.Labels[testCustomLabel2] != testCustomLabelValue {
+				return fmt.Errorf("roleBinding %s does not have expected labels", registrationRoleBindingName(managedCluster.Name))
+			}
+			return nil
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 		Eventually(func() error {
-			_, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).Get(context.Background(), workRoleBindingName(managedCluster.Name), metav1.GetOptions{})
-			return err
+			workRoleBinding, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).Get(context.Background(), workRoleBindingName(managedCluster.Name), metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if workRoleBinding.Labels[testCustomLabel] != testCustomLabelValue || workRoleBinding.Labels[testCustomLabel2] != testCustomLabelValue {
+				return fmt.Errorf("workRoleBinding %s does not have expected labels", workRoleBindingName(managedCluster.Name))
+			}
+			return nil
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 	})
 
