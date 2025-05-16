@@ -34,7 +34,18 @@ func (f *finalizeReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alp
 		*workapiv1alpha1.ManifestWorkReplicaSet, workapiv1alpha1.ManifestWorkReplicaSetSpec, workapiv1alpha1.ManifestWorkReplicaSetStatus](
 		f.workClient.WorkV1alpha1().ManifestWorkReplicaSets(mwrSet.Namespace))
 
-	// Remove finalizer after delete all created Manifestworks
+	// remove finalizer until all works are gone if deletionPolicy is Foreground
+	// otherwise remove finalizer after delete all works
+	if mwrSet.Spec.CascadeDeletionPolicy == workapiv1alpha1.Foreground {
+		manifestWorks, err := listManifestWorksByManifestWorkReplicaSet(mwrSet, f.manifestWorkLister)
+		if err != nil {
+			return mwrSet, reconcileContinue, err
+		}
+
+		if len(manifestWorks) != 0 {
+			return mwrSet, reconcileContinue, nil
+		}
+	}
 	if err := workSetPatcher.RemoveFinalizer(ctx, mwrSet, ManifestWorkReplicaSetFinalizer); err != nil {
 		return mwrSet, reconcileContinue, err
 	}
