@@ -73,13 +73,15 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 	}
 
 	var errs []error
+	assetFn := helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, "", false, c.labels)
+
 	// Clean up managedcluser cluserroles if there are no managed clusters
 	if len(managedClusters) == 0 {
 		results := resourceapply.DeleteAll(
 			ctx,
 			resourceapply.NewKubeClientHolder(c.kubeClient),
 			c.eventRecorder,
-			manifests.RBACManifests.ReadFile,
+			assetFn,
 			manifests.CommonClusterRoleFiles...,
 		)
 		for _, result := range results {
@@ -94,7 +96,7 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 	results := c.applier.Apply(
 		ctx,
 		syncCtx.Recorder(),
-		helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, "", false, c.labels),
+		assetFn,
 		manifests.CommonClusterRoleFiles...,
 	)
 

@@ -62,7 +62,7 @@ type managedClusterController struct {
 	patcher            patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
 	hubDriver          register.HubDriver
 	eventRecorder      events.Recorder
-	labels			   string
+	labels             string
 }
 
 // NewManagedClusterController creates a new managed cluster controller
@@ -96,7 +96,7 @@ func NewManagedClusterController(
 			*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus](
 			clusterClient.ClusterV1().ManagedClusters()),
 		eventRecorder: recorder.WithComponentSuffix("managed-cluster-controller"),
-		labels:    labels,
+		labels:        labels,
 	}
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterInformer.Informer()).
@@ -208,7 +208,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	// 2. cluster specific rbac resources for this spoke cluster.(hubAcceptsClient=true)
 	// 3. cluster specific rolebinding(registration-agent and work-agent) for this spoke cluster.
 	var errs []error
-	_, _, err = resourceapply.ApplyNamespace(ctx, c.kubeClient.CoreV1(), syncCtx.Recorder(), namespace)
+	_, _, err = resourceapply.ApplyNamespace(ctx, c.kubeClient.CoreV1(), syncCtx.Recorder(), namespace) //TODO: Pass labels here as well
 	if err != nil {
 		errs = append(errs, err)
 	}
