@@ -191,6 +191,51 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
+	By("clean the resources in the cluster ns before delete the cluster after the test case")
+	err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).
+		DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+	Expect(err).ToNot(HaveOccurred())
+
+	err = hub.WorkClient.WorkV1().ManifestWorks(universalAgentNamespace).
+		DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+	Expect(err).ToNot(HaveOccurred())
+
+	Eventually(func() error {
+		addons, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).
+			List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		for _, addon := range addons.Items {
+			addon.SetFinalizers(nil)
+			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).
+				Update(context.TODO(), &addon, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
+		}
+
+		works, err := hub.WorkClient.WorkV1().ManifestWorks(universalAgentNamespace).
+			List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return nil
+		}
+		for _, work := range works.Items {
+			work.SetFinalizers(nil)
+			_, err = hub.WorkClient.WorkV1().ManifestWorks(universalAgentNamespace).
+				Update(context.TODO(), &work, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}).Should(Succeed())
+
 	By(fmt.Sprintf("clean klusterlet %v resources after the test case", universalKlusterletName))
 	framework.CleanKlusterletRelatedResources(hub, spoke, universalKlusterletName, universalClusterName)
+
+	By("clean the resources on the hub cluster after the test case")
+	err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().
+		Delete(context.TODO(), universalClusterSetName, metav1.DeleteOptions{})
+	Expect(err).ToNot(HaveOccurred())
 })
