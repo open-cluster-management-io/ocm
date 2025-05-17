@@ -28,24 +28,19 @@ import (
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
-var (
-	managedStaticResourceFiles = []string{
-		"klusterlet/managed/klusterlet-registration-serviceaccount.yaml",
-		"klusterlet/managed/klusterlet-registration-clusterrole.yaml",
-		"klusterlet/managed/klusterlet-registration-clusterrole-addon-management.yaml",
-		"klusterlet/managed/klusterlet-registration-clusterrolebinding.yaml",
-		"klusterlet/managed/klusterlet-registration-clusterrolebinding-addon-management.yaml",
-		"klusterlet/managed/klusterlet-work-serviceaccount.yaml",
-		"klusterlet/managed/klusterlet-work-clusterrole.yaml",
-		"klusterlet/managed/klusterlet-work-clusterrole-execution.yaml",
-		"klusterlet/managed/klusterlet-work-clusterrolebinding.yaml",
-		"klusterlet/managed/klusterlet-work-clusterrolebinding-aggregate.yaml",
-		"klusterlet/managed/klusterlet-work-clusterrolebinding-execution-admin.yaml",
-	}
-
-	cleanedManagedStaticResourceFiles = append(managedStaticResourceFiles,
-		"klusterlet/managed/klusterlet-work-clusterrolebinding-execution.yaml")
-)
+var managedStaticResourceFiles = []string{
+	"klusterlet/managed/klusterlet-registration-serviceaccount.yaml",
+	"klusterlet/managed/klusterlet-registration-clusterrole.yaml",
+	"klusterlet/managed/klusterlet-registration-clusterrole-addon-management.yaml",
+	"klusterlet/managed/klusterlet-registration-clusterrolebinding.yaml",
+	"klusterlet/managed/klusterlet-registration-clusterrolebinding-addon-management.yaml",
+	"klusterlet/managed/klusterlet-work-serviceaccount.yaml",
+	"klusterlet/managed/klusterlet-work-clusterrole.yaml",
+	"klusterlet/managed/klusterlet-work-clusterrole-execution.yaml",
+	"klusterlet/managed/klusterlet-work-clusterrolebinding.yaml",
+	"klusterlet/managed/klusterlet-work-clusterrolebinding-aggregate.yaml",
+	"klusterlet/managed/klusterlet-work-clusterrolebinding-execution-admin.yaml",
+}
 
 // managedReconcile apply resources to managed clusters
 type managedReconcile struct {
@@ -180,7 +175,7 @@ func (r *managedReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.
 	}
 
 	if err := removeStaticResources(ctx, r.managedClusterClients.kubeClient, r.managedClusterClients.apiExtensionClient,
-		cleanedManagedStaticResourceFiles, config); err != nil {
+		managedStaticResourceFiles, config); err != nil {
 		return klusterlet, reconcileStop, err
 	}
 
