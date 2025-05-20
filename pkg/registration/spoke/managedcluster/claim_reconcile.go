@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog/v2"
 
 	clusterv1alpha1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
@@ -64,8 +63,11 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 		return fmt.Errorf("unable to get klusterlet: %w", err)
 	}
 
-	reservedClusterClaimSuffixes := klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration.DeepCopy().ReservedClusterClaimSuffixes
-	klog.Infof("The reserved suffixes ARE: %s\n", reservedClusterClaimSuffixes[0])
+	var reservedClusterClaimSuffixes []string
+	if klusterlet.Spec.RegistrationConfiguration != nil && klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration != nil {
+		reservedClusterClaimSuffixes = klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration.DeepCopy().ReservedClusterClaimSuffixes
+	}
+
 	reservedSuffixes := append(reservedClusterClaimSuffixes, clusterv1alpha1.ReservedClusterClaimNames[:]...)
 	reservedClaimNames := sets.NewString(reservedSuffixes...)
 	for _, clusterClaim := range clusterClaims {
@@ -93,13 +95,12 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 	if n := len(customClaims); n > r.maxCustomClusterClaims {
 		customClaims = customClaims[:r.maxCustomClusterClaims]
 		r.recorder.Eventf("CustomClusterClaimsTruncated",
-			"%d BOOM cluster claims are found. It exceeds the max number of custom cluster claims (%d). %d custom cluster claims are not exposed.",
+			"%d cluster claims are found. It exceeds the max number of custom cluster claims (%d). %d custom cluster claims are not exposed.",
 			n, r.maxCustomClusterClaims, n-r.maxCustomClusterClaims)
 	}
 
 	// merge reserved claims and custom claims
 	claims := append(reservedClaims, customClaims...) // nolint:gocritic
-	klog.Info(reservedClaimNames)
 	cluster.Status.ClusterClaims = claims
 	return nil
 }

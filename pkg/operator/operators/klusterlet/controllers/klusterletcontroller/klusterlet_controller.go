@@ -370,6 +370,12 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 				AuthType: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType,
 			}
 		}
+
+		//include clusterClaimConfig info if it exists
+		if klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration != nil {
+			config.MaxCustomClusterClaims = int(klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration.MaxCustomClusterClaims)
+		}
+
 		// construct cluster annotations string, the final format is "key1=value1,key2=value2"
 		var annotationsArray []string
 		for k, v := range commonhelpers.FilterClusterAnnotations(klusterlet.Spec.RegistrationConfiguration.ClusterAnnotations) {
@@ -385,10 +391,6 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		workFeatureGates = klusterlet.Spec.WorkConfiguration.FeatureGates
 		config.WorkKubeAPIQPS = float32(klusterlet.Spec.WorkConfiguration.KubeAPIQPS)
 		config.WorkKubeAPIBurst = klusterlet.Spec.WorkConfiguration.KubeAPIBurst
-	}
-
-	if klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration != nil {
-		config.MaxCustomClusterClaims = int(klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration.MaxCustomClusterClaims)
 	}
 
 	config.WorkFeatureGates, workFeatureMsgs = helpers.ConvertToFeatureGateFlags("Work", workFeatureGates, ocmfeature.DefaultSpokeWorkFeatureGates)
