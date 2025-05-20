@@ -112,7 +112,19 @@ type DecisionGroup struct {
 	// LabelSelector to select clusters subset by label.
 	// +kubebuilder:validation:Required
 	// +required
-	ClusterSelector ClusterSelector `json:"groupClusterSelector,omitempty"`
+	ClusterSelector GroupClusterSelector `json:"groupClusterSelector,omitempty"`
+}
+
+// GroupClusterSelector represents the AND of the containing selectors for groupClusterSelector. An empty group cluster selector matches all objects.
+// A null group cluster selector matches no objects.
+type GroupClusterSelector struct {
+	// LabelSelector represents a selector of ManagedClusters by label
+	// +optional
+	LabelSelector metav1.LabelSelector `json:"labelSelector,omitempty"`
+
+	// ClaimSelector represents a selector of ManagedClusters by clusterClaims in status
+	// +optional
+	ClaimSelector ClusterClaimSelector `json:"claimSelector,omitempty"`
 }
 
 // Group the created placementDecision into decision groups based on the number of clusters per decision group.
@@ -173,6 +185,16 @@ type ClusterSelector struct {
 	// ClaimSelector represents a selector of ManagedClusters by clusterClaims in status
 	// +optional
 	ClaimSelector ClusterClaimSelector `json:"claimSelector,omitempty"`
+
+	// CelSelector represents a selector of ManagedClusters by CEL expressions on ManagedCluster fields
+	// +optional
+	CelSelector ClusterCelSelector `json:"celSelector,omitempty"`
+}
+
+// ClusterCelSelector is a list of CEL expressions. The expressions are ANDed.
+type ClusterCelSelector struct {
+	// +optional
+	CelExpressions []string `json:"celExpressions,omitempty"`
 }
 
 // ClusterClaimSelector is a claim query over a set of ManagedClusters. An empty cluster claim

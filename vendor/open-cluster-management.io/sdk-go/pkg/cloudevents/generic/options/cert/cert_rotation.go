@@ -37,14 +37,14 @@ type clientCertRotating struct {
 	conn   Connection
 
 	// queue only ever has one item, but it has nice error handling backoff/retry semantics
-	queue workqueue.RateLimitingInterface
+	queue workqueue.RateLimitingInterface // nolint:staticcheck // SA1019
 }
 
 func StartClientCertRotating(reload reloadFunc, conn Connection) {
 	r := &clientCertRotating{
 		reload: reload,
 		conn:   conn,
-		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ClientCertRotator"),
+		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ClientCertRotator"), // nolint:staticcheck // SA1019
 	}
 
 	go r.run(context.Background())

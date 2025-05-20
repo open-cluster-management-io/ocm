@@ -215,7 +215,8 @@ func (config *klusterletConfig) populateBootstrap(klusterlet *operatorapiv1.Klus
 
 	if config.MultipleHubs {
 		var bootstapKubeconfigSecrets []string
-		if klusterlet.Spec.RegistrationConfiguration.BootstrapKubeConfigs.Type == operatorapiv1.LocalSecrets {
+		if klusterlet.Spec.RegistrationConfiguration.BootstrapKubeConfigs.Type == operatorapiv1.LocalSecrets &&
+			klusterlet.Spec.RegistrationConfiguration.BootstrapKubeConfigs.LocalSecrets != nil {
 			for _, secret := range klusterlet.Spec.RegistrationConfiguration.BootstrapKubeConfigs.LocalSecrets.KubeConfigSecrets {
 				bootstapKubeconfigSecrets = append(bootstapKubeconfigSecrets, secret.Name)
 			}

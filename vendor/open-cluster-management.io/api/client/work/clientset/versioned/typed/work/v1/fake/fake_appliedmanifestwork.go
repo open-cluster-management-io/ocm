@@ -3,114 +3,34 @@
 package fake
 
 import (
-	"context"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
+	workv1 "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	v1 "open-cluster-management.io/api/work/v1"
 )
 
-// FakeAppliedManifestWorks implements AppliedManifestWorkInterface
-type FakeAppliedManifestWorks struct {
+// fakeAppliedManifestWorks implements AppliedManifestWorkInterface
+type fakeAppliedManifestWorks struct {
+	*gentype.FakeClientWithList[*v1.AppliedManifestWork, *v1.AppliedManifestWorkList]
 	Fake *FakeWorkV1
 }
 
-var appliedmanifestworksResource = v1.SchemeGroupVersion.WithResource("appliedmanifestworks")
-
-var appliedmanifestworksKind = v1.SchemeGroupVersion.WithKind("AppliedManifestWork")
-
-// Get takes name of the appliedManifestWork, and returns the corresponding appliedManifestWork object, and an error if there is any.
-func (c *FakeAppliedManifestWorks) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.AppliedManifestWork, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(appliedmanifestworksResource, name), &v1.AppliedManifestWork{})
-	if obj == nil {
-		return nil, err
+func newFakeAppliedManifestWorks(fake *FakeWorkV1) workv1.AppliedManifestWorkInterface {
+	return &fakeAppliedManifestWorks{
+		gentype.NewFakeClientWithList[*v1.AppliedManifestWork, *v1.AppliedManifestWorkList](
+			fake.Fake,
+			"",
+			v1.SchemeGroupVersion.WithResource("appliedmanifestworks"),
+			v1.SchemeGroupVersion.WithKind("AppliedManifestWork"),
+			func() *v1.AppliedManifestWork { return &v1.AppliedManifestWork{} },
+			func() *v1.AppliedManifestWorkList { return &v1.AppliedManifestWorkList{} },
+			func(dst, src *v1.AppliedManifestWorkList) { dst.ListMeta = src.ListMeta },
+			func(list *v1.AppliedManifestWorkList) []*v1.AppliedManifestWork {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1.AppliedManifestWorkList, items []*v1.AppliedManifestWork) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1.AppliedManifestWork), err
-}
-
-// List takes label and field selectors, and returns the list of AppliedManifestWorks that match those selectors.
-func (c *FakeAppliedManifestWorks) List(ctx context.Context, opts metav1.ListOptions) (result *v1.AppliedManifestWorkList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(appliedmanifestworksResource, appliedmanifestworksKind, opts), &v1.AppliedManifestWorkList{})
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1.AppliedManifestWorkList{ListMeta: obj.(*v1.AppliedManifestWorkList).ListMeta}
-	for _, item := range obj.(*v1.AppliedManifestWorkList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested appliedManifestWorks.
-func (c *FakeAppliedManifestWorks) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(appliedmanifestworksResource, opts))
-}
-
-// Create takes the representation of a appliedManifestWork and creates it.  Returns the server's representation of the appliedManifestWork, and an error, if there is any.
-func (c *FakeAppliedManifestWorks) Create(ctx context.Context, appliedManifestWork *v1.AppliedManifestWork, opts metav1.CreateOptions) (result *v1.AppliedManifestWork, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(appliedmanifestworksResource, appliedManifestWork), &v1.AppliedManifestWork{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1.AppliedManifestWork), err
-}
-
-// Update takes the representation of a appliedManifestWork and updates it. Returns the server's representation of the appliedManifestWork, and an error, if there is any.
-func (c *FakeAppliedManifestWorks) Update(ctx context.Context, appliedManifestWork *v1.AppliedManifestWork, opts metav1.UpdateOptions) (result *v1.AppliedManifestWork, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(appliedmanifestworksResource, appliedManifestWork), &v1.AppliedManifestWork{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1.AppliedManifestWork), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeAppliedManifestWorks) UpdateStatus(ctx context.Context, appliedManifestWork *v1.AppliedManifestWork, opts metav1.UpdateOptions) (*v1.AppliedManifestWork, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(appliedmanifestworksResource, "status", appliedManifestWork), &v1.AppliedManifestWork{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1.AppliedManifestWork), err
-}
-
-// Delete takes name of the appliedManifestWork and deletes it. Returns an error if one occurs.
-func (c *FakeAppliedManifestWorks) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(appliedmanifestworksResource, name, opts), &v1.AppliedManifestWork{})
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeAppliedManifestWorks) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(appliedmanifestworksResource, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1.AppliedManifestWorkList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched appliedManifestWork.
-func (c *FakeAppliedManifestWorks) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.AppliedManifestWork, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(appliedmanifestworksResource, name, pt, data, subresources...), &v1.AppliedManifestWork{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1.AppliedManifestWork), err
 }

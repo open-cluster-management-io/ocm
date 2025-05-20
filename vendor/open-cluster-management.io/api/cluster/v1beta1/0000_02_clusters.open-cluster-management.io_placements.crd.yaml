@@ -29,7 +29,6 @@ spec:
           Placement defines a rule to select a set of ManagedClusters from the ManagedClusterSets bound
           to the placement namespace.
 
-
           Here is how the placement policy combines with other selection methods to determine a matching
           list of ManagedClusters:
            1. Kubernetes clusters are registered with hub as cluster-scoped ManagedClusters;
@@ -39,16 +38,13 @@ spec:
               of potential ManagedClusters;
            5. Then Placements subselect from that working set using label/claim selection.
 
-
           A ManagedCluster will not be selected if no ManagedClusterSet is bound to the placement
           namespace. A user is able to bind a ManagedClusterSet to a namespace by creating a
           ManagedClusterSetBinding in that namespace if they have an RBAC rule to CREATE on the virtual
           subresource of `managedclustersets/bind`.
 
-
           A slice of PlacementDecisions with the label cluster.open-cluster-management.io/placement={placement name}
           will be created to represent the ManagedClusters selected by this placement.
-
 
           If a ManagedCluster is selected and added into the PlacementDecisions, other components may
           apply workload on it; once it is removed from the PlacementDecisions, the workload applied on
@@ -105,7 +101,6 @@ spec:
                           ex; for a total 100 clusters selected, ClustersPerDecisionGroup equal to 20% will divide the placement decision
                           to 5 groups each group should have 20 clusters.
                           Default is having all clusters in a single group.
-
 
                           The predefined decisionGroups is expected to be a subset of the selected clusters and the number of items in each
                           group SHOULD be less than ClustersPerDecisionGroup. Once the number of items exceeds the ClustersPerDecisionGroup,
@@ -256,6 +251,15 @@ spec:
                         3) If a ManagedCluster (not selected previously) starts to match the selector, it will either
                            be selected or at least has a chance to be selected (when NumberOfClusters is specified);
                       properties:
+                        celSelector:
+                          description: CelSelector represents a selector of ManagedClusters
+                            by CEL expressions on ManagedCluster fields
+                          properties:
+                            celExpressions:
+                              items:
+                                type: string
+                              type: array
+                          type: object
                         claimSelector:
                           description: ClaimSelector represents a selector of ManagedClusters
                             by clusterClaims in status
@@ -543,16 +547,8 @@ spec:
                 description: Conditions contains the different condition status for
                   this Placement.
                 items:
-                  description: "Condition contains details for one aspect of the current
-                    state of this API Resource.\n---\nThis struct is intended for
-                    direct use as an array at the field path .status.conditions.  For
-                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
-                    observations of a foo's current state.\n\t    // Known .status.conditions.type
-                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
-                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
-                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
-                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
-                    \   // other fields\n\t}"
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -593,12 +589,7 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: |-
-                        type of condition in CamelCase or in foo.example.com/CamelCase.
-                        ---
-                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-                        useful (see .node.status.conditions), the ability to deconflict is important.
-                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string

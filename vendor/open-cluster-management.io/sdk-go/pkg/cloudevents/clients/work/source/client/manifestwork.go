@@ -101,7 +101,7 @@ func (c *ManifestWorkSourceClient) Create(ctx context.Context, manifestWork *wor
 	}
 
 	if err := c.cloudEventsClient.Publish(ctx, eventType, newWork); err != nil {
-		returnErr := cloudeventserrors.NewPublishError(common.ManifestWorkGR, manifestWork.Name, err)
+		returnErr := cloudeventserrors.ToStatusError(common.ManifestWorkGR, manifestWork.Name, err)
 		generic.IncreaseWorkProcessedCounter("create", string(returnErr.ErrStatus.Reason))
 		return nil, returnErr
 	}
@@ -149,7 +149,7 @@ func (c *ManifestWorkSourceClient) Delete(ctx context.Context, name string, opts
 	deletingWork.DeletionTimestamp = &now
 
 	if err := c.cloudEventsClient.Publish(ctx, eventType, deletingWork); err != nil {
-		returnErr := cloudeventserrors.NewPublishError(common.ManifestWorkGR, name, err)
+		returnErr := cloudeventserrors.ToStatusError(common.ManifestWorkGR, name, err)
 		generic.IncreaseWorkProcessedCounter("delete", string(returnErr.ErrStatus.Reason))
 		return returnErr
 	}
@@ -278,7 +278,7 @@ func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt ku
 	}
 
 	if err := c.cloudEventsClient.Publish(ctx, eventType, newWork); err != nil {
-		returnErr := cloudeventserrors.NewPublishError(common.ManifestWorkGR, name, err)
+		returnErr := cloudeventserrors.ToStatusError(common.ManifestWorkGR, name, err)
 		generic.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
 		return nil, returnErr
 	}

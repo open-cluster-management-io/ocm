@@ -3,7 +3,7 @@
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,15 +12,15 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 	versioned "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	internalinterfaces "open-cluster-management.io/api/client/cluster/informers/externalversions/internalinterfaces"
-	v1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
-	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
+	apiclusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 )
 
 // AddOnPlacementScoreInformer provides access to a shared informer and lister for
 // AddOnPlacementScores.
 type AddOnPlacementScoreInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.AddOnPlacementScoreLister
+	Lister() clusterv1alpha1.AddOnPlacementScoreLister
 }
 
 type addOnPlacementScoreInformer struct {
@@ -55,7 +55,7 @@ func NewFilteredAddOnPlacementScoreInformer(client versioned.Interface, namespac
 				return client.ClusterV1alpha1().AddOnPlacementScores(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&clusterv1alpha1.AddOnPlacementScore{},
+		&apiclusterv1alpha1.AddOnPlacementScore{},
 		resyncPeriod,
 		indexers,
 	)
@@ -66,9 +66,9 @@ func (f *addOnPlacementScoreInformer) defaultInformer(client versioned.Interface
 }
 
 func (f *addOnPlacementScoreInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&clusterv1alpha1.AddOnPlacementScore{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiclusterv1alpha1.AddOnPlacementScore{}, f.defaultInformer)
 }
 
-func (f *addOnPlacementScoreInformer) Lister() v1alpha1.AddOnPlacementScoreLister {
-	return v1alpha1.NewAddOnPlacementScoreLister(f.Informer().GetIndexer())
+func (f *addOnPlacementScoreInformer) Lister() clusterv1alpha1.AddOnPlacementScoreLister {
+	return clusterv1alpha1.NewAddOnPlacementScoreLister(f.Informer().GetIndexer())
 }

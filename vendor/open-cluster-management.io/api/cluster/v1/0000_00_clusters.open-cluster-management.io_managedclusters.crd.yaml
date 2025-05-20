@@ -39,16 +39,13 @@ spec:
           of a managed cluster. ManagedCluster is a cluster-scoped resource. The name
           is the cluster UID.
 
-
           The cluster join process is a double opt-in process. See the following join process steps:
-
 
           1. The agent on the managed cluster creates a CSR on the hub with the cluster UID and agent name.
           2. The agent on the managed cluster creates a ManagedCluster on the hub.
           3. The cluster admin on the hub cluster approves the CSR for the UID and agent name of the ManagedCluster.
           4. The cluster admin sets the spec.acceptClient of the ManagedCluster to true.
           5. The cluster admin on the managed cluster creates a credential of the kubeconfig for the hub cluster.
-
 
           After the hub cluster creates the cluster namespace, the klusterlet agent on the ManagedCluster pushes
           the credential to the hub cluster to use against the kube-apiserver of the ManagedCluster.
@@ -98,9 +95,8 @@ spec:
                   ManagedClusterClientConfigs represents a list of the apiserver address of the managed cluster.
                   If it is empty, the managed cluster has no accessible address for the hub to connect with it.
                 items:
-                  description: |-
-                    ClientConfig represents the apiserver address of the managed cluster.
-                    TODO include credential to connect to managed cluster kube-apiserver
+                  description: ClientConfig represents the apiserver address of the
+                    managed cluster.
                   properties:
                     caBundle:
                       description: |-
@@ -112,6 +108,8 @@ spec:
                       description: URL is the URL of apiserver endpoint of the managed
                         cluster.
                       type: string
+                  required:
+                  - url
                   type: object
                 type: array
               taints:
@@ -210,16 +208,8 @@ spec:
                 description: Conditions contains the different condition statuses
                   for this managed cluster.
                 items:
-                  description: "Condition contains details for one aspect of the current
-                    state of this API Resource.\n---\nThis struct is intended for
-                    direct use as an array at the field path .status.conditions.  For
-                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
-                    observations of a foo's current state.\n\t    // Known .status.conditions.type
-                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
-                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
-                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
-                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
-                    \   // other fields\n\t}"
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -260,12 +250,7 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: |-
-                        type of condition in CamelCase or in foo.example.com/CamelCase.
-                        ---
-                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-                        useful (see .node.status.conditions), the ability to deconflict is important.
-                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string

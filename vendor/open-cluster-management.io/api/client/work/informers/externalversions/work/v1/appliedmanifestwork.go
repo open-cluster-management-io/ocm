@@ -3,7 +3,7 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,15 +12,15 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 	versioned "open-cluster-management.io/api/client/work/clientset/versioned"
 	internalinterfaces "open-cluster-management.io/api/client/work/informers/externalversions/internalinterfaces"
-	v1 "open-cluster-management.io/api/client/work/listers/work/v1"
-	workv1 "open-cluster-management.io/api/work/v1"
+	workv1 "open-cluster-management.io/api/client/work/listers/work/v1"
+	apiworkv1 "open-cluster-management.io/api/work/v1"
 )
 
 // AppliedManifestWorkInformer provides access to a shared informer and lister for
 // AppliedManifestWorks.
 type AppliedManifestWorkInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.AppliedManifestWorkLister
+	Lister() workv1.AppliedManifestWorkLister
 }
 
 type appliedManifestWorkInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredAppliedManifestWorkInformer(client versioned.Interface, resyncPe
 				return client.WorkV1().AppliedManifestWorks().Watch(context.TODO(), options)
 			},
 		},
-		&workv1.AppliedManifestWork{},
+		&apiworkv1.AppliedManifestWork{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *appliedManifestWorkInformer) defaultInformer(client versioned.Interface
 }
 
 func (f *appliedManifestWorkInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&workv1.AppliedManifestWork{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiworkv1.AppliedManifestWork{}, f.defaultInformer)
 }
 
-func (f *appliedManifestWorkInformer) Lister() v1.AppliedManifestWorkLister {
-	return v1.NewAppliedManifestWorkLister(f.Informer().GetIndexer())
+func (f *appliedManifestWorkInformer) Lister() workv1.AppliedManifestWorkLister {
+	return workv1.NewAppliedManifestWorkLister(f.Informer().GetIndexer())
 }

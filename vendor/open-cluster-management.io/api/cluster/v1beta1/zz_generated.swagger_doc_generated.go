@@ -21,6 +21,14 @@ func (AddOnScore) SwaggerDoc() map[string]string {
 	return map_AddOnScore
 }
 
+var map_ClusterCelSelector = map[string]string{
+	"": "ClusterCelSelector is a list of CEL expressions. The expressions are ANDed.",
+}
+
+func (ClusterCelSelector) SwaggerDoc() map[string]string {
+	return map_ClusterCelSelector
+}
+
 var map_ClusterClaimSelector = map[string]string{
 	"":                 "ClusterClaimSelector is a claim query over a set of ManagedClusters. An empty cluster claim selector matches all objects. A null cluster claim selector matches no objects.",
 	"matchExpressions": "matchExpressions is a list of cluster claim selector requirements. The requirements are ANDed.",
@@ -43,6 +51,7 @@ var map_ClusterSelector = map[string]string{
 	"":              "ClusterSelector represents the AND of the containing selectors. An empty cluster selector matches all objects. A null cluster selector matches no objects.",
 	"labelSelector": "LabelSelector represents a selector of ManagedClusters by label",
 	"claimSelector": "ClaimSelector represents a selector of ManagedClusters by clusterClaims in status",
+	"celSelector":   "CelSelector represents a selector of ManagedClusters by CEL expressions on ManagedCluster fields",
 }
 
 func (ClusterSelector) SwaggerDoc() map[string]string {
@@ -78,6 +87,16 @@ var map_DecisionStrategy = map[string]string{
 
 func (DecisionStrategy) SwaggerDoc() map[string]string {
 	return map_DecisionStrategy
+}
+
+var map_GroupClusterSelector = map[string]string{
+	"":              "GroupClusterSelector represents the AND of the containing selectors for groupClusterSelector. An empty group cluster selector matches all objects. A null group cluster selector matches no objects.",
+	"labelSelector": "LabelSelector represents a selector of ManagedClusters by label",
+	"claimSelector": "ClaimSelector represents a selector of ManagedClusters by clusterClaims in status",
+}
+
+func (GroupClusterSelector) SwaggerDoc() map[string]string {
+	return map_GroupClusterSelector
 }
 
 var map_GroupStrategy = map[string]string{

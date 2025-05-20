@@ -3,24 +3,24 @@
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	apiaddonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	versioned "open-cluster-management.io/api/client/addon/clientset/versioned"
 	internalinterfaces "open-cluster-management.io/api/client/addon/informers/externalversions/internalinterfaces"
-	v1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addonv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 )
 
 // ClusterManagementAddOnInformer provides access to a shared informer and lister for
 // ClusterManagementAddOns.
 type ClusterManagementAddOnInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.ClusterManagementAddOnLister
+	Lister() addonv1alpha1.ClusterManagementAddOnLister
 }
 
 type clusterManagementAddOnInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredClusterManagementAddOnInformer(client versioned.Interface, resyn
 				return client.AddonV1alpha1().ClusterManagementAddOns().Watch(context.TODO(), options)
 			},
 		},
-		&addonv1alpha1.ClusterManagementAddOn{},
+		&apiaddonv1alpha1.ClusterManagementAddOn{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *clusterManagementAddOnInformer) defaultInformer(client versioned.Interf
 }
 
 func (f *clusterManagementAddOnInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&addonv1alpha1.ClusterManagementAddOn{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiaddonv1alpha1.ClusterManagementAddOn{}, f.defaultInformer)
 }
 
-func (f *clusterManagementAddOnInformer) Lister() v1alpha1.ClusterManagementAddOnLister {
-	return v1alpha1.NewClusterManagementAddOnLister(f.Informer().GetIndexer())
+func (f *clusterManagementAddOnInformer) Lister() addonv1alpha1.ClusterManagementAddOnLister {
+	return addonv1alpha1.NewClusterManagementAddOnLister(f.Informer().GetIndexer())
 }

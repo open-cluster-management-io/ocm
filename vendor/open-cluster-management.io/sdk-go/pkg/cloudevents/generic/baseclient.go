@@ -131,8 +131,8 @@ func (c *baseClient) publish(ctx context.Context, evt cloudevents.Event) error {
 
 	klog.V(4).Infof("Sending event: %v\n%s", sendingCtx, evt.Context)
 	klog.V(5).Infof("Sending event: evt=%s", evt)
-	if result := c.cloudEventsClient.Send(sendingCtx, evt); cloudevents.IsUndelivered(result) {
-		return fmt.Errorf("failed to send event %s, %v", evt.Context, result)
+	if err := c.cloudEventsClient.Send(sendingCtx, evt); cloudevents.IsUndelivered(err) {
+		return err
 	}
 
 	return nil

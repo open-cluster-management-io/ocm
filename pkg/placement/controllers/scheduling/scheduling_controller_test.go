@@ -158,7 +158,7 @@ func TestSchedulingController_sync(t *testing.T) {
 				DecisionGroups: []clusterapiv1beta1.DecisionGroup{
 					{
 						GroupName: "canary",
-						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+						ClusterSelector: clusterapiv1beta1.GroupClusterSelector{
 							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
 						},
 					},
@@ -236,13 +236,13 @@ func TestSchedulingController_sync(t *testing.T) {
 				DecisionGroups: []clusterapiv1beta1.DecisionGroup{
 					{
 						GroupName: "group1",
-						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+						ClusterSelector: clusterapiv1beta1.GroupClusterSelector{
 							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Amazon"}},
 						},
 					},
 					{
 						GroupName: "group2",
-						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+						ClusterSelector: clusterapiv1beta1.GroupClusterSelector{
 							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
 						},
 					},
@@ -1071,7 +1071,7 @@ func TestBind(t *testing.T) {
 				DecisionGroups: []clusterapiv1beta1.DecisionGroup{
 					{
 						GroupName: "canary",
-						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+						ClusterSelector: clusterapiv1beta1.GroupClusterSelector{
 							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
 						},
 					},
@@ -1144,7 +1144,7 @@ func TestBind(t *testing.T) {
 				DecisionGroups: []clusterapiv1beta1.DecisionGroup{
 					{
 						GroupName: "canary",
-						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+						ClusterSelector: clusterapiv1beta1.GroupClusterSelector{
 							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
 						},
 					},
@@ -1177,13 +1177,13 @@ func TestBind(t *testing.T) {
 				DecisionGroups: []clusterapiv1beta1.DecisionGroup{
 					{
 						GroupName: "group1",
-						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+						ClusterSelector: clusterapiv1beta1.GroupClusterSelector{
 							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Amazon"}},
 						},
 					},
 					{
 						GroupName: "group2",
-						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+						ClusterSelector: clusterapiv1beta1.GroupClusterSelector{
 							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
 						},
 					},
