@@ -20,3 +20,7 @@ rules:
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["clusterclaims"]
   verbs: ["get", "list", "watch"]
+# Allow agent to list klusterlet
+- apiGroups: ["operator.open-cluster-management.io"]
+  resources: ["klusterlets"]
+  verbs: ["get", "list", "watch"]
