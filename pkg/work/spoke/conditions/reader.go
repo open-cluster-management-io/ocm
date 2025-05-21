@@ -29,8 +29,8 @@ func NewConditionReader() *ConditionReader {
 
 func (s *ConditionReader) GetConditionByRule(obj *unstructured.Unstructured, rule workapiv1.ConditionRule) (metav1.Condition, error) {
 	switch rule.Type {
-	case workapiv1.WellKnownCompletionsType:
-		r := s.wellKnownConditions.GetRuleByKindCondition(obj.GroupVersionKind(), workapiv1.ManifestComplete)
+	case workapiv1.WellKnownConditionsType:
+		r := s.wellKnownConditions.GetRuleByKindCondition(obj.GroupVersionKind(), rule.Condition)
 		if len(r.CelExpressions) == 0 {
 			err := fmt.Errorf("cannot find the wellknown conditions for resource with gvk %s", obj.GroupVersionKind().String())
 			return metav1.Condition{
@@ -42,9 +42,6 @@ func (s *ConditionReader) GetConditionByRule(obj *unstructured.Unstructured, rul
 		}
 
 		// Check for supported overrides in rule
-		if rule.Condition != "" {
-			r.Condition = rule.Condition
-		}
 		if rule.Message != "" {
 			r.Message = rule.Message
 		}
