@@ -5,6 +5,12 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
   name: clusterprofiles.multicluster.x-k8s.io
+  labels:
+    {{ if gt (len .Labels) 0 }}
+    {{ range $key, $value := .Labels }}
+    "{{ $key }}": "{{ $value }}"
+    {{ end }}
+    {{ end }}
 spec:
   group: multicluster.x-k8s.io
   names:
