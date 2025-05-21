@@ -267,7 +267,7 @@ func TestConditionReader(t *testing.T) {
 		{
 			name:   "Job complete",
 			object: unstrctureObject(jobJsonComplete),
-			rule:   workapiv1.ConditionRule{Type: workapiv1.WellKnownCompletionsType},
+			rule:   workapiv1.ConditionRule{Type: workapiv1.WellKnownConditionsType, Condition: workapiv1.ManifestComplete},
 			expectedCondition: metav1.Condition{
 				Type:    workapiv1.ManifestComplete,
 				Status:  metav1.ConditionTrue,
@@ -278,7 +278,7 @@ func TestConditionReader(t *testing.T) {
 		{
 			name:   "Job failed",
 			object: unstrctureObject(jobJsonFailed),
-			rule:   workapiv1.ConditionRule{Type: workapiv1.WellKnownCompletionsType},
+			rule:   workapiv1.ConditionRule{Type: workapiv1.WellKnownConditionsType, Condition: workapiv1.ManifestComplete},
 			expectedCondition: metav1.Condition{
 				Type:    workapiv1.ManifestComplete,
 				Status:  metav1.ConditionTrue,
@@ -289,7 +289,7 @@ func TestConditionReader(t *testing.T) {
 		{
 			name:   "Job incomplete",
 			object: unstrctureObject(jobJsonIncomplete),
-			rule:   workapiv1.ConditionRule{Type: workapiv1.WellKnownCompletionsType},
+			rule:   workapiv1.ConditionRule{Type: workapiv1.WellKnownConditionsType, Condition: workapiv1.ManifestComplete},
 			expectedCondition: metav1.Condition{
 				Type:    workapiv1.ManifestComplete,
 				Status:  metav1.ConditionFalse,
@@ -300,7 +300,7 @@ func TestConditionReader(t *testing.T) {
 		{
 			name:   "Pod complete",
 			object: unstrctureObject(podJsonSucceeded),
-			rule:   workapiv1.ConditionRule{Type: workapiv1.WellKnownCompletionsType},
+			rule:   workapiv1.ConditionRule{Type: workapiv1.WellKnownConditionsType, Condition: workapiv1.ManifestComplete},
 			expectedCondition: metav1.Condition{
 				Type:    workapiv1.ManifestComplete,
 				Status:  metav1.ConditionTrue,
@@ -311,7 +311,7 @@ func TestConditionReader(t *testing.T) {
 		{
 			name:   "Pod failed",
 			object: unstrctureObject(podJsonFailed),
-			rule:   workapiv1.ConditionRule{Type: workapiv1.WellKnownCompletionsType},
+			rule:   workapiv1.ConditionRule{Type: workapiv1.WellKnownConditionsType, Condition: workapiv1.ManifestComplete},
 			expectedCondition: metav1.Condition{
 				Type:    workapiv1.ManifestComplete,
 				Status:  metav1.ConditionTrue,
@@ -322,7 +322,7 @@ func TestConditionReader(t *testing.T) {
 		{
 			name:   "Pod running",
 			object: unstrctureObject(podJsonRunning),
-			rule:   workapiv1.ConditionRule{Type: workapiv1.WellKnownCompletionsType},
+			rule:   workapiv1.ConditionRule{Type: workapiv1.WellKnownConditionsType, Condition: workapiv1.ManifestComplete},
 			expectedCondition: metav1.Condition{
 				Type:    workapiv1.ManifestComplete,
 				Status:  metav1.ConditionFalse,
