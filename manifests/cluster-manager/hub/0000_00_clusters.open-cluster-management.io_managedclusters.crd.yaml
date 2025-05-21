@@ -154,8 +154,6 @@ spec:
                   - key
                   type: object
                 type: array
-            required:
-            - hubAcceptsClient
             type: object
           status:
             description: Status represents the current status of joined managed cluster

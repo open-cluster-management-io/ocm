@@ -112,6 +112,8 @@ type ManifestConfigOption struct {
 	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
 
 	// ConditionRules defines how to set manifestwork conditions for a specific manifest.
+	// +listType:=map
+	// +listMapKey:=condition
 	// +optional
 	ConditionRules []ConditionRule `json:"conditionRules,omitempty"`
 }
@@ -122,14 +124,14 @@ type ConditionRule struct {
 	// Any condition is supported, but certain special conditions can be used to
 	// to control higher level behaviors of the manifestwork.
 	// If the condition is Complete, the manifest will no longer be updated once completed.
-	// Required for CEL rules, WellKnownCompletions will default to the "Complete" condition
-	// +optional
+	// +kubebuilder:validation:Required
+	// +required
 	Condition string `json:"condition"`
 
 	// Type defines how a manifest should be evaluated for a condition.
-	// It can be CEL, or WellKnownCompletions.
+	// It can be CEL, or WellKnownConditions.
 	// If the type is CEL, user should specify the celExpressions field
-	// If the type is WellKnownCompletions, certain common types in k8s.io/api will be considered
+	// If the type is WellKnownConditions, certain common types in k8s.io/api will be considered
 	// completed as defined by hardcoded rules.
 	// +kubebuilder:validation:Required
 	// +required
@@ -153,13 +155,13 @@ type ConditionRule struct {
 	MessageExpression string `json:"messageExpression"`
 }
 
-// +kubebuilder:validation:Enum=WellKnownCompletions;CEL
+// +kubebuilder:validation:Enum=WellKnownConditions;CEL
 type ConditionRuleType string
 
 const (
-	// WellKnownCompletionsType represents a standard Complete condition for some common types, which
+	// WellKnownConditionsType represents a standard Complete condition for some common types, which
 	// is reflected with a hardcoded rule for types in k8s.io/api
-	WellKnownCompletionsType ConditionRuleType = "WellKnownCompletions"
+	WellKnownConditionsType ConditionRuleType = "WellKnownConditions"
 
 	// CelConditionExpressionsType enables user defined rules to set the status of the condition
 	CelConditionExpressionsType ConditionRuleType = "CEL"

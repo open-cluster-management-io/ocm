@@ -63,8 +63,8 @@ func (AppliedManifestWorkStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ConditionRule = map[string]string{
-	"condition":         "Condition is the type of condition that is set based on this rule. Any condition is supported, but certain special conditions can be used to to control higher level behaviors of the manifestwork. If the condition is Complete, the manifest will no longer be updated once completed. Required for CEL rules, WellKnownCompletions will default to the \"Complete\" condition",
-	"type":              "Type defines how a manifest should be evaluated for a condition. It can be CEL, or WellKnownCompletions. If the type is CEL, user should specify the celExpressions field If the type is WellKnownCompletions, certain common types in k8s.io/api will be considered completed as defined by hardcoded rules.",
+	"condition":         "Condition is the type of condition that is set based on this rule. Any condition is supported, but certain special conditions can be used to to control higher level behaviors of the manifestwork. If the condition is Complete, the manifest will no longer be updated once completed.",
+	"type":              "Type defines how a manifest should be evaluated for a condition. It can be CEL, or WellKnownConditions. If the type is CEL, user should specify the celExpressions field If the type is WellKnownConditions, certain common types in k8s.io/api will be considered completed as defined by hardcoded rules.",
 	"celExpressions":    "CelExpressions defines the CEL expressions to be evaluated for the condition. Final result is the logical AND of all expressions.",
 	"message":           "Message is set on the condition created for this rule",
 	"messageExpression": "MessageExpression uses a CEL expression to generate a message for the condition Will override message if both are set and messageExpression returns a non-empty string. Variables: - object: The current instance of the manifest - result: Boolean result of the CEL expressions",

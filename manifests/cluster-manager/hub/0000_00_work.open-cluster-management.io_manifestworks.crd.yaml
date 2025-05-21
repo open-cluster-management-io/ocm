@@ -180,7 +180,6 @@ spec:
                               Any condition is supported, but certain special conditions can be used to
                               to control higher level behaviors of the manifestwork.
                               If the condition is Complete, the manifest will no longer be updated once completed.
-                              Required for CEL rules, WellKnownCompletions will default to the "Complete" condition
                             type: string
                           message:
                             description: Message is set on the condition created for
@@ -197,21 +196,25 @@ spec:
                           type:
                             description: |-
                               Type defines how a manifest should be evaluated for a condition.
-                              It can be CEL, or WellKnownCompletions.
+                              It can be CEL, or WellKnownConditions.
                               If the type is CEL, user should specify the celExpressions field
-                              If the type is WellKnownCompletions, certain common types in k8s.io/api will be considered
+                              If the type is WellKnownConditions, certain common types in k8s.io/api will be considered
                               completed as defined by hardcoded rules.
                             enum:
-                            - WellKnownCompletions
+                            - WellKnownConditions
                             - CEL
                             type: string
                         required:
+                        - condition
                         - type
                         type: object
                         x-kubernetes-validations:
                         - message: Condition is required for CEL rules
                           rule: self.type != 'CEL' || self.condition != ""
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - condition
+                      x-kubernetes-list-type: map
                     feedbackRules:
                       description: |-
                         FeedbackRules defines what resource status field should be returned. If it is not set or empty,
