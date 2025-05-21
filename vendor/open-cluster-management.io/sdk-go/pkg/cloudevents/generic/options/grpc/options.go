@@ -4,11 +4,10 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"google.golang.org/grpc/credentials/insecure"
 	"os"
 	"sync"
 	"time"
-
-	"google.golang.org/grpc/credentials/insecure"
 
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
