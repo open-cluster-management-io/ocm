@@ -2,10 +2,10 @@ package helpers
 
 import (
 	"context"
-	"math"
 	"time"
 
 	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/common/types/ref"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
@@ -16,6 +16,7 @@ import (
 	ocmcelcommon "open-cluster-management.io/sdk-go/pkg/cel/common"
 	ocmcellibrary "open-cluster-management.io/sdk-go/pkg/cel/library"
 
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 )
 
@@ -126,8 +127,10 @@ func (c *CELSelector) Validate(ctx context.Context, cluster *clusterapiv1.Manage
 // evaluateAllExpressions evaluates each CEL expression in sequence.
 // Returns (true, remainingBudget) if all expressions succeed, otherwise (false, budget at failure).
 func (c *CELSelector) evaluateAllExpressions(ctx context.Context, cluster *unstructured.Unstructured, budget int64) (bool, int64) {
+	ctx = context.WithValue(ctx, "cluster", cluster.GetName())
 	logger := klog.FromContext(ctx)
 	remainingBudget := budget
+	input := map[string]any{"managedCluster": cluster.Object}
 
 	for i, compiled := range c.compilationResult {
 		// Validate program compilation
@@ -137,8 +140,14 @@ func (c *CELSelector) evaluateAllExpressions(ctx context.Context, cluster *unstr
 		}
 
 		// Evaluate single expression
-		ok, newBudget := c.evaluateSingleExpression(ctx, compiled.Program, cluster, remainingBudget, i)
-		if !ok {
+		evalResult, newBudget := commonhelpers.EvaluateSingleExpression(
+			ctx,
+			compiled.Program,
+			remainingBudget,
+			c.celExpressions[i],
+			input,
+		)
+		if !c.isResultValid(evalResult) {
 			return false, newBudget
 		}
 		remainingBudget = newBudget
@@ -152,70 +161,10 @@ func (c *CELSelector) isProgramValid(compiled CompilationResult) bool {
 	return compiled.Program != nil && compiled.Error == nil
 }
 
-// evaluateSingleExpression evaluates one CEL expression and handles its cost accounting.
-// Returns (true, newBudget) if evaluation succeeds, otherwise (false, -1 or remaining budget).
-func (c *CELSelector) evaluateSingleExpression(
-	ctx context.Context,
-	program cel.Program,
-	cluster *unstructured.Unstructured,
-	budget int64,
-	index int,
-) (bool, int64) {
-	logger := klog.FromContext(ctx)
-
-	// Evaluate the expression
-	evalResult, evalDetails, err := program.ContextEval(ctx, map[string]interface{}{
-		"managedCluster": cluster.Object,
-	})
-
-	// Cost calculation
-	ok, rtCost := c.costCalculation(ctx, evalDetails, budget, index)
-	if !ok {
-		return false, -1
+func (c *CELSelector) isResultValid(evalResult ref.Val) bool {
+	if evalResult == nil {
+		return false
 	}
-
-	remainingBudget := budget - rtCost
-	// Handle evaluation error
-	if err != nil {
-		logger.Info("Expression evaluation failed", "rule", c.celExpressions[index], "cluster", cluster.GetName(), "err", err)
-		return false, remainingBudget
-	}
-
-	// Check expression result
-	if value, ok := evalResult.Value().(bool); !ok || !value {
-		return false, remainingBudget
-	}
-
-	return true, remainingBudget
-}
-
-// costCalculation processes the cost details of an evaluation
-func (c *CELSelector) costCalculation(ctx context.Context, evalDetails *cel.EvalDetails, budget int64, index int) (bool, int64) {
-	logger := klog.FromContext(ctx)
-
-	// Check if cost details are available
-	if evalDetails == nil {
-		logger.Info("Runtime cost calculation failed: no evaluation details",
-			"rule", c.celExpressions[index])
-		return false, -1
-	}
-
-	rtCost := evalDetails.ActualCost()
-	if rtCost == nil {
-		logger.Info("Runtime cost calculation failed: no cost information",
-			"rule", c.celExpressions[index])
-		return false, -1
-	}
-
-	// Validate cost against budget
-	if *rtCost > math.MaxInt64 || int64(*rtCost) > budget {
-		logger.Info("Cost budget exceeded",
-			"rule", c.celExpressions[index],
-			"cost", *rtCost,
-			"budget", budget)
-		return false, -1
-	}
-
-	// Safe to convert since we checked for overflow
-	return true, int64(*rtCost) //nolint:gosec
+	value, ok := evalResult.Value().(bool)
+	return value && ok
 }
