@@ -21,7 +21,7 @@ spec:
         app: clustermanager-addon-manager-controller
         {{ if gt (len .Labels) 0 }}
         {{ range $key, $value := .Labels }}
-        {{ $key }}: {{ $value }}
+        "{{ $key }}": "{{ $value }}"
         {{ end }}
         {{ end }}
     spec:
