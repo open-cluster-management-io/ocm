@@ -2,6 +2,13 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: cluster-manager
+  labels:
+    gwcp.guidewire.com/app-name: cluster-manager
+    gwcp.guidewire.com/created-by: pod-vulcan
+    gwcp.guidewire.com/dept: "275"
+    gwcp.guidewire.com/maintained-by: pod-vulcan
+    gwcp.guidewire.com/tenant-name: quadrant-shared
+    gwcp.guidewire.com/version: 0.16.0
 rules:
 # Allow the registration-operator to create workload
 - apiGroups: [""]

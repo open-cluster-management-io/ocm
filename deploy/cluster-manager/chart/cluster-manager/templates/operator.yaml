@@ -5,6 +5,12 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: cluster-manager
+    gwcp.guidewire.com/app-name: cluster-manager
+    gwcp.guidewire.com/created-by: pod-vulcan
+    gwcp.guidewire.com/dept: "275"
+    gwcp.guidewire.com/maintained-by: pod-vulcan
+    gwcp.guidewire.com/tenant-name: quadrant-shared
+    gwcp.guidewire.com/version: 0.16.0
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -14,6 +20,12 @@ spec:
     metadata:
       labels:
         app: cluster-manager
+        gwcp.guidewire.com/app-name: cluster-manager
+        gwcp.guidewire.com/created-by: pod-vulcan
+        gwcp.guidewire.com/dept: "275"
+        gwcp.guidewire.com/maintained-by: pod-vulcan
+        gwcp.guidewire.com/tenant-name: quadrant-shared
+        gwcp.guidewire.com/version: 0.16.0
     spec:
       {{- with .Values.affinity }}
       affinity:

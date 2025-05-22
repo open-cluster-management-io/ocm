@@ -6,11 +6,11 @@ replicaCount: 3
 images:
   # the overrides can replace the corresponding image if not empty.
   overrides:
-    registrationImage: ""
+    registrationImage: "776719623202.dkr.ecr.us-west-2.amazonaws.com/open-cluster-management/registration:May22"
     workImage: ""
     placementImage: ""
     addOnManagerImage: ""
-    operatorImage: ""
+    operatorImage: "776719623202.dkr.ecr.us-west-2.amazonaws.com/open-cluster-management/registration-operator:May22"
   # registry and tag work on all images, but the image will be replaced by overrides if the image in overrides is not empty.
   # The registry name must NOT contain a trailing slash.
   registry: quay.io/open-cluster-management
