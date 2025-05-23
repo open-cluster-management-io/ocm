@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -12,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	clusterv1alpha1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
-	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	ocmfeature "open-cluster-management.io/api/feature"
@@ -23,10 +23,10 @@ import (
 const labelCustomizedOnly = "open-cluster-management.io/spoke-only"
 
 type claimReconcile struct {
-	recorder               events.Recorder
-	claimLister            clusterv1alpha1listers.ClusterClaimLister
-	klusterletLister       operatorlister.KlusterletLister
-	maxCustomClusterClaims int
+	recorder                     events.Recorder
+	claimLister                  clusterv1alpha1listers.ClusterClaimLister
+	maxCustomClusterClaims       int
+	reservedClusterClaimSuffixes []string
 }
 
 func (r *claimReconcile) reconcile(ctx context.Context, cluster *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error) {
@@ -57,25 +57,21 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 		return fmt.Errorf("unable to list cluster claims: %w", err)
 	}
 
-	klusterlet, err := r.klusterletLister.Get("klusterlet")
-
-	if err != nil {
-		return fmt.Errorf("unable to get klusterlet: %w", err)
-	}
-
-	var reservedClusterClaimSuffixes []string
-	if klusterlet.Spec.RegistrationConfiguration != nil && klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration != nil {
-		reservedClusterClaimSuffixes = klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration.DeepCopy().ReservedClusterClaimSuffixes
-	}
-
-	reservedSuffixes := append(reservedClusterClaimSuffixes, clusterv1alpha1.ReservedClusterClaimNames[:]...)
-	reservedClaimNames := sets.NewString(reservedSuffixes...)
+	reservedClaimSuffixes := sets.New(clusterv1alpha1.ReservedClusterClaimNames[:]...)
+	reservedClaimSuffixes.Insert(r.reservedClusterClaimSuffixes...)
 	for _, clusterClaim := range clusterClaims {
 		managedClusterClaim := clusterv1.ManagedClusterClaim{
 			Name:  clusterClaim.Name,
 			Value: clusterClaim.Spec.Value,
 		}
-		if reservedClaimNames.Has(clusterClaim.Name) {
+		match := false
+		for reservedSuffix := range reservedClaimSuffixes {
+			if strings.HasSuffix(clusterClaim.Name, reservedSuffix) {
+				match = true
+				break
+			}
+		}
+		if match {
 			reservedClaims = append(reservedClaims, managedClusterClaim)
 			continue
 		}
