@@ -23,8 +23,6 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
-	operatorclientfake "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
-	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
@@ -306,9 +304,6 @@ func TestHealthCheck(t *testing.T) {
 
 			kubeClient := kubefake.NewSimpleClientset(c.nodes...)
 			kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Minute*10)
-
-			klusterletClient := operatorclientfake.NewSimpleClientset()
-			klusterletInformerFactory := operatorinformer.NewSharedInformerFactory(klusterletClient, time.Minute*10)
 			nodeStore := kubeInformerFactory.Core().V1().Nodes().Informer().GetStore()
 			for _, node := range c.nodes {
 				if err := nodeStore.Add(node); err != nil {
@@ -333,7 +328,6 @@ func TestHealthCheck(t *testing.T) {
 				clusterInformerFactory.Cluster().V1().ManagedClusters(),
 				discoveryClient,
 				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
-				klusterletInformerFactory.Operator().V1().Klusterlets(),
 				kubeInformerFactory.Core().V1().Nodes(),
 				20,
 				[]string{},

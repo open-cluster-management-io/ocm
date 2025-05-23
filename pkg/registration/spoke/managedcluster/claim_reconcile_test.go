@@ -19,8 +19,6 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
-	operatorclientfake "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
-	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	ocmfeature "open-cluster-management.io/api/feature"
@@ -100,9 +98,6 @@ func TestSync(t *testing.T) {
 
 			clusterClient := clusterfake.NewSimpleClientset(objects...)
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
-
-			klusterletClient := operatorclientfake.NewSimpleClientset()
-			klusterletInformerFactory := operatorinformer.NewSharedInformerFactory(klusterletClient, time.Minute*10)
 			if c.cluster != nil {
 				if err := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore().Add(c.cluster); err != nil {
 					t.Fatal(err)
@@ -128,7 +123,6 @@ func TestSync(t *testing.T) {
 				clusterInformerFactory.Cluster().V1().ManagedClusters(),
 				discoveryClient,
 				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
-				klusterletInformerFactory.Operator().V1().Klusterlets(),
 				kubeInformerFactory.Core().V1().Nodes(),
 				20,
 				[]string{},
@@ -332,10 +326,6 @@ func TestExposeClaims(t *testing.T) {
 
 			clusterClient := clusterfake.NewSimpleClientset(objects...)
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
-
-			klusterletClient := operatorclientfake.NewSimpleClientset()
-			klusterletInformerFactory := operatorinformer.NewSharedInformerFactory(klusterletClient, time.Minute*10)
-
 			if c.cluster != nil {
 				if err := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore().Add(c.cluster); err != nil {
 					t.Fatal(err)
@@ -365,7 +355,6 @@ func TestExposeClaims(t *testing.T) {
 				clusterInformerFactory.Cluster().V1().ManagedClusters(),
 				discoveryClient,
 				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
-				klusterletInformerFactory.Operator().V1().Klusterlets(),
 				kubeInformerFactory.Core().V1().Nodes(),
 				c.maxCustomClusterClaims,
 				[]string{},

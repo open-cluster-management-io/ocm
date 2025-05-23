@@ -97,6 +97,9 @@ spec:
           {{if .MaxCustomClusterClaims}}
           - "--max-custom-cluster-claims={{ .MaxCustomClusterClaims }}"
           {{end}}
+          {{if .ReservedClusterClaimSuffixes}}
+          - "--reserved-cluster-claim-suffixes={{ .ReservedClusterClaimSuffixes }}"
+          {{end}}
           {{if eq .RegistrationDriver.AuthType "awsirsa"}}
           - "--registration-auth={{ .RegistrationDriver.AuthType }}"
           - "--hub-cluster-arn={{ .RegistrationDriver.AwsIrsa.HubClusterArn }}"

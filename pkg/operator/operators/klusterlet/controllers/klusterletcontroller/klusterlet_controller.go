@@ -373,9 +373,10 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			}
 		}
 
-		//include clusterClaimConfig info if it exists
+		// include clusterClaimConfig info if it exists
 		if klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration != nil {
 			config.MaxCustomClusterClaims = int(klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration.MaxCustomClusterClaims)
+			config.ReservedClusterClaimSuffixes = klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration.ReservedClusterClaimSuffixes
 		}
 
 		// construct cluster annotations string, the final format is "key1=value1,key2=value2"
