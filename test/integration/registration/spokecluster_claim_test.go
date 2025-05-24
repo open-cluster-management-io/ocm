@@ -27,6 +27,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 	var managedClusterName, hubKubeconfigSecret, hubKubeconfigDir string
 	var claims []*clusterv1alpha1.ClusterClaim
 	var maxCustomClusterClaims int
+	var reservedClusterClaimSuffixes []string
 	var err error
 	var cancel context.CancelFunc
 
@@ -52,11 +53,12 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 
 		// run registration agent
 		agentOptions := &spoke.SpokeAgentOptions{
-			BootstrapKubeconfig:      bootstrapKubeConfigFile,
-			HubKubeconfigSecret:      hubKubeconfigSecret,
-			ClusterHealthCheckPeriod: 1 * time.Minute,
-			MaxCustomClusterClaims:   maxCustomClusterClaims,
-			RegisterDriverOption:     registerfactory.NewOptions(),
+			BootstrapKubeconfig:          bootstrapKubeConfigFile,
+			HubKubeconfigSecret:          hubKubeconfigSecret,
+			ClusterHealthCheckPeriod:     1 * time.Minute,
+			MaxCustomClusterClaims:       maxCustomClusterClaims,
+			ReservedClusterClaimSuffixes: reservedClusterClaimSuffixes,
+			RegisterDriverOption:         registerfactory.NewOptions(),
 		}
 		commOptions := commonoptions.NewAgentOptions()
 		commOptions.HubKubeconfigDir = hubKubeconfigDir
@@ -268,6 +270,47 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 				}
 
 				return len(spokeCluster.Status.ClusterClaims) == maxCustomClusterClaims
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		})
+	})
+
+	ginkgo.Context("Keep custom reserved claims", func() {
+		ginkgo.BeforeEach(func() {
+			maxCustomClusterClaims = 5
+			reservedClusterClaimSuffixes = []string{"reserved.io"}
+			claims = []*clusterv1alpha1.ClusterClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "claim.reserved.io",
+					},
+					Spec: clusterv1alpha1.ClusterClaimSpec{
+						Value: "value-test",
+					},
+				},
+			}
+			for i := 0; i < 10; i++ {
+				claims = append(claims, &clusterv1alpha1.ClusterClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fmt.Sprintf("claim-%d", i),
+					},
+					Spec: clusterv1alpha1.ClusterClaimSpec{
+						Value: fmt.Sprintf("value-%d", i),
+					},
+				})
+			}
+		})
+
+		ginkgo.It("should sync custom suffix claims to status of ManagedCluster", func() {
+			assertSuccessBootstrap()
+
+			ginkgo.By("Sync claims")
+			gomega.Eventually(func() bool {
+				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
+				if err != nil {
+					return false
+				}
+
+				return len(spokeCluster.Status.ClusterClaims) == maxCustomClusterClaims+1
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 		})
 	})
