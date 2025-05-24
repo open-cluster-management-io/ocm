@@ -54,6 +54,7 @@ func NewManagedClusterStatusController(
 	claimInformer clusterv1alpha1informer.ClusterClaimInformer,
 	nodeInformer corev1informers.NodeInformer,
 	maxCustomClusterClaims int,
+	reservedClusterClaimSuffixes []string,
 	resyncInterval time.Duration,
 	recorder events.Recorder,
 	hubEventRecorder kevents.EventRecorder) factory.Controller {
@@ -65,6 +66,7 @@ func NewManagedClusterStatusController(
 		claimInformer,
 		nodeInformer,
 		maxCustomClusterClaims,
+		reservedClusterClaimSuffixes,
 		recorder,
 		hubEventRecorder,
 	)
@@ -84,6 +86,7 @@ func newManagedClusterStatusController(
 	claimInformer clusterv1alpha1informer.ClusterClaimInformer,
 	nodeInformer corev1informers.NodeInformer,
 	maxCustomClusterClaims int,
+	reservedClusterClaimSuffixes []string,
 	recorder events.Recorder,
 	hubEventRecorder kevents.EventRecorder) *managedClusterStatusController {
 	return &managedClusterStatusController{
@@ -94,7 +97,8 @@ func newManagedClusterStatusController(
 		reconcilers: []statusReconcile{
 			&joiningReconcile{recorder: recorder},
 			&resoureReconcile{managedClusterDiscoveryClient: managedClusterDiscoveryClient, nodeLister: nodeInformer.Lister()},
-			&claimReconcile{claimLister: claimInformer.Lister(), recorder: recorder, maxCustomClusterClaims: maxCustomClusterClaims},
+			&claimReconcile{claimLister: claimInformer.Lister(), recorder: recorder,
+				maxCustomClusterClaims: maxCustomClusterClaims, reservedClusterClaimSuffixes: reservedClusterClaimSuffixes},
 		},
 		hubClusterLister: hubClusterInformer.Lister(),
 		hubEventRecorder: hubEventRecorder,

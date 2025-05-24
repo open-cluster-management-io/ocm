@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -22,9 +23,10 @@ import (
 const labelCustomizedOnly = "open-cluster-management.io/spoke-only"
 
 type claimReconcile struct {
-	recorder               events.Recorder
-	claimLister            clusterv1alpha1listers.ClusterClaimLister
-	maxCustomClusterClaims int
+	recorder                     events.Recorder
+	claimLister                  clusterv1alpha1listers.ClusterClaimLister
+	maxCustomClusterClaims       int
+	reservedClusterClaimSuffixes []string
 }
 
 func (r *claimReconcile) reconcile(ctx context.Context, cluster *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error) {
@@ -55,13 +57,21 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 		return fmt.Errorf("unable to list cluster claims: %w", err)
 	}
 
-	reservedClaimNames := sets.NewString(clusterv1alpha1.ReservedClusterClaimNames[:]...)
+	reservedClaimSuffixes := sets.New(clusterv1alpha1.ReservedClusterClaimNames[:]...)
+	reservedClaimSuffixes.Insert(r.reservedClusterClaimSuffixes...)
 	for _, clusterClaim := range clusterClaims {
 		managedClusterClaim := clusterv1.ManagedClusterClaim{
 			Name:  clusterClaim.Name,
 			Value: clusterClaim.Spec.Value,
 		}
-		if reservedClaimNames.Has(clusterClaim.Name) {
+		match := false
+		for reservedSuffix := range reservedClaimSuffixes {
+			if strings.HasSuffix(clusterClaim.Name, reservedSuffix) {
+				match = true
+				break
+			}
+		}
+		if match {
 			reservedClaims = append(reservedClaims, managedClusterClaim)
 			continue
 		}
