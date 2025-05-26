@@ -840,7 +840,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 					return false
 				}
 				return actual.Spec.Template.Spec.Containers[0].Args[7] == "--max-custom-cluster-claims=2" &&
-					actual.Spec.Template.Spec.Containers[0].Args[8] == "--reserved-cluster-claim-suffixes=[reserved1.io reserved2.io]"
+					actual.Spec.Template.Spec.Containers[0].Args[8] == "--reserved-cluster-claim-suffixes=reserved1.io,reserved2.io"
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Check if generations are correct

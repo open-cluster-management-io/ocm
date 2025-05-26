@@ -64,14 +64,8 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 			Name:  clusterClaim.Name,
 			Value: clusterClaim.Spec.Value,
 		}
-		match := false
-		for reservedSuffix := range reservedClaimSuffixes {
-			if strings.HasSuffix(clusterClaim.Name, reservedSuffix) {
-				match = true
-				break
-			}
-		}
-		if match {
+
+		if suffixesMatch(reservedClaimSuffixes, managedClusterClaim) {
 			reservedClaims = append(reservedClaims, managedClusterClaim)
 			continue
 		}
@@ -99,4 +93,13 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 	claims := append(reservedClaims, customClaims...) // nolint:gocritic
 	cluster.Status.ClusterClaims = claims
 	return nil
+}
+
+func suffixesMatch(suffixes sets.Set[string], claim clusterv1.ManagedClusterClaim) bool {
+	for suffix := range suffixes {
+		if strings.HasSuffix(claim.Name, suffix) {
+			return true
+		}
+	}
+	return false
 }

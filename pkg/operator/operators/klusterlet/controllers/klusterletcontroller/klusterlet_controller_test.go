@@ -377,7 +377,8 @@ func getDeployments(actions []clienttesting.Action, verb, suffix string) *appsv1
 	return nil
 }
 
-func assertKlusterletDeployment(t *testing.T, actions []clienttesting.Action, verb, serverURL, clusterName string) {
+func assertKlusterletDeployment(t *testing.T, registrationAuthType string, actions []clienttesting.Action, verb, serverURL, clusterName string,
+	claimConfig *operatorapiv1.ClusterClaimConfiguration) {
 	deployment := getDeployments(actions, verb, "agent")
 	if deployment == nil {
 		t.Errorf("klusterlet deployment not found")
@@ -399,24 +400,39 @@ func assertKlusterletDeployment(t *testing.T, actions []clienttesting.Action, ve
 		"--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig",
 	}
 
+	expectedArgs = append(expectedArgs, "--agent-id=", "--workload-source-driver=kube", "--workload-source-config=/spoke/hub-kubeconfig/kubeconfig",
+		"--status-sync-interval=60s", "--kube-api-qps=20", "--kube-api-burst=60")
+
 	if serverURL != "" {
 		expectedArgs = append(expectedArgs, fmt.Sprintf("--spoke-external-server-urls=%s", serverURL))
 	}
 
-	expectedArgs = append(expectedArgs, "--agent-id=", "--workload-source-driver=kube", "--workload-source-config=/spoke/hub-kubeconfig/kubeconfig",
-		"--status-sync-interval=60s", "--kube-api-qps=20", "--kube-api-burst=60",
-		"--registration-auth=awsirsa",
-		"--hub-cluster-arn=arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1",
-		"--managed-cluster-arn=arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
-		"--managed-cluster-role-suffix=7f8141296c75f2871e3d030f85c35692")
+	if claimConfig != nil {
+		if claimConfig.MaxCustomClusterClaims > 0 {
+			expectedArgs = append(expectedArgs, fmt.Sprintf("--max-custom-cluster-claims=%d", claimConfig.MaxCustomClusterClaims))
+		}
+		if len(claimConfig.ReservedClusterClaimSuffixes) > 0 {
+			expectedArgs = append(expectedArgs, fmt.Sprintf("--reserved-cluster-claim-suffixes=%s",
+				strings.Join(claimConfig.ReservedClusterClaimSuffixes, ",")))
+		}
+	}
+	if registrationAuthType == "awsirsa" {
+		expectedArgs = append(expectedArgs,
+			"--registration-auth=awsirsa",
+			"--hub-cluster-arn=arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1",
+			"--managed-cluster-arn=arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
+			"--managed-cluster-role-suffix=7f8141296c75f2871e3d030f85c35692")
+	}
 
 	if !equality.Semantic.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expect args %v, but got %v", expectedArgs, args)
 		return
 	}
 
-	assert.True(t, isDotAwsMounted(volumeMounts))
-	assert.True(t, isDotAwsVolumePresent(volumes))
+	if registrationAuthType == "awsirsa" {
+		assert.True(t, isDotAwsMounted(volumeMounts))
+		assert.True(t, isDotAwsVolumePresent(volumes))
+	}
 
 }
 
@@ -1075,7 +1091,7 @@ func TestAWSIrsaAuthInSingletonMode(t *testing.T) {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 
-	assertKlusterletDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1")
+	assertKlusterletDeployment(t, commonhelpers.AwsIrsaAuthType, controller.kubeClient.Actions(), createVerb, "", "cluster1", nil)
 }
 
 func TestAWSIrsaAuthInNonSingletonMode(t *testing.T) {
@@ -1411,6 +1427,40 @@ func TestRenderingResourceRequirements(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClusterClaimConfigInSingletonMode(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	claimConfig := &operatorapiv1.ClusterClaimConfiguration{
+		MaxCustomClusterClaims:       2,
+		ReservedClusterClaimSuffixes: []string{"test1.io", "test2.io"},
+	}
+	if klusterlet.Spec.RegistrationConfiguration == nil {
+		klusterlet.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationConfiguration{}
+	}
+	klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration = claimConfig
+
+	klusterlet.Spec.DeployOption.Mode = operatorapiv1.InstallModeSingleton
+	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
+	hubSecret.Data["kubeconfig"] = []byte("dummykubeconfig")
+	hubSecret.Data["cluster-name"] = []byte("cluster1")
+	objects := []runtime.Object{
+		newNamespace("testns"),
+		newSecret(helpers.BootstrapHubKubeConfig, "testns"),
+		hubSecret,
+	}
+
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
+		objects...)
+
+	err := controller.controller.sync(context.TODO(), syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	assertKlusterletDeployment(t, commonhelpers.CSRAuthType, controller.kubeClient.Actions(), createVerb,
+		"", "cluster1", claimConfig)
 }
 
 func newKubeConfig(host string) []byte {

@@ -72,7 +72,7 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 		"The period to check managed cluster kube-apiserver health")
 	fs.IntVar(&o.MaxCustomClusterClaims, "max-custom-cluster-claims", o.MaxCustomClusterClaims,
 		"The max number of custom cluster claims to expose.")
-	fs.StringArrayVar(&o.ReservedClusterClaimSuffixes, "reserved-cluster-claim-suffixes", o.ReservedClusterClaimSuffixes,
+	fs.StringSliceVar(&o.ReservedClusterClaimSuffixes, "reserved-cluster-claim-suffixes", o.ReservedClusterClaimSuffixes,
 		"A list of suffixes for reserved cluster claims.")
 	fs.StringToStringVar(&o.ClusterAnnotations, "cluster-annotations", o.ClusterAnnotations, `the annotations with the reserve
 	 prefix "agent.open-cluster-management.io" set on ManagedCluster when creating only, other actors can update it afterwards.`)
