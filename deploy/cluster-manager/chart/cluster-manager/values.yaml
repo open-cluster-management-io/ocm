@@ -79,7 +79,7 @@ affinity:
                   - cluster-manager
 
 # enableSyncLabels for clusterManager operator deployment.
-enableSyncLabels: true
+enableSyncLabels: false
 
 # if true, will create a bootstrap secret for cluster join and auto approve.
 createBootstrapToken: false
