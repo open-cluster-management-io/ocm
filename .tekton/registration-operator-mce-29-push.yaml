@@ -28,6 +28,9 @@ spec:
     - name: build-platforms
       value:
         - linux/x86_64
+        - linux/arm64
+        - linux/ppc64le
+        - linux/s390x
     - name: dockerfile
       value: build/Dockerfile.registration-operator.rhtap
     - name: path-context
@@ -114,6 +117,9 @@ spec:
         type: string
       - default:
           - linux/x86_64
+          - linux/arm64
+          - linux/ppc64le
+          - linux/s390x
         description:
           List of platforms to build the container images on. The available
           set of values is determined by the configuration of the multi-platform-controller.
