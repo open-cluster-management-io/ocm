@@ -3,24 +3,21 @@ package managedcluster
 import (
 	"context"
 	"fmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
-	aboutv1alpha1 "sigs.k8s.io/about-api/pkg/apis/v1alpha1"
-	"sort"
-	"strings"
-
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-
+	"k8s.io/apimachinery/pkg/util/sets"
 	clusterv1alpha1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	ocmfeature "open-cluster-management.io/api/feature"
-	aboutv1alpha1listers "sigs.k8s.io/about-api/pkg/generated/listers/apis/v1alpha1"
-
 	"open-cluster-management.io/ocm/pkg/features"
+	aboutv1alpha1 "sigs.k8s.io/about-api/pkg/apis/v1alpha1"
+	aboutv1alpha1listers "sigs.k8s.io/about-api/pkg/generated/listers/apis/v1alpha1"
+	"sort"
+	"strings"
 )
 
 const labelCustomizedOnly = "open-cluster-management.io/spoke-only"
@@ -34,9 +31,6 @@ type claimReconcile struct {
 }
 
 func (r *claimReconcile) reconcile(ctx context.Context, cluster *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error) {
-	if !features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
-		return cluster, reconcileContinue, nil
-	}
 	// current managed cluster has not joined the hub yet, do nothing.
 	if !meta.IsStatusConditionTrue(cluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined) {
 		r.recorder.Eventf("ManagedClusterIsNotAccepted", "Managed cluster %q does not join the hub yet", cluster.Name)
@@ -50,15 +44,22 @@ func (r *claimReconcile) reconcile(ctx context.Context, cluster *clusterv1.Manag
 // exposeClaims saves cluster claims fetched on managed cluster into status of the
 // managed cluster on hub. Some of the customized claims might not be exposed once
 // the total number of the claims exceeds the value of `cluster-claims-max`.
-func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.ManagedCluster) error {
+func (r *claimReconcile) exposeClaims(_ context.Context, cluster *clusterv1.ManagedCluster) error {
 	var reservedClaims, customClaims []clusterv1.ManagedClusterClaim
+	var clusterClaims []*clusterv1alpha1.ClusterClaim
 
 	// clusterClaim with label `open-cluster-management.io/spoke-only` will not be synced to managedCluster.Status at hub.
-	requirement, _ := labels.NewRequirement(labelCustomizedOnly, selection.DoesNotExist, []string{})
-	selector := labels.NewSelector().Add(*requirement)
-	clusterClaims, err := r.claimLister.List(selector)
+	requirement, err := labels.NewRequirement(labelCustomizedOnly, selection.DoesNotExist, []string{})
 	if err != nil {
-		return fmt.Errorf("unable to list cluster claims: %w", err)
+		return err
+	}
+	selector := labels.NewSelector().Add(*requirement)
+
+	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
+		clusterClaims, err = r.claimLister.List(selector)
+		if err != nil {
+			return fmt.Errorf("unable to list cluster claims: %w", err)
+		}
 	}
 
 	// check if the cluster claim is one of the reserved claims or has a reserved suffix.
@@ -68,15 +69,18 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 
 	// when ClusterProperties feature is not enabled, the informer will not be started and the lister will
 	// return an empty list, so we do not need to check featuregate here.
-	clusterProperties, err := r.aboutLister.List(selector)
-	if err != nil {
-		return fmt.Errorf("unable to list cluster properties: %w", err)
+	propertiesMap := map[string]*aboutv1alpha1.ClusterProperty{}
+	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterProperty) {
+		clusterProperties, err := r.aboutLister.List(selector)
+		if err != nil {
+			return fmt.Errorf("unable to list cluster properties: %w", err)
+		}
+
+		for _, property := range clusterProperties {
+			propertiesMap[property.Name] = property
+		}
 	}
 
-	propertiesMap := map[string]*aboutv1alpha1.ClusterProperty{}
-	for _, property := range clusterProperties {
-		propertiesMap[property.Name] = property
-	}
 	// convert claim to properties
 	for _, clusterClaim := range clusterClaims {
 		// if the claim has the same name with the property, ignore it.
@@ -103,8 +107,8 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 			reservedClaimNames.Insert(property.Name)
 			continue
 		}
-		customClaims = append(customClaims, managedClusterClaim)
 
+		customClaims = append(customClaims, managedClusterClaim)
 	}
 
 	// sort claims by name

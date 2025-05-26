@@ -75,7 +75,7 @@ func NewManagedClusterStatusController(
 	)
 
 	return factory.New().
-		WithInformers(hubClusterInformer.Informer(), nodeInformer.Informer(), claimInformer.Informer(), propertyInformer.Informer()).
+		WithInformers(hubClusterInformer.Informer(), nodeInformer.Informer(), claimInformer.Informer()).
 		WithSync(c.sync).
 		ResyncEvery(resyncInterval).
 		ToController("ManagedClusterStatusController", recorder)
@@ -138,7 +138,7 @@ func (c *managedClusterStatusController) sync(ctx context.Context, syncCtx facto
 	outOfSynced := meta.IsStatusConditionFalse(newCluster.Status.Conditions, clusterv1.ManagedClusterConditionClockSynced)
 	if outOfSynced {
 		c.recorder.Eventf("ClockOutOfSync", "The managed cluster's clock is out of sync, the agent will not be able to update the status of managed cluster.")
-		return fmt.Errorf("the managed cluster's clock is out of sync, the agent will not be able to update the status of managed cluster.")
+		return fmt.Errorf("the managed cluster's clock is out of sync, the agent will not be able to update the status of managed cluster")
 	}
 
 	changed, err := c.patcher.PatchStatus(ctx, newCluster, newCluster.Status, cluster.Status)
@@ -175,5 +175,4 @@ func (c *managedClusterStatusController) sendAvailableConditionEvent(
 		c.hubEventRecorder.Eventf(newCluster, nil, corev1.EventTypeWarning, "Unavailable", "Unavailable",
 			"The %s is successfully imported. However, its Kube API server is unavailable", cluster.Name)
 	}
-
 }

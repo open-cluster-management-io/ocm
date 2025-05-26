@@ -15,13 +15,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
+	aboutclient "sigs.k8s.io/about-api/pkg/generated/clientset/versioned"
+	aboutinformers "sigs.k8s.io/about-api/pkg/generated/informers/externalversions"
 
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	ocmfeature "open-cluster-management.io/api/feature"
-	aboutclient "sigs.k8s.io/about-api/pkg/generated/clientset/versioned"
-	aboutinformers "sigs.k8s.io/about-api/pkg/generated/informers/externalversions"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
@@ -153,7 +153,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	spokeKubeClient kubernetes.Interface,
 	spokeKubeInformerFactory informers.SharedInformerFactory,
 	spokeClusterInformerFactory clusterv1informers.SharedInformerFactory,
-	aboutinformers aboutinformers.SharedInformerFactory,
+	aboutInformers aboutinformers.SharedInformerFactory,
 	recorder events.Recorder) error {
 	logger := klog.FromContext(ctx)
 	logger.Info("Cluster name and agent ID", "clusterName", o.agentOptions.SpokeClusterName, "agentID", o.agentOptions.AgentID)
@@ -365,7 +365,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		hubClient.ClusterInformer,
 		spokeKubeClient.Discovery(),
 		spokeClusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
-		aboutinformers.About().V1alpha1().ClusterProperties(),
+		aboutInformers.About().V1alpha1().ClusterProperties(),
 		spokeKubeInformerFactory.Core().V1().Nodes(),
 		o.registrationOption.MaxCustomClusterClaims,
 		o.registrationOption.ReservedClusterClaimSuffixes,
@@ -442,7 +442,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	}
 
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterProperty) {
-		go aboutinformers.Start(ctx.Done())
+		go aboutInformers.Start(ctx.Done())
 	}
 
 	go secretController.Run(ctx, 1)

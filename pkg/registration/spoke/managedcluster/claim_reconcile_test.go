@@ -12,10 +12,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	kubeinformers "k8s.io/client-go/informers"
-	fakekube "k8s.io/client-go/kubernetes/fake"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	aboutv1alpha1 "sigs.k8s.io/about-api/pkg/apis/v1alpha1"
+	aboutclusterfake "sigs.k8s.io/about-api/pkg/generated/clientset/versioned/fake"
 	aboutinformers "sigs.k8s.io/about-api/pkg/generated/informers/externalversions"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -108,6 +108,10 @@ func TestSync(t *testing.T) {
 	defer apiServer.Close()
 	kubeClient := kubefake.NewClientset()
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Minute*10)
+	err := features.SpokeMutableFeatureGate.Set("ClusterProperty=true")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -138,7 +142,7 @@ func TestSync(t *testing.T) {
 				}
 			}
 
-			fakeHubClient := fakekube.NewSimpleClientset()
+			fakeHubClient := kubefake.NewClientset()
 			ctx := context.TODO()
 			hubEventRecorder, err := helpers.NewEventRecorder(ctx,
 				clusterscheme.Scheme, fakeHubClient.EventsV1(), "test")
@@ -573,8 +577,12 @@ func TestExposeClaims(t *testing.T) {
 
 	apiServer, discoveryClient := newDiscoveryServer(t, nil)
 	defer apiServer.Close()
-	kubeClient := kubefake.NewSimpleClientset()
+	kubeClient := kubefake.NewClientset()
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Minute*10)
+	err := features.SpokeMutableFeatureGate.Set("ClusterProperty=true")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -609,7 +617,7 @@ func TestExposeClaims(t *testing.T) {
 				c.maxCustomClusterClaims = 20
 			}
 
-			fakeHubClient := fakekube.NewSimpleClientset()
+			fakeHubClient := kubefake.NewClientset()
 			ctx := context.TODO()
 			hubEventRecorder, err := helpers.NewEventRecorder(ctx,
 				clusterscheme.Scheme, fakeHubClient.EventsV1(), "test")
