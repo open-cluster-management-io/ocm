@@ -82,6 +82,15 @@ type DeleteOption struct {
 
 	// selectivelyOrphan represents a list of resources following orphan deletion stratecy
 	SelectivelyOrphan *SelectivelyOrphan `json:"selectivelyOrphans,omitempty"`
+
+	// TTLSecondsAfterFinished limits the lifetime of a ManifestWork that has been marked Complete
+	// by one or more conditionRules set for its manifests. If this field is set, and
+	// the manifestwork has completed, then it is elligible to be automatically deleted.
+	// If this field is unset, the manifestwork won't be automatically deleted even afer completion.
+	// If this field is set to zero, the manfiestwork becomes elligible to be deleted immediately
+	// after completion.
+	// +optional
+	TTLSecondsAfterFinished *int64 `json:"ttlSecondsAfterFinished,omitempty"`
 }
 
 // ManifestConfigOption represents the configurations of a manifest defined in workload field.
@@ -101,7 +110,62 @@ type ManifestConfigOption struct {
 	// if it is not set.
 	// +optional
 	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
+
+	// ConditionRules defines how to set manifestwork conditions for a specific manifest.
+	// +listType:=map
+	// +listMapKey:=condition
+	// +optional
+	ConditionRules []ConditionRule `json:"conditionRules,omitempty"`
 }
+
+// +kubebuilder:validation:XValidation:rule="self.type != 'CEL' || self.condition != \"\"",message="Condition is required for CEL rules"
+type ConditionRule struct {
+	// Condition is the type of condition that is set based on this rule.
+	// Any condition is supported, but certain special conditions can be used to
+	// to control higher level behaviors of the manifestwork.
+	// If the condition is Complete, the manifest will no longer be updated once completed.
+	// +kubebuilder:validation:Required
+	// +required
+	Condition string `json:"condition"`
+
+	// Type defines how a manifest should be evaluated for a condition.
+	// It can be CEL, or WellKnownConditions.
+	// If the type is CEL, user should specify the celExpressions field
+	// If the type is WellKnownConditions, certain common types in k8s.io/api will be considered
+	// completed as defined by hardcoded rules.
+	// +kubebuilder:validation:Required
+	// +required
+	Type ConditionRuleType `json:"type"`
+
+	// CelExpressions defines the CEL expressions to be evaluated for the condition.
+	// Final result is the logical AND of all expressions.
+	// +optional
+	CelExpressions []string `json:"celExpressions"`
+
+	// Message is set on the condition created for this rule
+	// +optional
+	Message string `json:"message"`
+
+	// MessageExpression uses a CEL expression to generate a message for the condition
+	// Will override message if both are set and messageExpression returns a non-empty string.
+	// Variables:
+	// - object: The current instance of the manifest
+	// - result: Boolean result of the CEL expressions
+	// +optional
+	MessageExpression string `json:"messageExpression"`
+}
+
+// +kubebuilder:validation:Enum=WellKnownConditions;CEL
+type ConditionRuleType string
+
+const (
+	// WellKnownConditionsType represents a standard Complete condition for some common types, which
+	// is reflected with a hardcoded rule for types in k8s.io/api
+	WellKnownConditionsType ConditionRuleType = "WellKnownConditions"
+
+	// CelConditionExpressionsType enables user defined rules to set the status of the condition
+	CelConditionExpressionsType ConditionRuleType = "CEL"
+)
 
 // ManifestWorkExecutor is the executor that applies the resources to the managed cluster. i.e. the
 // work agent.
@@ -527,6 +591,21 @@ const (
 	// ManifestDegraded represents that the current state of resource object does not
 	// match the desired state for a certain period.
 	ManifestDegraded string = "Degraded"
+	// ManifestComplete represents that the resource has completed and should no longer
+	// be updated.
+	ManifestComplete string = "Complete"
+)
+
+// Condition reasons
+const (
+	// ConditionRuleTrue is set when a rule is evaluated without error
+	ConditionRuleEvaluated string = "ConditionRuleEvaluated"
+	// ConditionRuleInvalid is set when a rule is invalid and cannot be evaluated
+	ConditionRuleInvalid string = "ConditionRuleInvalid"
+	// ConditionRuleExpressionError is set when a rule fails due to an invalid expression
+	ConditionRuleExpressionError string = "ConditionRuleExpressionError"
+	// ConditionRuleInternalError is set when rule evaluation results in an error not caused by the expression
+	ConditionRuleInternalError string = "ConditionRuleInternalError"
 )
 
 const (

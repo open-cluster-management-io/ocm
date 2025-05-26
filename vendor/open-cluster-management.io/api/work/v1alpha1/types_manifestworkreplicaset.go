@@ -63,6 +63,16 @@ type ManifestWorkReplicaSetSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	// +required
 	PlacementRefs []LocalPlacementReference `json:"placementRefs"`
+
+	// CascadeDeletionPolicy decides the manifestWorkReplicaSet is deleted before/after the related manifestWorks are gone.
+	// Acceptable values are:
+	// 'Background'- the manifestWorkReplicaSet is deleted without waiting for the related manifestWorks to be gone.
+	// 'Foreground'- the manifestWorkReplicaSet is deleted until the related manifestWorks are gone.
+	// +kubebuilder:default=Background
+	// +kubebuilder:validation:Enum=Background;Foreground
+	// +kubebuilder:validation:Required
+	// +optional
+	CascadeDeletionPolicy CascadeDeletionPolicy `json:"cascadeDeletionPolicy,omitempty"`
 }
 
 // ManifestWorkReplicaSetStatus defines the observed state of ManifestWorkReplicaSet
@@ -171,4 +181,15 @@ const (
 	//
 	// Reason: AsExpected, NotAsExpected or Processing
 	ManifestWorkReplicaSetConditionManifestworkApplied string = "ManifestworkApplied"
+)
+
+// CascadeDeletionPolicy decides the manifestWorkReplicaSet is deleted before/after the related manifestWorks are gone.
+type CascadeDeletionPolicy string
+
+const (
+	// Foreground decides the manifestWorkReplicaSet is deleted until the related manifestWorks are gone.
+	Foreground CascadeDeletionPolicy = "Foreground"
+
+	// Background decides the manifestWorkReplicaSet is deleted without waiting for the related manifestWorks to be gone.
+	Background CascadeDeletionPolicy = "Background"
 )
