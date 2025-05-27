@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -42,7 +43,7 @@ const (
 	originalImageValue                       = "quay.io/open-cluster-management/addon-examples:latest"
 	overrideImageValue                       = "quay.io/ocm/addon-examples:latest"
 	customSignerName                         = "example.com/signer-name"
-	//#nosec G101
+	// #nosec G101
 	customSignerSecretName = "addon-signer-secret"
 )
 
@@ -161,7 +162,10 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			}
 
 			return fmt.Errorf("the managedClusterAddon should be deleted")
-		}).ShouldNot(gomega.HaveOccurred())
+			// set 120s here, because need to wait for the feedbackrule update in pre-delete manifestwork status,
+			// the default status sync interval of work agent is 60s when the replica is 1.
+			// TODO: configure a small status-sync-interval in the e2e
+		}, 120*time.Second).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By(fmt.Sprintf("delete addon template resources for cluster %v", universalClusterName))
 		err = deleteResourcesFromYamlFiles(context.Background(), hub.DynamicClient, hub.RestMapper, s,
@@ -321,7 +325,10 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			}
 
 			return fmt.Errorf("the managedClusterAddon should be deleted")
-		}).ShouldNot(gomega.HaveOccurred())
+			// set 120s here, because need to wait for the feedbackrule update in pre-delete manifestwork status,
+			// the default status sync interval of work agent is 60s when the replica is 1.
+			// TODO: configure a small status-sync-interval in the e2e
+		}, 120*time.Second).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("The pre-delete job should be deleted ")
 		gomega.Eventually(func() error {
