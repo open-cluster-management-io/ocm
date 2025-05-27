@@ -11,6 +11,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
@@ -172,7 +173,12 @@ var _ = BeforeSuite(func() {
 			},
 		},
 	}, metav1.CreateOptions{})
-	Expect(err).ToNot(HaveOccurred())
+	if err != nil {
+		// ignore the already exists error so we can run the e2e test multiple times locally
+		if !errors.IsAlreadyExists(err) {
+			Expect(err).ToNot(HaveOccurred())
+		}
+	}
 
 	Eventually(func() error {
 		umc, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), universalClusterName, metav1.GetOptions{})

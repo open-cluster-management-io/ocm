@@ -3,6 +3,7 @@ package framework
 import (
 	"context"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -83,6 +84,9 @@ func (spoke *Spoke) CreateKlusterlet(
 			Namespace:   klusterletNamespace,
 			DeployOption: operatorapiv1.KlusterletDeployOption{
 				Mode: mode,
+			},
+			WorkConfiguration: &operatorapiv1.WorkAgentConfiguration{
+				StatusSyncInterval: &metav1.Duration{Duration: 5 * time.Second},
 			},
 		},
 	}

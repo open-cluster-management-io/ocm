@@ -86,7 +86,9 @@ spec:
           {{if .ExternalServerURL}}
           - "--spoke-external-server-urls={{ .ExternalServerURL }}"
           {{end}}
-          {{if eq .Replica 1}}
+          {{if .WorkStatusSyncInterval}}
+          - "--status-sync-interval={{ .WorkStatusSyncInterval }}"
+          {{else if eq .Replica 1}}
           - "--status-sync-interval=60s"
           {{end}}
           {{if gt .ClientCertExpirationSeconds 0}}
