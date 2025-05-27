@@ -61,6 +61,17 @@ spec:
             description: Spec reperesents the desired ManifestWork payload and Placement
               reference to be reconciled
             properties:
+              cascadeDeletionPolicy:
+                default: Background
+                description: |-
+                  CascadeDeletionPolicy decides the manifestWorkReplicaSet is deleted before/after the related manifestWorks are gone.
+                  Acceptable values are:
+                  'Background'- the manifestWorkReplicaSet is deleted without waiting for the related manifestWorks to be gone.
+                  'Foreground'- the manifestWorkReplicaSet is deleted until the related manifestWorks are gone.
+                enum:
+                - Background
+                - Foreground
+                type: string
               manifestWorkTemplate:
                 description: ManifestWorkTemplate is the ManifestWorkSpec that will
                   be used to generate a per-cluster ManifestWork
@@ -581,6 +592,7 @@ spec:
                 minItems: 1
                 type: array
             required:
+            - cascadeDeletionPolicy
             - placementRefs
             type: object
           status:

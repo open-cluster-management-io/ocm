@@ -342,6 +342,8 @@ github.com/xiang90/probing v0.0.0-20221125231312-a49e3df8f510 h1:S2dVYn90KE98chq
 github.com/xiang90/probing v0.0.0-20221125231312-a49e3df8f510/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
+github.com/zhujian7/api-ocm v0.0.0-20250527031219-2fcb3d3b497c h1:hUZyNpDQeUJLNz+ByolKWwKygnIaqvLsVuV2M+wRSW4=
+github.com/zhujian7/api-ocm v0.0.0-20250527031219-2fcb3d3b497c/go.mod h1:/OeqXycNBZQoe3WG6ghuWsMgsKGuMZrK8ZpsU6gWL0Y=
 go.etcd.io/bbolt v1.3.11 h1:yGEzV1wPz2yVCLsD8ZAiGHhHVlczyC9d1rP43/VCRJ0=
 go.etcd.io/bbolt v1.3.11/go.mod h1:dksAq7YMXoljX0xu6VF5DMZGbhYYoLUalEiSySYAS4I=
 go.etcd.io/etcd/api/v3 v3.5.16 h1:WvmyJVbjWqK4R1E+B12RRHz3bRGy9XVfh++MgbN+6n0=
@@ -487,8 +489,6 @@ k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 h1:M3sRQVHv7vB20Xc2ybTt7ODCeFj6J
 k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 open-cluster-management.io/addon-framework v0.12.1-0.20250407131028-9d436ffc2da7 h1:oLu9ag44Msf56Hb19b/b+UTNq0J2l9rhlBQ1gh7izCU=
 open-cluster-management.io/addon-framework v0.12.1-0.20250407131028-9d436ffc2da7/go.mod h1:7AEw1Sq9UEWpQGTU8zV1XPNkFRBYPbyBh8tfhISV++s=
-open-cluster-management.io/api v0.16.2-0.20250506092504-9143e192a0a7 h1:UupwgKlXEy/uyIIy8L6AEIOQUsZkz259C7mr44pJKC0=
-open-cluster-management.io/api v0.16.2-0.20250506092504-9143e192a0a7/go.mod h1:/OeqXycNBZQoe3WG6ghuWsMgsKGuMZrK8ZpsU6gWL0Y=
 open-cluster-management.io/sdk-go v0.16.1-0.20250428032116-875454003818 h1:b7HpdTpKPzLEoJ5UtrXCed1PjxaKOxEboJ+kG6FZudI=
 open-cluster-management.io/sdk-go v0.16.1-0.20250428032116-875454003818/go.mod h1:n89YVVoi5zm3KVpOyVMmTdD4rGOVSsykUtu7Ol3do3M=
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.0 h1:CPT0ExVicCzcpeN4baWEV2ko2Z/AsiZgEdwgcfwLgMo=
