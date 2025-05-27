@@ -182,7 +182,7 @@ type klusterletConfig struct {
 	InstallMode                                 operatorapiv1.InstallMode
 
 	MaxCustomClusterClaims       int
-	ReservedClusterClaimSuffixes []string
+	ReservedClusterClaimSuffixes string
 	// PriorityClassName is the name of the PriorityClass used by the deployed agents
 	PriorityClassName string
 
