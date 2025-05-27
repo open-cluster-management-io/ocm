@@ -57,15 +57,17 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 		return fmt.Errorf("unable to list cluster claims: %w", err)
 	}
 
-	reservedClaimSuffixes := sets.New(clusterv1alpha1.ReservedClusterClaimNames[:]...)
-	reservedClaimSuffixes.Insert(r.reservedClusterClaimSuffixes...)
+	// check if the cluster claim is one of the reserved claims or has a reserved suffix.
+	// if so, it will be treated as a reserved claim and will always be exposed.
+	reservedClaimNames := sets.New(clusterv1alpha1.ReservedClusterClaimNames[:]...)
+	reservedClaimSuffixes := sets.New(r.reservedClusterClaimSuffixes...)
 	for _, clusterClaim := range clusterClaims {
 		managedClusterClaim := clusterv1.ManagedClusterClaim{
 			Name:  clusterClaim.Name,
 			Value: clusterClaim.Spec.Value,
 		}
 
-		if suffixesMatch(reservedClaimSuffixes, managedClusterClaim) {
+		if matchReservedClaims(reservedClaimNames, reservedClaimSuffixes, managedClusterClaim) {
 			reservedClaims = append(reservedClaims, managedClusterClaim)
 			continue
 		}
@@ -95,8 +97,12 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 	return nil
 }
 
-func suffixesMatch(suffixes sets.Set[string], claim clusterv1.ManagedClusterClaim) bool {
-	for suffix := range suffixes {
+func matchReservedClaims(reservedClaims, reservedSuffixes sets.Set[string], claim clusterv1.ManagedClusterClaim) bool {
+	if reservedClaims.Has(claim.Name) {
+		return true
+	}
+
+	for suffix := range reservedSuffixes {
 		if strings.HasSuffix(claim.Name, suffix) {
 			return true
 		}

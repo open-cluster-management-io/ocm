@@ -214,6 +214,14 @@ func TestExposeClaims(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
+						Name: "id-test.k8s.io",
+					},
+					Spec: clusterv1alpha1.ClusterClaimSpec{
+						Value: "cluster1",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: "c",
 					},
 					Spec: clusterv1alpha1.ClusterClaimSpec{
