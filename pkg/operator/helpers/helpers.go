@@ -837,8 +837,15 @@ func GetClusterManagerLabels(cm *operatorapiv1.ClusterManager) map[string]string
 	if labels == nil {
 		labels = map[string]string{}
 	}
-
 	return labels
+}
+
+func ConvertLabelsMapToString(labels map[string]string) string {
+	var labelList []string
+	for key, value := range labels {
+		labelList = append(labelList, fmt.Sprintf("%s=%s", key, value))
+	}
+	return strings.Join(labelList, ",")
 }
 
 func MapCompare(required, existing map[string]string) bool {

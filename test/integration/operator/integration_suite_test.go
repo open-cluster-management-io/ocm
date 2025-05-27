@@ -129,8 +129,8 @@ var _ = ginkgo.BeforeSuite(func() {
 	_, err = operatorClient.OperatorV1().ClusterManagers().Create(context.Background(), &operatorapiv1.ClusterManager{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterManagerName,
-			Labels: map[string]string {
-				"app": "clustermanager",
+			Labels: map[string]string{
+				"app":      "clustermanager",
 				"labelOne": "valueOne",
 				"labelTwo": "valueTwo",
 			},
@@ -163,8 +163,8 @@ var _ = ginkgo.BeforeSuite(func() {
 	_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Create(context.Background(), &operatorapiv1.ClusterManager{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterManagerName,
-			Labels: map[string]string {
-				"app": "clustermanager",
+			Labels: map[string]string{
+				"app":      "clustermanager",
 				"labelOne": "valueOne",
 				"labelTwo": "valueTwo",
 			},

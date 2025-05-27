@@ -15,6 +15,11 @@ spec:
   selector:
     matchLabels:
       app: clustermanager-registration-controller
+      { { if gt (len .Labels) 0 } }
+      { { range $key, $value := .Labels } }
+      "{{ $key }}": "{{ $value }}"
+      { { end } }
+      { { end } }
   template:
     metadata:
       labels:
@@ -89,8 +94,8 @@ spec:
           {{if .AwsResourceTags}}
           - "--aws-resource-tags={{ .AwsResourceTags }}"
           {{end}}
-          {{ if gt (len .Labels) 0 }}
-          - "--labels={{ .Labels }}"
+          {{ if gt (len .LabelsString) 0 }}
+          - "--labels={{ .LabelsString }}"
           {{ end }}
         env:
           - name: POD_NAME

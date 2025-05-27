@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	errorhelpers "errors"
-	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -227,7 +226,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	}
 
 	if n.enableSyncLabels {
-		fmt.Printf("get cluster manager labels: %v", helpers.GetClusterManagerLabels(clusterManager))
+		config.LabelsString = helpers.ConvertLabelsMapToString(helpers.GetClusterManagerLabels(clusterManager))
 		config.Labels = helpers.GetClusterManagerLabels(clusterManager)
 	}
 
