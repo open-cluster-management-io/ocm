@@ -65,7 +65,8 @@ var authn *util.TestAuthn
 var stopHub context.CancelFunc
 var stopProxy context.CancelFunc
 
-var startHub func()
+var startHub func(m *hub.HubManagerOptions)
+var hubOption *hub.HubManagerOptions
 
 var CRDPaths = []string{
 	// hub
@@ -204,16 +205,16 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	// start hub controller
 	var ctx context.Context
-	startHub = func() {
+
+	hubOption = hub.NewHubManagerOptions()
+	hubOption.EnabledRegistrationDrivers = []string{helpers.CSRAuthType}
+	hubOption.ClusterAutoApprovalUsers = []string{util.AutoApprovalBootstrapUser}
+
+	startHub = func(m *hub.HubManagerOptions) {
 		ctx, stopHub = context.WithCancel(context.Background())
 		go func() {
 			defer ginkgo.GinkgoRecover()
-			m := hub.NewHubManagerOptions()
 			m.ImportOption.APIServerURL = cfg.Host
-			m.EnabledRegistrationDrivers = []string{helpers.CSRAuthType, helpers.AwsIrsaAuthType}
-			m.HubClusterArn = "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
-			m.ClusterAutoApprovalUsers = []string{util.AutoApprovalBootstrapUser}
-			m.AutoApprovedARNPatterns = []string{"arn:aws:eks:us-west-2:123456789012:cluster/.*"}
 			err := m.RunControllerManager(ctx, &controllercmd.ControllerContext{
 				KubeConfig:    cfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
@@ -222,7 +223,7 @@ var _ = ginkgo.BeforeSuite(func() {
 		}()
 	}
 
-	startHub()
+	startHub(hubOption)
 
 	// start a proxy server
 	proxyCertData, proxyKeyData, err := authn.SignServerCert("proxyserver", 24*time.Hour)
