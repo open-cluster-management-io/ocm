@@ -29,8 +29,11 @@ import (
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
-func TestSync(t *testing.T) {
+func init() {
 	utilruntime.Must(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeRegistrationFeatureGates))
+}
+
+func TestSync(t *testing.T) {
 	cases := []struct {
 		name            string
 		cluster         runtime.Object
@@ -125,6 +128,7 @@ func TestSync(t *testing.T) {
 				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
 				kubeInformerFactory.Core().V1().Nodes(),
 				20,
+				[]string{},
 				eventstesting.NewTestingEventRecorder(t),
 				hubEventRecorder,
 			)
@@ -139,12 +143,13 @@ func TestSync(t *testing.T) {
 
 func TestExposeClaims(t *testing.T) {
 	cases := []struct {
-		name                   string
-		cluster                *clusterv1.ManagedCluster
-		claims                 []*clusterv1alpha1.ClusterClaim
-		maxCustomClusterClaims int
-		validateActions        func(t *testing.T, actions []clienttesting.Action)
-		expectedErr            string
+		name                         string
+		cluster                      *clusterv1.ManagedCluster
+		claims                       []*clusterv1alpha1.ClusterClaim
+		maxCustomClusterClaims       int
+		reservedClusterClaimSuffixes []string
+		validateActions              func(t *testing.T, actions []clienttesting.Action)
+		expectedErr                  string
 	}{
 		{
 			name:    "sync claims into status of the managed cluster",
@@ -209,6 +214,14 @@ func TestExposeClaims(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
+						Name: "id-test.k8s.io",
+					},
+					Spec: clusterv1alpha1.ClusterClaimSpec{
+						Value: "cluster1",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: "c",
 					},
 					Spec: clusterv1alpha1.ClusterClaimSpec{
@@ -229,6 +242,85 @@ func TestExposeClaims(t *testing.T) {
 					{
 						Name:  "id.k8s.io",
 						Value: "cluster1",
+					},
+					{
+						Name:  "a",
+						Value: "b",
+					},
+					{
+						Name:  "c",
+						Value: "d",
+					},
+				}
+				actual := cluster.Status.ClusterClaims
+				if !reflect.DeepEqual(actual, expected) {
+					t.Errorf("expected cluster claim %v but got: %v", expected, actual)
+				}
+			},
+		},
+		{
+			name:    "keep custom reserved cluster claims",
+			cluster: testinghelpers.NewJoinedManagedCluster(),
+			claims: []*clusterv1alpha1.ClusterClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "a",
+					},
+					Spec: clusterv1alpha1.ClusterClaimSpec{
+						Value: "b",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "e",
+					},
+					Spec: clusterv1alpha1.ClusterClaimSpec{
+						Value: "f",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "id.k8s.io",
+					},
+					Spec: clusterv1alpha1.ClusterClaimSpec{
+						Value: "cluster1",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "c",
+					},
+					Spec: clusterv1alpha1.ClusterClaimSpec{
+						Value: "d",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test.reserved.io",
+					},
+					Spec: clusterv1alpha1.ClusterClaimSpec{
+						Value: "test",
+					},
+				},
+			},
+			maxCustomClusterClaims:       2,
+			reservedClusterClaimSuffixes: []string{"reserved.io"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				cluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, cluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				expected := []clusterv1.ManagedClusterClaim{
+					{
+						Name:  "id.k8s.io",
+						Value: "cluster1",
+					},
+					{
+						Name:  "test.reserved.io",
+						Value: "test",
 					},
 					{
 						Name:  "a",
@@ -356,6 +448,7 @@ func TestExposeClaims(t *testing.T) {
 				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
 				kubeInformerFactory.Core().V1().Nodes(),
 				c.maxCustomClusterClaims,
+				c.reservedClusterClaimSuffixes,
 				eventstesting.NewTestingEventRecorder(t),
 				hubEventRecorder,
 			)

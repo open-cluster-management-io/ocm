@@ -107,6 +107,12 @@ spec:
           {{if gt .AgentKubeAPIBurst 0}}
           - "--kube-api-burst={{ .AgentKubeAPIBurst }}"
           {{end}}
+          {{if .MaxCustomClusterClaims}}
+          - "--max-custom-cluster-claims={{ .MaxCustomClusterClaims }}"
+          {{end}}
+          {{if .ReservedClusterClaimSuffixes}}
+          - "--reserved-cluster-claim-suffixes={{ .ReservedClusterClaimSuffixes }}"
+          {{end}}
           {{if .AppliedManifestWorkEvictionGracePeriod}}
           - "--appliedmanifestwork-eviction-grace-period={{ .AppliedManifestWorkEvictionGracePeriod }}"
           {{end}}
