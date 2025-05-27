@@ -193,6 +193,9 @@ type ClusterClaimConfiguration struct {
 
 	// Custom suffixes for reserved ClusterClaims.
 	// +optional
+	// +kubebuilder:validation:MaxItems=10
+	// +kubebuilder:validation:items:MinLength=1
+	// +kubebuilder:validation:items:MaxLength=64
 	ReservedClusterClaimSuffixes []string `json:"reservedClusterClaimSuffixes,omitempty"`
 }
 
@@ -296,6 +299,14 @@ type WorkAgentConfiguration struct {
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Pattern="^([0-9]+(s|m|h))+$"
 	AppliedManifestWorkEvictionGracePeriod *metav1.Duration `json:"appliedManifestWorkEvictionGracePeriod,omitempty"`
+
+	// StatusSyncInterval is the interval for the work agent to check the status of ManifestWorks.
+	// Larger value means less frequent status sync and less api calls to the managed cluster, vice versa.
+	// The value(x) should be: 5s <= x <= 1h.
+	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Pattern="^([0-9]+(s|m|h))+$"
+	StatusSyncInterval *metav1.Duration `json:"statusSyncInterval,omitempty"`
 }
 
 const (

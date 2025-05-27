@@ -160,7 +160,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 				return err
 			}
 
-			return fmt.Errorf("the managedClusterAddon should be deleted")
+			return fmt.Errorf("the managedClusterAddon %s should be deleted", addOnName)
 		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By(fmt.Sprintf("delete addon template resources for cluster %v", universalClusterName))

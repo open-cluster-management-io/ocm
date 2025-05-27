@@ -30,11 +30,12 @@ type SpokeAgentOptions struct {
 	// See more details in: https://github.com/open-cluster-management-io/ocm/pull/443#discussion_r1610868646
 	HubConnectionTimeoutSeconds int32
 
-	HubKubeconfigSecret      string
-	SpokeExternalServerURLs  []string
-	ClusterHealthCheckPeriod time.Duration
-	MaxCustomClusterClaims   int
-	ClusterAnnotations       map[string]string
+	HubKubeconfigSecret          string
+	SpokeExternalServerURLs      []string
+	ClusterHealthCheckPeriod     time.Duration
+	MaxCustomClusterClaims       int
+	ReservedClusterClaimSuffixes []string
+	ClusterAnnotations           map[string]string
 
 	RegisterDriverOption *registerfactory.Options
 }
@@ -71,6 +72,8 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 		"The period to check managed cluster kube-apiserver health")
 	fs.IntVar(&o.MaxCustomClusterClaims, "max-custom-cluster-claims", o.MaxCustomClusterClaims,
 		"The max number of custom cluster claims to expose.")
+	fs.StringSliceVar(&o.ReservedClusterClaimSuffixes, "reserved-cluster-claim-suffixes", o.ReservedClusterClaimSuffixes,
+		"A list of suffixes for reserved cluster claims.")
 	fs.StringToStringVar(&o.ClusterAnnotations, "cluster-annotations", o.ClusterAnnotations, `the annotations with the reserve
 	 prefix "agent.open-cluster-management.io" set on ManagedCluster when creating only, other actors can update it afterwards.`)
 

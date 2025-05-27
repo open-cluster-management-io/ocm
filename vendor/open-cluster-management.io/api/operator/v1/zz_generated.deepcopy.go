@@ -780,6 +780,11 @@ func (in *WorkAgentConfiguration) DeepCopyInto(out *WorkAgentConfiguration) {
 		*out = new(metav1.Duration)
 		**out = **in
 	}
+	if in.StatusSyncInterval != nil {
+		in, out := &in.StatusSyncInterval, &out.StatusSyncInterval
+		*out = new(metav1.Duration)
+		**out = **in
+	}
 	return
 }
 

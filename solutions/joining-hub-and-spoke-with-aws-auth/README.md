@@ -69,7 +69,7 @@ The hub and spoke can be joined using AWS IAM based authentication by running fo
 
 4. Login to hub EKS clusters and initialize hub:
    ```shell
-   clusteradm init --bundle-version latest --registration-drivers awsirsa \
+   clusteradm init --registration-drivers awsirsa \
    --feature-gates ManagedClusterAutoApproval=true \
    --auto-approved-arn-patterns "arn:aws:eks:us-west-2:123412341234:cluster/.*" --wait
    
@@ -83,7 +83,7 @@ The hub and spoke can be joined using AWS IAM based authentication by running fo
    ```shell
    clusteradm join --hub-token $TOKEN --hub-apiserver $HUB_API_SERVER \
    --wait --cluster-name $SPOKE_CLUSTER_NAME --singleton \
-   --bundle-version latest --registration-auth awsirsa \
+   --registration-auth awsirsa \
    --hub-cluster-arn arn:aws:eks:$HUB_REGION:"$HUB_ACCOUNT_ID":cluster/$HUB_CLUSTER_NAME
    ```
 

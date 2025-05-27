@@ -171,6 +171,8 @@ type klusterletConfig struct {
 	RegistrationKubeAPIBurst                    int32
 	WorkKubeAPIQPS                              float32
 	WorkKubeAPIBurst                            int32
+	AppliedManifestWorkEvictionGracePeriod      string
+	WorkStatusSyncInterval                      string
 	AgentKubeAPIQPS                             float32
 	AgentKubeAPIBurst                           int32
 	ExternalManagedKubeConfigSecret             string
@@ -178,8 +180,9 @@ type klusterletConfig struct {
 	ExternalManagedKubeConfigWorkSecret         string
 	ExternalManagedKubeConfigAgentSecret        string
 	InstallMode                                 operatorapiv1.InstallMode
-	AppliedManifestWorkEvictionGracePeriod      string
 
+	MaxCustomClusterClaims       int
+	ReservedClusterClaimSuffixes string
 	// PriorityClassName is the name of the PriorityClass used by the deployed agents
 	PriorityClassName string
 
@@ -252,20 +255,19 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 
 	config := klusterletConfig{
-		KlusterletName:                         klusterlet.Name,
-		KlusterletNamespace:                    helpers.KlusterletNamespace(klusterlet),
-		AgentNamespace:                         helpers.AgentNamespace(klusterlet),
-		AgentID:                                string(klusterlet.UID),
-		RegistrationImage:                      klusterlet.Spec.RegistrationImagePullSpec,
-		WorkImage:                              klusterlet.Spec.WorkImagePullSpec,
-		ClusterName:                            klusterlet.Spec.ClusterName,
-		SingletonImage:                         klusterlet.Spec.ImagePullSpec,
-		HubKubeConfigSecret:                    helpers.HubKubeConfig,
-		ExternalServerURL:                      getServersFromKlusterlet(klusterlet),
-		OperatorNamespace:                      n.operatorNamespace,
-		Replica:                                replica,
-		PriorityClassName:                      helpers.AgentPriorityClassName(klusterlet, n.kubeVersion),
-		AppliedManifestWorkEvictionGracePeriod: getAppliedManifestWorkEvictionGracePeriod(klusterlet),
+		KlusterletName:      klusterlet.Name,
+		KlusterletNamespace: helpers.KlusterletNamespace(klusterlet),
+		AgentNamespace:      helpers.AgentNamespace(klusterlet),
+		AgentID:             string(klusterlet.UID),
+		RegistrationImage:   klusterlet.Spec.RegistrationImagePullSpec,
+		WorkImage:           klusterlet.Spec.WorkImagePullSpec,
+		ClusterName:         klusterlet.Spec.ClusterName,
+		SingletonImage:      klusterlet.Spec.ImagePullSpec,
+		HubKubeConfigSecret: helpers.HubKubeConfig,
+		ExternalServerURL:   getServersFromKlusterlet(klusterlet),
+		OperatorNamespace:   n.operatorNamespace,
+		Replica:             replica,
+		PriorityClassName:   helpers.AgentPriorityClassName(klusterlet, n.kubeVersion),
 
 		ExternalManagedKubeConfigSecret:             helpers.ExternalManagedKubeConfig,
 		ExternalManagedKubeConfigRegistrationSecret: helpers.ExternalManagedKubeConfigRegistration,
@@ -370,6 +372,14 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 				AuthType: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType,
 			}
 		}
+
+		// include clusterClaimConfig info if it exists
+		if klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration != nil {
+			config.MaxCustomClusterClaims = int(klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration.MaxCustomClusterClaims)
+			config.ReservedClusterClaimSuffixes = strings.Join(
+				klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration.ReservedClusterClaimSuffixes, ",")
+		}
+
 		// construct cluster annotations string, the final format is "key1=value1,key2=value2"
 		var annotationsArray []string
 		for k, v := range commonhelpers.FilterClusterAnnotations(klusterlet.Spec.RegistrationConfiguration.ClusterAnnotations) {
@@ -385,6 +395,12 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		workFeatureGates = klusterlet.Spec.WorkConfiguration.FeatureGates
 		config.WorkKubeAPIQPS = float32(klusterlet.Spec.WorkConfiguration.KubeAPIQPS)
 		config.WorkKubeAPIBurst = klusterlet.Spec.WorkConfiguration.KubeAPIBurst
+		if klusterlet.Spec.WorkConfiguration.AppliedManifestWorkEvictionGracePeriod != nil {
+			config.AppliedManifestWorkEvictionGracePeriod = klusterlet.Spec.WorkConfiguration.AppliedManifestWorkEvictionGracePeriod.Duration.String()
+		}
+		if klusterlet.Spec.WorkConfiguration.StatusSyncInterval != nil {
+			config.WorkStatusSyncInterval = klusterlet.Spec.WorkConfiguration.StatusSyncInterval.Duration.String()
+		}
 	}
 
 	config.WorkFeatureGates, workFeatureMsgs = helpers.ConvertToFeatureGateFlags("Work", workFeatureGates, ocmfeature.DefaultSpokeWorkFeatureGates)
@@ -472,22 +488,6 @@ func getServersFromKlusterlet(klusterlet *operatorapiv1.Klusterlet) string {
 		serverString = append(serverString, server.URL)
 	}
 	return strings.Join(serverString, ",")
-}
-
-func getAppliedManifestWorkEvictionGracePeriod(klusterlet *operatorapiv1.Klusterlet) string {
-	if klusterlet == nil {
-		return ""
-	}
-
-	if klusterlet.Spec.WorkConfiguration == nil {
-		return ""
-	}
-
-	if klusterlet.Spec.WorkConfiguration.AppliedManifestWorkEvictionGracePeriod == nil {
-		return ""
-	}
-
-	return klusterlet.Spec.WorkConfiguration.AppliedManifestWorkEvictionGracePeriod.Duration.String()
 }
 
 // getManagedKubeConfig is a helper func for Hosted mode, it will retrieve managed cluster

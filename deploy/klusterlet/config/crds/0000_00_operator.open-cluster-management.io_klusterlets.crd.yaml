@@ -264,7 +264,10 @@ spec:
                       reservedClusterClaimSuffixes:
                         description: Custom suffixes for reserved ClusterClaims.
                         items:
+                          maxLength: 64
+                          minLength: 1
                           type: string
+                        maxItems: 10
                         type: array
                     required:
                     - maxCustomClusterClaims
@@ -486,6 +489,13 @@ spec:
                       If it is set empty, use the default value: 50
                     format: int32
                     type: integer
+                  statusSyncInterval:
+                    description: |-
+                      StatusSyncInterval is the interval for the work agent to check the status of ManifestWorks.
+                      Larger value means less frequent status sync and less api calls to the managed cluster, vice versa.
+                      The value(x) should be: 5s <= x <= 1h.
+                    pattern: ^([0-9]+(s|m|h))+$
+                    type: string
                 type: object
               workImagePullSpec:
                 description: |-
