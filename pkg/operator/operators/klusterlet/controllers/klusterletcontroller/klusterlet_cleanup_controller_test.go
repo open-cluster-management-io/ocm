@@ -53,7 +53,7 @@ func TestSyncDelete(t *testing.T) {
 	}
 
 	// 11 managed static manifests + 12 management static manifests + 1 hub kubeconfig + 2 namespaces + 2 deployments
-	if len(deleteActions) != 29 {
+	if len(deleteActions) != 28 {
 		t.Errorf("Expected 28 delete actions, but got %d", len(deleteActions))
 	}
 
@@ -127,7 +127,7 @@ func TestSyncDeleteHosted(t *testing.T) {
 	}
 
 	// 12 static manifests + 2 namespaces
-	if len(deleteActionsManaged) != 15 {
+	if len(deleteActionsManaged) != 14 {
 		t.Errorf("Expected 14 delete actions, but got %d", len(deleteActionsManaged))
 	}
 
