@@ -544,7 +544,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			ginkgo.By("start the hub again")
-			startHub()
+			startHub(hubOption)
 
 			assertSuccessClusterBootstrap(testNamespace, managedClusterName, hubKubeconfigSecret, kubeClient, kubeClient, clusterClient, authn, time.Hour*24)
 		})

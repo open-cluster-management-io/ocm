@@ -14,6 +14,7 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
+	"open-cluster-management.io/ocm/pkg/registration/hub"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	awsirsa "open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
 	registerfactory "open-cluster-management.io/ocm/pkg/registration/register/factory"
@@ -21,11 +22,29 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("Joining Process for aws flow", func() {
+// use ordered container since we need to run beforeAll to restart the hub with aws option
+var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 	var bootstrapKubeconfig string
 	var managedClusterName string
 	var hubKubeconfigSecret string
 	var hubKubeconfigDir string
+
+	ginkgo.BeforeAll(func() {
+		// stop the hub and start new hub with the updated option
+		stopHub()
+
+		awsHubOption := hub.NewHubManagerOptions()
+		awsHubOption.EnabledRegistrationDrivers = []string{helpers.CSRAuthType, helpers.AwsIrsaAuthType}
+		awsHubOption.HubClusterArn = "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
+		awsHubOption.AutoApprovedARNPatterns = []string{"arn:aws:eks:us-west-2:123456789012:cluster/.*"}
+		startHub(awsHubOption)
+
+		// stop hub with awsOption and restart hub with default option
+		ginkgo.DeferCleanup(func() {
+			stopHub()
+			startHub(hubOption)
+		})
+	})
 
 	ginkgo.BeforeEach(func() {
 		postfix := rand.String(5)
