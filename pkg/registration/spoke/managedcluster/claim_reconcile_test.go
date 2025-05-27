@@ -102,6 +102,61 @@ func TestSync(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:    "sync a joined managed cluster with same property and claims",
+			cluster: testinghelpers.NewJoinedManagedCluster(),
+			properties: []runtime.Object{
+				&aboutv1alpha1.ClusterProperty{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "key1",
+					},
+					Spec: aboutv1alpha1.ClusterPropertySpec{
+						Value: "value1",
+					},
+				},
+				&aboutv1alpha1.ClusterProperty{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "key2",
+					},
+					Spec: aboutv1alpha1.ClusterPropertySpec{
+						Value: "value2",
+					},
+				},
+			},
+			claims: []runtime.Object{
+				&clusterv1alpha1.ClusterClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "key1",
+					},
+					Spec: clusterv1alpha1.ClusterClaimSpec{
+						Value: "value3",
+					},
+				},
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				cluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, cluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				expected := []clusterv1.ManagedClusterClaim{
+					{
+						Name:  "key1",
+						Value: "value1",
+					},
+					{
+						Name:  "key2",
+						Value: "value2",
+					},
+				}
+				actual := cluster.Status.ClusterClaims
+				if !reflect.DeepEqual(actual, expected) {
+					t.Errorf("expected cluster claim %v but got: %v", expected, actual)
+				}
+			},
+		},
 	}
 
 	apiServer, discoveryClient := newDiscoveryServer(t, nil)
@@ -156,105 +211,6 @@ func TestSync(t *testing.T) {
 				discoveryClient,
 				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
 				clusterPropertyInformerFactory.About().V1alpha1().ClusterProperties(),
-				kubeInformerFactory.Core().V1().Nodes(),
-				20,
-				[]string{},
-				eventstesting.NewTestingEventRecorder(t),
-				hubEventRecorder,
-			)
-
-			syncErr := ctrl.sync(ctx, testingcommon.NewFakeSyncContext(t, ""))
-			testingcommon.AssertError(t, syncErr, c.expectedErr)
-
-			c.validateActions(t, clusterClient.Actions())
-		})
-	}
-}
-
-func TestExposeClaims(t *testing.T) {
-	cases := []struct {
-		name                   string
-		cluster                *clusterv1.ManagedCluster
-		properties             []*aboutv1alpha1.ClusterProperty
-		claims                 []*clusterv1alpha1.ClusterClaim
-		maxCustomClusterClaims int
-		validateActions        func(t *testing.T, actions []clienttesting.Action)
-		expectedErr            string
-	}{
-		{
-			name:    "sync claims into status of the managed cluster",
-			cluster: testinghelpers.NewJoinedManagedCluster(),
-			claims: []*clusterv1alpha1.ClusterClaim{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "a",
-					},
-					Spec: clusterv1alpha1.ClusterClaimSpec{
-						Value: "b",
-					},
-				},
-			},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "patch")
-				patch := actions[0].(clienttesting.PatchAction).GetPatch()
-				cluster := &clusterv1.ManagedCluster{}
-				err := json.Unmarshal(patch, cluster)
-				if err != nil {
-					t.Fatal(err)
-				}
-				expected := []clusterv1.ManagedClusterClaim{
-					{
-						Name:  "a",
-						Value: "b",
-					},
-				}
-				actual := cluster.Status.ClusterClaims
-				if !reflect.DeepEqual(actual, expected) {
-					t.Errorf("expected cluster claim %v but got: %v", expected, actual)
-				}
-			},
-		},
-	}
-
-	apiServer, discoveryClient := newDiscoveryServer(t, nil)
-	defer apiServer.Close()
-	kubeClient := kubefake.NewSimpleClientset()
-	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Minute*10)
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			var objects []runtime.Object
-			if c.cluster != nil {
-				objects = append(objects, c.cluster)
-			}
-
-			clusterClient := clusterfake.NewSimpleClientset(objects...)
-			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
-			if c.cluster != nil {
-				if err := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore().Add(c.cluster); err != nil {
-					t.Fatal(err)
-				}
-			}
-
-			for _, claim := range c.claims {
-				if err := clusterInformerFactory.Cluster().V1alpha1().ClusterClaims().Informer().GetStore().Add(claim); err != nil {
-					t.Fatal(err)
-				}
-			}
-
-			fakeHubClient := fakekube.NewSimpleClientset()
-			ctx := context.TODO()
-			hubEventRecorder, err := helpers.NewEventRecorder(ctx,
-				clusterscheme.Scheme, fakeHubClient.EventsV1(), "test")
-			if err != nil {
-				t.Fatal(err)
-			}
-			ctrl := newManagedClusterStatusController(
-				testinghelpers.TestManagedClusterName,
-				clusterClient,
-				clusterInformerFactory.Cluster().V1().ManagedClusters(),
-				discoveryClient,
-				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
 				kubeInformerFactory.Core().V1().Nodes(),
 				20,
 				[]string{},
@@ -648,19 +604,6 @@ func TestExposeClaims(t *testing.T) {
 
 func newManagedCluster(claims []clusterv1.ManagedClusterClaim) *clusterv1.ManagedCluster {
 	cluster := testinghelpers.NewJoinedManagedCluster()
-	cluster.Status.ClusterClaims = claims
-	return cluster
-}
-
-func newManagedClusterWithProperties(properties []aboutv1alpha1.ClusterProperty) *clusterv1.ManagedCluster {
-	cluster := testinghelpers.NewJoinedManagedCluster()
-	claims := make([]clusterv1.ManagedClusterClaim, len(properties))
-	for _, property := range properties {
-		claims = append(claims, clusterv1.ManagedClusterClaim{
-			Name:  property.Name,
-			Value: property.Spec.Value,
-		})
-	}
 	cluster.Status.ClusterClaims = claims
 	return cluster
 }

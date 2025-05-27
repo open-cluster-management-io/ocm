@@ -3,21 +3,22 @@ package managedcluster
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
+
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
+	aboutv1alpha1listers "sigs.k8s.io/about-api/pkg/generated/listers/apis/v1alpha1"
+
 	clusterv1alpha1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	ocmfeature "open-cluster-management.io/api/feature"
+
 	"open-cluster-management.io/ocm/pkg/features"
-	aboutv1alpha1 "sigs.k8s.io/about-api/pkg/apis/v1alpha1"
-	aboutv1alpha1listers "sigs.k8s.io/about-api/pkg/generated/listers/apis/v1alpha1"
-	"sort"
-	"strings"
 )
 
 const labelCustomizedOnly = "open-cluster-management.io/spoke-only"
@@ -47,6 +48,7 @@ func (r *claimReconcile) reconcile(ctx context.Context, cluster *clusterv1.Manag
 func (r *claimReconcile) exposeClaims(_ context.Context, cluster *clusterv1.ManagedCluster) error {
 	var reservedClaims, customClaims []clusterv1.ManagedClusterClaim
 	var clusterClaims []*clusterv1alpha1.ClusterClaim
+	claimsMap := map[string]clusterv1.ManagedClusterClaim{}
 
 	// clusterClaim with label `open-cluster-management.io/spoke-only` will not be synced to managedCluster.Status at hub.
 	requirement, err := labels.NewRequirement(labelCustomizedOnly, selection.DoesNotExist, []string{})
@@ -55,10 +57,34 @@ func (r *claimReconcile) exposeClaims(_ context.Context, cluster *clusterv1.Mana
 	}
 	selector := labels.NewSelector().Add(*requirement)
 
+	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterProperty) {
+		clusterProperties, err := r.aboutLister.List(selector)
+		if err != nil {
+			return fmt.Errorf("unable to list cluster properties: %w", err)
+		}
+
+		for _, property := range clusterProperties {
+			claimsMap[property.Name] = clusterv1.ManagedClusterClaim{
+				Name:  property.Name,
+				Value: property.Spec.Value,
+			}
+		}
+	}
+
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
 		clusterClaims, err = r.claimLister.List(selector)
 		if err != nil {
 			return fmt.Errorf("unable to list cluster claims: %w", err)
+		}
+
+		for _, claim := range clusterClaims {
+			// if the claim has the same name with the property, ignore it.
+			if _, ok := claimsMap[claim.Name]; !ok {
+				claimsMap[claim.Name] = clusterv1.ManagedClusterClaim{
+					Name:  claim.Name,
+					Value: claim.Spec.Value,
+				}
+			}
 		}
 	}
 
@@ -67,44 +93,10 @@ func (r *claimReconcile) exposeClaims(_ context.Context, cluster *clusterv1.Mana
 	reservedClaimNames := sets.New(clusterv1alpha1.ReservedClusterClaimNames[:]...)
 	reservedClaimSuffixes := sets.New(r.reservedClusterClaimSuffixes...)
 
-	// when ClusterProperties feature is not enabled, the informer will not be started and the lister will
-	// return an empty list, so we do not need to check featuregate here.
-	propertiesMap := map[string]*aboutv1alpha1.ClusterProperty{}
-	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterProperty) {
-		clusterProperties, err := r.aboutLister.List(selector)
-		if err != nil {
-			return fmt.Errorf("unable to list cluster properties: %w", err)
-		}
-
-		for _, property := range clusterProperties {
-			propertiesMap[property.Name] = property
-		}
-	}
-
-	// convert claim to properties
-	for _, clusterClaim := range clusterClaims {
-		// if the claim has the same name with the property, ignore it.
-		if _, ok := propertiesMap[clusterClaim.Name]; ok {
-			continue
-		}
-		propertiesMap[clusterClaim.Name] = &aboutv1alpha1.ClusterProperty{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: clusterClaim.Name,
-			},
-			Spec: aboutv1alpha1.ClusterPropertySpec{
-				Value: clusterClaim.Spec.Value,
-			},
-		}
-	}
-
-	for _, property := range propertiesMap {
-		managedClusterClaim := clusterv1.ManagedClusterClaim{
-			Name:  property.Name,
-			Value: property.Spec.Value,
-		}
+	for _, managedClusterClaim := range claimsMap {
 		if matchReservedClaims(reservedClaimNames, reservedClaimSuffixes, managedClusterClaim) {
 			reservedClaims = append(reservedClaims, managedClusterClaim)
-			reservedClaimNames.Insert(property.Name)
+			// reservedClaimNames.Insert(managedClusterClaim.Name)
 			continue
 		}
 

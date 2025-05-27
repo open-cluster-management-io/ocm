@@ -21,7 +21,10 @@ import (
 	clusterv1alpha1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1alpha1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	ocmfeature "open-cluster-management.io/api/feature"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
+
+	"open-cluster-management.io/ocm/pkg/features"
 )
 
 // managedClusterStatusController checks the kube-apiserver health on managed cluster to determine it whether is available
@@ -74,11 +77,18 @@ func NewManagedClusterStatusController(
 		hubEventRecorder,
 	)
 
-	return factory.New().
-		WithInformers(hubClusterInformer.Informer(), nodeInformer.Informer(), claimInformer.Informer()).
-		WithSync(c.sync).
-		ResyncEvery(resyncInterval).
-		ToController("ManagedClusterStatusController", recorder)
+	controllerFactory := factory.New().
+		WithInformers(hubClusterInformer.Informer(), nodeInformer.Informer()).
+		WithSync(c.sync).ResyncEvery(resyncInterval)
+
+	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
+		controllerFactory = controllerFactory.WithInformers(claimInformer.Informer())
+	}
+	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterProperty) {
+		controllerFactory = controllerFactory.WithInformers(propertyInformer.Informer())
+	}
+
+	return controllerFactory.ToController("ManagedClusterStatusController", recorder)
 }
 
 func newManagedClusterStatusController(
