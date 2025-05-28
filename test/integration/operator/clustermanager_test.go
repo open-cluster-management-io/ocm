@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -1190,10 +1191,6 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 			// Compare labels on registration-controller
 			gomega.Eventually(func() error {
 				registrationDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
-				println("registrationDeployment.GetLabels()")
-				println(registrationDeployment.GetLabels())
-				println("labels")
-				println(labels)
 				if err != nil {
 					return err
 				}
@@ -1211,7 +1208,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				}
 				commandLineArgs := registrationDeployment.Spec.Template.Spec.Containers[0].Args
 				labelsArg, present := findMatchingArg(commandLineArgs, "--labels")
-				return present && labelsArg == helpers.ConvertLabelsMapToString(labels)
+				return present && strings.SplitN(labelsArg, "=", 2)[1] == helpers.ConvertLabelsMapToString(labels)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Compare labels on registration-webhook
@@ -1279,10 +1276,12 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 	ginkgo.Context("Cluster manager statuses", func() {
 		ginkgo.It("should have correct degraded conditions", func() {
 			gomega.Eventually(func() error {
+				println("debug1")
 				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(
 					context.Background(), hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
+				println("debug2")
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
@@ -1291,17 +1290,19 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				"HubRegistrationDegraded", "UnavailableRegistrationPod", metav1.ConditionTrue)
 			util.AssertClusterManagerCondition(clusterManagerName, operatorClient,
 				"Progressing", "ClusterManagerDeploymentRolling", metav1.ConditionTrue)
-
+			println("debug3")
 			// Update replica of deployment
 			updateDeploymentsStatusSuccess(kubeClient, hubNamespace,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
 				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddonManagerDeployment)
-
+			println("debug4")
 			// The cluster manager should be functional at last
 			util.AssertClusterManagerCondition(clusterManagerName, operatorClient,
 				"HubRegistrationDegraded", "RegistrationFunctional", metav1.ConditionFalse)
+			println("debug5")
 			util.AssertClusterManagerCondition(clusterManagerName, operatorClient,
 				"Progressing", "ClusterManagerUpToDate", metav1.ConditionFalse)
+			println("debug6")
 		})
 	})
 

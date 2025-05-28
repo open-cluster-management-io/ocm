@@ -248,7 +248,6 @@ func DeleteAll(ctx context.Context, clients *ClientHolder, recorder events.Recor
 			ret = append(ret, result)
 			continue
 		}
-		fmt.Printf("objBytes: %s\n", string(objBytes))
 		requiredObj, err := resourceread.ReadGenericWithUnstructured(objBytes)
 		if err != nil {
 			result.Error = fmt.Errorf("cannot decode %q: %v", file, err)
