@@ -32,6 +32,8 @@ type AgentOptions struct {
 	HubKubeconfigDir    string
 	HubKubeconfigFile   string
 	AgentID             string
+	HubBurst            int
+	HubQPS              float32
 }
 
 // NewAgentOptions returns the flags with default value set
@@ -61,6 +63,8 @@ func (o *AgentOptions) AddFlags(flags *pflag.FlagSet) {
 		"The mount path of hub-kubeconfig-secret in the container.")
 	flags.StringVar(&o.HubKubeconfigFile, "hub-kubeconfig", o.HubKubeconfigFile, "Location of kubeconfig file to connect to hub cluster.")
 	flags.StringVar(&o.AgentID, "agent-id", o.AgentID, "ID of the agent")
+	flags.Float32Var(&o.HubQPS, "hub-kube-api-qps", 50.0, "QPS to use while talking with apiserver on hub cluster.")
+	flags.IntVar(&o.HubBurst, "hub-kube-api-burst", 100, "Burst to use while talking with apiserver on hub cluster.")
 }
 
 // SpokeKubeConfig builds kubeconfig for the spoke/managed cluster
