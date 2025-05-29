@@ -3,13 +3,6 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: open-cluster-management:bootstrap:agent-registration
-  labels:
-    gwcp.guidewire.com/app-name: cluster-manager
-    gwcp.guidewire.com/created-by: pod-vulcan
-    gwcp.guidewire.com/dept: "275"
-    gwcp.guidewire.com/maintained-by: pod-vulcan
-    gwcp.guidewire.com/tenant-name: quadrant-shared
-    gwcp.guidewire.com/version: 0.16.0
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole

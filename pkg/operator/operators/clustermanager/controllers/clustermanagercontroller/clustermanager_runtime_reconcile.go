@@ -137,13 +137,8 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 	}
 
 	if cm.Labels != nil {
-		// println("reconciling labels: ", cm.Labels)
 		config.Labels = cm.Labels
-		// for k, v := range config.Labels {
-		// 	fmt.Printf("Label key: %s, value: %s\n", k, v)
-		// }
 		config.LabelsString = helpers.ConvertLabelsMapToString(cm.Labels)
-		// println("LabelArgs:", config.LabelsString)
 	}
 
 	var progressingDeployments []string
@@ -165,7 +160,6 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 				if err != nil {
 					return nil, err
 				}
-				println("applying config to template:", config.LabelsString)
 				objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
 				helpers.SetRelatedResourcesStatusesWithObj(&cm.Status.RelatedResources, objData)
 				return objData, nil

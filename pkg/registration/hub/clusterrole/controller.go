@@ -71,7 +71,6 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 	if err != nil {
 		return err
 	}
-	println("clusterrolecontroller labels: ", c.labels)
 	var errs []error
 	assetFn := helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, "", false, c.labels)
 
