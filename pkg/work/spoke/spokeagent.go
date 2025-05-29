@@ -207,6 +207,8 @@ func (o *WorkAgentConfig) newWorkClientAndInformer(
 		if err != nil {
 			return "", nil, nil, err
 		}
+		config.QPS = o.agentOptions.HubQPS
+		config.Burst = o.agentOptions.HubBurst
 
 		workClient, err = workclientset.NewForConfig(config)
 		if err != nil {

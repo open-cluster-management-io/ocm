@@ -12,6 +12,7 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
+	"k8s.io/client-go/rest"
 	cpclientset "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned"
 	cpinformerv1alpha1 "sigs.k8s.io/cluster-inventory-api/client/informers/externalversions"
 
@@ -98,7 +99,11 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 		return err
 	}
 
-	metadataClient, err := metadata.NewForConfig(controllerContext.KubeConfig)
+	// copy a separate config for gc controller and increase the gc controller's throughput.
+	metadataKubeConfig := rest.CopyConfig(controllerContext.KubeConfig)
+	metadataKubeConfig.QPS = controllerContext.KubeConfig.QPS * 2
+	metadataKubeConfig.Burst = controllerContext.KubeConfig.Burst * 2
+	metadataClient, err := metadata.NewForConfig(metadataKubeConfig)
 	if err != nil {
 		return err
 	}
