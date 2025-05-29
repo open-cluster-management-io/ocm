@@ -171,6 +171,8 @@ type klusterletConfig struct {
 	RegistrationKubeAPIBurst                    int32
 	WorkKubeAPIQPS                              float32
 	WorkKubeAPIBurst                            int32
+	WorkHubKubeAPIQPS                           float32
+	WorkHubKubeAPIBurst                         int32
 	AppliedManifestWorkEvictionGracePeriod      string
 	WorkStatusSyncInterval                      string
 	AgentKubeAPIQPS                             float32
@@ -395,6 +397,8 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		workFeatureGates = klusterlet.Spec.WorkConfiguration.FeatureGates
 		config.WorkKubeAPIQPS = float32(klusterlet.Spec.WorkConfiguration.KubeAPIQPS)
 		config.WorkKubeAPIBurst = klusterlet.Spec.WorkConfiguration.KubeAPIBurst
+		config.WorkHubKubeAPIQPS = float32(klusterlet.Spec.WorkConfiguration.HubKubeAPIQPS)
+		config.WorkHubKubeAPIBurst = klusterlet.Spec.WorkConfiguration.HubKubeAPIBurst
 		if klusterlet.Spec.WorkConfiguration.AppliedManifestWorkEvictionGracePeriod != nil {
 			config.AppliedManifestWorkEvictionGracePeriod = klusterlet.Spec.WorkConfiguration.AppliedManifestWorkEvictionGracePeriod.Duration.String()
 		}
