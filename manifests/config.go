@@ -39,7 +39,7 @@ type HubConfig struct {
 	AutoApprovedARNPatterns           string
 	AwsResourceTags                   string
 	Labels                            map[string]string
-	LabelsArgs                        string
+	LabelsString                      string
 }
 
 type Webhook struct {

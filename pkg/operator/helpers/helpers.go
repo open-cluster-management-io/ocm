@@ -229,6 +229,13 @@ func ApplyDeployment(
 	deployment.(*appsv1.Deployment).Spec.Template.Spec.NodeSelector = nodePlacement.NodeSelector
 	deployment.(*appsv1.Deployment).Spec.Template.Spec.Tolerations = nodePlacement.Tolerations
 
+	// println("before printing deployment args")
+	// if (deployment.(*appsv1.Deployment).Name == "hub-registration-controller") {
+	// 	for i, arg := range deployment.(*appsv1.Deployment).Spec.Template.Spec.Containers[0].Args {
+	// 		fmt.Printf("Arg[%d]: %s\n", i, arg)
+	// 	}
+	// }
+
 	updatedDeployment, updated, err := resourceapply.ApplyDeployment(
 		ctx,
 		client.AppsV1(),
