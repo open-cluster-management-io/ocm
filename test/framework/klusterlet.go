@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
@@ -246,16 +247,41 @@ func CleanKlusterletRelatedResources(
 	}
 	Expect(err).To(BeNil())
 
-	Eventually(func() error {
-		_, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), managedClusterName, metav1.GetOptions{})
+	clusterIsFound := true
+	leftCluster := &clusterv1.ManagedCluster{}
+	for i := 0; i < 18; i++ {
+		leftCluster, err = hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), managedClusterName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
+			clusterIsFound = false
 			klog.Infof("managed cluster %s deleted successfully", managedClusterName)
-			return nil
+			break
 		}
 		if err != nil {
-			klog.Infof("get managed cluster %s error: %v", klusterletName, err)
-			return err
+			klog.Errorf("get managed cluster %s error: %v", klusterletName, err)
+			continue
 		}
-		return fmt.Errorf("managed cluster %s still exists", managedClusterName)
-	}).Should(Succeed())
+		time.Sleep(5 * time.Second)
+
+	}
+
+	if clusterIsFound {
+		klog.Infof("left cluster: %#v", leftCluster)
+
+		workList, err := hub.WorkClient.WorkV1().ManifestWorks(managedClusterName).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			klog.Errorf("failed to list work : %v", err)
+		}
+		if len(workList.Items) != 0 {
+			klog.Infof("left works: %#v", workList.Items)
+		}
+		addonList, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			klog.Errorf("failed to list addon: %v", err)
+		}
+		if len(addonList.Items) != 0 {
+			klog.Infof("left addon: %#v ", addonList.Items)
+		}
+	}
+
+	Expect(clusterIsFound).To(BeFalse())
 }
