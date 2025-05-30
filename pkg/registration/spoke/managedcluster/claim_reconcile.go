@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
+	aboutv1alpha1listers "sigs.k8s.io/about-api/pkg/generated/listers/apis/v1alpha1"
 
 	clusterv1alpha1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -25,14 +26,12 @@ const labelCustomizedOnly = "open-cluster-management.io/spoke-only"
 type claimReconcile struct {
 	recorder                     events.Recorder
 	claimLister                  clusterv1alpha1listers.ClusterClaimLister
+	aboutLister                  aboutv1alpha1listers.ClusterPropertyLister
 	maxCustomClusterClaims       int
 	reservedClusterClaimSuffixes []string
 }
 
 func (r *claimReconcile) reconcile(ctx context.Context, cluster *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error) {
-	if !features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
-		return cluster, reconcileContinue, nil
-	}
 	// current managed cluster has not joined the hub yet, do nothing.
 	if !meta.IsStatusConditionTrue(cluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined) {
 		r.recorder.Eventf("ManagedClusterIsNotAccepted", "Managed cluster %q does not join the hub yet", cluster.Name)
@@ -46,31 +45,61 @@ func (r *claimReconcile) reconcile(ctx context.Context, cluster *clusterv1.Manag
 // exposeClaims saves cluster claims fetched on managed cluster into status of the
 // managed cluster on hub. Some of the customized claims might not be exposed once
 // the total number of the claims exceeds the value of `cluster-claims-max`.
-func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.ManagedCluster) error {
+func (r *claimReconcile) exposeClaims(_ context.Context, cluster *clusterv1.ManagedCluster) error {
 	var reservedClaims, customClaims []clusterv1.ManagedClusterClaim
+	var clusterClaims []*clusterv1alpha1.ClusterClaim
+	claimsMap := map[string]clusterv1.ManagedClusterClaim{}
 
 	// clusterClaim with label `open-cluster-management.io/spoke-only` will not be synced to managedCluster.Status at hub.
-	requirement, _ := labels.NewRequirement(labelCustomizedOnly, selection.DoesNotExist, []string{})
-	selector := labels.NewSelector().Add(*requirement)
-	clusterClaims, err := r.claimLister.List(selector)
+	requirement, err := labels.NewRequirement(labelCustomizedOnly, selection.DoesNotExist, []string{})
 	if err != nil {
-		return fmt.Errorf("unable to list cluster claims: %w", err)
+		return err
+	}
+	selector := labels.NewSelector().Add(*requirement)
+
+	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterProperty) {
+		clusterProperties, err := r.aboutLister.List(selector)
+		if err != nil {
+			return fmt.Errorf("unable to list cluster properties: %w", err)
+		}
+
+		for _, property := range clusterProperties {
+			claimsMap[property.Name] = clusterv1.ManagedClusterClaim{
+				Name:  property.Name,
+				Value: property.Spec.Value,
+			}
+		}
+	}
+
+	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
+		clusterClaims, err = r.claimLister.List(selector)
+		if err != nil {
+			return fmt.Errorf("unable to list cluster claims: %w", err)
+		}
+
+		for _, claim := range clusterClaims {
+			// if the claim has the same name with the property, ignore it.
+			if _, ok := claimsMap[claim.Name]; !ok {
+				claimsMap[claim.Name] = clusterv1.ManagedClusterClaim{
+					Name:  claim.Name,
+					Value: claim.Spec.Value,
+				}
+			}
+		}
 	}
 
 	// check if the cluster claim is one of the reserved claims or has a reserved suffix.
 	// if so, it will be treated as a reserved claim and will always be exposed.
 	reservedClaimNames := sets.New(clusterv1alpha1.ReservedClusterClaimNames[:]...)
 	reservedClaimSuffixes := sets.New(r.reservedClusterClaimSuffixes...)
-	for _, clusterClaim := range clusterClaims {
-		managedClusterClaim := clusterv1.ManagedClusterClaim{
-			Name:  clusterClaim.Name,
-			Value: clusterClaim.Spec.Value,
-		}
 
+	for _, managedClusterClaim := range claimsMap {
 		if matchReservedClaims(reservedClaimNames, reservedClaimSuffixes, managedClusterClaim) {
 			reservedClaims = append(reservedClaims, managedClusterClaim)
+			// reservedClaimNames.Insert(managedClusterClaim.Name)
 			continue
 		}
+
 		customClaims = append(customClaims, managedClusterClaim)
 	}
 

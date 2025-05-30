@@ -79,6 +79,7 @@ var CRDPaths = []string{
 	"./vendor/open-cluster-management.io/api/cluster/v1alpha1/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml",
 	// external API deps
 	"./test/integration/testdeps/capi/cluster.x-k8s.io_clusters.yaml",
+	"./manifests/klusterlet/managed/clusterproperties.crd.yaml",
 }
 
 func runAgent(name string, opt *spoke.SpokeAgentOptions, commOption *commonoptions.AgentOptions, cfg *rest.Config) context.CancelFunc {

@@ -14,13 +14,17 @@ import (
 	"k8s.io/client-go/discovery"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	kevents "k8s.io/client-go/tools/events"
+	aboutv1alpha1informer "sigs.k8s.io/about-api/pkg/generated/informers/externalversions/apis/v1alpha1"
 
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1alpha1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1alpha1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	ocmfeature "open-cluster-management.io/api/feature"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
+
+	"open-cluster-management.io/ocm/pkg/features"
 )
 
 // managedClusterStatusController checks the kube-apiserver health on managed cluster to determine it whether is available
@@ -52,6 +56,7 @@ func NewManagedClusterStatusController(
 	hubClusterInformer clusterv1informer.ManagedClusterInformer,
 	managedClusterDiscoveryClient discovery.DiscoveryInterface,
 	claimInformer clusterv1alpha1informer.ClusterClaimInformer,
+	propertyInformer aboutv1alpha1informer.ClusterPropertyInformer,
 	nodeInformer corev1informers.NodeInformer,
 	maxCustomClusterClaims int,
 	reservedClusterClaimSuffixes []string,
@@ -64,6 +69,7 @@ func NewManagedClusterStatusController(
 		hubClusterInformer,
 		managedClusterDiscoveryClient,
 		claimInformer,
+		propertyInformer,
 		nodeInformer,
 		maxCustomClusterClaims,
 		reservedClusterClaimSuffixes,
@@ -71,11 +77,18 @@ func NewManagedClusterStatusController(
 		hubEventRecorder,
 	)
 
-	return factory.New().
-		WithInformers(hubClusterInformer.Informer(), nodeInformer.Informer(), claimInformer.Informer()).
-		WithSync(c.sync).
-		ResyncEvery(resyncInterval).
-		ToController("ManagedClusterStatusController", recorder)
+	controllerFactory := factory.New().
+		WithInformers(hubClusterInformer.Informer(), nodeInformer.Informer()).
+		WithSync(c.sync).ResyncEvery(resyncInterval)
+
+	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
+		controllerFactory = controllerFactory.WithInformers(claimInformer.Informer())
+	}
+	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterProperty) {
+		controllerFactory = controllerFactory.WithInformers(propertyInformer.Informer())
+	}
+
+	return controllerFactory.ToController("ManagedClusterStatusController", recorder)
 }
 
 func newManagedClusterStatusController(
@@ -84,6 +97,7 @@ func newManagedClusterStatusController(
 	hubClusterInformer clusterv1informer.ManagedClusterInformer,
 	managedClusterDiscoveryClient discovery.DiscoveryInterface,
 	claimInformer clusterv1alpha1informer.ClusterClaimInformer,
+	propertyInformer aboutv1alpha1informer.ClusterPropertyInformer,
 	nodeInformer corev1informers.NodeInformer,
 	maxCustomClusterClaims int,
 	reservedClusterClaimSuffixes []string,
@@ -98,7 +112,10 @@ func newManagedClusterStatusController(
 			&joiningReconcile{recorder: recorder},
 			&resoureReconcile{managedClusterDiscoveryClient: managedClusterDiscoveryClient, nodeLister: nodeInformer.Lister()},
 			&claimReconcile{claimLister: claimInformer.Lister(), recorder: recorder,
-				maxCustomClusterClaims: maxCustomClusterClaims, reservedClusterClaimSuffixes: reservedClusterClaimSuffixes},
+				maxCustomClusterClaims:       maxCustomClusterClaims,
+				reservedClusterClaimSuffixes: reservedClusterClaimSuffixes,
+				aboutLister:                  propertyInformer.Lister(),
+			},
 		},
 		hubClusterLister: hubClusterInformer.Lister(),
 		hubEventRecorder: hubEventRecorder,
@@ -131,7 +148,7 @@ func (c *managedClusterStatusController) sync(ctx context.Context, syncCtx facto
 	outOfSynced := meta.IsStatusConditionFalse(newCluster.Status.Conditions, clusterv1.ManagedClusterConditionClockSynced)
 	if outOfSynced {
 		c.recorder.Eventf("ClockOutOfSync", "The managed cluster's clock is out of sync, the agent will not be able to update the status of managed cluster.")
-		return fmt.Errorf("the managed cluster's clock is out of sync, the agent will not be able to update the status of managed cluster.")
+		return fmt.Errorf("the managed cluster's clock is out of sync, the agent will not be able to update the status of managed cluster")
 	}
 
 	changed, err := c.patcher.PatchStatus(ctx, newCluster, newCluster.Status, cluster.Status)
@@ -168,5 +185,4 @@ func (c *managedClusterStatusController) sendAvailableConditionEvent(
 		c.hubEventRecorder.Eventf(newCluster, nil, corev1.EventTypeWarning, "Unavailable", "Unavailable",
 			"The %s is successfully imported. However, its Kube API server is unavailable", cluster.Name)
 	}
-
 }

@@ -1,0 +1,62 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    api-approved.kubernetes.io: "https://github.com/kubernetes/enhancements/pull/3084"
+  name: clusterproperties.about.k8s.io
+spec:
+  group: about.k8s.io
+  names:
+    kind: ClusterProperty
+    listKind: ClusterPropertyList
+    plural: clusterproperties
+    singular: clusterproperty
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.value
+      name: value
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ClusterProperty is the Schema for the clusterproperties API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ClusterPropertySpec defines the desired state of ClusterProperty
+            properties:
+              value:
+                description: ClusterProperty value
+                minLength: 1
+                type: string
+            required:
+            - value
+            type: object
+          status:
+            description: ClusterPropertyStatus defines the observed state of ClusterProperty
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
