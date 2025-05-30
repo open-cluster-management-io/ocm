@@ -42,7 +42,7 @@ const (
 	originalImageValue                       = "quay.io/open-cluster-management/addon-examples:latest"
 	overrideImageValue                       = "quay.io/ocm/addon-examples:latest"
 	customSignerName                         = "example.com/signer-name"
-	//#nosec G101
+	// #nosec G101
 	customSignerSecretName = "addon-signer-secret"
 )
 
@@ -161,6 +161,22 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			}
 
 			return fmt.Errorf("the managedClusterAddon %s should be deleted", addOnName)
+		}).ShouldNot(gomega.HaveOccurred())
+
+		gomega.Eventually(func() error {
+			works, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).List(context.TODO(), metav1.ListOptions{})
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				return err
+			}
+
+			if len(works.Items) == 0 {
+				return nil
+			}
+
+			return fmt.Errorf("the works should be deleted: %#v", works)
 		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By(fmt.Sprintf("delete addon template resources for cluster %v", universalClusterName))
