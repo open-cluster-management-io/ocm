@@ -123,8 +123,10 @@ func newKlusterlet(name, namespace, clustername string) *operatorapiv1.Klusterle
 				KubeAPIBurst: 60,
 			},
 			WorkConfiguration: &operatorapiv1.WorkAgentConfiguration{
-				KubeAPIQPS:   20,
-				KubeAPIBurst: 50,
+				KubeAPIQPS:      20,
+				KubeAPIBurst:    50,
+				HubKubeAPIQPS:   40,
+				HubKubeAPIBurst: 80,
 			},
 			HubApiServerHostAlias: &operatorapiv1.HubApiServerHostAlias{
 				IP:       "11.22.33.44",
@@ -401,7 +403,7 @@ func assertKlusterletDeployment(t *testing.T, registrationAuthType string, actio
 	}
 
 	expectedArgs = append(expectedArgs, "--agent-id=", "--workload-source-driver=kube", "--workload-source-config=/spoke/hub-kubeconfig/kubeconfig",
-		"--status-sync-interval=60s", "--kube-api-qps=20", "--kube-api-burst=60")
+		"--status-sync-interval=60s", "--kube-api-qps=20", "--kube-api-burst=60", "--hub-kube-api-qps=40", "--hub-kube-api-burst=80")
 
 	if serverURL != "" {
 		expectedArgs = append(expectedArgs, fmt.Sprintf("--spoke-external-server-urls=%s", serverURL))
@@ -528,7 +530,7 @@ func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, cl
 		expectArgs = append(expectArgs, fmt.Sprintf("--status-sync-interval=%s", workStatusSyncInterval))
 	}
 
-	expectArgs = append(expectArgs, "--kube-api-qps=20", "--kube-api-burst=50")
+	expectArgs = append(expectArgs, "--kube-api-qps=20", "--kube-api-burst=50", "--hub-kube-api-qps=40", "--hub-kube-api-burst=80")
 	if appliedManifestWorkEvictionGracePeriod != "" {
 		expectArgs = append(expectArgs, fmt.Sprintf("--appliedmanifestwork-eviction-grace-period=%s", appliedManifestWorkEvictionGracePeriod))
 	}
