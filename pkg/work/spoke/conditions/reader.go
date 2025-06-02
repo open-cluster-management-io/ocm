@@ -74,7 +74,9 @@ func (s *ConditionReader) EvaluateConditions(ctx context.Context, runtimeObj run
 	return conditionResults, nil
 }
 
-func (s *ConditionReader) GetConditionByRule(ctx context.Context, obj *unstructured.Unstructured, rule workapiv1.ConditionRule, budget int64) (metav1.Condition, int64, error) {
+func (s *ConditionReader) GetConditionByRule(
+	ctx context.Context, obj *unstructured.Unstructured, rule workapiv1.ConditionRule, budget int64,
+) (metav1.Condition, int64, error) {
 	switch rule.Type {
 	case workapiv1.WellKnownConditionsType:
 		r := s.wellKnownConditions.GetRuleByKindCondition(obj.GroupVersionKind(), rule.Condition)
@@ -109,7 +111,9 @@ func (s *ConditionReader) GetConditionByRule(ctx context.Context, obj *unstructu
 	}
 }
 
-func (s *ConditionReader) getConditionByCelRule(ctx context.Context, obj *unstructured.Unstructured, rule workapiv1.ConditionRule, budget int64) (metav1.Condition, int64, error) {
+func (s *ConditionReader) getConditionByCelRule(
+	ctx context.Context, obj *unstructured.Unstructured, rule workapiv1.ConditionRule, budget int64,
+) (metav1.Condition, int64, error) {
 	var message string
 	var err error
 	status, reason, remainingBudget, err := s.evaluateCelExpressions(ctx, obj, rule.CelExpressions, budget)
@@ -130,7 +134,9 @@ func (s *ConditionReader) getConditionByCelRule(ctx context.Context, obj *unstru
 	}, remainingBudget, err
 }
 
-func (s *ConditionReader) evaluateCelExpressions(ctx context.Context, obj *unstructured.Unstructured, expressions []string, budget int64) (status metav1.ConditionStatus, reason string, remainingBudget int64, err error) {
+func (s *ConditionReader) evaluateCelExpressions(
+	ctx context.Context, obj *unstructured.Unstructured, expressions []string, budget int64,
+) (status metav1.ConditionStatus, reason string, remainingBudget int64, err error) {
 	remainingBudget = budget
 	estimator := newEstimator()
 	for _, expression := range expressions {
@@ -174,7 +180,9 @@ func (s *ConditionReader) evaluateCelExpressions(ctx context.Context, obj *unstr
 	return metav1.ConditionTrue, workapiv1.ConditionRuleEvaluated, remainingBudget, nil
 }
 
-func (s *ConditionReader) getConditionMessageByRule(ctx context.Context, obj *unstructured.Unstructured, rule workapiv1.ConditionRule, result bool, budget int64) (string, int64, error) {
+func (s *ConditionReader) getConditionMessageByRule(
+	ctx context.Context, obj *unstructured.Unstructured, rule workapiv1.ConditionRule, result bool, budget int64,
+) (string, int64, error) {
 	if rule.MessageExpression != "" {
 		ast, iss := s.messageEnv.Compile(rule.MessageExpression)
 		err := iss.Err()
