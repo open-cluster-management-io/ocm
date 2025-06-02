@@ -3,6 +3,8 @@ apiVersion: apps/v1
 metadata:
   name: cluster-manager
   namespace: {{ .Release.Namespace }}
+  labels:
+    app: cluster-manager
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:

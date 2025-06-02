@@ -2,7 +2,6 @@ package helpers
 
 import (
 	"embed"
-	"fmt"
 	"net/url"
 	"strings"
 

@@ -5,13 +5,6 @@ apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
   name: {{ .Values.priorityClassName }}
-  labels:
-    gwcp.guidewire.com/app-name: cluster-manager
-    gwcp.guidewire.com/created-by: pod-vulcan
-    gwcp.guidewire.com/dept: "275"
-    gwcp.guidewire.com/maintained-by: pod-vulcan
-    gwcp.guidewire.com/tenant-name: quadrant-shared
-    gwcp.guidewire.com/version: 0.16.0
 value: 1000000
 globalDefault: false
 description: "This priority class should be used for klusterlet agents only."
