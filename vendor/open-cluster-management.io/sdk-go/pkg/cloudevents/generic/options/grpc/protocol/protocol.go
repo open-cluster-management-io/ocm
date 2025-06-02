@@ -19,6 +19,7 @@ import (
 // define protocol for grpc
 
 type Protocol struct {
+	clientConn      *grpc.ClientConn
 	client          pbv1.CloudEventServiceClient
 	subscribeOption *SubscribeOption
 	// receiver
@@ -37,14 +38,15 @@ var (
 )
 
 // new create grpc protocol
-func NewProtocol(clientConn grpc.ClientConnInterface, opts ...Option) (*Protocol, error) {
+func NewProtocol(clientConn *grpc.ClientConn, opts ...Option) (*Protocol, error) {
 	if clientConn == nil {
 		return nil, fmt.Errorf("the client connection must not be nil")
 	}
 
 	// TODO: support clientID and error handling in grpc connection
 	p := &Protocol{
-		client: pbv1.NewCloudEventServiceClient(clientConn),
+		clientConn: clientConn,
+		client:     pbv1.NewCloudEventServiceClient(clientConn),
 		// subClient:
 		incoming:  make(chan *pbv1.CloudEvent),
 		closeChan: make(chan struct{}),
@@ -132,8 +134,8 @@ func (p *Protocol) OpenInbound(ctx context.Context) error {
 	case <-ctx.Done():
 	case <-p.closeChan:
 	}
-
-	return nil
+	logger.Infof("Close grpc client connection")
+	return p.clientConn.Close()
 }
 
 // Receive implements Receiver.Receive

@@ -1782,7 +1782,7 @@ open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v0.16.1-0.20250515010443-c47c401d8a26
+# open-cluster-management.io/sdk-go v0.16.1-0.20250530024739-3724a1e691fe
 ## explicit; go 1.23.6
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
