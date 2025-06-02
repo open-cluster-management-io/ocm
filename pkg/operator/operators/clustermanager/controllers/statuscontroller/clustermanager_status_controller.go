@@ -75,7 +75,6 @@ func (s *clusterManagerStatusController) sync(ctx context.Context, controllerCon
 	newClusterManager := clusterManager.DeepCopy()
 
 	registrationCond := s.updateStatusOfRegistration(clusterManager.Name, clusterManagerNamespace)
-	fmt.Sprintf("registration condition %v", registrationCond)
 	registrationCond.ObservedGeneration = clusterManager.Generation
 	meta.SetStatusCondition(&newClusterManager.Status.Conditions, registrationCond)
 	placementCond := s.updateStatusOfPlacement(clusterManager.Name, clusterManagerNamespace)

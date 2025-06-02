@@ -137,7 +137,6 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 	}
 
 	if cm.Labels != nil {
-		fmt.Printf("Labels: %v\n", cm.Labels)
 		config.Labels = cm.Labels
 		config.LabelsString = helpers.ConvertLabelsMapToString(cm.Labels)
 	}
@@ -173,12 +172,6 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 		}
 		helpers.SetGenerationStatuses(&cm.Status.Generations, currentGeneration)
 
-		fmt.Printf("name:%s", updatedDeployment.Name)
-		fmt.Printf("generation:%d", updatedDeployment.Generation)
-		fmt.Printf("observedGeneration:%d", updatedDeployment.Status.ObservedGeneration)
-		fmt.Printf("replicas:%d", *updatedDeployment.Spec.Replicas)
-		fmt.Printf("readyReplicas:%d", updatedDeployment.Status.ReadyReplicas)
-		fmt.Println("next")
 		if updatedDeployment.Generation != updatedDeployment.Status.ObservedGeneration || *updatedDeployment.Spec.Replicas != updatedDeployment.Status.ReadyReplicas {
 			progressingDeployments = append(progressingDeployments, updatedDeployment.Name)
 		}

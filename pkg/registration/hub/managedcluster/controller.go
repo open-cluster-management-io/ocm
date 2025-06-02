@@ -97,7 +97,6 @@ func NewManagedClusterController(
 		eventRecorder: recorder.WithComponentSuffix("managed-cluster-controller"),
 		labels:        labels,
 	}
-	fmt.Printf("ManagedClusterController labels:%s", c.labels)
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterInformer.Informer()).
 		WithFilteredEventsInformersQueueKeysFunc(
