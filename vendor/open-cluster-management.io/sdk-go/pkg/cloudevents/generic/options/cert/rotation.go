@@ -6,7 +6,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"os"
 	"reflect"
 	"sync"
 	"time"
@@ -18,6 +17,8 @@ import (
 )
 
 const workItemKey = "key"
+
+type ReloadCerts func() (*CertConfig, error)
 
 type Connection interface {
 	Close() error
@@ -37,14 +38,18 @@ type clientCertRotating struct {
 	conn   Connection
 
 	// queue only ever has one item, but it has nice error handling backoff/retry semantics
-	queue workqueue.RateLimitingInterface // nolint:staticcheck // SA1019
+	queue workqueue.TypedRateLimitingInterface[string]
 }
 
 func StartClientCertRotating(reload reloadFunc, conn Connection) {
 	r := &clientCertRotating{
 		reload: reload,
 		conn:   conn,
-		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ClientCertRotator"), // nolint:staticcheck // SA1019
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "ClientCertRotator",
+			}),
 	}
 
 	go r.run(context.Background())
@@ -185,16 +190,22 @@ func (c *certificateCacheEntry) isStale() bool {
 	return time.Since(c.birth) > time.Second
 }
 
-func newCertificateCacheEntry(certFile, keyFile string) certificateCacheEntry {
-	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+func newCertificateCacheEntry(reload ReloadCerts) certificateCacheEntry {
+	certs, err := reload()
+	if err != nil {
+		return certificateCacheEntry{err: err, birth: time.Now()}
+	}
+
+	cert, err := tls.X509KeyPair(certs.ClientCertData, certs.ClientKeyData)
 	return certificateCacheEntry{cert: &cert, err: err, birth: time.Now()}
 }
 
 // CachingCertificateLoader ensures that we don't hammer the filesystem when opening many connections
 // the underlying cert files are read at most once every second
-func CachingCertificateLoader(certFile, keyFile string) func() (*tls.Certificate, error) {
-	current := newCertificateCacheEntry(certFile, keyFile)
+func CachingCertificateLoader(reload ReloadCerts) func() (*tls.Certificate, error) {
 	var currentMtx sync.RWMutex
+
+	current := newCertificateCacheEntry(reload)
 
 	return func() (*tls.Certificate, error) {
 		currentMtx.RLock()
@@ -205,7 +216,7 @@ func CachingCertificateLoader(certFile, keyFile string) func() (*tls.Certificate
 			defer currentMtx.Unlock()
 
 			if current.isStale() {
-				current = newCertificateCacheEntry(certFile, keyFile)
+				current = newCertificateCacheEntry(reload)
 			}
 		} else {
 			defer currentMtx.RUnlock()
@@ -220,21 +231,22 @@ func CachingCertificateLoader(certFile, keyFile string) func() (*tls.Certificate
 // If CA is not provided, the system cert pool will be used.
 // If client certificate and key are provided, they will be used for client authentication.
 // And a goroutine will be started to periodically refresh client certificates for this connection.
-func AutoLoadTLSConfig(caFile, certFile, keyFile string, conn Connection) (*tls.Config, error) {
-	var tlsConfig *tls.Config
-	certPool, err := rootCAs(caFile)
+func AutoLoadTLSConfig(certs CertConfig, reload ReloadCerts, conn Connection) (*tls.Config, error) {
+	certPool, err := rootCAs(certs.CAData)
 	if err != nil {
 		return nil, err
 	}
-	tlsConfig = &tls.Config{
+
+	tlsConfig := &tls.Config{
 		RootCAs:    certPool,
 		MinVersion: tls.VersionTLS13,
 		MaxVersion: tls.VersionTLS13,
 	}
-	if certFile != "" && keyFile != "" {
+
+	if len(certs.ClientCertData) != 0 && len(certs.ClientKeyData) != 0 {
 		// Set client certificate and key getter for tls config
 		tlsConfig.GetClientCertificate = func(cri *tls.CertificateRequestInfo) (*tls.Certificate, error) {
-			return CachingCertificateLoader(certFile, keyFile)()
+			return CachingCertificateLoader(reload)()
 		}
 		// Start a goroutine to periodically refresh client certificates for this connection
 		StartClientCertRotating(tlsConfig.GetClientCertificate, conn)
@@ -244,26 +256,21 @@ func AutoLoadTLSConfig(caFile, certFile, keyFile string, conn Connection) (*tls.
 }
 
 // rootCAs returns a cert pool to verify the TLS connection.
-// If the caFile is not provided, the default system certificate pool will be returned
-// If the caFile is provided, the provided CA will be appended to the system certificate pool
-func rootCAs(caFile string) (*x509.CertPool, error) {
+// If the ca is not provided, the default system certificate pool will be returned
+// If the ca is provided, the provided CA will be appended to the system certificate pool
+func rootCAs(ca []byte) (*x509.CertPool, error) {
 	certPool, err := x509.SystemCertPool()
 	if err != nil {
 		return nil, err
 	}
 
-	if len(caFile) == 0 {
-		klog.Warningf("CA file is not provided, TLS connection will be verified with the system cert pool")
+	if len(ca) == 0 {
+		klog.Warningf("CA is not provided, TLS connection will be verified with the system cert pool")
 		return certPool, nil
 	}
 
-	caPEM, err := os.ReadFile(caFile)
-	if err != nil {
-		return nil, err
-	}
-
-	if ok := certPool.AppendCertsFromPEM(caPEM); !ok {
-		return nil, fmt.Errorf("invalid CA %s", caFile)
+	if ok := certPool.AppendCertsFromPEM(ca); !ok {
+		return nil, fmt.Errorf("invalid CA")
 	}
 
 	return certPool, nil
