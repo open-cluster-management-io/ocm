@@ -69,13 +69,18 @@ func newController(t *testing.T, work *workapiv1.ManifestWork, appliedWork *work
 		}
 	}
 
+	conditionReader, err := conditions.NewConditionReader()
+	if err != nil {
+		t.Fatalf("Expected no err when creating ConditionReader but got %v", err)
+	}
+
 	return &testController{
 		controller: controller,
 		workClient: fakeWorkClient,
 		mwReconciler: &manifestworkReconciler{
 			restMapper:      mapper,
 			validator:       basic.NewSARValidator(nil, spokeKubeClient),
-			conditionReader: conditions.NewConditionReader(),
+			conditionReader: conditionReader,
 		},
 	}
 }

@@ -18,7 +18,6 @@ import (
 	"k8s.io/klog/v2"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
-	"open-cluster-management.io/sdk-go/pkg/cel/common"
 
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/work/helper"
@@ -213,35 +212,10 @@ func (m *manifestworkReconciler) applyOneManifest(
 	result.Result, result.Error = applier.Apply(ctx, gvr, required, requiredOwner, option, recorder)
 
 	if result.Result != nil && result.Error == nil && option != nil && len(option.ConditionRules) > 0 {
-		// TODO: Not sure that error on condition evaluation should be set as result error.
-		// 		 Definitely not when caused by bad expressions.
-		result.Conditions, result.Error = m.getStatusConditions(result.Result, option.ConditionRules)
+		result.Conditions, result.Error = m.conditionReader.EvaluateConditions(ctx, result.Result, option.ConditionRules)
 	}
 
 	return result
-}
-
-func (m *manifestworkReconciler) getStatusConditions(runtimeObj runtime.Object, rules []workapiv1.ConditionRule) ([]metav1.Condition, error) {
-	obj, err := common.ConvertObjectToUnstructured(runtimeObj)
-	if err != nil {
-		return nil, err
-	}
-
-	var conditionResults []metav1.Condition
-	var errs []error
-	for _, rule := range rules {
-		condition, err := m.conditionReader.GetConditionByRule(obj, rule)
-		if err != nil {
-			// Errors from rule evaluation are not returned since they don't impact resource apply
-			// The error will be set in condition message for users to handle
-			klog.Errorf("failed to evaluate condition rule: %s", err.Error())
-		}
-		if condition.Type != "" && condition.Status != "" {
-			conditionResults = append(conditionResults, condition)
-		}
-	}
-
-	return conditionResults, utilerrors.NewAggregate(errs)
 }
 
 // allInCondition checks status of conditions with a particular type in ManifestCondition array.

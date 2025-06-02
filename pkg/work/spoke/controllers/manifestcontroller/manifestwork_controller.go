@@ -70,7 +70,8 @@ func NewManifestWorkController(
 	appliedManifestWorkInformer workinformer.AppliedManifestWorkInformer,
 	hubHash, agentID string,
 	restMapper meta.RESTMapper,
-	validator auth.ExecutorValidator) factory.Controller {
+	validator auth.ExecutorValidator,
+	conditionReader *conditions.ConditionReader) factory.Controller {
 
 	controller := &ManifestWorkController{
 		manifestWorkPatcher: patcher.NewPatcher[
@@ -89,7 +90,7 @@ func NewManifestWorkController(
 				restMapper:      restMapper,
 				appliers:        apply.NewAppliers(spokeDynamicClient, spokeKubeClient, spokeAPIExtensionClient),
 				validator:       validator,
-				conditionReader: conditions.NewConditionReader(),
+				conditionReader: conditionReader,
 			},
 			&appliedManifestWorkReconciler{
 				spokeDynamicClient: spokeDynamicClient,
