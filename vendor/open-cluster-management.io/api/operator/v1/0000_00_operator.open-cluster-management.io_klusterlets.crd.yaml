@@ -264,7 +264,10 @@ spec:
                       reservedClusterClaimSuffixes:
                         description: Custom suffixes for reserved ClusterClaims.
                         items:
+                          maxLength: 64
+                          minLength: 1
                           type: string
+                        maxItems: 10
                         type: array
                     required:
                     - maxCustomClusterClaims
@@ -302,14 +305,14 @@ spec:
                   kubeAPIBurst:
                     default: 100
                     description: |-
-                      KubeAPIBurst indicates the maximum burst of the throttle while talking with apiserver of hub cluster from the spoke cluster.
+                      KubeAPIBurst indicates the maximum burst of the throttle while talking with apiserver on the spoke cluster.
                       If it is set empty, use the default value: 100
                     format: int32
                     type: integer
                   kubeAPIQPS:
                     default: 50
                     description: |-
-                      KubeAPIQPS indicates the maximum QPS while talking with apiserver of hub cluster from the spoke cluster.
+                      KubeAPIQPS indicates the maximum QPS while talking with apiserver on the spoke cluster.
                       If it is set empty, use the default value: 50
                     format: int32
                     type: integer
@@ -472,20 +475,41 @@ spec:
                       - feature
                       type: object
                     type: array
+                  hubKubeAPIBurst:
+                    default: 100
+                    description: |-
+                      HubKubeAPIBurst indicates the maximum burst of the throttle while talking with apiserver on the hub cluster.
+                      If it is set empty, use the default value: 100
+                    format: int32
+                    type: integer
+                  hubKubeAPIQPS:
+                    default: 50
+                    description: |-
+                      HubKubeAPIQPS indicates the maximum QPS while talking with apiserver on the hub cluster.
+                      If it is set empty, use the default value: 50
+                    format: int32
+                    type: integer
                   kubeAPIBurst:
                     default: 100
                     description: |-
-                      KubeAPIBurst indicates the maximum burst of the throttle while talking with apiserver of hub cluster from the spoke cluster.
+                      KubeAPIBurst indicates the maximum burst of the throttle while talking with apiserver on the spoke cluster.
                       If it is set empty, use the default value: 100
                     format: int32
                     type: integer
                   kubeAPIQPS:
                     default: 50
                     description: |-
-                      KubeAPIQPS indicates the maximum QPS while talking with apiserver of hub cluster from the spoke cluster.
+                      KubeAPIQPS indicates the maximum QPS while talking with apiserver on the spoke cluster.
                       If it is set empty, use the default value: 50
                     format: int32
                     type: integer
+                  statusSyncInterval:
+                    description: |-
+                      StatusSyncInterval is the interval for the work agent to check the status of ManifestWorks.
+                      Larger value means less frequent status sync and less api calls to the managed cluster, vice versa.
+                      The value(x) should be: 5s <= x <= 1h.
+                    pattern: ^([0-9]+(s|m|h))+$
+                    type: string
                 type: object
               workImagePullSpec:
                 description: |-
