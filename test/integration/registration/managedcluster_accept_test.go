@@ -97,7 +97,7 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Label
 				return err
 			}
 			if registrationClusterRole.Labels[testCustomLabel] != testCustomLabelValue || registrationClusterRole.Labels[testCustomLabel2] != testCustomLabelValue2 {
-				return fmt.Errorf("clusterRole open-cluster-management:managedcluster:registration does not have expected labels", mclClusterRoleName(managedCluster.Name))
+				return fmt.Errorf("clusterRol %s open-cluster-management:managedcluster:registration does not have expected labels", mclClusterRoleName(managedCluster.Name))
 			}
 
 			return nil
@@ -109,7 +109,7 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Label
 				return err
 			}
 			if workClusterRole.Labels[testCustomLabel] != testCustomLabelValue || workClusterRole.Labels[testCustomLabel2] != testCustomLabelValue2 {
-				return fmt.Errorf("clusterRole open-cluster-management:managedcluster:work does not have expected labels", mclClusterRoleName(managedCluster.Name))
+				return fmt.Errorf("clusterRole %s open-cluster-management:managedcluster:work does not have expected labels", mclClusterRoleName(managedCluster.Name))
 			}
 
 			return nil
