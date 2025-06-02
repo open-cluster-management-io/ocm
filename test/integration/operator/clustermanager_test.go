@@ -1275,11 +1275,14 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 
 	ginkgo.Context("Cluster manager statuses", func() {
 		ginkgo.It("should have correct degraded conditions", func() {
+			fmt.Println("Check if registration deployment is created")
 			gomega.Eventually(func() error {
-				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(
-					context.Background(), hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
+				registrationDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(
+					context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
+				if err != nil {
 					return err
 				}
+				fmt.Printf("registrationDeployment: %v", registrationDeployment)
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
@@ -1292,6 +1295,19 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 			updateDeploymentsStatusSuccess(kubeClient, hubNamespace,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
 				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddonManagerDeployment)
+			gomega.Eventually(func() error {
+				registrationDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(
+					context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				fmt.Printf("registrationDeploymentgeneration: %d", registrationDeployment.Generation)
+				fmt.Printf("registrationDeploymentreplica:%d", *registrationDeployment.Spec.Replicas)
+				fmt.Printf("registrationDeploymentstatusgeneration: %d", registrationDeployment.Status.ObservedGeneration)
+				fmt.Printf("registrationDeploymentstatusrepica: %d", registrationDeployment.Status.ReadyReplicas)
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 			// The cluster manager should be functional at last
 			util.AssertClusterManagerCondition(clusterManagerName, operatorClient,
 				"HubRegistrationDegraded", "RegistrationFunctional", metav1.ConditionFalse)

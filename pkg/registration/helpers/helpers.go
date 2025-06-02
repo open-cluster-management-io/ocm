@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"embed"
+	"fmt"
 	"net/url"
 	"strings"
 
@@ -187,6 +188,7 @@ func ParseLabels(labels string) map[string]string {
 	}
 	// Split the labels by comma
 	labelsList := strings.Split(labels, ",")
+	fmt.Printf("Labels to parse: %v\n", labelsList)
 	// Iterate over each label and split by '='
 	for _, label := range labelsList {
 		parts := strings.SplitN(label, "=", 2)
@@ -194,5 +196,6 @@ func ParseLabels(labels string) map[string]string {
 			parsedLabels[parts[0]] = parts[1]
 		}
 	}
+	fmt.Printf("Parsed labels: %v\n", parsedLabels)
 	return parsedLabels
 }
