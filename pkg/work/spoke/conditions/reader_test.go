@@ -1,12 +1,14 @@
 package conditions
 
 import (
+	"context"
 	"testing"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/utils/ptr"
 
 	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -170,6 +172,7 @@ func TestConditionReader(t *testing.T) {
 		enableRaw         bool
 		expectError       bool
 		expectedCondition metav1.Condition
+		budget            *int64
 	}{
 		{
 			name:   "deployment available",
@@ -330,22 +333,50 @@ func TestConditionReader(t *testing.T) {
 				Message: "Pod is in phase Running",
 			},
 		},
+		{
+			name:        "Budget exceeded",
+			object:      unstrctureObject(podJsonRunning),
+			rule:        workapiv1.ConditionRule{Type: workapiv1.WellKnownConditionsType, Condition: workapiv1.ManifestComplete},
+			expectError: true,
+			expectedCondition: metav1.Condition{
+				Type:    workapiv1.ManifestComplete,
+				Status:  metav1.ConditionFalse,
+				Reason:  workapiv1.ConditionRuleExpressionError,
+				Message: "CEL evaluation budget exceeded",
+			},
+			budget: ptr.To(int64(1)),
+		},
 	}
 
-	reader := NewConditionReader()
+	reader, err := NewConditionReader()
+	if err != nil {
+		t.Fatalf("Expected no err when creating ConditionReader but got %v", err)
+	}
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			condition, err := reader.GetConditionByRule(c.object, c.rule)
+			var budget int64
+			if c.budget != nil {
+				budget = *c.budget
+			} else {
+				budget = int64(1000)
+			}
+
+			condition, remainingBudget, err := reader.GetConditionByRule(context.TODO(), c.object, c.rule, budget)
 			if err == nil && c.expectError {
 				t.Errorf("%s: Expect error but got no error", c.name)
 			}
 
 			if err != nil && !c.expectError {
-				t.Errorf("%s: Expect no error but got %v", err, c.name)
+				t.Errorf("%s: Expect no error but got %v", c.name, err)
 			}
 
 			if !apiequality.Semantic.DeepEqual(c.expectedCondition, condition) {
 				t.Errorf("%s: Expect condition %+v, but got %+v", c.name, c.expectedCondition, condition)
+			}
+
+			if err == nil && remainingBudget >= budget {
+				t.Errorf("%s: Expect remaining budget to be less than initial budget. Budget: %d, Remaining: %d", c.name, budget, remainingBudget)
 			}
 		})
 	}
