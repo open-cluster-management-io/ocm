@@ -28,6 +28,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
+	"open-cluster-management.io/ocm/pkg/work/spoke/conditions"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/finalizercontroller"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/manifestcontroller"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/statuscontroller"
@@ -124,6 +125,11 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		restMapper,
 	).NewExecutorValidator(ctx, features.SpokeMutableFeatureGate.Enabled(ocmfeature.ExecutorValidatingCaches))
 
+	conditionReader, err := conditions.NewConditionReader()
+	if err != nil {
+		return err
+	}
+
 	manifestWorkController := manifestcontroller.NewManifestWorkController(
 		controllerContext.EventRecorder,
 		spokeDynamicClient,
@@ -137,6 +143,7 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		hubHash, agentID,
 		restMapper,
 		validator,
+		conditionReader,
 	)
 	addFinalizerController := finalizercontroller.NewAddFinalizerController(
 		controllerContext.EventRecorder,
