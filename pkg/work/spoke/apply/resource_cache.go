@@ -29,6 +29,8 @@ type resourceCache struct {
 	cache *syncmap.Map // use syncmap for concurrent access
 }
 
+// NewResourceCache creates a new resource cache instance.
+// TODO: currently only work agent uses this syncmap cache, consider using this in other components
 func NewResourceCache() *resourceCache {
 	return &resourceCache{
 		cache: &syncmap.Map{},
