@@ -313,10 +313,11 @@ func deleteAccessEntry(ctx context.Context, eksClient *eks.Client, roleArn strin
 	}
 
 	_, err := eksClient.DeleteAccessEntry(ctx, params)
-	if strings.Contains(err.Error(), resourceNotFound) {
-		logger.V(4).Error(err, "Access Entry already deleted for HubClusterName", "HubClusterName", hubClusterName)
-		return nil
-	} else if err != nil {
+	if err != nil {
+		if strings.Contains(err.Error(), resourceNotFound) {
+			logger.V(4).Error(err, "Access Entry already deleted for HubClusterName", "HubClusterName", hubClusterName)
+			return nil
+		}
 		logger.V(4).Error(err, "Failed to delete Access Entry for HubClusterName", "HubClusterName", hubClusterName)
 		return err
 	} else {
