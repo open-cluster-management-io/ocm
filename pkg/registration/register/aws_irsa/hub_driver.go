@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	resourceNotFound 		= "ResourceNotFoundException"
+	resourceNotFound        = "ResourceNotFoundException"
 	errNoSuchEntity         = "NoSuchEntity"
 	errEntityAlreadyExists  = "EntityAlreadyExists"
 	trustPolicyTemplatePath = "managed-cluster-policy/TrustPolicy.tmpl"
