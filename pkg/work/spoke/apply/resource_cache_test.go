@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -59,8 +58,8 @@ func TestCache(t *testing.T) {
 
 func TestCurrentReadWriteCache(t *testing.T) {
 
-	cache := resourceapply.NewResourceCache()
-	// cache := NewResourceCache()
+	// cache := resourceapply.NewResourceCache()
+	cache := NewResourceCache()
 	if cache == nil {
 		t.Fatal("expected non-nil resource cache")
 	}
