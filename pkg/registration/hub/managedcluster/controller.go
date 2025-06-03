@@ -61,7 +61,7 @@ type managedClusterController struct {
 	patcher            patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
 	hubDriver          register.HubDriver
 	eventRecorder      events.Recorder
-	labels             string
+	labels             map[string]string
 }
 
 // NewManagedClusterController creates a new managed cluster controller
@@ -75,7 +75,7 @@ func NewManagedClusterController(
 	clusterRoleBindingInformer rbacv1informers.ClusterRoleBindingInformer,
 	manifestWorkInformer workinformers.ManifestWorkInformer,
 	hubDriver register.HubDriver,
-	recorder events.Recorder, labels string) factory.Controller {
+	recorder events.Recorder, labels map[string]string) factory.Controller {
 
 	c := &managedClusterController{
 		kubeClient:         kubeClient,
@@ -197,14 +197,8 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		ObjectMeta: metav1.ObjectMeta{
 			Name: managedClusterName,
 			Labels: func() map[string]string {
-				labels := map[string]string{
-					v1.ClusterNameLabelKey: managedClusterName,
-				}
-				if c.labels != "" {
-					for k, v := range helpers.ParseLabels(c.labels) {
-						labels[k] = v
-					}
-				}
+				labels := c.labels
+				labels[v1.ClusterNameLabelKey] = managedClusterName
 				return labels
 			}()},
 	}

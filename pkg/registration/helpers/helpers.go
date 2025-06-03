@@ -77,7 +77,7 @@ func ManagedClusterAssetFn(fs embed.FS, managedClusterName string) resourceapply
 	}
 }
 
-func ManagedClusterAssetFnWithAccepted(fs embed.FS, managedClusterName string, accepted bool, labels string) resourceapply.AssetFunc {
+func ManagedClusterAssetFnWithAccepted(fs embed.FS, managedClusterName string, accepted bool, labels map[string]string) resourceapply.AssetFunc {
 	return func(name string) ([]byte, error) {
 		config := struct {
 			ManagedClusterName string
@@ -86,7 +86,7 @@ func ManagedClusterAssetFnWithAccepted(fs embed.FS, managedClusterName string, a
 		}{
 			ManagedClusterName: managedClusterName,
 			Accepted:           accepted,
-			Labels:             ParseLabels(labels),
+			Labels:             labels,
 		}
 
 		template, err := fs.ReadFile(name)

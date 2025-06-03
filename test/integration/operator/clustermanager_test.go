@@ -1186,7 +1186,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 			// Get clustermanager resource
 			clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			labels := helpers.GetClusterManagerLabels(clusterManager)
+			labels := clusterManager.Labels
 
 			// Compare labels on registration-controller
 			gomega.Eventually(func() error {

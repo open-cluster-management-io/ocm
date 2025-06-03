@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/rest"
+	generate "k8s.io/kubectl/pkg/generate"
 	cpclientset "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned"
 	cpinformerv1alpha1 "sigs.k8s.io/cluster-inventory-api/client/informers/externalversions"
 
@@ -197,7 +198,14 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		}
 	}
 	hubDriver := register.NewAggregatedHubDriver(drivers...)
-
+	labelsMap := make(map[string]string)
+	if m.Labels != "" {
+		var err error
+		labelsMap, err = generate.ParseLabels(m.Labels)
+		if err != nil {
+			return err
+		}
+	}
 	managedClusterController := managedcluster.NewManagedClusterController(
 		kubeClient,
 		clusterClient,
@@ -209,7 +217,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		workInformers.Work().V1().ManifestWorks(),
 		hubDriver,
 		controllerContext.EventRecorder,
-		m.Labels,
+		labelsMap,
 	)
 
 	taintController := taint.NewTaintController(
@@ -257,7 +265,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		kubeInformers.Rbac().V1().ClusterRoles(),
 		controllerContext.EventRecorder,
-		m.Labels,
+		labelsMap,
 	)
 
 	addOnHealthCheckController := addon.NewManagedClusterAddOnHealthCheckController(

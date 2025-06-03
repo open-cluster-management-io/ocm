@@ -33,7 +33,7 @@ type clusterroleController struct {
 	applier       *apply.PermissionApplier
 	cache         resourceapply.ResourceCache
 	eventRecorder events.Recorder
-	labels        string
+	labels        map[string]string
 }
 
 // NewManagedClusterClusterroleController creates a clusterrole controller on hub cluster.
@@ -42,7 +42,7 @@ func NewManagedClusterClusterroleController(
 	clusterInformer clusterv1informer.ManagedClusterInformer,
 	clusterRoleInformer rbacv1informers.ClusterRoleInformer,
 	recorder events.Recorder,
-	labels string) factory.Controller {
+	labels map[string]string) factory.Controller {
 	c := &clusterroleController{
 		kubeClient:    kubeClient,
 		clusterLister: clusterInformer.Lister(),

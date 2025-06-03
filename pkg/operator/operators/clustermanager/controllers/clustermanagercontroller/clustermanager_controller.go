@@ -226,8 +226,8 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	}
 
 	if n.enableSyncLabels {
-		config.LabelsString = helpers.ConvertLabelsMapToString(helpers.GetClusterManagerLabels(clusterManager))
-		config.Labels = helpers.GetClusterManagerLabels(clusterManager)
+		config.LabelsString = helpers.ConvertLabelsMapToString(clusterManager.Labels)
+		config.Labels = clusterManager.Labels
 	}
 
 	// Update finalizer at first

@@ -46,7 +46,7 @@ func TestSyncManagedCluster(t *testing.T) {
 		roleBindings           []runtime.Object
 		manifestWorks          []runtime.Object
 		startingObjects        []runtime.Object
-		labels                 string
+		labels                 map[string]string
 		validateClusterActions func(t *testing.T, actions []clienttesting.Action)
 		validateKubeActions    func(t *testing.T, actions []clienttesting.Action)
 	}{
@@ -168,7 +168,7 @@ func TestSyncManagedCluster(t *testing.T) {
 					"delete", // clusterrolebinding
 					"delete", // registration rolebinding
 					"delete", // work rolebinding
-					"patch") // work rolebinding
+					"patch")  // work rolebinding
 				patch := actions[4].(clienttesting.PatchAction).GetPatch()
 				roleBinding := &rbacv1.RoleBinding{}
 				err := json.Unmarshal(patch, roleBinding)
@@ -227,7 +227,7 @@ func TestSyncManagedCluster(t *testing.T) {
 			validateClusterActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertNoActions(t, actions)
 			},
-			labels: fmt.Sprintf("%s=%s,%s=%s", testCustomLabel, testCustomLabelValue, testCustomLabel2, testCustomLabelValue2),
+			labels: map[string]string{testCustomLabel: testCustomLabelValue, testCustomLabel2: testCustomLabelValue2},
 			validateKubeActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions,
 					"get", "create", // namespace

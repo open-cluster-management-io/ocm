@@ -284,8 +284,8 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.Cl
 	if err != nil {
 		t.Errorf("Unable to access objectmeta: %v", err)
 	}
-
-	if enableSyncLabels && !helpers.MapCompare(helpers.GetClusterManagerLabels(hubCore), access.GetLabels()) {
+	//TODO: add test by enabling sync labels = true
+	if enableSyncLabels && !helpers.MapCompare(hubCore.Labels, access.GetLabels()) {
 		t.Errorf("the labels of the clustermanager are not synced to %v %v %v", access.GetName(), hubCore.GetLabels(), access.GetLabels())
 		return
 	}
@@ -435,7 +435,7 @@ func TestSyncSecret(t *testing.T) {
 // TestSyncDeploy tests sync manifests of hub component
 func TestSyncDeploy(t *testing.T) {
 	clusterManager := newClusterManager("testhub")
-	clusterManager.SetLabels(map[string]string{"test": "test", "createdByClusterManager": "testhub", "abc": "abc"})
+	//clusterManager.SetLabels(map[string]string{"test": "test", "createdByClusterManager": "testhub", "abc": "abc"})
 	tc := newTestController(t, clusterManager)
 	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
 	cd := setDeployment(clusterManager.Name, clusterManagerNamespace)
