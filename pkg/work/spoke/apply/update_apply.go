@@ -36,8 +36,8 @@ func NewUpdateApply(dynamicClient dynamic.Interface, kubeclient kubernetes.Inter
 		kubeclient:         kubeclient,
 		apiExtensionClient: apiExtensionClient,
 		// TODO we did not gc resources in cache, which may cause more memory usage. It
-		// should be refactored using own cache implementation in the future.
-		staticResourceCache: resourceapply.NewResourceCache(),
+		// should be refactored in the future.
+		staticResourceCache: NewResourceCache(),
 	}
 }
 
