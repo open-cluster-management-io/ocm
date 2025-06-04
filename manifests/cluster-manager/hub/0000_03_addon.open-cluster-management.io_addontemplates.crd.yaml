@@ -3,12 +3,6 @@ kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
   name: addontemplates.addon.open-cluster-management.io
-  labels:
-    {{ if gt (len .Labels) 0 }}
-    {{ range $key, $value := .Labels }}
-    "{{ $key }}": "{{ $value }}"
-    {{ end }}
-    {{ end }}
 spec:
   group: addon.open-cluster-management.io
   names:

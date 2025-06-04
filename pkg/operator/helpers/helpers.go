@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"reflect"
@@ -23,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -850,4 +852,39 @@ func MapCompare(required, existing map[string]string) bool {
 		}
 	}
 	return true
+}
+
+func AddLabelsToYaml(objData []byte, cmLabels map[string]string) ([]byte, error) {
+	jsonData, err := yaml.YAMLToJSON(objData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert YAML to JSON: %w", err)
+	}
+	u := &unstructured.Unstructured{}
+	if err := json.Unmarshal(jsonData, u); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+	}
+
+	// Add or update labels
+	labels := u.GetLabels()
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	for k, v := range cmLabels {
+		labels[k] = v
+	}
+	u.SetLabels(labels)
+
+	// Marshal back to JSON
+	modifiedJSON, err := json.Marshal(u)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal updated object: %w", err)
+	}
+
+	// Convert back to YAML (optional, if needed downstream)
+	modifiedYAML, err := yaml.JSONToYAML(modifiedJSON)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert JSON to YAML: %w", err)
+	}
+
+	return modifiedYAML, nil
 }
