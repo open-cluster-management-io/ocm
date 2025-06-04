@@ -3,8 +3,8 @@ package apply
 import (
 	"fmt"
 	"reflect"
+	"sync"
 
-	"golang.org/x/sync/syncmap"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,14 +26,14 @@ type cachedResource struct {
 }
 
 type resourceCache struct {
-	cache *syncmap.Map // use syncmap for concurrent access
+	cache sync.Map // use syncmap for concurrent access
 }
 
 // NewResourceCache creates a new resource cache instance.
 // TODO: currently only work agent uses this syncmap cache, consider using this in other components
 func NewResourceCache() *resourceCache {
 	return &resourceCache{
-		cache: &syncmap.Map{},
+		cache: sync.Map{},
 	}
 }
 
@@ -87,7 +87,7 @@ func getResourceVersion(obj runtime.Object) (string, error) {
 }
 
 func (c *resourceCache) UpdateCachedResourceMetadata(required runtime.Object, actual runtime.Object) {
-	if c == nil || c.cache == nil {
+	if c == nil {
 		return
 	}
 	if required == nil || actual == nil {
@@ -118,7 +118,7 @@ func (c *resourceCache) UpdateCachedResourceMetadata(required runtime.Object, ac
 // hasn't been modified since the ApplyFoo last updated that resource, then return true (we don't
 // need to reapply the resource). Otherwise return false.
 func (c *resourceCache) SafeToSkipApply(required runtime.Object, existing runtime.Object) bool {
-	if c == nil || c.cache == nil {
+	if c == nil {
 		return false
 	}
 	if required == nil || existing == nil {
