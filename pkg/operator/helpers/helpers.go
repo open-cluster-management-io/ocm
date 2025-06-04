@@ -3,10 +3,8 @@ package helpers
 import (
 	"context"
 	"fmt"
-	"maps"
 	"os"
 	"reflect"
-	"slices"
 	"strings"
 
 	"github.com/ghodss/yaml"
@@ -39,6 +37,9 @@ import (
 	"k8s.io/klog/v2"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
+	"maps"
+	"slices"
+
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
 
@@ -830,14 +831,6 @@ func GetKlusterletAgentLabels(klusterlet *operatorapiv1.Klusterlet) map[string]s
 	// This label key is used to filter resources in deployment informer
 	labels[AgentLabelKey] = klusterlet.GetName()
 
-	return labels
-}
-
-func GetClusterManagerLabels(cm *operatorapiv1.ClusterManager) map[string]string {
-	labels := cm.GetLabels()
-	if labels == nil {
-		labels = map[string]string{}
-	}
 	return labels
 }
 

@@ -434,8 +434,9 @@ func TestSyncSecret(t *testing.T) {
 
 // TestSyncDeploy tests sync manifests of hub component
 func TestSyncDeploy(t *testing.T) {
+	labels := map[string]string{"test": "test", "createdByClusterManager": "testhub", "abc": "abc"}
 	clusterManager := newClusterManager("testhub")
-	//clusterManager.SetLabels(map[string]string{"test": "test", "createdByClusterManager": "testhub", "abc": "abc"})
+	clusterManager.SetLabels(labels)
 	tc := newTestController(t, clusterManager)
 	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
 	cd := setDeployment(clusterManager.Name, clusterManagerNamespace)

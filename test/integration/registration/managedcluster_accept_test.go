@@ -3,13 +3,14 @@ package registration_test
 import (
 	"context"
 	"fmt"
+	"reflect"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"reflect"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )

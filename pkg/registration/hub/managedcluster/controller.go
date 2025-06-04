@@ -20,6 +20,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	rbacv1listers "k8s.io/client-go/listers/rbac/v1"
 	"k8s.io/klog/v2"
+
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	informerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	listerv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
@@ -28,13 +29,13 @@ import (
 	v1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 	workv1 "open-cluster-management.io/api/work/v1"
-	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/apply"
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/features"
+	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/manifests"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
@@ -197,7 +198,10 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		ObjectMeta: metav1.ObjectMeta{
 			Name: managedClusterName,
 			Labels: func() map[string]string {
-				labels := c.labels
+				labels := make(map[string]string)
+				if c.labels != nil {
+					labels = c.labels
+				}
 				labels[v1.ClusterNameLabelKey] = managedClusterName
 				return labels
 			}()},
