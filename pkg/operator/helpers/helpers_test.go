@@ -1672,10 +1672,10 @@ func TestAddLabelsToYaml(t *testing.T) {
 apiVersion: v1
 kind: ConfigMap
 metadata:
-name: test-cm
-namespace: test-ns
+ name: test-cm
+ namespace: test-ns
 data:
-key: value
+ key: value
 `,
 			labels: map[string]string{
 				"foo": "bar",
@@ -1693,12 +1693,12 @@ key: value
 apiVersion: v1
 kind: ConfigMap
 metadata:
-name: test-cm
-namespace: test-ns
-labels:
-existing: label
+ name: test-cm
+ namespace: test-ns
+ labels:
+  existing: label
 data:
-key: value
+ key: value
 `,
 			labels: map[string]string{
 				"foo": "bar",

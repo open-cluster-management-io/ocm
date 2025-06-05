@@ -1213,7 +1213,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 
 			// Compare labels on registration-webhook
 			gomega.Eventually(func() error {
-				registrationDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationWebhookDeployment, metav1.GetOptions{})
+				registrationDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(),
+					hubRegistrationWebhookDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}

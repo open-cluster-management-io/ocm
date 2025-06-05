@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/ghodss/yaml"
@@ -39,8 +40,6 @@ import (
 	"k8s.io/klog/v2"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
-	"maps"
-	"slices"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
@@ -838,8 +837,13 @@ func GetKlusterletAgentLabels(klusterlet *operatorapiv1.Klusterlet) map[string]s
 
 func ConvertLabelsMapToString(labels map[string]string) string {
 	var labelList []string
-	sortedMap := slices.Sorted(maps.Keys(labels))
-	for _, key := range sortedMap {
+	keys := make([]string, 0, len(labels))
+	for k := range labels {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
 		labelList = append(labelList, fmt.Sprintf("%s=%s", key, labels[key]))
 	}
 	return strings.Join(labelList, ",")
