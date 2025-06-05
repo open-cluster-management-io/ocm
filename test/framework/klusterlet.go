@@ -213,6 +213,56 @@ func (spoke *Spoke) CheckKlusterletStatus(klusterletName, condType, reason strin
 	return nil
 }
 
+func (spoke *Spoke) EnableRegistrationFeature(klusterletName, feature string) error {
+	kl, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(context.TODO(), klusterletName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	if kl.Spec.RegistrationConfiguration == nil {
+		kl.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationConfiguration{}
+	}
+
+	if len(kl.Spec.RegistrationConfiguration.FeatureGates) == 0 {
+		kl.Spec.RegistrationConfiguration.FeatureGates = make([]operatorapiv1.FeatureGate, 0)
+	}
+
+	for idx, f := range kl.Spec.RegistrationConfiguration.FeatureGates {
+		if f.Feature == feature {
+			if f.Mode == operatorapiv1.FeatureGateModeTypeEnable {
+				return nil
+			}
+			kl.Spec.RegistrationConfiguration.FeatureGates[idx].Mode = operatorapiv1.FeatureGateModeTypeEnable
+			_, err = spoke.OperatorClient.OperatorV1().Klusterlets().Update(context.TODO(), kl, metav1.UpdateOptions{})
+			return err
+		}
+	}
+
+	featureGate := operatorapiv1.FeatureGate{
+		Feature: feature,
+		Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+	}
+
+	kl.Spec.RegistrationConfiguration.FeatureGates = append(kl.Spec.RegistrationConfiguration.FeatureGates, featureGate)
+	_, err = spoke.OperatorClient.OperatorV1().Klusterlets().Update(context.TODO(), kl, metav1.UpdateOptions{})
+	return err
+}
+
+func (spoke *Spoke) RemoveRegistrationFeature(klusterletName string, feature string) error {
+	kl, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(context.TODO(), klusterletName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	for indx, fg := range kl.Spec.RegistrationConfiguration.FeatureGates {
+		if fg.Feature == feature {
+			kl.Spec.RegistrationConfiguration.FeatureGates[indx].Mode = operatorapiv1.FeatureGateModeTypeDisable
+			break
+		}
+	}
+	_, err = spoke.OperatorClient.OperatorV1().Klusterlets().Update(context.TODO(), kl, metav1.UpdateOptions{})
+	return err
+}
+
 // CleanKlusterletRelatedResources needs both hub side and spoke side operations
 func CleanKlusterletRelatedResources(
 	hub *Hub, spoke *Spoke,

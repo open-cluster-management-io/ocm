@@ -209,6 +209,9 @@ type klusterletConfig struct {
 	ManagedClusterArn        string
 	ManagedClusterRoleArn    string
 	ManagedClusterRoleSuffix string
+
+	// flag to enable about about-api
+	AboutAPIEnabled bool
 }
 
 // If multiplehubs feature gate is enabled, using the bootstrapkubeconfigs from klusterlet CR.
@@ -389,6 +392,9 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		}
 		config.ClusterAnnotationsString = strings.Join(annotationsArray, ",")
 	}
+
+	config.AboutAPIEnabled = helpers.FeatureGateEnabled(
+		registrationFeatureGates, ocmfeature.DefaultSpokeRegistrationFeatureGates, ocmfeature.ClusterProperty)
 	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration",
 		registrationFeatureGates, ocmfeature.DefaultSpokeRegistrationFeatureGates)
 
