@@ -37,12 +37,8 @@ import (
 )
 
 const (
-	eventuallyTimeout     = 30 // seconds
-	eventuallyInterval    = 1  // seconds
-	testCustomLabel       = "custom-label"
-	testCustomLabelValue  = "custom-value"
-	testCustomLabel2      = "custom-label2"
-	testCustomLabelValue2 = "custom-value2"
+	eventuallyTimeout  = 30 // seconds
+	eventuallyInterval = 1  // seconds
 )
 
 var spokeCfg *rest.Config
@@ -223,7 +219,6 @@ var _ = ginkgo.BeforeSuite(func() {
 			m.HubClusterArn = "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
 			m.ClusterAutoApprovalUsers = []string{util.AutoApprovalBootstrapUser}
 			m.AutoApprovedARNPatterns = []string{"arn:aws:eks:us-west-2:123456789012:cluster/.*"}
-			m.Labels = fmt.Sprintf("%s=%s,%s=%s", testCustomLabel, testCustomLabelValue, testCustomLabel2, testCustomLabelValue2)
 			err := m.RunControllerManager(ctx, &controllercmd.ControllerContext{
 				KubeConfig:    cfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("hub"),

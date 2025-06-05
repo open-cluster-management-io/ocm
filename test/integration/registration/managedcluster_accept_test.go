@@ -13,10 +13,32 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	"open-cluster-management.io/ocm/pkg/registration/hub"
 )
 
-var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Label("managedcluster-accept"), func() {
+var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Ordered, Label("managedcluster-accept"), func() {
 	var managedCluster *clusterv1.ManagedCluster
+	var testCustomLabel = "custom-label"
+	var testCustomLabelValue = "custom-value"
+	var testCustomLabel2 = "custom-label2"
+	var testCustomLabelValue2 = "custom-value2"
+
+	BeforeAll(func() {
+		// stop the hub and start new hub with the updated option
+		stopHub()
+
+		awsHubOption := hub.NewHubManagerOptions()
+		awsHubOption.Labels = fmt.Sprintf("%s=%s,%s=%s", testCustomLabel, testCustomLabelValue, testCustomLabel2, testCustomLabelValue2)
+		startHub(awsHubOption)
+
+		// stop hub with awsOption and restart hub with default option
+		DeferCleanup(func() {
+			stopHub()
+			startHub(hubOption)
+		})
+	})
+
 	BeforeEach(func() {
 		managedClusterName := fmt.Sprintf("managedcluster-%s", rand.String(6))
 		managedCluster = &clusterv1.ManagedCluster{
@@ -123,7 +145,6 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Label
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 	})
-
 	It("should set hubAcceptsClient to false", func() {
 		// Set hubAcceptsClient to false
 		Eventually(func() error {

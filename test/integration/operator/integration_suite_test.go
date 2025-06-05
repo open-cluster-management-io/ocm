@@ -129,11 +129,6 @@ var _ = ginkgo.BeforeSuite(func() {
 	_, err = operatorClient.OperatorV1().ClusterManagers().Create(context.Background(), &operatorapiv1.ClusterManager{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterManagerName,
-			Labels: map[string]string{
-				"app":      "clustermanager",
-				"labelOne": "valueOne",
-				"labelTwo": "valueTwo",
-			},
 		},
 		Spec: operatorapiv1.ClusterManagerSpec{
 			RegistrationImagePullSpec: "quay.io/open-cluster-management/registration",
@@ -163,11 +158,6 @@ var _ = ginkgo.BeforeSuite(func() {
 	_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Create(context.Background(), &operatorapiv1.ClusterManager{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterManagerName,
-			Labels: map[string]string{
-				"app":      "clustermanager",
-				"labelOne": "valueOne",
-				"labelTwo": "valueTwo",
-			},
 		},
 		Spec: operatorapiv1.ClusterManagerSpec{
 			RegistrationImagePullSpec: "quay.io/open-cluster-management/registration",

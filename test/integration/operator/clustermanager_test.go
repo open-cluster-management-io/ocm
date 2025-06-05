@@ -56,7 +56,7 @@ func startHubOperator(ctx context.Context, mode operatorapiv1.InstallMode) {
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 }
 
-var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
+var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 	var cancel context.CancelFunc
 	var hubRegistrationDeployment = fmt.Sprintf("%s-registration-controller", clusterManagerName)
 	var hubPlacementDeployment = fmt.Sprintf("%s-placement-controller", clusterManagerName)
@@ -81,7 +81,6 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 		ctx, cancel = context.WithCancel(context.Background())
 		go startHubOperator(ctx, operatorapiv1.InstallModeDefault)
 	})
-
 	ginkgo.AfterEach(func() {
 		// delete deployment for clustermanager here so tests are not impacted with each other
 		err := kubeClient.AppsV1().Deployments(hubNamespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
@@ -275,10 +274,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddonManagerDeployment)
 
 			// Check validating webhook
-			registrationValidtingWebhook := "managedclustervalidators.admission.cluster.open-cluster-management.io"
+			registrationValidatingWebhook := "managedclustervalidators.admission.cluster.open-cluster-management.io"
 			// Should not apply the webhook config if the replica and observed is not set
 			_, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
-				context.Background(), registrationValidtingWebhook, metav1.GetOptions{})
+				context.Background(), registrationValidatingWebhook, metav1.GetOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 
 			workValidtingWebhook := "manifestworkvalidators.admission.work.open-cluster-management.io"
@@ -294,7 +293,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 
 			gomega.Eventually(func() error {
 				_, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
-					context.Background(), registrationValidtingWebhook, metav1.GetOptions{})
+					context.Background(), registrationValidatingWebhook, metav1.GetOptions{})
 				return err
 			}, eventuallyTimeout*10, eventuallyInterval).Should(gomega.BeNil())
 
@@ -1186,8 +1185,12 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 			// Get clustermanager resource
 			clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			labels := clusterManager.Labels
-
+			// Updating the cluster manager with labels
+			var labelsMap = map[string]string{"app": "clustermanager", "test-label": "test-value", "test-label2": "test-value2"}
+			clusterManager.Labels = labelsMap
+			updatedClusterManager, err := operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			labels := updatedClusterManager.Labels
 			// Compare labels on registration-controller
 			gomega.Eventually(func() error {
 				registrationDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
