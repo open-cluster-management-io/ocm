@@ -42,7 +42,7 @@ const (
 	originalImageValue                       = "quay.io/open-cluster-management/addon-examples:latest"
 	overrideImageValue                       = "quay.io/ocm/addon-examples:latest"
 	customSignerName                         = "example.com/signer-name"
-	//#nosec G101
+	// #nosec G101
 	customSignerSecretName = "addon-signer-secret"
 )
 
@@ -153,14 +153,23 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		gomega.Eventually(func() error {
 			_, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
-			if err != nil {
-				if errors.IsNotFound(err) {
-					return nil
-				}
+			if err == nil {
+				return fmt.Errorf("the managedClusterAddon %s should be deleted", addOnName)
+			}
+			if err != nil && !errors.IsNotFound(err) {
 				return err
 			}
 
-			return fmt.Errorf("the managedClusterAddon %s should be deleted", addOnName)
+			// check works after addon is not found
+			works, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).List(
+				context.TODO(), metav1.ListOptions{})
+			if err == nil && len(works.Items) != 0 {
+				return fmt.Errorf("expected no works,but got: %+v", works.Items)
+			}
+			if err != nil && !errors.IsNotFound(err) {
+				return err
+			}
+			return nil
 		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By(fmt.Sprintf("delete addon template resources for cluster %v", universalClusterName))
