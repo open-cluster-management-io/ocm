@@ -189,14 +189,14 @@ func (a *CRDTemplateAgentAddon) renderObjects(
 			return objects, err
 		}
 
-		object, err = a.decorateObject(template, object, presetValues, privateValues)
+		object, err = a.decorateObject(addon, template, object, presetValues, privateValues)
 		if err != nil {
 			return objects, err
 		}
 		objects = append(objects, object)
 	}
 
-	additionalObjects, err := a.injectAdditionalObjects(template, presetValues, privateValues)
+	additionalObjects, err := a.injectAdditionalObjects(addon, template, presetValues, privateValues)
 	if err != nil {
 		return objects, err
 	}
@@ -206,14 +206,16 @@ func (a *CRDTemplateAgentAddon) renderObjects(
 }
 
 func (a *CRDTemplateAgentAddon) decorateObject(
+	addon *addonapiv1alpha1.ManagedClusterAddOn,
 	template *addonapiv1alpha1.AddOnTemplate,
 	obj *unstructured.Unstructured,
 	orderedValues orderedValues,
-	privateValues addonfactory.Values) (*unstructured.Unstructured, error) {
+	privateValues addonfactory.Values,
+) (*unstructured.Unstructured, error) {
 	decorators := []decorator{
 		newDeploymentDecorator(a.logger, a.addonName, template, orderedValues, privateValues),
 		newDaemonSetDecorator(a.logger, a.addonName, template, orderedValues, privateValues),
-		newNamespaceDecorator(privateValues),
+		newNamespaceDecorator(addon.Spec.InstallNamespace, privateValues),
 	}
 
 	var err error
@@ -228,6 +230,7 @@ func (a *CRDTemplateAgentAddon) decorateObject(
 }
 
 func (a *CRDTemplateAgentAddon) injectAdditionalObjects(
+	addon *addonapiv1alpha1.ManagedClusterAddOn,
 	template *addonapiv1alpha1.AddOnTemplate,
 	orderedValues orderedValues,
 	privateValues addonfactory.Values) ([]runtime.Object, error) {
@@ -237,7 +240,7 @@ func (a *CRDTemplateAgentAddon) injectAdditionalObjects(
 
 	decorators := []decorator{
 		// decorate the namespace of the additional objects
-		newNamespaceDecorator(privateValues),
+		newNamespaceDecorator(addon.Spec.InstallNamespace, privateValues),
 	}
 
 	var objs []runtime.Object
@@ -296,54 +299,60 @@ func (a *CRDTemplateAgentAddon) getDesiredAddOnTemplateInner(
 	return template.DeepCopy(), nil
 }
 
-// TemplateAgentRegistrationNamespaceFunc reads deployment/daemonset resources in the manifests and use that namespace
-// as the default registration namespace. If addonDeploymentConfig is set, uses the namespace in it.
+// TemplateAgentRegistrationNamespaceFunc reads the registration namespace according to the following
+// priorities, from high to low:
+//  1. namespace configured in the addonDeploymentConfig
+//  2. managedClusterAddon.spec.installNamespace
+//  3. namespace of deployment/daemonset resources defined in the addonTemplated manifests
 func (a *CRDTemplateAgentAddon) TemplateAgentRegistrationNamespaceFunc(
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
-	template, err := a.getDesiredAddOnTemplateInner(addon.Name, addon.Status.ConfigReferences)
-	if err != nil {
-		return "", err
-	}
-	if template == nil {
-		return "", fmt.Errorf("addon %s template not found in status", addon.Name)
-	}
 
-	// pick the namespace of the first deployment, if there is no deployment, pick the namespace of the first daemonset
-	var desiredNS = "open-cluster-management-agent-addon"
-	var firstDeploymentNamespace, firstDaemonSetNamespace string
-	for _, manifest := range template.Spec.AgentSpec.Workload.Manifests {
-		object := &unstructured.Unstructured{}
-		if err := object.UnmarshalJSON(manifest.Raw); err != nil {
-			a.logger.Error(err, "failed to extract the object")
-			continue
+	desiredNs := addon.Spec.InstallNamespace
+	if len(desiredNs) == 0 {
+		template, err := a.getDesiredAddOnTemplateInner(addon.Name, addon.Status.ConfigReferences)
+		if err != nil {
+			return "", err
+		}
+		if template == nil {
+			return "", fmt.Errorf("addon %s template not found in status", addon.Name)
 		}
 
-		if firstDeploymentNamespace == "" {
-			if _, err = utils.ConvertToDeployment(object); err == nil {
-				firstDeploymentNamespace = object.GetNamespace()
-				break
+		// pick the namespace of the first deployment, if there is no deployment, pick the namespace of the first daemonset
+		desiredNs = "open-cluster-management-agent-addon"
+		var firstDeploymentNamespace, firstDaemonSetNamespace string
+		for _, manifest := range template.Spec.AgentSpec.Workload.Manifests {
+			object := &unstructured.Unstructured{}
+			if err := object.UnmarshalJSON(manifest.Raw); err != nil {
+				a.logger.Error(err, "failed to extract the object")
+				continue
+			}
+
+			if firstDeploymentNamespace == "" {
+				if _, err = utils.ConvertToDeployment(object); err == nil {
+					firstDeploymentNamespace = object.GetNamespace()
+					break
+				}
+			}
+			if firstDaemonSetNamespace == "" {
+				if _, err = utils.ConvertToDaemonSet(object); err == nil {
+					firstDaemonSetNamespace = object.GetNamespace()
+				}
 			}
 		}
-		if firstDaemonSetNamespace == "" {
-			if _, err = utils.ConvertToDaemonSet(object); err == nil {
-				firstDaemonSetNamespace = object.GetNamespace()
-			}
+
+		if firstDeploymentNamespace != "" {
+			desiredNs = firstDeploymentNamespace
+		} else if firstDaemonSetNamespace != "" {
+			desiredNs = firstDaemonSetNamespace
 		}
 	}
-
-	if firstDeploymentNamespace != "" {
-		desiredNS = firstDeploymentNamespace
-	} else if firstDaemonSetNamespace != "" {
-		desiredNS = firstDaemonSetNamespace
-	}
-
 	overrideNs, err := utils.AgentInstallNamespaceFromDeploymentConfigFunc(
 		utils.NewAddOnDeploymentConfigGetter(a.addonClient))(addon)
 	if err != nil {
 		return "", err
 	}
 	if len(overrideNs) > 0 {
-		desiredNS = overrideNs
+		desiredNs = overrideNs
 	}
-	return desiredNS, nil
+	return desiredNs, nil
 }
