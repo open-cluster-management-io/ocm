@@ -37,6 +37,7 @@ import (
 	fakeoperatorclient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
+	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
@@ -1463,6 +1464,40 @@ func TestClusterClaimConfigInSingletonMode(t *testing.T) {
 
 	assertKlusterletDeployment(t, commonhelpers.CSRAuthType, controller.kubeClient.Actions(), createVerb,
 		"", "cluster1", claimConfig)
+}
+
+// TestSyncEnableClusterProperty test enabling clusterproperty
+func TestSyncEnableClusterProperty(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	klusterlet.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationConfiguration{
+		FeatureGates: []operatorapiv1.FeatureGate{
+			{
+				Feature: string(ocmfeature.ClusterProperty),
+				Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+			},
+		},
+	}
+
+	objects := []runtime.Object{}
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
+		objects...)
+
+	err := controller.controller.sync(context.TODO(), syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	var createCnt int
+	for _, action := range controller.apiExtensionClient.Actions() {
+		if action.GetVerb() == "create" {
+			createCnt++
+		}
+	}
+
+	if createCnt != 3 {
+		t.Errorf("Expected 3 actions, got %d", len(controller.apiExtensionClient.Actions()))
+	}
 }
 
 func newKubeConfig(host string) []byte {

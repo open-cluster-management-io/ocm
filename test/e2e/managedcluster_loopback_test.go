@@ -175,30 +175,31 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 
 		// make sure the cpu and memory are still in the status, for compatibility
 		ginkgo.By("Make sure cpu and memory exist in status")
-		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
-			managedCluster, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
+		err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 30*time.Second, true,
+			func(ctx context.Context) (bool, error) {
+				managedCluster, err := managedClusters.Get(ctx, universalClusterName, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
 
-			if _, exist := managedCluster.Status.Allocatable[clusterv1.ResourceCPU]; !exist {
-				return false, fmt.Errorf("Resource %v doesn't exist in Allocatable", clusterv1.ResourceCPU)
-			}
+				if _, exist := managedCluster.Status.Allocatable[clusterv1.ResourceCPU]; !exist {
+					return false, fmt.Errorf("Resource %v doesn't exist in Allocatable", clusterv1.ResourceCPU)
+				}
 
-			if _, exist := managedCluster.Status.Allocatable[clusterv1.ResourceMemory]; !exist {
-				return false, fmt.Errorf("Resource %v doesn't exist in Allocatable", clusterv1.ResourceMemory)
-			}
+				if _, exist := managedCluster.Status.Allocatable[clusterv1.ResourceMemory]; !exist {
+					return false, fmt.Errorf("Resource %v doesn't exist in Allocatable", clusterv1.ResourceMemory)
+				}
 
-			if _, exist := managedCluster.Status.Capacity[clusterv1.ResourceCPU]; !exist {
-				return false, fmt.Errorf("Resource %v doesn't exist in Capacity", clusterv1.ResourceCPU)
-			}
+				if _, exist := managedCluster.Status.Capacity[clusterv1.ResourceCPU]; !exist {
+					return false, fmt.Errorf("Resource %v doesn't exist in Capacity", clusterv1.ResourceCPU)
+				}
 
-			if _, exist := managedCluster.Status.Capacity[clusterv1.ResourceMemory]; !exist {
-				return false, fmt.Errorf("Resource %v doesn't exist in Capacity", clusterv1.ResourceMemory)
-			}
+				if _, exist := managedCluster.Status.Capacity[clusterv1.ResourceMemory]; !exist {
+					return false, fmt.Errorf("Resource %v doesn't exist in Capacity", clusterv1.ResourceMemory)
+				}
 
-			return true, nil
-		})
+				return true, nil
+			})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By("Make sure ClusterClaims are synced")
@@ -208,14 +209,15 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 				Value: clusterId,
 			},
 		}
-		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
-			managedCluster, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
+		err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 30*time.Second, true,
+			func(ctx context.Context) (bool, error) {
+				managedCluster, err := managedClusters.Get(ctx, universalClusterName, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
 
-			return reflect.DeepEqual(clusterClaims, managedCluster.Status.ClusterClaims), nil
-		})
+				return reflect.DeepEqual(clusterClaims, managedCluster.Status.ClusterClaims), nil
+			})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By("Create addon on hub")
@@ -260,21 +262,22 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		)
 
 		ginkgo.By(fmt.Sprintf("Waiting for the CSR for addOn %q to exist", addOnName))
-		err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
-			var err error
-			csrs, err = csrClient.List(context.TODO(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("open-cluster-management.io/cluster-name=%s,open-cluster-management.io/addon-name=%s", universalClusterName, addOnName),
+		err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 90*time.Second, true,
+			func(ctx context.Context) (bool, error) {
+				var err error
+				csrs, err = csrClient.List(ctx, metav1.ListOptions{
+					LabelSelector: fmt.Sprintf("open-cluster-management.io/cluster-name=%s,open-cluster-management.io/addon-name=%s", universalClusterName, addOnName),
+				})
+				if err != nil {
+					return false, err
+				}
+
+				if len(csrs.Items) >= 1 {
+					return true, nil
+				}
+
+				return false, nil
 			})
-			if err != nil {
-				return false, err
-			}
-
-			if len(csrs.Items) >= 1 {
-				return true, nil
-			}
-
-			return false, nil
-		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By("Approving all pending CSRs")
