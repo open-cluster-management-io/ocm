@@ -29,7 +29,7 @@ type namespaceDecorator struct {
 	paths map[string][]string
 }
 
-func newNamespaceDecorator(privateValues addonfactory.Values) *namespaceDecorator {
+func newNamespaceDecorator(defaultNs string, privateValues addonfactory.Values) *namespaceDecorator {
 	decorator := &namespaceDecorator{
 		paths: map[string][]string{
 			"ClusterRoleBinding": {"subjects", "namespace"},
@@ -40,6 +40,8 @@ func newNamespaceDecorator(privateValues addonfactory.Values) *namespaceDecorato
 	namespace, ok := privateValues[InstallNamespacePrivateValueKey]
 	if ok {
 		decorator.installNamespace = namespace.(string)
+	} else if len(defaultNs) != 0 {
+		decorator.installNamespace = defaultNs
 	}
 
 	return decorator
