@@ -23,10 +23,15 @@ import (
 )
 
 func TestSyncManagedClusterClusterRole(t *testing.T) {
+	const (
+		testCustomLabel      = "custom-label"
+		testCustomLabelValue = "custom-value"
+	)
 	cases := []struct {
 		name            string
 		clusters        []runtime.Object
 		clusterroles    []runtime.Object
+		labels          map[string]string
 		validateActions func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
@@ -62,6 +67,30 @@ func TestSyncManagedClusterClusterRole(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:         "add labels to created clusterroles",
+			clusters:     []runtime.Object{testinghelpers.NewManagedCluster()},
+			clusterroles: []runtime.Object{},
+			labels:       map[string]string{testCustomLabel: testCustomLabelValue},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "create", "create")
+				registrationClusterRole := (actions[0].(clienttesting.CreateActionImpl).Object).(*rbacv1.ClusterRole)
+				if registrationClusterRole.Name != "open-cluster-management:managedcluster:registration" {
+					t.Errorf("expected registration clusterrole, but failed")
+				}
+				if registrationClusterRole.Labels[testCustomLabel] != testCustomLabelValue {
+					t.Errorf("expected label '%s=%s' on registration clusterrole, but not found", testCustomLabel, testCustomLabelValue)
+				}
+
+				workClusterRole := (actions[1].(clienttesting.CreateActionImpl).Object).(*rbacv1.ClusterRole)
+				if workClusterRole.Name != "open-cluster-management:managedcluster:work" {
+					t.Errorf("expected work clusterrole, but failed")
+				}
+				if workClusterRole.Labels[testCustomLabel] != testCustomLabelValue {
+					t.Errorf("expected label '%s=%s' on work clusterrole, but not found", testCustomLabel, testCustomLabelValue)
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -90,6 +119,7 @@ func TestSyncManagedClusterClusterRole(t *testing.T) {
 				clusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				cache:         resourceapply.NewResourceCache(),
 				eventRecorder: eventstesting.NewTestingEventRecorder(t),
+				labels:        c.labels,
 			}
 
 			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, "testmangedclsuterclusterrole"))

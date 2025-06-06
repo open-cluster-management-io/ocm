@@ -136,6 +136,11 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 		}
 	}
 
+	if cm.Labels != nil {
+		config.Labels = cm.Labels
+		config.LabelsString = helpers.ConvertLabelsMapToString(cm.Labels)
+	}
+
 	var progressingDeployments []string
 	deployResources := deploymentFiles
 	if config.AddOnManagerEnabled {

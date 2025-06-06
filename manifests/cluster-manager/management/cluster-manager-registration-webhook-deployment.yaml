@@ -5,15 +5,30 @@ metadata:
   namespace: {{ .ClusterManagerNamespace }}
   labels:
     app: {{ .ClusterManagerName }}-registration-webhook
+    {{ if gt (len .Labels) 0 }}
+    {{ range $key, $value := .Labels }}
+    "{{ $key }}": "{{ $value }}"
+    {{ end }}
+    {{ end }}
 spec:
   replicas: {{ .Replica }}
   selector:
     matchLabels:
       app: {{ .ClusterManagerName }}-registration-webhook
+      {{ if gt (len .Labels) 0 }}
+      {{ range $key, $value := .Labels }}
+      "{{ $key }}": "{{ $value }}"
+      {{ end }}
+      {{ end }}
   template:
     metadata:
       labels:
         app: {{ .ClusterManagerName }}-registration-webhook
+        {{ if gt (len .Labels) 0 }}
+        {{ range $key, $value := .Labels }}
+        "{{ $key }}": "{{ $value }}"
+        {{ end }}
+        {{ end }}
     spec:
       affinity:
         podAntiAffinity:

@@ -279,10 +279,15 @@ func setup(t *testing.T, tc *testController, cd []runtime.Object, crds ...runtim
 	}
 }
 
-func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.ClusterManager) {
+func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.ClusterManager, enableSyncLabels bool) {
 	access, err := meta.Accessor(object)
 	if err != nil {
 		t.Errorf("Unable to access objectmeta: %v", err)
+	}
+	//TODO: add test by enabling sync labels = true
+	if enableSyncLabels && !helpers.MapCompare(hubCore.Labels, access.GetLabels()) {
+		t.Errorf("the labels of the clustermanager are not synced to %v %v %v", access.GetName(), hubCore.GetLabels(), access.GetLabels())
+		return
 	}
 
 	switch o := object.(type) { //nolint:gocritic
@@ -429,7 +434,9 @@ func TestSyncSecret(t *testing.T) {
 
 // TestSyncDeploy tests sync manifests of hub component
 func TestSyncDeploy(t *testing.T) {
+	labels := map[string]string{"test": "test", "createdByClusterManager": "testhub", "abc": "abc"}
 	clusterManager := newClusterManager("testhub")
+	clusterManager.SetLabels(labels)
 	tc := newTestController(t, clusterManager)
 	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
 	cd := setDeployment(clusterManager.Name, clusterManagerNamespace)
@@ -455,7 +462,7 @@ func TestSyncDeploy(t *testing.T) {
 	// We expect create the namespace twice respectively in the management cluster and the hub cluster.
 	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 28)
 	for _, object := range createKubeObjects {
-		ensureObject(t, object, clusterManager)
+		ensureObject(t, object, clusterManager, false)
 	}
 
 	var createCRDObjects []runtime.Object
@@ -495,7 +502,7 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 	// We expect create the namespace twice respectively in the management cluster and the hub cluster.
 	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 30)
 	for _, object := range createKubeObjects {
-		ensureObject(t, object, clusterManager)
+		ensureObject(t, object, clusterManager, false)
 	}
 
 	var createCRDObjects []runtime.Object

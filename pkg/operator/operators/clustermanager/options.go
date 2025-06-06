@@ -26,6 +26,7 @@ type Options struct {
 	SkipRemoveCRDs                bool
 	ControlPlaneNodeLabelSelector string
 	DeploymentReplicas            int32
+	EnableSyncLabels              bool
 }
 
 // RunClusterManagerOperator starts a new cluster manager operator
@@ -80,6 +81,7 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		o.ControlPlaneNodeLabelSelector,
 		o.DeploymentReplicas,
 		controllerContext.OperatorNamespace,
+		o.EnableSyncLabels,
 	)
 
 	statusController := clustermanagerstatuscontroller.NewClusterManagerStatusController(

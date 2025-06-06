@@ -37,6 +37,9 @@ spec:
         args:
           - "/registration-operator"
           - "hub"
+          {{- if .Values.enableSyncLabels }}
+          - --enable-sync-labels
+          {{- end }}
         env:
         - name: POD_NAME
           valueFrom:

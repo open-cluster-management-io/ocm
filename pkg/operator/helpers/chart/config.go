@@ -31,6 +31,8 @@ type ClusterManagerChartConfig struct {
 	CreateBootstrapSA bool `json:"createBootstrapSA,omitempty"`
 	// ClusterManager is the configuration of clusterManager CR
 	ClusterManager ClusterManagerConfig `json:"clusterManager,omitempty"`
+	// EnableSyncLabels is to enable the feature which can sync the labels from clustermanager to all hub resources.
+	EnableSyncLabels bool `json:"enableSyncLabels,omitempty"`
 }
 
 type KlusterletChartConfig struct {

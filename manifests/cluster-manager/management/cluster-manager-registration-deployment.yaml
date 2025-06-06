@@ -5,15 +5,30 @@ metadata:
   namespace: {{ .ClusterManagerNamespace }}
   labels:
     app: clustermanager-controller
+    {{ if gt (len .Labels) 0 }}
+    {{ range $key, $value := .Labels }}
+    "{{ $key }}": "{{ $value }}"
+    {{ end }}
+    {{ end }}
 spec:
   replicas: {{ .Replica }}
   selector:
     matchLabels:
       app: clustermanager-registration-controller
+      {{ if gt (len .Labels) 0 }}
+      {{ range $key, $value := .Labels }}
+      "{{ $key }}": "{{ $value }}"
+      {{ end }}
+      {{ end }}
   template:
     metadata:
       labels:
         app: clustermanager-registration-controller
+        {{ if gt (len .Labels) 0 }}
+        {{ range $key, $value := .Labels }}
+        "{{$key}}": "{{$value}}"
+        {{ end }}
+        {{ end }}
     spec:
       affinity:
         podAntiAffinity:
@@ -75,6 +90,9 @@ spec:
           {{ end }}
            {{ if .AutoApprovedARNPatterns }}
           - "--auto-approved-arn-patterns={{ .AutoApprovedARNPatterns }}"
+          {{ end }}
+          {{ if .LabelsString }}
+          - "--labels={{ .LabelsString }}"
           {{ end }}
           {{if .AwsResourceTags}}
           - "--aws-resource-tags={{ .AwsResourceTags }}"

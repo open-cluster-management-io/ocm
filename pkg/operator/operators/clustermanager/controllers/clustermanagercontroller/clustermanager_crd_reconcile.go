@@ -90,6 +90,12 @@ func (c *crdReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 				return nil, err
 			}
 			objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
+
+			objData, err = helpers.AddLabelsToYaml(objData, cm.Labels)
+			if err != nil {
+				return nil, fmt.Errorf("failed to add labels to template %s: %w", name, err)
+			}
+
 			helpers.SetRelatedResourcesStatusesWithObj(&cm.Status.RelatedResources, objData)
 			return objData, nil
 		},

@@ -5,6 +5,11 @@ metadata:
   namespace: "{{ .ManagedClusterName }}"
   labels:
     open-cluster-management.io/cluster-name: "{{ .ManagedClusterName }}"
+    {{ if gt (len .Labels) 0 }}
+    {{ range $key, $value := .Labels }}
+    "{{ $key }}": "{{ $value }}"
+    {{ end }}
+    {{ end }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
