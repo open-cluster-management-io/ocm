@@ -290,9 +290,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 	config.populateBootstrap(klusterlet)
 
-	if n.enableSyncLabels {
-		config.Labels = helpers.GetKlusterletAgentLabels(klusterlet)
-	}
+	config.Labels = helpers.GetKlusterletAgentLabels(klusterlet, n.enableSyncLabels)
 
 	managedClusterClients, err := n.managedClusterClientsBuilder.
 		withMode(config.InstallMode).

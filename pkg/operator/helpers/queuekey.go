@@ -85,7 +85,7 @@ func KlusterletDeploymentQueueKeyFunc(klusterletLister operatorlister.Klusterlet
 		namespace := accessor.GetNamespace()
 		name := accessor.GetName()
 		interestedObjectFound := false
-		if strings.HasSuffix(name, "registration-agent") || strings.HasSuffix(name, "work-agent") {
+		if strings.HasSuffix(name, "-agent") {
 			interestedObjectFound = true
 		}
 		if !interestedObjectFound {
@@ -115,6 +115,8 @@ func ClusterManagerDeploymentQueueKeyFunc(clusterManagerLister operatorlister.Cl
 		if strings.HasSuffix(name, "registration-controller") ||
 			strings.HasSuffix(name, "registration-webhook") ||
 			strings.HasSuffix(name, "work-webhook") ||
+			strings.HasSuffix(name, "addon-manager-controller") ||
+			strings.HasSuffix(name, "work-controller") ||
 			strings.HasSuffix(name, "placement-controller") {
 			interestedObjectFound = true
 		}

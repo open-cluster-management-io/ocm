@@ -36,24 +36,30 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		return err
 	}
 
-	// kubeInformer is for 3 usages: configmapInformer, secretInformer, deploynmentInformer
-	// After we introduced hosted mode, the hub components could be installed in a customized
-	// namespace.(Before that, it only inform from "open-cluster-management-hub" namespace)
-	// It requires us to add filter for each Informer respectively.
-	// TODO: Watch all namespace may cause performance issue.
-	kubeInformer := informers.NewSharedInformerFactoryWithOptions(kubeClient, 5*time.Minute)
-
-	newOnTermInformer := func(name string) informers.SharedInformerFactory {
+	newOneTermInformer := func(name string) informers.SharedInformerFactory {
 		return informers.NewSharedInformerFactoryWithOptions(kubeClient, 5*time.Minute,
 			informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 				options.FieldSelector = fields.OneTermEqualSelector("metadata.name", name).String()
 			}))
 	}
 
-	signerSecretInformer := newOnTermInformer(helpers.SignerSecret)
-	registrationSecretInformer := newOnTermInformer(helpers.RegistrationWebhookSecret)
-	workSecretInformer := newOnTermInformer(helpers.WorkWebhookSecret)
-	configmapInformer := newOnTermInformer(helpers.CaBundleConfigmap)
+	signerSecretInformer := newOneTermInformer(helpers.SignerSecret)
+	registrationSecretInformer := newOneTermInformer(helpers.RegistrationWebhookSecret)
+	workSecretInformer := newOneTermInformer(helpers.WorkWebhookSecret)
+	configmapInformer := newOneTermInformer(helpers.CaBundleConfigmap)
+
+	deploymentInformer := informers.NewSharedInformerFactoryWithOptions(kubeClient, 5*time.Minute,
+		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+			selector := &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      helpers.HubLabelKey,
+						Operator: metav1.LabelSelectorOpExists,
+					},
+				},
+			}
+			options.LabelSelector = metav1.FormatLabelSelector(selector)
+		}))
 
 	secretInformers := map[string]corev1informers.SecretInformer{
 		helpers.SignerSecret:              signerSecretInformer.Core().V1().Secrets(),
@@ -73,8 +79,8 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		controllerContext.KubeConfig,
 		operatorClient.OperatorV1().ClusterManagers(),
 		operatorInformer.Operator().V1().ClusterManagers(),
-		kubeInformer.Apps().V1().Deployments(),
-		kubeInformer.Core().V1().ConfigMaps(),
+		deploymentInformer.Apps().V1().Deployments(),
+		configmapInformer.Core().V1().ConfigMaps(),
 		controllerContext.EventRecorder,
 		o.SkipRemoveCRDs,
 		o.ControlPlaneNodeLabelSelector,
@@ -85,7 +91,7 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 	statusController := clustermanagerstatuscontroller.NewClusterManagerStatusController(
 		operatorClient.OperatorV1().ClusterManagers(),
 		operatorInformer.Operator().V1().ClusterManagers(),
-		kubeInformer.Apps().V1().Deployments(),
+		deploymentInformer.Apps().V1().Deployments(),
 		controllerContext.EventRecorder)
 
 	certRotationController := certrotationcontroller.NewCertRotationController(
@@ -109,7 +115,7 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		controllerContext.EventRecorder)
 
 	go operatorInformer.Start(ctx.Done())
-	go kubeInformer.Start(ctx.Done())
+	go deploymentInformer.Start(ctx.Done())
 	go signerSecretInformer.Start(ctx.Done())
 	go registrationSecretInformer.Start(ctx.Done())
 	go workSecretInformer.Start(ctx.Done())

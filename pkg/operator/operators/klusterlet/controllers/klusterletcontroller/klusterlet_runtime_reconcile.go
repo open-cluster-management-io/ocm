@@ -199,10 +199,7 @@ func (r *runtimeReconcile) createManagedClusterKubeconfig(
 	klusterlet *operatorapiv1.Klusterlet,
 	klusterletNamespace, agentNamespace, saName, secretName string,
 	recorder events.Recorder) error {
-	labels := map[string]string{}
-	if r.enableSyncLabels {
-		labels = helpers.GetKlusterletAgentLabels(klusterlet)
-	}
+	labels := helpers.GetKlusterletAgentLabels(klusterlet, r.enableSyncLabels)
 
 	tokenGetter := helpers.SATokenGetter(ctx, saName, klusterletNamespace, r.managedClusterClients.kubeClient)
 	err := helpers.SyncKubeConfigSecret(ctx, secretName, agentNamespace, "/spoke/config/kubeconfig",
