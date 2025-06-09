@@ -412,7 +412,7 @@ func TestFindManifestConfiguration(t *testing.T) {
 			expectedOption: nil,
 		},
 		{
-			name: "no feedbackRules and updateStrategy",
+			name: "no feedbackRules, conditionRules, or updateStrategy",
 			options: []workapiv1.ManifestConfigOption{
 				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "nodes", Name: "node1"}},
 				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "*", Namespace: "test*"}},
@@ -421,7 +421,7 @@ func TestFindManifestConfiguration(t *testing.T) {
 			expectedOption: nil,
 		},
 		{
-			name: "options found",
+			name: "options found with feedback rules",
 			options: []workapiv1.ManifestConfigOption{
 				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "nodes", Name: "node1"}},
 				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
@@ -435,17 +435,33 @@ func TestFindManifestConfiguration(t *testing.T) {
 			},
 		},
 		{
+			name: "options found with condition rules",
+			options: []workapiv1.ManifestConfigOption{
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "nodes", Name: "node1"}},
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
+					ConditionRules: []workapiv1.ConditionRule{{Type: workapiv1.WellKnownConditionsType, Condition: "Completed"}},
+				},
+			},
+			resourceMeta: workapiv1.ManifestResourceMeta{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
+			expectedOption: &workapiv1.ManifestConfigOption{
+				ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
+				ConditionRules:     []workapiv1.ConditionRule{{Type: workapiv1.WellKnownConditionsType, Condition: "Completed"}},
+			},
+		},
+		{
 			name: "options found include *",
 			options: []workapiv1.ManifestConfigOption{
 				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "nodes", Name: "node1"}},
 				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "*", Namespace: "test*"},
 					FeedbackRules:  []workapiv1.FeedbackRule{{Type: workapiv1.WellKnownStatusType}},
+					ConditionRules: []workapiv1.ConditionRule{{Type: workapiv1.WellKnownConditionsType, Condition: "Completed"}},
 					UpdateStrategy: &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeUpdate}},
 			},
 			resourceMeta: workapiv1.ManifestResourceMeta{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
 			expectedOption: &workapiv1.ManifestConfigOption{
 				ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
 				FeedbackRules:      []workapiv1.FeedbackRule{{Type: workapiv1.WellKnownStatusType}},
+				ConditionRules:     []workapiv1.ConditionRule{{Type: workapiv1.WellKnownConditionsType, Condition: "Completed"}},
 				UpdateStrategy:     &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeUpdate},
 			},
 		},

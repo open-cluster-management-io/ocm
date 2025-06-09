@@ -160,6 +160,37 @@ const (
             }
         }
     }`
+
+	jobJson = `{
+		"apiVersion": "batch/v1",
+		"kind": "Job",
+		"metadata": {
+			"name": "sleep-job",
+			"namespace": "default"
+		},
+		"spec": {
+			"parallelism": 1,
+			"template": {
+				"metadata": {
+					"creationTimestamp": null,
+					"labels": {
+						"app": "sleep"
+					}
+				},
+				"spec": {
+					"containers": [
+						{
+							"image": "ubuntu:latest",
+							"name": "sleep",
+							"command": ["sleep"],
+							"args": ["20"]
+						}
+					],
+					"restartPolicy": "Never"
+				}
+			}
+		}
+	}`
 )
 
 var (
@@ -264,6 +295,23 @@ func NewDaesonSet(namespace, name string) (u *unstructured.Unstructured, gvr sch
 	u.SetName(name)
 
 	gvr = schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "daemonsets"}
+	return u, gvr, nil
+}
+
+func NewJob(namespace, name, sa string) (u *unstructured.Unstructured, gvr schema.GroupVersionResource, err error) {
+	u, err = loadResourceFromJSON(jobJson)
+	if err != nil {
+		return u, gvr, err
+	}
+
+	u.SetNamespace(namespace)
+	u.SetName(name)
+
+	err = unstructured.SetNestedField(u.Object, sa, "spec", "template", "spec", "serviceAccountName")
+	if err != nil {
+		return u, gvr, err
+	}
+	gvr = schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}
 	return u, gvr, nil
 }
 

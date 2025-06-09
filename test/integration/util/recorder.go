@@ -3,6 +3,7 @@ package util
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -53,32 +54,54 @@ func (r *IntegrationTestEventRecorder) Warningf(reason, messageFmt string, args 
 
 func (r *IntegrationTestEventRecorder) Shutdown() {}
 
+func GetCondition(conditions []metav1.Condition, expectedType string) (metav1.Condition, bool) {
+	for _, condition := range conditions {
+		if condition.Type == expectedType {
+			return condition, true
+		}
+	}
+	return metav1.Condition{}, false
+}
+
+func MatchCondition(condition metav1.Condition, expected metav1.Condition) bool {
+	if len(expected.Type) > 0 && condition.Type != expected.Type {
+		return false
+	}
+
+	if len(expected.Reason) > 0 && condition.Reason != expected.Reason {
+		return false
+	}
+
+	if len(expected.Status) > 0 && condition.Status != expected.Status {
+		return false
+	}
+
+	if expected.ObservedGeneration != 0 && condition.ObservedGeneration != expected.ObservedGeneration {
+		return false
+	}
+
+	var zero time.Time
+	if expected.LastTransitionTime.Time != zero && condition.LastTransitionTime != expected.LastTransitionTime {
+		return false
+	}
+
+	return true
+}
+
 func HasCondition(
 	conditions []metav1.Condition,
 	expectedType, expectedReason string,
 	expectedStatus metav1.ConditionStatus,
 ) bool {
 
-	for _, condition := range conditions {
-		if condition.Type != expectedType {
-			continue
-		}
-
-		if condition.Status != expectedStatus {
-			return false
-		}
-
-		// skip checking reason
-		if len(expectedReason) == 0 {
-			return true
-		}
-
-		if condition.Reason != expectedReason {
-			return false
-		}
-
-		return true
+	condition, ok := GetCondition(conditions, expectedType)
+	if !ok {
+		return false
 	}
 
-	return false
+	return MatchCondition(condition, metav1.Condition{
+		Type:   expectedType,
+		Reason: expectedReason,
+		Status: expectedStatus,
+	})
 }

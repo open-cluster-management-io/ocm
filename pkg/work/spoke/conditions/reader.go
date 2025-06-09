@@ -143,6 +143,7 @@ func (s *ConditionReader) evaluateCelExpressions(
 		ast, iss := s.ruleEnv.Compile(expression)
 		err = iss.Err()
 		if err != nil {
+			// A error in compiling the rule gives False condition status by convention
 			return metav1.ConditionFalse, workapiv1.ConditionRuleExpressionError, remainingBudget, err
 		}
 
@@ -153,6 +154,7 @@ func (s *ConditionReader) evaluateCelExpressions(
 			cel.InterruptCheckFrequency(celconfig.CheckFrequency),
 		)
 		if err != nil {
+			// User has no control over this error, so we return Unknown condition status
 			return metav1.ConditionUnknown, workapiv1.ConditionRuleInternalError, remainingBudget, err
 		}
 
@@ -160,6 +162,7 @@ func (s *ConditionReader) evaluateCelExpressions(
 			"object": obj.Object,
 		})
 		if err != nil {
+			// A error in evaluating the rule gives False condition status by convention
 			return metav1.ConditionFalse, workapiv1.ConditionRuleExpressionError, remainingBudget, err
 		}
 		remainingBudget = newBudget
