@@ -78,13 +78,7 @@ func (s *ConditionReader) GetConditionByRule(
 	case workapiv1.WellKnownConditionsType:
 		r := s.wellKnownConditions.GetRuleByKindCondition(obj.GroupVersionKind(), rule.Condition)
 		if len(r.CelExpressions) == 0 {
-			err := fmt.Errorf("cannot find the wellknown conditions for resource with gvk %s", obj.GroupVersionKind().String())
-			return metav1.Condition{
-				Type:    rule.Condition,
-				Status:  metav1.ConditionUnknown,
-				Reason:  workapiv1.ConditionRuleInvalid,
-				Message: err.Error(),
-			}, budget, err
+			return metav1.Condition{}, budget, nil
 		}
 
 		// Check for supported overrides in rule
