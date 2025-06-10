@@ -197,7 +197,6 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 						jobConditions = job.Status.Conditions
 					}
 
-					fmt.Printf("%+v\n", work.Spec.ManifestConfigs)
 					return fmt.Errorf(
 						"Complete condition is not correct. Expected %+v but got %+v. Job Conditions %+v", expected, condition, jobConditions,
 					)
@@ -343,9 +342,9 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
-				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
-				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			// Update Job status on spoke
 			gomega.Eventually(func() error {
