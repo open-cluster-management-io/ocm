@@ -49,10 +49,7 @@ type managementReconcile struct {
 
 func (r *managementReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
-	labels := map[string]string{}
-	if r.enableSyncLabels {
-		labels = helpers.GetKlusterletAgentLabels(klusterlet)
-	}
+	labels := helpers.GetKlusterletAgentLabels(klusterlet, r.enableSyncLabels)
 
 	err := ensureNamespace(ctx, r.kubeClient, klusterlet, config.AgentNamespace, labels, r.recorder)
 	if err != nil {

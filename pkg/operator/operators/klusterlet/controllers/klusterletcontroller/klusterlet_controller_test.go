@@ -553,7 +553,7 @@ func ensureObject(t *testing.T, object runtime.Object, klusterlet *operatorapiv1
 		return
 	}
 
-	if enableSyncLabels && !helpers.MapCompare(helpers.GetKlusterletAgentLabels(klusterlet), access.GetLabels()) {
+	if enableSyncLabels && !helpers.MapCompare(helpers.GetKlusterletAgentLabels(klusterlet, enableSyncLabels), access.GetLabels()) {
 		t.Errorf("the labels of klusterlet are not synced to %v", access.GetName())
 		return
 	}

@@ -81,7 +81,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 		}
 
 		agentLabelSelector = metav1.FormatLabelSelector(&metav1.LabelSelector{
-			MatchLabels: helpers.GetKlusterletAgentLabels(klusterlet),
+			MatchLabels: helpers.GetKlusterletAgentLabels(klusterlet, false),
 		})
 
 		hubKubeConfigSecret = &corev1.Secret{

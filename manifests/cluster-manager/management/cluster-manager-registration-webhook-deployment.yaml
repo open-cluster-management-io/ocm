@@ -5,6 +5,7 @@ metadata:
   namespace: {{ .ClusterManagerNamespace }}
   labels:
     app: {{ .ClusterManagerName }}-registration-webhook
+    createdByClusterManager: {{ .ClusterManagerName }}
 spec:
   replicas: {{ .Replica }}
   selector:
