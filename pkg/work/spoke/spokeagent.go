@@ -28,7 +28,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
-	"open-cluster-management.io/ocm/pkg/work/spoke/conditions"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/finalizercontroller"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/manifestcontroller"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/statuscontroller"
@@ -125,11 +124,6 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		restMapper,
 	).NewExecutorValidator(ctx, features.SpokeMutableFeatureGate.Enabled(ocmfeature.ExecutorValidatingCaches))
 
-	conditionReader, err := conditions.NewConditionReader()
-	if err != nil {
-		return err
-	}
-
 	manifestWorkController := manifestcontroller.NewManifestWorkController(
 		controllerContext.EventRecorder,
 		spokeDynamicClient,
@@ -143,7 +137,6 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		hubHash, agentID,
 		restMapper,
 		validator,
-		conditionReader,
 	)
 	addFinalizerController := finalizercontroller.NewAddFinalizerController(
 		controllerContext.EventRecorder,
@@ -176,7 +169,7 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		o.workOptions.AppliedManifestWorkEvictionGracePeriod,
 		hubHash, agentID,
 	)
-	availableStatusController := statuscontroller.NewAvailableStatusController(
+	availableStatusController, err := statuscontroller.NewAvailableStatusController(
 		controllerContext.EventRecorder,
 		spokeDynamicClient,
 		hubWorkClient,
@@ -185,6 +178,9 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		o.workOptions.MaxJSONRawLength,
 		o.workOptions.StatusSyncInterval,
 	)
+	if err != nil {
+		return err
+	}
 
 	go spokeWorkInformerFactory.Start(ctx.Done())
 	go hubWorkInformer.Informer().Run(ctx.Done())

@@ -29,7 +29,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
-	"open-cluster-management.io/ocm/pkg/work/spoke/conditions"
 )
 
 var (
@@ -70,8 +69,7 @@ func NewManifestWorkController(
 	appliedManifestWorkInformer workinformer.AppliedManifestWorkInformer,
 	hubHash, agentID string,
 	restMapper meta.RESTMapper,
-	validator auth.ExecutorValidator,
-	conditionReader *conditions.ConditionReader) factory.Controller {
+	validator auth.ExecutorValidator) factory.Controller {
 
 	controller := &ManifestWorkController{
 		manifestWorkPatcher: patcher.NewPatcher[
@@ -87,10 +85,9 @@ func NewManifestWorkController(
 		agentID:                   agentID,
 		reconcilers: []workReconcile{
 			&manifestworkReconciler{
-				restMapper:      restMapper,
-				appliers:        apply.NewAppliers(spokeDynamicClient, spokeKubeClient, spokeAPIExtensionClient),
-				validator:       validator,
-				conditionReader: conditionReader,
+				restMapper: restMapper,
+				appliers:   apply.NewAppliers(spokeDynamicClient, spokeKubeClient, spokeAPIExtensionClient),
+				validator:  validator,
 			},
 			&appliedManifestWorkReconciler{
 				spokeDynamicClient: spokeDynamicClient,

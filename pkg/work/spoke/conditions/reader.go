@@ -11,13 +11,11 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/klog/v2"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
-	"open-cluster-management.io/sdk-go/pkg/cel/common"
 	ocmcelcommon "open-cluster-management.io/sdk-go/pkg/cel/common"
 	ocmcellibrary "open-cluster-management.io/sdk-go/pkg/cel/library"
 
@@ -50,12 +48,7 @@ func NewConditionReader() (*ConditionReader, error) {
 	}, nil
 }
 
-func (s *ConditionReader) EvaluateConditions(ctx context.Context, runtimeObj runtime.Object, rules []workapiv1.ConditionRule) ([]metav1.Condition, error) {
-	obj, err := common.ConvertObjectToUnstructured(runtimeObj)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *ConditionReader) EvaluateConditions(ctx context.Context, obj *unstructured.Unstructured, rules []workapiv1.ConditionRule) []metav1.Condition {
 	var conditionResults []metav1.Condition
 	remainingBudget := globalCostBudget
 	for _, rule := range rules {
@@ -68,10 +61,14 @@ func (s *ConditionReader) EvaluateConditions(ctx context.Context, runtimeObj run
 			// The error is set in condition message for users to handle
 			klog.Errorf("failed to evaluate condition rule: %s", err.Error())
 		}
-		conditionResults = append(conditionResults, condition)
+
+		// If type is not set, then it was a WellKnownCondition with no match and should be ignored.
+		if condition.Type != "" {
+			conditionResults = append(conditionResults, condition)
+		}
 	}
 
-	return conditionResults, nil
+	return conditionResults
 }
 
 func (s *ConditionReader) GetConditionByRule(

@@ -24,22 +24,19 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/basic"
-	"open-cluster-management.io/ocm/pkg/work/spoke/conditions"
 )
 
 type applyResult struct {
-	Result     runtime.Object
-	Conditions []metav1.Condition
-	Error      error
+	Result runtime.Object
+	Error  error
 
 	resourceMeta workapiv1.ManifestResourceMeta
 }
 
 type manifestworkReconciler struct {
-	restMapper      meta.RESTMapper
-	appliers        *apply.Appliers
-	validator       auth.ExecutorValidator
-	conditionReader *conditions.ConditionReader
+	restMapper meta.RESTMapper
+	appliers   *apply.Appliers
+	validator  auth.ExecutorValidator
 }
 
 func (m *manifestworkReconciler) reconcile(
@@ -79,9 +76,6 @@ func (m *manifestworkReconciler) reconcile(
 
 		// Add applied status condition
 		manifestCondition.Conditions = append(manifestCondition.Conditions, buildAppliedStatusCondition(result))
-
-		// Add result conditions
-		manifestCondition.Conditions = append(manifestCondition.Conditions, result.Conditions...)
 
 		newManifestConditions = append(newManifestConditions, manifestCondition)
 
@@ -210,10 +204,6 @@ func (m *manifestworkReconciler) applyOneManifest(
 
 	applier := m.appliers.GetApplier(strategy.Type)
 	result.Result, result.Error = applier.Apply(ctx, gvr, required, requiredOwner, option, recorder)
-
-	if result.Result != nil && result.Error == nil && option != nil && len(option.ConditionRules) > 0 {
-		result.Conditions, result.Error = m.conditionReader.EvaluateConditions(ctx, result.Result, option.ConditionRules)
-	}
 
 	return result
 }
