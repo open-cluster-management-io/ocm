@@ -7,6 +7,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/openshift/library-go/pkg/operator/events"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -54,15 +55,6 @@ func (r *IntegrationTestEventRecorder) Warningf(reason, messageFmt string, args 
 
 func (r *IntegrationTestEventRecorder) Shutdown() {}
 
-func GetCondition(conditions []metav1.Condition, expectedType string) (metav1.Condition, bool) {
-	for _, condition := range conditions {
-		if condition.Type == expectedType {
-			return condition, true
-		}
-	}
-	return metav1.Condition{}, false
-}
-
 func MatchCondition(condition metav1.Condition, expected metav1.Condition) bool {
 	if len(expected.Type) > 0 && condition.Type != expected.Type {
 		return false
@@ -73,6 +65,10 @@ func MatchCondition(condition metav1.Condition, expected metav1.Condition) bool 
 	}
 
 	if len(expected.Status) > 0 && condition.Status != expected.Status {
+		return false
+	}
+
+	if len(expected.Message) > 0 && condition.Message != expected.Message {
 		return false
 	}
 
@@ -93,13 +89,12 @@ func HasCondition(
 	expectedType, expectedReason string,
 	expectedStatus metav1.ConditionStatus,
 ) bool {
-
-	condition, ok := GetCondition(conditions, expectedType)
-	if !ok {
+	condition := meta.FindStatusCondition(conditions, expectedType)
+	if condition == nil {
 		return false
 	}
 
-	return MatchCondition(condition, metav1.Condition{
+	return MatchCondition(*condition, metav1.Condition{
 		Type:   expectedType,
 		Reason: expectedReason,
 		Status: expectedStatus,

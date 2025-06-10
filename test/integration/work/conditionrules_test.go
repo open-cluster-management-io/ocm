@@ -9,7 +9,7 @@ import (
 	"github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/utils/ptr"
@@ -138,16 +138,11 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					return fmt.Errorf("the size of resource status is not correct, expect to be 1 but got %d", len(work.Status.ResourceStatus.Manifests))
 				}
 
-				condition, ok := util.GetCondition(work.Status.ResourceStatus.Manifests[0].Conditions, workapiv1.ManifestComplete)
-				expected := metav1.Condition{
+				return checkCondition(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
 					Type:   workapiv1.ManifestComplete,
 					Status: metav1.ConditionFalse,
 					Reason: workapiv1.ConditionRuleEvaluated,
-				}
-				if !ok || !util.MatchCondition(condition, expected) {
-					return fmt.Errorf("Complete condition is not correct. Expected %+v but got %+v", expected, condition)
-				}
-				return nil
+				})
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Update complete condition on job
@@ -184,24 +179,11 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					return fmt.Errorf("the size of resource status is not correct, expect to be 1 but got %d", len(work.Status.ResourceStatus.Manifests))
 				}
 
-				condition, ok := util.GetCondition(work.Status.ResourceStatus.Manifests[0].Conditions, workapiv1.ManifestComplete)
-				expected := metav1.Condition{
+				return checkCondition(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
 					Type:   workapiv1.ManifestComplete,
 					Status: metav1.ConditionTrue,
 					Reason: workapiv1.ConditionRuleEvaluated,
-				}
-				if !ok || !util.MatchCondition(condition, expected) {
-					var jobConditions []batchv1.JobCondition
-					job, err := spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).Get(context.Background(), "job1", metav1.GetOptions{})
-					if err == nil {
-						jobConditions = job.Status.Conditions
-					}
-
-					return fmt.Errorf(
-						"Complete condition is not correct. Expected %+v but got %+v. Job Conditions %+v", expected, condition, jobConditions,
-					)
-				}
-				return nil
+				})
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 		})
 
@@ -262,19 +244,12 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					return fmt.Errorf("the size of resource status is not correct, expect to be 1 but got %d", len(work.Status.ResourceStatus.Manifests))
 				}
 
-				conditions := work.Status.ResourceStatus.Manifests[0].Conditions
-				condition, ok := util.GetCondition(conditions, "OneActive")
-				if !ok || !apiequality.Semantic.DeepEqual(condition, metav1.Condition{
-					Type:               "OneActive",
-					Reason:             workapiv1.ConditionRuleEvaluated,
-					Status:             metav1.ConditionFalse,
-					Message:            "There is not only one pod active",
-					ObservedGeneration: condition.ObservedGeneration,
-					LastTransitionTime: condition.LastTransitionTime,
-				}) {
-					return fmt.Errorf("conditions are not correct, we got %v", conditions)
-				}
-				return nil
+				return checkCondition(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
+					Type:    "OneActive",
+					Reason:  workapiv1.ConditionRuleEvaluated,
+					Status:  metav1.ConditionFalse,
+					Message: "There is not only one pod active",
+				})
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Set active to 1
@@ -301,19 +276,12 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					return fmt.Errorf("the size of resource status is not correct, expect to be 1 but got %d", len(work.Status.ResourceStatus.Manifests))
 				}
 
-				conditions := work.Status.ResourceStatus.Manifests[0].Conditions
-				condition, ok := util.GetCondition(conditions, "OneActive")
-				if !ok || !apiequality.Semantic.DeepEqual(condition, metav1.Condition{
-					Type:               "OneActive",
-					Reason:             workapiv1.ConditionRuleEvaluated,
-					Status:             metav1.ConditionTrue,
-					Message:            "One pod is active",
-					ObservedGeneration: condition.ObservedGeneration,
-					LastTransitionTime: condition.LastTransitionTime,
-				}) {
-					return fmt.Errorf("conditions are not correct, we got %v", conditions)
-				}
-				return nil
+				return checkCondition(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
+					Type:    "OneActive",
+					Reason:  workapiv1.ConditionRuleEvaluated,
+					Status:  metav1.ConditionTrue,
+					Message: "One pod is active",
+				})
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 		})
 
@@ -372,9 +340,8 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					return fmt.Errorf("the size of resource status is not correct, expect to be 1 but got %d", len(work.Status.ResourceStatus.Manifests))
 				}
 
-				conditions := work.Status.ResourceStatus.Manifests[0].Conditions
-				condition, ok := util.GetCondition(conditions, "NotWellKnown")
-				if ok {
+				condition := meta.FindStatusCondition(work.Status.ResourceStatus.Manifests[0].Conditions, "NotWellKnown")
+				if condition != nil {
 					return fmt.Errorf("did not expect to find NotWellKnown condition, we got %v", condition)
 				}
 
@@ -481,27 +448,24 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					return fmt.Errorf("the size of resource status is not correct, expect to be 2 but got %d", len(work.Status.ResourceStatus.Manifests))
 				}
 
-				condition, ok := util.GetCondition(work.Status.ResourceStatus.Manifests[0].Conditions, workapiv1.ManifestComplete)
-				expected := metav1.Condition{
+				err := checkCondition(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
 					Type:   workapiv1.ManifestComplete,
 					Status: metav1.ConditionFalse,
 					Reason: workapiv1.ConditionRuleEvaluated,
-				}
-				if !ok || !util.MatchCondition(condition, expected) {
-					return fmt.Errorf("Complete condition for job1 is not correct. Expected %+v but got %+v", expected, condition)
+				})
+				if err != nil {
+					return fmt.Errorf("Job1: %v", err)
 				}
 
-				condition, ok = util.GetCondition(work.Status.ResourceStatus.Manifests[1].Conditions, workapiv1.ManifestComplete)
-				expected = metav1.Condition{
+				err = checkCondition(work.Status.ResourceStatus.Manifests[1].Conditions, metav1.Condition{
 					Type:   workapiv1.ManifestComplete,
 					Status: metav1.ConditionTrue,
 					Reason: workapiv1.ConditionRuleEvaluated,
+				})
+				if err != nil {
+					return fmt.Errorf("Job2: %v", err)
 				}
-				if !ok || !util.MatchCondition(condition, expected) {
-					return fmt.Errorf("Complete condition for job2 is not correct. Expected %+v but got %+v", expected, condition)
-				}
-
-				return err
+				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 		})
 
@@ -601,28 +565,35 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					return fmt.Errorf("the size of resource status is not correct, expect to be 2 but got %d", len(work.Status.ResourceStatus.Manifests))
 				}
 
-				condition, ok := util.GetCondition(work.Status.ResourceStatus.Manifests[0].Conditions, workapiv1.ManifestComplete)
-				expected := metav1.Condition{
+				err := checkCondition(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
 					Type:   workapiv1.ManifestComplete,
 					Status: metav1.ConditionFalse,
 					Reason: workapiv1.ConditionRuleEvaluated,
-				}
-				if !ok || !util.MatchCondition(condition, expected) {
-					return fmt.Errorf("Complete condition for job1 is not correct. Expected %+v but got %+v", expected, condition)
+				})
+				if err != nil {
+					return fmt.Errorf("Job1: %v", err)
 				}
 
-				condition, ok = util.GetCondition(work.Status.ResourceStatus.Manifests[1].Conditions, workapiv1.ManifestComplete)
-				expected = metav1.Condition{
+				err = checkCondition(work.Status.ResourceStatus.Manifests[1].Conditions, metav1.Condition{
 					Type:   workapiv1.ManifestComplete,
 					Status: metav1.ConditionFalse,
 					Reason: workapiv1.ConditionRuleExpressionError,
+				})
+				if err != nil {
+					return fmt.Errorf("Job2: %v", err)
 				}
-				if !ok || !util.MatchCondition(condition, expected) {
-					return fmt.Errorf("Complete condition for job2 is not correct. Expected %+v but got %+v", expected, condition)
-				}
-
-				return err
+				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 		})
 	})
 })
+
+func checkCondition(conditions []metav1.Condition, expected metav1.Condition) error {
+	condition := meta.FindStatusCondition(conditions, expected.Type)
+	if condition == nil || !util.MatchCondition(*condition, expected) {
+		return fmt.Errorf(
+			"%s condition is not correct. Expected %+v but got %+v", expected.Type, expected, condition,
+		)
+	}
+	return nil
+}

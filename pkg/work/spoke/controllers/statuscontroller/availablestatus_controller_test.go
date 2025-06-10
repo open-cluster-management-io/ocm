@@ -7,6 +7,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -21,8 +22,10 @@ import (
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/features"
+	"open-cluster-management.io/ocm/pkg/work/spoke/conditions"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 	"open-cluster-management.io/ocm/pkg/work/spoke/statusfeedback"
+	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 func TestSyncManifestWork(t *testing.T) {
@@ -481,6 +484,142 @@ func TestStatusFeedback(t *testing.T) {
 				t.Fatal(err)
 			}
 			c.validateActions(t, fakeClient.Actions())
+		})
+	}
+}
+
+func TestConditionRules(t *testing.T) {
+	activeRule := workapiv1.ConditionRule{
+		Type:      workapiv1.CelConditionExpressionsType,
+		Condition: "Active",
+		CelExpressions: []string{
+			"has(object.status) && hasConditions(object.status) ? object.status.conditions.exists(c, c.type == 'Active' && c.status == 'True') : false",
+		},
+		MessageExpression: "result ? 'NewObject is active' : 'NewObject is not active'",
+	}
+
+	cases := []struct {
+		name               string
+		existingResources  []runtime.Object
+		configOption       []workapiv1.ManifestConfigOption
+		manifests          []workapiv1.ManifestCondition
+		expectedConditions []metav1.Condition
+	}{
+		{
+			name: "condition rule successful evaluation",
+			existingResources: []runtime.Object{
+				testingcommon.NewUnstructuredWithContent(
+					"v1", "NewObject", "ns1", "n1",
+					map[string]any{
+						"spec": map[string]any{"key1": "val1"},
+						"status": map[string]any{
+							"conditions": []any{
+								map[string]any{"type": "Active", "status": "True"},
+							},
+						}}),
+				testingcommon.NewUnstructuredWithContent(
+					"v1", "NewObject", "ns1", "n2",
+					map[string]any{"spec": map[string]any{"key1": "val2"}}),
+			},
+			configOption: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "newobjects", Namespace: "ns1", Name: "n1"},
+					ConditionRules:     []workapiv1.ConditionRule{activeRule},
+				},
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "newobjects", Namespace: "ns1", Name: "n2"},
+					ConditionRules:     []workapiv1.ConditionRule{activeRule},
+				},
+			},
+			manifests: []workapiv1.ManifestCondition{
+				newManifest("", "v1", "newobjects", "ns1", "n1"),
+				newManifest("", "v1", "newobjects", "ns1", "n2"),
+			},
+			expectedConditions: []metav1.Condition{
+				{Type: "Active", Status: metav1.ConditionTrue, Reason: workapiv1.ConditionRuleEvaluated, Message: "NewObject is active"},
+				{Type: "Active", Status: metav1.ConditionFalse, Reason: workapiv1.ConditionRuleEvaluated, Message: "NewObject is not active"},
+			},
+		},
+		{
+			name: "condition rule invalid expression",
+			existingResources: []runtime.Object{
+				testingcommon.NewUnstructuredWithContent(
+					"v1", "NewObject", "ns1", "n1",
+					map[string]any{"spec": map[string]any{"key1": "val1"}}),
+			},
+			configOption: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "newobjects", Namespace: "ns1", Name: "n1"},
+					ConditionRules: []workapiv1.ConditionRule{
+						{
+							Type:           workapiv1.CelConditionExpressionsType,
+							Condition:      "Active",
+							CelExpressions: []string{"object.invalid.key == 'Active'"},
+						},
+					},
+				},
+			},
+			manifests: []workapiv1.ManifestCondition{
+				newManifest("", "v1", "newobjects", "ns1", "n1"),
+			},
+			expectedConditions: []metav1.Condition{
+				{Type: "Active", Status: metav1.ConditionFalse, Reason: workapiv1.ConditionRuleExpressionError, Message: "no such key: invalid"},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			testingWork, _ := spoketesting.NewManifestWork(0)
+			testingWork.Finalizers = []string{workapiv1.ManifestWorkFinalizer}
+			testingWork.Spec.ManifestConfigs = c.configOption
+			testingWork.Status = workapiv1.ManifestWorkStatus{
+				ResourceStatus: workapiv1.ManifestResourceStatus{
+					Manifests: c.manifests,
+				},
+				Conditions: []metav1.Condition{
+					{Type: workapiv1.WorkApplied},
+				},
+			}
+
+			fakeClient := fakeworkclient.NewSimpleClientset(testingWork)
+			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), c.existingResources...)
+			conditionReader, err := conditions.NewConditionReader()
+			if err != nil {
+				t.Fatal(err)
+			}
+			controller := AvailableStatusController{
+				spokeDynamicClient: fakeDynamicClient,
+				statusReader:       statusfeedback.NewStatusReader(),
+				conditionReader:    conditionReader,
+				patcher: patcher.NewPatcher[
+					*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
+					fakeClient.WorkV1().ManifestWorks(testingWork.Namespace)),
+			}
+
+			err = controller.syncManifestWork(context.TODO(), testingWork)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			actions := fakeClient.Actions()
+			testingcommon.AssertActions(t, actions, "patch")
+			p := actions[0].(clienttesting.PatchActionImpl).Patch
+			work := &workapiv1.ManifestWork{}
+			if err := json.Unmarshal(p, work); err != nil {
+				t.Fatal(err)
+			}
+			if len(work.Status.ResourceStatus.Manifests) != len(c.manifests) {
+				t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests))
+			}
+
+			for i, manifestStatus := range work.Status.ResourceStatus.Manifests {
+				expected := c.expectedConditions[i]
+				condition := meta.FindStatusCondition(manifestStatus.Conditions, expected.Type)
+				if condition == nil || !util.MatchCondition(*condition, expected) {
+					t.Fatalf("%s: Expected to find condition %+v, got %+v", manifestStatus.ResourceMeta.Name, expected, condition)
+				}
+			}
 		})
 	}
 }

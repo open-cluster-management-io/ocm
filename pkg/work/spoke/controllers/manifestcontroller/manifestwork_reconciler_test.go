@@ -30,6 +30,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/basic"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
+	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 const defaultOwner = "testowner"
@@ -99,20 +100,20 @@ func (t *testController) withUnstructuredObject(objects ...runtime.Object) *test
 	return t
 }
 
-func assertCondition(t *testing.T, conditions []metav1.Condition, expected conditionAssertion) {
-	condition := meta.FindStatusCondition(conditions, expected.conditionType)
+func assertCondition(t *testing.T, conditions []metav1.Condition, expected metav1.Condition) {
+	condition := meta.FindStatusCondition(conditions, expected.Type)
 	if condition == nil {
-		t.Errorf("condition %s not found, got: %#v", expected.conditionType, conditions)
+		t.Errorf("condition %s not found, got: %#v", expected.Type, conditions)
 		return
 	}
 
-	if !expected.matches(*condition) {
+	if !util.MatchCondition(*condition, expected) {
 		t.Errorf("expected condition %#v but got: %#v", expected, condition)
 	}
 }
 
 func assertManifestCondition(
-	t *testing.T, conds []workapiv1.ManifestCondition, index int32, expected conditionAssertion) {
+	t *testing.T, conds []workapiv1.ManifestCondition, index int32, expected metav1.Condition) {
 	cond := findManifestConditionByIndex(index, conds)
 	if cond == nil {
 		t.Errorf("expected to find the condition with index %d", index)
@@ -132,45 +133,15 @@ type testCase struct {
 	expectedKubeAction         []string
 	expectedAppliedWorkAction  []string
 	expectedDynamicAction      []string
-	expectedManifestConditions []conditionAssertion
-	expectedWorkConditions     []conditionAssertion
+	expectedManifestConditions []metav1.Condition
+	expectedWorkConditions     []metav1.Condition
 }
 
-func expectedCondition(conditionType string, status metav1.ConditionStatus) conditionAssertion {
-	return conditionAssertion{
-		conditionType: conditionType,
-		status:        status,
+func expectedCondition(conditionType string, status metav1.ConditionStatus) metav1.Condition {
+	return metav1.Condition{
+		Type:   conditionType,
+		Status: status,
 	}
-}
-
-type conditionAssertion struct {
-	conditionType string
-	status        metav1.ConditionStatus
-	reason        string
-	message       string
-}
-
-func (ca conditionAssertion) withReason(reason string) conditionAssertion {
-	ca.reason = reason
-	return ca
-}
-
-func (ca conditionAssertion) withMessage(message string) conditionAssertion {
-	ca.message = message
-	return ca
-}
-
-func (ca conditionAssertion) matches(condition metav1.Condition) bool {
-	if condition.Type != ca.conditionType || condition.Status != ca.status {
-		return false
-	}
-	if ca.reason != "" && condition.Reason != ca.reason {
-		return false
-	}
-	if ca.message != "" && condition.Message != ca.message {
-		return false
-	}
-	return true
 }
 
 func newTestCase(name string) *testCase {
@@ -184,8 +155,8 @@ func newTestCase(name string) *testCase {
 		expectedAppliedWorkAction:  []string{},
 		expectedKubeAction:         []string{},
 		expectedDynamicAction:      []string{},
-		expectedManifestConditions: []conditionAssertion{},
-		expectedWorkConditions:     []conditionAssertion{},
+		expectedManifestConditions: []metav1.Condition{},
+		expectedWorkConditions:     []metav1.Condition{},
 	}
 }
 
@@ -229,12 +200,12 @@ func (t *testCase) withExpectedDynamicAction(actions ...string) *testCase {
 	return t
 }
 
-func (t *testCase) withExpectedManifestCondition(conds ...conditionAssertion) *testCase {
+func (t *testCase) withExpectedManifestCondition(conds ...metav1.Condition) *testCase {
 	t.expectedManifestConditions = conds
 	return t
 }
 
-func (t *testCase) withExpectedWorkCondition(conds ...conditionAssertion) *testCase {
+func (t *testCase) withExpectedWorkCondition(conds ...metav1.Condition) *testCase {
 	t.expectedWorkConditions = conds
 	return t
 }
@@ -605,121 +576,6 @@ func TestServerSideApplyConflict(t *testing.T) {
 	}
 
 	testCase.validate(t, controller.dynamicClient, controller.workClient, controller.kubeClient)
-}
-
-func TestConditionRules(t *testing.T) {
-	activeRule := workapiv1.ConditionRule{
-		Type:      workapiv1.CelConditionExpressionsType,
-		Condition: "Active",
-		CelExpressions: []string{
-			"hasConditions(object.status) ? object.status.conditions.exists(c, c.type == 'Active' && c.status == 'True') : false",
-		},
-		MessageExpression: "result ? 'NewObject is active' : 'NewObject is not active'",
-	}
-
-	cases := []*testCase{
-		newTestCase("object with successful condition rule").
-			withWorkManifest(
-				testingcommon.NewUnstructuredWithContent(
-					"v1", "NewObject", "ns1", "n1",
-					map[string]any{"spec": map[string]any{"key1": "val1"}}),
-				testingcommon.NewUnstructuredWithContent(
-					"v1", "NewObject", "ns1", "n2",
-					map[string]any{"spec": map[string]any{"key1": "val2"}}),
-			).
-			withSpokeDynamicObject(
-				testingcommon.NewUnstructuredWithContent(
-					"v1", "NewObject", "ns1", "n1",
-					map[string]any{
-						"spec": map[string]any{"key1": "val2"},
-						"status": map[string]any{
-							"conditions": []any{
-								map[string]any{"type": "Active", "status": "True"},
-							},
-						}}),
-			).
-			withManifestConfig(
-				newManifestConfigOption("", "newobjects", "ns1", "n1", nil, activeRule),
-				newManifestConfigOption("", "newobjects", "ns1", "n2", nil, activeRule),
-			).
-			withExpectedWorkAction("patch").
-			withAppliedWorkAction("create").
-			withExpectedDynamicAction("get", "update", "get", "create").
-			withExpectedManifestCondition(
-				expectedCondition(workapiv1.ManifestApplied, metav1.ConditionTrue),
-				expectedCondition(workapiv1.ManifestApplied, metav1.ConditionTrue),
-			).
-			withExpectedManifestCondition(
-				expectedCondition("Active", metav1.ConditionTrue).
-					withReason(workapiv1.ConditionRuleEvaluated).
-					withMessage("NewObject is active"),
-				expectedCondition("Active", metav1.ConditionFalse).
-					withReason(workapiv1.ConditionRuleEvaluated).
-					withMessage("NewObject is not active"),
-			).
-			withExpectedWorkCondition(expectedCondition(workapiv1.WorkApplied, metav1.ConditionTrue)),
-		newTestCase("object with invalid condition rule").
-			withWorkManifest(testingcommon.NewUnstructuredWithContent(
-				"v1", "NewObject", "ns1", "n1",
-				map[string]any{"spec": map[string]any{"key1": "val1"}})).
-			withSpokeDynamicObject(
-				testingcommon.NewUnstructuredWithContent(
-					"v1", "NewObject", "ns1", "n1",
-					map[string]any{"spec": map[string]any{"key1": "val2"}})).
-			withManifestConfig(
-				newManifestConfigOption("", "newobjects", "ns1", "n1", nil, workapiv1.ConditionRule{
-					Type:           workapiv1.CelConditionExpressionsType,
-					Condition:      "Active",
-					CelExpressions: []string{"object.invalid.key == 'Active'"},
-				}),
-			).
-			withExpectedWorkAction("patch").
-			withAppliedWorkAction("create").
-			withExpectedDynamicAction("get", "update").
-			withExpectedManifestCondition(expectedCondition(workapiv1.ManifestApplied, metav1.ConditionTrue)).
-			withExpectedManifestCondition(expectedCondition("Active", metav1.ConditionFalse).withReason(workapiv1.ConditionRuleExpressionError)).
-			withExpectedWorkCondition(expectedCondition(workapiv1.WorkApplied, metav1.ConditionTrue)),
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			work, workKey := spoketesting.NewManifestWork(0, c.workManifest...)
-			work.Spec.ManifestConfigs = c.workManifestConfig
-			work.Finalizers = []string{workapiv1.ManifestWorkFinalizer}
-			controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
-				withKubeObject(c.spokeObject...).
-				withUnstructuredObject(c.spokeDynamicObject...)
-
-			// The default reactor doesn't support apply, so we need our own (trivial) reactor
-			controller.dynamicClient.PrependReactor("update", "newobjects",
-				func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-					return true, testingcommon.NewUnstructuredWithContent(
-						"v1", "NewObject", "ns1", "n1",
-						map[string]any{
-							"spec": map[string]any{"key1": "val1"},
-							"status": map[string]any{
-								"conditions": []any{
-									map[string]any{"type": "Active", "status": "True"},
-								},
-							}}), nil
-				})
-			controller.dynamicClient.PrependReactor("create", "newobjects",
-				func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-					return true, testingcommon.NewUnstructuredWithContent(
-						"v1", "NewObject", "ns1", "n2",
-						map[string]any{
-							"spec":   map[string]any{"key1": "val1"},
-							"status": map[string]any{}}), nil
-				})
-			syncContext := testingcommon.NewFakeSyncContext(t, workKey)
-			err := controller.toController().sync(context.TODO(), syncContext)
-			if err != nil {
-				t.Errorf("Should be success with no err: %v", err)
-			}
-
-			c.validate(t, controller.dynamicClient, controller.workClient, controller.kubeClient)
-		})
-	}
 }
 
 func newManifestConfigOption(

@@ -252,7 +252,9 @@ func (c *AvailableStatusController) getFeedbackValues(
 	}
 }
 
-func (c *AvailableStatusController) evaluateConditions(ctx context.Context, obj *unstructured.Unstructured, option *workapiv1.ManifestConfigOption) []metav1.Condition {
+func (c *AvailableStatusController) evaluateConditions(
+	ctx context.Context, obj *unstructured.Unstructured, option *workapiv1.ManifestConfigOption,
+) []metav1.Condition {
 	if option == nil || len(option.ConditionRules) == 0 {
 		return nil
 	}
