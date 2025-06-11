@@ -52,7 +52,7 @@ func (m *manifestworkReconciler) reconcile(
 	resourceResults := make([]applyResult, len(manifestWork.Spec.Workload.Manifests))
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		resourceResults = m.applyManifests(
-			ctx, manifestWork.Spec.Workload.Manifests, manifestWork.Spec, controllerContext.Recorder(), *owner, resourceResults)
+			ctx, manifestWork.Spec.Workload.Manifests, manifestWork.Spec, manifestWork.Status, controllerContext.Recorder(), *owner, resourceResults)
 
 		for _, result := range resourceResults {
 			if apierrors.IsConflict(result.Error) {
@@ -133,6 +133,7 @@ func (m *manifestworkReconciler) applyManifests(
 	ctx context.Context,
 	manifests []workapiv1.Manifest,
 	workSpec workapiv1.ManifestWorkSpec,
+	workStatus workapiv1.ManifestWorkStatus,
 	recorder events.Recorder,
 	owner metav1.OwnerReference,
 	existingResults []applyResult) []applyResult {
@@ -141,10 +142,10 @@ func (m *manifestworkReconciler) applyManifests(
 		switch {
 		case existingResults[index].Result == nil:
 			// Apply if there is no result.
-			existingResults[index] = m.applyOneManifest(ctx, index, manifest, workSpec, recorder, owner)
+			existingResults[index] = m.applyOneManifest(ctx, index, manifest, workSpec, workStatus, recorder, owner)
 		case apierrors.IsConflict(existingResults[index].Error):
 			// Apply if there is a resource conflict error.
-			existingResults[index] = m.applyOneManifest(ctx, index, manifest, workSpec, recorder, owner)
+			existingResults[index] = m.applyOneManifest(ctx, index, manifest, workSpec, workStatus, recorder, owner)
 		}
 	}
 
@@ -156,6 +157,7 @@ func (m *manifestworkReconciler) applyOneManifest(
 	index int,
 	manifest workapiv1.Manifest,
 	workSpec workapiv1.ManifestWorkSpec,
+	workStatus workapiv1.ManifestWorkStatus,
 	recorder events.Recorder,
 	owner metav1.OwnerReference) applyResult {
 
@@ -179,6 +181,16 @@ func (m *manifestworkReconciler) applyOneManifest(
 	if err != nil {
 		result.Error = err
 		return result
+	}
+
+	// manifests with the Complete condition are not updated
+	manifestCondition := helper.FindManifestCondition(resMeta, workStatus.ResourceStatus.Manifests)
+	if manifestCondition != nil {
+		complete := meta.FindStatusCondition(manifestCondition.Conditions, workapiv1.ManifestComplete)
+		if complete != nil && complete.Status == metav1.ConditionTrue {
+			result.Result = required
+			return result
+		}
 	}
 
 	// check if the resource to be applied should be owned by the manifest work
