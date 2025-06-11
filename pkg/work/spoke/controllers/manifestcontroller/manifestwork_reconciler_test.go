@@ -19,6 +19,7 @@ import (
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/utils/ptr"
 
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
@@ -45,12 +46,14 @@ type testController struct {
 
 func newController(t *testing.T, work *workapiv1.ManifestWork, appliedWork *workapiv1.AppliedManifestWork, mapper meta.RESTMapper) *testController {
 	fakeWorkClient := fakeworkclient.NewSimpleClientset(work)
+	manifestWorkClient := fakeWorkClient.WorkV1().ManifestWorks("cluster1")
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fakeWorkClient, 5*time.Minute, workinformers.WithNamespace("cluster1"))
 	spokeKubeClient := fakekube.NewSimpleClientset()
 	controller := &ManifestWorkController{
+		manifestWorkClient: manifestWorkClient,
 		manifestWorkPatcher: patcher.NewPatcher[
 			*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
-			fakeWorkClient.WorkV1().ManifestWorks("cluster1")),
+			manifestWorkClient),
 		manifestWorkLister: workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks("cluster1"),
 		appliedManifestWorkPatcher: patcher.NewPatcher[
 			*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus](
@@ -100,18 +103,6 @@ func (t *testController) withUnstructuredObject(objects ...runtime.Object) *test
 	return t
 }
 
-func assertCondition(t *testing.T, conditions []metav1.Condition, expected metav1.Condition) {
-	condition := meta.FindStatusCondition(conditions, expected.Type)
-	if condition == nil {
-		t.Errorf("condition %s not found, got: %#v", expected.Type, conditions)
-		return
-	}
-
-	if !util.MatchCondition(*condition, expected) {
-		t.Errorf("expected condition %#v but got: %#v", expected, condition)
-	}
-}
-
 func assertManifestCondition(
 	t *testing.T, conds []workapiv1.ManifestCondition, index int32, expected metav1.Condition) {
 	cond := findManifestConditionByIndex(index, conds)
@@ -120,13 +111,16 @@ func assertManifestCondition(
 		return
 	}
 
-	assertCondition(t, cond.Conditions, expected)
+	if err := util.CheckExpectedConditions(cond.Conditions, expected); err != nil {
+		t.Error(err)
+	}
 }
 
 type testCase struct {
 	name                       string
 	workManifest               []*unstructured.Unstructured
 	workManifestConfig         []workapiv1.ManifestConfigOption
+	deleteOption               *workapiv1.DeleteOption
 	spokeObject                []runtime.Object
 	spokeDynamicObject         []runtime.Object
 	expectedWorkAction         []string
@@ -135,6 +129,7 @@ type testCase struct {
 	expectedDynamicAction      []string
 	expectedManifestConditions []metav1.Condition
 	expectedWorkConditions     []metav1.Condition
+	existingWorkConditions     []metav1.Condition
 }
 
 func expectedCondition(conditionType string, status metav1.ConditionStatus) metav1.Condition {
@@ -157,6 +152,7 @@ func newTestCase(name string) *testCase {
 		expectedDynamicAction:      []string{},
 		expectedManifestConditions: []metav1.Condition{},
 		expectedWorkConditions:     []metav1.Condition{},
+		existingWorkConditions:     []metav1.Condition{},
 	}
 }
 
@@ -167,6 +163,11 @@ func (t *testCase) withWorkManifest(objects ...*unstructured.Unstructured) *test
 
 func (t *testCase) withManifestConfig(configs ...workapiv1.ManifestConfigOption) *testCase {
 	t.workManifestConfig = configs
+	return t
+}
+
+func (t *testCase) withDeleteOption(deleteOption *workapiv1.DeleteOption) *testCase {
+	t.deleteOption = deleteOption
 	return t
 }
 
@@ -210,6 +211,11 @@ func (t *testCase) withExpectedWorkCondition(conds ...metav1.Condition) *testCas
 	return t
 }
 
+func (t *testCase) withExistingWorkCondition(conds ...metav1.Condition) *testCase {
+	t.existingWorkConditions = conds
+	return t
+}
+
 func (t *testCase) validate(
 	ts *testing.T,
 	dynamicClient *fakedynamic.FakeDynamicClient,
@@ -232,21 +238,45 @@ func (t *testCase) validate(
 	spokeKubeActions := kubeClient.Actions()
 	testingcommon.AssertActions(ts, spokeKubeActions, t.expectedKubeAction...)
 
-	actual, ok := actualWorkActions[len(actualWorkActions)-1].(clienttesting.PatchActionImpl)
-	if !ok {
-		ts.Errorf("Expected to get patch action")
+	if len(t.expectedWorkAction) == 0 {
+		// No work actions to inspect
+		return
 	}
-	p := actual.Patch
+
 	actualWork := &workapiv1.ManifestWork{}
-	if err := json.Unmarshal(p, actualWork); err != nil {
-		ts.Fatal(err)
+	switch actual := actualWorkActions[len(actualWorkActions)-1].(type) {
+	case clienttesting.PatchActionImpl:
+		p := actual.Patch
+		if err := json.Unmarshal(p, actualWork); err != nil {
+			ts.Fatal(err)
+		}
+	case clienttesting.DeleteActionImpl:
+		if len(t.expectedManifestConditions) > 0 || len(t.expectedWorkConditions) > 0 {
+			ts.Fatal("Unable to validate conditions on a delete action")
+		}
+	default:
+		ts.Fatalf("Unexpected work action: %+v", actual)
 	}
+
 	for index, cond := range t.expectedManifestConditions {
 		assertManifestCondition(ts, actualWork.Status.ResourceStatus.Manifests, int32(index), cond) //nolint:gosec
 	}
-	for _, cond := range t.expectedWorkConditions {
-		assertCondition(ts, actualWork.Status.Conditions, cond)
+	if errs := util.CheckExpectedConditions(actualWork.Status.Conditions, t.expectedWorkConditions...); errs != nil {
+		for _, err := range errs.Errors() {
+			ts.Error(err)
+		}
+		ts.FailNow()
 	}
+}
+
+func (t *testCase) newManifestWork() (*workapiv1.ManifestWork, string) {
+	work, workKey := spoketesting.NewManifestWork(0, t.workManifest...)
+	work.Status.Conditions = t.existingWorkConditions
+	work.Spec.ManifestConfigs = t.workManifestConfig
+	work.Spec.DeleteOption = t.deleteOption
+	work.Finalizers = []string{workapiv1.ManifestWorkFinalizer}
+
+	return work, workKey
 }
 
 func newCondition(name, status, reason, message string, generation int64, lastTransition *metav1.Time) metav1.Condition {
@@ -340,12 +370,26 @@ func TestSync(t *testing.T) {
 				expectedCondition(workapiv1.ManifestApplied, metav1.ConditionTrue),
 				expectedCondition(workapiv1.ManifestApplied, metav1.ConditionTrue)).
 			withExpectedWorkCondition(expectedCondition(workapiv1.WorkApplied, metav1.ConditionTrue)),
+		newTestCase("ignore completed manifestwork with no TTL").
+			withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test")).
+			withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
+			withExistingWorkCondition(metav1.Condition{Type: workapiv1.WorkComplete, Status: metav1.ConditionTrue}),
+		newTestCase("ignore completed manifestwork with unsatisfied TTL").
+			withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test")).
+			withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
+			withDeleteOption(&workapiv1.DeleteOption{TTLSecondsAfterFinished: ptr.To[int64](30)}).
+			withExistingWorkCondition(metav1.Condition{Type: workapiv1.WorkComplete, Status: metav1.ConditionTrue, LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * time.Second))}),
+		newTestCase("delete completed manifestwork with satisfied TTL").
+			withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test")).
+			withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
+			withDeleteOption(&workapiv1.DeleteOption{TTLSecondsAfterFinished: ptr.To[int64](10)}).
+			withExistingWorkCondition(metav1.Condition{Type: workapiv1.WorkComplete, Status: metav1.ConditionTrue, LastTransitionTime: metav1.NewTime(time.Now().Add(-11 * time.Second))}).
+			withExpectedWorkAction("delete"),
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			work, workKey := spoketesting.NewManifestWork(0, c.workManifest...)
-			work.Finalizers = []string{workapiv1.ManifestWorkFinalizer}
+			work, workKey := c.newManifestWork()
 			controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
 				withKubeObject(c.spokeObject...).
 				withUnstructuredObject(c.spokeDynamicObject...)
@@ -375,8 +419,7 @@ func TestFailedToApplyResource(t *testing.T) {
 			expectedCondition(workapiv1.ManifestApplied, metav1.ConditionFalse)).
 		withExpectedWorkCondition(expectedCondition(workapiv1.WorkApplied, metav1.ConditionFalse))
 
-	work, workKey := spoketesting.NewManifestWork(0, tc.workManifest...)
-	work.Finalizers = []string{workapiv1.ManifestWorkFinalizer}
+	work, workKey := tc.newManifestWork()
 	controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).withKubeObject(tc.spokeObject...).withUnstructuredObject()
 
 	// Add a reactor on fake client to throw error when creating secret on namespace ns2
@@ -515,9 +558,7 @@ func TestUpdateStrategy(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			work, workKey := spoketesting.NewManifestWork(0, c.workManifest...)
-			work.Spec.ManifestConfigs = c.workManifestConfig
-			work.Finalizers = []string{workapiv1.ManifestWorkFinalizer}
+			work, workKey := c.newManifestWork()
 			controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
 				withKubeObject(c.spokeObject...).
 				withUnstructuredObject(c.spokeDynamicObject...)
@@ -558,9 +599,7 @@ func TestServerSideApplyConflict(t *testing.T) {
 		withExpectedManifestCondition(expectedCondition(workapiv1.ManifestApplied, metav1.ConditionFalse)).
 		withExpectedWorkCondition(expectedCondition(workapiv1.WorkApplied, metav1.ConditionFalse))
 
-	work, workKey := spoketesting.NewManifestWork(0, testCase.workManifest...)
-	work.Spec.ManifestConfigs = testCase.workManifestConfig
-	work.Finalizers = []string{workapiv1.ManifestWorkFinalizer}
+	work, workKey := testCase.newManifestWork()
 	controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
 		withKubeObject(testCase.spokeObject...).
 		withUnstructuredObject(testCase.spokeDynamicObject...)
