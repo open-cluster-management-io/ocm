@@ -46,6 +46,7 @@ type workReconcile interface {
 // ManifestWorkController is to reconcile the workload resources
 // fetched from hub cluster on spoke cluster.
 type ManifestWorkController struct {
+	manifestWorkClient         workv1client.ManifestWorkInterface
 	manifestWorkPatcher        patcher.Patcher[*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus]
 	manifestWorkLister         worklister.ManifestWorkNamespaceLister
 	appliedManifestWorkClient  workv1client.AppliedManifestWorkInterface
@@ -72,6 +73,7 @@ func NewManifestWorkController(
 	validator auth.ExecutorValidator) factory.Controller {
 
 	controller := &ManifestWorkController{
+		manifestWorkClient: manifestWorkClient,
 		manifestWorkPatcher: patcher.NewPatcher[
 			*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
 			manifestWorkClient),
@@ -131,6 +133,11 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	// it ensures all maintained resources will be cleaned once manifestwork is deleted
 	if !commonhelper.HasFinalizer(manifestWork.Finalizers, workapiv1.ManifestWorkFinalizer) {
 		return nil
+	}
+
+	// work that is completed does not recieve any updates
+	if isComplete, err := m.manifestWorkCompletion(ctx, controllerContext, manifestWork); isComplete || err != nil {
+		return err
 	}
 
 	// Apply appliedManifestWork
@@ -207,4 +214,42 @@ func (m *ManifestWorkController) applyAppliedManifestWork(ctx context.Context, w
 
 	_, err = m.appliedManifestWorkPatcher.PatchSpec(ctx, appliedManifestWork, requiredAppliedWork.Spec, appliedManifestWork.Spec)
 	return appliedManifestWork, err
+}
+
+func (m *ManifestWorkController) manifestWorkCompletion(ctx context.Context, controllerContext factory.SyncContext, manifestWork *workapiv1.ManifestWork) (bool, error) {
+	complete := meta.FindStatusCondition(manifestWork.Status.Conditions, workapiv1.ManifestComplete)
+	if complete != nil && complete.Status == metav1.ConditionTrue {
+		var err error
+		// check if work has TTL set and it has elapsed since completion
+		if ttl, ok := remainingTtl(complete.LastTransitionTime, manifestWork.Spec.DeleteOption); ok {
+			if ttl <= 0 {
+				// Only delete if resourceVersion matches in case complete condition has changed
+				deleteOpts := metav1.DeleteOptions{Preconditions: &metav1.Preconditions{ResourceVersion: &manifestWork.ResourceVersion}}
+				err = m.manifestWorkClient.Delete(ctx, manifestWork.Name, deleteOpts)
+				if err == nil {
+					controllerContext.Recorder().Eventf("ManifestWorkDeleted", "Deleted ManifestWork %s because its TTL elapsed after completion", manifestWork.Name)
+				}
+			} else {
+				// Requeue after TTL to delete the manifestwork
+				controllerContext.Queue().AddAfter(manifestWork.Name, ttl)
+			}
+		}
+		return true, err
+	}
+	return false, nil
+}
+
+// remainingTtl returns the remaining duration before a completed manifestwork should be deleted, if configured
+func remainingTtl(completedAt metav1.Time, deleteOption *workapiv1.DeleteOption) (time.Duration, bool) {
+	if deleteOption == nil || deleteOption.TTLSecondsAfterFinished == nil {
+		return 0, false
+	}
+
+	ttl := *deleteOption.TTLSecondsAfterFinished
+	if ttl <= 0 {
+		return 0, true
+	}
+
+	remaining := time.Second*time.Duration(ttl) - time.Since(completedAt.Time)
+	return remaining, true
 }
