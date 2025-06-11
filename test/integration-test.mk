@@ -35,7 +35,7 @@ test-registration-integration: ensure-kubebuilder-tools
 .PHONY: test-registration-integration
 
 test-work-integration: ensure-kubebuilder-tools build-work-integration
-	./work-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast
+	./work-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast ${ARGS}
 .PHONY: test-work-integration
 
 test-placement-integration: ensure-kubebuilder-tools

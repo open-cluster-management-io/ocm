@@ -607,6 +607,9 @@ const (
 )
 
 // Manifest condition reasons
+//
+// All reasons set by condition rule evaluation are expected to be prefixed with "ConditionRule"
+// in order to determine which conditions were set by rules.
 const (
 	// ConditionRuleTrue is set when a rule is evaluated without error
 	ConditionRuleEvaluated string = "ConditionRuleEvaluated"
