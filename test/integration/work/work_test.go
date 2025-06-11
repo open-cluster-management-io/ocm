@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/common"
@@ -44,6 +45,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 	var work *workapiv1.ManifestWork
 	var expectedFinalizer string
 	var manifests []workapiv1.Manifest
+	var workOpts []func(work *workapiv1.ManifestWork)
 	var appliedManifestWorkName string
 
 	var err error
@@ -76,12 +78,16 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		ctx, cancel = context.WithCancel(context.Background())
 		go startWorkAgent(ctx, o, commOptions)
 
-		// reset manifests
+		// reset manifests and workOpts
 		manifests = nil
+		workOpts = nil
 	})
 
 	ginkgo.JustBeforeEach(func() {
 		work = util.NewManifestWork(commOptions.SpokeClusterName, workName, manifests)
+		for _, opt := range workOpts {
+			opt(work)
+		}
 		work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
 		appliedManifestWorkName = util.AppliedManifestWorkName(sourceDriver, hubHash, work)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -870,6 +876,92 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertAppliedManifestWorkDeleted(appliedManifestWork.Name, spokeWorkClient, eventuallyTimeout, eventuallyInterval)
+		})
+	})
+
+	ginkgo.Context("With completion TTL", func() {
+		ginkgo.BeforeEach(func() {
+			manifests = []workapiv1.Manifest{
+				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm1, map[string]string{"a": "b"}, nil)),
+				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm2, map[string]string{"c": "d"}, nil)),
+			}
+			workOpts = append(workOpts, func(work *workapiv1.ManifestWork) {
+				work.Spec.DeleteOption = &workapiv1.DeleteOption{
+					TTLSecondsAfterFinished: ptr.To[int64](min(10, eventuallyTimeout/2)),
+					PropagationPolicy:       "Foreground",
+				}
+				work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+					{
+						ResourceIdentifier: workapiv1.ResourceIdentifier{
+							Resource:  "configmaps",
+							Name:      cm1,
+							Namespace: commOptions.SpokeClusterName,
+						},
+						ConditionRules: []workapiv1.ConditionRule{
+							{
+								Type:      workapiv1.CelConditionExpressionsType,
+								Condition: workapiv1.ManifestComplete,
+								CelExpressions: []string{
+									"has(object.data.complete) && object.data.complete == 'true'",
+								},
+							},
+						},
+					},
+				}
+			})
+		})
+
+		ginkgo.It("should update work and be completed", func() {
+			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			newManifests := []workapiv1.Manifest{
+				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm1, map[string]string{"a": "b", "complete": "true"}, nil)),
+				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm2, map[string]string{"c": "d"}, nil)),
+			}
+
+			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			newWork := updatedWork.DeepCopy()
+			newWork.Spec.Workload.Manifests = newManifests
+
+			pathBytes, err := util.NewWorkPatch(updatedWork, newWork)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Patch(
+				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// ManifestWork should be marked completed and eventually be deleted
+			gomega.Eventually(func() error {
+				work, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					if errors.IsNotFound(err) {
+						return nil
+					}
+					return err
+				}
+
+				// If ManifestWork still exists we expect it to be marked complete
+				if err := util.CheckExpectedConditions(work.Status.Conditions, metav1.Condition{
+					Type:   workapiv1.WorkComplete,
+					Status: metav1.ConditionTrue,
+					Reason: workapiv1.WorkManifestsComplete,
+				}); err != nil {
+					return fmt.Errorf("%s: %v", work.Name, err)
+				}
+
+				// If marked complete and still exists, we expect deletion timestamp to be set
+				if work.DeletionTimestamp.IsZero() {
+					return fmt.Errorf("Expected work %s to be deleted", work.Name)
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 		})
 	})
 })
