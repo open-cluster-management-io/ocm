@@ -887,7 +887,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			}
 			workOpts = append(workOpts, func(work *workapiv1.ManifestWork) {
 				work.Spec.DeleteOption = &workapiv1.DeleteOption{
-					TTLSecondsAfterFinished: ptr.To[int64](min(10, eventuallyTimeout/2)),
+					TTLSecondsAfterFinished: ptr.To[int64](min(5, eventuallyTimeout/2)),
 					PropagationPolicy:       "Foreground",
 				}
 				work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
