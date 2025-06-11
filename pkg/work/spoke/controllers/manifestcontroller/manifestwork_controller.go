@@ -135,7 +135,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 		return nil
 	}
 
-	// work that is completed does not recieve any updates
+	// work that is completed does not receive any updates
 	if isComplete, err := m.manifestWorkCompletion(ctx, controllerContext, manifestWork); isComplete || err != nil {
 		return err
 	}
@@ -216,7 +216,9 @@ func (m *ManifestWorkController) applyAppliedManifestWork(ctx context.Context, w
 	return appliedManifestWork, err
 }
 
-func (m *ManifestWorkController) manifestWorkCompletion(ctx context.Context, controllerContext factory.SyncContext, manifestWork *workapiv1.ManifestWork) (bool, error) {
+func (m *ManifestWorkController) manifestWorkCompletion(
+	ctx context.Context, controllerContext factory.SyncContext, manifestWork *workapiv1.ManifestWork,
+) (bool, error) {
 	complete := meta.FindStatusCondition(manifestWork.Status.Conditions, workapiv1.ManifestComplete)
 	if complete != nil && complete.Status == metav1.ConditionTrue {
 		var err error
@@ -227,7 +229,9 @@ func (m *ManifestWorkController) manifestWorkCompletion(ctx context.Context, con
 				deleteOpts := metav1.DeleteOptions{Preconditions: &metav1.Preconditions{ResourceVersion: &manifestWork.ResourceVersion}}
 				err = m.manifestWorkClient.Delete(ctx, manifestWork.Name, deleteOpts)
 				if err == nil {
-					controllerContext.Recorder().Eventf("ManifestWorkDeleted", "Deleted ManifestWork %s because its TTL elapsed after completion", manifestWork.Name)
+					controllerContext.Recorder().Eventf(
+						"ManifestWorkDeleted", "Deleted ManifestWork %s because its TTL elapsed after completion", manifestWork.Name,
+					)
 				}
 			} else {
 				// Requeue after TTL to delete the manifestwork

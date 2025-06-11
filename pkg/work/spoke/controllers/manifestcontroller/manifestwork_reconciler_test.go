@@ -378,12 +378,24 @@ func TestSync(t *testing.T) {
 			withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test")).
 			withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
 			withDeleteOption(&workapiv1.DeleteOption{TTLSecondsAfterFinished: ptr.To[int64](30)}).
-			withExistingWorkCondition(metav1.Condition{Type: workapiv1.WorkComplete, Status: metav1.ConditionTrue, LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * time.Second))}),
+			withExistingWorkCondition(
+				metav1.Condition{
+					Type:               workapiv1.WorkComplete,
+					Status:             metav1.ConditionTrue,
+					LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * time.Second)),
+				},
+			),
 		newTestCase("delete completed manifestwork with satisfied TTL").
 			withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test")).
 			withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
 			withDeleteOption(&workapiv1.DeleteOption{TTLSecondsAfterFinished: ptr.To[int64](10)}).
-			withExistingWorkCondition(metav1.Condition{Type: workapiv1.WorkComplete, Status: metav1.ConditionTrue, LastTransitionTime: metav1.NewTime(time.Now().Add(-11 * time.Second))}).
+			withExistingWorkCondition(
+				metav1.Condition{
+					Type:               workapiv1.WorkComplete,
+					Status:             metav1.ConditionTrue,
+					LastTransitionTime: metav1.NewTime(time.Now().Add(-11 * time.Second)),
+				},
+			).
 			withExpectedWorkAction("delete"),
 	}
 
