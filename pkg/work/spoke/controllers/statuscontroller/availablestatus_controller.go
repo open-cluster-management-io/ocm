@@ -3,6 +3,8 @@ package statuscontroller
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -115,6 +117,7 @@ func (c *AvailableStatusController) syncManifestWork(ctx context.Context, origin
 
 	// handle status condition of manifests
 	// TODO revist this controller since this might bring races when user change the manifests in spec.
+	numCompletable, numCompleted := 0, 0
 	for index, manifest := range manifestWork.Status.ResourceStatus.Manifests {
 		obj, availableStatusCondition, err := buildAvailableStatusCondition(manifest.ResourceMeta, c.spokeDynamicClient)
 		manifestConditions := &manifestWork.Status.ResourceStatus.Manifests[index].Conditions
@@ -131,11 +134,29 @@ func (c *AvailableStatusController) syncManifestWork(ctx context.Context, origin
 		meta.SetStatusCondition(manifestConditions, statusFeedbackCondition)
 		manifestWork.Status.ResourceStatus.Manifests[index].StatusFeedbacks.Values = values
 
-		// Read conditions according to condition rules
-		conditions := c.evaluateConditions(ctx, obj, option)
-		for _, condition := range conditions {
-			meta.SetStatusCondition(manifestConditions, condition)
+		// Update manifest conditions according to condition rules
+		c.evaluateConditionRules(ctx, manifestConditions, obj, option, manifestWork.Generation)
+
+		// Check if manifest is completable/completed
+		if complete := meta.FindStatusCondition(*manifestConditions, workapiv1.ManifestComplete); complete != nil {
+			numCompletable++
+			if complete.Status == metav1.ConditionTrue {
+				numCompleted++
+			}
 		}
+	}
+
+	if numCompletable > 0 && numCompletable == numCompleted {
+		meta.SetStatusCondition(&manifestWork.Status.Conditions, metav1.Condition{
+			Type:               workapiv1.WorkComplete,
+			Status:             metav1.ConditionTrue,
+			Reason:             workapiv1.WorkManifestsComplete,
+			Message:            "All completion condition rules passed",
+			LastTransitionTime: metav1.Now(),
+			ObservedGeneration: manifestWork.Generation,
+		})
+	} else {
+		meta.RemoveStatusCondition(&manifestWork.Status.Conditions, workapiv1.WorkComplete)
 	}
 
 	// aggregate ManifestConditions and update work status condition
@@ -252,14 +273,29 @@ func (c *AvailableStatusController) getFeedbackValues(
 	}
 }
 
-func (c *AvailableStatusController) evaluateConditions(
-	ctx context.Context, obj *unstructured.Unstructured, option *workapiv1.ManifestConfigOption,
-) []metav1.Condition {
-	if option == nil || len(option.ConditionRules) == 0 {
-		return nil
+// evaluateConditionRules updates manifestConditions based on configured condition rules for the manifest
+func (c *AvailableStatusController) evaluateConditionRules(ctx context.Context,
+	manifestConditions *[]metav1.Condition, obj *unstructured.Unstructured, option *workapiv1.ManifestConfigOption, generation int64,
+) {
+	// Evaluate rules
+	var conditions []metav1.Condition
+	if option != nil && len(option.ConditionRules) > 0 {
+		conditions = c.conditionReader.EvaluateConditions(ctx, obj, option.ConditionRules)
 	}
 
-	return c.conditionReader.EvaluateConditions(ctx, obj, option.ConditionRules)
+	// Update manifest conditions with latest condition rule results and observed generation
+	for _, condition := range conditions {
+		condition.ObservedGeneration = generation
+		meta.SetStatusCondition(manifestConditions, condition)
+	}
+
+	// Remove conditions set by old rules that no longer exist
+	// All conditions set by rules have reason prefixed with "ConditionRule" to easily identify them vs. conditions set elsewhere
+	// Additionally they will always set ObservedGeneration in order to identify a condition set by a rule that no longer exists.
+	// Generation will always update when the ManifestWorkSpec changes, so removing a rule will result in a new generation.
+	*manifestConditions = slices.DeleteFunc(*manifestConditions, func(c metav1.Condition) bool {
+		return strings.HasPrefix(c.Reason, "ConditionRule") && c.ObservedGeneration != generation
+	})
 }
 
 // buildAvailableStatusCondition returns a StatusCondition with type Available for a given manifest resource
