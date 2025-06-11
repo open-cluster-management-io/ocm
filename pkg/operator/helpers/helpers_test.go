@@ -1657,3 +1657,61 @@ func TestFeatureGateEnabled(t *testing.T) {
 		})
 	}
 }
+
+func TestGetKlusterletAgentLabels(t *testing.T) {
+	cases := []struct {
+		name             string
+		klusterlet       *operatorapiv1.Klusterlet
+		enableSyncLabels bool
+		desiredLabels    map[string]string
+	}{
+		{
+			name: "enableSyncLabels is false",
+			klusterlet: &operatorapiv1.Klusterlet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+			},
+			desiredLabels: map[string]string{
+				AgentLabelKey: "cluster-manager",
+			},
+		},
+		{
+			name: "enableSyncLabels is true",
+			klusterlet: &operatorapiv1.Klusterlet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+			},
+			enableSyncLabels: true,
+			desiredLabels: map[string]string{
+				AgentLabelKey: "cluster-manager",
+			},
+		},
+		{
+			name: "with klusterlet labels",
+			klusterlet: &operatorapiv1.Klusterlet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+					Labels: map[string]string{
+						"testKey": "testValue",
+					},
+				},
+			},
+			enableSyncLabels: true,
+			desiredLabels: map[string]string{
+				AgentLabelKey: "cluster-manager",
+				"testKey":     "testValue",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := GetKlusterletAgentLabels(tc.klusterlet, tc.enableSyncLabels)
+			if !reflect.DeepEqual(actual, tc.desiredLabels) {
+				t.Errorf("Name: %s, expect labels are %v, but got %v", tc.name, tc.desiredLabels, actual)
+			}
+		})
+	}
+}

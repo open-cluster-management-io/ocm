@@ -26,6 +26,8 @@ var (
 		"klusterlet/managed/0000_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml",
 		"klusterlet/managed/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml",
 	}
+
+	aboutAPIFile = "klusterlet/managed/clusterproperties.crd.yaml"
 )
 
 // crdReconcile apply crds to managed clusters
@@ -41,6 +43,13 @@ func (r *crdReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.
 		r.managedClusterClients.apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions(),
 		crdmanager.EqualV1,
 	)
+
+	var crdFiles []string
+	crdFiles = append(crdFiles, crdV1StaticFiles...)
+	if config.AboutAPIEnabled {
+		crdFiles = append(crdFiles, aboutAPIFile)
+	}
+
 	applyErr := crdManager.Apply(ctx,
 		func(name string) ([]byte, error) {
 			template, err := manifests.KlusterletManifestFiles.ReadFile(name)
@@ -51,7 +60,7 @@ func (r *crdReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.
 			helpers.SetRelatedResourcesStatusesWithObj(&klusterlet.Status.RelatedResources, objData)
 			return objData, nil
 		},
-		crdV1StaticFiles...,
+		crdFiles...,
 	)
 
 	if applyErr != nil {
@@ -74,6 +83,13 @@ func (r *crdReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klus
 		r.managedClusterClients.apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions(),
 		crdmanager.EqualV1,
 	)
+
+	var crdFiles []string
+	crdFiles = append(crdFiles, crdV1StaticFiles...)
+	if config.AboutAPIEnabled {
+		crdFiles = append(crdFiles, aboutAPIFile)
+	}
+
 	deleteErr := crdManager.Clean(ctx, true,
 		func(name string) ([]byte, error) {
 			template, err := manifests.KlusterletManifestFiles.ReadFile(name)
@@ -84,7 +100,7 @@ func (r *crdReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klus
 			helpers.SetRelatedResourcesStatusesWithObj(&klusterlet.Status.RelatedResources, objData)
 			return objData, nil
 		},
-		crdV1StaticFiles...,
+		crdFiles...,
 	)
 
 	if deleteErr != nil {

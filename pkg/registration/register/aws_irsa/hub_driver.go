@@ -28,6 +28,7 @@ import (
 )
 
 const (
+	resourceNotFound        = "ResourceNotFoundException"
 	errNoSuchEntity         = "NoSuchEntity"
 	errEntityAlreadyExists  = "EntityAlreadyExists"
 	trustPolicyTemplatePath = "managed-cluster-policy/TrustPolicy.tmpl"
@@ -77,14 +78,14 @@ func (c *AWSIRSAHubDriver) Cleanup(ctx context.Context, managedCluster *clusterv
 		return err
 	}
 
-	err = deleteIAMRole(ctx, c.cfg, roleName)
+	eksClient := eks.NewFromConfig(c.cfg)
+	_, hubClusterName := commonhelpers.GetAwsAccountIdAndClusterName(c.hubClusterArn)
+	err = deleteAccessEntry(ctx, eksClient, roleArn, hubClusterName)
 	if err != nil {
 		return err
 	}
 
-	eksClient := eks.NewFromConfig(c.cfg)
-	_, hubClusterName := commonhelpers.GetAwsAccountIdAndClusterName(c.hubClusterArn)
-	err = deleteAccessEntry(ctx, eksClient, roleArn, hubClusterName)
+	err = deleteIAMRole(ctx, c.cfg, roleName)
 	if err != nil {
 		return err
 	}
@@ -313,6 +314,10 @@ func deleteAccessEntry(ctx context.Context, eksClient *eks.Client, roleArn strin
 
 	_, err := eksClient.DeleteAccessEntry(ctx, params)
 	if err != nil {
+		if strings.Contains(err.Error(), resourceNotFound) {
+			logger.V(4).Error(err, "Access Entry already deleted for HubClusterName", "HubClusterName", hubClusterName)
+			return nil
+		}
 		logger.V(4).Error(err, "Failed to delete Access Entry for HubClusterName", "HubClusterName", hubClusterName)
 		return err
 	} else {

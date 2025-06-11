@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	fakeapiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
@@ -325,7 +324,7 @@ func TestApplyUnstructred(t *testing.T) {
 
 			c.required.SetOwnerReferences([]metav1.OwnerReference{c.owner})
 			syncContext := testingcommon.NewFakeSyncContext(t, "test")
-			cache := resourceapply.NewResourceCache()
+			cache := NewResourceCache()
 			cache.UpdateCachedResourceMetadata(c.required, c.existing)
 			_, _, err := applier.applyUnstructured(
 				context.TODO(), c.required, c.gvr, syncContext.Recorder(), cache)

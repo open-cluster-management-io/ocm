@@ -55,10 +55,7 @@ type managedReconcile struct {
 
 func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
-	labels := map[string]string{}
-	if r.enableSyncLabels {
-		labels = helpers.GetKlusterletAgentLabels(klusterlet)
-	}
+	labels := helpers.GetKlusterletAgentLabels(klusterlet, r.enableSyncLabels)
 
 	if !config.DisableAddonNamespace {
 		// For now, whether in Default or Hosted mode, the addons will be deployed on the managed cluster.
@@ -153,9 +150,7 @@ func (r *managedReconcile) createAggregationRule(ctx context.Context, klusterlet
 			},
 			Rules: []rbacv1.PolicyRule{},
 		}
-		if r.enableSyncLabels {
-			aggregateClusterRole.SetLabels(helpers.GetKlusterletAgentLabels(klusterlet))
-		}
+		aggregateClusterRole.SetLabels(helpers.GetKlusterletAgentLabels(klusterlet, r.enableSyncLabels))
 		_, createErr := r.managedClusterClients.kubeClient.RbacV1().ClusterRoles().Create(ctx, aggregateClusterRole, metav1.CreateOptions{})
 		return createErr
 	}

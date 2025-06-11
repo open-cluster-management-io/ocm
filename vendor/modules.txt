@@ -1714,7 +1714,7 @@ open-cluster-management.io/addon-framework/pkg/agent
 open-cluster-management.io/addon-framework/pkg/assets
 open-cluster-management.io/addon-framework/pkg/index
 open-cluster-management.io/addon-framework/pkg/utils
-# open-cluster-management.io/api v0.16.2-0.20250527062515-98a1d87193c1
+# open-cluster-management.io/api v0.16.2-0.20250529024642-922ceaca4e66
 ## explicit; go 1.23.6
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/client/addon/clientset/versioned
@@ -1822,6 +1822,19 @@ open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types
 open-cluster-management.io/sdk-go/pkg/helpers
 open-cluster-management.io/sdk-go/pkg/patcher
+# sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03
+## explicit; go 1.22
+sigs.k8s.io/about-api/pkg/apis/v1alpha1
+sigs.k8s.io/about-api/pkg/generated/clientset/versioned
+sigs.k8s.io/about-api/pkg/generated/clientset/versioned/fake
+sigs.k8s.io/about-api/pkg/generated/clientset/versioned/scheme
+sigs.k8s.io/about-api/pkg/generated/clientset/versioned/typed/apis/v1alpha1
+sigs.k8s.io/about-api/pkg/generated/clientset/versioned/typed/apis/v1alpha1/fake
+sigs.k8s.io/about-api/pkg/generated/informers/externalversions
+sigs.k8s.io/about-api/pkg/generated/informers/externalversions/apis
+sigs.k8s.io/about-api/pkg/generated/informers/externalversions/apis/v1alpha1
+sigs.k8s.io/about-api/pkg/generated/informers/externalversions/internalinterfaces
+sigs.k8s.io/about-api/pkg/generated/listers/apis/v1alpha1
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.0
 ## explicit; go 1.21
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client

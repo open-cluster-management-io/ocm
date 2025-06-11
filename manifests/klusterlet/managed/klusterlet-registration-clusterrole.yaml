@@ -20,3 +20,7 @@ rules:
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["clusterclaims"]
   verbs: ["get", "list", "watch"]
+  # Allow agent to list clusterproperties
+- apiGroups: ["about.k8s.io"]
+  resources: ["clusterproperties"]
+  verbs: ["get", "list", "watch"]

@@ -107,6 +107,12 @@ spec:
           {{if gt .AgentKubeAPIBurst 0}}
           - "--kube-api-burst={{ .AgentKubeAPIBurst }}"
           {{end}}
+          {{if gt .WorkHubKubeAPIQPS 0.0}}
+          - "--hub-kube-api-qps={{ .WorkHubKubeAPIQPS }}"
+          {{end}}
+          {{if gt .WorkHubKubeAPIBurst 0}}
+          - "--hub-kube-api-burst={{ .WorkHubKubeAPIBurst }}"
+          {{end}}
           {{if .MaxCustomClusterClaims}}
           - "--max-custom-cluster-claims={{ .MaxCustomClusterClaims }}"
           {{end}}

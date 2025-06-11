@@ -1,6 +1,7 @@
 package framework
 
 import (
+	"k8s.io/client-go/rest"
 	clientcmd "k8s.io/client-go/tools/clientcmd"
 )
 
@@ -14,6 +15,8 @@ type Spoke struct {
 	// is different from the klusterlet namespace and name.
 	KlusterletOperatorNamespace string
 	KlusterletOperator          string
+
+	RestConfig *rest.Config
 }
 
 func NewSpoke(kubeconfig string) (*Spoke, error) {
@@ -31,5 +34,6 @@ func NewSpoke(kubeconfig string) (*Spoke, error) {
 		// The same name as deploy/klusterlet/config/operator/operator.yaml
 		KlusterletOperatorNamespace: "open-cluster-management",
 		KlusterletOperator:          "klusterlet",
+		RestConfig:                  clusterCfg,
 	}, nil
 }

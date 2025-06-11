@@ -52,6 +52,9 @@ const (
 	// DefaultAddonNamespace is the default namespace for agent addon
 	DefaultAddonNamespace = "open-cluster-management-agent-addon"
 
+	// HubLabelKey is used to filter resources in informers
+	HubLabelKey = "createdByClusterManager"
+
 	// AgentLabelKey is used to filter resources in informers
 	AgentLabelKey = "createdByKlusterlet"
 )
@@ -819,10 +822,12 @@ func GetOperatorNamespace() string {
 	return operatorNamespace
 }
 
-func GetKlusterletAgentLabels(klusterlet *operatorapiv1.Klusterlet) map[string]string {
-	labels := klusterlet.GetLabels()
-	if labels == nil {
-		labels = map[string]string{}
+func GetKlusterletAgentLabels(klusterlet *operatorapiv1.Klusterlet, enableSyncLabels bool) map[string]string {
+	labels := map[string]string{}
+	if enableSyncLabels {
+		for k, v := range klusterlet.GetLabels() {
+			labels[k] = v
+		}
 	}
 
 	// This label key is used to filter resources in deployment informer

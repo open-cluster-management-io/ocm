@@ -5,6 +5,7 @@ metadata:
   namespace: {{ .ClusterManagerNamespace }}
   labels:
     app: clustermanager-controller
+    createdByClusterManager: {{ .ClusterManagerName }}
 spec:
   replicas: {{ .Replica }}
   selector:
