@@ -397,6 +397,19 @@ func FindManifestConfiguration(resourceMeta workapiv1.ManifestResourceMeta,
 	return rstOption
 }
 
+// FindManifestCondition searches the slice for a manifest that matches the given resource metadata
+func FindManifestCondition(resourceMeta workapiv1.ManifestResourceMeta, manifestConditions []workapiv1.ManifestCondition) *workapiv1.ManifestCondition {
+	resourceMeta = resetOrdinal(resourceMeta)
+	for i := range manifestConditions {
+		manifestCondition := &manifestConditions[i]
+		if resourceMeta != resetOrdinal(manifestCondition.ResourceMeta) {
+			continue
+		}
+		return manifestCondition
+	}
+	return nil
+}
+
 func ApplyOwnerReferences(ctx context.Context, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource,
 	existing runtime.Object, requiredOwner metav1.OwnerReference) error {
 	accessor, err := meta.Accessor(existing)
