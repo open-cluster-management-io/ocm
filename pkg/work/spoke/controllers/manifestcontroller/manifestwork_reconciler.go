@@ -186,8 +186,7 @@ func (m *manifestworkReconciler) applyOneManifest(
 	// manifests with the Complete condition are not updated
 	manifestCondition := helper.FindManifestCondition(resMeta, workStatus.ResourceStatus.Manifests)
 	if manifestCondition != nil {
-		complete := meta.FindStatusCondition(manifestCondition.Conditions, workapiv1.ManifestComplete)
-		if complete != nil && complete.Status == metav1.ConditionTrue {
+		if meta.IsStatusConditionTrue(manifestCondition.Conditions, workapiv1.ManifestComplete) {
 			result.Result = required
 			return result
 		}
