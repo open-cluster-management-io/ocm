@@ -3,8 +3,6 @@ package statuscontroller
 import (
 	"context"
 	"fmt"
-	"slices"
-	"strings"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -278,24 +276,22 @@ func (c *AvailableStatusController) evaluateConditionRules(ctx context.Context,
 	manifestConditions *[]metav1.Condition, obj *unstructured.Unstructured, option *workapiv1.ManifestConfigOption, generation int64,
 ) {
 	// Evaluate rules
-	var conditions []metav1.Condition
+	var newConditions []metav1.Condition
 	if option != nil && len(option.ConditionRules) > 0 {
-		conditions = c.conditionReader.EvaluateConditions(ctx, obj, option.ConditionRules)
+		newConditions = c.conditionReader.EvaluateConditions(ctx, obj, option.ConditionRules)
 	}
 
 	// Update manifest conditions with latest condition rule results and observed generation
-	for _, condition := range conditions {
+	for _, condition := range newConditions {
 		condition.ObservedGeneration = generation
 		meta.SetStatusCondition(manifestConditions, condition)
 	}
 
 	// Remove conditions set by old rules that no longer exist
-	// All conditions set by rules have reason prefixed with "ConditionRule" to easily identify them vs. conditions set elsewhere
-	// Additionally they will always set ObservedGeneration in order to identify a condition set by a rule that no longer exists.
-	// Generation will always update when the ManifestWorkSpec changes, so removing a rule will result in a new generation.
-	*manifestConditions = slices.DeleteFunc(*manifestConditions, func(c metav1.Condition) bool {
-		return strings.HasPrefix(c.Reason, "ConditionRule") && c.ObservedGeneration != generation
-	})
+	// Conditions are merged into the existing slice because they are managed in multiple controllers
+	// (e.g. manifestwork_reconciler adds the "Applied" condition), so we must explicitly
+	// delete conditions that were created by rules which no longer exist.
+	conditions.PruneConditionsGeneratedByConditionRules(manifestConditions, generation)
 }
 
 // buildAvailableStatusCondition returns a StatusCondition with type Available for a given manifest resource
