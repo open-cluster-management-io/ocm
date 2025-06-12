@@ -2,6 +2,9 @@ module open-cluster-management.io/ocm
 
 go 1.25.0
 
+// TEMPORARY while waiting for upstream tag – must be removed before merge
+replace open-cluster-management.io/api => github.com/bhperry/ocm-api v0.0.0-20250612225613-ffa7865df0a9
+
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.1
 	github.com/aws/aws-sdk-go-v2/config v1.32.7

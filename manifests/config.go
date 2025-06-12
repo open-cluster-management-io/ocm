@@ -1,6 +1,8 @@
 package manifests
 
-import operatorapiv1 "open-cluster-management.io/api/operator/v1"
+import (
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+)
 
 type HubConfig struct {
 	ClusterManagerName             string
@@ -50,7 +52,10 @@ type HubConfig struct {
 }
 
 type Webhook struct {
-	IsIPFormat bool
-	Port       int32
-	Address    string
+	IsIPFormat      bool
+	Port            int32
+	HealthProbePort int32
+	MetricsPort     int32
+	Address         string
+	HostNetwork     bool
 }
