@@ -267,6 +267,10 @@ func KubeConfigFromSecretOption(s SecretOption, bootstrap bool) (*rest.Config, e
 			return nil, fmt.Errorf("unable to load bootstrap kubeconfig: %w", err)
 		}
 	} else {
+		if s.HubKubeconfigFile == "" {
+			return nil, fmt.Errorf("no hub kubeconfig found")
+		}
+
 		kubeConfig, err = clientcmd.BuildConfigFromFlags("", s.HubKubeconfigFile)
 		if err != nil {
 			return nil, fmt.Errorf("unable to load hub kubeconfig from file %q: %w", s.HubKubeconfigFile, err)
