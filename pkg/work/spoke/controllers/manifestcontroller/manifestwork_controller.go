@@ -219,7 +219,7 @@ func (m *ManifestWorkController) applyAppliedManifestWork(ctx context.Context, w
 func (m *ManifestWorkController) manifestWorkCompletion(
 	ctx context.Context, controllerContext factory.SyncContext, manifestWork *workapiv1.ManifestWork,
 ) (bool, error) {
-	complete := meta.FindStatusCondition(manifestWork.Status.Conditions, workapiv1.ManifestComplete)
+	complete := meta.FindStatusCondition(manifestWork.Status.Conditions, workapiv1.WorkComplete)
 	if complete != nil && complete.Status == metav1.ConditionTrue {
 		var err error
 		// check if work has TTL set and it has elapsed since completion
