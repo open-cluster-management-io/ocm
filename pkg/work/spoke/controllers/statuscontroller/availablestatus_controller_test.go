@@ -594,7 +594,7 @@ func TestConditionRules(t *testing.T) {
 				{{Type: workapiv1.ManifestComplete, Status: metav1.ConditionTrue, Reason: workapiv1.ConditionRuleEvaluated}},
 			},
 			expectedWorkConditions: []metav1.Condition{
-				{Type: workapiv1.WorkComplete, Status: metav1.ConditionTrue, Reason: workapiv1.WorkManifestsComplete},
+				{Type: workapiv1.WorkComplete, Status: metav1.ConditionTrue, Reason: "ConditionRulesAggregated"},
 			},
 		},
 		{
@@ -638,7 +638,7 @@ func TestConditionRules(t *testing.T) {
 				{{Type: workapiv1.ManifestComplete, Status: metav1.ConditionFalse, Reason: workapiv1.ConditionRuleEvaluated}},
 			},
 			expectedWorkConditions: []metav1.Condition{
-				{Type: workapiv1.WorkComplete, Status: util.ConditionNotFound},
+				{Type: workapiv1.WorkComplete, Status: metav1.ConditionFalse, Reason: "ConditionRulesAggregated"},
 			},
 		},
 		{
@@ -648,7 +648,7 @@ func TestConditionRules(t *testing.T) {
 					"v1", "NewObject", "ns1", "n1",
 					map[string]any{"spec": map[string]any{"key1": "val1"}}),
 			},
-			existingConditions: []metav1.Condition{{Type: workapiv1.WorkComplete, Status: metav1.ConditionTrue}},
+			existingConditions: []metav1.Condition{{Type: workapiv1.WorkComplete, Status: metav1.ConditionTrue, Reason: "ConditionRulesAggregated"}},
 			configOption: []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "newobjects", Namespace: "ns1", Name: "n1"},

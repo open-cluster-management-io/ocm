@@ -951,7 +951,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 				if err := util.CheckExpectedConditions(work.Status.Conditions, metav1.Condition{
 					Type:   workapiv1.WorkComplete,
 					Status: metav1.ConditionTrue,
-					Reason: workapiv1.WorkManifestsComplete,
+					Reason: "ConditionRulesAggregated",
 				}); err != nil {
 					return fmt.Errorf("%s: %v", work.Name, err)
 				}
