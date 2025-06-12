@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ghodss/yaml"
 	"github.com/google/go-cmp/cmp"
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -1711,6 +1712,88 @@ func TestGetKlusterletAgentLabels(t *testing.T) {
 			actual := GetKlusterletAgentLabels(tc.klusterlet, tc.enableSyncLabels)
 			if !reflect.DeepEqual(actual, tc.desiredLabels) {
 				t.Errorf("Name: %s, expect labels are %v, but got %v", tc.name, tc.desiredLabels, actual)
+			}
+		})
+	}
+}
+func TestAddLabelsToYaml(t *testing.T) {
+	tests := []struct {
+		name        string
+		inputYAML   string
+		labels      map[string]string
+		wantLabels  map[string]string
+		expectError bool
+	}{
+		{
+			name: "add labels to object with no labels",
+			inputYAML: `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+ name: test-cm
+ namespace: test-ns
+data:
+ key: value
+`,
+			labels: map[string]string{
+				"foo": "bar",
+				"baz": "qux",
+			},
+			wantLabels: map[string]string{
+				"foo": "bar",
+				"baz": "qux",
+			},
+			expectError: false,
+		},
+		{
+			name: "add labels to object with existing labels",
+			inputYAML: `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+ name: test-cm
+ namespace: test-ns
+ labels:
+  existing: label
+data:
+ key: value
+`,
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			wantLabels: map[string]string{
+				"existing": "label",
+				"foo":      "bar",
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out, err := AddLabelsToYaml([]byte(tt.inputYAML), tt.labels)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// Unmarshal output YAML to unstructured to check labels
+			jsonData, err := yaml.YAMLToJSON(out)
+			if err != nil {
+				t.Fatalf("failed to convert output YAML to JSON: %v", err)
+			}
+			u := &unstructured.Unstructured{}
+			if err := json.Unmarshal(jsonData, u); err != nil {
+				t.Fatalf("failed to unmarshal output JSON: %v", err)
+			}
+			gotLabels := u.GetLabels()
+			if !reflect.DeepEqual(gotLabels, tt.wantLabels) {
+				t.Errorf("labels mismatch: got %v, want %v", gotLabels, tt.wantLabels)
 			}
 		})
 	}

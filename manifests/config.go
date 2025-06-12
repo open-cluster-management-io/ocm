@@ -38,6 +38,8 @@ type HubConfig struct {
 	AutoApprovedCSRUsers              string
 	AutoApprovedARNPatterns           string
 	AwsResourceTags                   string
+	Labels                            map[string]string
+	LabelsString                      string
 }
 
 type Webhook struct {
