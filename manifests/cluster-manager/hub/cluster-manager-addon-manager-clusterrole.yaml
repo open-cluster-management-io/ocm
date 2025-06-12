@@ -2,6 +2,12 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: open-cluster-management:{{ .ClusterManagerName }}-addon-manager:controller
+  labels:
+    {{ if gt (len .Labels) 0 }}
+    {{ range $key, $value := .Labels }}
+    "{{ $key }}": "{{ $value }}"
+    {{ end }}
+    {{ end }}
 rules:
 # Allow controller to get/list/watch/create/delete configmaps/events
 - apiGroups: [""]

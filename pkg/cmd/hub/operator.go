@@ -28,6 +28,8 @@ func NewHubOperatorCmd() *cobra.Command {
 			"e.g. 'environment=production', 'tier notin (frontend,backend)'")
 	flags.Int32Var(&cmOptions.DeploymentReplicas, "deployment-replicas", 0,
 		"Number of deployment replicas, operator will automatically determine replicas if not set")
+	flags.BoolVar(&cmOptions.EnableSyncLabels, "enable-sync-labels", false,
+		"If set, will sync the labels of Klusterlet CR to all agent resources")
 	opts.AddFlags(flags)
 	return cmd
 }

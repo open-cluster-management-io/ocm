@@ -9,14 +9,38 @@ import (
 	. "github.com/onsi/gomega"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	v1 "open-cluster-management.io/api/cluster/v1"
+
+	"open-cluster-management.io/ocm/pkg/registration/hub"
 )
 
-var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Label("managedcluster-accept"), func() {
+var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Ordered, Label("managedcluster-accept"), func() {
 	var managedCluster *clusterv1.ManagedCluster
+	var testCustomLabel = "custom-label"
+	var testCustomLabelValue = "custom-value"
+	var testCustomLabel2 = "custom-label2"
+	var testCustomLabelValue2 = "custom-value2"
+
+	BeforeAll(func() {
+		// stop the hub and start new hub with the updated option
+		stopHub()
+
+		awsHubOptionWithLabelSetting := hub.NewHubManagerOptions()
+		awsHubOptionWithLabelSetting.Labels = fmt.Sprintf("%s=%s,%s=%s", testCustomLabel, testCustomLabelValue, testCustomLabel2, testCustomLabelValue2)
+		startHub(awsHubOptionWithLabelSetting)
+
+		// stop hub with awsOption and restart hub with default option
+		DeferCleanup(func() {
+			stopHub()
+			startHub(hubOption)
+		})
+	})
+
 	BeforeEach(func() {
 		managedClusterName := fmt.Sprintf("managedcluster-%s", rand.String(6))
 		managedCluster = &clusterv1.ManagedCluster{
@@ -29,14 +53,21 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Label
 		}
 		_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), managedCluster, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
-
-		// Check rbac files should be created
+		// Checks if the namespace has the required labels
 		Eventually(func() error {
-			_, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), mclClusterRoleName(managedCluster.Name), metav1.GetOptions{})
+			namespace, err := kubeClient.CoreV1().Namespaces().Get(context.Background(), managedCluster.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
+			if namespace.Labels != nil && namespace.Labels[testCustomLabel] != "" &&
+				namespace.Labels[testCustomLabel] != testCustomLabelValue || namespace.Labels[testCustomLabel2] != testCustomLabelValue2 {
+				return fmt.Errorf("namespace %s should  have custom label", managedCluster.Name)
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
+		// Check rbac files should be created
+		Eventually(func() error {
 			// check clusterrole is correct
 			clusterRole, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), mclClusterRoleName(managedCluster.Name), metav1.GetOptions{})
 			if err != nil {
@@ -45,28 +76,88 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Label
 			if len(clusterRole.Rules) != 4 {
 				return fmt.Errorf("expected 4 rules, got %d rules", len(clusterRole.Rules))
 			}
+			if clusterRole.Labels[testCustomLabel] != testCustomLabelValue || clusterRole.Labels[testCustomLabel2] != testCustomLabelValue2 {
+				return fmt.Errorf("clusterRole %s does not have expected labels", mclClusterRoleName(managedCluster.Name))
+			}
 
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 		Eventually(func() error {
-			_, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), mclClusterRoleBindingName(managedCluster.Name), metav1.GetOptions{})
-			return err
+			clusterRoleBinding, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(),
+				mclClusterRoleBindingName(managedCluster.Name), metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if clusterRoleBinding.Labels[testCustomLabel] != testCustomLabelValue || clusterRoleBinding.Labels[testCustomLabel2] != testCustomLabelValue2 {
+				return fmt.Errorf("clusterRoleBinding %s does not have expected labels", mclClusterRoleBindingName(managedCluster.Name))
+			}
+			return nil
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 		Eventually(func() error {
-			_, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).
+			registrationRoleBinding, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).
 				Get(context.Background(), registrationRoleBindingName(managedCluster.Name), metav1.GetOptions{})
-			return err
+			if err != nil {
+				return err
+			}
+			if registrationRoleBinding.Labels[testCustomLabel] != testCustomLabelValue || registrationRoleBinding.Labels[testCustomLabel2] != testCustomLabelValue2 {
+				return fmt.Errorf("roleBinding %s does not have expected labels", registrationRoleBindingName(managedCluster.Name))
+			}
+			return nil
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 		Eventually(func() error {
-			_, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).Get(context.Background(), workRoleBindingName(managedCluster.Name), metav1.GetOptions{})
-			return err
+			workRoleBinding, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).Get(context.Background(),
+				workRoleBindingName(managedCluster.Name), metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if workRoleBinding.Labels[testCustomLabel] != testCustomLabelValue || workRoleBinding.Labels[testCustomLabel2] != testCustomLabelValue2 {
+				return fmt.Errorf("workRoleBinding %s does not have expected labels", workRoleBindingName(managedCluster.Name))
+			}
+			return nil
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
-	})
 
+		Eventually(func() error {
+			registrationClusterRole, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(),
+				"open-cluster-management:managedcluster:registration", metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if registrationClusterRole.Labels[testCustomLabel] != testCustomLabelValue || registrationClusterRole.Labels[testCustomLabel2] != testCustomLabelValue2 {
+				return fmt.Errorf("clusterRole %s open-cluster-management:managedcluster:registration does not have expected labels",
+					mclClusterRoleName(managedCluster.Name))
+			}
+
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+
+		Eventually(func() error {
+			workClusterRole, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(),
+				"open-cluster-management:managedcluster:work", metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if workClusterRole.Labels[testCustomLabel] != testCustomLabelValue || workClusterRole.Labels[testCustomLabel2] != testCustomLabelValue2 {
+				return fmt.Errorf("clusterRole %s open-cluster-management:managedcluster:work does not have expected labels", mclClusterRoleName(managedCluster.Name))
+			}
+
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+
+	})
 	It("should set hubAcceptsClient to false", func() {
+		Eventually(func() error {
+			mc, err := clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedCluster.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if !meta.IsStatusConditionTrue(mc.Status.Conditions, v1.ManagedClusterConditionHubAccepted) {
+				return fmt.Errorf("managed cluster %s should have hub accepted condition", managedCluster.Name)
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 		// Set hubAcceptsClient to false
 		Eventually(func() error {
 			mc, err := clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedCluster.Name, metav1.GetOptions{})
