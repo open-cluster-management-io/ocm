@@ -13,6 +13,16 @@ metadata:
     {{ end }}
 spec:
   replicas: {{ .Replica }}
+  {{- if .WorkWebhook.HostNetwork }}
+  strategy:
+    rollingUpdate:
+      {{- if lt .Replica 4 }}
+      maxUnavailable: 1
+      {{- else }}
+      maxUnavailable: 25%
+      {{- end }}
+    type: RollingUpdate
+  {{- end }}
   selector:
     matchLabels:
       app: {{ .ClusterManagerName }}-work-webhook
@@ -65,7 +75,9 @@ spec:
         args:
           - /work
           - "webhook-server"
-          - "port=9443"
+          - "--port={{ .WorkWebhook.Port }}"
+          - "--health-probe-bind-address={{ .WorkWebhook.HealthProbeBindAddress }}"
+          - "--metrics-bind-address={{ .WorkWebhook.MetricsBindAddress }}"
           {{ if gt (len .WorkFeatureGates) 0 }}
           {{range .WorkFeatureGates}}
           - {{ . }}
@@ -82,19 +94,21 @@ spec:
           privileged: false
           runAsNonRoot: true
           readOnlyRootFilesystem: true
+        {{- if gt .WorkWebhook.HealthProbePort 0 }}
         livenessProbe:
           httpGet:
             path: /healthz
             scheme: HTTP
-            port: 8000
+            port: {{ .WorkWebhook.HealthProbePort }}
           initialDelaySeconds: 2
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /healthz
             scheme: HTTP
-            port: 8000
+            port: {{ .WorkWebhook.HealthProbePort }}
           initialDelaySeconds: 2
+        {{- end }}
         {{- if or (eq .ResourceRequirementResourceType "Default") (eq .ResourceRequirementResourceType "") }}
         resources:
           requests:
@@ -109,7 +123,7 @@ spec:
           {{ .ResourceRequirements | indent 10 }}
         {{- end }}
         ports:
-        - containerPort: 9443
+        - containerPort: {{ .WorkWebhook.Port }}
           protocol: TCP
         volumeMounts:
         - mountPath: /tmp/k8s-webhook-server/serving-certs
@@ -120,6 +134,10 @@ spec:
           name: kubeconfig
           readOnly: true
         {{ end }}
+      {{- if .WorkWebhook.HostNetwork }}
+      dnsPolicy: ClusterFirstWithHostNet
+      hostNetwork: true
+      {{- end }}
       volumes:
       - name: webhook-secret
         secret:
