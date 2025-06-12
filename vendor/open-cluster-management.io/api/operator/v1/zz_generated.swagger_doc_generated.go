@@ -48,9 +48,10 @@ func (ClusterManager) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterManagerDeployOption = map[string]string{
-	"":       "ClusterManagerDeployOption describes the deployment options for cluster-manager",
-	"mode":   "Mode can be Default or Hosted. In Default mode, the Hub is installed as a whole and all parts of Hub are deployed in the same cluster. In Hosted mode, only crd and configurations are installed on one cluster(defined as hub-cluster). Controllers run in another cluster (defined as management-cluster) and connect to the hub with the kubeconfig in secret of \"external-hub-kubeconfig\"(a kubeconfig of hub-cluster with cluster-admin permission). Note: Do not modify the Mode field once it's applied.",
-	"hosted": "Hosted includes configurations we need for clustermanager in the Hosted mode.",
+	"":        "ClusterManagerDeployOption describes the deployment options for cluster-manager",
+	"mode":    "Mode can be Default or Hosted. In Default mode, the Hub is installed as a whole and all parts of Hub are deployed in the same cluster. In Hosted mode, only crd and configurations are installed on one cluster(defined as hub-cluster). Controllers run in another cluster (defined as management-cluster) and connect to the hub with the kubeconfig in secret of \"external-hub-kubeconfig\"(a kubeconfig of hub-cluster with cluster-admin permission). Note: Do not modify the Mode field once it's applied.",
+	"default": "Default includes configurations for clustermanager in the Default mode",
+	"hosted":  "Hosted includes configurations we need for clustermanager in the Hosted mode.",
 }
 
 func (ClusterManagerDeployOption) SwaggerDoc() map[string]string {
@@ -95,6 +96,16 @@ var map_ClusterManagerStatus = map[string]string{
 
 func (ClusterManagerStatus) SwaggerDoc() map[string]string {
 	return map_ClusterManagerStatus
+}
+
+var map_DefaultClusterManagerConfiguration = map[string]string{
+	"":                                 "DefaultClusterManagerConfiguration represents customized configurations for clustermanager in the Default mode",
+	"registrationWebhookConfiguration": "RegistrationWebhookConfiguration represents the customized webhook-server configuration of registration.",
+	"workWebhookConfiguration":         "WorkWebhookConfiguration represents the customized webhook-server configuration of work.",
+}
+
+func (DefaultClusterManagerConfiguration) SwaggerDoc() map[string]string {
+	return map_DefaultClusterManagerConfiguration
 }
 
 var map_FeatureGate = map[string]string{
@@ -181,6 +192,18 @@ var map_WebhookConfiguration = map[string]string{
 
 func (WebhookConfiguration) SwaggerDoc() map[string]string {
 	return map_WebhookConfiguration
+}
+
+var map_WebhookDefaultConfiguration = map[string]string{
+	"":                       "WebhookDefaultConfiguration represents configuration for webhooks running in \"Default\" mode in the hub cluster",
+	"port":                   "Port represents the port of a webhook-server. The default value of Port is 9443.",
+	"healthProbeBindAddress": "HealthProbeBindAddress represents the healthcheck address of a webhook-server. The default value is \":8000\". Healthchecks may be disabled by setting a value of \"0\" or \"\".",
+	"metricsBindAddress":     "MetricsBindAddress represents the metrics address of a webhook-server. The default value is \":8080\" Metrics may be disabled by setting a value of \"0\" or \"\".",
+	"hostNetwork":            "HostNetwork enables running webhook pods with hostNetwork: true This may be required in some installations, such as EKS with Calico CNI, to allow the API Server to communicate with the webhook pods.",
+}
+
+func (WebhookDefaultConfiguration) SwaggerDoc() map[string]string {
+	return map_WebhookDefaultConfiguration
 }
 
 var map_WorkConfiguration = map[string]string{

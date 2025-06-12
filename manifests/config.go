@@ -1,6 +1,11 @@
 package manifests
 
-import operatorapiv1 "open-cluster-management.io/api/operator/v1"
+import (
+	"net"
+	"strconv"
+
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+)
 
 type HubConfig struct {
 	ClusterManagerName             string
@@ -43,7 +48,38 @@ type HubConfig struct {
 }
 
 type Webhook struct {
-	IsIPFormat bool
-	Port       int32
-	Address    string
+	IsIPFormat             bool
+	HostNetwork            bool
+	Port                   int32
+	HealthProbeBindAddress string
+	MetricsBindAddress     string
+	Address                string
+}
+
+func (w Webhook) HealthProbePort() int32 {
+	_, port, err := parseHostPort(w.HealthProbeBindAddress)
+	if err != nil {
+		return 0
+	}
+	return port
+}
+
+func (w Webhook) MetricsPort() int32 {
+	_, port, err := parseHostPort(w.MetricsBindAddress)
+	if err != nil {
+		return 0
+	}
+	return port
+}
+
+func parseHostPort(address string) (host string, port int32, err error) {
+	host, portStr, err := net.SplitHostPort(address)
+	if err != nil {
+		return host, port, err
+	}
+	port64, err := strconv.ParseInt(portStr, 10, 32)
+	if err != nil {
+		return host, port, err
+	}
+	return host, int32(port64), nil
 }

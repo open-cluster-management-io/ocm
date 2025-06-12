@@ -232,6 +232,17 @@ const (
 	FeatureGateModeTypeDisable FeatureGateModeType = "Disable"
 )
 
+// DefaultClusterManagerConfiguration represents customized configurations for clustermanager in the Default mode
+type DefaultClusterManagerConfiguration struct {
+	// RegistrationWebhookConfiguration represents the customized webhook-server configuration of registration.
+	// +optional
+	RegistrationWebhookConfiguration WebhookDefaultConfiguration `json:"registrationWebhookConfiguration,omitempty"`
+
+	// WorkWebhookConfiguration represents the customized webhook-server configuration of work.
+	// +optional
+	WorkWebhookConfiguration WebhookDefaultConfiguration `json:"workWebhookConfiguration,omitempty"`
+}
+
 // HostedClusterManagerConfiguration represents customized configurations we need to set for clustermanager in the Hosted mode.
 type HostedClusterManagerConfiguration struct {
 	// RegistrationWebhookConfiguration represents the customized webhook-server configuration of registration.
@@ -241,6 +252,33 @@ type HostedClusterManagerConfiguration struct {
 	// WorkWebhookConfiguration represents the customized webhook-server configuration of work.
 	// +optional
 	WorkWebhookConfiguration WebhookConfiguration `json:"workWebhookConfiguration,omitempty"`
+}
+
+// WebhookDefaultConfiguration represents configuration for webhooks running in "Default" mode in the hub cluster
+type WebhookDefaultConfiguration struct {
+	// Port represents the port of a webhook-server. The default value of Port is 9443.
+	// +optional
+	// +kubebuilder:default=9443
+	// +kubebuilder:validation:Maximum=65535
+	Port int32 `json:"port,omitempty"`
+
+	// HealthProbeBindAddress represents the healthcheck address of a webhook-server. The default value is ":8000".
+	// Healthchecks may be disabled by setting a value of "0" or "".
+	// +optional
+	// +kubebuilder:default=":8000"
+	HealthProbeBindAddress string `json:"healthProbeBindAddress"`
+
+	// MetricsBindAddress represents the metrics address of a webhook-server. The default value is ":8080"
+	// Metrics may be disabled by setting a value of "0" or "".
+	// +optional
+	// +kubebuilder:default=":8080"
+	MetricsBindAddress string `json:"metricsBindAddress"`
+
+	// HostNetwork enables running webhook pods with hostNetwork: true
+	// This may be required in some installations, such as EKS with Calico CNI,
+	// to allow the API Server to communicate with the webhook pods.
+	// +optional
+	HostNetwork bool `json:"hostNetwork,omitempty"`
 }
 
 // WebhookConfiguration has two properties: Address and Port.
@@ -273,6 +311,10 @@ type ClusterManagerDeployOption struct {
 	// +kubebuilder:default=Default
 	// +kubebuilder:validation:Enum=Default;Hosted
 	Mode InstallMode `json:"mode,omitempty"`
+
+	// Default includes configurations for clustermanager in the Default mode
+	// +optional
+	Default *DefaultClusterManagerConfiguration `json:"default,omitempty"`
 
 	// Hosted includes configurations we need for clustermanager in the Hosted mode.
 	// +optional

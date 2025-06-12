@@ -91,6 +91,71 @@ spec:
                   DeployOption contains the options of deploying a cluster-manager
                   Default mode is used if DeployOption is not set.
                 properties:
+                  default:
+                    description: Default includes configurations for clustermanager
+                      in the Default mode
+                    properties:
+                      registrationWebhookConfiguration:
+                        description: RegistrationWebhookConfiguration represents the
+                          customized webhook-server configuration of registration.
+                        properties:
+                          healthProbeBindAddress:
+                            default: :8000
+                            description: |-
+                              HealthProbeBindAddress represents the healthcheck address of a webhook-server. The default value is ":8000".
+                              Healthchecks may be disabled by setting a value of "0" or "".
+                            type: string
+                          hostNetwork:
+                            description: |-
+                              HostNetwork enables running webhook pods with hostNetwork: true
+                              This may be required in some installations, such as EKS with Calico CNI,
+                              to allow the API Server to communicate with the webhook pods.
+                            type: boolean
+                          metricsBindAddress:
+                            default: :8080
+                            description: |-
+                              MetricsBindAddress represents the metrics address of a webhook-server. The default value is ":8080"
+                              Metrics may be disabled by setting a value of "0" or "".
+                            type: string
+                          port:
+                            default: 9443
+                            description: Port represents the port of a webhook-server.
+                              The default value of Port is 9443.
+                            format: int32
+                            maximum: 65535
+                            type: integer
+                        type: object
+                      workWebhookConfiguration:
+                        description: WorkWebhookConfiguration represents the customized
+                          webhook-server configuration of work.
+                        properties:
+                          healthProbeBindAddress:
+                            default: :8000
+                            description: |-
+                              HealthProbeBindAddress represents the healthcheck address of a webhook-server. The default value is ":8000".
+                              Healthchecks may be disabled by setting a value of "0" or "".
+                            type: string
+                          hostNetwork:
+                            description: |-
+                              HostNetwork enables running webhook pods with hostNetwork: true
+                              This may be required in some installations, such as EKS with Calico CNI,
+                              to allow the API Server to communicate with the webhook pods.
+                            type: boolean
+                          metricsBindAddress:
+                            default: :8080
+                            description: |-
+                              MetricsBindAddress represents the metrics address of a webhook-server. The default value is ":8080"
+                              Metrics may be disabled by setting a value of "0" or "".
+                            type: string
+                          port:
+                            default: 9443
+                            description: Port represents the port of a webhook-server.
+                              The default value of Port is 9443.
+                            format: int32
+                            maximum: 65535
+                            type: integer
+                        type: object
+                    type: object
                   hosted:
                     description: Hosted includes configurations we need for clustermanager
                       in the Hosted mode.
