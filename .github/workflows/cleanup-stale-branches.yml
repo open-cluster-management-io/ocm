@@ -1,0 +1,34 @@
+name: Cleanup Stale Branches
+
+on:
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch all remote branches
+        run: |
+          git fetch --all
+          git branch -r | grep 'konflux' | sed 's/origin\///' > branches.txt
+
+      - name: Find and delete branches without open PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          while read branch; do
+            echo "Processing branch: $branch"
+            # Check if the branch has any open pull requests
+            pr_count=$(gh pr list --head "$branch" --state open --json number | jq 'length')
+            if [ "$pr_count" -eq 0 ]; then
+              echo "No open PRs found for branch: $branch"
+              echo "Deleting branch: $branch"
+              gh api --method DELETE "repos/${{ github.repository }}/git/refs/heads/$branch"
+              echo "Successfully deleted branch: $branch"
+            else
+              echo "Branch $branch has $pr_count open PR(s), skipping deletion."
+            fi
+          done < branches.txt
