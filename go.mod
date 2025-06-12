@@ -1,6 +1,6 @@
 module open-cluster-management.io/ocm
 
-go 1.23.6
+go 1.24.0
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.36.3
@@ -29,7 +29,7 @@ require (
 	helm.sh/helm/v3 v3.17.3
 	k8s.io/api v0.32.4
 	k8s.io/apiextensions-apiserver v0.32.2
-	k8s.io/apimachinery v0.32.4
+	k8s.io/apimachinery v0.33.1
 	k8s.io/apiserver v0.32.3
 	k8s.io/client-go v0.32.4
 	k8s.io/component-base v0.32.4
@@ -102,7 +102,6 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.6.9 // indirect
-	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
