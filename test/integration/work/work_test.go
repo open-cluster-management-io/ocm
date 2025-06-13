@@ -17,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/ptr"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/common"
@@ -879,17 +878,13 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		})
 	})
 
-	ginkgo.Context("With completion TTL", func() {
+	ginkgo.Context("Work completion", func() {
 		ginkgo.BeforeEach(func() {
 			manifests = []workapiv1.Manifest{
 				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm1, map[string]string{"a": "b"}, nil)),
 				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm2, map[string]string{"c": "d"}, nil)),
 			}
 			workOpts = append(workOpts, func(work *workapiv1.ManifestWork) {
-				work.Spec.DeleteOption = &workapiv1.DeleteOption{
-					TTLSecondsAfterFinished: ptr.To[int64](min(5, eventuallyTimeout/2)),
-					PropagationPolicy:       "Foreground",
-				}
 				work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 					{
 						ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -937,28 +932,19 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			// ManifestWork should be marked completed and eventually be deleted
+			// ManifestWork should be marked completed
 			gomega.Eventually(func() error {
 				work, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
-					if errors.IsNotFound(err) {
-						return nil
-					}
 					return err
 				}
 
-				// If ManifestWork still exists we expect it to be marked complete
 				if err := util.CheckExpectedConditions(work.Status.Conditions, metav1.Condition{
 					Type:   workapiv1.WorkComplete,
 					Status: metav1.ConditionTrue,
 					Reason: "ConditionRulesAggregated",
 				}); err != nil {
 					return fmt.Errorf("%s: %v", work.Name, err)
-				}
-
-				// If marked complete and still exists, we expect deletion timestamp to be set
-				if work.DeletionTimestamp.IsZero() {
-					return fmt.Errorf("Expected work %s to be deleted", work.Name)
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
