@@ -46,7 +46,6 @@ type workReconcile interface {
 // ManifestWorkController is to reconcile the workload resources
 // fetched from hub cluster on spoke cluster.
 type ManifestWorkController struct {
-	manifestWorkClient         workv1client.ManifestWorkInterface
 	manifestWorkPatcher        patcher.Patcher[*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus]
 	manifestWorkLister         worklister.ManifestWorkNamespaceLister
 	appliedManifestWorkClient  workv1client.AppliedManifestWorkInterface
@@ -73,7 +72,6 @@ func NewManifestWorkController(
 	validator auth.ExecutorValidator) factory.Controller {
 
 	controller := &ManifestWorkController{
-		manifestWorkClient: manifestWorkClient,
 		manifestWorkPatcher: patcher.NewPatcher[
 			*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
 			manifestWorkClient),
