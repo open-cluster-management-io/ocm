@@ -19,7 +19,6 @@ import (
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/utils/ptr"
 
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
@@ -163,11 +162,6 @@ func (t *testCase) withWorkManifest(objects ...*unstructured.Unstructured) *test
 
 func (t *testCase) withManifestConfig(configs ...workapiv1.ManifestConfigOption) *testCase {
 	t.workManifestConfig = configs
-	return t
-}
-
-func (t *testCase) withDeleteOption(deleteOption *workapiv1.DeleteOption) *testCase {
-	t.deleteOption = deleteOption
 	return t
 }
 
@@ -370,33 +364,10 @@ func TestSync(t *testing.T) {
 				expectedCondition(workapiv1.ManifestApplied, metav1.ConditionTrue),
 				expectedCondition(workapiv1.ManifestApplied, metav1.ConditionTrue)).
 			withExpectedWorkCondition(expectedCondition(workapiv1.WorkApplied, metav1.ConditionTrue)),
-		newTestCase("ignore completed manifestwork with no TTL").
+		newTestCase("ignore completed manifestwork").
 			withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test")).
 			withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
 			withExistingWorkCondition(metav1.Condition{Type: workapiv1.WorkComplete, Status: metav1.ConditionTrue}),
-		newTestCase("ignore completed manifestwork with unsatisfied TTL").
-			withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test")).
-			withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
-			withDeleteOption(&workapiv1.DeleteOption{TTLSecondsAfterFinished: ptr.To[int64](30)}).
-			withExistingWorkCondition(
-				metav1.Condition{
-					Type:               workapiv1.WorkComplete,
-					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * time.Second)),
-				},
-			),
-		newTestCase("delete completed manifestwork with satisfied TTL").
-			withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test")).
-			withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
-			withDeleteOption(&workapiv1.DeleteOption{TTLSecondsAfterFinished: ptr.To[int64](10)}).
-			withExistingWorkCondition(
-				metav1.Condition{
-					Type:               workapiv1.WorkComplete,
-					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.NewTime(time.Now().Add(-11 * time.Second)),
-				},
-			).
-			withExpectedWorkAction("delete"),
 	}
 
 	for _, c := range cases {
