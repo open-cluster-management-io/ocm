@@ -45,14 +45,12 @@ type testController struct {
 
 func newController(t *testing.T, work *workapiv1.ManifestWork, appliedWork *workapiv1.AppliedManifestWork, mapper meta.RESTMapper) *testController {
 	fakeWorkClient := fakeworkclient.NewSimpleClientset(work)
-	manifestWorkClient := fakeWorkClient.WorkV1().ManifestWorks("cluster1")
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fakeWorkClient, 5*time.Minute, workinformers.WithNamespace("cluster1"))
 	spokeKubeClient := fakekube.NewSimpleClientset()
 	controller := &ManifestWorkController{
-		manifestWorkClient: manifestWorkClient,
 		manifestWorkPatcher: patcher.NewPatcher[
 			*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
-			manifestWorkClient),
+			fakeWorkClient.WorkV1().ManifestWorks("cluster1")),
 		manifestWorkLister: workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks("cluster1"),
 		appliedManifestWorkPatcher: patcher.NewPatcher[
 			*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus](
