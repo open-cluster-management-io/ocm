@@ -471,7 +471,7 @@ func newAddonWorkObjectMeta(namePrefix, addonName, addonNamespace, workNamespace
 
 func getManifestConfigOption(agentAddon agent.AgentAddon,
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) []workapiv1.ManifestConfigOption {
+	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]workapiv1.ManifestConfigOption, error) {
 	manifestConfigs := []workapiv1.ManifestConfigOption{}
 
 	if agentAddon.GetAgentAddonOptions().HealthProber != nil &&
@@ -491,7 +491,7 @@ func getManifestConfigOption(agentAddon agent.AgentAddon,
 
 		manifests, err := agentAddon.Manifests(cluster, addon)
 		if err != nil {
-			return manifestConfigs
+			return manifestConfigs, fmt.Errorf("get all deployments error: %v", err)
 		}
 
 		deployments := utils.FilterDeployments(manifests)
@@ -506,7 +506,7 @@ func getManifestConfigOption(agentAddon agent.AgentAddon,
 
 		manifests, err := agentAddon.Manifests(cluster, addon)
 		if err != nil {
-			return manifestConfigs
+			return manifestConfigs, fmt.Errorf("get all workloads error: %v", err)
 		}
 		workloads := utils.FilterWorkloads(manifests)
 		for _, workload := range workloads {
@@ -543,7 +543,7 @@ func getManifestConfigOption(agentAddon agent.AgentAddon,
 			manifestConfigs[index].UpdateStrategy = mc.UpdateStrategy
 		}
 	}
-	return manifestConfigs
+	return manifestConfigs, nil
 }
 
 func containsResourceIdentifier(mcs []workapiv1.ManifestConfigOption, ri workapiv1.ResourceIdentifier) int {
