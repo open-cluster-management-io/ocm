@@ -114,10 +114,14 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 		return nil, fmt.Errorf("failed to get clustername extension: %v", err)
 	}
 
+	// Use the event's resource version as the current work's generation and resource version.
+	// In the event case, the event's resource version should correspond to its spec change.
+	// We can use the resource version to determine the spec of a work whether changed.
 	work := &workv1.ManifestWork{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             kubetypes.UID(resourceID),
+			Generation:      int64(resourceVersion),
 			ResourceVersion: fmt.Sprintf("%d", resourceVersion),
 			Name:            resourceID,
 			Namespace:       clusterName,

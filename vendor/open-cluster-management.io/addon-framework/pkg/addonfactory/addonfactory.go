@@ -148,6 +148,12 @@ func (f *AgentAddonFactory) WithManagedClusterClient(c clusterclientset.Interfac
 	return f
 }
 
+// WithUpdaters defines which type of update opration should by used for specific resources.
+func (f *AgentAddonFactory) WithUpdaters(updater []agent.Updater) *AgentAddonFactory {
+	f.agentAddonOptions.Updaters = updater
+	return f
+}
+
 // WithAgentDeployTriggerClusterFilter defines the filter func to trigger the agent deploy/redploy when cluster info is
 // changed. Addons that need information from the ManagedCluster resource when deploying the agent should use this
 // function to set what information they need, otherwise the expected/up-to-date agent may be deployed delayed since the

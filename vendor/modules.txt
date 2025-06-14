@@ -368,10 +368,6 @@ github.com/mitchellh/copystructure
 github.com/mitchellh/reflectwalk
 # github.com/moby/docker-image-spec v1.3.1
 ## explicit; go 1.18
-# github.com/moby/sys/user v0.3.0
-## explicit; go 1.17
-# github.com/moby/sys/userns v0.1.0
-## explicit; go 1.21
 # github.com/mochi-mqtt/server/v2 v2.6.6
 ## explicit; go 1.21
 github.com/mochi-mqtt/server/v2
@@ -728,7 +724,7 @@ go.uber.org/zap/internal/pool
 go.uber.org/zap/internal/stacktrace
 go.uber.org/zap/zapcore
 go.uber.org/zap/zapgrpc
-# golang.org/x/crypto v0.36.0
+# golang.org/x/crypto v0.37.0
 ## explicit; go 1.23.0
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
@@ -772,7 +768,7 @@ golang.org/x/oauth2/google/internal/stsexchange
 golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
-# golang.org/x/sync v0.12.0
+# golang.org/x/sync v0.13.0
 ## explicit; go 1.23.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/singleflight
@@ -783,10 +779,10 @@ golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/term v0.30.0
+# golang.org/x/term v0.31.0
 ## explicit; go 1.23.0
 golang.org/x/term
-# golang.org/x/text v0.23.0
+# golang.org/x/text v0.24.0
 ## explicit; go 1.23.0
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
@@ -1706,7 +1702,7 @@ k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/ptr
 k8s.io/utils/trace
-# open-cluster-management.io/addon-framework v0.12.1-0.20250407131028-9d436ffc2da7
+# open-cluster-management.io/addon-framework v1.0.0
 ## explicit; go 1.23.6
 open-cluster-management.io/addon-framework/pkg/addonfactory
 open-cluster-management.io/addon-framework/pkg/addonmanager
@@ -1722,7 +1718,7 @@ open-cluster-management.io/addon-framework/pkg/agent
 open-cluster-management.io/addon-framework/pkg/assets
 open-cluster-management.io/addon-framework/pkg/index
 open-cluster-management.io/addon-framework/pkg/utils
-# open-cluster-management.io/api v0.16.2-0.20250530014337-5880b0cf7dab
+# open-cluster-management.io/api v1.0.0
 ## explicit; go 1.23.6
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/client/addon/clientset/versioned
@@ -1790,7 +1786,7 @@ open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v0.16.1-0.20250530024739-3724a1e691fe
+# open-cluster-management.io/sdk-go v1.0.0
 ## explicit; go 1.23.6
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
