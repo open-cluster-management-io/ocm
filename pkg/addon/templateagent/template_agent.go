@@ -15,6 +15,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
+	addonconstants "open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -132,6 +133,7 @@ func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 		HealthProber: &agent.HealthProber{
 			Type: agent.HealthProberTypeWorkloadAvailability,
 		},
+		HostedModeInfoFunc:  addonconstants.GetHostedModeInfo,
 		SupportedConfigGVRs: supportedConfigGVRs,
 		Registration: &agent.RegistrationOption{
 			CSRConfigurations:     a.TemplateCSRConfigurationsFunc(),

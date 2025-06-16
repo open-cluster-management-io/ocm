@@ -289,8 +289,9 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 			getWorkByAddon: c.getWorksByAddonFn(index.ManifestWorkHookByHostedAddon),
 			agentAddon:     agentAddon},
 		&healthCheckSyncer{
-			getWorkByAddon: c.getWorksByAddonFn(index.ManifestWorkByAddon),
-			agentAddon:     agentAddon,
+			getWorkByAddon:       c.getWorksByAddonFn(index.ManifestWorkByAddon),
+			getWorkByHostedAddon: c.getWorksByAddonFn(index.ManifestWorkByHostedAddon),
+			agentAddon:           agentAddon,
 		},
 	}
 
@@ -406,7 +407,11 @@ func (c *addonDeployController) buildDeployManifestWorksFunc(addonWorkBuilder *a
 			mode, _ = agentAddon.GetAgentAddonOptions().HostedModeInfoFunc(addon, cluster)
 		}
 
-		manifestOptions := getManifestConfigOption(agentAddon, cluster, addon)
+		manifestOptions, err := getManifestConfigOption(agentAddon, cluster, addon)
+		if err != nil {
+			return nil, nil, fmt.Errorf("get manifest config option error: %v", err)
+		}
+
 		existingWorksCopy := []workapiv1.ManifestWork{}
 		for _, work := range existingWorks {
 			existingWorksCopy = append(existingWorksCopy, *work)
