@@ -380,6 +380,12 @@ spec:
                               items:
                                 type: string
                               type: array
+                            disableManagedIam:
+                              description: |-
+                                DisableManagedIam disables creation and management of IAM roles and policies on the hub.
+                                If true, all AWS permissions for awsirsa registration must be managed manually by the administrator.
+                                Used in cases where IAM permissions cannot be granted to OCM, or to run an EKS hub with non-aws spoke clusters.
+                              type: boolean
                             hubClusterArn:
                               description: |-
                                 This represents the hub cluster ARN

@@ -151,6 +151,12 @@ type AwsIrsaConfig struct {
 	// +optional
 	AutoApprovedIdentities []string `json:"autoApprovedIdentities,omitempty"`
 
+	// DisableManagedIam disables creation and management of IAM roles and policies on the hub.
+	// If true, all AWS permissions for awsirsa registration must be managed manually by the administrator.
+	// Used in cases where IAM permissions cannot be granted to OCM, or to run an EKS hub with non-aws spoke clusters.
+	// +optional
+	DisableManagedIam bool `json:"disableManagedIam,omitempty"`
+
 	// List of tags to be added to AWS resources created by hub while processing awsirsa registration request
 	// Example - "product:v1:tenant:app-name=My-App"
 	// +optional

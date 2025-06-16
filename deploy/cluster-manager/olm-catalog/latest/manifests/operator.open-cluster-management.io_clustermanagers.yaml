@@ -344,6 +344,11 @@ spec:
                               items:
                                 type: string
                               type: array
+                            disableManagedIam:
+                              description: |-
+                                DisableManagedIAM disables IAM role management in the hub. All required IAM roles
+                                must be created by the administrator.
+                              type: boolean
                             hubClusterArn:
                               description: |-
                                 This represents the hub cluster ARN

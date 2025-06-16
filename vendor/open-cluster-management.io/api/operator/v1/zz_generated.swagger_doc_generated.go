@@ -22,6 +22,7 @@ func (AddOnManagerConfiguration) SwaggerDoc() map[string]string {
 var map_AwsIrsaConfig = map[string]string{
 	"hubClusterArn":          "This represents the hub cluster ARN Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1",
 	"autoApprovedIdentities": "AutoApprovedIdentities represent a list of approved arn patterns",
+	"disableManagedIam":      "DisableManagedIam disables creation and management of IAM roles and policies on the hub. If true, all AWS permissions for awsirsa registration must be managed manually by the administrator. Used in cases where IAM permissions cannot be granted to OCM, or to run an EKS hub with non-aws spoke clusters.",
 	"tags":                   "List of tags to be added to AWS resources created by hub while processing awsirsa registration request Example - \"product:v1:tenant:app-name=My-App\"",
 }
 
@@ -225,7 +226,8 @@ func (WorkConfiguration) SwaggerDoc() map[string]string {
 
 var map_AwsIrsa = map[string]string{
 	"hubClusterArn":     "The arn of the hub cluster (ie: an EKS cluster). This will be required to pass information to hub, which hub will use to create IAM identities for this klusterlet. Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1.",
-	"managedClusterArn": "The arn of the managed cluster (ie: an EKS cluster). This will be required to generate the md5hash which will be used as a suffix to create IAM role on hub as well as used by kluslerlet-agent, to assume role suffixed with the md5hash, on startup. Example - arn:eks:us-west-2:12345678910:cluster/managed-cluster1.",
+	"managedClusterArn": "The arn of the managed cluster (ie: an EKS cluster). This will be used when managed IAM is enabled to generate the md5hash as a suffix to create IAM role on hub as well as used by kluslerlet-agent, to assume role suffixed with the md5hash, on startup. Example - arn:eks:us-west-2:12345678910:cluster/managed-cluster1.",
+	"iamConfigSecret":   "IamConfigSecret is the name of a secret containing \"config\" and/or \"credentials\" files mounted to /.aws/config and /.aws/credentials respectively. More Info: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html",
 }
 
 func (AwsIrsa) SwaggerDoc() map[string]string {

@@ -93,7 +93,9 @@ func (c *AWSIRSADriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluste
 	if cluster.Annotations == nil {
 		cluster.Annotations = make(map[string]string)
 	}
-	cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterArn] = c.managedClusterArn
+	if c.managedClusterArn != "" {
+		cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterArn] = c.managedClusterArn
+	}
 	cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+ManagedClusterIAMRoleSuffix] = c.managedClusterRoleSuffix
 	return cluster
 }

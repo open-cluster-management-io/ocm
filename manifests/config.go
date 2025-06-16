@@ -39,6 +39,7 @@ type HubConfig struct {
 	ResourceRequirements              []byte
 	ManagedClusterIdentityCreatorRole string
 	HubClusterArn                     string
+	DisableManagedIam                 bool
 	EnabledRegistrationDrivers        string
 	AutoApprovedCSRUsers              string
 	AutoApprovedARNPatterns           string

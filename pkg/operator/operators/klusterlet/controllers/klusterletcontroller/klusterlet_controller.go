@@ -115,6 +115,7 @@ func NewKlusterletController(
 type AwsIrsa struct {
 	HubClusterArn     string
 	ManagedClusterArn string
+	IamConfigSecret   string
 }
 
 type RegistrationDriver struct {
@@ -127,6 +128,9 @@ type ManagedClusterIamRole struct {
 }
 
 func (managedClusterIamRole *ManagedClusterIamRole) arn() string {
+	if managedClusterIamRole.AwsIrsa.ManagedClusterArn == "" {
+		return ""
+	}
 	managedClusterAccountId, managedClusterName := commonhelpers.GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.ManagedClusterArn)
 	hubClusterAccountId, hubClusterName := commonhelpers.GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.HubClusterArn)
 	md5HashUniqueIdentifier := commonhelpers.Md5HashSuffix(hubClusterAccountId, hubClusterName, managedClusterAccountId, managedClusterName)
@@ -355,19 +359,27 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 			hubClusterArn := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.HubClusterArn
 			managedClusterArn := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.ManagedClusterArn
+			iamConfigSecret := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.IamConfigSecret
 
 			config.RegistrationDriver = RegistrationDriver{
 				AuthType: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType,
 				AwsIrsa: &AwsIrsa{
 					HubClusterArn:     hubClusterArn,
 					ManagedClusterArn: managedClusterArn,
+					IamConfigSecret:   iamConfigSecret,
 				},
 			}
 			managedClusterIamRole := ManagedClusterIamRole{
 				AwsIrsa: config.RegistrationDriver.AwsIrsa,
 			}
 			config.ManagedClusterRoleArn = managedClusterIamRole.arn()
-			managedClusterAccountId, managedClusterName := commonhelpers.GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.ManagedClusterArn)
+			var managedClusterAccountId, managedClusterName string
+			if managedClusterIamRole.AwsIrsa.ManagedClusterArn != "" {
+				managedClusterAccountId, managedClusterName = commonhelpers.GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.ManagedClusterArn)
+			} else {
+				// Klusterlet running in non-AWS cluster, no account ID
+				managedClusterName = config.ClusterName
+			}
 			hubClusterAccountId, hubClusterName := commonhelpers.GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.HubClusterArn)
 			config.ManagedClusterRoleSuffix = commonhelpers.Md5HashSuffix(hubClusterAccountId, hubClusterName, managedClusterAccountId, managedClusterName)
 		} else {
