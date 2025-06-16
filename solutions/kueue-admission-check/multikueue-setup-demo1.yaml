@@ -1,23 +1,25 @@
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: ResourceFlavor
 metadata:
-  name: "default-flavor-demo1"
+  name: "default-flavor"
 ---
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: ClusterQueue
 metadata:
-  name: "cluster-queue-demo1"
+  name: "cluster-queue"
 spec:
   namespaceSelector: {} # match all.
   resourceGroups:
-  - coveredResources: ["cpu", "memory"]
+  - coveredResources: ["cpu", "memory","nvidia.com/gpu"]
     flavors:
-    - name: "default-flavor-demo1"
+    - name: "default-flavor"
       resources:
       - name: "cpu"
         nominalQuota: 9
       - name: "memory"
         nominalQuota: 36Gi
+      - name: "nvidia.com/gpu"
+        nominalQuota: 3
   admissionChecks:
   - multikueue-demo1
 ---
@@ -25,9 +27,9 @@ apiVersion: kueue.x-k8s.io/v1beta1
 kind: LocalQueue
 metadata:
   namespace: "default"
-  name: "user-queue-demo1"
+  name: "user-queue"
 spec:
-  clusterQueue: "cluster-queue-demo1"
+  clusterQueue: "cluster-queue"
 ---
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: AdmissionCheck
@@ -46,26 +48,26 @@ metadata:
   name:  multikueue-config-demo1
 spec:
   clusters:
-  - multikueue-demo1-cluster1
-  - multikueue-demo1-cluster2
+  - multikueue-config-demo1-cluster1
+  - multikueue-config-demo1-cluster2
 ---
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: MultiKueueCluster
 metadata:
-  name: multikueue-demo1-cluster1
+  name: multikueue-config-demo1-cluster1
 spec:
   kubeConfig:
     locationType: Secret
-    location: kueue-admin-cluster1-kubeconfig
-    # a secret called "kueue-admin-cluster1-kubeconfig" should be created in the namespace the kueue
+    location: multikueue-cluster1
+    # a secret called " multikueue-cluster1" should be created in the namespace the kueue
     # controller manager runs into, holding the kubeConfig needed to connect to the
     # worker cluster in the "kubeconfig" key;
 ---
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: MultiKueueCluster
 metadata:
-  name: multikueue-demo1-cluster2
+  name: multikueue-config-demo1-cluster2
 spec:
   kubeConfig:
     locationType: Secret
-    location: kueue-admin-cluster2-kubeconfig
+    location: multikueue-cluster2

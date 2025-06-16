@@ -4,7 +4,7 @@ metadata:
   generateName: demo1-job
   namespace: default
   labels:
-    kueue.x-k8s.io/queue-name: user-queue-demo1
+    kueue.x-k8s.io/queue-name: "user-queue"
 spec:
   parallelism: 1
   completions: 1
