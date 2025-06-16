@@ -218,13 +218,16 @@ type AwsIrsa struct {
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Pattern=`^arn:aws:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$`
 	HubClusterArn string `json:"hubClusterArn"`
-	// The arn of the managed cluster (ie: an EKS cluster). This will be required to generate the md5hash which will be used as a suffix to create IAM role on hub
+	// The arn of the managed cluster (ie: an EKS cluster). This will be used when managed IAM is enabled to generate the md5hash as a suffix to create IAM role on hub
 	// as well as used by kluslerlet-agent, to assume role suffixed with the md5hash, on startup.
 	// Example - arn:eks:us-west-2:12345678910:cluster/managed-cluster1.
-	// +required
-	// +kubebuilder:validation:MinLength=1
+	// +optional
 	// +kubebuilder:validation:Pattern=`^arn:aws:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$`
 	ManagedClusterArn string `json:"managedClusterArn"`
+
+	// IamConfigSecret is the name of a secret containing "config" and/or "credentials" files mounted to ~/.aws/config and ~/.aws/credentials respectively.
+	// More Info: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
+	IamConfigSecret string `json:"iamConfigSecret"`
 }
 
 type TypeBootstrapKubeConfigs string
