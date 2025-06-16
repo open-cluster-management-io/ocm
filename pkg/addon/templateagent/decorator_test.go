@@ -19,6 +19,7 @@ import (
 )
 
 func TestNamespaceDecorator(t *testing.T) {
+	defaultNs := "ocm-addon"
 	tests := []struct {
 		name           string
 		namespace      string
@@ -29,7 +30,7 @@ func TestNamespaceDecorator(t *testing.T) {
 			name:   "no namespace set",
 			object: testingcommon.NewUnstructured("v1", "Pod", "default", "test"),
 			validateObject: func(t *testing.T, obj *unstructured.Unstructured) {
-				testingcommon.AssertEqualNameNamespace(t, obj.GetName(), obj.GetNamespace(), "test", "default")
+				testingcommon.AssertEqualNameNamespace(t, obj.GetName(), obj.GetNamespace(), "test", defaultNs)
 			},
 		},
 		{
@@ -153,7 +154,7 @@ func TestNamespaceDecorator(t *testing.T) {
 				values[InstallNamespacePrivateValueKey] = tc.namespace
 			}
 
-			d := newNamespaceDecorator(values)
+			d := newNamespaceDecorator(defaultNs, values)
 			result, err := d.decorate(tc.object)
 			if err != nil {
 				t.Fatal(err)

@@ -154,6 +154,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 	cases := []struct {
 		name                  string
 		addonTemplatePath     string
+		mcaInstallNamespace   string
 		addonDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
 		managedCluster        *clusterv1.ManagedCluster
 		expectedErr           string
@@ -474,7 +475,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if daemonSet.Namespace != "open-cluster-management-agent-addon-ds" { // first daemonset ns
+				if daemonSet.Namespace != "open-cluster-management-agent-addon-ds" {
 					t.Errorf("unexpected namespace %s", daemonSet.Namespace)
 				}
 				validatePodTemplate(t, daemonSet.Spec.Template,
@@ -503,6 +504,88 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 			validateAgentOptions: func(t *testing.T, o agent.AgentAddonOptions,
 				mca *addonapiv1alpha1.ManagedClusterAddOn) {
 				validateAgentOptions(t, o, mca, "open-cluster-management-agent-addon-ds")
+			},
+		},
+		{
+			name:                "manifests with only daemonset and with mca.spec.namespace configured rendered successfully",
+			addonTemplatePath:   "./testmanifests/addontemplate_daemonset.yaml",
+			mcaInstallNamespace: "ocm-addon",
+			addonDeploymentConfig: &addonapiv1alpha1.AddOnDeploymentConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "hello-config",
+					Namespace: "default",
+				},
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					// AgentInstallNamespace: "test-install-namespace",
+					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+						{
+							Name:  "LOG_LEVEL",
+							Value: "4",
+						},
+					},
+					NodePlacement: &addonapiv1alpha1.NodePlacement{
+						NodeSelector: map[string]string{
+							"host": "ssd",
+						},
+						Tolerations: []corev1.Toleration{
+							{
+								Key:      "foo",
+								Operator: corev1.TolerationOpExists,
+								Effect:   corev1.TaintEffectNoExecute,
+							},
+						},
+					},
+					Registries: []addonapiv1alpha1.ImageMirror{
+						{
+							Source: "quay.io/open-cluster-management",
+							Mirror: "quay.io/ocm",
+						},
+					},
+				},
+			},
+			managedCluster: addonfactory.NewFakeManagedCluster(clusterName, "1.10.1"),
+			validateObjects: func(t *testing.T, objects []runtime.Object) {
+				if len(objects) != 3 {
+					t.Fatalf("expected 3 objects, but got %v", len(objects))
+				}
+
+				unstructDaemonSet, ok := objects[0].(*unstructured.Unstructured)
+				if !ok {
+					t.Errorf("expected object to be *appsv1.DaemonSet, but got %T", objects[0])
+				}
+				daemonSet, err := utils.ConvertToDaemonSet(unstructDaemonSet)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if daemonSet.Namespace != "ocm-addon" {
+					t.Errorf("unexpected namespace %s", daemonSet.Namespace)
+				}
+				validatePodTemplate(t, daemonSet.Spec.Template,
+					[]corev1.EnvVar{
+						{Name: "LOG_LEVEL", Value: "4"},
+						{Name: "HUB_KUBECONFIG", Value: "/managed/hub-kubeconfig/kubeconfig"},
+						{Name: "CLUSTER_NAME", Value: clusterName},
+						// {Name: "INSTALL_NAMESPACE", Value: "test-install-namespace"},
+					},
+					false)
+
+				// check clusterrole
+				unstructCRB, ok := objects[2].(*unstructured.Unstructured)
+				if !ok {
+					t.Errorf("expected object to be unstructured, but got %T", objects[2])
+				}
+				clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
+				err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructCRB.Object, clusterRoleBinding)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if clusterRoleBinding.Subjects[0].Namespace != "ocm-addon" {
+					t.Errorf("clusterRolebinding namespace does not match, got %s", clusterRoleBinding.Subjects[0].Namespace)
+				}
+			},
+			validateAgentOptions: func(t *testing.T, o agent.AgentAddonOptions,
+				mca *addonapiv1alpha1.ManagedClusterAddOn) {
+				validateAgentOptions(t, o, mca, "ocm-addon")
 			},
 		},
 		{
@@ -640,6 +723,9 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 						Name:      addonName,
 						Namespace: clusterName,
 					},
+					Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+						InstallNamespace: tc.mcaInstallNamespace,
+					},
 				},
 			)
 
@@ -756,6 +842,33 @@ func TestAgentInstallNamespace(t *testing.T) {
 				},
 			),
 			expected: "test-install-namespace",
+		},
+		{
+			name: "install namespace is set by mca.spec.installnamespace",
+			addonTemplate: &addonapiv1alpha1.AddOnTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "hello-template",
+				},
+				Spec: addonapiv1alpha1.AddOnTemplateSpec{
+					AgentSpec: workapiv1.ManifestWorkSpec{
+						Workload: workapiv1.ManifestsTemplate{
+							Manifests: []workapiv1.Manifest{},
+						},
+					},
+				},
+			},
+			managedClusterAddonBuilder: newManagedClusterAddonBuilder(
+				&addonapiv1alpha1.ManagedClusterAddOn{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      addonName,
+						Namespace: clusterName,
+					},
+					Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+						InstallNamespace: "test-addon",
+					},
+				},
+			),
+			expected: "test-addon",
 		},
 		{
 			name: "not support addon deployment config",
