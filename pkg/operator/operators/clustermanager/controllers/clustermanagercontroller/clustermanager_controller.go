@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -44,6 +45,12 @@ const (
 	defaultWebhookPort       = int32(9443)
 	clusterManagerReSyncTime = 5 * time.Second
 )
+
+var reservedLabelKeySets = sets.Set[string]{
+	"app":                     sets.Empty{},
+	"createdByClusterManager": sets.Empty{},
+	"open-cluster-management.io/cluster-name": sets.Empty{},
+}
 
 type clusterManagerController struct {
 	patcher              patcher.Patcher[*operatorapiv1.ClusterManager, operatorapiv1.ClusterManagerSpec, operatorapiv1.ClusterManagerStatus]
@@ -226,8 +233,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	}
 
 	if n.enableSyncLabels {
-		config.LabelsString = helpers.ConvertLabelsMapToString(clusterManager.Labels)
-		config.Labels = clusterManager.Labels
+		labels := filterLabels(clusterManager.Labels)
+		config.LabelsString = helpers.ConvertLabelsMapToString(labels)
+		config.Labels = labels
 	}
 
 	// Update finalizer at first
@@ -443,4 +451,15 @@ func getIdentityCreatorRoleAndTags(cm operatorapiv1.ClusterManager) string {
 		}
 	}
 	return ""
+}
+
+func filterLabels(labels map[string]string) map[string]string {
+	result := map[string]string{}
+	for key, value := range labels {
+		if reservedLabelKeySets.Has(key) {
+			continue
+		}
+		result[key] = value
+	}
+	return result
 }
