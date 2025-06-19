@@ -20,8 +20,9 @@ import (
 )
 
 type healthCheckSyncer struct {
-	getWorkByAddon func(addonName, addonNamespace string) ([]*workapiv1.ManifestWork, error)
-	agentAddon     agent.AgentAddon
+	getWorkByAddon       func(addonName, addonNamespace string) ([]*workapiv1.ManifestWork, error)
+	getWorkByHostedAddon func(addonName, addonNamespace string) ([]*workapiv1.ManifestWork, error)
+	agentAddon           agent.AgentAddon
 }
 
 func (s *healthCheckSyncer) sync(ctx context.Context,
@@ -128,8 +129,16 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 		}
 	}
 
-	addonWorks, err := s.getWorkByAddon(addon.Name, addon.Namespace)
-	if err != nil || len(addonWorks) == 0 {
+	var addonManifestWorks []*workapiv1.ManifestWork
+	var err error
+	installMode, _ := s.agentAddon.GetAgentAddonOptions().HostedModeInfoFunc(addon, cluster)
+	if installMode == constants.InstallModeHosted {
+		addonManifestWorks, err = s.getWorkByHostedAddon(addon.Name, addon.Namespace)
+	} else {
+		addonManifestWorks, err = s.getWorkByAddon(addon.Name, addon.Namespace)
+	}
+
+	if err != nil || len(addonManifestWorks) == 0 {
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 			Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
 			Status:  metav1.ConditionUnknown,
@@ -140,7 +149,7 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 	}
 
 	manifestConditions := []workapiv1.ManifestCondition{}
-	for _, work := range addonWorks {
+	for _, work := range addonManifestWorks {
 		if !strings.HasPrefix(work.Name, constants.DeployWorkNamePrefix(addon.Name)) {
 			continue
 		}

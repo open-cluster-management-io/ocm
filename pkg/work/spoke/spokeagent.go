@@ -169,7 +169,7 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		o.workOptions.AppliedManifestWorkEvictionGracePeriod,
 		hubHash, agentID,
 	)
-	availableStatusController := statuscontroller.NewAvailableStatusController(
+	availableStatusController, err := statuscontroller.NewAvailableStatusController(
 		controllerContext.EventRecorder,
 		spokeDynamicClient,
 		hubWorkClient,
@@ -178,6 +178,9 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		o.workOptions.MaxJSONRawLength,
 		o.workOptions.StatusSyncInterval,
 	)
+	if err != nil {
+		return err
+	}
 
 	go spokeWorkInformerFactory.Start(ctx.Done())
 	go hubWorkInformer.Informer().Run(ctx.Done())

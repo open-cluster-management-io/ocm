@@ -4,6 +4,11 @@ metadata:
   name: open-cluster-management:managedcluster:registration
   labels:
     open-cluster-management.io/cluster-name: ""
+    {{ if gt (len .Labels) 0 }}
+    {{ range $key, $value := .Labels }}
+    "{{ $key }}": "{{ $value }}"
+    {{ end }}
+    {{ end }}
 rules:
 # Allow spoke registration agent to get/update coordination.k8s.io/lease
 - apiGroups: ["coordination.k8s.io"]

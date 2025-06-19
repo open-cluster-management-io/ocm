@@ -2,6 +2,7 @@ package managedcluster
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -62,6 +63,7 @@ type managedClusterController struct {
 	patcher            patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
 	hubDriver          register.HubDriver
 	eventRecorder      events.Recorder
+	labels             map[string]string
 }
 
 // NewManagedClusterController creates a new managed cluster controller
@@ -75,8 +77,13 @@ func NewManagedClusterController(
 	clusterRoleBindingInformer rbacv1informers.ClusterRoleBindingInformer,
 	manifestWorkInformer workinformers.ManifestWorkInformer,
 	hubDriver register.HubDriver,
-	recorder events.Recorder) factory.Controller {
+	recorder events.Recorder, labels map[string]string) factory.Controller {
 
+	// Creating a deep copy of the labels to avoid controllers from reading the same map concurrently.
+	deepCopyLabels := make(map[string]string, len(labels))
+	for k, v := range labels {
+		deepCopyLabels[k] = v
+	}
 	c := &managedClusterController{
 		kubeClient:         kubeClient,
 		clusterClient:      clusterClient,
@@ -95,6 +102,7 @@ func NewManagedClusterController(
 			*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus](
 			clusterClient.ClusterV1().ManagedClusters()),
 		eventRecorder: recorder.WithComponentSuffix("managed-cluster-controller"),
+		labels:        deepCopyLabels,
 	}
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterInformer.Informer()).
@@ -114,8 +122,13 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Reconciling ManagedCluster", "managedClusterName", managedClusterName)
 	managedCluster, err := c.clusterLister.Get(managedClusterName)
-	if errors.IsNotFound(err) {
-		return c.removeClusterRbac(ctx, managedClusterName, true)
+	if apierrors.IsNotFound(err) {
+		err = c.removeClusterRbac(ctx, managedClusterName, true)
+		if errors.Is(err, requeueError) {
+			syncCtx.Queue().AddAfter(managedClusterName, requeueError.RequeueTime)
+			return nil
+		}
+		return err
 	}
 	if err != nil {
 		return err
@@ -130,6 +143,10 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 
 		err = c.removeClusterRbac(ctx, managedClusterName, true)
 		if err != nil {
+			if errors.Is(err, requeueError) {
+				syncCtx.Queue().AddAfter(managedClusterName, requeueError.RequeueTime)
+				return nil
+			}
 			return err
 		}
 
@@ -158,7 +175,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		// Apply(Update) the cluster specific rbac resources for this spoke cluster with hubAcceptsClient=false.
 		var errs []error
 		applyResults := c.applier.Apply(ctx, syncCtx.Recorder(),
-			helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, managedClusterName, managedCluster.Spec.HubAcceptsClient),
+			helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, managedClusterName, managedCluster.Spec.HubAcceptsClient, c.labels),
 			manifests.ClusterSpecificRBACFiles...)
 		for _, result := range applyResults {
 			if result.Error != nil {
@@ -186,7 +203,12 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		}
 
 		// Remove the cluster role binding files for registration-agent and work-agent.
-		return c.removeClusterRbac(ctx, managedClusterName, managedCluster.Spec.HubAcceptsClient)
+		err = c.removeClusterRbac(ctx, managedClusterName, managedCluster.Spec.HubAcceptsClient)
+		if errors.Is(err, requeueError) {
+			syncCtx.Queue().AddAfter(managedClusterName, requeueError.RequeueTime)
+			return nil
+		}
+		return err
 	}
 
 	// TODO consider to add the managedcluster-namespace.yaml back to staticFiles,
@@ -195,10 +217,14 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: managedClusterName,
-			Labels: map[string]string{
-				v1.ClusterNameLabelKey: managedClusterName,
-			},
-		},
+			Labels: func() map[string]string {
+				labels := make(map[string]string)
+				if c.labels != nil {
+					labels = c.labels
+				}
+				labels[v1.ClusterNameLabelKey] = managedClusterName
+				return labels
+			}()},
 	}
 
 	// Hub cluster-admin accepts the spoke cluster, we apply
@@ -217,7 +243,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	}
 
 	resourceResults := c.applier.Apply(ctx, syncCtx.Recorder(),
-		helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, managedClusterName, managedCluster.Spec.HubAcceptsClient),
+		helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, managedClusterName, managedCluster.Spec.HubAcceptsClient, c.labels),
 		append(manifests.ClusterSpecificRBACFiles, manifests.ClusterSpecificRoleBindings...)...)
 	for _, result := range resourceResults {
 		if result.Error != nil {
@@ -280,7 +306,7 @@ func (c *managedClusterController) acceptCluster(ctx context.Context, managedClu
 // the finalizer on work roleBinding will be removed after there is no works in the ns.
 func (c *managedClusterController) removeClusterRbac(ctx context.Context, clusterName string, accepted bool) error {
 	var errs []error
-	assetFn := helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, clusterName, accepted)
+	assetFn := helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, clusterName, accepted, c.labels)
 	files := manifests.ClusterSpecificRoleBindings
 	if accepted {
 		files = append(files, manifests.ClusterSpecificRBACFiles...)
@@ -295,7 +321,7 @@ func (c *managedClusterController) removeClusterRbac(ctx context.Context, cluste
 	}
 
 	works, err := c.manifestWorkLister.ManifestWorks(clusterName).List(labels.Everything())
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		errs = append(errs, err)
 		return operatorhelpers.NewMultiLineAggregate(errs)
 	}
@@ -309,7 +335,7 @@ func (c *managedClusterController) removeClusterRbac(ctx context.Context, cluste
 func (c *managedClusterController) removeFinalizerFromWorkRoleBinding(ctx context.Context, clusterName string) error {
 	workRoleBinding, err := c.roleBindingLister.RoleBindings(clusterName).Get(workRoleBindingName(clusterName))
 	switch {
-	case errors.IsNotFound(err):
+	case apierrors.IsNotFound(err):
 		return nil
 	case err != nil:
 		return err

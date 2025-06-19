@@ -6,15 +6,30 @@ metadata:
   labels:
     app: {{ .ClusterManagerName }}-work-webhook
     createdByClusterManager: {{ .ClusterManagerName }}
+    {{ if gt (len .Labels) 0 }}
+    {{ range $key, $value := .Labels }}
+    "{{ $key }}": "{{ $value }}"
+    {{ end }}
+    {{ end }}
 spec:
   replicas: {{ .Replica }}
   selector:
     matchLabels:
       app: {{ .ClusterManagerName }}-work-webhook
+      {{ if gt (len .Labels) 0 }}
+      {{ range $key, $value := .Labels }}
+      "{{ $key }}": "{{ $value }}"
+      {{ end }}
+      {{ end }}
   template:
     metadata:
       labels:
         app: {{ .ClusterManagerName }}-work-webhook
+        {{ if gt (len .Labels) 0 }}
+        {{ range $key, $value := .Labels }}
+        "{{ $key }}": "{{ $value }}"
+        {{ end }}
+        {{ end }}
     spec:
       affinity:
         podAntiAffinity:

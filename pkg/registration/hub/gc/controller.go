@@ -2,11 +2,11 @@ package gc
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -98,6 +98,10 @@ func (r *GCController) sync(ctx context.Context, controllerContext factory.SyncC
 
 	gcErr := r.gcResourcesController.reconcile(ctx, copyCluster, clusterName)
 	if cluster == nil {
+		if errors.Is(gcErr, requeueError) {
+			controllerContext.Queue().AddAfter(clusterName, requeueError.RequeueTime)
+			return nil
+		}
 		return gcErr
 	}
 
@@ -117,6 +121,10 @@ func (r *GCController) sync(ctx context.Context, controllerContext factory.SyncC
 		return err
 	}
 
+	if errors.Is(gcErr, requeueError) {
+		controllerContext.Queue().AddAfter(clusterName, requeueError.RequeueTime)
+		return nil
+	}
 	if gcErr != nil {
 		return gcErr
 	}

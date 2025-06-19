@@ -4,6 +4,11 @@ metadata:
   name: open-cluster-management:managedcluster:work
   labels:
     open-cluster-management.io/cluster-name: ""
+    {{ if gt (len .Labels) 0 }}
+    {{ range $key, $value := .Labels }}
+    "{{ $key }}": "{{ $value }}"
+    {{ end }}
+    {{ end }}
 rules:
 # Allow work agent to send event to hub
 - apiGroups: ["", "events.k8s.io"]

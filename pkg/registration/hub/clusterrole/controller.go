@@ -17,6 +17,7 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/common/apply"
 	"open-cluster-management.io/ocm/pkg/common/queue"
+	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/manifests"
 )
 
@@ -32,6 +33,7 @@ type clusterroleController struct {
 	applier       *apply.PermissionApplier
 	cache         resourceapply.ResourceCache
 	eventRecorder events.Recorder
+	labels        map[string]string
 }
 
 // NewManagedClusterClusterroleController creates a clusterrole controller on hub cluster.
@@ -39,7 +41,14 @@ func NewManagedClusterClusterroleController(
 	kubeClient kubernetes.Interface,
 	clusterInformer clusterv1informer.ManagedClusterInformer,
 	clusterRoleInformer rbacv1informers.ClusterRoleInformer,
-	recorder events.Recorder) factory.Controller {
+	recorder events.Recorder,
+	labels map[string]string) factory.Controller {
+
+	// Creating a deep copy of the labels to avoid controllers from reading the same map concurrently.
+	deepCopyLabels := make(map[string]string, len(labels))
+	for k, v := range labels {
+		deepCopyLabels[k] = v
+	}
 	c := &clusterroleController{
 		kubeClient:    kubeClient,
 		clusterLister: clusterInformer.Lister(),
@@ -52,6 +61,7 @@ func NewManagedClusterClusterroleController(
 			nil,
 		),
 		eventRecorder: recorder.WithComponentSuffix("managed-cluster-clusterrole-controller"),
+		labels:        deepCopyLabels,
 	}
 	return factory.New().
 		WithFilteredEventsInformers(
@@ -67,15 +77,16 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 	if err != nil {
 		return err
 	}
-
 	var errs []error
+	assetFn := helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, "", false, c.labels)
+
 	// Clean up managedcluser cluserroles if there are no managed clusters
 	if len(managedClusters) == 0 {
 		results := resourceapply.DeleteAll(
 			ctx,
 			resourceapply.NewKubeClientHolder(c.kubeClient),
 			c.eventRecorder,
-			manifests.RBACManifests.ReadFile,
+			assetFn,
 			manifests.CommonClusterRoleFiles...,
 		)
 		for _, result := range results {
@@ -90,7 +101,7 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 	results := c.applier.Apply(
 		ctx,
 		syncCtx.Recorder(),
-		manifests.RBACManifests.ReadFile,
+		assetFn,
 		manifests.CommonClusterRoleFiles...,
 	)
 

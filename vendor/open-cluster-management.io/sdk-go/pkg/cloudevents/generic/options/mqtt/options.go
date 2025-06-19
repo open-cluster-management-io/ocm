@@ -79,6 +79,8 @@ type MQTTOptions struct {
 
 // MQTTConfig holds the information needed to build connect to MQTT broker as a given user.
 type MQTTConfig struct {
+	cert.CertConfig `json:",inline" yaml:",inline"`
+
 	// BrokerHost is the host of the MQTT broker (hostname:port).
 	BrokerHost string `json:"brokerHost" yaml:"brokerHost"`
 
@@ -86,13 +88,6 @@ type MQTTConfig struct {
 	Username string `json:"username,omitempty" yaml:"username,omitempty"`
 	// Password is the password for basic authentication to connect the MQTT broker.
 	Password string `json:"password,omitempty" yaml:"password,omitempty"`
-
-	// CAFile is the file path to a cert file for the MQTT broker certificate authority.
-	CAFile string `json:"caFile,omitempty" yaml:"caFile,omitempty"`
-	// ClientCertFile is the file path to a client cert file for TLS.
-	ClientCertFile string `json:"clientCertFile,omitempty" yaml:"clientCertFile,omitempty"`
-	// ClientKeyFile is the file path to a client key file for TLS.
-	ClientKeyFile string `json:"clientKeyFile,omitempty" yaml:"clientKeyFile,omitempty"`
 
 	// KeepAlive is the keep alive time in seconds for MQTT clients, by default is 60s
 	KeepAlive *uint16 `json:"keepAlive,omitempty" yaml:"keepAlive,omitempty"`
@@ -109,8 +104,7 @@ type MQTTConfig struct {
 	Topics *types.Topics `json:"topics,omitempty" yaml:"topics,omitempty"`
 }
 
-// BuildMQTTOptionsFromFlags builds configs from a config filepath.
-func BuildMQTTOptionsFromFlags(configPath string) (*MQTTOptions, error) {
+func LoadConfig(configPath string) (*MQTTConfig, error) {
 	configData, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, err
@@ -121,13 +115,26 @@ func BuildMQTTOptionsFromFlags(configPath string) (*MQTTOptions, error) {
 		return nil, err
 	}
 
+	if err := config.CertConfig.EmbedCerts(); err != nil {
+		return nil, err
+	}
+
+	return config, nil
+}
+
+// BuildMQTTOptionsFromFlags builds configs from a config filepath.
+func BuildMQTTOptionsFromFlags(configPath string) (*MQTTOptions, error) {
+	config, err := LoadConfig(configPath)
+	if err != nil {
+		return nil, err
+	}
+
 	if config.BrokerHost == "" {
 		return nil, fmt.Errorf("brokerHost is required")
 	}
 
-	if (config.ClientCertFile == "" && config.ClientKeyFile != "") ||
-		(config.ClientCertFile != "" && config.ClientKeyFile == "") {
-		return nil, fmt.Errorf("either both or none of clientCertFile and clientKeyFile must be set")
+	if err := config.CertConfig.Validate(); err != nil {
+		return nil, err
 	}
 
 	if err := validateTopics(config.Topics); err != nil {
@@ -165,10 +172,20 @@ func BuildMQTTOptionsFromFlags(configPath string) (*MQTTOptions, error) {
 		Timeout:    dialTimeout,
 	}
 
-	if config.ClientCertFile != "" && config.ClientKeyFile != "" {
+	if config.CertConfig.HasCerts() {
 		// Set up TLS configuration for the MQTT connection if the client certificate and key are provided.
 		// the certificates will be reloaded periodically.
-		options.Dialer.TLSConfig, err = cert.AutoLoadTLSConfig(config.CAFile, config.ClientCertFile, config.ClientKeyFile, options.Dialer)
+		options.Dialer.TLSConfig, err = cert.AutoLoadTLSConfig(
+			config.CertConfig,
+			func() (*cert.CertConfig, error) {
+				config, err := LoadConfig(configPath)
+				if err != nil {
+					return nil, err
+				}
+				return &config.CertConfig, nil
+			},
+			options.Dialer,
+		)
 		if err != nil {
 			return nil, err
 		}

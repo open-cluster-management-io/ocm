@@ -62,9 +62,22 @@ func (AppliedManifestWorkStatus) SwaggerDoc() map[string]string {
 	return map_AppliedManifestWorkStatus
 }
 
+var map_ConditionRule = map[string]string{
+	"condition":         "Condition is the type of condition that is set based on this rule. Any condition is supported, but certain special conditions can be used to to control higher level behaviors of the manifestwork. If the condition is Complete, the manifest will no longer be updated once completed.",
+	"type":              "Type defines how a manifest should be evaluated for a condition. It can be CEL, or WellKnownConditions. If the type is CEL, user should specify the celExpressions field If the type is WellKnownConditions, certain common types in k8s.io/api will be considered completed as defined by hardcoded rules.",
+	"celExpressions":    "CelExpressions defines the CEL expressions to be evaluated for the condition. Final result is the logical AND of all expressions.",
+	"message":           "Message is set on the condition created for this rule",
+	"messageExpression": "MessageExpression uses a CEL expression to generate a message for the condition Will override message if both are set and messageExpression returns a non-empty string. Variables: - object: The current instance of the manifest - result: Boolean result of the CEL expressions",
+}
+
+func (ConditionRule) SwaggerDoc() map[string]string {
+	return map_ConditionRule
+}
+
 var map_DeleteOption = map[string]string{
-	"propagationPolicy":  "propagationPolicy can be Foreground, Orphan or SelectivelyOrphan SelectivelyOrphan should be rarely used.  It is provided for cases where particular resources is transfering ownership from one ManifestWork to another or another management unit. Setting this value will allow a flow like 1. create manifestwork/2 to manage foo 2. update manifestwork/1 to selectively orphan foo 3. remove foo from manifestwork/1 without impacting continuity because manifestwork/2 adopts it.",
-	"selectivelyOrphans": "selectivelyOrphan represents a list of resources following orphan deletion stratecy",
+	"propagationPolicy":       "propagationPolicy can be Foreground, Orphan or SelectivelyOrphan SelectivelyOrphan should be rarely used.  It is provided for cases where particular resources is transfering ownership from one ManifestWork to another or another management unit. Setting this value will allow a flow like 1. create manifestwork/2 to manage foo 2. update manifestwork/1 to selectively orphan foo 3. remove foo from manifestwork/1 without impacting continuity because manifestwork/2 adopts it.",
+	"selectivelyOrphans":      "selectivelyOrphan represents a list of resources following orphan deletion stratecy",
+	"ttlSecondsAfterFinished": "TTLSecondsAfterFinished limits the lifetime of a ManifestWork that has been marked Complete by one or more conditionRules set for its manifests. If this field is set, and the manifestwork has completed, then it is elligible to be automatically deleted. If this field is unset, the manifestwork won't be automatically deleted even afer completion. If this field is set to zero, the manfiestwork becomes elligible to be deleted immediately after completion.",
 }
 
 func (DeleteOption) SwaggerDoc() map[string]string {
@@ -145,6 +158,7 @@ var map_ManifestConfigOption = map[string]string{
 	"resourceIdentifier": "ResourceIdentifier represents the group, resource, name and namespace of a resoure. iff this refers to a resource not created by this manifest work, the related rules will not be executed.",
 	"feedbackRules":      "FeedbackRules defines what resource status field should be returned. If it is not set or empty, no feedback rules will be honored.",
 	"updateStrategy":     "UpdateStrategy defines the strategy to update this manifest. UpdateStrategy is Update if it is not set.",
+	"conditionRules":     "ConditionRules defines how to set manifestwork conditions for a specific manifest.",
 }
 
 func (ManifestConfigOption) SwaggerDoc() map[string]string {

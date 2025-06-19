@@ -3,6 +3,12 @@ apiVersion: v1
 metadata:
   name: cluster-manager-registration-webhook
   namespace: {{ .ClusterManagerNamespace }}
+  labels:
+    {{ if gt (len .Labels) 0 }}
+    {{ range $key, $value := .Labels }}
+    "{{ $key }}": "{{ $value }}"
+    {{ end }}
+    {{ end }}
 subsets:
   - addresses:
       - ip: {{.RegistrationWebhook.Address}}
