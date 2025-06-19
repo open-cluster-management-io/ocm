@@ -1,0 +1,37 @@
+
+name: FOSSA License Scanning
+
+on:
+  push:
+    branches:
+      - main
+      - release-*
+  pull_request:
+    branches:
+      - main
+      - release-*
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  fossa-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Debug secret
+        run: echo "FOSSA_API_KEY is set"
+        env:
+          fossa_api_key: ${{ secrets.FOSSA_API_KEY }}
+      - name: Checkout tree
+        uses: actions/checkout@v4
+
+      - name: Run FOSSA scan and upload build data
+        uses: fossas/fossa-action@main
+        with:
+          api-key: ${{ secrets.FOSSA_API_KEY }}
+          debug: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fossa.debug.json.gz
+          path: ./fossa.debug.json.gz
