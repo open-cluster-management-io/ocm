@@ -830,6 +830,9 @@ func GetKlusterletAgentLabels(klusterlet *operatorapiv1.Klusterlet, enableSyncLa
 	labels := map[string]string{}
 	if enableSyncLabels {
 		for k, v := range klusterlet.GetLabels() {
+			if k == "app" {
+				continue
+			}
 			labels[k] = v
 		}
 	}
