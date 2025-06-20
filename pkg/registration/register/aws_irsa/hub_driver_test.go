@@ -126,6 +126,7 @@ func TestAccept(t *testing.T) {
 			"arn:aws:eks:us-west-2:123456789012:cluster/.*",
 			"arn:aws:eks:us-west-1:123456789012:cluster/.*",
 		}, []string{},
+		false,
 	)
 
 	if err != nil {
@@ -146,7 +147,7 @@ func TestNewDriverValidation(t *testing.T) {
 	// Test with an invalid manager cluster approval pattern
 	_, err := NewAWSIRSAHubDriver(context.Background(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster", []string{
 		"arn:(aws:eks:us-west-2:123456789012:cluster/.*", // bad pattern
-	}, []string{})
+	}, []string{}, false)
 	if err == nil {
 		t.Errorf("Error expected")
 	}
@@ -485,7 +486,7 @@ func TestCleanup(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			awsIrsaHubDriver, err := NewAWSIRSAHubDriver(context.Background(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster", []string{}, []string{})
+			awsIrsaHubDriver, err := NewAWSIRSAHubDriver(context.Background(), "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster", []string{}, []string{}, false)
 			if err != nil {
 				t.Errorf("error creating AWSIRSAHubDriver")
 				return

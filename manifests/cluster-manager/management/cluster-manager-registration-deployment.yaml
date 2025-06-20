@@ -98,6 +98,9 @@ spec:
           {{if .AwsResourceTags}}
           - "--aws-resource-tags={{ .AwsResourceTags }}"
           {{end}}
+          {{ if .DisableManagedIam }}
+          - "--disable-managed-iam"
+          {{ end }}
         env:
           - name: POD_NAME
             valueFrom:

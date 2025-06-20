@@ -59,6 +59,7 @@ type HubManagerOptions struct {
 	AutoApprovedARNPatterns    []string
 	AwsResourceTags            []string
 	Labels                     string
+	DisableManagedIam          bool
 }
 
 // NewHubManagerOptions returns a HubManagerOptions
@@ -86,6 +87,7 @@ func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 			"The flag works only when ResourceCleanup feature gate is enable.")
 	fs.StringVar(&m.HubClusterArn, "hub-cluster-arn", m.HubClusterArn,
 		"Hub Cluster Arn required to connect to Hub and create IAM Roles and Policies")
+	fs.BoolVar(&m.DisableManagedIam, "disable-managed-iam", m.DisableManagedIam, "Disable IAM role and access entry management for spoke clusters")
 	fs.StringSliceVar(&m.AutoApprovedCSRUsers, "auto-approved-csr-users", m.AutoApprovedCSRUsers,
 		"A bootstrap user list whose cluster registration requests can be automatically approved.")
 	fs.StringSliceVar(&m.AutoApprovedARNPatterns, "auto-approved-arn-patterns", m.AutoApprovedARNPatterns,
@@ -190,7 +192,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 			}
 			drivers = append(drivers, csrDriver)
 		case commonhelpers.AwsIrsaAuthType:
-			awsIRSAHubDriver, err := awsirsa.NewAWSIRSAHubDriver(ctx, m.HubClusterArn, m.AutoApprovedARNPatterns, m.AwsResourceTags)
+			awsIRSAHubDriver, err := awsirsa.NewAWSIRSAHubDriver(ctx, m.HubClusterArn, m.AutoApprovedARNPatterns, m.AwsResourceTags, m.DisableManagedIam)
 			if err != nil {
 				return err
 			}
