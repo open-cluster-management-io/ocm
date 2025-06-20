@@ -133,6 +133,11 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 		return nil
 	}
 
+	// work that is completed does not receive any updates
+	if meta.IsStatusConditionTrue(manifestWork.Status.Conditions, workapiv1.WorkComplete) {
+		return nil
+	}
+
 	// Apply appliedManifestWork
 	appliedManifestWork, err := m.applyAppliedManifestWork(ctx, manifestWork.Name, m.hubHash, m.agentID)
 	if err != nil {
