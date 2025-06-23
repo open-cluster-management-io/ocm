@@ -55,12 +55,17 @@ const (
 	// DefaultAddonNamespace is the default namespace for agent addon
 	DefaultAddonNamespace = "open-cluster-management-agent-addon"
 
+	// The labels with LabelPrefix are reserved, and will not be synced to the resources created by the operators.
+	LabelPrefix = "open-cluster-management.io"
+
 	// HubLabelKey is used to filter resources in informers
-	HubLabelKey = "createdByClusterManager"
+	HubLabelKey = LabelPrefix + "/created-by-clustermanager"
 
 	// AgentLabelKey is used to filter resources in informers
-	AgentLabelKey          = "createdByKlusterlet"
-	ClusterManagerLabelKey = "createdByClusterManager"
+	AgentLabelKey = LabelPrefix + "/created-by-klusterlet"
+
+	// AppLabelKey is the label key for all deployments
+	AppLabelKey = "app"
 )
 
 const (
@@ -826,15 +831,38 @@ func GetOperatorNamespace() string {
 	return operatorNamespace
 }
 
+// filterLabels removes reserved label keys from the input map
+func filterLabels(labels map[string]string) map[string]string {
+	filtered := map[string]string{}
+	for k, v := range labels {
+		if k == AppLabelKey || strings.HasPrefix(k, LabelPrefix) {
+			continue
+		}
+		filtered[k] = v
+	}
+	return filtered
+}
+
+func GetRegistrationLabelString(clusterManagerLabels map[string]string) string {
+	return ConvertLabelsMapToString(filterLabels(clusterManagerLabels))
+}
+
+func GetClusterManagerHubLabels(clusterManager *operatorapiv1.ClusterManager, enableSyncLabels bool) map[string]string {
+	labels := map[string]string{}
+	if enableSyncLabels {
+		labels = filterLabels(clusterManager.Labels)
+	}
+
+	// This label key is used to filter resources in deployment informer
+	labels[HubLabelKey] = clusterManager.GetName()
+
+	return labels
+}
+
 func GetKlusterletAgentLabels(klusterlet *operatorapiv1.Klusterlet, enableSyncLabels bool) map[string]string {
 	labels := map[string]string{}
 	if enableSyncLabels {
-		for k, v := range klusterlet.GetLabels() {
-			if k == "app" {
-				continue
-			}
-			labels[k] = v
-		}
+		labels = filterLabels(klusterlet.Labels)
 	}
 
 	// This label key is used to filter resources in deployment informer

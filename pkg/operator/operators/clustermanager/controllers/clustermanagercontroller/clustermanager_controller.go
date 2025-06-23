@@ -17,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -45,12 +44,6 @@ const (
 	defaultWebhookPort       = int32(9443)
 	clusterManagerReSyncTime = 5 * time.Second
 )
-
-var reservedLabelKeySets = sets.Set[string]{
-	"app":                     sets.Empty{},
-	"createdByClusterManager": sets.Empty{},
-	"open-cluster-management.io/cluster-name": sets.Empty{},
-}
 
 type clusterManagerController struct {
 	patcher              patcher.Patcher[*operatorapiv1.ClusterManager, operatorapiv1.ClusterManagerSpec, operatorapiv1.ClusterManagerStatus]
@@ -232,11 +225,8 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		config.WorkWebhook = convertWebhookConfiguration(clusterManager.Spec.DeployOption.Hosted.WorkWebhookConfiguration)
 	}
 
-	if n.enableSyncLabels {
-		labels := filterLabels(clusterManager.Labels)
-		config.LabelsString = helpers.ConvertLabelsMapToString(labels)
-		config.Labels = labels
-	}
+	config.Labels = helpers.GetClusterManagerHubLabels(clusterManager, n.enableSyncLabels)
+	config.LabelsString = helpers.GetRegistrationLabelString(config.Labels)
 
 	// Update finalizer at first
 	if clusterManager.DeletionTimestamp.IsZero() {
@@ -262,7 +252,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		&crdReconcile{cache: n.cache, recorder: n.recorder, hubAPIExtensionClient: hubApiExtensionClient,
 			hubMigrationClient: hubMigrationClient, skipRemoveCRDs: n.skipRemoveCRDs},
 		&secretReconcile{cache: n.cache, recorder: n.recorder, operatorKubeClient: n.operatorKubeClient,
-			hubKubeClient: hubClient, operatorNamespace: n.operatorNamespace},
+			hubKubeClient: hubClient, operatorNamespace: n.operatorNamespace, enableSyncLabels: n.enableSyncLabels},
 		&hubReconcile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient},
 		&runtimeReconcile{cache: n.cache, recorder: n.recorder, hubKubeConfig: hubKubeConfig, hubKubeClient: hubClient,
 			kubeClient: managementClient, ensureSAKubeconfigs: n.ensureSAKubeconfigs},
@@ -451,15 +441,4 @@ func getIdentityCreatorRoleAndTags(cm operatorapiv1.ClusterManager) string {
 		}
 	}
 	return ""
-}
-
-func filterLabels(labels map[string]string) map[string]string {
-	result := map[string]string{}
-	for key, value := range labels {
-		if reservedLabelKeySets.Has(key) {
-			continue
-		}
-		result[key] = value
-	}
-	return result
 }
