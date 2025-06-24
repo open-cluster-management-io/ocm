@@ -4,7 +4,7 @@ metadata:
   name: {{ .ClusterManagerName }}-placement-controller
   namespace: {{ .ClusterManagerNamespace }}
   labels:
-    app: clustermanager-controller
+    app: {{ .ClusterManagerName }}-placement-controller
     createdByClusterManager: {{ .ClusterManagerName }}
     {{ if gt (len .Labels) 0 }}
     {{ range $key, $value := .Labels }}
@@ -15,16 +15,12 @@ spec:
   replicas: {{ .Replica }}
   selector:
     matchLabels:
-      app: clustermanager-placement-controller
-      {{ if gt (len .Labels) 0 }}
-      {{ range $key, $value := .Labels }}
-      "{{ $key }}": "{{ $value }}"
-      {{ end }}
-      {{ end }}
+      app: {{ .ClusterManagerName }}-placement-controller
+
   template:
     metadata:
       labels:
-        app: clustermanager-placement-controller
+        app: {{ .ClusterManagerName }}-placement-controller
         {{ if gt (len .Labels) 0 }}
         {{ range $key, $value := .Labels }}
         "{{ $key }}": "{{ $value }}"
