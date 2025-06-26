@@ -4,8 +4,7 @@ metadata:
   name: {{ .ClusterManagerName }}-registration-controller
   namespace: {{ .ClusterManagerNamespace }}
   labels:
-    app: clustermanager-controller
-    createdByClusterManager: {{ .ClusterManagerName }}
+    app: {{ .ClusterManagerName }}-registration-controller
     {{ if gt (len .Labels) 0 }}
     {{ range $key, $value := .Labels }}
     "{{ $key }}": "{{ $value }}"
@@ -15,16 +14,11 @@ spec:
   replicas: {{ .Replica }}
   selector:
     matchLabels:
-      app: clustermanager-registration-controller
-      {{ if gt (len .Labels) 0 }}
-      {{ range $key, $value := .Labels }}
-      "{{ $key }}": "{{ $value }}"
-      {{ end }}
-      {{ end }}
+      app: {{ .ClusterManagerName }}-registration-controller
   template:
     metadata:
       labels:
-        app: clustermanager-registration-controller
+        app: {{ .ClusterManagerName }}-registration-controller
         {{ if gt (len .Labels) 0 }}
         {{ range $key, $value := .Labels }}
         "{{$key}}": "{{$value}}"

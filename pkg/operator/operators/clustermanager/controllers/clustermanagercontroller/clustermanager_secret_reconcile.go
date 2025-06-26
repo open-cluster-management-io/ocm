@@ -29,6 +29,7 @@ type secretReconcile struct {
 	operatorNamespace  string
 	cache              resourceapply.ResourceCache
 	recorder           events.Recorder
+	enableSyncLabels   bool
 }
 
 func (c *secretReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager,
@@ -53,7 +54,7 @@ func (c *secretReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clust
 			config.ClusterManagerNamespace,
 			secretName,
 			[]metav1.OwnerReference{},
-			nil,
+			helpers.GetClusterManagerHubLabels(cm, c.enableSyncLabels),
 		); err != nil {
 			syncedErrs = append(syncedErrs, fmt.Errorf("failed to sync secret %s: %v", secretName, err))
 		}

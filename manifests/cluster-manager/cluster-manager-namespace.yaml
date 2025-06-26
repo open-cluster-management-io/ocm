@@ -2,3 +2,9 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: {{ .ClusterManagerNamespace }}
+  labels:
+    {{ if gt (len .Labels) 0 }}
+    {{ range $key, $value := .Labels }}
+    "{{ $key }}": "{{ $value }}"
+    {{ end }}
+    {{ end }}

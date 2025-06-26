@@ -5,7 +5,6 @@ metadata:
   namespace: {{ .ClusterManagerNamespace }}
   labels:
     app: {{ .ClusterManagerName }}-work-controller
-    createdByClusterManager: {{ .ClusterManagerName }}
     {{ if gt (len .Labels) 0 }}
     {{ range $key, $value := .Labels }}
     "{{ $key }}": "{{ $value }}"
@@ -16,11 +15,6 @@ spec:
   selector:
     matchLabels:
       app: {{ .ClusterManagerName }}-work-controller
-      {{ if gt (len .Labels) 0 }}
-      {{ range $key, $value := .Labels }}
-      "{{ $key }}": "{{ $value }}"
-      {{ end }}
-      {{ end }}
   template:
     metadata:
       labels:

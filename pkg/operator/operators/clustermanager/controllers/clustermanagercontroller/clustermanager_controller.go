@@ -225,10 +225,8 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		config.WorkWebhook = convertWebhookConfiguration(clusterManager.Spec.DeployOption.Hosted.WorkWebhookConfiguration)
 	}
 
-	if n.enableSyncLabels {
-		config.LabelsString = helpers.ConvertLabelsMapToString(clusterManager.Labels)
-		config.Labels = clusterManager.Labels
-	}
+	config.Labels = helpers.GetClusterManagerHubLabels(clusterManager, n.enableSyncLabels)
+	config.LabelsString = helpers.GetRegistrationLabelString(config.Labels)
 
 	// Update finalizer at first
 	if clusterManager.DeletionTimestamp.IsZero() {
@@ -254,7 +252,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		&crdReconcile{cache: n.cache, recorder: n.recorder, hubAPIExtensionClient: hubApiExtensionClient,
 			hubMigrationClient: hubMigrationClient, skipRemoveCRDs: n.skipRemoveCRDs},
 		&secretReconcile{cache: n.cache, recorder: n.recorder, operatorKubeClient: n.operatorKubeClient,
-			hubKubeClient: hubClient, operatorNamespace: n.operatorNamespace},
+			hubKubeClient: hubClient, operatorNamespace: n.operatorNamespace, enableSyncLabels: n.enableSyncLabels},
 		&hubReconcile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient},
 		&runtimeReconcile{cache: n.cache, recorder: n.recorder, hubKubeConfig: hubKubeConfig, hubKubeClient: hubClient,
 			kubeClient: managementClient, ensureSAKubeconfigs: n.ensureSAKubeconfigs},

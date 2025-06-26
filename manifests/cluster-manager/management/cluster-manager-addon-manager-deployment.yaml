@@ -4,8 +4,7 @@ metadata:
   name: {{ .ClusterManagerName }}-addon-manager-controller
   namespace: {{ .ClusterManagerNamespace }}
   labels:
-    app: clustermanager-controller
-    createdByClusterManager: {{ .ClusterManagerName }}
+    app: {{ .ClusterManagerName }}-addon-manager-controller
     {{ if gt (len .Labels) 0 }}
     {{ range $key, $value := .Labels }}
     "{{ $key }}": "{{ $value }}"
@@ -15,16 +14,11 @@ spec:
   replicas: {{ .Replica }}
   selector:
     matchLabels:
-      app: clustermanager-addon-manager-controller
-      {{ if gt (len .Labels) 0 }}
-      {{ range $key, $value := .Labels }}
-      "{{ $key }}": "{{ $value }}"
-      {{ end }}
-      {{ end }}
+      app: {{ .ClusterManagerName }}-addon-manager-controller
   template:
     metadata:
       labels:
-        app: clustermanager-addon-manager-controller
+        app: {{ .ClusterManagerName }}-addon-manager-controller
         {{ if gt (len .Labels) 0 }}
         {{ range $key, $value := .Labels }}
         "{{ $key }}": "{{ $value }}"
