@@ -37,8 +37,20 @@ const (
 	// ResyncRequestAction represents the cloud event is for the resync request.
 	ResyncRequestAction EventAction = "resync_request"
 
-	// ResyncRequestAction represents the cloud event is for the resync response.
+	// ResyncResponseAction represents the cloud event is for the resync response.
 	ResyncResponseAction EventAction = "resync_response"
+
+	// CreateRequestAction represents the cloud event is for resource create.
+	CreateRequestAction EventAction = "create_request"
+
+	// UpdateRequestAction represents the cloud event is for resource update.
+	UpdateRequestAction EventAction = "update_request"
+
+	// DeleteRequestAction represents the cloud event is for resource delete.
+	DeleteRequestAction EventAction = "delete_request"
+
+	// WatchRequestAction represents the cloud event is for resource watch.
+	WatchRequestAction EventAction = "watch_request"
 )
 
 const (

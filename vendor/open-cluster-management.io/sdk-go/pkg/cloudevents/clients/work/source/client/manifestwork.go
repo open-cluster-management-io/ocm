@@ -80,7 +80,7 @@ func (c *ManifestWorkSourceClient) Create(ctx context.Context, manifestWork *wor
 	eventType := types.CloudEventsType{
 		CloudEventsDataType: payload.ManifestBundleEventDataType,
 		SubResource:         types.SubResourceSpec,
-		Action:              common.CreateRequestAction,
+		Action:              types.CreateRequestAction,
 	}
 
 	newWork := manifestWork.DeepCopy()
@@ -141,7 +141,7 @@ func (c *ManifestWorkSourceClient) Delete(ctx context.Context, name string, opts
 	eventType := types.CloudEventsType{
 		CloudEventsDataType: payload.ManifestBundleEventDataType,
 		SubResource:         types.SubResourceSpec,
-		Action:              common.DeleteRequestAction,
+		Action:              types.DeleteRequestAction,
 	}
 
 	deletingWork := work.DeepCopy()
@@ -265,7 +265,7 @@ func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt ku
 	eventType := types.CloudEventsType{
 		CloudEventsDataType: payload.ManifestBundleEventDataType,
 		SubResource:         types.SubResourceSpec,
-		Action:              common.UpdateRequestAction,
+		Action:              types.UpdateRequestAction,
 	}
 
 	newWork := patchedWork.DeepCopy()

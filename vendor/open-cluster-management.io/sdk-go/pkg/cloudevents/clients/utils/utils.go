@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/bwmarrin/snowflake"
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/google/uuid"
 
 	"k8s.io/apimachinery/pkg/api/meta"
