@@ -30,7 +30,7 @@ rules:
   verbs: ["get"]
 - apiGroups: ["", "events.k8s.io"]
   resources: ["events"]
-  verbs: ["create", "patch", "update"]
+  verbs: ["create", "patch", "update", "list", "watch"]
 - apiGroups: ["apps"]
   resources: ["replicasets"]
   verbs: ["get"]   

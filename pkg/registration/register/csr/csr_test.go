@@ -389,6 +389,16 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 			isValid:            false,
 		},
 		{
+			name:               "invalid issuer",
+			clusterName:        "cluster2",
+			agentName:          "agent1",
+			kubeconfig:         kubeconfig,
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("c1", "https://127.0.0.1:6001", "", "", nil, nil, nil),
+			tlsKey:             cert1.Key,
+			tlsCert:            cert1.Cert,
+			isValid:            false,
+		},
+		{
 			name:               "valid hub client config",
 			clusterName:        "cluster1",
 			agentName:          "agent1",
