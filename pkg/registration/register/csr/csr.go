@@ -19,7 +19,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -349,23 +348,26 @@ func (c *CSRDriver) BuildClients(ctx context.Context, secretOption register.Secr
 		return nil, fmt.Errorf("failed to create CSR control: %w", err)
 	}
 
-	err = csrControl.Informer().AddIndexers(cache.Indexers{
-		indexByCluster: indexByClusterFunc,
-	})
+	err = c.SetCSRControl(csrControl, secretOption.ClusterName)
 	if err != nil {
 		return nil, err
 	}
 
-	err = csrControl.Informer().AddIndexers(cache.Indexers{
-		indexByAddon: indexByAddonFunc,
-	})
-	if err != nil {
-		utilruntime.HandleError(err)
+	return clients, nil
+}
+
+func (c *CSRDriver) SetCSRControl(csrControl CSRControl, clusterName string) error {
+	if err := csrControl.Informer().AddIndexers(cache.Indexers{indexByCluster: indexByClusterFunc}); err != nil {
+		return err
+	}
+
+	if err := csrControl.Informer().AddIndexers(cache.Indexers{indexByAddon: indexByAddonFunc}); err != nil {
+		return err
 	}
 
 	c.csrControl = csrControl
-	c.haltCSRCreation = haltCSRCreationFunc(csrControl.Informer().GetIndexer(), secretOption.ClusterName)
-	return clients, nil
+	c.haltCSRCreation = haltCSRCreationFunc(csrControl.Informer().GetIndexer(), clusterName)
+	return nil
 }
 
 var _ register.RegisterDriver = &CSRDriver{}

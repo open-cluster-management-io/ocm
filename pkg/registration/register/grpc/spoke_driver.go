@@ -141,9 +141,9 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 		return nil, err
 	}
 	csrControl := &csrControl{csrClientHolder: csrClientHolder}
-	// if err := d.csrDriver.SetCSRControl(csrControl, secretOption.ClusterName); err != nil {
-	// 	return nil, err
-	// }
+	if err := d.csrDriver.SetCSRControl(csrControl, secretOption.ClusterName); err != nil {
+		return nil, err
+	}
 	d.control = csrControl
 
 	clients := &register.Clients{
