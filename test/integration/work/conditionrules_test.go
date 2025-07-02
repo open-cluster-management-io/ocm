@@ -9,7 +9,6 @@ import (
 	"github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/utils/ptr"
@@ -138,7 +137,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					return fmt.Errorf("the size of resource status is not correct, expect to be 1 but got %d", len(work.Status.ResourceStatus.Manifests))
 				}
 
-				return checkCondition(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
+				return util.CheckExpectedConditions(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
 					Type:   workapiv1.ManifestComplete,
 					Status: metav1.ConditionFalse,
 					Reason: workapiv1.ConditionRuleEvaluated,
@@ -179,7 +178,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					return fmt.Errorf("the size of resource status is not correct, expect to be 1 but got %d", len(work.Status.ResourceStatus.Manifests))
 				}
 
-				return checkCondition(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
+				return util.CheckExpectedConditions(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
 					Type:   workapiv1.ManifestComplete,
 					Status: metav1.ConditionTrue,
 					Reason: workapiv1.ConditionRuleEvaluated,
@@ -244,7 +243,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					return fmt.Errorf("the size of resource status is not correct, expect to be 1 but got %d", len(work.Status.ResourceStatus.Manifests))
 				}
 
-				return checkCondition(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
+				return util.CheckExpectedConditions(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
 					Type:    "OneActive",
 					Reason:  workapiv1.ConditionRuleEvaluated,
 					Status:  metav1.ConditionFalse,
@@ -276,7 +275,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					return fmt.Errorf("the size of resource status is not correct, expect to be 1 but got %d", len(work.Status.ResourceStatus.Manifests))
 				}
 
-				return checkCondition(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
+				return util.CheckExpectedConditions(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
 					Type:    "OneActive",
 					Reason:  workapiv1.ConditionRuleEvaluated,
 					Status:  metav1.ConditionTrue,
@@ -340,12 +339,10 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					return fmt.Errorf("the size of resource status is not correct, expect to be 1 but got %d", len(work.Status.ResourceStatus.Manifests))
 				}
 
-				condition := meta.FindStatusCondition(work.Status.ResourceStatus.Manifests[0].Conditions, "NotWellKnown")
-				if condition != nil {
-					return fmt.Errorf("did not expect to find NotWellKnown condition, we got %v", condition)
-				}
-
-				return nil
+				return util.CheckExpectedConditions(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
+					Type:   "NotWellKnown",
+					Status: util.ConditionNotFound,
+				})
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 		})
 	})
@@ -448,7 +445,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					return fmt.Errorf("the size of resource status is not correct, expect to be 2 but got %d", len(work.Status.ResourceStatus.Manifests))
 				}
 
-				err := checkCondition(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
+				err := util.CheckExpectedConditions(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
 					Type:   workapiv1.ManifestComplete,
 					Status: metav1.ConditionFalse,
 					Reason: workapiv1.ConditionRuleEvaluated,
@@ -457,7 +454,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					return fmt.Errorf("Job1: %v", err)
 				}
 
-				err = checkCondition(work.Status.ResourceStatus.Manifests[1].Conditions, metav1.Condition{
+				err = util.CheckExpectedConditions(work.Status.ResourceStatus.Manifests[1].Conditions, metav1.Condition{
 					Type:   workapiv1.ManifestComplete,
 					Status: metav1.ConditionTrue,
 					Reason: workapiv1.ConditionRuleEvaluated,
@@ -565,7 +562,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					return fmt.Errorf("the size of resource status is not correct, expect to be 2 but got %d", len(work.Status.ResourceStatus.Manifests))
 				}
 
-				err := checkCondition(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
+				err = util.CheckExpectedConditions(work.Status.ResourceStatus.Manifests[0].Conditions, metav1.Condition{
 					Type:   workapiv1.ManifestComplete,
 					Status: metav1.ConditionFalse,
 					Reason: workapiv1.ConditionRuleEvaluated,
@@ -574,7 +571,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					return fmt.Errorf("Job1: %v", err)
 				}
 
-				err = checkCondition(work.Status.ResourceStatus.Manifests[1].Conditions, metav1.Condition{
+				err = util.CheckExpectedConditions(work.Status.ResourceStatus.Manifests[1].Conditions, metav1.Condition{
 					Type:   workapiv1.ManifestComplete,
 					Status: metav1.ConditionFalse,
 					Reason: workapiv1.ConditionRuleExpressionError,
@@ -587,13 +584,3 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 		})
 	})
 })
-
-func checkCondition(conditions []metav1.Condition, expected metav1.Condition) error {
-	condition := meta.FindStatusCondition(conditions, expected.Type)
-	if condition == nil || !util.MatchCondition(*condition, expected) {
-		return fmt.Errorf(
-			"%s condition is not correct. Expected %+v but got %+v", expected.Type, expected, condition,
-		)
-	}
-	return nil
-}

@@ -9,6 +9,12 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+)
+
+var (
+	// ConditionNotFound can be used to assert a condition type does not exist with ExpectedConditions
+	ConditionNotFound metav1.ConditionStatus = "-"
 )
 
 func NewIntegrationTestEventRecorder(component string) events.Recorder {
@@ -82,6 +88,27 @@ func MatchCondition(condition metav1.Condition, expected metav1.Condition) bool 
 	}
 
 	return true
+}
+
+func CheckExpectedConditions(conditions []metav1.Condition, expectedConditions ...metav1.Condition) utilerrors.Aggregate {
+	var errs []error
+	for _, expected := range expectedConditions {
+		condition := meta.FindStatusCondition(conditions, expected.Type)
+		switch expected.Status {
+		case ConditionNotFound:
+			if condition != nil {
+				errs = append(errs, fmt.Errorf("Expected not to find condition %s, got %+v", expected.Type, condition))
+			}
+		default:
+			if condition == nil || !MatchCondition(*condition, expected) {
+				errs = append(errs, fmt.Errorf("Expected to find condition %+v, got %+v", expected, condition))
+			}
+		}
+	}
+	if errs == nil {
+		return nil
+	}
+	return utilerrors.NewAggregate(errs)
 }
 
 func HasCondition(
