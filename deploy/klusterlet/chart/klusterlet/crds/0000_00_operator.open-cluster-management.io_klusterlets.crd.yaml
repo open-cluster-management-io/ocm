@@ -341,17 +341,20 @@ spec:
                             minLength: 1
                             pattern: ^arn:aws:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$
                             type: string
+                          iamConfigSecret:
+                            description: |-
+                              IamConfigSecret is the name of a secret containing "config" and/or "credentials" files mounted to ~/.aws/config and ~/.aws/credentials respectively.
+                              More Info: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
+                            type: string
                           managedClusterArn:
                             description: |-
-                              The arn of the managed cluster (ie: an EKS cluster). This will be required to generate the md5hash which will be used as a suffix to create IAM role on hub
+                              The arn of the managed cluster (ie: an EKS cluster). This will be used when managed IAM is enabled to generate the md5hash as a suffix to create IAM role on hub
                               as well as used by kluslerlet-agent, to assume role suffixed with the md5hash, on startup.
                               Example - arn:eks:us-west-2:12345678910:cluster/managed-cluster1.
-                            minLength: 1
                             pattern: ^arn:aws:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$
                             type: string
                         required:
                         - hubClusterArn
-                        - managedClusterArn
                         type: object
                     required:
                     - authType
