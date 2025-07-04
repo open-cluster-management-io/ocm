@@ -13,7 +13,6 @@ import (
 	certificatesv1 "k8s.io/api/certificates/v1"
 	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
-	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -101,14 +100,13 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 		return nil, err
 	}
 
-	eventWatchStore := cloudeventsstore.NewSimpleStore[*eventsv1.Event]()
 	eventClient, err := cloudeventsevent.NewClientHolder(
 		ctx,
 		cloudeventsoptions.NewGenericClientOptions(
 			config,
 			cloudeventsevent.NewEventCodec(),
 			secretOption.ClusterName,
-		).WithClusterName(secretOption.ClusterName).WithClientWatcherStore(eventWatchStore),
+		).WithClusterName(secretOption.ClusterName).WithSubscription(false).WithResyncEnabled(false),
 	)
 	if err != nil {
 		return nil, err

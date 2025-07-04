@@ -5,16 +5,15 @@ import (
 	"fmt"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+	eventv1 "k8s.io/api/events/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
 	eventce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server"
-
-	"open-cluster-management.io/ocm/pkg/server/services"
 )
 
 type EventService struct {
@@ -30,31 +29,11 @@ func NewEventService(client kubernetes.Interface) server.Service {
 }
 
 func (e *EventService) Get(ctx context.Context, resourceID string) (*cloudevents.Event, error) {
-	namespace, name, err := cache.SplitMetaNamespaceKey(resourceID)
-	if err != nil {
-		return nil, err
-	}
-	evt, err := e.client.EventsV1().Events(namespace).Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return e.codec.Encode(services.CloudEventsSourceKube, types.CloudEventsType{CloudEventsDataType: eventce.EventEventDataType}, evt)
+	return nil, errors.NewMethodNotSupported(eventv1.Resource("events"), "get")
 }
 
 func (e *EventService) List(listOpts types.ListOptions) ([]*cloudevents.Event, error) {
-	evts, err := e.client.EventsV1().Events(listOpts.ClusterName).List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	var cloudevts []*cloudevents.Event
-	for _, evt := range evts.Items {
-		cloudevt, err := e.codec.Encode(services.CloudEventsSourceKube, types.CloudEventsType{CloudEventsDataType: eventce.EventEventDataType}, &evt)
-		if err != nil {
-			return nil, err
-		}
-		cloudevts = append(cloudevts, cloudevt)
-	}
-	return cloudevts, nil
+	return nil, errors.NewMethodNotSupported(eventv1.Resource("events"), "list")
 }
 
 func (e *EventService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.Event) error {
@@ -74,7 +53,20 @@ func (e *EventService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.
 		_, err := e.client.EventsV1().Events(event.Namespace).Create(ctx, event, metav1.CreateOptions{})
 		return err
 	case types.UpdateRequestAction:
-		_, err := e.client.EventsV1().Events(event.Namespace).Update(ctx, event, metav1.UpdateOptions{})
+		last, err := e.client.EventsV1().Events(event.Namespace).Get(ctx, event.Name, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			// event is not found, do nothing
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		// only update the series field
+		updated := last.DeepCopy()
+		updated.Series = event.Series
+
+		_, err = e.client.EventsV1().Events(event.Namespace).Update(ctx, updated, metav1.UpdateOptions{})
 		return err
 	default:
 		return fmt.Errorf("unsupported action %s for event %s/%s", eventType.Action, event.Namespace, event.Name)

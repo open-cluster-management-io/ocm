@@ -12,9 +12,7 @@ import (
 	eventv1client "k8s.io/client-go/kubernetes/typed/events/v1"
 	"k8s.io/klog/v2"
 
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/common"
 	cloudeventserrors "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/errors"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/store"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/utils"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
@@ -22,17 +20,12 @@ import (
 
 type EventClient struct {
 	cloudEventsClient *generic.CloudEventAgentClient[*eventv1.Event]
-	watcherStore      store.ClientWatcherStore[*eventv1.Event]
 	namespace         string
 }
 
-func NewEventClient(
-	cloudEventsClient *generic.CloudEventAgentClient[*eventv1.Event],
-	watcherStore store.ClientWatcherStore[*eventv1.Event],
-) *EventClient {
+func NewEventClient(cloudEventsClient *generic.CloudEventAgentClient[*eventv1.Event]) *EventClient {
 	return &EventClient{
 		cloudEventsClient: cloudEventsClient,
-		watcherStore:      watcherStore,
 	}
 }
 
@@ -43,14 +36,6 @@ func (e *EventClient) WithNamespace(namespace string) *EventClient {
 
 func (e *EventClient) Create(ctx context.Context, event *eventv1.Event, opts metav1.CreateOptions) (*eventv1.Event, error) {
 	klog.V(4).Infof("creating Event %s", event.Name)
-	_, exists, err := e.watcherStore.Get(event.Namespace, event.Name)
-	if err != nil {
-		return nil, errors.NewInternalError(err)
-	}
-	if exists {
-		return nil, errors.NewAlreadyExists(eventv1.Resource("events"), event.Name)
-	}
-
 	eventType := types.CloudEventsType{
 		CloudEventsDataType: EventEventDataType,
 		SubResource:         types.SubResourceSpec,
@@ -58,7 +43,7 @@ func (e *EventClient) Create(ctx context.Context, event *eventv1.Event, opts met
 	}
 
 	if err := e.cloudEventsClient.Publish(ctx, eventType, event); err != nil {
-		return nil, cloudeventserrors.ToStatusError(common.CSRGR, event.Name, err)
+		return nil, cloudeventserrors.ToStatusError(eventv1.Resource("events"), event.Name, err)
 	}
 
 	return event.DeepCopy(), nil
@@ -89,15 +74,14 @@ func (e *EventClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch
 }
 
 func (e *EventClient) Patch(ctx context.Context, name string, pt kubetypes.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *eventv1.Event, err error) {
-	last, exists, err := e.watcherStore.Get(e.namespace, name)
-	if err != nil {
-		return nil, errors.NewInternalError(err)
-	}
-	if !exists {
-		return nil, errors.NewNotFound(eventv1.Resource("events"), name)
-	}
-
-	patchedEvent, err := utils.Patch(pt, last, data)
+	// This will be called when recording isomorphic events (https://github.com/kubernetes/client-go/blob/master/tools/events/event_broadcaster.go#L58C6-L58C15)
+	// The event broadcaster will only increase the event series.
+	// Only publish the event series with an event patch
+	patchedEvent, err := utils.Patch(pt, &eventv1.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: e.namespace,
+		}}, data)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}

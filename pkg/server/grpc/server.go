@@ -25,7 +25,6 @@ import (
 	leasece "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/lease"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/payload"
 	grpcauthn "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authn"
-	grpcauthz "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authz/kube"
 	grpcoptions "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/options"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
@@ -55,8 +54,6 @@ func NewGRPCServer() *cobra.Command {
 					grpcauthn.NewTokenAuthenticator(clients.kubeClient),
 				).WithAuthenticator(
 					grpcauthn.NewMtlsAuthenticator(),
-				).WithAuthorizer(
-					grpcauthz.NewSARAuthorizer(clients.kubeClient),
 				).WithService(
 					clusterce.ManagedClusterEventDataType,
 					cluster.NewClusterService(clients.clusterClient, clients.clusterInformers.Cluster().V1().ManagedClusters()),

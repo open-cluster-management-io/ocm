@@ -25,14 +25,12 @@ func (e EventV1ClientWrapper) Events(namespace string) eventv1client.EventInterf
 var _ eventv1client.EventsV1Interface = &EventV1ClientWrapper{}
 
 func NewClientHolder(ctx context.Context, opt *options.GenericClientOptions[*eventv1.Event]) (*EventV1ClientWrapper, error) {
-
-	// start to subscribe
 	cloudEventsClient, err := opt.AgentClient(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	eventClient := NewEventClient(cloudEventsClient, opt.WatcherStore())
+	eventClient := NewEventClient(cloudEventsClient)
 
 	return &EventV1ClientWrapper{EventClient: eventClient}, nil
 }

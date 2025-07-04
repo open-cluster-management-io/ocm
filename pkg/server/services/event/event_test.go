@@ -18,87 +18,16 @@ import (
 )
 
 func TestGet(t *testing.T) {
-	cases := []struct {
-		name          string
-		events        []runtime.Object
-		resourceID    string
-		expectedError bool
-	}{
-		{
-			name:          "event not found",
-			events:        []runtime.Object{},
-			resourceID:    "test-namespace/test-event",
-			expectedError: true,
-		},
-		{
-			name:       "get event",
-			resourceID: "test-namespace/test-event",
-			events: []runtime.Object{&eventsv1.Event{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-event", Namespace: "test-namespace"},
-			}},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			kubeClient := kubefake.NewSimpleClientset(c.events...)
-
-			service := NewEventService(kubeClient)
-			_, err := service.Get(context.Background(), c.resourceID)
-			if c.expectedError {
-				if err == nil {
-					t.Errorf("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-		})
+	service := NewEventService(kubefake.NewSimpleClientset())
+	if _, err := service.Get(context.Background(), "test-event"); err == nil {
+		t.Errorf("expected error, but failed")
 	}
 }
 
 func TestList(t *testing.T) {
-	cases := []struct {
-		name           string
-		events         []runtime.Object
-		clusterName    string
-		expectedEvents int
-	}{
-		{
-			name:           "no events",
-			events:         []runtime.Object{},
-			clusterName:    "test-cluster",
-			expectedEvents: 0,
-		},
-		{
-			name: "list events",
-			events: []runtime.Object{
-				&eventsv1.Event{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-event1", Namespace: "test-cluster1"},
-				},
-				&eventsv1.Event{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-event2", Namespace: "test-cluster2"},
-				},
-			},
-			clusterName:    "test-cluster1",
-			expectedEvents: 1,
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			kubeClient := kubefake.NewSimpleClientset(c.events...)
-
-			service := NewEventService(kubeClient)
-			evts, err := service.List(types.ListOptions{ClusterName: c.clusterName})
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if len(evts) != c.expectedEvents {
-				t.Errorf("expected %d events, got %d", c.expectedEvents, len(evts))
-			}
-		})
+	service := NewEventService(kubefake.NewSimpleClientset())
+	if _, err := service.List(types.ListOptions{}); err == nil {
+		t.Errorf("expected error, but failed")
 	}
 }
 
@@ -175,8 +104,8 @@ func TestHandleStatusUpdate(t *testing.T) {
 				return &evt
 			}(),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "update")
-				if len(actions[0].GetSubresource()) != 0 {
+				testingcommon.AssertActions(t, actions, "get", "update")
+				if len(actions[1].GetSubresource()) != 0 {
 					t.Errorf("unexpected subresource %s", actions[0].GetSubresource())
 				}
 			},

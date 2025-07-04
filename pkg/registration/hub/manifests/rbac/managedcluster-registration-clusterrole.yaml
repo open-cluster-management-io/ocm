@@ -28,4 +28,4 @@ rules:
 # Allow agent to send events to the hub
 - apiGroups: ["events.k8s.io"]
   resources: ["events"]
-  verbs: ["create", "list", "watch"]
+  verbs: ["create"]

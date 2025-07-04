@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	cetypes "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
