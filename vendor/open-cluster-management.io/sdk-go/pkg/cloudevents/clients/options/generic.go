@@ -19,6 +19,7 @@ type GenericClientOptions[T generic.ResourceObject] struct {
 	clientID     string
 	sourceID     string
 	clusterName  string
+	subscription bool
 	resync       bool
 }
 
@@ -41,10 +42,11 @@ func NewGenericClientOptions[T generic.ResourceObject](config any,
 	codec generic.Codec[T],
 	clientID string) *GenericClientOptions[T] {
 	return &GenericClientOptions[T]{
-		config:   config,
-		codec:    codec,
-		clientID: clientID,
-		resync:   true,
+		config:       config,
+		codec:        codec,
+		clientID:     clientID,
+		subscription: true,
+		resync:       true,
 	}
 }
 
@@ -66,6 +68,13 @@ func (o *GenericClientOptions[T]) WithSourceID(sourceID string) *GenericClientOp
 // WithClusterName set the managed cluster name when building a client for an agent.
 func (o *GenericClientOptions[T]) WithClusterName(clusterName string) *GenericClientOptions[T] {
 	o.clusterName = clusterName
+	return o
+}
+
+// WithSubscription control the client subscription (Default is true), if it's false, the client
+// will not subscribe to source/consumer.
+func (o *GenericClientOptions[T]) WithSubscription(enabled bool) *GenericClientOptions[T] {
+	o.subscription = enabled
 	return o
 }
 
@@ -118,8 +127,10 @@ func (o *GenericClientOptions[T]) AgentClient(ctx context.Context) (*generic.Clo
 		return nil, err
 	}
 
-	// start to subscribe
-	cloudEventsClient.Subscribe(ctx, o.watcherStore.HandleReceivedResource)
+	if o.subscription {
+		// start to subscribe
+		cloudEventsClient.Subscribe(ctx, o.watcherStore.HandleReceivedResource)
+	}
 
 	// start a go routine to receive client reconnect signal
 	go func() {
@@ -187,8 +198,11 @@ func (o *GenericClientOptions[T]) SourceClient(ctx context.Context) (*generic.Cl
 		return nil, err
 	}
 
-	// start to subscribe
-	cloudEventsClient.Subscribe(ctx, o.watcherStore.HandleReceivedResource)
+	if o.subscription {
+		// start to subscribe
+		cloudEventsClient.Subscribe(ctx, o.watcherStore.HandleReceivedResource)
+	}
+
 	// start a go routine to receive client reconnect signal
 	go func() {
 		for {

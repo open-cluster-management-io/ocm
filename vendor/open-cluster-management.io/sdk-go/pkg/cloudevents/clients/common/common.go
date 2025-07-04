@@ -27,12 +27,6 @@ const (
 // CloudEventsOriginalSourceLabelKey is the key of the cloudevents original source label.
 const CloudEventsOriginalSourceLabelKey = "cloudevents.open-cluster-management.io/originalsource"
 
-const (
-	CreateRequestAction = "create_request"
-	UpdateRequestAction = "update_request"
-	DeleteRequestAction = "delete_request"
-)
-
 // ResourceDeleted represents a resource is deleted.
 const ResourceDeleted = "Deleted"
 
