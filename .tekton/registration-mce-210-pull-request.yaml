@@ -4,18 +4,19 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/stolostron/ocm?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: "{{revision}}"
+    build.appstudio.redhat.com/pull_request_number: "{{pull_request_number}}"
     build.appstudio.redhat.com/target_branch: "{{target_branch}}"
-    pipelinesascode.tekton.dev/cancel-in-progress: "false"
+    pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression:
-      event == "push" && target_branch
+      event == "pull_request" && target_branch
       == "main"
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: release-mce-29
-    appstudio.openshift.io/component: work-mce-29
+    appstudio.openshift.io/application: release-mce-210
+    appstudio.openshift.io/component: registration-mce-210
     pipelines.appstudio.openshift.io/type: build
-  name: work-mce-29-on-push
+  name: registration-mce-210-on-pull-request
   namespace: crt-redhat-acm-tenant
 spec:
   params:
@@ -24,7 +25,9 @@ spec:
     - name: revision
       value: "{{revision}}"
     - name: output-image
-      value: quay.io/redhat-user-workloads/crt-redhat-acm-tenant/work-mce-29:{{revision}}
+      value: quay.io/redhat-user-workloads/crt-redhat-acm-tenant/registration-mce-210:on-pr-{{revision}}
+    - name: image-expires-after
+      value: 5d
     - name: build-platforms
       value:
         - linux/x86_64
@@ -32,7 +35,7 @@ spec:
         - linux/ppc64le
         - linux/s390x
     - name: dockerfile
-      value: build/Dockerfile.work.rhtap
+      value: build/Dockerfile.registration.rhtap
     - name: path-context
       value: .
   pipelineSpec:
@@ -612,7 +615,7 @@ spec:
       - name: netrc
         optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-work-mce-29
+    serviceAccountName: build-pipeline-registration-mce-210
   workspaces:
     - name: git-auth
       secret:
