@@ -462,7 +462,8 @@ func TestSyncDeploy(t *testing.T) {
 
 	// Check if resources are created as expected
 	// We expect create the namespace twice respectively in the management cluster and the hub cluster.
-	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 28)
+	// Added 2 more resources for addon-manager aggregate ClusterRole and ClusterRoleBinding
+	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 30)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager, true)
 	}
@@ -502,7 +503,8 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 
 	// Check if resources are created as expected
 	// We expect create the namespace twice respectively in the management cluster and the hub cluster.
-	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 30)
+	// Added 2 more resources for addon-manager aggregate ClusterRole and ClusterRoleBinding
+	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 32)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager, false)
 	}
@@ -544,7 +546,7 @@ func TestSyncDelete(t *testing.T) {
 			deleteKubeActions = append(deleteKubeActions, deleteKubeAction)
 		}
 	}
-	testingcommon.AssertEqualNumber(t, len(deleteKubeActions), 30) // delete namespace both from the hub cluster and the mangement cluster
+	testingcommon.AssertEqualNumber(t, len(deleteKubeActions), 32) // delete namespace both from the hub cluster and the mangement cluster
 
 	var deleteCRDActions []clienttesting.DeleteActionImpl
 	crdActions := tc.apiExtensionClient.Actions()

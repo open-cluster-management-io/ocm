@@ -253,7 +253,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 			hubMigrationClient: hubMigrationClient, skipRemoveCRDs: n.skipRemoveCRDs},
 		&secretReconcile{cache: n.cache, recorder: n.recorder, operatorKubeClient: n.operatorKubeClient,
 			hubKubeClient: hubClient, operatorNamespace: n.operatorNamespace, enableSyncLabels: n.enableSyncLabels},
-		&hubReconcile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient},
+		&hubReconcile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient, enableSyncLabels: n.enableSyncLabels},
 		&runtimeReconcile{cache: n.cache, recorder: n.recorder, hubKubeConfig: hubKubeConfig, hubKubeClient: hubClient,
 			kubeClient: managementClient, ensureSAKubeconfigs: n.ensureSAKubeconfigs},
 		&webhookReconcile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient, kubeClient: managementClient},

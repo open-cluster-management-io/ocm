@@ -87,7 +87,6 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		"addon/cluster_management_addon.yaml",
 		"addon/cluster_role.yaml",
 		"addon/signca_secret_role.yaml",
-		"addon/signca_secret_rolebinding.yaml",
 	}
 
 	var signerSecretNamespace string

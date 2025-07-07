@@ -11,6 +11,8 @@ import (
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -58,6 +60,8 @@ var (
 		// addon-manager
 		"cluster-manager/hub/cluster-manager-addon-manager-clusterrole.yaml",
 		"cluster-manager/hub/cluster-manager-addon-manager-clusterrolebinding.yaml",
+		"cluster-manager/hub/cluster-manager-addon-manager-clusterrole-aggregate.yaml",
+		"cluster-manager/hub/cluster-manager-addon-manager-clusterrolebinding-aggregate.yaml",
 		"cluster-manager/hub/cluster-manager-addon-manager-work-executor-admin-clusterrolebinding.yaml",
 		"cluster-manager/hub/cluster-manager-addon-manager-serviceaccount.yaml",
 	}
@@ -78,9 +82,10 @@ var (
 )
 
 type hubReconcile struct {
-	hubKubeClient kubernetes.Interface
-	cache         resourceapply.ResourceCache
-	recorder      events.Recorder
+	hubKubeClient    kubernetes.Interface
+	cache            resourceapply.ResourceCache
+	recorder         events.Recorder
+	enableSyncLabels bool
 }
 
 func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager,
@@ -124,6 +129,13 @@ func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 	for _, result := range resourceResults {
 		if result.Error != nil {
 			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
+		}
+	}
+
+	// add aggregation clusterrole for addon-manager, this is not allowed in library-go for now, so need an additional creating
+	if config.AddOnManagerEnabled {
+		if err := c.createAddonManagerAggregationRule(ctx, cm); err != nil {
+			appliedErrs = append(appliedErrs, err)
 		}
 	}
 
@@ -171,4 +183,31 @@ func getHubResources(mode operatorapiv1.InstallMode, config manifests.HubConfig)
 	}
 
 	return hubResources
+}
+
+func (c *hubReconcile) createAddonManagerAggregationRule(ctx context.Context, cm *operatorapiv1.ClusterManager) error {
+	aggregateClusterRoleName := fmt.Sprintf("open-cluster-management:%s-addon-manager:aggregate", cm.Name)
+	_, err := c.hubKubeClient.RbacV1().ClusterRoles().Get(ctx, aggregateClusterRoleName, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		aggregateClusterRole := &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: aggregateClusterRoleName,
+			},
+			AggregationRule: &rbacv1.AggregationRule{
+				ClusterRoleSelectors: []metav1.LabelSelector{
+					{
+						MatchLabels: map[string]string{
+							"open-cluster-management.io/aggregate-to-addon-manager": "true",
+						},
+					},
+				},
+			},
+			Rules: []rbacv1.PolicyRule{},
+		}
+		aggregateClusterRole.SetLabels(helpers.GetClusterManagerHubLabels(cm, c.enableSyncLabels))
+		_, createErr := c.hubKubeClient.RbacV1().ClusterRoles().Create(ctx, aggregateClusterRole, metav1.CreateOptions{})
+		return createErr
+	}
+
+	return nil
 }

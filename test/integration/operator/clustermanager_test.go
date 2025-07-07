@@ -70,6 +70,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 	var hubWorkWebhookClusterRole = fmt.Sprintf("open-cluster-management:%s-work:webhook", clusterManagerName)
 	var hubWorkControllerClusterRole = fmt.Sprintf("open-cluster-management:%s-work:controller", clusterManagerName)
 	var hubAddOnManagerClusterRole = fmt.Sprintf("open-cluster-management:%s-addon-manager:controller", clusterManagerName)
+	var hubAddOnManagerAggregateClusterRole = fmt.Sprintf("open-cluster-management:%s-addon-manager:aggregate", clusterManagerName)
 	var hubRegistrationSA = "registration-controller-sa"
 	var hubRegistrationWebhookSA = "registration-webhook-sa"
 	var hubWorkWebhookSA = "work-webhook-sa"
@@ -701,6 +702,20 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 			gomega.Eventually(func() error {
 				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), hubAddOnManagerClusterRole, metav1.GetOptions{}); err != nil {
+					return err
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			// Check aggregate clusterrole
+			gomega.Eventually(func() error {
+				if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubAddOnManagerAggregateClusterRole, metav1.GetOptions{}); err != nil {
+					return err
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			gomega.Eventually(func() error {
+				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), hubAddOnManagerAggregateClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
