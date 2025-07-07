@@ -112,6 +112,15 @@ func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 	hubResources := getHubResources(cm.Spec.DeployOption.Mode, config)
 	var appliedErrs []error
 
+	// create aggregation clusterrole for addon-manager when enabled, this must happen before static resources
+	// are applied because the static ClusterRoleBinding references this ClusterRole; this is not allowed in library-go
+	// for now, so need additional creating
+	if config.AddOnManagerEnabled {
+		if err := c.createAddonManagerAggregationRule(ctx, cm); err != nil {
+			appliedErrs = append(appliedErrs, err)
+		}
+	}
+
 	resourceResults := helpers.ApplyDirectly(
 		ctx,
 		c.hubKubeClient,
@@ -132,13 +141,6 @@ func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 	for _, result := range resourceResults {
 		if result.Error != nil {
 			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
-		}
-	}
-
-	// add aggregation clusterrole for addon-manager when enabled, this is not allowed in library-go for now, so need additional creating
-	if config.AddOnManagerEnabled {
-		if err := c.createAddonManagerAggregationRule(ctx, cm); err != nil {
-			appliedErrs = append(appliedErrs, err)
 		}
 	}
 
@@ -222,8 +224,12 @@ func (c *hubReconcile) createAddonManagerAggregationRule(ctx context.Context, cm
 		aggregateClusterRole.SetLabels(helpers.GetClusterManagerHubLabels(cm, c.enableSyncLabels))
 		_, createErr := c.hubKubeClient.RbacV1().ClusterRoles().Create(ctx, aggregateClusterRole, metav1.CreateOptions{})
 		return createErr
+	} else if err != nil {
+		// Return any other error from the Get operation
+		return err
 	}
 
+	// ClusterRole already exists, nothing to do
 	return nil
 }
 
