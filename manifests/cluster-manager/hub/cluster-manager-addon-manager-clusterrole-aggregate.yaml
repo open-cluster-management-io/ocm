@@ -6,11 +6,11 @@ kind: ClusterRole
 metadata:
   name: open-cluster-management:{{ .ClusterManagerName }}-addon-manager:aggregate
   labels:
-    {{ if gt (len .Labels) 0 }}
-    {{ range $key, $value := .Labels }}
+{{- if gt (len .Labels) 0 }}
+{{- range $key, $value := .Labels }}
     "{{ $key }}": "{{ $value }}"
-    {{ end }}
-    {{ end }}
+{{- end }}
+{{- end }}
 aggregationRule:
   clusterRoleSelectors:
   - matchLabels:
