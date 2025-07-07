@@ -1026,8 +1026,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 46 {
-					return fmt.Errorf("should get 46 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 47 {
+					return fmt.Errorf("should get 47 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
