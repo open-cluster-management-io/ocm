@@ -221,8 +221,10 @@ func BuildGRPCOptionsFromFlags(configPath string) (*GRPCOptions, error) {
 	// Set the keepalive options
 	options.Dialer.KeepAliveOptions = keepAliveOptions
 
+	// If token or client certs are provided, set up TLS configuration for the gRPC connection,
+	// the certificates will be reloaded periodically.
+	// Note: setting token requires authority certificates
 	if token != "" || config.CertConfig.HasCerts() {
-		// Set up TLS configuration for the gRPC connection, the certificates will be reloaded periodically.
 		options.Dialer.TLSConfig, err = cert.AutoLoadTLSConfig(
 			config.CertConfig,
 			func() (*cert.CertConfig, error) {

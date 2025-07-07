@@ -7,6 +7,8 @@ import (
 	"sync"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/cloudevents/sdk-go/v2/binding"
 	cecontext "github.com/cloudevents/sdk-go/v2/context"
@@ -123,6 +125,12 @@ func (p *Protocol) OpenInbound(ctx context.Context) error {
 		for {
 			msg, err := subClient.Recv()
 			if err != nil {
+				if errStatus, _ := status.FromError(err); errStatus.Code() == codes.Canceled {
+					// context canceled, return directly
+					return
+				}
+
+				logger.Errorf("failed to receive events, %v", err)
 				return
 			}
 			p.incoming <- msg
