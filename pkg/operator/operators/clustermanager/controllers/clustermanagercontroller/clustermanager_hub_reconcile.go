@@ -60,7 +60,6 @@ var (
 		// addon-manager
 		"cluster-manager/hub/cluster-manager-addon-manager-clusterrole.yaml",
 		"cluster-manager/hub/cluster-manager-addon-manager-clusterrolebinding.yaml",
-		"cluster-manager/hub/cluster-manager-addon-manager-clusterrole-aggregate.yaml",
 		"cluster-manager/hub/cluster-manager-addon-manager-clusterrolebinding-aggregate.yaml",
 		"cluster-manager/hub/cluster-manager-addon-manager-work-executor-admin-clusterrolebinding.yaml",
 		"cluster-manager/hub/cluster-manager-addon-manager-serviceaccount.yaml",
@@ -149,13 +148,38 @@ func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 		return cm, reconcileStop, utilerrors.NewAggregate(appliedErrs)
 	}
 
+	// cleanup aggregation clusterrole when addon-manager is disabled (after static resources are processed)
+	if !config.AddOnManagerEnabled {
+		if err := c.cleanupAddonManagerAggregationRule(ctx, cm); err != nil {
+			meta.SetStatusCondition(&cm.Status.Conditions, metav1.Condition{
+				Type:    operatorapiv1.ConditionClusterManagerApplied,
+				Status:  metav1.ConditionFalse,
+				Reason:  "HubResourceCleanupFailed",
+				Message: fmt.Sprintf("Failed to cleanup aggregate ClusterRole: %v", err),
+			})
+			return cm, reconcileStop, err
+		}
+	}
+
 	return cm, reconcileContinue, nil
 }
 
 func (c *hubReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterManager,
 	config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
 	hubResources := getHubResources(cm.Spec.DeployOption.Mode, config)
-	return cleanResources(ctx, c.hubKubeClient, cm, config, hubResources...)
+
+	// First clean up static resources (including ClusterRoleBinding that references the aggregate ClusterRole)
+	cm, state, err := cleanResources(ctx, c.hubKubeClient, cm, config, hubResources...)
+	if err != nil {
+		return cm, state, err
+	}
+
+	// Then cleanup the dynamically created aggregate ClusterRole
+	if err := c.cleanupAddonManagerAggregationRule(ctx, cm); err != nil {
+		return cm, reconcileStop, err
+	}
+
+	return cm, state, nil
 }
 
 func getHubResources(mode operatorapiv1.InstallMode, config manifests.HubConfig) []string {
@@ -210,4 +234,14 @@ func (c *hubReconcile) createAddonManagerAggregationRule(ctx context.Context, cm
 	}
 
 	return nil
+}
+
+func (c *hubReconcile) cleanupAddonManagerAggregationRule(ctx context.Context, cm *operatorapiv1.ClusterManager) error {
+	aggregateClusterRoleName := fmt.Sprintf("open-cluster-management:%s-addon-manager:aggregate", cm.Name)
+	err := c.hubKubeClient.RbacV1().ClusterRoles().Delete(ctx, aggregateClusterRoleName, metav1.DeleteOptions{})
+	if errors.IsNotFound(err) {
+		// ClusterRole doesn't exist, nothing to clean up
+		return nil
+	}
+	return err
 }
