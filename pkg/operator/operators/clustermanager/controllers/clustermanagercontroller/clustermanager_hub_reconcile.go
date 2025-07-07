@@ -95,6 +95,10 @@ func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 		if err != nil {
 			return cm, reconcileStop, err
 		}
+		// cleanup aggregation clusterrole when addon-manager is disabled
+		if err := c.cleanupAddonManagerAggregationRule(ctx, cm); err != nil {
+			return cm, reconcileStop, err
+		}
 	}
 
 	// Remove ManifestWokReplicaSet deployment if feature not enabled
@@ -131,7 +135,7 @@ func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 		}
 	}
 
-	// add aggregation clusterrole for addon-manager, this is not allowed in library-go for now, so need an additional creating
+	// add aggregation clusterrole for addon-manager when enabled, this is not allowed in library-go for now, so need additional creating
 	if config.AddOnManagerEnabled {
 		if err := c.createAddonManagerAggregationRule(ctx, cm); err != nil {
 			appliedErrs = append(appliedErrs, err)
@@ -146,19 +150,6 @@ func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 			Message: fmt.Sprintf("Failed to apply hub resources: %v", utilerrors.NewAggregate(appliedErrs)),
 		})
 		return cm, reconcileStop, utilerrors.NewAggregate(appliedErrs)
-	}
-
-	// cleanup aggregation clusterrole when addon-manager is disabled (after static resources are processed)
-	if !config.AddOnManagerEnabled {
-		if err := c.cleanupAddonManagerAggregationRule(ctx, cm); err != nil {
-			meta.SetStatusCondition(&cm.Status.Conditions, metav1.Condition{
-				Type:    operatorapiv1.ConditionClusterManagerApplied,
-				Status:  metav1.ConditionFalse,
-				Reason:  "HubResourceCleanupFailed",
-				Message: fmt.Sprintf("Failed to cleanup aggregate ClusterRole: %v", err),
-			})
-			return cm, reconcileStop, err
-		}
 	}
 
 	return cm, reconcileContinue, nil
