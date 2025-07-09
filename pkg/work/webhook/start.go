@@ -13,6 +13,7 @@ import (
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	ocmfeature "open-cluster-management.io/api/feature"
@@ -41,7 +42,10 @@ func (c *Options) RunWebhookServer() error {
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
-		HealthProbeBindAddress: ":8000",
+		HealthProbeBindAddress: c.HealthProbeBindAddr,
+		Metrics: server.Options{
+			BindAddress: c.MetricsBindAddr,
+		},
 		WebhookServer: webhook.NewServer(webhook.Options{
 			TLSOpts: []func(config *tls.Config){
 				func(config *tls.Config) {
@@ -57,15 +61,17 @@ func (c *Options) RunWebhookServer() error {
 		return err
 	}
 
-	// add healthz/readyz check handler
-	if err := mgr.AddHealthzCheck("healthz-ping", healthz.Ping); err != nil {
-		logger.Error(err, "unable to add healthz check handler")
-		return err
-	}
+	if c.HealthProbeBindAddr != "" && c.HealthProbeBindAddr != "0" {
+		// add healthz/readyz check handler
+		if err := mgr.AddHealthzCheck("healthz-ping", healthz.Ping); err != nil {
+			logger.Error(err, "unable to add healthz check handler")
+			return err
+		}
 
-	if err := mgr.AddReadyzCheck("readyz-ping", healthz.Ping); err != nil {
-		logger.Error(err, "unable to add readyz check handler")
-		return err
+		if err := mgr.AddReadyzCheck("readyz-ping", healthz.Ping); err != nil {
+			logger.Error(err, "unable to add readyz check handler")
+			return err
+		}
 	}
 
 	common.ManifestValidator.WithLimit(c.ManifestLimit)

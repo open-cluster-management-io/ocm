@@ -17,8 +17,8 @@ webhooks:
       namespace: {{ .ClusterManagerNamespace }}
       name: cluster-manager-work-webhook
       path: /validate-work-open-cluster-management-io-v1-manifestwork
-      port: {{.RegistrationWebhook.Port}}
-    caBundle: {{ .RegistrationAPIServiceCABundle }}
+      port: {{.WorkWebhook.Port}}
+    caBundle: {{ .WorkAPIServiceCABundle }}
   rules:
   - operations:
     - CREATE

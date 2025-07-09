@@ -82,6 +82,7 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 				config.HubClusterArn = registrationDriver.AwsIrsa.HubClusterArn
 				config.AutoApprovedARNPatterns = strings.Join(registrationDriver.AwsIrsa.AutoApprovedIdentities, ",")
 				config.AwsResourceTags = strings.Join(registrationDriver.AwsIrsa.Tags, ",")
+				config.DisableManagedIam = registrationDriver.AwsIrsa.DisableManagedIam
 			} else if registrationDriver.AuthType == commonhelpers.CSRAuthType && registrationDriver.CSR != nil {
 				config.AutoApprovedCSRUsers = strings.Join(registrationDriver.CSR.AutoApprovedIdentities, ",")
 			}
