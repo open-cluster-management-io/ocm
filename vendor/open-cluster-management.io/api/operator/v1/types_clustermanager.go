@@ -236,32 +236,26 @@ const (
 type DefaultClusterManagerConfiguration struct {
 	// RegistrationWebhookConfiguration represents the customized webhook-server configuration of registration.
 	// +optional
-	RegistrationWebhookConfiguration WebhookDefaultConfiguration `json:"registrationWebhookConfiguration,omitempty"`
+	RegistrationWebhookConfiguration DefaultWebhookConfiguration `json:"registrationWebhookConfiguration,omitempty"`
 
 	// WorkWebhookConfiguration represents the customized webhook-server configuration of work.
 	// +optional
-	WorkWebhookConfiguration WebhookDefaultConfiguration `json:"workWebhookConfiguration,omitempty"`
+	WorkWebhookConfiguration DefaultWebhookConfiguration `json:"workWebhookConfiguration,omitempty"`
 }
 
 // HostedClusterManagerConfiguration represents customized configurations we need to set for clustermanager in the Hosted mode.
 type HostedClusterManagerConfiguration struct {
 	// RegistrationWebhookConfiguration represents the customized webhook-server configuration of registration.
 	// +optional
-	RegistrationWebhookConfiguration WebhookConfiguration `json:"registrationWebhookConfiguration,omitempty"`
+	RegistrationWebhookConfiguration HostedWebhookConfiguration `json:"registrationWebhookConfiguration,omitempty"`
 
 	// WorkWebhookConfiguration represents the customized webhook-server configuration of work.
 	// +optional
-	WorkWebhookConfiguration WebhookConfiguration `json:"workWebhookConfiguration,omitempty"`
+	WorkWebhookConfiguration HostedWebhookConfiguration `json:"workWebhookConfiguration,omitempty"`
 }
 
-// WebhookDefaultConfiguration represents configuration for webhooks running in "Default" mode in the hub cluster
-type WebhookDefaultConfiguration struct {
-	// Port represents the port of a webhook-server. The default value of Port is 9443.
-	// +optional
-	// +kubebuilder:default=9443
-	// +kubebuilder:validation:Maximum=65535
-	Port int32 `json:"port,omitempty"`
-
+// WebhookConfiguration represents customization of webhook servers
+type WebhookConfiguration struct {
 	// HealthProbeBindAddress represents the healthcheck address of a webhook-server. The default value is ":8000".
 	// Healthchecks may be disabled by setting a value of "0" or "".
 	// +optional
@@ -281,8 +275,19 @@ type WebhookDefaultConfiguration struct {
 	HostNetwork bool `json:"hostNetwork,omitempty"`
 }
 
-// WebhookConfiguration has two properties: Address and Port.
-type WebhookConfiguration struct {
+// DefaultWebhookConfiguration represents customization of webhook servers running in default installation mode
+type DefaultWebhookConfiguration struct {
+	// Port represents the port of a webhook-server. The default value of Port is 9443.
+	// +optional
+	// +kubebuilder:default=9443
+	// +kubebuilder:validation:Maximum=65535
+	Port int32 `json:"port,omitempty"`
+
+	WebhookConfiguration `json:",inline"`
+}
+
+// HostedWebhookConfiguration represents customization of webhook servers running in hosted installation mode
+type HostedWebhookConfiguration struct {
 	// Address represents the address of a webhook-server.
 	// It could be in IP format or fqdn format.
 	// The Address must be reachable by apiserver of the hub cluster.
@@ -296,6 +301,8 @@ type WebhookConfiguration struct {
 	// +kubebuilder:default=443
 	// +kubebuilder:validation:Maximum=65535
 	Port int32 `json:"port,omitempty"`
+
+	WebhookConfiguration `json:",inline"`
 }
 
 // ClusterManagerDeployOption describes the deployment options for cluster-manager

@@ -108,6 +108,15 @@ func (DefaultClusterManagerConfiguration) SwaggerDoc() map[string]string {
 	return map_DefaultClusterManagerConfiguration
 }
 
+var map_DefaultWebhookConfiguration = map[string]string{
+	"":     "DefaultWebhookConfiguration represents customization of webhook servers running in default installation mode",
+	"port": "Port represents the port of a webhook-server. The default value of Port is 9443.",
+}
+
+func (DefaultWebhookConfiguration) SwaggerDoc() map[string]string {
+	return map_DefaultWebhookConfiguration
+}
+
 var map_FeatureGate = map[string]string{
 	"feature": "Feature is the key of feature gate. e.g. featuregate/Foo.",
 	"mode":    "Mode is either Enable, Disable, \"\" where \"\" is Disable by default. In Enable mode, a valid feature gate `featuregate/Foo` will be set to \"--featuregate/Foo=true\". In Disable mode, a valid feature gate `featuregate/Foo` will be set to \"--featuregate/Foo=false\".",
@@ -139,6 +148,16 @@ var map_HostedClusterManagerConfiguration = map[string]string{
 
 func (HostedClusterManagerConfiguration) SwaggerDoc() map[string]string {
 	return map_HostedClusterManagerConfiguration
+}
+
+var map_HostedWebhookConfiguration = map[string]string{
+	"":        "HostedWebhookConfiguration represents customization of webhook servers running in hosted installation mode",
+	"address": "Address represents the address of a webhook-server. It could be in IP format or fqdn format. The Address must be reachable by apiserver of the hub cluster.",
+	"port":    "Port represents the port of a webhook-server. The default value of Port is 443.",
+}
+
+func (HostedWebhookConfiguration) SwaggerDoc() map[string]string {
+	return map_HostedWebhookConfiguration
 }
 
 var map_NodePlacement = map[string]string{
@@ -185,25 +204,14 @@ func (RelatedResourceMeta) SwaggerDoc() map[string]string {
 }
 
 var map_WebhookConfiguration = map[string]string{
-	"":        "WebhookConfiguration has two properties: Address and Port.",
-	"address": "Address represents the address of a webhook-server. It could be in IP format or fqdn format. The Address must be reachable by apiserver of the hub cluster.",
-	"port":    "Port represents the port of a webhook-server. The default value of Port is 443.",
-}
-
-func (WebhookConfiguration) SwaggerDoc() map[string]string {
-	return map_WebhookConfiguration
-}
-
-var map_WebhookDefaultConfiguration = map[string]string{
-	"":                       "WebhookDefaultConfiguration represents configuration for webhooks running in \"Default\" mode in the hub cluster",
-	"port":                   "Port represents the port of a webhook-server. The default value of Port is 9443.",
+	"":                       "WebhookConfiguration represents customization of webhook servers",
 	"healthProbeBindAddress": "HealthProbeBindAddress represents the healthcheck address of a webhook-server. The default value is \":8000\". Healthchecks may be disabled by setting a value of \"0\" or \"\".",
 	"metricsBindAddress":     "MetricsBindAddress represents the metrics address of a webhook-server. The default value is \":8080\" Metrics may be disabled by setting a value of \"0\" or \"\".",
 	"hostNetwork":            "HostNetwork enables running webhook pods with hostNetwork: true This may be required in some installations, such as EKS with Calico CNI, to allow the API Server to communicate with the webhook pods.",
 }
 
-func (WebhookDefaultConfiguration) SwaggerDoc() map[string]string {
-	return map_WebhookDefaultConfiguration
+func (WebhookConfiguration) SwaggerDoc() map[string]string {
+	return map_WebhookConfiguration
 }
 
 var map_WorkConfiguration = map[string]string{
