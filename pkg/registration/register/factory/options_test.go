@@ -5,6 +5,7 @@ import (
 
 	awsirsa "open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
+	"open-cluster-management.io/ocm/pkg/registration/register/grpc"
 )
 
 func TestValidate(t *testing.T) {
@@ -47,6 +48,34 @@ func TestValidate(t *testing.T) {
 				RegistrationAuth: "awsirsa",
 				AWSISRAOption: &awsirsa.AWSOption{
 					HubClusterArn: "arn:aws:iam::123456789012:role/aws-iam-authenticator",
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name: "grpc validate",
+			opt: &Options{
+				RegistrationAuth: "grpc",
+				GRPCOption:       &grpc.Option{},
+			},
+			expectErr: true,
+		},
+		{
+			name: "grpc validate pass (bootstrap config)",
+			opt: &Options{
+				RegistrationAuth: "grpc",
+				GRPCOption: &grpc.Option{
+					BootstrapConfigFile: "test-bootstrap-config",
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name: "grpc validate pass",
+			opt: &Options{
+				RegistrationAuth: "grpc",
+				GRPCOption: &grpc.Option{
+					ConfigFile: "test-config",
 				},
 			},
 			expectErr: false,
