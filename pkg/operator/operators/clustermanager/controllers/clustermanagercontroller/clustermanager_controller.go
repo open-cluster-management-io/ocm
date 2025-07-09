@@ -424,6 +424,10 @@ func ensureNamespace(ctx context.Context, kubeClient kubernetes.Interface, names
 
 // TODO: support IPV6 address
 func isIPFormat(address string) bool {
+	if address == "" {
+		return false
+	}
+
 	runes := []rune(address)
 	for i := 0; i < len(runes); i++ {
 		if (runes[i] < '0' || runes[i] > '9') && runes[i] != '.' {
@@ -446,17 +450,27 @@ func webhookConfigurations(deployOption operatorapiv1.ClusterManagerDeployOption
 		} else {
 			registration = convertDefaultWebhookConfiguration(deployOption.Default.RegistrationWebhookConfiguration)
 			work = convertDefaultWebhookConfiguration(deployOption.Default.WorkWebhookConfiguration)
+			return
 		}
 	case operatorapiv1.InstallModeHosted:
-		if deployOption.Hosted == nil {
-			registration.Port = defaultWebhookPort
-			work.Port = defaultWebhookPort
-		} else {
+		if deployOption.Hosted != nil {
 			registration = convertHostedWebhookConfiguration(deployOption.Hosted.RegistrationWebhookConfiguration)
 			work = convertHostedWebhookConfiguration(deployOption.Hosted.WorkWebhookConfiguration)
+			return
 		}
 	}
-	return registration, work
+
+	registration = manifests.Webhook{
+		Port:            defaultWebhookPort,
+		HealthProbePort: defaultHealthProbePort,
+		MetricsPort:     defaultMetricsPort,
+	}
+	work = manifests.Webhook{
+		Port:            defaultWebhookPort,
+		HealthProbePort: defaultHealthProbePort,
+		MetricsPort:     defaultMetricsPort,
+	}
+	return
 }
 
 func convertHostedWebhookConfiguration(webhookConfiguration operatorapiv1.HostedWebhookConfiguration) manifests.Webhook {
