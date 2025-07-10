@@ -136,7 +136,7 @@ func (m *unmanagedAppliedWorkController) evictAppliedManifestWork(ctx context.Co
 		return nil
 	}
 
-	klog.V(2).Infof("Delete appliedWork %s by agent %s after eviction grace periodby", appliedManifestWork.Name, m.agentID)
+	klog.Infof("Delete appliedWork %s by agent %s after eviction grace periodby", appliedManifestWork.Name, m.agentID)
 	return m.appliedManifestWorkClient.Delete(ctx, appliedManifestWork.Name, metav1.DeleteOptions{})
 }
 
