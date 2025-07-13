@@ -503,6 +503,16 @@ const (
 	// WorkDegraded represents that the current state of work does not match
 	// the desired state for a certain period.
 	WorkDegraded string = "Degraded"
+	// WorkComplete represents that the work has completed and should no longer
+	// be updated.
+	WorkComplete string = "Complete"
+)
+
+// Work condition reasons
+const (
+	// WorkManifestsComplete represents that all completable manifests in the work
+	// have the Complete condition
+	WorkManifestsComplete string = "ManifestsComplete"
 )
 
 // ManifestCondition represents the conditions of the resources deployed on a
@@ -596,7 +606,10 @@ const (
 	ManifestComplete string = "Complete"
 )
 
-// Condition reasons
+// Manifest condition reasons
+//
+// All reasons set by condition rule evaluation are expected to be prefixed with "ConditionRule"
+// in order to determine which conditions were set by rules.
 const (
 	// ConditionRuleTrue is set when a rule is evaluated without error
 	ConditionRuleEvaluated string = "ConditionRuleEvaluated"
