@@ -208,8 +208,14 @@ spec:
       - name: tmpdir
         emptyDir: { }
       {{if eq .RegistrationDriver.AuthType "awsirsa"}}
+      {{if and .RegistrationDriver.AwsIrsa .RegistrationDriver.AwsIrsa.IamConfigSecret }}
+      - name: dot-aws
+        secret:
+          secretName: {{ .RegistrationDriver.AwsIrsa.IamConfigSecret }}
+      {{else}}
       - name: dot-aws
         emptyDir: { }
+      {{end}}
       - name: awscli
         emptyDir: { }
       {{end}}

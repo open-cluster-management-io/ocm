@@ -151,6 +151,12 @@ type AwsIrsaConfig struct {
 	// +optional
 	AutoApprovedIdentities []string `json:"autoApprovedIdentities,omitempty"`
 
+	// DisableManagedIam disables creation and management of IAM roles and policies on the hub.
+	// If true, all AWS permissions for awsirsa registration must be managed manually by the administrator.
+	// Used in cases where IAM permissions cannot be granted to OCM, or to run an EKS hub with non-aws spoke clusters.
+	// +optional
+	DisableManagedIam bool `json:"disableManagedIam,omitempty"`
+
 	// List of tags to be added to AWS resources created by hub while processing awsirsa registration request
 	// Example - "product:v1:tenant:app-name=My-App"
 	// +optional
@@ -232,19 +238,62 @@ const (
 	FeatureGateModeTypeDisable FeatureGateModeType = "Disable"
 )
 
+// DefaultClusterManagerConfiguration represents customized configurations for clustermanager in the Default mode
+type DefaultClusterManagerConfiguration struct {
+	// RegistrationWebhookConfiguration represents the customized webhook-server configuration of registration.
+	// +optional
+	RegistrationWebhookConfiguration DefaultWebhookConfiguration `json:"registrationWebhookConfiguration,omitempty"`
+
+	// WorkWebhookConfiguration represents the customized webhook-server configuration of work.
+	// +optional
+	WorkWebhookConfiguration DefaultWebhookConfiguration `json:"workWebhookConfiguration,omitempty"`
+}
+
 // HostedClusterManagerConfiguration represents customized configurations we need to set for clustermanager in the Hosted mode.
 type HostedClusterManagerConfiguration struct {
 	// RegistrationWebhookConfiguration represents the customized webhook-server configuration of registration.
 	// +optional
-	RegistrationWebhookConfiguration WebhookConfiguration `json:"registrationWebhookConfiguration,omitempty"`
+	RegistrationWebhookConfiguration HostedWebhookConfiguration `json:"registrationWebhookConfiguration,omitempty"`
 
 	// WorkWebhookConfiguration represents the customized webhook-server configuration of work.
 	// +optional
-	WorkWebhookConfiguration WebhookConfiguration `json:"workWebhookConfiguration,omitempty"`
+	WorkWebhookConfiguration HostedWebhookConfiguration `json:"workWebhookConfiguration,omitempty"`
 }
 
-// WebhookConfiguration has two properties: Address and Port.
+// WebhookConfiguration represents customization of webhook servers
 type WebhookConfiguration struct {
+	// HealthProbeBindAddress represents the healthcheck address of a webhook-server. The default value is ":8000".
+	// Healthchecks may be disabled by setting a value of "0" or "".
+	// +optional
+	// +kubebuilder:default=":8000"
+	HealthProbeBindAddress string `json:"healthProbeBindAddress"`
+
+	// MetricsBindAddress represents the metrics address of a webhook-server. The default value is ":8080"
+	// Metrics may be disabled by setting a value of "0" or "".
+	// +optional
+	// +kubebuilder:default=":8080"
+	MetricsBindAddress string `json:"metricsBindAddress"`
+
+	// HostNetwork enables running webhook pods with hostNetwork: true
+	// This may be required in some installations, such as EKS with Calico CNI,
+	// to allow the API Server to communicate with the webhook pods.
+	// +optional
+	HostNetwork bool `json:"hostNetwork,omitempty"`
+}
+
+// DefaultWebhookConfiguration represents customization of webhook servers running in default installation mode
+type DefaultWebhookConfiguration struct {
+	// Port represents the port of a webhook-server. The default value of Port is 9443.
+	// +optional
+	// +kubebuilder:default=9443
+	// +kubebuilder:validation:Maximum=65535
+	Port int32 `json:"port,omitempty"`
+
+	WebhookConfiguration `json:",inline"`
+}
+
+// HostedWebhookConfiguration represents customization of webhook servers running in hosted installation mode
+type HostedWebhookConfiguration struct {
 	// Address represents the address of a webhook-server.
 	// It could be in IP format or fqdn format.
 	// The Address must be reachable by apiserver of the hub cluster.
@@ -258,6 +307,8 @@ type WebhookConfiguration struct {
 	// +kubebuilder:default=443
 	// +kubebuilder:validation:Maximum=65535
 	Port int32 `json:"port,omitempty"`
+
+	WebhookConfiguration `json:",inline"`
 }
 
 // ClusterManagerDeployOption describes the deployment options for cluster-manager
@@ -273,6 +324,10 @@ type ClusterManagerDeployOption struct {
 	// +kubebuilder:default=Default
 	// +kubebuilder:validation:Enum=Default;Hosted
 	Mode InstallMode `json:"mode,omitempty"`
+
+	// Default includes configurations for clustermanager in the Default mode
+	// +optional
+	Default *DefaultClusterManagerConfiguration `json:"default,omitempty"`
 
 	// Hosted includes configurations we need for clustermanager in the Hosted mode.
 	// +optional

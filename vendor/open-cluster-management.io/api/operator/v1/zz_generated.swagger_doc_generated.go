@@ -22,6 +22,7 @@ func (AddOnManagerConfiguration) SwaggerDoc() map[string]string {
 var map_AwsIrsaConfig = map[string]string{
 	"hubClusterArn":          "This represents the hub cluster ARN Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1",
 	"autoApprovedIdentities": "AutoApprovedIdentities represent a list of approved arn patterns",
+	"disableManagedIam":      "DisableManagedIam disables creation and management of IAM roles and policies on the hub. If true, all AWS permissions for awsirsa registration must be managed manually by the administrator. Used in cases where IAM permissions cannot be granted to OCM, or to run an EKS hub with non-aws spoke clusters.",
 	"tags":                   "List of tags to be added to AWS resources created by hub while processing awsirsa registration request Example - \"product:v1:tenant:app-name=My-App\"",
 }
 
@@ -48,9 +49,10 @@ func (ClusterManager) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterManagerDeployOption = map[string]string{
-	"":       "ClusterManagerDeployOption describes the deployment options for cluster-manager",
-	"mode":   "Mode can be Default or Hosted. In Default mode, the Hub is installed as a whole and all parts of Hub are deployed in the same cluster. In Hosted mode, only crd and configurations are installed on one cluster(defined as hub-cluster). Controllers run in another cluster (defined as management-cluster) and connect to the hub with the kubeconfig in secret of \"external-hub-kubeconfig\"(a kubeconfig of hub-cluster with cluster-admin permission). Note: Do not modify the Mode field once it's applied.",
-	"hosted": "Hosted includes configurations we need for clustermanager in the Hosted mode.",
+	"":        "ClusterManagerDeployOption describes the deployment options for cluster-manager",
+	"mode":    "Mode can be Default or Hosted. In Default mode, the Hub is installed as a whole and all parts of Hub are deployed in the same cluster. In Hosted mode, only crd and configurations are installed on one cluster(defined as hub-cluster). Controllers run in another cluster (defined as management-cluster) and connect to the hub with the kubeconfig in secret of \"external-hub-kubeconfig\"(a kubeconfig of hub-cluster with cluster-admin permission). Note: Do not modify the Mode field once it's applied.",
+	"default": "Default includes configurations for clustermanager in the Default mode",
+	"hosted":  "Hosted includes configurations we need for clustermanager in the Hosted mode.",
 }
 
 func (ClusterManagerDeployOption) SwaggerDoc() map[string]string {
@@ -97,6 +99,25 @@ func (ClusterManagerStatus) SwaggerDoc() map[string]string {
 	return map_ClusterManagerStatus
 }
 
+var map_DefaultClusterManagerConfiguration = map[string]string{
+	"":                                 "DefaultClusterManagerConfiguration represents customized configurations for clustermanager in the Default mode",
+	"registrationWebhookConfiguration": "RegistrationWebhookConfiguration represents the customized webhook-server configuration of registration.",
+	"workWebhookConfiguration":         "WorkWebhookConfiguration represents the customized webhook-server configuration of work.",
+}
+
+func (DefaultClusterManagerConfiguration) SwaggerDoc() map[string]string {
+	return map_DefaultClusterManagerConfiguration
+}
+
+var map_DefaultWebhookConfiguration = map[string]string{
+	"":     "DefaultWebhookConfiguration represents customization of webhook servers running in default installation mode",
+	"port": "Port represents the port of a webhook-server. The default value of Port is 9443.",
+}
+
+func (DefaultWebhookConfiguration) SwaggerDoc() map[string]string {
+	return map_DefaultWebhookConfiguration
+}
+
 var map_FeatureGate = map[string]string{
 	"feature": "Feature is the key of feature gate. e.g. featuregate/Foo.",
 	"mode":    "Mode is either Enable, Disable, \"\" where \"\" is Disable by default. In Enable mode, a valid feature gate `featuregate/Foo` will be set to \"--featuregate/Foo=true\". In Disable mode, a valid feature gate `featuregate/Foo` will be set to \"--featuregate/Foo=false\".",
@@ -128,6 +149,16 @@ var map_HostedClusterManagerConfiguration = map[string]string{
 
 func (HostedClusterManagerConfiguration) SwaggerDoc() map[string]string {
 	return map_HostedClusterManagerConfiguration
+}
+
+var map_HostedWebhookConfiguration = map[string]string{
+	"":        "HostedWebhookConfiguration represents customization of webhook servers running in hosted installation mode",
+	"address": "Address represents the address of a webhook-server. It could be in IP format or fqdn format. The Address must be reachable by apiserver of the hub cluster.",
+	"port":    "Port represents the port of a webhook-server. The default value of Port is 443.",
+}
+
+func (HostedWebhookConfiguration) SwaggerDoc() map[string]string {
+	return map_HostedWebhookConfiguration
 }
 
 var map_NodePlacement = map[string]string{
@@ -174,9 +205,10 @@ func (RelatedResourceMeta) SwaggerDoc() map[string]string {
 }
 
 var map_WebhookConfiguration = map[string]string{
-	"":        "WebhookConfiguration has two properties: Address and Port.",
-	"address": "Address represents the address of a webhook-server. It could be in IP format or fqdn format. The Address must be reachable by apiserver of the hub cluster.",
-	"port":    "Port represents the port of a webhook-server. The default value of Port is 443.",
+	"":                       "WebhookConfiguration represents customization of webhook servers",
+	"healthProbeBindAddress": "HealthProbeBindAddress represents the healthcheck address of a webhook-server. The default value is \":8000\". Healthchecks may be disabled by setting a value of \"0\" or \"\".",
+	"metricsBindAddress":     "MetricsBindAddress represents the metrics address of a webhook-server. The default value is \":8080\" Metrics may be disabled by setting a value of \"0\" or \"\".",
+	"hostNetwork":            "HostNetwork enables running webhook pods with hostNetwork: true This may be required in some installations, such as EKS with Calico CNI, to allow the API Server to communicate with the webhook pods.",
 }
 
 func (WebhookConfiguration) SwaggerDoc() map[string]string {
@@ -194,7 +226,8 @@ func (WorkConfiguration) SwaggerDoc() map[string]string {
 
 var map_AwsIrsa = map[string]string{
 	"hubClusterArn":     "The arn of the hub cluster (ie: an EKS cluster). This will be required to pass information to hub, which hub will use to create IAM identities for this klusterlet. Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1.",
-	"managedClusterArn": "The arn of the managed cluster (ie: an EKS cluster). This will be required to generate the md5hash which will be used as a suffix to create IAM role on hub as well as used by kluslerlet-agent, to assume role suffixed with the md5hash, on startup. Example - arn:eks:us-west-2:12345678910:cluster/managed-cluster1.",
+	"managedClusterArn": "The arn of the managed cluster (ie: an EKS cluster). This will be used when managed IAM is enabled to generate the md5hash as a suffix to create IAM role on hub as well as used by kluslerlet-agent, to assume role suffixed with the md5hash, on startup. Example - arn:eks:us-west-2:12345678910:cluster/managed-cluster1.",
+	"iamConfigSecret":   "IamConfigSecret is the name of a secret containing \"config\" and/or \"credentials\" files mounted to /.aws/config and /.aws/credentials respectively. More Info: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html",
 }
 
 func (AwsIrsa) SwaggerDoc() map[string]string {

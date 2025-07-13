@@ -14,5 +14,5 @@ spec:
     app: {{ .ClusterManagerName }}-registration-webhook
   ports:
   - name: webhook
-    port: 9443
-    targetPort: 9443
+    port: {{ .RegistrationWebhook.Port }}
+    targetPort: {{ .RegistrationWebhook.Port }}
