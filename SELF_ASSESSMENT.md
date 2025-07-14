@@ -58,11 +58,11 @@ The Open Cluster Management (OCM) architecture uses a hub - agent model. The hub
 So there are the following actors:
 
 - Hub cluster
-  1. cluster-manager-operator: a operator runs on the hub cluster, watches the ClusterManager resource, and installs OCM components(registration-controller, placement-controller, addon-manager) on the hub cluster.
+  1. cluster-manager-operator: an operator that runs on the hub cluster, watches the ClusterManager resource, and installs OCM components (registration-controller, placement-controller, addon-manager) on the hub cluster.
   2. registration-controller: manages registration applications for managed clusters, grant/revoke clusters permission once they are accepted/rejected, periodically check the health of clusters and addons.
   3. placement-controller: dynamically selects managed clusters based on the Placement CR.
-  4. addon-manager(global): a global addon manager that manages automatic installation and rolling updates of addons. Also manages the deployment and registration of all template type addons.
-  5. addon-managers: each non-template type addon has a dedicated addon manager, which is used to manage the deployment and registration of the addon.
+  4. addon-manager (global): a global addon manager that manages automatic installation and rolling updates of addons. Also manages the deployment and registration of all template type addons.
+  5. addon-managers: each non-template type addon has a dedicated addon manager that handles the deployment and registration of the addon.
 
 - Managed cluster
   1. klusterlet-operator: an operator that runs on the managed cluster, watches the Klusterlet resource, and installs OCM components (registration-agent, work-agent) on the managed cluster.
@@ -76,13 +76,13 @@ So there are the following actors:
 
 Registering a managed cluster requires "double opt-in handshaking"
 
-- Actors: hub-cluster-admin, managed-cluster-admin, registraion-controller, registration-agent
+- Actors: hub-cluster-admin, managed-cluster-admin, registration-controller, registration-agent
 - Workflow: When joining a managed cluster:
   - hub-cluster-admin distributes a bootstrap kubeconfig with permission to create/list/get CertificateSigningRequest(CSR) and ManagedCluster to the managed-cluster-admin;
-  - manged-cluster-admin decides to join the hub, passes the bootstrap kubeconfig to the registration-agent
-  - registration-agent creates a private key, and use this private key make a CSR with subject group `open-cluster-management:<ManagedClusterName>`, then use the bootstrap kubeconfig to send the CSR to the hub cluster and create a ManagedCluster to request joining the hub
-  - hub-cluster-admin allowes the joining requests, and the CSR gets approved
-  - registration-controller grants the subject group `open-cluster-management:<ManagedClusterName>` the minimum permisons that the agent must have, create a dedicated namespace for the cluster, each managed cluster is isolated and can only access resources in its own namespace on the hub
+  - managed-cluster-admin decides to join the hub, passes the bootstrap kubeconfig to the registration-agent
+  - registration-agent creates a private key, and uses this private key make a CSR with subject group `open-cluster-management:<ManagedClusterName>`, then use the bootstrap kubeconfig to send the CSR to the hub cluster and create a ManagedCluster to request joining the hub
+  - hub-cluster-admin allows the joining requests, and the CSR gets approved
+  - registration-controller grants the subject group `open-cluster-management:<ManagedClusterName>` the minimum permissions that the agent must have, create a dedicated namespace for the cluster, each managed cluster is isolated and can only access resources in its own namespace on the hub
   - registration-agent gets the certificate from the CRS status, and can use the certificate and the private key to access the hub cluster
 - Security Checks: Practically the hub cluster and the managed cluster can be owned/maintained by different admins, so in OCM we clearly separated the roles and make the cluster registration require approval from the both sides defending from unwelcome requests. And each managed cluster are isolated.
 
@@ -119,7 +119,7 @@ Distribute workload to selected managed clusters.
 **General**:
 
 - Centralized Management: The hub centralizes control of all the managed clusters.
-- Scalability: Divide and offload the execution into separated agents ond the managed clusters. A hub cluster can accept and manage thousand-ish clusters.
+- Scalability: Divide and offload the execution into separated agents on the managed clusters. A hub cluster can accept and manage thousand-ish clusters.
 - Modularity: Functionality working in OCM is expected to be freely-pluggable by modularizing the atomic capability into separated building blocks.
 - Extensibility: Provide developers with a simple and convenient mechanism to expand OCM capabilities.
 
@@ -152,14 +152,14 @@ This document is intended to be used by the OCM team to identify areas of improv
 
 | Component | Applicability | Description of Importance |
 | --------- | ------------- | ------------------------- |
-| Managed clusters isolation | Critical | In OCM, for each of the managed cluster we will be provisioning a dedicated namespace for the managed cluster and grants RBAC permissions so that the klusterlet can persist data in the hub cluster. This dedicated namespace is the "cluster namespace" which can not be access by other managed clusters. |
+| Managed clusters isolation | Critical | In OCM, for each of the managed cluster we will be provisioning a dedicated namespace for the managed cluster and grants RBAC permissions so that the klusterlet can persist data in the hub cluster. This dedicated namespace is the "cluster namespace" which cannot be access by other managed clusters. |
 | Managed clusters credential free | Critical | Benefiting from the merit of "hub-spoke" architecture, in abstraction OCM de-couples most of the multi-cluster operations generally into (1) computation/decision and (2) execution, and the actual execution against the target cluster will be completely off-loaded into the managed cluster. The hub cluster won’t directly request against the managed clusters, instead it just persists its prescriptions declaratively for each cluster, and the klusterlet will be actively pulling the prescriptions from the hub and doing the execution. So no managed cluster credential are required. |
 | Minimal Permissions | Critical | OCM applies the principle of least privilege by granting managed clusters only the essential permissions necessary for their operation. |
 | Double Opt-In Handshake for Cluster Registration | Critical | Registration requires both hub cluster admin and managed cluster admin consent to the connection. |
 | mTLS connection | Critical | The registration process ensures all connections between the managed clusters and the hub are mTLS, and the certificates rotate automatically as well. |
 | Feature-Gate Auto Approve | Relevant | Auto approve cluster joining request created by a certain user, using a white list to configure the allowed users. This feature is disabled by default, can be enabled by a feature gate. |
 | Work executor subject | Relevant | All manifests in ManifestWork are applied by the work-agent using the mounted service account to raise requests against the managed cluster by default. And the work agent has very high permission to access the managed cluster which means that any hub user with write access to the ManifestWork resources will be able to dispatch any resources that the work-agent can manipulate to the managed cluster. We have an executor subject feature provides a way to clarify the owner identity(executor) of the ManifestWork before it takes effect so that we can explicitly check whether the executor has sufficient permission in the managed cluster. This feature is Disabled by default, should consider enabling it by default in the future. |
-| Logs and Events | Relevant | All operations on the clusters(hub and managed) are recored by logs and events. |
+| Logs and Events | Relevant | All operations on the clusters(hub and managed) are recorded by logs and events. |
 
 ## Project Compliance
 
@@ -185,7 +185,7 @@ All code is maintained on [Github](https://github.com/open-cluster-management-io
   - Commits to the main branch directly are not allowed.
 - Code Review
   - Changes must be reviewed by at least 1 reviewer.
-  - Chagees must be approved by at least 1 maintainers.
+  - Changes must be approved by at least 1 maintainers.
 - Automated Testing
   - In each PR, the code has to pass through linting verify and various security checks and vulnerability analysis, to find if the code is secure and would not fail basic testing.
   - Tools like Dependency Review, License Compliance have been adopted for security scanning.
