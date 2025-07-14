@@ -219,7 +219,8 @@ Patches will be made to the most recent three minor releases. Information will b
   - OCM has attained the Open Source Security Foundation(OpenSSF) Best Practices Badge, refer to https://bestpractices.coreinfrastructure.org/projects/5376.
 - Case Studies
   - All adopters can be found at [adopters-list](https://github.com/open-cluster-management-io/ocm/blob/main/ADOPTERS.md).
-  - TODO: Add 2 examples
+  - Guidewire: [Policy-Driven Multi-Cluster Management with Kubernetes](https://medium.com/guidewire-engineering-blog/policy-driven-multi-cluster-management-with-kubernetes-906ca96958c3) — Guidewire leverages OCM to implement policy-driven management across multiple Kubernetes clusters, dramatically simplifying the management of clusters and workloads at scale, regardless of where they run. Their approach demonstrates how OCM can streamline multi-cluster operations and automation for large organizations.
+  - Alibaba Cloud: [Fleet Management Feature of ACK One](https://www.alibabacloud.com/blog/fleet-management-feature-of-ack-one-enterprise-class-multi-cluster-management-solution_601824) — Alibaba Cloud utilizes OCM as a core component of its ACK One enterprise-class multi-cluster management solution. OCM enables Alibaba Cloud to provide centralized fleet management, cross-cluster application delivery, and GitOps-based continuous deployment across large-scale, hybrid, and multi-cloud Kubernetes environments for enterprise customers.
 - Related Projects / Vendors
   - **Karmada**: [Karmada](https://karmada.io/) (Kubernetes Armada) is a Kubernetes management system that can manage cloud-native applications across multiple Kubernetes clusters and clouds, with no changes to the applications.
     - [Difference between OCM and Karmada](https://www.cncf.io/blog/2022/09/26/karmada-and-open-cluster-management-two-new-approaches-to-the-multicluster-fleet-management-challenge/):
