@@ -499,11 +499,13 @@ func TestConditionRules(t *testing.T) {
 	}
 
 	cases := []struct {
-		name               string
-		existingResources  []runtime.Object
-		configOption       []workapiv1.ManifestConfigOption
-		manifests          []workapiv1.ManifestCondition
-		expectedConditions []metav1.Condition
+		name                       string
+		existingResources          []runtime.Object
+		existingConditions         []metav1.Condition
+		configOption               []workapiv1.ManifestConfigOption
+		manifests                  []workapiv1.ManifestCondition
+		expectedManifestConditions [][]metav1.Condition
+		expectedWorkConditions     []metav1.Condition
 	}{
 		{
 			name: "condition rule successful evaluation",
@@ -535,9 +537,9 @@ func TestConditionRules(t *testing.T) {
 				newManifest("", "v1", "newobjects", "ns1", "n1"),
 				newManifest("", "v1", "newobjects", "ns1", "n2"),
 			},
-			expectedConditions: []metav1.Condition{
-				{Type: "Active", Status: metav1.ConditionTrue, Reason: workapiv1.ConditionRuleEvaluated, Message: "NewObject is active"},
-				{Type: "Active", Status: metav1.ConditionFalse, Reason: workapiv1.ConditionRuleEvaluated, Message: "NewObject is not active"},
+			expectedManifestConditions: [][]metav1.Condition{
+				{{Type: "Active", Status: metav1.ConditionTrue, Reason: workapiv1.ConditionRuleEvaluated, Message: "NewObject is active"}},
+				{{Type: "Active", Status: metav1.ConditionFalse, Reason: workapiv1.ConditionRuleEvaluated, Message: "NewObject is not active"}},
 			},
 		},
 		{
@@ -562,8 +564,117 @@ func TestConditionRules(t *testing.T) {
 			manifests: []workapiv1.ManifestCondition{
 				newManifest("", "v1", "newobjects", "ns1", "n1"),
 			},
-			expectedConditions: []metav1.Condition{
-				{Type: "Active", Status: metav1.ConditionFalse, Reason: workapiv1.ConditionRuleExpressionError, Message: "no such key: invalid"},
+			expectedManifestConditions: [][]metav1.Condition{
+				{{Type: "Active", Status: metav1.ConditionFalse, Reason: workapiv1.ConditionRuleExpressionError, Message: "no such key: invalid"}},
+			},
+		},
+		{
+			name: "condition rule Complete aggregates to work condition",
+			existingResources: []runtime.Object{
+				testingcommon.NewUnstructuredWithContent(
+					"v1", "NewObject", "ns1", "n1",
+					map[string]any{"spec": map[string]any{"key1": "val1"}}),
+			},
+			configOption: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "newobjects", Namespace: "ns1", Name: "n1"},
+					ConditionRules: []workapiv1.ConditionRule{
+						{
+							Type:           workapiv1.CelConditionExpressionsType,
+							Condition:      workapiv1.ManifestComplete,
+							CelExpressions: []string{"true"},
+						},
+					},
+				},
+			},
+			manifests: []workapiv1.ManifestCondition{
+				newManifest("", "v1", "newobjects", "ns1", "n1"),
+			},
+			expectedManifestConditions: [][]metav1.Condition{
+				{{Type: workapiv1.ManifestComplete, Status: metav1.ConditionTrue, Reason: workapiv1.ConditionRuleEvaluated}},
+			},
+			expectedWorkConditions: []metav1.Condition{
+				{Type: workapiv1.WorkComplete, Status: metav1.ConditionTrue, Reason: "ConditionRulesAggregated"},
+			},
+		},
+		{
+			name: "work Complete requires all completable manifests to Complete",
+			existingResources: []runtime.Object{
+				testingcommon.NewUnstructuredWithContent(
+					"v1", "NewObject", "ns1", "n1",
+					map[string]any{"spec": map[string]any{"key1": "val1"}}),
+				testingcommon.NewUnstructuredWithContent(
+					"v1", "NewObject", "ns1", "n2",
+					map[string]any{"spec": map[string]any{"key1": "val2"}}),
+			},
+			configOption: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "newobjects", Namespace: "ns1", Name: "n1"},
+					ConditionRules: []workapiv1.ConditionRule{
+						{
+							Type:           workapiv1.CelConditionExpressionsType,
+							Condition:      workapiv1.ManifestComplete,
+							CelExpressions: []string{"true"},
+						},
+					},
+				},
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "newobjects", Namespace: "ns1", Name: "n2"},
+					ConditionRules: []workapiv1.ConditionRule{
+						{
+							Type:           workapiv1.CelConditionExpressionsType,
+							Condition:      workapiv1.ManifestComplete,
+							CelExpressions: []string{"false"},
+						},
+					},
+				},
+			},
+			manifests: []workapiv1.ManifestCondition{
+				newManifest("", "v1", "newobjects", "ns1", "n1"),
+				newManifest("", "v1", "newobjects", "ns1", "n2"),
+			},
+			expectedManifestConditions: [][]metav1.Condition{
+				{{Type: workapiv1.ManifestComplete, Status: metav1.ConditionTrue, Reason: workapiv1.ConditionRuleEvaluated}},
+				{{Type: workapiv1.ManifestComplete, Status: metav1.ConditionFalse, Reason: workapiv1.ConditionRuleEvaluated}},
+			},
+			expectedWorkConditions: []metav1.Condition{
+				{Type: workapiv1.WorkComplete, Status: metav1.ConditionFalse, Reason: "ConditionRulesAggregated"},
+			},
+		},
+		{
+			name: "remove conditions set by deleted rules",
+			existingResources: []runtime.Object{
+				testingcommon.NewUnstructuredWithContent(
+					"v1", "NewObject", "ns1", "n1",
+					map[string]any{"spec": map[string]any{"key1": "val1"}}),
+			},
+			existingConditions: []metav1.Condition{{Type: workapiv1.WorkComplete, Status: metav1.ConditionTrue, Reason: "ConditionRulesAggregated"}},
+			configOption: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "newobjects", Namespace: "ns1", Name: "n1"},
+					ConditionRules: []workapiv1.ConditionRule{
+						{
+							Type:           workapiv1.CelConditionExpressionsType,
+							Condition:      "SomeOtherRule",
+							CelExpressions: []string{"true"},
+						},
+					},
+				},
+			},
+			manifests: []workapiv1.ManifestCondition{
+				newManifest(
+					"", "v1", "newobjects", "ns1", "n1",
+					metav1.Condition{Type: workapiv1.ManifestComplete, Status: metav1.ConditionTrue, Reason: workapiv1.ConditionRuleEvaluated},
+				),
+			},
+			expectedManifestConditions: [][]metav1.Condition{
+				{
+					{Type: "SomeOtherRule", Status: metav1.ConditionTrue, Reason: workapiv1.ConditionRuleEvaluated},
+					{Type: workapiv1.ManifestComplete, Status: util.ConditionNotFound},
+				},
+			},
+			expectedWorkConditions: []metav1.Condition{
+				{Type: workapiv1.WorkComplete, Status: util.ConditionNotFound},
 			},
 		},
 	}
@@ -571,15 +682,20 @@ func TestConditionRules(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			testingWork, _ := spoketesting.NewManifestWork(0)
+			// Deleting conditions from old rules relies on change in ObservedGeneration
+			// Emualate that by setting generation to something other than 0
+			testingWork.Generation = 2
 			testingWork.Finalizers = []string{workapiv1.ManifestWorkFinalizer}
 			testingWork.Spec.ManifestConfigs = c.configOption
+			existingCondition := c.existingConditions
+			if meta.FindStatusCondition(c.existingConditions, workapiv1.WorkApplied) == nil {
+				existingCondition = append([]metav1.Condition{{Type: workapiv1.WorkApplied}}, existingCondition...)
+			}
 			testingWork.Status = workapiv1.ManifestWorkStatus{
 				ResourceStatus: workapiv1.ManifestResourceStatus{
 					Manifests: c.manifests,
 				},
-				Conditions: []metav1.Condition{
-					{Type: workapiv1.WorkApplied},
-				},
+				Conditions: existingCondition,
 			}
 
 			fakeClient := fakeworkclient.NewSimpleClientset(testingWork)
@@ -602,6 +718,7 @@ func TestConditionRules(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			// Parse work
 			actions := fakeClient.Actions()
 			testingcommon.AssertActions(t, actions, "patch")
 			p := actions[0].(clienttesting.PatchActionImpl).Patch
@@ -613,18 +730,35 @@ func TestConditionRules(t *testing.T) {
 				t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests))
 			}
 
-			for i, manifestStatus := range work.Status.ResourceStatus.Manifests {
-				expected := c.expectedConditions[i]
-				condition := meta.FindStatusCondition(manifestStatus.Conditions, expected.Type)
-				if condition == nil || !util.MatchCondition(*condition, expected) {
-					t.Fatalf("%s: Expected to find condition %+v, got %+v", manifestStatus.ResourceMeta.Name, expected, condition)
+			// Check expected conditions on manifests and work
+			conditionsFailed := false
+			for i, expectedConditions := range c.expectedManifestConditions {
+				manifestStatus := work.Status.ResourceStatus.Manifests[i]
+				errs := util.CheckExpectedConditions(manifestStatus.Conditions, expectedConditions...)
+				if errs != nil {
+					conditionsFailed = true
+					for _, err := range errs.Errors() {
+						t.Errorf("%s: %v", manifestStatus.ResourceMeta.Name, err)
+					}
 				}
+			}
+
+			errs := util.CheckExpectedConditions(work.Status.Conditions, c.expectedWorkConditions...)
+			if errs != nil {
+				conditionsFailed = true
+				for _, err := range errs.Errors() {
+					t.Errorf("ManifestWork: %v", err)
+				}
+			}
+
+			if conditionsFailed {
+				t.FailNow()
 			}
 		})
 	}
 }
 
-func newManifest(group, version, resource, namespace, name string) workapiv1.ManifestCondition {
+func newManifest(group, version, resource, namespace, name string, conditions ...metav1.Condition) workapiv1.ManifestCondition {
 	return workapiv1.ManifestCondition{
 		ResourceMeta: workapiv1.ManifestResourceMeta{
 			Group:     group,
@@ -633,24 +767,25 @@ func newManifest(group, version, resource, namespace, name string) workapiv1.Man
 			Namespace: namespace,
 			Name:      name,
 		},
+		Conditions: conditions,
 	}
 }
 
 func newManifestWthCondition(group, version, resource, namespace, name string) workapiv1.ManifestCondition {
-	cond := newManifest(group, version, resource, namespace, name)
-	cond.Conditions = []metav1.Condition{
-		{
+	cond := newManifest(
+		group, version, resource, namespace, name,
+		metav1.Condition{
 			Type:    workapiv1.ManifestAvailable,
 			Status:  metav1.ConditionTrue,
 			Reason:  "ResourceAvailable",
 			Message: "Resource is available",
 		},
-		{
+		metav1.Condition{
 			Type:   statusFeedbackConditionType,
 			Reason: "NoStatusFeedbackSynced",
 			Status: metav1.ConditionTrue,
 		},
-	}
+	)
 	return cond
 }
 
