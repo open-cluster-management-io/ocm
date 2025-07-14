@@ -65,10 +65,10 @@ So there are the following actors:
   5. addon-managers: each non-template type addon has a dedicated addon manager, which is used to manage the deployment and registration of the addon.
 
 - Managed cluster
-  1. klusterlet-operator: a operator runs on the managed cluster, watches the Klusterket resource, and installs OCM components(registration-agent, work-agent) on the managed cluster.
-  2. registration-agent: register a managed cluster and addons to the hub, requests certificates to connect to the hub for the registration/work and addons agents.
-  3. work-agent: pulls manifestworks created in the cluster namespace on the hub cluster, and apply them on the managed cluster
-  4. addon-agents: Functionality defined by users to extend the OCM capabilities.
+  1. klusterlet-operator: an operator that runs on the managed cluster, watches the Klusterlet resource, and installs OCM components (registration-agent, work-agent) on the managed cluster.
+  2. registration-agent: registers a managed cluster and its add-ons with the hub and requests certificates to connect to the hub for the registration/work and add-on agents.
+  3. work-agent: pulls ManifestWorks created in the cluster namespace on the hub cluster and applies them on the managed cluster.
+  4. addon-agents: functionality defined by users to extend the OCM capabilities.
 
 ### Actions
 
