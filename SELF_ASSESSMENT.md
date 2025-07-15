@@ -29,8 +29,8 @@ This document evaluates the security posture of the Open Cluster Management (OCM
 
 ## Metadata
 
-| | |
-|-----------|------|
+| Key | Value |
+|------|------|
 | Software | <ul><li>[OCM Core](https://github.com/open-cluster-management-io)</li><li>[OCM clusteradm](https://github.com/open-cluster-management-io/clusteradm/)</li></ul> |
 | Security Provider? | No. OCM is designed to enable end-to-end visibility and control across multiple Kubernetes clusters. Security is not the primary objective.|
 | Languages | Go, Shell, Python, Makefile, Dockerfile |
@@ -51,9 +51,9 @@ OCM addresses these challenges by offering a powerful, modular, extensible platf
 
 ### Actors
 
-The Open Cluster Management (OCM) architecture uses a hub - agent model. The hub centralizes control of all the managed clusters. An agent, klusterlet, resides on each managed cluster to manage registration to the hub and run instructions from the hub.
+The Open Cluster Management (OCM) architecture uses a hub-agent model. The hub centralizes control of all managed clusters. An agent, Klusterlet, resides on each managed cluster to manage registration to the hub and execute instructions from the hub.
 
-![ocm-arch](assets/ocm-arch.png)
+![High-level OCM hub–agent architecture](assets/ocm-arch.png)
 
 So there are the following actors:
 
@@ -80,11 +80,11 @@ Registering a managed cluster requires "double opt-in handshaking"
 - Workflow: When joining a managed cluster:
   - hub-cluster-admin distributes a bootstrap kubeconfig with permission to create/list/get CertificateSigningRequest(CSR) and ManagedCluster to the managed-cluster-admin;
   - managed-cluster-admin decides to join the hub, passes the bootstrap kubeconfig to the registration-agent
-  - registration-agent creates a private key, and uses this private key make a CSR with subject group `open-cluster-management:<ManagedClusterName>`, then use the bootstrap kubeconfig to send the CSR to the hub cluster and create a ManagedCluster to request joining the hub
+  - registration-agent creates a private key and uses it to make a CSR with subject group `open-cluster-management:<ManagedClusterName>`, then uses the bootstrap kubeconfig to send the CSR to the hub cluster and create a ManagedCluster to request joining the hub
   - hub-cluster-admin allows the joining requests, and the CSR gets approved
   - registration-controller grants the subject group `open-cluster-management:<ManagedClusterName>` the minimum permissions that the agent must have, create a dedicated namespace for the cluster, each managed cluster is isolated and can only access resources in its own namespace on the hub
   - registration-agent gets the certificate from the CRS status, and can use the certificate and the private key to access the hub cluster
-- Security Checks: Practically the hub cluster and the managed cluster can be owned/maintained by different admins, so in OCM we clearly separated the roles and make the cluster registration require approval from the both sides defending from unwelcome requests. And each managed cluster are isolated.
+- Security Checks: Practically the hub cluster and the managed cluster can be owned/maintained by different admins, so in OCM we clearly separated the roles and make the cluster registration require approval from the both sides defending from unwelcome requests. And each managed cluster is isolated.
 
 #### Detach a managed cluster
 
@@ -94,7 +94,7 @@ Detaching a managed cluster is a unilateral action, either the hub or the manage
   - Actors: hub-cluster-admin, registration-controller
   - Workflow:
     - hub-cluster-admin deletes the ManagedCluster on the hub, or set the ManagedCluster `.spec.hubAcceptsClient:` to `False`
-    - registration-controller revokes the permissions binded to the subject group `open-cluster-management:<ManagedClusterName>`
+    - registration-controller revokes the permissions bound to the subject group `open-cluster-management:<ManagedClusterName>`
 - Detaching from the managed side
   - Actors: managed-cluster-admin, klusterlet-operator
   - Workflow:
@@ -108,9 +108,9 @@ Distribute workload to selected managed clusters.
 
 - Actors: hub-cluster-admin, placement-controller, work-agent
 - Workflow:
-  - hub-cluster-admin creates a `Placement` CR to describe the target managed clusters' attributes;
+  - hub-cluster-admin creates a `Placement` resource to describe the target managed clusters' attributes;
   - placement-controller selects all clusters that meet the attributes;
-  - hub-cluster-admin creates `Manifestwork` containing the workload to selected clusters' namespace;
+  - hub-cluster-admin creates a `Manifestwork` resource containing the workload into the selected clusters' namespace;
   - work-agents on managed clusters watch the `Manifestwork` created, apply the workload on the managed cluster
 - Security Checks: Pull mode, the hub cluster does not access the managed clusters; Manifestwork for each managed cluster is isolated in its own namespace.
 
@@ -152,8 +152,8 @@ This document is intended to be used by the OCM team to identify areas of improv
 
 | Component | Applicability | Description of Importance |
 | --------- | ------------- | ------------------------- |
-| Managed clusters isolation | Critical | In OCM, for each of the managed cluster we will be provisioning a dedicated namespace for the managed cluster and grants RBAC permissions so that the klusterlet can persist data in the hub cluster. This dedicated namespace is the "cluster namespace" which cannot be access by other managed clusters. |
-| Managed clusters credential free | Critical | Benefiting from the merit of "hub-spoke" architecture, in abstraction OCM de-couples most of the multi-cluster operations generally into (1) computation/decision and (2) execution, and the actual execution against the target cluster will be completely off-loaded into the managed cluster. The hub cluster won’t directly request against the managed clusters, instead it just persists its prescriptions declaratively for each cluster, and the klusterlet will be actively pulling the prescriptions from the hub and doing the execution. So no managed cluster credential are required. |
+| Managed clusters isolation | Critical | In OCM, for each of the managed cluster we will be provisioning a dedicated namespace for the managed cluster and grants RBAC permissions so that the klusterlet can persist data in the hub cluster. This dedicated namespace "cluster namespace" cannot be access by other managed clusters. |
+| Managed clusters credential free | Critical | Benefiting from the merit of "hub-spoke" architecture, in abstraction OCM de-couples most of the multi-cluster operations generally into (1) computation/decision and (2) execution, and the actual execution against the target cluster will be completely off-loaded into the managed cluster. The hub cluster won’t directly request against the managed clusters, instead it just persists its prescriptions declaratively for each cluster, and the klusterlet will be actively pulling the prescriptions from the hub and doing the execution. Therefore, no managed cluster credentials are required. |
 | Minimal Permissions | Critical | OCM applies the principle of least privilege by granting managed clusters only the essential permissions necessary for their operation. |
 | Double Opt-In Handshake for Cluster Registration | Critical | Registration requires both hub cluster admin and managed cluster admin consent to the connection. |
 | mTLS connection | Critical | The registration process ensures all connections between the managed clusters and the hub are mTLS, and the certificates rotate automatically as well. |
@@ -187,7 +187,7 @@ All code is maintained on [Github](https://github.com/open-cluster-management-io
   - Changes must be reviewed by at least 1 reviewer.
   - Changes must be approved by at least 1 maintainers.
 - Automated Testing
-  - In each PR, the code has to pass through linting verify and various security checks and vulnerability analysis, to find if the code is secure and would not fail basic testing.
+  - Each PR must pass linting, security checks, and vulnerability analysis to ensure the changes are secure and do not break basic tests.
   - Tools like Dependency Review, License Compliance have been adopted for security scanning.
   - The project utilizes various unit tests and e2e tests to quantify whether the changes would be safe in basic context, before the reviews done by the project maintainers.
 - Dependency Management
