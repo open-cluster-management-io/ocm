@@ -39,7 +39,7 @@ This document evaluates the security posture of the Open Cluster Management (OCM
 
 ## Overview
 
-Open Cluster Management(OCM) aims to simplify the management of multiple Kubernetes clusters across various environments. It offers open APIs for cluster registration, work distribution, and multi-cluster scheduling, facilitating seamless multicluster and multicloud operations. Its architecture also provides add-ons as extensible points for users to build their own management tools or integrate with other open source projects to extend the multicluster management capability.
+Open Cluster Management (OCM) aims to simplify the management of multiple Kubernetes clusters across various environments. It offers open APIs for cluster registration, work distribution, and multi-cluster scheduling, facilitating seamless multicluster and multicloud operations. Its architecture also provides add-ons as extensible points for users to build their own management tools or integrate with other open source projects to extend the multicluster management capability.
 
 ### Background
 
@@ -59,7 +59,7 @@ So there are the following actors:
 
 - Hub cluster
   1. cluster-manager-operator: an operator that runs on the hub cluster, watches the ClusterManager resource, and installs OCM components (registration-controller, placement-controller, addon-manager) on the hub cluster.
-  2. registration-controller: manages registration applications for managed clusters, grant/revoke clusters permission once they are accepted/rejected, periodically check the health of clusters and addons.
+  2. registration-controller: manages registration applications for managed clusters, grants/revokes clusters permissions once they are accepted/rejected, periodically checks the health of clusters and addons.
   3. placement-controller: dynamically selects managed clusters based on the Placement CR.
   4. addon-manager (global): a global addon manager that manages automatic installation and rolling updates of addons. Also manages the deployment and registration of all template type addons.
   5. addon-managers: each non-template type addon has a dedicated addon manager that handles the deployment and registration of the addon.
@@ -83,7 +83,7 @@ Registering a managed cluster requires "double opt-in handshaking"
   - registration-agent creates a private key and uses it to make a CSR with subject group `open-cluster-management:<ManagedClusterName>`, then uses the bootstrap kubeconfig to send the CSR to the hub cluster and create a ManagedCluster to request joining the hub
   - hub-cluster-admin allows the joining requests, and the CSR gets approved
   - registration-controller grants the subject group `open-cluster-management:<ManagedClusterName>` the minimum permissions that the agent must have, create a dedicated namespace for the cluster, each managed cluster is isolated and can only access resources in its own namespace on the hub
-  - registration-agent gets the certificate from the CRS status, and can use the certificate and the private key to access the hub cluster
+  - registration-agent gets the certificate from the CSR status, and can use the certificate and the private key to access the hub cluster
 - Security Checks: Practically the hub cluster and the managed cluster can be owned/maintained by different admins, so in OCM we clearly separated the roles and make the cluster registration require approval from the both sides defending from unwelcome requests. And each managed cluster is isolated.
 
 #### Detach a managed cluster
@@ -110,8 +110,8 @@ Distribute workload to selected managed clusters.
 - Workflow:
   - hub-cluster-admin creates a `Placement` resource to describe the target managed clusters' attributes;
   - placement-controller selects all clusters that meet the attributes;
-  - hub-cluster-admin creates a `Manifestwork` resource containing the workload into the selected clusters' namespace;
-  - work-agents on managed clusters watch the `Manifestwork` created, apply the workload on the managed cluster
+  - hub-cluster-admin creates a `ManifestWork` resource containing the workload into the selected clusters' namespace;
+  - work-agents on managed clusters watch the `ManifestWork` created, apply the workload on the managed cluster
 - Security Checks: Pull mode, the hub cluster does not access the managed clusters; Manifestwork for each managed cluster is isolated in its own namespace.
 
 ### Goals
@@ -158,7 +158,7 @@ This document is intended to be used by the OCM team to identify areas of improv
 | Double Opt-In Handshake for Cluster Registration | Critical | Registration requires both hub cluster admin and managed cluster admin consent to the connection. |
 | mTLS connection | Critical | The registration process ensures all connections between the managed clusters and the hub are mTLS, and the certificates rotate automatically as well. |
 | Feature-Gate Auto Approve | Relevant | Auto approve cluster joining request created by a certain user, using a white list to configure the allowed users. This feature is disabled by default, can be enabled by a feature gate. |
-| Work executor subject | Relevant | All manifests in ManifestWork are applied by the work-agent using the mounted service account to raise requests against the managed cluster by default. And the work agent has very high permission to access the managed cluster which means that any hub user with write access to the ManifestWork resources will be able to dispatch any resources that the work-agent can manipulate to the managed cluster. We have an executor subject feature provides a way to clarify the owner identity(executor) of the ManifestWork before it takes effect so that we can explicitly check whether the executor has sufficient permission in the managed cluster. This feature is Disabled by default, should consider enabling it by default in the future. |
+| Work executor subject | Relevant | All manifests in ManifestWork are applied by the work-agent using the mounted service account to raise requests against the managed cluster by default. And the work agent has very high permission to access the managed cluster which means that any hub user with write access to the ManifestWork resources will be able to dispatch any resources that the work-agent can manipulate to the managed cluster. We have an executor subject feature provides a way to clarify the owner identity(executor) of the ManifestWork before it takes effect so that we can explicitly check whether the executor has sufficient permission in the managed cluster. This feature is disabled by default, should consider enabling it by default in the future. |
 | Logs and Events | Relevant | All operations on the clusters(hub and managed) are recorded by logs and events. |
 
 ## Project Compliance
@@ -207,7 +207,7 @@ The OCM project accepts vulnerability reports through the email [OCM-security@go
 
 ### Incident Response
 
-In the event that a vulnerability is reported, the maintainer team will collaborate to determine the validity and criticality of the report. Based on these findings, the fix will be triaged and the maintainer team will work to issue a patch in a timely manner.
+When a vulnerability is reported, the maintainer team will determine its validity and criticality. Based on these findings, the fix will be triaged and the maintainer team will work to issue a patch in a timely manner.
 
 Patches will be made to the most recent three minor releases. Information will be disseminated to the community through all appropriate outbound channels as soon as possible based on the circumstance.
 
@@ -216,7 +216,7 @@ Patches will be made to the most recent three minor releases. Information will b
 - Known Issues Over Time
   - There are currently no known vulnerabilities in any version.
 - OpenSSF Best Practices
-  - OCM has attained the Open Source Security Foundation(OpenSSF) Best Practices Badge, refer to https://bestpractices.coreinfrastructure.org/projects/5376.
+  - OCM has attained the Open Source Security Foundation (OpenSSF) Best Practices Badge; see the badge on the [OpenSSF site](https://bestpractices.coreinfrastructure.org/projects/5376).
 - Case Studies
   - All adopters can be found at [adopters-list](https://github.com/open-cluster-management-io/ocm/blob/main/ADOPTERS.md).
   - Guidewire: [Policy-Driven Multi-Cluster Management with Kubernetes](https://medium.com/guidewire-engineering-blog/policy-driven-multi-cluster-management-with-kubernetes-906ca96958c3) — Guidewire leverages OCM to implement policy-driven management across multiple Kubernetes clusters, dramatically simplifying the management of clusters and workloads at scale, regardless of where they run. Their approach demonstrates how OCM can streamline multi-cluster operations and automation for large organizations.
