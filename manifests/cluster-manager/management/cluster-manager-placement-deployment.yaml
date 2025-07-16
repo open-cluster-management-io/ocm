@@ -14,11 +14,11 @@ spec:
   replicas: {{ .Replica }}
   selector:
     matchLabels:
-      app: {{ .ClusterManagerName }}-placement-controller
+      app: clustermanager-placement-controller
   template:
     metadata:
       labels:
-        app: {{ .ClusterManagerName }}-placement-controller
+        app: clustermanager-placement-controller
         {{ if gt (len .Labels) 0 }}
         {{ range $key, $value := .Labels }}
         "{{ $key }}": "{{ $value }}"
