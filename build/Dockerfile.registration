@@ -10,9 +10,15 @@ RUN GOOS=${OS} \
     GO_BUILD_PACKAGES=./cmd/registration \
     make build --warn-undefined-variables
 
+RUN GOOS=${OS} \
+    GOARCH=${ARCH} \
+    GO_BUILD_PACKAGES=./cmd/server \
+    make build --warn-undefined-variables
+
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 ENV USER_UID=10001
 
 COPY --from=builder /go/src/open-cluster-management.io/ocm/registration /
+COPY --from=builder /go/src/open-cluster-management.io/ocm/server /
 
 USER ${USER_UID}

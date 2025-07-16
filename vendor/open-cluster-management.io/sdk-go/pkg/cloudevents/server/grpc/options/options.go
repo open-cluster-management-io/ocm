@@ -1,27 +1,44 @@
 package options
 
 import (
-	"github.com/spf13/pflag"
 	"math"
+	"os"
 	"time"
+
+	"github.com/spf13/pflag"
+	"gopkg.in/yaml.v2"
 )
 
 type GRPCServerOptions struct {
-	TLSCertFile             string
-	TLSKeyFile              string
-	ClientCAFile            string
-	ServerBindPort          string
-	MaxConcurrentStreams    uint32
-	MaxReceiveMessageSize   int
-	MaxSendMessageSize      int
-	ConnectionTimeout       time.Duration
-	WriteBufferSize         int
-	ReadBufferSize          int
-	MaxConnectionAge        time.Duration
-	ClientMinPingInterval   time.Duration
-	ServerPingInterval      time.Duration
-	ServerPingTimeout       time.Duration
-	PermitPingWithoutStream bool
+	TLSCertFile             string        `json:"tls_cert_file" yaml:"tls_cert_file"`
+	TLSKeyFile              string        `json:"tls_key_file" yaml:"tls_key_file"`
+	ClientCAFile            string        `json:"client_ca_file" yaml:"client_ca_file"`
+	ServerBindPort          string        `json:"server_bind_port" yaml:"server_bind_port"`
+	MaxConcurrentStreams    uint32        `json:"max_concurrent_streams" yaml:"max_concurrent_streams"`
+	MaxReceiveMessageSize   int           `json:"max_receive_message_size" yaml:"max_receive_message_size"`
+	MaxSendMessageSize      int           `json:"max_send_message_size" yaml:"max_send_message_size"`
+	WriteBufferSize         int           `json:"write_buffer_size" yaml:"write_buffer_size"`
+	ReadBufferSize          int           `json:"read_buffer_size" yaml:"read_buffer_size"`
+	ConnectionTimeout       time.Duration `json:"connection_timeout" yaml:"connection_timeout"`
+	MaxConnectionAge        time.Duration `json:"max_connection_age" yaml:"max_connection_age"`
+	ClientMinPingInterval   time.Duration `json:"client_min_ping_interval" yaml:"client_min_ping_interval"`
+	ServerPingInterval      time.Duration `json:"server_ping_interval" yaml:"server_ping_interval"`
+	ServerPingTimeout       time.Duration `json:"server_ping_timeout" yaml:"server_ping_timeout"`
+	PermitPingWithoutStream bool          `json:"permit_ping_without_stream" yaml:"permit_ping_without_stream"`
+}
+
+func LoadGRPCServerOptions(configPath string) (*GRPCServerOptions, error) {
+	opts := NewGRPCServerOptions()
+	grpcServerConfig, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := yaml.Unmarshal(grpcServerConfig, opts); err != nil {
+		return nil, err
+	}
+
+	return opts, nil
 }
 
 func NewGRPCServerOptions() *GRPCServerOptions {
