@@ -2,12 +2,14 @@ package util
 
 import (
 	"context"
+	"encoding/json"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -96,8 +98,19 @@ func RemoveConfigmapFinalizers(kubeClient kubernetes.Interface, namespace string
 		if err != nil {
 			return err
 		}
-		cm.Finalizers = nil
-		_, err = kubeClient.CoreV1().ConfigMaps(cm.Namespace).Update(context.Background(), cm, metav1.UpdateOptions{})
+
+		patch := map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"finalizers": nil,
+			},
+		}
+		patchBytes, err := json.Marshal(patch)
+		if err != nil {
+			return err
+		}
+
+		_, err = kubeClient.CoreV1().ConfigMaps(cm.Namespace).Patch(
+			context.Background(), cm.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 		if err != nil {
 			return err
 		}

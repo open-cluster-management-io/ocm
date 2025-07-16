@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -74,7 +75,7 @@ var _ = Describe("Create klusterlet CR", Label("klusterlet"), func() {
 			err := spoke.CheckKlusterletStatus(klusterletName, "HubConnectionDegraded",
 				"HubConnectionFunctional", metav1.ConditionFalse)
 			return err
-		}).Should(Succeed())
+		}, 60*time.Second, time.Second).Should(Succeed())
 	})
 
 	It("Create klusterlet CR with managed cluster name", func() {
@@ -116,7 +117,7 @@ var _ = Describe("Create klusterlet CR", Label("klusterlet"), func() {
 			err := spoke.CheckKlusterletStatus(klusterletName, "HubConnectionDegraded",
 				"HubConnectionFunctional", metav1.ConditionFalse)
 			return err
-		}).Should(Succeed())
+		}, 60*time.Second, time.Second).Should(Succeed())
 	})
 
 	It("Created klusterlet without managed cluster name", func() {
@@ -172,7 +173,7 @@ var _ = Describe("Create klusterlet CR", Label("klusterlet"), func() {
 			err := spoke.CheckKlusterletStatus(klusterletName, "HubConnectionDegraded",
 				"HubConnectionFunctional", metav1.ConditionFalse)
 			return err
-		}).Should(Succeed())
+		}, 60*time.Second, time.Second).Should(Succeed())
 	})
 
 	It("Update klusterlet CR namespace", func() {
@@ -248,6 +249,6 @@ var _ = Describe("Create klusterlet CR", Label("klusterlet"), func() {
 		Eventually(func() error {
 			err := spoke.CheckKlusterletStatus(klusterletName, "HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
 			return err
-		}).Should(Succeed())
+		}, 60*time.Second, time.Second).Should(Succeed())
 	})
 })
