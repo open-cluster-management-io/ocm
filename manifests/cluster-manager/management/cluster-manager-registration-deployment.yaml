@@ -14,11 +14,11 @@ spec:
   replicas: {{ .Replica }}
   selector:
     matchLabels:
-      app: {{ .ClusterManagerName }}-registration-controller
+      app: clustermanager-registration-controller
   template:
     metadata:
       labels:
-        app: {{ .ClusterManagerName }}-registration-controller
+        app: clustermanager-registration-controller
         {{ if gt (len .Labels) 0 }}
         {{ range $key, $value := .Labels }}
         "{{$key}}": "{{$value}}"
