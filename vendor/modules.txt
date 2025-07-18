@@ -1836,6 +1836,8 @@ open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authz
 open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/options
 open-cluster-management.io/sdk-go/pkg/helpers
 open-cluster-management.io/sdk-go/pkg/patcher
+open-cluster-management.io/sdk-go/pkg/testing
+open-cluster-management.io/sdk-go/test/integration/cloudevents/util
 # sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03
 ## explicit; go 1.22
 sigs.k8s.io/about-api/pkg/apis/v1alpha1
