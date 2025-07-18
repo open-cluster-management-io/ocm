@@ -164,7 +164,7 @@ func AssertFinalizerAdded(namespace, name, expectedFinalizer string, workClient 
 				return nil
 			}
 		}
-		return fmt.Errorf("not found")
+		return fmt.Errorf("expected finalizer %s not found, %v", expectedFinalizer, work.Finalizers)
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 

@@ -72,6 +72,9 @@ func (w *WorkService) List(listOpts types.ListOptions) ([]*cloudevents.Event, er
 
 	var evts []*cloudevents.Event
 	for _, work := range works {
+		work = work.DeepCopy()
+		// use the work generation as the work cloudevent resource version
+		work.ResourceVersion = fmt.Sprintf("%d", work.Generation)
 		evt, err := w.codec.Encode(services.CloudEventsSourceKube, types.CloudEventsType{CloudEventsDataType: payload.ManifestBundleEventDataType}, work)
 		if err != nil {
 			return nil, err
