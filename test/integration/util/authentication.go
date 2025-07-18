@@ -640,6 +640,23 @@ func FindAutoApprovedSpokeCSR(kubeClient kubernetes.Interface, spokeClusterName 
 	return autoApproved, nil
 }
 
+func ApproveCSR(kubeClient kubernetes.Interface, csr *certificates.CertificateSigningRequest) error {
+	// approve the csr
+	approved, err := kubeClient.CertificatesV1().CertificateSigningRequests().Get(context.TODO(), csr.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	approved.Status.Conditions = append(approved.Status.Conditions, certificates.CertificateSigningRequestCondition{
+		Type:           certificates.CertificateApproved,
+		Status:         corev1.ConditionTrue,
+		Reason:         "Approved",
+		Message:        "CSR Approved.",
+		LastUpdateTime: metav1.Now(),
+	})
+	_, err = kubeClient.CertificatesV1().CertificateSigningRequests().UpdateApproval(context.TODO(), approved.Name, approved, metav1.UpdateOptions{})
+	return err
+}
+
 func (t *TestAuthn) ApproveSpokeClusterCSRWithExpiredCert(kubeClient kubernetes.Interface, spokeClusterName string) error {
 	now := time.Now()
 
@@ -668,19 +685,7 @@ func (t *TestAuthn) ApproveCSR(kubeClient kubernetes.Interface, csr *certificate
 	}
 
 	// approve the csr
-	approved, err := kubeClient.CertificatesV1().CertificateSigningRequests().Get(context.TODO(), csr.Name, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	approved.Status.Conditions = append(approved.Status.Conditions, certificates.CertificateSigningRequestCondition{
-		Type:           certificates.CertificateApproved,
-		Status:         corev1.ConditionTrue,
-		Reason:         "Approved",
-		Message:        "CSR Approved.",
-		LastUpdateTime: metav1.Now(),
-	})
-	_, err = kubeClient.CertificatesV1().CertificateSigningRequests().UpdateApproval(context.TODO(), approved.Name, approved, metav1.UpdateOptions{})
-	return err
+	return ApproveCSR(kubeClient, csr)
 }
 
 func (t *TestAuthn) FillCertificateToApprovedCSR(kubeClient kubernetes.Interface,
