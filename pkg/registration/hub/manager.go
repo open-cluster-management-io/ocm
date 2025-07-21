@@ -349,7 +349,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	go workInformers.Start(ctx.Done())
 	go kubeInformers.Start(ctx.Done())
 	go addOnInformers.Start(ctx.Done())
-	if features.HubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.ClusterProfile) {
 		go clusterProfileInformers.Start(ctx.Done())
 	}
 
