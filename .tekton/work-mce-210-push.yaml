@@ -35,12 +35,10 @@ spec:
       value: build/Dockerfile.work.rhtap
     - name: path-context
       value: .
+    - name: send-slack-notification
+      value: true
     - name: konflux-application-name
       value: release-mce-210 # Need to be updated for each release
-    - name: slack-webhook-url-secret-name
-      value: slack-acm-server-foundation-notify-secret
-    - name: slack-webhook-url-secret-key
-      value: slack-webhook-url
     - name: slack-member-id
       value: U02CRCBPXK4 # zhujian7, The slack member id of the current component owner
   pipelineRef:
