@@ -26,10 +26,13 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/payload"
 	sourcecodec "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/source/codec"
 	workstore "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/store"
+	grpcoptions "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/options"
 
 	"open-cluster-management.io/ocm/pkg/features"
+	serviceswork "open-cluster-management.io/ocm/pkg/server/services/work"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/hub"
 	"open-cluster-management.io/ocm/test/integration/util"
@@ -153,6 +156,27 @@ var _ = ginkgo.BeforeSuite(func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		hubWorkClient = sourceClient.WorkInterface()
+	case util.GRPCDriver:
+		hubWorkClient, err = workclientset.NewForConfig(cfg)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		sourceConfigFileName = path.Join(tempDir, "grpcconfig")
+		gRPCURL, gRPCServerOptions, _, err := util.CreateGRPCConfigs(sourceConfigFileName)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		hubHash = helper.HubHash(gRPCURL)
+
+		hook, err := util.NewGRPCServerWorkHook(cfg)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		server := grpcoptions.NewServer(gRPCServerOptions).WithPreStartHooks(hook).WithService(
+			payload.ManifestBundleEventDataType,
+			serviceswork.NewWorkService(hook.WorkClient, hook.WorkInformers.Work().V1().ManifestWorks()),
+		)
+
+		go func() {
+			err := server.Run(envCtx)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		}()
 	default:
 		ginkgo.Fail(fmt.Sprintf("unsupported test driver %s", sourceDriver))
 	}

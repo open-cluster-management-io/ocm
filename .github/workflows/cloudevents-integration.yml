@@ -4,6 +4,7 @@ on:
   workflow_dispatch: {}
   pull_request:
     paths:
+     - 'pkg/server/**'
      - 'pkg/work/spoke/*.go'
      - 'test/integration/work/**'
     branches:
