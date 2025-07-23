@@ -31,26 +31,26 @@ build-work-integration:
 
 test-registration-integration: ensure-kubebuilder-tools
 	go test -c ./test/integration/registration -o ./registration-integration.test
-	./registration-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast
+	./registration-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast ${ARGS}
 .PHONY: test-registration-integration
 
 test-work-integration: ensure-kubebuilder-tools build-work-integration
-	./work-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast
+	./work-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast ${ARGS}
 .PHONY: test-work-integration
 
 test-placement-integration: ensure-kubebuilder-tools
 	go test -c ./test/integration/placement -o ./placement-integration.test
-	./placement-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast
+	./placement-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast ${ARGS}
 .PHONY: test-placement-integration
 
 test-registration-operator-integration: ensure-kubebuilder-tools
 	go test -c ./test/integration/operator -o ./registration-operator-integration.test
-	./registration-operator-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast
+	./registration-operator-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast ${ARGS}
 .PHONY: test-registration-operator-integration
 
 test-addon-integration: ensure-kubebuilder-tools
 	go test -c ./test/integration/addon -o ./addon-integration.test
-	./addon-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast
+	./addon-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast ${ARGS}
 .PHONY: test-addon-integration
 
 # In the cloud events scenario, skip the following tests
@@ -58,14 +58,31 @@ test-addon-integration: ensure-kubebuilder-tools
 # - unmanaged_appliedwork_test.go, this test mainly focus on switching the hub kube-apiserver
 # - manifestworkreplicaset_test.go, this test needs to update the work status with the hub work client,
 #   cloud events work client does not support it. (TODO) may add e2e to for mwrs.
-test-cloudevents-integration: ensure-kubebuilder-tools build-work-integration
+test-cloudevents-work-mqtt-integration: ensure-kubebuilder-tools build-work-integration
 	./work-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast \
 		-ginkgo.skip-file manifestworkreplicaset_test.go \
 		-ginkgo.skip-file executor_test.go \
 		-ginkgo.skip-file unmanaged_appliedwork_test.go \
 		-test.driver=mqtt \
-		-v=4
-.PHONY: test-cloudevents-integration
+		-v=4 ${ARGS}
+.PHONY: test-cloudevents-work-mqtt-integration
+
+# In the cloud events scenario, skip the following tests
+# - executor_test.go, this feature is not supported yet by cloud events work client
+# - unmanaged_appliedwork_test.go, this test mainly focus on switching the hub kube-apiserver
+# - manifestworkreplicaset_test.go, this test needs to update the work status with the hub work client,
+#   cloud events work client does not support it. (TODO) may add e2e to for mwrs.
+test-cloudevents-work-grpc-integration: ensure-kubebuilder-tools build-work-integration
+	./work-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast \
+		-ginkgo.skip-file manifestworkreplicaset_test.go \
+		-ginkgo.skip-file executor_test.go \
+		-ginkgo.skip-file unmanaged_appliedwork_test.go \
+		-test.driver=grpc \
+		-v=4 ${ARGS}
+.PHONY: test-cloudevents-work-grpc-integration
 
 test-integration: test-registration-operator-integration test-registration-integration test-placement-integration test-work-integration test-addon-integration
 .PHONY: test-integration
+
+test-cloudevents-integration: test-cloudevents-work-mqtt-integration test-cloudevents-work-grpc-integration
+.PHONY: test-cloudevents-integration

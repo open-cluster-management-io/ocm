@@ -4,6 +4,7 @@
 /work
 /registration-operator
 /addon
+/server
 
 *.exe
 *.dll
