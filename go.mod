@@ -41,7 +41,7 @@ require (
 	k8s.io/utils v0.0.0-20241210054802-24370beab758
 	open-cluster-management.io/addon-framework v1.0.1-0.20250722093201-ee47752c02f3
 	open-cluster-management.io/api v1.0.1-0.20250722080758-779879f46835
-	open-cluster-management.io/sdk-go v1.0.1-0.20250714033031-2a092f845650
+	open-cluster-management.io/sdk-go v1.0.1-0.20250718034047-bff5c35277b9
 	sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03
 	sigs.k8s.io/cluster-inventory-api v0.0.0-20240730014211-ef0154379848
 	sigs.k8s.io/controller-runtime v0.21.0
