@@ -146,7 +146,7 @@ func (PortOpts) SwaggerDoc() map[string]string {
 var map_RootVolume = map[string]string{
 	"sourceUUID":       "sourceUUID specifies the UUID of a glance image used to populate the root volume. Deprecated: set image in the platform spec instead. This will be ignored if image is set in the platform spec.",
 	"volumeType":       "volumeType specifies a volume type to use when creating the root volume. If not specified the default volume type will be used.",
-	"diskSize":         "diskSize specifies the size, in GB, of the created root volume.",
+	"diskSize":         "diskSize specifies the size, in GiB, of the created root volume.",
 	"availabilityZone": "availabilityZone specifies the Cinder availability where the root volume will be created.",
 	"sourceType":       "Deprecated: sourceType will be silently ignored. There is no replacement.",
 	"deviceType":       "Deprecated: deviceType will be silently ignored. There is no replacement.",
