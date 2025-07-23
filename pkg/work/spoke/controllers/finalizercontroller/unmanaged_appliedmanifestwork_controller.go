@@ -100,8 +100,13 @@ func (m *unmanagedAppliedWorkController) sync(ctx context.Context, controllerCon
 		return err
 	}
 
+	// skip if appliedManifestWork is already in deleting state
+	if appliedManifestWork.DeletionTimestamp != nil {
+		return nil
+	}
+
 	// Do NOT evict the AppliedManifestWorks if the eviction grace period reaches or exceeds the
-	// EvictionGracePeriodBound
+	// EvictionGracePeriodBound indicating the eviction is disabled for all the appliedmanifestworks.
 	if m.evictionGracePeriod >= EvictionGracePeriodBound {
 		return m.stopToEvictAppliedManifestWork(ctx, appliedManifestWork)
 	}

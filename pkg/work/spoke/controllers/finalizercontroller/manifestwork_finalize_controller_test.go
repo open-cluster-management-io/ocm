@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
@@ -66,8 +67,18 @@ func TestSyncManifestWorkController(t *testing.T) {
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "delete")
 			},
-			validateManifestWorkActions: testingcommon.AssertNoActions,
-			expectedQueueLen:            1,
+			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.ManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
+				}
+				if !meta.IsStatusConditionTrue(work.Status.Conditions, workapiv1.WorkDeleting) {
+					t.Errorf("expected work to have deleting condition")
+				}
+			},
+			expectedQueueLen: 1,
 		},
 		{
 			name:     "delete applied work when work is deleting",
@@ -88,8 +99,18 @@ func TestSyncManifestWorkController(t *testing.T) {
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "delete")
 			},
-			validateManifestWorkActions: testingcommon.AssertNoActions,
-			expectedQueueLen:            1,
+			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.ManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
+				}
+				if !meta.IsStatusConditionTrue(work.Status.Conditions, workapiv1.WorkDeleting) {
+					t.Errorf("expected work to have deleting condition")
+				}
+			},
+			expectedQueueLen: 1,
 		},
 		{
 			name:     "requeue work when applied work is deleting",

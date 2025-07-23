@@ -832,6 +832,9 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			err := hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkDeleting, metav1.ConditionTrue,
+				nil, eventuallyTimeout, eventuallyInterval)
+
 			// remove finalizer from one of applied resources every 2 seconds
 			go func() {
 				for _, manifest := range manifests {
