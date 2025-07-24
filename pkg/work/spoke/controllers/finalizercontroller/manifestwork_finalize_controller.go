@@ -8,6 +8,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -77,7 +78,7 @@ func (m *ManifestWorkFinalizeController) sync(ctx context.Context, controllerCon
 	case err != nil:
 		return err
 	case !manifestWork.DeletionTimestamp.IsZero():
-		err := m.deleteAppliedManifestWork(ctx, appliedManifestWorkName)
+		err := m.deleteAppliedManifestWork(ctx, manifestWork, appliedManifestWorkName)
 		if err != nil {
 			return err
 		}
@@ -113,7 +114,7 @@ func (m *ManifestWorkFinalizeController) sync(ctx context.Context, controllerCon
 	return nil
 }
 
-func (m *ManifestWorkFinalizeController) deleteAppliedManifestWork(ctx context.Context, appliedManifestWorkName string) error {
+func (m *ManifestWorkFinalizeController) deleteAppliedManifestWork(ctx context.Context, work *workapiv1.ManifestWork, appliedManifestWorkName string) error {
 	appliedManifestWork, err := m.appliedManifestWorkLister.Get(appliedManifestWorkName)
 	switch {
 	case errors.IsNotFound(err):
@@ -122,6 +123,19 @@ func (m *ManifestWorkFinalizeController) deleteAppliedManifestWork(ctx context.C
 		return err
 	case !appliedManifestWork.DeletionTimestamp.IsZero():
 		return nil
+	}
+
+	workCopy := work.DeepCopy()
+	meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
+		Type:               workapiv1.WorkDeleting,
+		Reason:             "WorkDeleting",
+		Status:             metav1.ConditionTrue,
+		Message:            "ManifestWork is being deleted",
+		ObservedGeneration: workCopy.Generation,
+	})
+
+	if _, err = m.patcher.PatchStatus(ctx, work, workCopy.Status, work.Status); err != nil {
+		return err
 	}
 
 	return m.appliedManifestWorkClient.Delete(ctx, appliedManifestWorkName, metav1.DeleteOptions{})

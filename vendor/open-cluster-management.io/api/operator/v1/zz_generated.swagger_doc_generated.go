@@ -106,6 +106,26 @@ func (FeatureGate) SwaggerDoc() map[string]string {
 	return map_FeatureGate
 }
 
+var map_GRPCConfig = map[string]string{
+	"":                       "GRPC represents the configuration for gRPC driver.",
+	"imagePullSpec":          "ImagePullSpec represents the desired image of the gRPC broker installed on hub.",
+	"endpointExposure":       "EndpointExposure represents the configuration for endpoint exposure.",
+	"autoApprovedIdentities": "AutoApprovedIdentities represent a list of approved arn patterns",
+}
+
+func (GRPCConfig) SwaggerDoc() map[string]string {
+	return map_GRPCConfig
+}
+
+var map_GRPCEndpointExposure = map[string]string{
+	"type":     "Type specifies how the gRPC endpoint is exposed. You may need to apply an object to expose the gRPC endpoint, for example: a route.",
+	"hostname": "Hostname points to a fixed hostname for serving agents' handshakes.",
+}
+
+func (GRPCEndpointExposure) SwaggerDoc() map[string]string {
+	return map_GRPCEndpointExposure
+}
+
 var map_GenerationStatus = map[string]string{
 	"":               "GenerationStatus keeps track of the generation for a given resource so that decisions about forced updates can be made. The definition matches the GenerationStatus defined in github.com/openshift/api/v1",
 	"group":          "group is the group of the resource that you're tracking",
@@ -130,6 +150,14 @@ func (HostedClusterManagerConfiguration) SwaggerDoc() map[string]string {
 	return map_HostedClusterManagerConfiguration
 }
 
+var map_HostnameConfig = map[string]string{
+	"": "HostnameConfig references a fixed hostname.",
+}
+
+func (HostnameConfig) SwaggerDoc() map[string]string {
+	return map_HostnameConfig
+}
+
 var map_NodePlacement = map[string]string{
 	"":             "NodePlacement describes node scheduling configuration for the pods.",
 	"nodeSelector": "NodeSelector defines which Nodes the Pods are scheduled on. The default is an empty list.",
@@ -144,6 +172,7 @@ var map_RegistrationDriverHub = map[string]string{
 	"authType": "Type of the authentication used by hub to initialize the Hub cluster. Possible values are csr and awsirsa.",
 	"csr":      "CSR represents the configuration for csr driver.",
 	"awsirsa":  "AwsIrsa represents the configuration for awsirsa driver.",
+	"grpc":     "GRPC represents the configuration for gRPC driver.",
 }
 
 func (RegistrationDriverHub) SwaggerDoc() map[string]string {

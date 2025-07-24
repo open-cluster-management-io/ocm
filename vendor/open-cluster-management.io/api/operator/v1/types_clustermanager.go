@@ -122,7 +122,7 @@ type RegistrationDriverHub struct {
 	// Type of the authentication used by hub to initialize the Hub cluster. Possible values are csr and awsirsa.
 	// +required
 	// +kubebuilder:default:=csr
-	// +kubebuilder:validation:Enum=csr;awsirsa
+	// +kubebuilder:validation:Enum=csr;awsirsa;grpc
 	AuthType string `json:"authType,omitempty"`
 
 	// CSR represents the configuration for csr driver.
@@ -132,7 +132,55 @@ type RegistrationDriverHub struct {
 	// AwsIrsa represents the configuration for awsirsa driver.
 	// +optional
 	AwsIrsa *AwsIrsaConfig `json:"awsirsa,omitempty"`
+
+	// GRPC represents the configuration for gRPC driver.
+	// +optional
+	GRPC *GRPCConfig `json:"grpc,omitempty"`
 }
+
+// GRPC represents the configuration for gRPC driver.
+type GRPCConfig struct {
+	// ImagePullSpec represents the desired image of the gRPC broker installed on hub.
+	// +optional
+	// +kubebuilder:default=quay.io/open-cluster-management/registration
+	ImagePullSpec string `json:"imagePullSpec,omitempty"`
+
+	// EndpointExposure represents the configuration for endpoint exposure.
+	// +optional
+	EndpointExposure *GRPCEndpointExposure `json:"endpointExposure,omitempty"`
+
+	// AutoApprovedIdentities represent a list of approved arn patterns
+	// +optional
+	AutoApprovedIdentities []string `json:"autoApprovedIdentities,omitempty"`
+}
+
+type GRPCEndpointExposure struct {
+	// Type specifies how the gRPC endpoint is exposed.
+	// You may need to apply an object to expose the gRPC endpoint, for example: a route.
+	// TODO: support loadbalancer.
+	// +kubebuilder:default:=hostname
+	// +kubebuilder:validation:Enum=hostname
+	// +required
+	Type GRPCEndpointExposureType `json:"type,omitempty"`
+
+	// Hostname points to a fixed hostname for serving agents' handshakes.
+	// +optional
+	Hostname *HostnameConfig `json:"hostname,omitempty"`
+}
+
+// HostnameConfig references a fixed hostname.
+type HostnameConfig struct {
+	// +required
+	Value string `json:"value"`
+}
+
+// GRPCEndpointExposureType represents the type of endpoint exposure for gRPC.
+type GRPCEndpointExposureType string
+
+const (
+	// GRPCEndpointTypeHostname is the gRPC endpoint exposure type for hostname.
+	GRPCEndpointTypeHostname GRPCEndpointExposureType = "hostname"
+)
 
 type CSRConfig struct {
 	// AutoApprovedIdentities represent a list of approved users

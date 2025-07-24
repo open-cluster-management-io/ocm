@@ -268,6 +268,7 @@ spec:
                           enum:
                           - csr
                           - awsirsa
+                          - grpc
                           type: string
                         awsirsa:
                           description: AwsIrsa represents the configuration for awsirsa
@@ -302,6 +303,46 @@ spec:
                               items:
                                 type: string
                               type: array
+                          type: object
+                        grpc:
+                          description: GRPC represents the configuration for gRPC
+                            driver.
+                          properties:
+                            autoApprovedIdentities:
+                              description: AutoApprovedIdentities represent a list
+                                of approved arn patterns
+                              items:
+                                type: string
+                              type: array
+                            endpointExposure:
+                              description: EndpointExposure represents the configuration
+                                for endpoint exposure.
+                              properties:
+                                hostname:
+                                  description: Hostname points to a fixed hostname
+                                    for serving agents' handshakes.
+                                  properties:
+                                    value:
+                                      type: string
+                                  required:
+                                  - value
+                                  type: object
+                                type:
+                                  default: hostname
+                                  description: |-
+                                    Type specifies how the gRPC endpoint is exposed.
+                                    You may need to apply an object to expose the gRPC endpoint, for example: a route.
+                                  enum:
+                                  - hostname
+                                  type: string
+                              required:
+                              - type
+                              type: object
+                            imagePullSpec:
+                              default: quay.io/open-cluster-management/registration
+                              description: ImagePullSpec represents the desired image
+                                of the gRPC broker installed on hub.
+                              type: string
                           type: object
                       required:
                       - authType

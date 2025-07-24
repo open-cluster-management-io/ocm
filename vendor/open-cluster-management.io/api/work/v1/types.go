@@ -506,6 +506,9 @@ const (
 	// WorkComplete represents that the work has completed and should no longer
 	// be updated.
 	WorkComplete string = "Complete"
+	// WorkDeleting represents that the work is being deleted by the agent currently.
+	// This condition is added only when the work's deletion timestamp is not nil.
+	WorkDeleting = "Deleting"
 )
 
 // Work condition reasons

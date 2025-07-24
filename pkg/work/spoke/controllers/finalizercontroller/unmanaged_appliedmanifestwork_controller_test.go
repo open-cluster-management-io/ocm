@@ -41,6 +41,27 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
 		},
 		{
+			name:                    "appliedmanifestwork is deleting",
+			appliedManifestWorkName: "hubhash-test",
+			hubHash:                 "hubhash",
+			agentID:                 "test-agent",
+			works:                   []runtime.Object{},
+			appliedWorks: []runtime.Object{
+				&workapiv1.AppliedManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "hubhash-test",
+						DeletionTimestamp: &metav1.Time{},
+					},
+					Spec: workapiv1.AppliedManifestWorkSpec{
+						ManifestWorkName: "test",
+						HubHash:          "hubhash",
+						AgentID:          "test-agent",
+					},
+				},
+			},
+			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
+		},
+		{
 			name:                    "evict appliedmanifestwork when its relating manifestwork is missing on the hub",
 			appliedManifestWorkName: "hubhash-test",
 			hubHash:                 "hubhash",
