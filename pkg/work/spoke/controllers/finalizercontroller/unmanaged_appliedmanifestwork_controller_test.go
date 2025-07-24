@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
@@ -37,6 +38,27 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 			agentID:                            "test-agent",
 			works:                              []runtime.Object{},
 			appliedWorks:                       []runtime.Object{},
+			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
+		},
+		{
+			name:                    "appliedmanifestwork is deleting",
+			appliedManifestWorkName: "hubhash-test",
+			hubHash:                 "hubhash",
+			agentID:                 "test-agent",
+			works:                   []runtime.Object{},
+			appliedWorks: []runtime.Object{
+				&workapiv1.AppliedManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "hubhash-test",
+						DeletionTimestamp: &metav1.Time{},
+					},
+					Spec: workapiv1.AppliedManifestWorkSpec{
+						ManifestWorkName: "test",
+						HubHash:          "hubhash",
+						AgentID:          "test-agent",
+					},
+				},
+			},
 			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
 		},
 		{
@@ -253,6 +275,7 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 			}
 
 			controller := &unmanagedAppliedWorkController{
+				recorder:                  eventstesting.NewTestingEventRecorder(t),
 				manifestWorkLister:        informerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks("test"),
 				appliedManifestWorkClient: fakeClient.WorkV1().AppliedManifestWorks(),
 				patcher: patcher.NewPatcher[

@@ -163,7 +163,7 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 		c.Lock()
 		defer c.Unlock()
 
-		eventType.Action = common.UpdateRequestAction
+		eventType.Action = types.UpdateRequestAction
 		// publish the status update event to source, source will check the resource version
 		// and reject the update if it's status update is outdated.
 		if err := c.cloudEventsClient.Publish(ctx, eventType, newWork); err != nil {
@@ -234,7 +234,7 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 			Message: fmt.Sprintf("The manifests are deleted from the cluster %s", newWork.Namespace),
 		})
 
-		eventType.Action = common.DeleteRequestAction
+		eventType.Action = types.UpdateRequestAction
 		if err := c.cloudEventsClient.Publish(ctx, eventType, newWork); err != nil {
 			returnErr := cloudeventserrors.ToStatusError(common.ManifestWorkGR, name, err)
 			generic.IncreaseWorkProcessedCounter("delete", string(returnErr.ErrStatus.Reason))

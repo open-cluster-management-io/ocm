@@ -8,6 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/eks v1.63.1
 	github.com/aws/aws-sdk-go-v2/service/iam v1.38.6
 	github.com/aws/smithy-go v1.22.2
+	github.com/cloudevents/sdk-go/v2 v2.15.3-0.20240911135016-682f3a9684e4
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/evanphx/json-patch v5.9.11+incompatible
 	github.com/ghodss/yaml v1.0.0
@@ -25,6 +26,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.10.0
 	github.com/valyala/fasttemplate v1.2.2
+	golang.org/x/net v0.38.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.17.3
 	k8s.io/api v0.32.4
@@ -38,8 +40,8 @@ require (
 	k8s.io/kubectl v0.32.2
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 	open-cluster-management.io/addon-framework v1.0.0
-	open-cluster-management.io/api v1.0.0
-	open-cluster-management.io/sdk-go v1.0.0
+	open-cluster-management.io/api v1.0.1-0.20250722080758-779879f46835
+	open-cluster-management.io/sdk-go v1.0.1-0.20250714033031-2a092f845650
 	sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03
 	sigs.k8s.io/cluster-inventory-api v0.0.0-20240730014211-ef0154379848
 	sigs.k8s.io/controller-runtime v0.20.2
@@ -48,7 +50,7 @@ require (
 )
 
 require (
-	cel.dev/expr v0.19.1 // indirect
+	cel.dev/expr v0.23.1 // indirect
 	cloud.google.com/go/compute/metadata v0.5.0 // indirect
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect
@@ -76,7 +78,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20240413090539-7fef29478991 // indirect
 	github.com/cloudevents/sdk-go/protocol/mqtt_paho/v2 v2.0.0-20241008145627-6bcc075b5b6c // indirect
-	github.com/cloudevents/sdk-go/v2 v2.15.3-0.20240911135016-682f3a9684e4 // indirect
 	github.com/confluentinc/confluent-kafka-go/v2 v2.3.0 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
@@ -155,7 +156,6 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
 	golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67 // indirect
-	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/oauth2 v0.28.0 // indirect
 	golang.org/x/sync v0.13.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect

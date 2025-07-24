@@ -251,7 +251,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
-			//#nosec G101
+			// #nosec G101
 			workWebhookSecret := "work-webhook-serving-cert"
 			gomega.Eventually(func() error {
 				s, err := kubeClient.CoreV1().Secrets(hubNamespace).Get(context.Background(), workWebhookSecret, metav1.GetOptions{})
@@ -1183,7 +1183,12 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 
 		ginkgo.It("should have labels on resources created by clustermanager", func() {
 
-			labels := map[string]string{"app": "clustermanager", "createdByClusterManager": "hub", "test-label": "test-value", "test-label2": "test-value2"}
+			labels := map[string]string{helpers.AppLabelKey: "clustermanager", helpers.HubLabelKey: "hub",
+				helpers.LabelPrefix + "/cluster-name": "test", "test-label": "test-value", "test-label2": "test-value2"}
+			// app and createdByClusterManager are reserved label keys, and will not be changed to the hub resources.
+			expectedDeploymentLabels := map[string]string{helpers.AppLabelKey: "deployment name", helpers.HubLabelKey: clusterManagerName,
+				"test-label": "test-value", "test-label2": "test-value2"}
+			expectedRegistrationLabels := map[string]string{"test-label": "test-value", "test-label2": "test-value2"}
 			gomega.Eventually(func() error {
 				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
@@ -1202,8 +1207,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if !helpers.MapCompare(registrationDeployment.GetLabels(), labels) {
-					return fmt.Errorf("expected registration-controller labels to be %v, but got %v", labels, registrationDeployment.GetLabels())
+
+				expectedDeploymentLabels[helpers.AppLabelKey] = clusterManagerName + "-registration-controller"
+				if !helpers.MapCompare(registrationDeployment.GetLabels(), expectedDeploymentLabels) {
+					return fmt.Errorf("expected registration-controller labels to be %v, but got %v", expectedDeploymentLabels, registrationDeployment.GetLabels())
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
@@ -1216,7 +1223,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				}
 				commandLineArgs := registrationDeployment.Spec.Template.Spec.Containers[0].Args
 				labelsArg, present := findMatchingArg(commandLineArgs, "--labels")
-				return present && strings.SplitN(labelsArg, "=", 2)[1] == helpers.ConvertLabelsMapToString(labels)
+				return present && strings.SplitN(labelsArg, "=", 2)[1] == helpers.ConvertLabelsMapToString(expectedRegistrationLabels)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Compare labels on registration-webhook
@@ -1226,8 +1233,9 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if !helpers.MapCompare(registrationDeployment.GetLabels(), labels) {
-					return fmt.Errorf("expected registration-webhook labels to be %v, but got %v", labels, registrationDeployment.GetLabels())
+				expectedDeploymentLabels[helpers.AppLabelKey] = clusterManagerName + "-registration-webhook"
+				if !helpers.MapCompare(registrationDeployment.GetLabels(), expectedDeploymentLabels) {
+					return fmt.Errorf("expected registration-webhook labels to be %v, but got %v", expectedDeploymentLabels, registrationDeployment.GetLabels())
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
@@ -1238,8 +1246,9 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if !helpers.MapCompare(registrationDeployment.GetLabels(), labels) {
-					return fmt.Errorf("expected work-webhook labels to be %v, but got %v", labels, registrationDeployment.GetLabels())
+				expectedDeploymentLabels[helpers.AppLabelKey] = clusterManagerName + "-work-webhook"
+				if !helpers.MapCompare(registrationDeployment.GetLabels(), expectedDeploymentLabels) {
+					return fmt.Errorf("expected work-webhook labels to be %v, but got %v", expectedDeploymentLabels, registrationDeployment.GetLabels())
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
@@ -1250,8 +1259,9 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if !helpers.MapCompare(registrationDeployment.GetLabels(), labels) {
-					return fmt.Errorf("expected placement-controller labels to be %v, but got %v", labels, registrationDeployment.GetLabels())
+				expectedDeploymentLabels[helpers.AppLabelKey] = clusterManagerName + "-placement-controller"
+				if !helpers.MapCompare(registrationDeployment.GetLabels(), expectedDeploymentLabels) {
+					return fmt.Errorf("expected placement-controller labels to be %v, but got %v", expectedDeploymentLabels, registrationDeployment.GetLabels())
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
@@ -1262,8 +1272,9 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if !helpers.MapCompare(registrationDeployment.GetLabels(), labels) {
-					return fmt.Errorf("expected labels addon-manager-controller to be %v, but got %v", labels, registrationDeployment.GetLabels())
+				expectedDeploymentLabels[helpers.AppLabelKey] = clusterManagerName + "-addon-manager-controller"
+				if !helpers.MapCompare(registrationDeployment.GetLabels(), expectedDeploymentLabels) {
+					return fmt.Errorf("expected labels addon-manager-controller to be %v, but got %v", expectedDeploymentLabels, registrationDeployment.GetLabels())
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
@@ -1274,8 +1285,9 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if !helpers.MapCompare(registrationDeployment.GetLabels(), labels) {
-					return fmt.Errorf("expected work-controller labels to be %v, but got %v", labels, registrationDeployment.GetLabels())
+				expectedDeploymentLabels[helpers.AppLabelKey] = clusterManagerName + "-work-controller"
+				if !helpers.MapCompare(registrationDeployment.GetLabels(), expectedDeploymentLabels) {
+					return fmt.Errorf("expected work-controller labels to be %v, but got %v", expectedDeploymentLabels, registrationDeployment.GetLabels())
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())

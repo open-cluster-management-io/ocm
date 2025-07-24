@@ -284,8 +284,9 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.Cl
 	if err != nil {
 		t.Errorf("Unable to access objectmeta: %v", err)
 	}
-	//TODO: add test by enabling sync labels = true
-	if enableSyncLabels && !helpers.MapCompare(hubCore.Labels, access.GetLabels()) {
+
+	labels := helpers.GetClusterManagerHubLabels(hubCore, enableSyncLabels)
+	if enableSyncLabels && !helpers.MapCompare(access.GetLabels(), labels) {
 		t.Errorf("the labels of the clustermanager are not synced to %v %v %v", access.GetName(), hubCore.GetLabels(), access.GetLabels())
 		return
 	}
@@ -434,7 +435,8 @@ func TestSyncSecret(t *testing.T) {
 
 // TestSyncDeploy tests sync manifests of hub component
 func TestSyncDeploy(t *testing.T) {
-	labels := map[string]string{"test": "test", "createdByClusterManager": "testhub", "abc": "abc"}
+	labels := map[string]string{"app": "test", helpers.HubLabelKey: "testhub", "abc": "abc",
+		"open-cluster-management.io/cluster-name": "test"}
 	clusterManager := newClusterManager("testhub")
 	clusterManager.SetLabels(labels)
 	tc := newTestController(t, clusterManager)
@@ -462,7 +464,7 @@ func TestSyncDeploy(t *testing.T) {
 	// We expect create the namespace twice respectively in the management cluster and the hub cluster.
 	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 28)
 	for _, object := range createKubeObjects {
-		ensureObject(t, object, clusterManager, false)
+		ensureObject(t, object, clusterManager, true)
 	}
 
 	var createCRDObjects []runtime.Object

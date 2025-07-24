@@ -18,6 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/rand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -101,6 +102,13 @@ var _ = ginkgo.Describe("Cluster Auto Importer", func() {
 			}
 			_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.TODO(), cluster, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// Wait for managed cluster namespace to be created
+			namespaceGVR := schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}
+			gomega.Eventually(func() error {
+				_, err := dynamicClient.Resource(namespaceGVR).Get(context.TODO(), managedClusterName, metav1.GetOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 		})
 
 		ginkgo.JustAfterEach(func() {

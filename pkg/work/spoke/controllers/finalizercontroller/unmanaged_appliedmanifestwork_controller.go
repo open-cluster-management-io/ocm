@@ -33,6 +33,7 @@ const (
 )
 
 type unmanagedAppliedWorkController struct {
+	recorder                  events.Recorder
 	manifestWorkLister        worklister.ManifestWorkNamespaceLister
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
 	patcher                   patcher.Patcher[*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus]
@@ -62,6 +63,7 @@ func NewUnManagedAppliedWorkController(
 	hubHash, agentID string,
 ) factory.Controller {
 	controller := &unmanagedAppliedWorkController{
+		recorder:                  recorder,
 		manifestWorkLister:        manifestWorkLister,
 		appliedManifestWorkClient: appliedManifestWorkClient,
 		patcher: patcher.NewPatcher[
@@ -98,8 +100,13 @@ func (m *unmanagedAppliedWorkController) sync(ctx context.Context, controllerCon
 		return err
 	}
 
+	// skip if appliedManifestWork is already in deleting state
+	if appliedManifestWork.DeletionTimestamp != nil {
+		return nil
+	}
+
 	// Do NOT evict the AppliedManifestWorks if the eviction grace period reaches or exceeds the
-	// EvictionGracePeriodBound
+	// EvictionGracePeriodBound indicating the eviction is disabled for all the appliedmanifestworks.
 	if m.evictionGracePeriod >= EvictionGracePeriodBound {
 		return m.stopToEvictAppliedManifestWork(ctx, appliedManifestWork)
 	}
@@ -136,8 +143,13 @@ func (m *unmanagedAppliedWorkController) evictAppliedManifestWork(ctx context.Co
 		return nil
 	}
 
-	klog.V(2).Infof("Delete appliedWork %s by agent %s after eviction grace periodby", appliedManifestWork.Name, m.agentID)
-	return m.appliedManifestWorkClient.Delete(ctx, appliedManifestWork.Name, metav1.DeleteOptions{})
+	err := m.appliedManifestWorkClient.Delete(ctx, appliedManifestWork.Name, metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+	m.recorder.Eventf("AppliedManifestWorkEvicted", appliedManifestWork.Name,
+		"AppliedManifestWork %s evicted by agent %s after eviction grace period", appliedManifestWork.Name, m.agentID)
+	return nil
 }
 
 func (m *unmanagedAppliedWorkController) stopToEvictAppliedManifestWork(

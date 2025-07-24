@@ -302,6 +302,9 @@ func AssertAppliedResources(appliedManifestWorkName string, gvrs []schema.GroupV
 }
 
 func HaveManifestCondition(conditions []workapiv1.ManifestCondition, expectedType string, expectedStatuses []metav1.ConditionStatus) bool {
+	if expectedStatuses == nil {
+		return true
+	}
 	if len(conditions) != len(expectedStatuses) {
 		return false
 	}

@@ -1,10 +1,10 @@
 header:
   schema-version: '1.0.0'
-  last-updated: '2025-03-17'
-  last-reviewed: '2025-03-17'
-  expiration-date: '2026-03-17T01:00:00.000Z'
+  last-updated: '2025-07-14'
+  last-reviewed: '2025-07-14'
+  expiration-date: '2026-07-14T01:00:00.000Z'
   project-url: 'https://github.com/open-cluster-management-io/ocm'
-  project-release: '0.16.0'
+  project-release: '1.0.0'
   changelog: 'https://github.com/open-cluster-management-io/ocm/releases'
   license: 'https://github.com/open-cluster-management-io/ocm/blob/main/LICENSE'
 project-lifecycle:
@@ -41,7 +41,7 @@ security-testing:
     before-release: true
 - tool-type: sca
   tool-name: Dependency-Review
-  tool-version: 'v4.5.0'
+  tool-version: 'v4.7.1'
   tool-url: 'https://github.com/open-cluster-management-io/ocm/blob/main/.github/workflows/dependency-review.yml'
   integration:
     ad-hoc: false

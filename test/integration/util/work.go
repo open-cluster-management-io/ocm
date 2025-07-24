@@ -12,6 +12,7 @@ import (
 const (
 	KubeDriver = "kube"
 	MQTTDriver = "mqtt"
+	GRPCDriver = "grpc"
 )
 
 func NewWorkPatch(old, new *workapiv1.ManifestWork) ([]byte, error) {
