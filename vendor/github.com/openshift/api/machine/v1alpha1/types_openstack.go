@@ -368,7 +368,7 @@ type RootVolume struct {
 	// volumeType specifies a volume type to use when creating the root
 	// volume. If not specified the default volume type will be used.
 	VolumeType string `json:"volumeType,omitempty"`
-	// diskSize specifies the size, in GB, of the created root volume.
+	// diskSize specifies the size, in GiB, of the created root volume.
 	Size int `json:"diskSize,omitempty"`
 	// availabilityZone specifies the Cinder availability where the root volume will be created.
 	Zone string `json:"availabilityZone,omitempty"`

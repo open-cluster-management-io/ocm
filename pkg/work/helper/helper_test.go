@@ -164,7 +164,7 @@ func TestMergeManifestConditions(t *testing.T) {
 				}
 
 				if !equality.Semantic.DeepEqual(actualCondition, expectedCondition) {
-					t.Errorf(cmp.Diff(actualCondition, expectedCondition))
+					t.Errorf("%s", cmp.Diff(actualCondition, expectedCondition))
 				}
 			}
 		})
@@ -228,7 +228,7 @@ func TestMergeStatusConditions(t *testing.T) {
 					actual.LastTransitionTime = metav1.Time{}
 				}
 				if !equality.Semantic.DeepEqual(actual, expect) {
-					t.Errorf(cmp.Diff(actual, expect))
+					t.Errorf("%s", cmp.Diff(actual, expect))
 				}
 			}
 		})
@@ -348,7 +348,7 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 			}
 
 			if !equality.Semantic.DeepEqual(actual, c.expectedResourcesPendingFinalization) {
-				t.Errorf(cmp.Diff(actual, c.expectedResourcesPendingFinalization))
+				t.Errorf("%s", cmp.Diff(actual, c.expectedResourcesPendingFinalization))
 			}
 		})
 	}
@@ -799,7 +799,7 @@ func TestFindUntrackedResources(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			actual := FindUntrackedResources(c.appliedResources, c.newAppliedResources)
 			if !reflect.DeepEqual(actual, c.expectedUntrackedResources) {
-				t.Errorf(diff.ObjectDiff(actual, c.expectedUntrackedResources))
+				t.Errorf("%s", diff.ObjectDiff(actual, c.expectedUntrackedResources))
 			}
 		})
 	}

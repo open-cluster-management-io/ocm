@@ -61,7 +61,7 @@ type ConsolePluginSpec struct {
 	// from a cluster service.
 	// CSP violation reports can be viewed in the browser's console logs during development and
 	// testing of the plugin in the OpenShift web console.
-	// Available directive types are DefaultSrc, ScriptSrc, StyleSrc, ImgSrc, FontSrc, ObjectSrc and ConnectSrc.
+	// Available directive types are DefaultSrc, ScriptSrc, StyleSrc, ImgSrc, FontSrc and ConnectSrc.
 	// Each of the available directives may be defined only once in the list.
 	// The value 'self' is automatically included in all fetch directives by the OpenShift web
 	// console's backend.
@@ -101,7 +101,7 @@ type ConsolePluginSpec struct {
 
 // DirectiveType is an enumeration of OpenShift web console supported CSP directives.
 // LoadType is an enumeration of i18n loading types.
-// +kubebuilder:validation:Enum:="DefaultSrc";"ScriptSrc";"StyleSrc";"ImgSrc";"FontSrc";"ObjectSrc";"ConnectSrc"
+// +kubebuilder:validation:Enum:="DefaultSrc";"ScriptSrc";"StyleSrc";"ImgSrc";"FontSrc";"ConnectSrc"
 // +enum
 type DirectiveType string
 
@@ -126,10 +126,6 @@ const (
 	// For more information about the FontSrc directive, see:
 	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/font-src
 	FontSrc DirectiveType = "FontSrc"
-	// ObjectSrc directive specifies valid sources for the <object> and <embed> elements.
-	// For more information about the ObjectSrc directive, see:
-	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/object-src
-	ObjectSrc DirectiveType = "ObjectSrc"
 	// ConnectSrc directive restricts the URLs which can be loaded using script interfaces.
 	// For more information about the ConnectSrc directive, see:
 	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/connect-src
@@ -151,7 +147,7 @@ type CSPDirectiveValue string
 // ConsolePluginCSP holds configuration for a specific CSP directive
 type ConsolePluginCSP struct {
 	// directive specifies which Content-Security-Policy directive to configure.
-	// Available directive types are DefaultSrc, ScriptSrc, StyleSrc, ImgSrc, FontSrc, ObjectSrc and ConnectSrc.
+	// Available directive types are DefaultSrc, ScriptSrc, StyleSrc, ImgSrc, FontSrc and ConnectSrc.
 	// DefaultSrc directive serves as a fallback for the other CSP fetch directives.
 	// For more information about the DefaultSrc directive, see:
 	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/default-src
@@ -167,9 +163,6 @@ type ConsolePluginCSP struct {
 	// FontSrc directive specifies valid sources for fonts loaded using @font-face.
 	// For more information about the FontSrc directive, see:
 	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/font-src
-	// ObjectSrc directive specifies valid sources for the <object> and <embed> elements.
-	// For more information about the ObjectSrc directive, see:
-	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/object-src
 	// ConnectSrc directive restricts the URLs which can be loaded using script interfaces.
 	// For more information about the ConnectSrc directive, see:
 	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/connect-src
@@ -346,7 +339,7 @@ type ConsolePluginBackend struct {
 	// Service serving certificate. The console backend will proxy the
 	// plugins assets from the Service using the service CA bundle.
 	// +optional
-	Service *ConsolePluginService `json:"service"`
+	Service *ConsolePluginService `json:"service,omitempty"`
 }
 
 // ConsolePluginService holds information on Service that is serving
@@ -375,7 +368,7 @@ type ConsolePluginService struct {
 	// +kubebuilder:validation:Pattern=`^[a-zA-Z0-9.\-_~!$&'()*+,;=:@\/]*$`
 	// +kubebuilder:default:="/"
 	// +optional
-	BasePath string `json:"basePath"`
+	BasePath string `json:"basePath,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

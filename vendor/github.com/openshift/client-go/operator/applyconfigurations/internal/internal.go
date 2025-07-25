@@ -727,6 +727,17 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.openshift.api.operator.v1.ConfigStatus
       default: {}
+- name: com.github.openshift.api.operator.v1.ConfigMapFileReference
+  map:
+    fields:
+    - name: key
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: com.github.openshift.api.operator.v1.ConfigSpec
   map:
     fields:
@@ -845,6 +856,14 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: documentationBaseURL
       type:
         scalar: string
+    - name: logos
+      type:
+        list:
+          elementType:
+            namedType: com.github.openshift.api.operator.v1.Logo
+          elementRelationship: associative
+          keys:
+          - type
     - name: perspectives
       type:
         list:
@@ -1327,6 +1346,16 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: multicast
       type:
         scalar: boolean
+- name: com.github.openshift.api.operator.v1.FileReferenceSource
+  map:
+    fields:
+    - name: configMap
+      type:
+        namedType: com.github.openshift.api.operator.v1.ConfigMapFileReference
+    - name: from
+      type:
+        scalar: string
+      default: ""
 - name: com.github.openshift.api.operator.v1.ForwardPlugin
   map:
     fields:
@@ -1627,6 +1656,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: matchType
       type:
         scalar: string
+      default: ""
     - name: maxLength
       type:
         scalar: numeric
@@ -2409,6 +2439,21 @@ var schemaYAML = typed.YAMLObject(`types:
         discriminatorValue: Container
       - fieldName: syslog
         discriminatorValue: Syslog
+- name: com.github.openshift.api.operator.v1.Logo
+  map:
+    fields:
+    - name: themes
+      type:
+        list:
+          elementType:
+            namedType: com.github.openshift.api.operator.v1.Theme
+          elementRelationship: associative
+          keys:
+          - mode
+    - name: type
+      type:
+        scalar: string
+      default: ""
 - name: com.github.openshift.api.operator.v1.MTUMigration
   map:
     fields:
@@ -2496,6 +2541,10 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - type
+    - name: managedBootImagesStatus
+      type:
+        namedType: com.github.openshift.api.operator.v1.ManagedBootImages
+      default: {}
     - name: nodeDisruptionPolicyStatus
       type:
         namedType: com.github.openshift.api.operator.v1.NodeDisruptionPolicyStatus
@@ -2880,7 +2929,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: currentRevision
       type:
         scalar: numeric
-      default: 0
     - name: lastFailedCount
       type:
         scalar: numeric
@@ -3842,6 +3890,17 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
+- name: com.github.openshift.api.operator.v1.Theme
+  map:
+    fields:
+    - name: mode
+      type:
+        scalar: string
+      default: ""
+    - name: source
+      type:
+        namedType: com.github.openshift.api.operator.v1.FileReferenceSource
+      default: {}
 - name: com.github.openshift.api.operator.v1.Upstream
   map:
     fields:
@@ -3885,6 +3944,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
     - name: granularMaxSnapshotsPerBlockVolumeInVVOL
+      type:
+        scalar: numeric
+    - name: maxAllowedBlockVolumesPerNode
       type:
         scalar: numeric
     - name: topologyCategories

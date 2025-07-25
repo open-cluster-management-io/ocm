@@ -3,11 +3,13 @@ package factory
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/robfig/cron"
 	"k8s.io/apimachinery/pkg/runtime"
 	errorutil "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -245,6 +247,11 @@ func (f *Factory) WithControllerInstanceName(controllerInstanceName string) *Fac
 	return f
 }
 
+type informerHandleTuple struct {
+	informer Informer
+	filter   uintptr
+}
+
 // Controller produce a runnable controller.
 func (f *Factory) ToController(name string, eventRecorder events.Recorder) Controller {
 	if f.sync == nil {
@@ -286,19 +293,37 @@ func (f *Factory) ToController(name string, eventRecorder events.Recorder) Contr
 		cacheSyncTimeout:       defaultCacheSyncTimeout,
 	}
 
+	// avoid adding an informer more than once
+	informerQueueKeySet := sets.New[informerHandleTuple]()
 	for i := range f.informerQueueKeys {
 		for d := range f.informerQueueKeys[i].informers {
 			informer := f.informerQueueKeys[i].informers[d]
 			queueKeyFn := f.informerQueueKeys[i].queueKeyFn
-			informer.AddEventHandler(c.syncContext.(syncContext).eventHandler(queueKeyFn, f.informerQueueKeys[i].filter))
+			tuple := informerHandleTuple{
+				informer: informer,
+				filter:   reflect.ValueOf(f.informerQueueKeys[i].filter).Pointer(),
+			}
+			if !informerQueueKeySet.Has(tuple) {
+				sets.Insert(informerQueueKeySet, tuple)
+				informer.AddEventHandler(c.syncContext.(syncContext).eventHandler(queueKeyFn, f.informerQueueKeys[i].filter))
+			}
 			c.cachesToSync = append(c.cachesToSync, informer.HasSynced)
 		}
 	}
 
+	// avoid adding an informer more than once
+	informerSet := sets.New[informerHandleTuple]()
 	for i := range f.informers {
 		for d := range f.informers[i].informers {
 			informer := f.informers[i].informers[d]
-			informer.AddEventHandler(c.syncContext.(syncContext).eventHandler(DefaultQueueKeysFunc, f.informers[i].filter))
+			tuple := informerHandleTuple{
+				informer: informer,
+				filter:   reflect.ValueOf(f.informers[i].filter).Pointer(),
+			}
+			if !informerSet.Has(tuple) {
+				sets.Insert(informerSet, tuple)
+				informer.AddEventHandler(c.syncContext.(syncContext).eventHandler(DefaultQueueKeysFunc, f.informers[i].filter))
+			}
 			c.cachesToSync = append(c.cachesToSync, informer.HasSynced)
 		}
 	}
