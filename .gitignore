@@ -32,3 +32,6 @@ _output/
 .hub-kubeconfig
 .external-hub-kubeconfig
 .external-managed-kubeconfig
+
+# VSCode workspace files
+.vscode/
