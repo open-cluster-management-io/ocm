@@ -13,8 +13,8 @@ import (
 
 // Disables root user sessions for privileged tasks across member accounts in your
 // organization. When you disable this feature, the management account and the
-// delegated admininstrator for IAM can no longer perform privileged tasks on
-// member accounts in your organization.
+// delegated administrator for IAM can no longer perform privileged tasks on member
+// accounts in your organization.
 func (c *Client) DisableOrganizationsRootSessions(ctx context.Context, params *DisableOrganizationsRootSessionsInput, optFns ...func(*Options)) (*DisableOrganizationsRootSessionsOutput, error) {
 	if params == nil {
 		params = &DisableOrganizationsRootSessionsInput{}
@@ -111,6 +111,9 @@ func (c *Client) addOperationDisableOrganizationsRootSessionsMiddlewares(stack *
 		return err
 	}
 	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
+	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opDisableOrganizationsRootSessions(options.Region), middleware.Before); err != nil {
