@@ -178,7 +178,6 @@ type WorkHealthProber struct {
 	// HealthCheck is deprecated and will be removed in the future. please use HealthChecker instead.
 	// HealthCheck will be ignored if HealthChecker is set.
 	// HealthCheck check status of the addon based on each probeField result.
-	// Deprecated: use HealthChecker instead.
 	HealthCheck AddonHealthCheckFunc
 
 	// HealthChecker check status of the addon based of all results of probeFields

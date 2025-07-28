@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	"open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
@@ -32,8 +32,8 @@ func NewDeploymentProber(deployments ...types.NamespacedName) *agent.HealthProbe
 	return &agent.HealthProber{
 		Type: agent.HealthProberTypeWork,
 		WorkProber: &agent.WorkHealthProber{
-			ProbeFields:   probeFields,
-			HealthChecker: DeploymentAvailabilityHealthChecker,
+			ProbeFields: probeFields,
+			HealthCheck: DeploymentAvailabilityHealthCheck,
 		},
 	}
 }
@@ -59,7 +59,7 @@ func NewAllDeploymentsProber() *agent.HealthProber {
 		Type: agent.HealthProberTypeWork,
 		WorkProber: &agent.WorkHealthProber{
 			ProbeFields:   probeFields,
-			HealthChecker: DeploymentAvailabilityHealthChecker,
+			HealthChecker: AllDeploymentsAvailabilityHealthCheck,
 		},
 	}
 }
@@ -84,43 +84,26 @@ func (d *DeploymentProber) ProbeFields() []agent.ProbeField {
 	return probeFields
 }
 
-// Deprecated: use DeploymentAvailabilityHealthChecker instead.
 func DeploymentAvailabilityHealthCheck(identifier workapiv1.ResourceIdentifier,
 	result workapiv1.StatusFeedbackResult) error {
-	return checkWorkloadAvailabilityHealth(identifier, result)
+	return WorkloadAvailabilityHealthCheck(identifier, result)
 }
 
-// Deprecated: use DeploymentAvailabilityHealthChecker instead.
 func AllDeploymentsAvailabilityHealthCheck(results []agent.FieldResult,
-	cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	cluster *clusterv1.ManagedCluster, addon *v1alpha1.ManagedClusterAddOn) error {
 	if len(results) < 2 {
 		return fmt.Errorf("all deployments are not available")
 	}
 
 	for _, result := range results {
-		if err := checkWorkloadAvailabilityHealth(result.ResourceIdentifier, result.FeedbackResult); err != nil {
+		if err := WorkloadAvailabilityHealthCheck(result.ResourceIdentifier, result.FeedbackResult); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func DeploymentAvailabilityHealthChecker(results []agent.FieldResult,
-	cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
-	return WorkloadAvailabilityHealthChecker(results, cluster, addon)
-}
-
-func WorkloadAvailabilityHealthChecker(results []agent.FieldResult,
-	cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
-	for _, result := range results {
-		if err := checkWorkloadAvailabilityHealth(result.ResourceIdentifier, result.FeedbackResult); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func checkWorkloadAvailabilityHealth(identifier workapiv1.ResourceIdentifier,
+func WorkloadAvailabilityHealthCheck(identifier workapiv1.ResourceIdentifier,
 	result workapiv1.StatusFeedbackResult) error {
 	// only support deployments and daemonsets for now
 	if identifier.Resource != "deployments" && identifier.Resource != "daemonsets" {

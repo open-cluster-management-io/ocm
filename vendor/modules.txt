@@ -362,10 +362,6 @@ github.com/mitchellh/copystructure
 github.com/mitchellh/reflectwalk
 # github.com/moby/docker-image-spec v1.3.1
 ## explicit; go 1.18
-# github.com/moby/patternmatcher v0.6.0
-## explicit; go 1.19
-# github.com/moby/sys/user v0.4.0
-## explicit; go 1.17
 # github.com/mochi-mqtt/server/v2 v2.6.6
 ## explicit; go 1.21
 github.com/mochi-mqtt/server/v2
@@ -1715,8 +1711,8 @@ k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/ptr
 k8s.io/utils/trace
-# open-cluster-management.io/addon-framework v1.0.1-0.20250722093201-ee47752c02f3
-## explicit; go 1.24.0
+# open-cluster-management.io/addon-framework v1.0.1
+## explicit; go 1.23.6
 open-cluster-management.io/addon-framework/pkg/addonfactory
 open-cluster-management.io/addon-framework/pkg/addonmanager
 open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting
