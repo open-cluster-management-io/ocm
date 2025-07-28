@@ -7,6 +7,20 @@ updates:
   commit-message:
       prefix: ":seedling:"
   open-pull-requests-limit: 3
+  groups:
+    k8s.io:
+      patterns:
+      - "k8s.io/*"
+      - "sigs.k8s.io/*"
+    go.opentelemetry.io:
+      patterns:
+      - "go.opentelemetry.io/*"
+    aws:
+      patterns:
+      - "github.com/aws/*"
+    open-cluster-management.io:
+      patterns:
+      - "open-cluster-management.io/*"
 - package-ecosystem: "github-actions"
   directory: "/"
   schedule:
