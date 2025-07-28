@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/utils/clock"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager"
@@ -45,5 +46,26 @@ func NewHubManagerCmd() *cobra.Command {
 
 	flags := cmd.Flags()
 	opts.AddFlags(flags)
+	return cmd
+}
+
+func NewWebhookCmd() *cobra.Command {
+	webhookOptions := commonoptions.NewWebhookOptions()
+	opts := hub.NewWebhookOptions()
+	cmd := &cobra.Command{
+		Use:   "webhook-server",
+		Short: "Start the registration webhook server",
+		RunE: func(c *cobra.Command, args []string) error {
+			if err := opts.SetupWebhookServer(webhookOptions); err != nil {
+				return err
+			}
+			return webhookOptions.RunWebhookServer(ctrl.SetupSignalHandler())
+		},
+	}
+
+	flags := cmd.Flags()
+	opts.AddFlags(flags)
+	webhookOptions.AddFlags(flags)
+
 	return cmd
 }

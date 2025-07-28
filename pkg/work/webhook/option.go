@@ -1,6 +1,8 @@
 package webhook
 
-import "github.com/spf13/pflag"
+import (
+	"github.com/spf13/pflag"
+)
 
 // Config contains the server (the webhook) cert and key.
 type Options struct {
