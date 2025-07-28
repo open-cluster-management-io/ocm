@@ -15367,6 +15367,9 @@ func awsAwsquery_deserializeOpErrorUpdateAccessKey(response *smithyhttp.Response
 	}
 	errorBody.Seek(0, io.SeekStart)
 	switch {
+	case strings.EqualFold("InvalidInput", errorCode):
+		return awsAwsquery_deserializeErrorInvalidInputException(response, errorBody)
+
 	case strings.EqualFold("LimitExceeded", errorCode):
 		return awsAwsquery_deserializeErrorLimitExceededException(response, errorBody)
 
@@ -16403,6 +16406,9 @@ func awsAwsquery_deserializeOpErrorUpdateSigningCertificate(response *smithyhttp
 	}
 	errorBody.Seek(0, io.SeekStart)
 	switch {
+	case strings.EqualFold("InvalidInput", errorCode):
+		return awsAwsquery_deserializeErrorInvalidInputException(response, errorBody)
+
 	case strings.EqualFold("LimitExceeded", errorCode):
 		return awsAwsquery_deserializeErrorLimitExceededException(response, errorBody)
 
@@ -16486,6 +16492,9 @@ func awsAwsquery_deserializeOpErrorUpdateSSHPublicKey(response *smithyhttp.Respo
 	}
 	errorBody.Seek(0, io.SeekStart)
 	switch {
+	case strings.EqualFold("InvalidInput", errorCode):
+		return awsAwsquery_deserializeErrorInvalidInputException(response, errorBody)
+
 	case strings.EqualFold("NoSuchEntity", errorCode):
 		return awsAwsquery_deserializeErrorNoSuchEntityException(response, errorBody)
 
@@ -24608,6 +24617,74 @@ func awsAwsquery_deserializeDocumentPosition(v **types.Position, decoder smithyx
 	return nil
 }
 
+func awsAwsquery_deserializeDocumentPrivateKeyList(v *[]types.SAMLPrivateKey, decoder smithyxml.NodeDecoder) error {
+	if v == nil {
+		return fmt.Errorf("unexpected nil of type %T", v)
+	}
+	var sv []types.SAMLPrivateKey
+	if *v == nil {
+		sv = make([]types.SAMLPrivateKey, 0)
+	} else {
+		sv = *v
+	}
+
+	originalDecoder := decoder
+	for {
+		t, done, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		if done {
+			break
+		}
+		switch {
+		case strings.EqualFold("member", t.Name.Local):
+			var col types.SAMLPrivateKey
+			nodeDecoder := smithyxml.WrapNodeDecoder(decoder.Decoder, t)
+			destAddr := &col
+			if err := awsAwsquery_deserializeDocumentSAMLPrivateKey(&destAddr, nodeDecoder); err != nil {
+				return err
+			}
+			col = *destAddr
+			sv = append(sv, col)
+
+		default:
+			err = decoder.Decoder.Skip()
+			if err != nil {
+				return err
+			}
+
+		}
+		decoder = originalDecoder
+	}
+	*v = sv
+	return nil
+}
+
+func awsAwsquery_deserializeDocumentPrivateKeyListUnwrapped(v *[]types.SAMLPrivateKey, decoder smithyxml.NodeDecoder) error {
+	var sv []types.SAMLPrivateKey
+	if *v == nil {
+		sv = make([]types.SAMLPrivateKey, 0)
+	} else {
+		sv = *v
+	}
+
+	switch {
+	default:
+		var mv types.SAMLPrivateKey
+		t := decoder.StartEl
+		_ = t
+		nodeDecoder := smithyxml.WrapNodeDecoder(decoder.Decoder, t)
+		destAddr := &mv
+		if err := awsAwsquery_deserializeDocumentSAMLPrivateKey(&destAddr, nodeDecoder); err != nil {
+			return err
+		}
+		mv = *destAddr
+		sv = append(sv, mv)
+	}
+	*v = sv
+	return nil
+}
 func awsAwsquery_deserializeDocumentReportGenerationLimitExceededException(v **types.ReportGenerationLimitExceededException, decoder smithyxml.NodeDecoder) error {
 	if v == nil {
 		return fmt.Errorf("unexpected nil of type %T", v)
@@ -25456,6 +25533,72 @@ func awsAwsquery_deserializeDocumentRoleUsageType(v **types.RoleUsageType, decod
 	return nil
 }
 
+func awsAwsquery_deserializeDocumentSAMLPrivateKey(v **types.SAMLPrivateKey, decoder smithyxml.NodeDecoder) error {
+	if v == nil {
+		return fmt.Errorf("unexpected nil of type %T", v)
+	}
+	var sv *types.SAMLPrivateKey
+	if *v == nil {
+		sv = &types.SAMLPrivateKey{}
+	} else {
+		sv = *v
+	}
+
+	for {
+		t, done, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		if done {
+			break
+		}
+		originalDecoder := decoder
+		decoder = smithyxml.WrapNodeDecoder(originalDecoder.Decoder, t)
+		switch {
+		case strings.EqualFold("KeyId", t.Name.Local):
+			val, err := decoder.Value()
+			if err != nil {
+				return err
+			}
+			if val == nil {
+				break
+			}
+			{
+				xtv := string(val)
+				sv.KeyId = ptr.String(xtv)
+			}
+
+		case strings.EqualFold("Timestamp", t.Name.Local):
+			val, err := decoder.Value()
+			if err != nil {
+				return err
+			}
+			if val == nil {
+				break
+			}
+			{
+				xtv := string(val)
+				t, err := smithytime.ParseDateTime(xtv)
+				if err != nil {
+					return err
+				}
+				sv.Timestamp = ptr.Time(t)
+			}
+
+		default:
+			// Do nothing and ignore the unexpected tag element
+			err = decoder.Decoder.Skip()
+			if err != nil {
+				return err
+			}
+
+		}
+		decoder = originalDecoder
+	}
+	*v = sv
+	return nil
+}
+
 func awsAwsquery_deserializeDocumentSAMLProviderListEntry(v **types.SAMLProviderListEntry, decoder smithyxml.NodeDecoder) error {
 	if v == nil {
 		return fmt.Errorf("unexpected nil of type %T", v)
@@ -26253,6 +26396,49 @@ func awsAwsquery_deserializeDocumentServiceSpecificCredential(v **types.ServiceS
 				sv.CreateDate = ptr.Time(t)
 			}
 
+		case strings.EqualFold("ExpirationDate", t.Name.Local):
+			val, err := decoder.Value()
+			if err != nil {
+				return err
+			}
+			if val == nil {
+				break
+			}
+			{
+				xtv := string(val)
+				t, err := smithytime.ParseDateTime(xtv)
+				if err != nil {
+					return err
+				}
+				sv.ExpirationDate = ptr.Time(t)
+			}
+
+		case strings.EqualFold("ServiceCredentialAlias", t.Name.Local):
+			val, err := decoder.Value()
+			if err != nil {
+				return err
+			}
+			if val == nil {
+				break
+			}
+			{
+				xtv := string(val)
+				sv.ServiceCredentialAlias = ptr.String(xtv)
+			}
+
+		case strings.EqualFold("ServiceCredentialSecret", t.Name.Local):
+			val, err := decoder.Value()
+			if err != nil {
+				return err
+			}
+			if val == nil {
+				break
+			}
+			{
+				xtv := string(val)
+				sv.ServiceCredentialSecret = ptr.String(xtv)
+			}
+
 		case strings.EqualFold("ServiceName", t.Name.Local):
 			val, err := decoder.Value()
 			if err != nil {
@@ -26382,6 +26568,36 @@ func awsAwsquery_deserializeDocumentServiceSpecificCredentialMetadata(v **types.
 					return err
 				}
 				sv.CreateDate = ptr.Time(t)
+			}
+
+		case strings.EqualFold("ExpirationDate", t.Name.Local):
+			val, err := decoder.Value()
+			if err != nil {
+				return err
+			}
+			if val == nil {
+				break
+			}
+			{
+				xtv := string(val)
+				t, err := smithytime.ParseDateTime(xtv)
+				if err != nil {
+					return err
+				}
+				sv.ExpirationDate = ptr.Time(t)
+			}
+
+		case strings.EqualFold("ServiceCredentialAlias", t.Name.Local):
+			val, err := decoder.Value()
+			if err != nil {
+				return err
+			}
+			if val == nil {
+				break
+			}
+			{
+				xtv := string(val)
+				sv.ServiceCredentialAlias = ptr.String(xtv)
 			}
 
 		case strings.EqualFold("ServiceName", t.Name.Local):
@@ -30396,6 +30612,19 @@ func awsAwsquery_deserializeOpDocumentGetSAMLProviderOutput(v **GetSAMLProviderO
 		originalDecoder := decoder
 		decoder = smithyxml.WrapNodeDecoder(originalDecoder.Decoder, t)
 		switch {
+		case strings.EqualFold("AssertionEncryptionMode", t.Name.Local):
+			val, err := decoder.Value()
+			if err != nil {
+				return err
+			}
+			if val == nil {
+				break
+			}
+			{
+				xtv := string(val)
+				sv.AssertionEncryptionMode = types.AssertionEncryptionModeType(xtv)
+			}
+
 		case strings.EqualFold("CreateDate", t.Name.Local):
 			val, err := decoder.Value()
 			if err != nil {
@@ -30413,6 +30642,12 @@ func awsAwsquery_deserializeOpDocumentGetSAMLProviderOutput(v **GetSAMLProviderO
 				sv.CreateDate = ptr.Time(t)
 			}
 
+		case strings.EqualFold("PrivateKeyList", t.Name.Local):
+			nodeDecoder := smithyxml.WrapNodeDecoder(decoder.Decoder, t)
+			if err := awsAwsquery_deserializeDocumentPrivateKeyList(&sv.PrivateKeyList, nodeDecoder); err != nil {
+				return err
+			}
+
 		case strings.EqualFold("SAMLMetadataDocument", t.Name.Local):
 			val, err := decoder.Value()
 			if err != nil {
@@ -30424,6 +30659,19 @@ func awsAwsquery_deserializeOpDocumentGetSAMLProviderOutput(v **GetSAMLProviderO
 			{
 				xtv := string(val)
 				sv.SAMLMetadataDocument = ptr.String(xtv)
+			}
+
+		case strings.EqualFold("SAMLProviderUUID", t.Name.Local):
+			val, err := decoder.Value()
+			if err != nil {
+				return err
+			}
+			if val == nil {
+				break
+			}
+			{
+				xtv := string(val)
+				sv.SAMLProviderUUID = ptr.String(xtv)
 			}
 
 		case strings.EqualFold("Tags", t.Name.Local):
@@ -32928,6 +33176,35 @@ func awsAwsquery_deserializeOpDocumentListServiceSpecificCredentialsOutput(v **L
 		originalDecoder := decoder
 		decoder = smithyxml.WrapNodeDecoder(originalDecoder.Decoder, t)
 		switch {
+		case strings.EqualFold("IsTruncated", t.Name.Local):
+			val, err := decoder.Value()
+			if err != nil {
+				return err
+			}
+			if val == nil {
+				break
+			}
+			{
+				xtv, err := strconv.ParseBool(string(val))
+				if err != nil {
+					return fmt.Errorf("expected booleanType to be of type *bool, got %T instead", val)
+				}
+				sv.IsTruncated = xtv
+			}
+
+		case strings.EqualFold("Marker", t.Name.Local):
+			val, err := decoder.Value()
+			if err != nil {
+				return err
+			}
+			if val == nil {
+				break
+			}
+			{
+				xtv := string(val)
+				sv.Marker = ptr.String(xtv)
+			}
+
 		case strings.EqualFold("ServiceSpecificCredentials", t.Name.Local):
 			nodeDecoder := smithyxml.WrapNodeDecoder(decoder.Decoder, t)
 			if err := awsAwsquery_deserializeDocumentServiceSpecificCredentialsListType(&sv.ServiceSpecificCredentials, nodeDecoder); err != nil {

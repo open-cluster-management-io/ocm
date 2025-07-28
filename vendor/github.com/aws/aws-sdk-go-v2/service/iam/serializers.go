@@ -11945,6 +11945,16 @@ func awsAwsquery_serializeOpDocumentCreateSAMLProviderInput(v *CreateSAMLProvide
 	object := value.Object()
 	_ = object
 
+	if v.AddPrivateKey != nil {
+		objectKey := object.Key("AddPrivateKey")
+		objectKey.String(*v.AddPrivateKey)
+	}
+
+	if len(v.AssertionEncryptionMode) > 0 {
+		objectKey := object.Key("AssertionEncryptionMode")
+		objectKey.String(string(v.AssertionEncryptionMode))
+	}
+
 	if v.Name != nil {
 		objectKey := object.Key("Name")
 		objectKey.String(*v.Name)
@@ -11990,6 +12000,11 @@ func awsAwsquery_serializeOpDocumentCreateServiceLinkedRoleInput(v *CreateServic
 func awsAwsquery_serializeOpDocumentCreateServiceSpecificCredentialInput(v *CreateServiceSpecificCredentialInput, value query.Value) error {
 	object := value.Object()
 	_ = object
+
+	if v.CredentialAgeDays != nil {
+		objectKey := object.Key("CredentialAgeDays")
+		objectKey.Integer(*v.CredentialAgeDays)
+	}
 
 	if v.ServiceName != nil {
 		objectKey := object.Key("ServiceName")
@@ -13517,6 +13532,21 @@ func awsAwsquery_serializeOpDocumentListServiceSpecificCredentialsInput(v *ListS
 	object := value.Object()
 	_ = object
 
+	if v.AllUsers != nil {
+		objectKey := object.Key("AllUsers")
+		objectKey.Boolean(*v.AllUsers)
+	}
+
+	if v.Marker != nil {
+		objectKey := object.Key("Marker")
+		objectKey.String(*v.Marker)
+	}
+
+	if v.MaxItems != nil {
+		objectKey := object.Key("MaxItems")
+		objectKey.Integer(*v.MaxItems)
+	}
+
 	if v.ServiceName != nil {
 		objectKey := object.Key("ServiceName")
 		objectKey.String(*v.ServiceName)
@@ -14535,6 +14565,21 @@ func awsAwsquery_serializeOpDocumentUpdateRoleInput(v *UpdateRoleInput, value qu
 func awsAwsquery_serializeOpDocumentUpdateSAMLProviderInput(v *UpdateSAMLProviderInput, value query.Value) error {
 	object := value.Object()
 	_ = object
+
+	if v.AddPrivateKey != nil {
+		objectKey := object.Key("AddPrivateKey")
+		objectKey.String(*v.AddPrivateKey)
+	}
+
+	if len(v.AssertionEncryptionMode) > 0 {
+		objectKey := object.Key("AssertionEncryptionMode")
+		objectKey.String(string(v.AssertionEncryptionMode))
+	}
+
+	if v.RemovePrivateKey != nil {
+		objectKey := object.Key("RemovePrivateKey")
+		objectKey.String(*v.RemovePrivateKey)
+	}
 
 	if v.SAMLMetadataDocument != nil {
 		objectKey := object.Key("SAMLMetadataDocument")

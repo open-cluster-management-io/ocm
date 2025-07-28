@@ -75,6 +75,14 @@ type CreateSAMLProviderInput struct {
 	// This member is required.
 	SAMLMetadataDocument *string
 
+	// The private key generated from your external identity provider. The private key
+	// must be a .pem file that uses AES-GCM or AES-CBC encryption algorithm to decrypt
+	// SAML assertions.
+	AddPrivateKey *string
+
+	// Specifies the encryption setting for the SAML provider.
+	AssertionEncryptionMode types.AssertionEncryptionModeType
+
 	// A list of tags that you want to attach to the new IAM SAML provider. Each tag
 	// consists of a key name and an associated value. For more information about
 	// tagging, see [Tagging IAM resources]in the IAM User Guide.
@@ -88,7 +96,9 @@ type CreateSAMLProviderInput struct {
 	noSmithyDocumentSerde
 }
 
-// Contains the response to a successful CreateSAMLProvider request.
+// Contains the response to a successful [CreateSAMLProvider] request.
+//
+// [CreateSAMLProvider]: https://docs.aws.amazon.com/IAM/latest/APIReference/API_CreateSAMLProvider.html
 type CreateSAMLProviderOutput struct {
 
 	// The Amazon Resource Name (ARN) of the new SAML provider resource in IAM.
@@ -169,6 +179,9 @@ func (c *Client) addOperationCreateSAMLProviderMiddlewares(stack *middleware.Sta
 		return err
 	}
 	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
+	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpCreateSAMLProviderValidationMiddleware(stack); err != nil {
