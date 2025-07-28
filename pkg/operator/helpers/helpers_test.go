@@ -956,10 +956,10 @@ func TestGetRelatedResource(t *testing.T) {
 
 			relatedResource, err := GenerateRelatedResource(objData)
 			if !errors.Is(err, c.expectedErr) {
-				t.Errorf(cmp.Diff(err, c.expectedErr))
+				t.Errorf("%s", cmp.Diff(err, c.expectedErr))
 			}
 			if !reflect.DeepEqual(relatedResource, c.expectedRelatedResource) {
-				t.Errorf(cmp.Diff(err, c.expectedErr))
+				t.Errorf("%s", cmp.Diff(relatedResource, c.expectedRelatedResource))
 			}
 		})
 
@@ -1493,7 +1493,7 @@ func TestSyncSecret(t *testing.T) {
 			}
 
 			if changed != tc.expectedChanged {
-				t.Errorf("%s: expected changed %t, got %t", tc.name, tc.expectedChanged, changed)
+				t.Errorf("expected changed %t, got %t", tc.expectedChanged, changed)
 			}
 		})
 	}

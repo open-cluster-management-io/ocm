@@ -41,7 +41,7 @@ const (
 	eventuallyInterval = 1  // seconds
 )
 
-var spokeCfg *rest.Config
+var hubCfg, spokeCfg *rest.Config
 var bootstrapKubeConfigFile string
 var bootstrapKubeConfigHTTPProxyFile string
 var bootstrapKubeConfigHTTPSProxyFile string
@@ -154,6 +154,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	serverCertFile = fmt.Sprintf("%s/apiserver.crt", testEnv.ControlPlane.APIServer.CertDir)
 
+	hubCfg = cfg
 	spokeCfg = cfg
 	gomega.Expect(spokeCfg).ToNot(gomega.BeNil())
 

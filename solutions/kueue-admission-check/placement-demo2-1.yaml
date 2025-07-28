@@ -1,11 +1,11 @@
 apiVersion: cluster.open-cluster-management.io/v1beta1
 kind: Placement
 metadata:
-  name: placement-demo2
+  name: multikueue-config-demo2
   namespace: kueue-system
 spec:
   clusterSets:
-  - spoke
+  - global
   tolerations:
   - key: cluster.open-cluster-management.io/unreachable
     operator: Exists
