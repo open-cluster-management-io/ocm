@@ -2,23 +2,27 @@ package webhook
 
 import (
 	"github.com/spf13/cobra"
+	ctrl "sigs.k8s.io/controller-runtime"
 
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/webhook"
 )
 
 func NewRegistrationWebhook() *cobra.Command {
-	ops := webhook.NewOptions()
+	webhookOptions := commonoptions.NewWebhookOptions()
 	cmd := &cobra.Command{
 		Use:   "webhook-server",
 		Short: "Start the registration webhook server",
 		RunE: func(c *cobra.Command, args []string) error {
-			err := ops.RunWebhookServer()
-			return err
+			if err := webhook.SetupWebhookServer(webhookOptions); err != nil {
+				return err
+			}
+			return webhookOptions.RunWebhookServer(ctrl.SetupSignalHandler())
 		},
 	}
 
 	flags := cmd.Flags()
-	ops.AddFlags(flags)
+	webhookOptions.AddFlags(flags)
 
 	return cmd
 }
