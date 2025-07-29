@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	Version                       = "2.6.6" // the current server version.
+	Version                       = "2.7.9" // the current server version.
 	defaultSysTopicInterval int64 = 1       // the interval between $SYS topic publishes
 	LocalListener                 = "local"
 	InlineClientId                = "inline"
@@ -485,7 +485,7 @@ func (s *Server) attachClient(cl *Client, listener string) error {
 	expire := (cl.Properties.ProtocolVersion == 5 && cl.Properties.Props.SessionExpiryInterval == 0) || (cl.Properties.ProtocolVersion < 5 && cl.Properties.Clean)
 	s.hooks.OnDisconnect(cl, err, expire)
 
-	if expire && atomic.LoadUint32(&cl.State.isTakenOver) == 0 {
+	if expire && !cl.IsTakenOver() {
 		cl.ClearInflights()
 		s.UnsubscribeClient(cl)
 		s.Clients.Delete(cl.ID) // [MQTT-4.1.0-2] ![MQTT-3.1.2-23]
@@ -565,11 +565,11 @@ func (s *Server) inheritClientSession(pk packets.Packet, cl *Client) bool {
 		if pk.Connect.Clean || (existing.Properties.Clean && existing.Properties.ProtocolVersion < 5) { // [MQTT-3.1.2-4] [MQTT-3.1.4-4]
 			s.UnsubscribeClient(existing)
 			existing.ClearInflights()
-			atomic.StoreUint32(&existing.State.isTakenOver, 1) // only set isTakenOver after unsubscribe has occurred
-			return false                                       // [MQTT-3.2.2-3]
+			existing.State.isTakenOver.Store(true) // only set isTakenOver after unsubscribe has occurred
+			return false                           // [MQTT-3.2.2-3]
 		}
 
-		atomic.StoreUint32(&existing.State.isTakenOver, 1)
+		existing.State.isTakenOver.Store(true)
 		if existing.State.Inflight.Len() > 0 {
 			cl.State.Inflight = existing.State.Inflight.Clone() // [MQTT-3.1.2-5]
 			if cl.State.Inflight.maximumReceiveQuota == 0 && cl.ops.options.Capabilities.ReceiveMaximum != 0 {
@@ -885,6 +885,11 @@ func (s *Server) processPublish(cl *Client, pk packets.Packet) error {
 	pk.Origin = cl.ID
 	pk.Created = time.Now().Unix()
 
+	if expiry := minimum(s.Options.Capabilities.MaximumMessageExpiryInterval,
+		int64(pk.Properties.MessageExpiryInterval)); expiry > 0 {
+		pk.Expiry = pk.Created + expiry
+	}
+
 	if !cl.Net.Inline {
 		if pki, ok := cl.State.Inflight.Get(pk.PacketID); ok {
 			if pki.FixedHeader.Type == packets.Pubrec { // [MQTT-4.3.3-10]
@@ -986,9 +991,11 @@ func (s *Server) publishToSubscribers(pk packets.Packet) {
 		pk.Created = time.Now().Unix()
 	}
 
-	pk.Expiry = pk.Created + s.Options.Capabilities.MaximumMessageExpiryInterval
-	if pk.Properties.MessageExpiryInterval > 0 {
-		pk.Expiry = pk.Created + int64(pk.Properties.MessageExpiryInterval)
+	if pk.Expiry == 0 {
+		if expiry := minimum(s.Options.Capabilities.MaximumMessageExpiryInterval,
+			int64(pk.Properties.MessageExpiryInterval)); expiry > 0 {
+			pk.Expiry = pk.Created + expiry
+		}
 	}
 
 	subscribers := s.Topics.Subscribers(pk.TopicName)
@@ -1358,7 +1365,7 @@ func (s *Server) UnsubscribeClient(cl *Client) {
 		cl.State.Subscriptions.Delete(k)
 	}
 
-	if atomic.LoadUint32(&cl.State.isTakenOver) == 1 {
+	if cl.IsTakenOver() {
 		return
 	}
 
@@ -1754,4 +1761,21 @@ func (s *Server) sendDelayedLWT(dt int64) {
 // Int64toa converts an int64 to a string.
 func Int64toa(v int64) string {
 	return strconv.FormatInt(v, 10)
+}
+
+// minimum differs from built-in min, it returns minimum of the non-zero value a and b.
+// If both a and b are zero value, it reutrns 0.
+func minimum(a, b int64) (m int64) {
+	if a != 0 {
+		m = a
+		if b != 0 && b < a {
+			m = b
+		}
+		return
+	}
+
+	if b != 0 {
+		m = b
+	}
+	return
 }
