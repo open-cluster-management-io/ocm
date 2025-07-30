@@ -304,7 +304,7 @@ func TestDeleteStaticObject(t *testing.T) {
 		"secret": newUnstructured(
 			"v1", "Secret", "ns1", "n1", map[string]interface{}{"data": map[string]interface{}{"key1": []byte("key1")}}),
 		"crd": newUnstructured(
-			"apiextensions.k8s.io/v1beta1", "CustomResourceDefinition", "", "", map[string]interface{}{}),
+			"apiextensions.k8s.io/v1", "CustomResourceDefinition", "", "", map[string]interface{}{}),
 		"kind1": newUnstructured(
 			"v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": []byte("key1")}}),
 	}

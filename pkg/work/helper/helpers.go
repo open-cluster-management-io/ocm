@@ -15,7 +15,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,8 +44,6 @@ var (
 )
 
 func init() {
-	// add apiextensions v1beta1 to scheme to support CustomResourceDefinition v1beta1
-	_ = apiextensionsv1beta1.AddToScheme(genericScheme)
 	_ = apiextensionsv1.AddToScheme(genericScheme)
 }
 

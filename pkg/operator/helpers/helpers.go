@@ -19,7 +19,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -87,7 +86,6 @@ var (
 
 func init() {
 	utilruntime.Must(api.InstallKube(genericScheme))
-	utilruntime.Must(apiextensionsv1beta1.AddToScheme(genericScheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(genericScheme))
 	utilruntime.Must(apiregistrationv1.AddToScheme(genericScheme))
 	utilruntime.Must(admissionv1.AddToScheme(genericScheme))
@@ -136,12 +134,6 @@ func CleanUpStaticObject(
 			err = fmt.Errorf("apiExtensionClient is nil")
 		} else {
 			err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, t.Name, metav1.DeleteOptions{})
-		}
-	case *apiextensionsv1beta1.CustomResourceDefinition:
-		if apiExtensionClient == nil {
-			err = fmt.Errorf("apiExtensionClient is nil")
-		} else {
-			err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(ctx, t.Name, metav1.DeleteOptions{})
 		}
 	case *apiregistrationv1.APIService:
 		if apiRegistrationClient == nil {
@@ -516,8 +508,6 @@ func GenerateRelatedResource(objBytes []byte) (operatorapiv1.RelatedResourceMeta
 		relatedResource = newRelatedResource(rbacv1.SchemeGroupVersion.WithResource("roles"), requiredObj)
 	case *rbacv1.RoleBinding:
 		relatedResource = newRelatedResource(rbacv1.SchemeGroupVersion.WithResource("rolebindings"), requiredObj)
-	case *apiextensionsv1beta1.CustomResourceDefinition:
-		relatedResource = newRelatedResource(apiextensionsv1beta1.SchemeGroupVersion.WithResource("customresourcedefinitions"), requiredObj)
 	case *apiextensionsv1.CustomResourceDefinition:
 		relatedResource = newRelatedResource(apiextensionsv1.SchemeGroupVersion.WithResource("customresourcedefinitions"), requiredObj)
 	default:
