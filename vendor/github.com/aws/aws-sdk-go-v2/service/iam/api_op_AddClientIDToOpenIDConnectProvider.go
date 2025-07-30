@@ -40,7 +40,9 @@ type AddClientIDToOpenIDConnectProviderInput struct {
 
 	// The Amazon Resource Name (ARN) of the IAM OpenID Connect (OIDC) provider
 	// resource to add the client ID to. You can get a list of OIDC provider ARNs by
-	// using the ListOpenIDConnectProvidersoperation.
+	// using the [ListOpenIDConnectProviders]operation.
+	//
+	// [ListOpenIDConnectProviders]: https://docs.aws.amazon.com/IAM/latest/APIReference/API_ListOpenIDConnectProviders.html
 	//
 	// This member is required.
 	OpenIDConnectProviderArn *string
@@ -119,6 +121,9 @@ func (c *Client) addOperationAddClientIDToOpenIDConnectProviderMiddlewares(stack
 	if err = addUserAgentRetryMode(stack, options); err != nil {
 		return err
 	}
+	if err = addCredentialSource(stack, options); err != nil {
+		return err
+	}
 	if err = addOpAddClientIDToOpenIDConnectProviderValidationMiddleware(stack); err != nil {
 		return err
 	}
@@ -138,6 +143,36 @@ func (c *Client) addOperationAddClientIDToOpenIDConnectProviderMiddlewares(stack
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAttempt(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptExecution(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeSerialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterSerialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeSigning(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterSigning(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptTransmit(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeDeserialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterDeserialization(stack, options); err != nil {
 		return err
 	}
 	if err = addSpanInitializeStart(stack); err != nil {

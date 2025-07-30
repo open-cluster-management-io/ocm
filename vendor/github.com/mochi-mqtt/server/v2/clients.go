@@ -150,7 +150,7 @@ type ClientState struct {
 	disconnected    int64                // the time the client disconnected in unix time, for calculating expiry
 	outbound        chan *packets.Packet // queue for pending outbound packets
 	endOnce         sync.Once            // only end once
-	isTakenOver     uint32               // used to identify orphaned clients
+	isTakenOver     atomic.Bool          // used to identify orphaned clients
 	packetID        uint32               // the current highest packetID
 	open            context.Context      // indicate that the client is open for packet exchange
 	cancelOpen      context.CancelFunc   // cancel function for open context
@@ -427,6 +427,10 @@ func (cl *Client) Closed() bool {
 	return cl.State.open == nil || cl.State.open.Err() != nil
 }
 
+func (cl *Client) IsTakenOver() bool {
+	return cl.State.isTakenOver.Load()
+}
+
 // ReadFixedHeader reads in the values of the next packet's fixed header.
 func (cl *Client) ReadFixedHeader(fh *packets.FixedHeader) error {
 	if cl.Net.bconn == nil {
@@ -529,7 +533,11 @@ func (cl *Client) WritePacket(pk packets.Packet) error {
 	}
 
 	if pk.Expiry > 0 {
-		pk.Properties.MessageExpiryInterval = uint32(pk.Expiry - time.Now().Unix()) // [MQTT-3.3.2-6]
+		expiry := pk.Expiry - time.Now().Unix()
+		if expiry < 1 {
+			expiry = 1
+		}
+		pk.Properties.MessageExpiryInterval = uint32(expiry) // [MQTT-3.3.2-6]
 	}
 
 	pk.ProtocolVersion = cl.Properties.ProtocolVersion

@@ -9,7 +9,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,11 +40,10 @@ var (
 
 func init() {
 	utilruntime.Must(apiextensionsv1.AddToScheme(genericScheme))
-	utilruntime.Must(apiextensionsv1beta1.AddToScheme(genericScheme))
 }
 
 type CRD interface {
-	*apiextensionsv1.CustomResourceDefinition | *apiextensionsv1beta1.CustomResourceDefinition
+	*apiextensionsv1.CustomResourceDefinition
 }
 
 type Manager[T CRD] struct {
@@ -282,12 +280,5 @@ func EqualV1(old, new *apiextensionsv1.CustomResourceDefinition) bool {
 	modified := pointer.Bool(false)
 
 	resourcemerge.EnsureCustomResourceDefinitionV1(modified, old, *new)
-	return !*modified
-}
-
-func EqualV1Beta1(old, new *apiextensionsv1beta1.CustomResourceDefinition) bool {
-	modified := pointer.Bool(false)
-
-	resourcemerge.EnsureCustomResourceDefinitionV1Beta1(modified, old, *new)
 	return !*modified
 }

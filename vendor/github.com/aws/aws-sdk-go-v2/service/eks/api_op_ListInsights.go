@@ -13,7 +13,17 @@ import (
 
 // Returns a list of all insights checked for against the specified cluster. You
 // can filter which insights are returned by category, associated Kubernetes
-// version, and status.
+// version, and status. The default filter lists all categories and every status.
+//
+// The following lists the available categories:
+//
+//   - UPGRADE_READINESS : Amazon EKS identifies issues that could impact your
+//     ability to upgrade to new versions of Kubernetes. These are called upgrade
+//     insights.
+//
+//   - MISCONFIGURATION : Amazon EKS identifies misconfiguration in your EKS Hybrid
+//     Nodes setup that could impair functionality of your cluster or workloads. These
+//     are called configuration insights.
 func (c *Client) ListInsights(ctx context.Context, params *ListInsightsInput, optFns ...func(*Options)) (*ListInsightsOutput, error) {
 	if params == nil {
 		params = &ListInsightsInput{}
@@ -162,6 +172,36 @@ func (c *Client) addOperationListInsightsMiddlewares(stack *middleware.Stack, op
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAttempt(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptExecution(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeSerialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterSerialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeSigning(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterSigning(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptTransmit(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeDeserialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterDeserialization(stack, options); err != nil {
 		return err
 	}
 	if err = addSpanInitializeStart(stack); err != nil {

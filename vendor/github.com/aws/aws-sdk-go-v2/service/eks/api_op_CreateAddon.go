@@ -61,12 +61,12 @@ type CreateAddonInput struct {
 	// DescribeAddonConfiguration .
 	ConfigurationValues *string
 
-	// An array of Pod Identity Assocations to be created. Each EKS Pod Identity
-	// association maps a Kubernetes service account to an IAM Role.
+	// An array of EKS Pod Identity associations to be created. Each association maps
+	// a Kubernetes service account to an IAM role.
 	//
-	// For more information, see [Attach an IAM Role to an Amazon EKS add-on using Pod Identity] in the Amazon EKS User Guide.
+	// For more information, see [Attach an IAM Role to an Amazon EKS add-on using EKS Pod Identity] in the Amazon EKS User Guide.
 	//
-	// [Attach an IAM Role to an Amazon EKS add-on using Pod Identity]: https://docs.aws.amazon.com/eks/latest/userguide/add-ons-iam.html
+	// [Attach an IAM Role to an Amazon EKS add-on using EKS Pod Identity]: https://docs.aws.amazon.com/eks/latest/userguide/add-ons-iam.html
 	PodIdentityAssociations []types.AddonPodIdentityAssociations
 
 	// How to resolve field value conflicts for an Amazon EKS add-on. Conflicts are
@@ -216,6 +216,36 @@ func (c *Client) addOperationCreateAddonMiddlewares(stack *middleware.Stack, opt
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAttempt(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptExecution(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeSerialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterSerialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeSigning(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterSigning(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptTransmit(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeDeserialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterDeserialization(stack, options); err != nil {
 		return err
 	}
 	if err = addSpanInitializeStart(stack); err != nil {

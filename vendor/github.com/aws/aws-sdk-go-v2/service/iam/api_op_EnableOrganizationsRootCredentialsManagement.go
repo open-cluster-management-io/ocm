@@ -13,8 +13,8 @@ import (
 
 // Enables the management of privileged root user credentials across member
 // accounts in your organization. When you enable root credentials management for [centralized root access]
-// , the management account and the delegated admininstrator for IAM can manage
-// root user credentials for member accounts in your organization.
+// , the management account and the delegated administrator for IAM can manage root
+// user credentials for member accounts in your organization.
 //
 // Before you enable centralized root access, you must have an account configured
 // with the following settings:
@@ -26,7 +26,7 @@ import (
 //
 // [Organizations]: https://docs.aws.amazon.com/organizations/latest/userguide/orgs_introduction.html
 // [centralized root access]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html#id_root-user-access-management
-// [IAM and Organizations]: https://docs.aws.amazon.com/organizations/latest/userguide/services-that-can-integrate-ra.html
+// [IAM and Organizations]: https://docs.aws.amazon.com/organizations/latest/userguide/services-that-can-integrate-iam.html
 func (c *Client) EnableOrganizationsRootCredentialsManagement(ctx context.Context, params *EnableOrganizationsRootCredentialsManagementInput, optFns ...func(*Options)) (*EnableOrganizationsRootCredentialsManagementOutput, error) {
 	if params == nil {
 		params = &EnableOrganizationsRootCredentialsManagementInput{}
@@ -124,6 +124,9 @@ func (c *Client) addOperationEnableOrganizationsRootCredentialsManagementMiddlew
 	if err = addUserAgentRetryMode(stack, options); err != nil {
 		return err
 	}
+	if err = addCredentialSource(stack, options); err != nil {
+		return err
+	}
 	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opEnableOrganizationsRootCredentialsManagement(options.Region), middleware.Before); err != nil {
 		return err
 	}
@@ -140,6 +143,36 @@ func (c *Client) addOperationEnableOrganizationsRootCredentialsManagementMiddlew
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAttempt(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptExecution(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeSerialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterSerialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeSigning(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterSigning(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptTransmit(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeDeserialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterDeserialization(stack, options); err != nil {
 		return err
 	}
 	if err = addSpanInitializeStart(stack); err != nil {

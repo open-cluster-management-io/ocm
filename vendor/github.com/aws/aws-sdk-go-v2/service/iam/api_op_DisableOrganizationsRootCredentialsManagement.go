@@ -13,7 +13,7 @@ import (
 
 // Disables the management of privileged root user credentials across member
 // accounts in your organization. When you disable this feature, the management
-// account and the delegated admininstrator for IAM can no longer manage root user
+// account and the delegated administrator for IAM can no longer manage root user
 // credentials for member accounts in your organization.
 func (c *Client) DisableOrganizationsRootCredentialsManagement(ctx context.Context, params *DisableOrganizationsRootCredentialsManagementInput, optFns ...func(*Options)) (*DisableOrganizationsRootCredentialsManagementOutput, error) {
 	if params == nil {
@@ -113,6 +113,9 @@ func (c *Client) addOperationDisableOrganizationsRootCredentialsManagementMiddle
 	if err = addUserAgentRetryMode(stack, options); err != nil {
 		return err
 	}
+	if err = addCredentialSource(stack, options); err != nil {
+		return err
+	}
 	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opDisableOrganizationsRootCredentialsManagement(options.Region), middleware.Before); err != nil {
 		return err
 	}
@@ -129,6 +132,36 @@ func (c *Client) addOperationDisableOrganizationsRootCredentialsManagementMiddle
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAttempt(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptExecution(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeSerialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterSerialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeSigning(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterSigning(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptTransmit(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeDeserialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterDeserialization(stack, options); err != nil {
 		return err
 	}
 	if err = addSpanInitializeStart(stack); err != nil {

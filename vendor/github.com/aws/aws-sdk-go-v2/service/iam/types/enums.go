@@ -22,6 +22,25 @@ func (AccessAdvisorUsageGranularityType) Values() []AccessAdvisorUsageGranularit
 	}
 }
 
+type AssertionEncryptionModeType string
+
+// Enum values for AssertionEncryptionModeType
+const (
+	AssertionEncryptionModeTypeRequired AssertionEncryptionModeType = "Required"
+	AssertionEncryptionModeTypeAllowed  AssertionEncryptionModeType = "Allowed"
+)
+
+// Values returns all known values for AssertionEncryptionModeType. Note that this
+// can be expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (AssertionEncryptionModeType) Values() []AssertionEncryptionModeType {
+	return []AssertionEncryptionModeType{
+		"Required",
+		"Allowed",
+	}
+}
+
 type AssignmentStatusType string
 
 // Enum values for AssignmentStatusType
@@ -424,6 +443,7 @@ type StatusType string
 const (
 	StatusTypeActive   StatusType = "Active"
 	StatusTypeInactive StatusType = "Inactive"
+	StatusTypeExpired  StatusType = "Expired"
 )
 
 // Values returns all known values for StatusType. Note that this can be expanded
@@ -434,6 +454,7 @@ func (StatusType) Values() []StatusType {
 	return []StatusType{
 		"Active",
 		"Inactive",
+		"Expired",
 	}
 }
 
