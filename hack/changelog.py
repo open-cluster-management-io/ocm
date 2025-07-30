@@ -3,6 +3,8 @@ import sys
 from enum import Enum
 from github import Github
 from github import Auth
+import re, sys
+from github import UnknownObjectException
 
 emojiFeature = str('✨')
 emojiBugfix = str('🐛')
@@ -58,7 +60,31 @@ if __name__ == '__main__':
     release_tag = args[1]
     g = Github(auth=auth)
     repo = g.get_repo("open-cluster-management-io/ocm")
-    pulls = repo.get_pulls(state='closed', sort='created', base='main', direction='desc')
+
+    # Determine the branch based on release type
+    # Validate semantic-version format (vX.Y.Z)
+    if not re.match(r'^v\d+\.\d+\.\d+$', release_tag):
+        print(f"Invalid release tag format: {release_tag}. Expected vX.Y.Z")
+        sys.exit(1)
+
+    # Determine the branch based on release type
+    current_version = release_tag.lstrip('v').split('.')
+    current_major, current_minor, current_patch = int(current_version[0]), int(current_version[1]), int(current_version[2])
+
+    if current_patch == 0:
+        # Minor/Major release: always on default branch
+        current_branch = repo.default_branch
+    else:
+        # Patch release: on release-x.y branch
+        current_branch = f"release-{current_major}.{current_minor}"
+
+    # Verify the target branch actually exists
+    try:
+        repo.get_branch(current_branch)
+    except UnknownObjectException:
+        raise RuntimeError(f"Branch '{current_branch}' not found in the repository.")
+
+    pulls = repo.get_pulls(state='closed', sort='created', base=current_branch, direction='desc')
 
     # get the last release tag
     tags = repo.get_tags()
@@ -68,15 +94,60 @@ if __name__ == '__main__':
     elif tags.totalCount == 1:
         last_release_tag = tags[0].name
     else:
-        last_release_tag = tags[1].name
+        # Determine what the previous version should be
+        if current_patch > 0:
+            # Patch release: find x.y.(z-1)
+            target_version = f"v{current_major}.{current_minor}.{current_patch - 1}"
+        elif current_minor > 0:
+            # Minor release: find x.(y-1).z (latest patch of previous minor)
+            target_minor = current_minor - 1
+            target_version_prefix = f"v{current_major}.{target_minor}."
+            target_version = f"v{current_major}.{target_minor}.0"
+        else:
+            # Major release: find (x-1).y.z (latest minor.patch of previous major)
+            target_major = current_major - 1
+            target_version_prefix = f"v{target_major}."
+
+            # Find all versions for the previous major release
+            previous_versions = []
+            for tag in tags:
+                if tag.name.startswith(target_version_prefix):
+                    try:
+                        version_parts = tag.name.lstrip('v').split('.')
+                        if len(version_parts) == 3:
+                            minor_num = int(version_parts[1])
+                            patch_num = int(version_parts[2])
+                            previous_versions.append((minor_num, patch_num))
+                    except ValueError:
+                        continue
+
+            if previous_versions:
+                # Find the latest minor.patch combination
+                latest_minor = max(v[0] for v in previous_versions)
+                target_version = f"v{target_major}.{latest_minor}.0"
+            else:
+                target_version = f"v{target_major}.0.0"
+
+        # Find the target version in tags
+        last_release_tag = None
+        for tag in tags:
+            if tag.name == target_version:
+                last_release_tag = tag.name
+                break
+
+        if not last_release_tag:
+            print(f"Could not find previous release tag {target_version}")
+            sys.exit()
 
     # get related PR from the last release tag
     last_release_pr = 0
-    for tag in tags:
-        if tag.name == last_release_tag:
-            tag_pulls = tag.commit.get_pulls()
-            last_release_pr = tag_pulls[0].number
-            break
+    if last_release_tag:
+        for tag in tags:
+            if tag.name == last_release_tag:
+                tag_pulls = tag.commit.get_pulls()
+                if tag_pulls.totalCount > 0:
+                    last_release_pr = tag_pulls[0].number
+                break
 
     # collect all PRs from the last release tag
     features = []
