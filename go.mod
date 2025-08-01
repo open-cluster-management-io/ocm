@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/eks v1.67.0
 	github.com/aws/aws-sdk-go-v2/service/iam v1.44.0
 	github.com/aws/smithy-go v1.22.5
-	github.com/cloudevents/sdk-go/v2 v2.15.3-0.20240911135016-682f3a9684e4
+	github.com/cloudevents/sdk-go/v2 v2.16.1
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/evanphx/json-patch v5.9.11+incompatible
 	github.com/ghodss/yaml v1.0.0
@@ -163,7 +163,7 @@ require (
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/term v0.32.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
-	golang.org/x/time v0.9.0 // indirect
+	golang.org/x/time v0.12.0 // indirect
 	golang.org/x/tools v0.33.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241209162323-e6fa225c2576 // indirect
