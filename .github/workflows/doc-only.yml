@@ -9,6 +9,8 @@ on:
       - 'assets/**'
       - 'troubleshooting/**'
       - ".github/ISSUE_TEMPLATE/*"
+      - 'README.md'
+      - '*.md'
     branches:
       - main
 
