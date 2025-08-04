@@ -41,6 +41,8 @@ import (
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 )
 
 const (
@@ -917,4 +919,37 @@ func AddLabelsToYaml(objData []byte, cmLabels map[string]string) ([]byte, error)
 	}
 
 	return modifiedYAML, nil
+}
+
+func GRPCAuthEnabled(cm *operatorapiv1.ClusterManager) bool {
+	if cm.Spec.RegistrationConfiguration == nil {
+		return false
+	}
+	for _, registrationDriver := range cm.Spec.RegistrationConfiguration.RegistrationDrivers {
+		if registrationDriver.AuthType == commonhelpers.GRPCCAuthType {
+			return true
+		}
+	}
+
+	return false
+}
+
+func GRPCServerHostNames(clustermanagerNamespace string, cm *operatorapiv1.ClusterManager) []string {
+	hostNames := []string{fmt.Sprintf("%s-grpc-server.%s.svc", cm.Name, clustermanagerNamespace)}
+	if cm.Spec.RegistrationConfiguration != nil {
+		for _, registrationDriver := range cm.Spec.RegistrationConfiguration.RegistrationDrivers {
+			if registrationDriver.AuthType != commonhelpers.GRPCCAuthType {
+				continue
+			}
+
+			if registrationDriver.GRPC != nil && registrationDriver.GRPC.EndpointExposure != nil {
+				if registrationDriver.GRPC.EndpointExposure.Type == operatorapiv1.GRPCEndpointTypeHostname {
+					if registrationDriver.GRPC.EndpointExposure.Hostname != nil {
+						hostNames = append(hostNames, registrationDriver.GRPC.EndpointExposure.Hostname.Value)
+					}
+				}
+			}
+		}
+	}
+	return hostNames
 }

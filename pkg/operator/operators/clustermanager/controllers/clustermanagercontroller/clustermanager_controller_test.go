@@ -36,6 +36,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/manifests"
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
@@ -250,6 +251,29 @@ func setDeployment(clusterManagerName, clusterManagerNamespace string) []runtime
 				ObservedGeneration: 1,
 			},
 		},
+		&appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       clusterManagerName + "-grpc-server",
+				Namespace:  clusterManagerNamespace,
+				Generation: 1,
+			},
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: clusterManagerName + "-grpc-server",
+							},
+						},
+					},
+				},
+				Replicas: &replicas,
+			},
+			Status: appsv1.DeploymentStatus{
+				ReadyReplicas:      replicas,
+				ObservedGeneration: 1,
+			},
+		},
 	}
 }
 
@@ -274,7 +298,7 @@ func setup(t *testing.T, tc *testController, cd []runtime.Object, crds ...runtim
 	tc.clusterManagerController.ensureSAKubeconfigs = func(ctx context.Context,
 		clusterManagerName, clusterManagerNamespace string, hubConfig *rest.Config,
 		hubClient, managementClient kubernetes.Interface, recorder events.Recorder,
-		mwctrEnabled, addonManagerEnabled bool) error {
+		mwctrEnabled, addonManagerEnabled, grpcAuthEnabled bool) error {
 		return nil
 	}
 }
@@ -303,6 +327,91 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.Cl
 		}
 		if strings.Contains(o.Name, "addon-manager") && hubCore.Spec.AddOnManagerImagePullSpec != o.Spec.Template.Spec.Containers[0].Image {
 			t.Errorf("AddOnManager image does not match to the expected.")
+		}
+		if strings.Contains(o.Name, "grpc-server") && hubCore.Spec.RegistrationImagePullSpec != o.Spec.Template.Spec.Containers[0].Image {
+			t.Errorf("GRPCServer image does not match to the expected.")
+		}
+	}
+}
+
+func assertDeployments(t *testing.T, clusterManager *operatorapiv1.ClusterManager, expectedCreatedKubeObjects, expectedCreatedCRDs int) {
+	tc := newTestController(t, clusterManager)
+	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
+	cd := setDeployment(clusterManager.Name, clusterManagerNamespace)
+	setup(t, tc, cd)
+
+	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
+
+	err := tc.clusterManagerController.sync(ctx, syncContext)
+	if err != nil {
+		t.Fatalf("Expected no error when sync, %v", err)
+	}
+
+	var createKubeObjects []runtime.Object
+	kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...) // record objects from both hub and management cluster
+	for _, action := range kubeActions {
+		if action.GetVerb() == createVerb {
+			object := action.(clienttesting.CreateActionImpl).Object
+			createKubeObjects = append(createKubeObjects, object)
+		}
+	}
+
+	// Check if resources are created as expected
+	// We expect create the namespace twice respectively in the management cluster and the hub cluster.
+	testingcommon.AssertEqualNumber(t, len(createKubeObjects), expectedCreatedKubeObjects)
+	for _, object := range createKubeObjects {
+		ensureObject(t, object, clusterManager, true)
+	}
+
+	var createCRDObjects []runtime.Object
+	crdActions := tc.apiExtensionClient.Actions()
+	for _, action := range crdActions {
+		if action.GetVerb() == createVerb {
+			object := action.(clienttesting.CreateActionImpl).Object
+			createCRDObjects = append(createCRDObjects, object)
+		}
+	}
+	// Check if resources are created as expected
+	testingcommon.AssertEqualNumber(t, len(createCRDObjects), expectedCreatedCRDs)
+}
+
+func assertDeletion(t *testing.T, clusterManager *operatorapiv1.ClusterManager, expectedDeleteActions, expectedDeleteCRDs int) {
+	tc := newTestController(t, clusterManager)
+	setup(t, tc, nil)
+
+	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
+	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
+
+	err := tc.clusterManagerController.sync(ctx, syncContext)
+	if err != nil {
+		t.Fatalf("Expected non error when sync, %v", err)
+	}
+
+	var deleteKubeActions []clienttesting.DeleteActionImpl
+	kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...)
+	for _, action := range kubeActions {
+		if action.GetVerb() == "delete" {
+			deleteKubeAction := action.(clienttesting.DeleteActionImpl)
+			deleteKubeActions = append(deleteKubeActions, deleteKubeAction)
+		}
+	}
+	testingcommon.AssertEqualNumber(t, len(deleteKubeActions), expectedDeleteActions) // delete namespace both from the hub cluster and the mangement cluster
+
+	var deleteCRDActions []clienttesting.DeleteActionImpl
+	crdActions := tc.apiExtensionClient.Actions()
+	for _, action := range crdActions {
+		if action.GetVerb() == "delete" {
+			deleteCRDAction := action.(clienttesting.DeleteActionImpl)
+			deleteCRDActions = append(deleteCRDActions, deleteCRDAction)
+		}
+	}
+	// Check if resources are created as expected
+	testingcommon.AssertEqualNumber(t, len(deleteCRDActions), expectedDeleteCRDs)
+
+	for _, action := range deleteKubeActions {
+		switch action.Resource.Resource { //nolint:gocritic
+		case "namespaces":
+			testingcommon.AssertEqualNameNamespace(t, action.Name, "", clusterManagerNamespace, "")
 		}
 	}
 }
@@ -439,44 +548,25 @@ func TestSyncDeploy(t *testing.T) {
 		"open-cluster-management.io/cluster-name": "test"}
 	clusterManager := newClusterManager("testhub")
 	clusterManager.SetLabels(labels)
-	tc := newTestController(t, clusterManager)
-	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
-	cd := setDeployment(clusterManager.Name, clusterManagerNamespace)
-	setup(t, tc, cd)
+	assertDeployments(t, clusterManager, 28, 12)
+}
 
-	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
-
-	err := tc.clusterManagerController.sync(ctx, syncContext)
-	if err != nil {
-		t.Fatalf("Expected no error when sync, %v", err)
+func TestSyncDeployWithGRPCAuthEnabled(t *testing.T) {
+	labels := map[string]string{"app": "test", helpers.HubLabelKey: "testhub", "abc": "abc",
+		"open-cluster-management.io/cluster-name": "test"}
+	clusterManager := newClusterManager("testhub")
+	clusterManager.SetLabels(labels)
+	clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+		RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+			{
+				AuthType: commonhelpers.CSRAuthType,
+			},
+			{
+				AuthType: commonhelpers.GRPCCAuthType,
+			},
+		},
 	}
-
-	var createKubeObjects []runtime.Object
-	kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...) // record objects from both hub and management cluster
-	for _, action := range kubeActions {
-		if action.GetVerb() == createVerb {
-			object := action.(clienttesting.CreateActionImpl).Object
-			createKubeObjects = append(createKubeObjects, object)
-		}
-	}
-
-	// Check if resources are created as expected
-	// We expect create the namespace twice respectively in the management cluster and the hub cluster.
-	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 28)
-	for _, object := range createKubeObjects {
-		ensureObject(t, object, clusterManager, true)
-	}
-
-	var createCRDObjects []runtime.Object
-	crdActions := tc.apiExtensionClient.Actions()
-	for _, action := range crdActions {
-		if action.GetVerb() == createVerb {
-			object := action.(clienttesting.CreateActionImpl).Object
-			createCRDObjects = append(createCRDObjects, object)
-		}
-	}
-	// Check if resources are created as expected
-	testingcommon.AssertEqualNumber(t, len(createCRDObjects), 12)
+	assertDeployments(t, clusterManager, 32, 12)
 }
 
 func TestSyncDeployNoWebhook(t *testing.T) {
@@ -525,44 +615,24 @@ func TestSyncDelete(t *testing.T) {
 	now := metav1.Now()
 	clusterManager.ObjectMeta.SetDeletionTimestamp(&now)
 
-	tc := newTestController(t, clusterManager)
-	setup(t, tc, nil)
+	assertDeletion(t, clusterManager, 30, 16)
+}
 
-	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
-	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
-
-	err := tc.clusterManagerController.sync(ctx, syncContext)
-	if err != nil {
-		t.Fatalf("Expected non error when sync, %v", err)
+func TestSyncDeleteWithGRPCAuthEnabled(t *testing.T) {
+	clusterManager := newClusterManager("testhub")
+	clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+		RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+			{
+				AuthType: commonhelpers.CSRAuthType,
+			},
+			{
+				AuthType: commonhelpers.GRPCCAuthType,
+			},
+		},
 	}
-
-	var deleteKubeActions []clienttesting.DeleteActionImpl
-	kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...)
-	for _, action := range kubeActions {
-		if action.GetVerb() == "delete" {
-			deleteKubeAction := action.(clienttesting.DeleteActionImpl)
-			deleteKubeActions = append(deleteKubeActions, deleteKubeAction)
-		}
-	}
-	testingcommon.AssertEqualNumber(t, len(deleteKubeActions), 30) // delete namespace both from the hub cluster and the mangement cluster
-
-	var deleteCRDActions []clienttesting.DeleteActionImpl
-	crdActions := tc.apiExtensionClient.Actions()
-	for _, action := range crdActions {
-		if action.GetVerb() == "delete" {
-			deleteCRDAction := action.(clienttesting.DeleteActionImpl)
-			deleteCRDActions = append(deleteCRDActions, deleteCRDAction)
-		}
-	}
-	// Check if resources are created as expected
-	testingcommon.AssertEqualNumber(t, len(deleteCRDActions), 16)
-
-	for _, action := range deleteKubeActions {
-		switch action.Resource.Resource { //nolint:gocritic
-		case "namespaces":
-			testingcommon.AssertEqualNameNamespace(t, action.Name, "", clusterManagerNamespace, "")
-		}
-	}
+	now := metav1.Now()
+	clusterManager.ObjectMeta.SetDeletionTimestamp(&now)
+	assertDeletion(t, clusterManager, 34, 16)
 }
 
 // TestDeleteCRD test delete crds

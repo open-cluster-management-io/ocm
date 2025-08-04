@@ -328,6 +328,7 @@ spec:
                         enum:
                         - csr
                         - awsirsa
+                        - grpc
                         type: string
                       awsIrsa:
                         description: |-

@@ -92,6 +92,10 @@ spec:
           {{if .AwsResourceTags}}
           - "--aws-resource-tags={{ .AwsResourceTags }}"
           {{end}}
+          {{if .GRPCAuthEnabled}}
+          - "--grpc-ca-file=/var/run/secrets/hub/grpc/certs/tls.crt"
+          - "--grpc-key-file=/var/run/secrets/hub/grpc/certs/tls.key"
+          {{end}}
         env:
           - name: POD_NAME
             valueFrom:
@@ -139,6 +143,11 @@ spec:
           name: kubeconfig
           readOnly: true
       {{ end }}
+      {{ if .GRPCAuthEnabled }}
+        - mountPath: /var/run/secrets/hub/grpc/certs
+          name: grpc-server-singer
+          readOnly: true
+      {{ end }}
       volumes:
       - name: tmpdir
         emptyDir: { }
@@ -146,4 +155,9 @@ spec:
       - name: kubeconfig
         secret:
           secretName: registration-controller-sa-kubeconfig
+      {{ end }}
+      {{ if .GRPCAuthEnabled }}
+      - name: grpc-server-singer
+        secret:
+          secretName: signer-secret
       {{ end }}

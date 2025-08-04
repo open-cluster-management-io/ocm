@@ -38,6 +38,7 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/manifests"
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 )
 
 const nameFoo = "foo"
@@ -1794,6 +1795,192 @@ data:
 			gotLabels := u.GetLabels()
 			if !reflect.DeepEqual(gotLabels, tt.wantLabels) {
 				t.Errorf("labels mismatch: got %v, want %v", gotLabels, tt.wantLabels)
+			}
+		})
+	}
+}
+
+func TestGRPCAuthEnabled(t *testing.T) {
+	cases := []struct {
+		name          string
+		cm            *operatorapiv1.ClusterManager
+		desiredResult bool
+	}{
+		{
+			name: "nil registration config",
+			cm: &operatorapiv1.ClusterManager{
+				Spec: operatorapiv1.ClusterManagerSpec{
+					RegistrationConfiguration: nil,
+				},
+			},
+			desiredResult: false,
+		},
+		{
+			name: "no registration drivers",
+			cm: &operatorapiv1.ClusterManager{
+				Spec: operatorapiv1.ClusterManagerSpec{
+					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
+						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{},
+					},
+				},
+			},
+			desiredResult: false,
+		},
+		{
+			name: "one grpc registration driver",
+			cm: &operatorapiv1.ClusterManager{
+				Spec: operatorapiv1.ClusterManagerSpec{
+					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
+						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+							{AuthType: helpers.GRPCCAuthType},
+						},
+					},
+				},
+			},
+			desiredResult: true,
+		},
+		{
+			name: "one non-grpc registration driver",
+			cm: &operatorapiv1.ClusterManager{
+				Spec: operatorapiv1.ClusterManagerSpec{
+					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
+						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+							{AuthType: helpers.CSRAuthType},
+						},
+					},
+				},
+			},
+			desiredResult: false,
+		},
+		{
+			name: "multiple registration drivers with one grpc",
+			cm: &operatorapiv1.ClusterManager{
+				Spec: operatorapiv1.ClusterManagerSpec{
+					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
+						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+							{AuthType: helpers.CSRAuthType},
+							{AuthType: helpers.GRPCCAuthType},
+						},
+					},
+				},
+			},
+			desiredResult: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			enabled := GRPCAuthEnabled(tc.cm)
+			if enabled != tc.desiredResult {
+				t.Errorf("Name: %s, expect grpc auth enabled is %v, but got %v", tc.name, tc.desiredResult, enabled)
+			}
+		})
+	}
+}
+
+func TestGRPCServerHostNames(t *testing.T) {
+	cases := []struct {
+		name          string
+		cm            *operatorapiv1.ClusterManager
+		namespace     string
+		desiredResult []string
+	}{
+		{
+			name: "nil registration config",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					RegistrationConfiguration: nil,
+				},
+			},
+			namespace:     "test",
+			desiredResult: []string{"cluster-manager-grpc-server.test.svc"},
+		},
+		{
+			name: "no registration drivers",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
+						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{},
+					},
+				},
+			},
+			namespace:     "test",
+			desiredResult: []string{"cluster-manager-grpc-server.test.svc"},
+		},
+		{
+			name: "one non-grpc registration driver",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
+						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+							{AuthType: helpers.CSRAuthType},
+						},
+					},
+				},
+			},
+			namespace:     "test",
+			desiredResult: []string{"cluster-manager-grpc-server.test.svc"},
+		},
+		{
+			name: "one grpc registration driver, no hostname",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
+						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+							{AuthType: helpers.GRPCCAuthType},
+						},
+					},
+				},
+			},
+			namespace:     "test",
+			desiredResult: []string{"cluster-manager-grpc-server.test.svc"},
+		},
+		{
+			name: "one grpc registration driver, with hostname",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
+						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+							{
+								AuthType: helpers.GRPCCAuthType,
+								GRPC: &operatorapiv1.GRPCConfig{
+									EndpointExposure: &operatorapiv1.GRPCEndpointExposure{
+										Type: operatorapiv1.GRPCEndpointTypeHostname,
+										Hostname: &operatorapiv1.HostnameConfig{
+											Value: "test.example.com",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			namespace:     "test",
+			desiredResult: []string{"cluster-manager-grpc-server.test.svc", "test.example.com"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			hostnames := GRPCServerHostNames(tc.namespace, tc.cm)
+			if !reflect.DeepEqual(hostnames, tc.desiredResult) {
+				t.Errorf("Name: %s, expect hostnames %v, but got %v", tc.name, tc.desiredResult, hostnames)
 			}
 		})
 	}

@@ -71,8 +71,14 @@ spec:
           - "--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig"
           {{end}}
           - "--agent-id={{ .AgentID }}"
+          {{if eq .RegistrationDriver.AuthType "grpc"}}
+          - "--workload-source-driver=grpc"
+          - "--workload-source-config=/spoke/hub-kubeconfig/config.yaml"
+          - "--cloudevents-client-id={{ .ClusterName }}-klusterlet-agent"
+          {{else}}
           - "--workload-source-driver=kube"
           - "--workload-source-config=/spoke/hub-kubeconfig/kubeconfig"
+          {{end}}
           {{ if gt (len .WorkFeatureGates) 0 }}
           {{range .WorkFeatureGates}}
           - {{ . }}
@@ -129,6 +135,11 @@ spec:
           {{if .ManagedClusterRoleSuffix}}
           - "--managed-cluster-role-suffix={{ .ManagedClusterRoleSuffix }}"
           {{end}}
+          {{end}}
+          {{if eq .RegistrationDriver.AuthType "grpc"}}
+          - "--registration-auth=grpc"
+          - "--grpc-bootstrap-config=/spoke/bootstrap/config.yaml"
+          - "--grpc-config=/spoke/hub-kubeconfig/config.yaml"
           {{end}}
         env:
           - name: POD_NAME

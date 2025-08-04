@@ -62,8 +62,14 @@ spec:
           - "/work"
           - "agent"
           - "--spoke-cluster-name={{ .ClusterName }}"
+          {{if eq .RegistrationDriver.AuthType "grpc"}}
+          - "--workload-source-driver=grpc"
+          - "--workload-source-config=/spoke/hub-kubeconfig/config.yaml"
+          - "--cloudevents-client-id={{ .ClusterName }}-work-agent"
+          {{else}}
           - "--workload-source-driver=kube"
           - "--workload-source-config=/spoke/hub-kubeconfig/kubeconfig"
+          {{end}}
           - "--agent-id={{ .AgentID }}"
           {{ if gt (len .WorkFeatureGates) 0 }}
           {{range .WorkFeatureGates}}

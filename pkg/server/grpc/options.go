@@ -13,6 +13,7 @@ import (
 	leasece "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/lease"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/payload"
 	grpcauthn "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authn"
+	grpcauthz "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authz/kube"
 	grpcoptions "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/options"
 
 	"open-cluster-management.io/ocm/pkg/server/services/addon"
@@ -50,6 +51,8 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 		grpcauthn.NewTokenAuthenticator(clients.KubeClient),
 	).WithAuthenticator(
 		grpcauthn.NewMtlsAuthenticator(),
+	).WithAuthorizer(
+		grpcauthz.NewSARAuthorizer(clients.KubeClient),
 	).WithService(
 		clusterce.ManagedClusterEventDataType,
 		cluster.NewClusterService(clients.ClusterClient, clients.ClusterInformers.Cluster().V1().ManagedClusters()),
