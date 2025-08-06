@@ -8,9 +8,9 @@ for f in $HUB_CRD_FILES
 do
     if [ -f "$BASE_DIR/$(basename $f).yaml-patch" ];
     then
-        $1 -o $BASE_DIR/$(basename $f).yaml-patch < $f > ./manifests/cluster-manager/hub/$(basename $f)
+        "$1" -o "$BASE_DIR/$(basename "$f").yaml-patch" < "$f" > "./manifests/cluster-manager/hub/crds/$(basename "$f")"
     else 
-        cp $f ./manifests/cluster-manager/hub/
+        cp $f ./manifests/cluster-manager/hub/crds
     fi
 done
 
