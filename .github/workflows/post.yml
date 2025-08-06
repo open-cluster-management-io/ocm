@@ -117,7 +117,6 @@ jobs:
       - name: push
         run: |
           docker manifest push quay.io/open-cluster-management/${{ matrix.image-name }}:latest
-          docker pull quay.io/open-cluster-management/${{ matrix.image-name }}:latest
           image_digest_latest=$(skopeo inspect docker://quay.io/open-cluster-management/${{ matrix.image-name }}:latest | jq -r '.Digest')
           echo "IMAGE_DIGEST_LATEST=${image_digest_latest}" >> $GITHUB_ENV
       - name: Generate SBOM
