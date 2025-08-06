@@ -83,7 +83,8 @@ func NewCertRotationController(
 			configMapInformer.Informer(),
 			secretInformers[helpers.SignerSecret].Informer(),
 			secretInformers[helpers.RegistrationWebhookSecret].Informer(),
-			secretInformers[helpers.WorkWebhookSecret].Informer()).
+			secretInformers[helpers.WorkWebhookSecret].Informer(),
+			secretInformers[helpers.GRPCServerSecret].Informer()).
 		ToController("CertRotationController", recorder)
 }
 
@@ -163,6 +164,12 @@ func (c certRotationController) syncOne(ctx context.Context, syncCtx factory.Syn
 				return fmt.Errorf("clean up deleted cluster-manager, deleting work webhook secret failed, err:%s", err.Error())
 			}
 
+			// delete grpc server secret
+			err = c.kubeClient.CoreV1().Secrets(clustermanagerNamespace).Delete(ctx, helpers.GRPCServerSecret, metav1.DeleteOptions{})
+			if err != nil && !errors.IsNotFound(err) {
+				return fmt.Errorf("clean up deleted cluster-manager, deleting grpc server secret failed, err:%s", err.Error())
+			}
+
 			delete(c.rotationMap, clustermanagerName)
 		}
 		return nil
@@ -174,6 +181,14 @@ func (c certRotationController) syncOne(ctx context.Context, syncCtx factory.Syn
 	}
 	if err != nil {
 		return err
+	}
+
+	// delete the grpc serving secret if the grpc auth is disabled
+	if !helpers.GRPCAuthEnabled(clustermanager) {
+		err = c.kubeClient.CoreV1().Secrets(clustermanagerNamespace).Delete(ctx, helpers.GRPCServerSecret, metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			return fmt.Errorf("clean up deleted cluster-manager, deleting grpc server secret failed, err:%s", err.Error())
+		}
 	}
 
 	// check if rotations exist, if not exist then create one
@@ -210,6 +225,20 @@ func (c certRotationController) syncOne(ctx context.Context, syncCtx factory.Syn
 				Client:    c.kubeClient.CoreV1(),
 			},
 		}
+
+		if helpers.GRPCAuthEnabled(clustermanager) {
+			// maintain the grpc serving certs
+			// TODO may support user provided certs
+			targetRotations = append(targetRotations, certrotation.TargetRotation{
+				Namespace: clustermanagerNamespace,
+				Name:      helpers.GRPCServerSecret,
+				Validity:  TargetCertValidity,
+				HostNames: helpers.GRPCServerHostNames(clustermanagerNamespace, clustermanager),
+				Lister:    c.secretInformers[helpers.GRPCServerSecret].Lister(),
+				Client:    c.kubeClient.CoreV1(),
+			})
+		}
+
 		c.rotationMap[clustermanagerName] = rotations{
 			signingRotation:  signingRotation,
 			caBundleRotation: caBundleRotation,

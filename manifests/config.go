@@ -40,6 +40,8 @@ type HubConfig struct {
 	AwsResourceTags                   string
 	Labels                            map[string]string
 	LabelsString                      string
+	GRPCAuthEnabled                   bool
+	GRPCServerImage                   string
 }
 
 type Webhook struct {

@@ -1,0 +1,144 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ .ClusterManagerName }}-grpc-server
+  namespace: {{ .ClusterManagerNamespace }}
+  labels:
+    app: {{ .ClusterManagerName }}-grpc-server
+    {{ if gt (len .Labels) 0 }}
+    {{ range $key, $value := .Labels }}
+    "{{ $key }}": "{{ $value }}"
+    {{ end }}
+    {{ end }}
+spec:
+  # TODO consider to use grpc-server own replicas
+  replicas: {{ .Replica }}
+  selector:
+    matchLabels:
+      app: {{ .ClusterManagerName }}-grpc-server
+  template:
+    metadata:
+      labels:
+        app: {{ .ClusterManagerName }}-grpc-server
+        {{ if gt (len .Labels) 0 }}
+        {{ range $key, $value := .Labels }}
+        "{{ $key }}": "{{ $value }}"
+        {{ end }}
+        {{ end }}
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 70
+            podAffinityTerm:
+              topologyKey: failure-domain.beta.kubernetes.io/zone
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - {{ .ClusterManagerName }}-grpc-server
+          - weight: 30
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - {{ .ClusterManagerName }}-grpc-server
+      {{- if .ImagePullSecret }}
+      imagePullSecrets:
+      - name: {{ .ImagePullSecret }}
+      {{- end }}
+      {{ if not .HostedMode }}
+      serviceAccountName: grpc-server-sa
+      {{ end }}
+      containers:
+      - name: grpc-server
+        image: {{ .GRPCServerImage }}
+        args:
+          - "/server"
+          - "grpc"
+          - "--server-config=/var/run/secrets/hub/grpc/config/config.yaml"
+        {{ if .HostedMode }}
+          - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
+        {{ end }}
+        env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
+          readOnlyRootFilesystem: true
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+        {{- if or (eq .ResourceRequirementResourceType "Default") (eq .ResourceRequirementResourceType "") }}
+        resources:
+          requests:
+            cpu: 2m
+            memory: 16Mi
+        {{- end }}
+        {{- if eq .ResourceRequirementResourceType "BestEffort" }}
+        resources: {}
+        {{- end }}
+        {{- if eq .ResourceRequirementResourceType "ResourceRequirement" }}
+        resources:
+          {{ .ResourceRequirements | indent 10 }}
+        {{- end }}
+        volumeMounts:
+        - name: tmpdir
+          mountPath: /tmp
+        - name: grpc-server-config
+          mountPath: "/var/run/secrets/hub/grpc/config"
+          readOnly: true
+        - name: grpc-server-ca
+          mountPath: "/var/run/secrets/hub/grpc/ca"
+          readOnly: true
+        - name: grpc-server-serving-cert
+          mountPath: "/var/run/secrets/hub/grpc/serving-cert"
+          readOnly: true
+      {{ if .HostedMode }}
+        - mountPath: /var/run/secrets/hub
+          name: kubeconfig
+          readOnly: true
+      {{ end }}
+      volumes:
+      - name: tmpdir
+        emptyDir: { }
+      - name: grpc-server-config
+        configMap:
+            name: grpc-server-config
+            optional: true
+      - name: grpc-server-ca
+        configMap:
+            name: ca-bundle-configmap
+      - name: grpc-server-serving-cert
+        secret:
+          secretName: grpc-server-serving-cert
+      {{ if .HostedMode }}
+      - name: kubeconfig
+        secret:
+          secretName: grpc-server-sa-kubeconfig
+      {{ end }}

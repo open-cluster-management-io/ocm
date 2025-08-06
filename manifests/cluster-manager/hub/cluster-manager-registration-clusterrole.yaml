@@ -125,3 +125,9 @@ rules:
   resources: ["clusterprofiles/status"]
   verbs: ["update", "patch"]
 {{end}}
+{{if .GRPCAuthEnabled}}
+- apiGroups: ["certificates.k8s.io"]
+  resources: ["signers"]
+  resourceNames: ["open-cluster-management.io/grpc"]
+  verbs: ["sign"]
+{{end}}

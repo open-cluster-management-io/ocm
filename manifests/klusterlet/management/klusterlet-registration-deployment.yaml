@@ -108,6 +108,11 @@ spec:
           - "--managed-cluster-role-suffix={{ .ManagedClusterRoleSuffix }}"
           {{end}}
           {{end}}
+          {{if eq .RegistrationDriver.AuthType "grpc"}}
+          - "--registration-auth=grpc"
+          - "--grpc-bootstrap-config=/spoke/bootstrap/config.yaml"
+          - "--grpc-config=/spoke/hub-kubeconfig/config.yaml"
+          {{end}}
         env:
           - name: POD_NAME
             valueFrom:

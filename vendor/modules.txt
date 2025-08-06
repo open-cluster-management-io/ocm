@@ -1737,7 +1737,7 @@ open-cluster-management.io/addon-framework/pkg/agent
 open-cluster-management.io/addon-framework/pkg/assets
 open-cluster-management.io/addon-framework/pkg/index
 open-cluster-management.io/addon-framework/pkg/utils
-# open-cluster-management.io/api v1.0.1-0.20250722080758-779879f46835
+# open-cluster-management.io/api v1.0.1-0.20250730122947-5e3423e7794a
 ## explicit; go 1.23.6
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/client/addon/clientset/versioned
@@ -1805,7 +1805,7 @@ open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v1.0.1-0.20250718034047-bff5c35277b9
+# open-cluster-management.io/sdk-go v1.0.1-0.20250805021042-68bb7fc51d4e
 ## explicit; go 1.24.0
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
@@ -1852,6 +1852,7 @@ open-cluster-management.io/sdk-go/pkg/cloudevents/server
 open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc
 open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authn
 open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authz
+open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authz/kube
 open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/options
 open-cluster-management.io/sdk-go/pkg/helpers
 open-cluster-management.io/sdk-go/pkg/patcher

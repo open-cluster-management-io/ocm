@@ -44,6 +44,8 @@ const (
 
 	SignerSecret      = "signer-secret"
 	CaBundleConfigmap = "ca-bundle-configmap"
+
+	GRPCServerSecret = "grpc-server-serving-cert" //#nosec G101
 )
 
 func ClusterManagerNamespace(clustermanagername string, mode operatorapiv1.InstallMode) string {

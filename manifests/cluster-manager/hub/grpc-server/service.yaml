@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .ClusterManagerName }}-grpc-server
+  namespace: {{ .ClusterManagerNamespace }}
+{{ if gt (len .Labels) 0 }}
+  labels:
+  {{ range $key, $value := .Labels }}
+    "{{ $key }}": "{{ $value }}"
+  {{ end }}
+{{ end }}
+spec:
+  selector:
+    app: {{ .ClusterManagerName }}-grpc-server
+  ports:
+    - protocol: TCP
+      port: 8090 
+      targetPort: 8090
+  type: ClusterIP

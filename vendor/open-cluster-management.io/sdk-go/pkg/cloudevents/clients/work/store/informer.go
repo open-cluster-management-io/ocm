@@ -136,6 +136,8 @@ func (s *AgentInformerWatcherStore) HandleReceivedResource(action types.Resource
 		}
 
 		updatedWork := lastWork.DeepCopy()
+		updatedWork.Generation = work.Generation
+		updatedWork.ResourceVersion = work.ResourceVersion
 		updatedWork.DeletionTimestamp = work.DeletionTimestamp
 		return s.Update(updatedWork)
 	default:

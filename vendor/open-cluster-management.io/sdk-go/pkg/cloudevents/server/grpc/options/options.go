@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v2"
+	"k8s.io/klog/v2"
 )
 
 type GRPCServerOptions struct {
@@ -29,6 +30,11 @@ type GRPCServerOptions struct {
 
 func LoadGRPCServerOptions(configPath string) (*GRPCServerOptions, error) {
 	opts := NewGRPCServerOptions()
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		klog.Warningf("GRPC server config file %s does not exist. Using default options.", configPath)
+		return opts, nil
+	}
+
 	grpcServerConfig, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, err
@@ -43,6 +49,9 @@ func LoadGRPCServerOptions(configPath string) (*GRPCServerOptions, error) {
 
 func NewGRPCServerOptions() *GRPCServerOptions {
 	return &GRPCServerOptions{
+		ClientCAFile:          "/var/run/secrets/hub/grpc/ca/ca-bundle.crt",
+		TLSCertFile:           "/var/run/secrets/hub/grpc/serving-cert/tls.crt",
+		TLSKeyFile:            "/var/run/secrets/hub/grpc/serving-cert/tls.key",
 		ServerBindPort:        "8090",
 		MaxConcurrentStreams:  math.MaxUint32,
 		MaxReceiveMessageSize: 1024 * 1024 * 4,
@@ -70,7 +79,7 @@ func (o *GRPCServerOptions) AddFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.PermitPingWithoutStream, "permit-ping-without-stream", o.PermitPingWithoutStream, "Allow keepalive pings even when there are no active streams")
 	flags.IntVar(&o.WriteBufferSize, "grpc-write-buffer-size", o.WriteBufferSize, "gPRC write buffer size")
 	flags.IntVar(&o.ReadBufferSize, "grpc-read-buffer-size", o.ReadBufferSize, "gPRC read buffer size")
-	flags.StringVar(&o.TLSCertFile, "grpc-tls-cert-file", "", "The path to the tls.crt file")
-	flags.StringVar(&o.TLSKeyFile, "grpc-tls-key-file", "", "The path to the tls.key file")
-	flags.StringVar(&o.ClientCAFile, "grpc-client-ca-file", "", "The path to the client ca file, must specify if using mtls authentication type")
+	flags.StringVar(&o.TLSCertFile, "grpc-tls-cert-file", o.TLSCertFile, "The path to the tls.crt file")
+	flags.StringVar(&o.TLSKeyFile, "grpc-tls-key-file", o.TLSKeyFile, "The path to the tls.key file")
+	flags.StringVar(&o.ClientCAFile, "grpc-client-ca-file", o.ClientCAFile, "The path to the client ca file, must specify if using mtls authentication type")
 }

@@ -75,6 +75,13 @@ var (
 	// hubHostedWebhookEndpointFiles only apply when the deploy mode is hosted and address is IPFormat.
 	hubHostedWebhookEndpointRegistration = "cluster-manager/hub/cluster-manager-registration-webhook-endpoint-hosted.yaml"
 	hubHostedWebhookEndpointWork         = "cluster-manager/hub/cluster-manager-work-webhook-endpoint-hosted.yaml"
+
+	grpcServerResourceFiles = []string{
+		"cluster-manager/hub/grpc-server/clusterrole.yaml",
+		"cluster-manager/hub/grpc-server/clusterrolebinding.yaml",
+		"cluster-manager/hub/grpc-server/serviceaccount.yaml",
+		"cluster-manager/hub/grpc-server/service.yaml",
+	}
 )
 
 type hubReconcile struct {
@@ -96,6 +103,14 @@ func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 	// Remove ManifestWokReplicaSet deployment if feature not enabled
 	if !config.MWReplicaSetEnabled {
 		_, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, mwReplicaSetResourceFiles...)
+		if err != nil {
+			return cm, reconcileStop, err
+		}
+	}
+
+	// Remove grpc server related resources if grpc auth is disabled
+	if !config.GRPCAuthEnabled {
+		_, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, grpcServerResourceFiles...)
 		if err != nil {
 			return cm, reconcileStop, err
 		}
@@ -155,6 +170,10 @@ func getHubResources(mode operatorapiv1.InstallMode, config manifests.HubConfig)
 
 	if config.MWReplicaSetEnabled {
 		hubResources = append(hubResources, mwReplicaSetResourceFiles...)
+	}
+
+	if config.GRPCAuthEnabled {
+		hubResources = append(hubResources, grpcServerResourceFiles...)
 	}
 
 	// the hubHostedWebhookServiceFiles are only used in hosted mode

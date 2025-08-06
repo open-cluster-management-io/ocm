@@ -31,6 +31,7 @@ rules:
     - "external-hub-kubeconfig"
     - "work-driver-config"
     - "open-cluster-management-image-pull-credentials"
+    - "grpc-server-serving-cert"
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["create"]
@@ -110,9 +111,10 @@ rules:
 - apiGroups: ["certificates.k8s.io"]
   resources: ["signers"]
   verbs: ["approve", "sign"]
+# the grpc-sever requires the create permission for bootstrapping a managed cluster
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["managedclusters"]
-  verbs: ["get", "list", "watch", "update", "patch"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["managedclustersetbindings", "placements", "addonplacementscores"]
   verbs: ["get", "list", "watch"]
@@ -158,3 +160,7 @@ rules:
 - apiGroups: [ "cluster.x-k8s.io" ]
   resources: [ "clusters" ]
   verbs: ["get", "list", "watch"]
+# for grpc-sever, the grpc-server need join permission for bootstrapping a managed cluster
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclustersets/join"]
+  verbs: ["create"]
