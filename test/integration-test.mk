@@ -8,7 +8,7 @@ KB_TOOLS_ARCHIVE_PATH := $(TEST_TMP)/$(KB_TOOLS_ARCHIVE_NAME)
 
 # download the kubebuilder-tools to get kube-apiserver binaries from it
 ensure-kubebuilder-tools:
-ifeq "" "$(wildcard $(KUBEBUILDER_ASSETS))"
+ifeq "" "$(wildcard $(KUBEBUILDER_ASSETS)/etcd)"
 	$(info Downloading kube-apiserver into '$(KUBEBUILDER_ASSETS)')
 	mkdir -p '$(KUBEBUILDER_ASSETS)'
 	curl -s -f -L https://storage.googleapis.com/kubebuilder-tools/$(KB_TOOLS_ARCHIVE_NAME) -o '$(KB_TOOLS_ARCHIVE_PATH)'
