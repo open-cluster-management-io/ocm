@@ -44,6 +44,8 @@ jobs:
     needs: [ env ]
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - name: checkout code
         uses: actions/checkout@v4
@@ -84,3 +86,27 @@ jobs:
           generate_release_notes: true
           files: |
             /home/runner/work/ocm/ocm/go/src/open-cluster-management.io/ocm/release/*.tgz
+      - name: Generate SBOM for cluster-manager
+        uses: anchore/sbom-action@v0
+        with:
+          file: /home/runner/work/ocm/ocm/go/src/open-cluster-management.io/ocm/release/cluster-manager-${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}.tgz
+          format: 'spdx-json'
+          artifact-name: 'cluster-manager-sbom-${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}.spdx.json'
+          output-file: 'cluster-manager-sbom.spdx.json'
+      - name: Attest cluster-manager
+        uses: actions/attest-sbom@v2
+        with:
+          subject-path: /home/runner/work/ocm/ocm/go/src/open-cluster-management.io/ocm/release/cluster-manager-${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}.tgz
+          sbom-path: 'cluster-manager-sbom.spdx.json'
+      - name: Generate SBOM for klusterlet
+        uses: anchore/sbom-action@v0
+        with:
+          file: /home/runner/work/ocm/ocm/go/src/open-cluster-management.io/ocm/release/klusterlet-${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}.tgz
+          format: 'spdx-json'
+          artifact-name: 'klusterlet-sbom-${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}.spdx.json'
+          output-file: 'klusterlet-sbom.spdx.json'
+      - name: Attest klusterlet
+        uses: actions/attest-sbom@v2
+        with:
+          subject-path: /home/runner/work/ocm/ocm/go/src/open-cluster-management.io/ocm/release/klusterlet-${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}.tgz
+          sbom-path: 'klusterlet-sbom.spdx.json'
