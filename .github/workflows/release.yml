@@ -4,9 +4,6 @@ permissions:
   contents: read
 
 on:
-  pull_request:
-    paths:
-      - .github/workflows/release.yml
   push:
     tags:
       - 'v*.*.*'
@@ -52,12 +49,12 @@ jobs:
         with:
           fetch-depth: 1
           path: go/src/open-cluster-management.io/ocm
-      - name: Set up Python 3.x
+      - name: set up Python 3.x
         uses: actions/setup-python@v5
         with:
           # Semantic version range syntax or exact version of a Python version
           python-version: '3.x'
-      - name: Install dependencies
+      - name: install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install PyGithub
@@ -86,7 +83,7 @@ jobs:
           generate_release_notes: true
           files: |
             /home/runner/work/ocm/ocm/go/src/open-cluster-management.io/ocm/release/*.tgz
-      - name: Generate helm charts attestation
+      - name: generate helm charts attestation
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: '/home/runner/work/ocm/ocm/go/src/open-cluster-management.io/ocm/release/*.tgz'
