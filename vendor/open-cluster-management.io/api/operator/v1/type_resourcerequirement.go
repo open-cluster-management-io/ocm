@@ -1,3 +1,4 @@
+// Copyright Contributors to the Open Cluster Management project
 package v1
 
 import corev1 "k8s.io/api/core/v1"

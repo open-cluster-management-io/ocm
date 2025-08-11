@@ -17,6 +17,8 @@ defaults:
 
 permissions:
   contents: read
+  id-token: write
+  attestations: write
 
 jobs:
   env:
@@ -45,6 +47,7 @@ jobs:
     strategy:
       matrix:
         arch: [ amd64, arm64 ]
+        image-name: [ registration-operator, registration, work, placement, addon-manager ]
     steps:
       - name: checkout code
         uses: actions/checkout@v4
@@ -58,23 +61,40 @@ jobs:
       - name: install imagebuilder
         run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
       - name: pull base image
-        run: docker pull registry.access.redhat.com/ubi8/ubi-minimal:latest --platform=linux/${{ matrix.arch }}
+        run: docker pull registry.access.redhat.com/ubi9/ubi-minimal:latest --platform=linux/${{ matrix.arch }}
       - name: images
         run: |
           IMAGE_TAG=${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }} \
+          IMAGE_REGISTRY=quay.io/open-cluster-management \
           IMAGE_BUILD_EXTRA_FLAGS="--build-arg OS=linux --build-arg ARCH=${{ matrix.arch }}" \
-            make images
+            make image-${{ matrix.image-name }}
       - name: push
         run: |
           echo ${{ secrets.DOCKER_PASSWORD }} | docker login quay.io --username ${{ secrets.DOCKER_USER }} --password-stdin
-          docker push quay.io/open-cluster-management/registration:${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }}
-          docker push quay.io/open-cluster-management/work:${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }}
-          docker push quay.io/open-cluster-management/placement:${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }}
-          docker push quay.io/open-cluster-management/registration-operator:${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }}
-          docker push quay.io/open-cluster-management/addon-manager:${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }}
+          docker push quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }}
+          image_digest=$(docker inspect --format='{{index .RepoDigests 0}}' "quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }}" | cut -d'@' -f2)
+          echo "IMAGE_DIGEST=${image_digest}" >> $GITHUB_ENV
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }}
+          format: 'spdx-json'
+          output-file: 'sbom.spdx.json'
+          upload-release-assets: false # disable uploading SBOM to release assets for images
+      - name: Attest
+        uses: actions/attest-sbom@v2
+        id: attest
+        with:
+          subject-name: quay.io/open-cluster-management/${{ matrix.image-name }}
+          subject-digest: ${{ env.IMAGE_DIGEST }}
+          sbom-path: 'sbom.spdx.json'
+          push-to-registry: true
   image-manifest:
     name: image manifest
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image-name: [ registration-operator, registration, work, placement, addon-manager ]
     needs: [ env, images ]
     steps:
       - name: checkout code
@@ -82,60 +102,40 @@ jobs:
         with:
           fetch-depth: 1
           path: go/src/open-cluster-management.io/ocm
+      # Step to install Skopeo
+      - name: Install Skopeo and jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo jq
       - name: create
         run: |
           echo ${{ secrets.DOCKER_PASSWORD }} | docker login quay.io --username ${{ secrets.DOCKER_USER }} --password-stdin
-          # registration
-          docker manifest create quay.io/open-cluster-management/registration:${{ needs.env.outputs.RELEASE_VERSION }} \
-            quay.io/open-cluster-management/registration:${{ needs.env.outputs.RELEASE_VERSION }}-amd64 \
-            quay.io/open-cluster-management/registration:${{ needs.env.outputs.RELEASE_VERSION }}-arm64
-          # work
-          docker manifest create quay.io/open-cluster-management/work:${{ needs.env.outputs.RELEASE_VERSION }} \
-            quay.io/open-cluster-management/work:${{ needs.env.outputs.RELEASE_VERSION }}-amd64 \
-            quay.io/open-cluster-management/work:${{ needs.env.outputs.RELEASE_VERSION }}-arm64
-          # placement
-          docker manifest create quay.io/open-cluster-management/placement:${{ needs.env.outputs.RELEASE_VERSION }} \
-            quay.io/open-cluster-management/placement:${{ needs.env.outputs.RELEASE_VERSION }}-amd64 \
-            quay.io/open-cluster-management/placement:${{ needs.env.outputs.RELEASE_VERSION }}-arm64
-          # addon-manager
-          docker manifest create quay.io/open-cluster-management/addon-manager:${{ needs.env.outputs.RELEASE_VERSION }} \
-            quay.io/open-cluster-management/addon-manager:${{ needs.env.outputs.RELEASE_VERSION }}-amd64 \
-            quay.io/open-cluster-management/addon-manager:${{ needs.env.outputs.RELEASE_VERSION }}-arm64
-          # registration-operator
-          docker manifest create quay.io/open-cluster-management/registration-operator:${{ needs.env.outputs.RELEASE_VERSION }} \
-            quay.io/open-cluster-management/registration-operator:${{ needs.env.outputs.RELEASE_VERSION }}-amd64 \
-            quay.io/open-cluster-management/registration-operator:${{ needs.env.outputs.RELEASE_VERSION }}-arm64
+          docker manifest create quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }} \
+            quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }}-amd64 \
+            quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }}-arm64
       - name: annotate
         run: |
-          # registration
-          docker manifest annotate quay.io/open-cluster-management/registration:${{ needs.env.outputs.RELEASE_VERSION }} \
-            quay.io/open-cluster-management/registration:${{ needs.env.outputs.RELEASE_VERSION }}-amd64 --arch amd64
-          docker manifest annotate quay.io/open-cluster-management/registration:${{ needs.env.outputs.RELEASE_VERSION }} \
-            quay.io/open-cluster-management/registration:${{ needs.env.outputs.RELEASE_VERSION }}-arm64 --arch arm64
-          # work
-          docker manifest annotate quay.io/open-cluster-management/work:${{ needs.env.outputs.RELEASE_VERSION }} \
-            quay.io/open-cluster-management/work:${{ needs.env.outputs.RELEASE_VERSION }}-amd64 --arch amd64
-          docker manifest annotate quay.io/open-cluster-management/work:${{ needs.env.outputs.RELEASE_VERSION }} \
-          quay.io/open-cluster-management/work:${{ needs.env.outputs.RELEASE_VERSION }}-arm64 --arch arm64
-          # placement
-          docker manifest annotate quay.io/open-cluster-management/placement:${{ needs.env.outputs.RELEASE_VERSION }} \
-            quay.io/open-cluster-management/placement:${{ needs.env.outputs.RELEASE_VERSION }}-amd64 --arch amd64
-          docker manifest annotate quay.io/open-cluster-management/placement:${{ needs.env.outputs.RELEASE_VERSION }} \
-            quay.io/open-cluster-management/placement:${{ needs.env.outputs.RELEASE_VERSION }}-arm64 --arch arm64
-          # addon-manager
-          docker manifest annotate quay.io/open-cluster-management/addon-manager:${{ needs.env.outputs.RELEASE_VERSION }} \
-            quay.io/open-cluster-management/addon-manager:${{ needs.env.outputs.RELEASE_VERSION }}-amd64 --arch amd64
-          docker manifest annotate quay.io/open-cluster-management/addon-manager:${{ needs.env.outputs.RELEASE_VERSION }} \
-            quay.io/open-cluster-management/addon-manager:${{ needs.env.outputs.RELEASE_VERSION }}-arm64 --arch arm64
-          # registration-operator
-          docker manifest annotate quay.io/open-cluster-management/registration-operator:${{ needs.env.outputs.RELEASE_VERSION }} \
-            quay.io/open-cluster-management/registration-operator:${{ needs.env.outputs.RELEASE_VERSION }}-amd64 --arch amd64
-          docker manifest annotate quay.io/open-cluster-management/registration-operator:${{ needs.env.outputs.RELEASE_VERSION }} \
-            quay.io/open-cluster-management/registration-operator:${{ needs.env.outputs.RELEASE_VERSION }}-arm64 --arch arm64
+          docker manifest annotate quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }} \
+            quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }}-amd64 --arch amd64
+          docker manifest annotate quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }} \
+            quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }}-arm64 --arch arm64
       - name: push
         run: |
-          docker manifest push quay.io/open-cluster-management/registration:${{ needs.env.outputs.RELEASE_VERSION }}
-          docker manifest push quay.io/open-cluster-management/work:${{ needs.env.outputs.RELEASE_VERSION }}
-          docker manifest push quay.io/open-cluster-management/placement:${{ needs.env.outputs.RELEASE_VERSION }}
-          docker manifest push quay.io/open-cluster-management/addon-manager:${{ needs.env.outputs.RELEASE_VERSION }}
-          docker manifest push quay.io/open-cluster-management/registration-operator:${{ needs.env.outputs.RELEASE_VERSION }}
+          docker manifest push quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }}
+          image_digest_release=$(skopeo inspect docker://quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }} | jq -r '.Digest')
+          echo "IMAGE_DIGEST_RELEASE=${image_digest_release}" >> $GITHUB_ENV
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }}
+          format: 'spdx-json'
+          output-file: 'sbom.spdx.json'
+          upload-release-assets: false # disable uploading SBOM to release assets for images
+      - name: Attest
+        uses: actions/attest-sbom@v2
+        id: attest
+        with:
+          subject-name: quay.io/open-cluster-management/${{ matrix.image-name }}
+          subject-digest: ${{ env.IMAGE_DIGEST_RELEASE }}
+          sbom-path: 'sbom.spdx.json'
+          push-to-registry: true

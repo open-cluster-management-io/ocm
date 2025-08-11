@@ -310,7 +310,7 @@ spec:
                           properties:
                             autoApprovedIdentities:
                               description: AutoApprovedIdentities represent a list
-                                of approved arn patterns
+                                of approved users
                               items:
                                 type: string
                               type: array

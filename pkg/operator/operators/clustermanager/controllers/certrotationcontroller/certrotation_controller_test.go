@@ -21,6 +21,7 @@ import (
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
@@ -41,6 +42,16 @@ func newClusterManager(name string, mode operatorapiv1.InstallMode) *operatorapi
 			RegistrationImagePullSpec: "testregistration",
 			DeployOption: operatorapiv1.ClusterManagerDeployOption{
 				Mode: mode,
+			},
+			RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
+				RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+					{
+						AuthType: commonhelpers.GRPCCAuthType,
+					},
+					{
+						AuthType: commonhelpers.CSRAuthType,
+					},
+				},
 			},
 		},
 	}
@@ -162,6 +173,7 @@ func TestCertRotation(t *testing.T) {
 				helpers.SignerSecret:              newOnTermInformer(helpers.SignerSecret).Core().V1().Secrets(),
 				helpers.RegistrationWebhookSecret: newOnTermInformer(helpers.RegistrationWebhookSecret).Core().V1().Secrets(),
 				helpers.WorkWebhookSecret:         newOnTermInformer(helpers.WorkWebhookSecret).Core().V1().Secrets(),
+				helpers.GRPCServerSecret:          newOnTermInformer(helpers.GRPCServerSecret).Core().V1().Secrets(),
 			}
 
 			configmapInformer := newOnTermInformer(helpers.CaBundleConfigmap).Core().V1().ConfigMaps()

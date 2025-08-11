@@ -41,6 +41,10 @@ var (
 	mwReplicaSetDeploymentFiles = []string{
 		"cluster-manager/management/cluster-manager-manifestworkreplicaset-deployment.yaml",
 	}
+
+	grpcServerDeploymentFiles = []string{
+		"cluster-manager/management/cluster-manager-grpc-server-deployment.yaml",
+	}
 )
 
 type runtimeReconcile struct {
@@ -50,7 +54,7 @@ type runtimeReconcile struct {
 
 	ensureSAKubeconfigs func(ctx context.Context, clusterManagerName, clusterManagerNamespace string,
 		hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder,
-		mwctrEnabled, addonManagerEnabled bool) error
+		mwctrEnabled, addonManagerEnabled, grpcAuthEnabled bool) error
 
 	cache    resourceapply.ResourceCache
 	recorder events.Recorder
@@ -74,16 +78,38 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 		}
 	}
 
+	// Remove grpc server deployment if the grpc auth is disabled
+	if !config.GRPCAuthEnabled {
+		_, _, err := cleanResources(ctx, c.kubeClient, cm, config, grpcServerDeploymentFiles...)
+		if err != nil {
+			return cm, reconcileStop, err
+		}
+	}
+
 	if cm.Spec.RegistrationConfiguration != nil && cm.Spec.RegistrationConfiguration.RegistrationDrivers != nil {
 		var enabledRegistrationDrivers []string
 		for _, registrationDriver := range cm.Spec.RegistrationConfiguration.RegistrationDrivers {
 			enabledRegistrationDrivers = append(enabledRegistrationDrivers, registrationDriver.AuthType)
-			if registrationDriver.AuthType == commonhelpers.AwsIrsaAuthType && registrationDriver.AwsIrsa != nil {
-				config.HubClusterArn = registrationDriver.AwsIrsa.HubClusterArn
-				config.AutoApprovedARNPatterns = strings.Join(registrationDriver.AwsIrsa.AutoApprovedIdentities, ",")
-				config.AwsResourceTags = strings.Join(registrationDriver.AwsIrsa.Tags, ",")
-			} else if registrationDriver.AuthType == commonhelpers.CSRAuthType && registrationDriver.CSR != nil {
-				config.AutoApprovedCSRUsers = strings.Join(registrationDriver.CSR.AutoApprovedIdentities, ",")
+			switch registrationDriver.AuthType {
+			case commonhelpers.AwsIrsaAuthType:
+				if registrationDriver.AwsIrsa != nil {
+					config.HubClusterArn = registrationDriver.AwsIrsa.HubClusterArn
+					config.AutoApprovedARNPatterns = strings.Join(registrationDriver.AwsIrsa.AutoApprovedIdentities, ",")
+					config.AwsResourceTags = strings.Join(registrationDriver.AwsIrsa.Tags, ",")
+				}
+			case commonhelpers.CSRAuthType:
+				if registrationDriver.CSR != nil {
+					config.AutoApprovedCSRUsers = strings.Join(registrationDriver.CSR.AutoApprovedIdentities, ",")
+				}
+			case commonhelpers.GRPCCAuthType:
+				if registrationDriver.GRPC == nil {
+					// using registration image as default
+					config.GRPCServerImage = cm.Spec.RegistrationImagePullSpec
+					continue
+				}
+
+				config.GRPCServerImage = registrationDriver.GRPC.ImagePullSpec
+				// TODO set AutoApprovedIdentities
 			}
 		}
 		config.EnabledRegistrationDrivers = strings.Join(enabledRegistrationDrivers, ",")
@@ -96,7 +122,7 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 		clusterManagerNamespace := helpers.ClusterManagerNamespace(cm.Name, cm.Spec.DeployOption.Mode)
 		err := c.ensureSAKubeconfigs(ctx, cm.Name, clusterManagerNamespace,
 			c.hubKubeConfig, c.hubKubeClient, c.kubeClient, c.recorder,
-			config.MWReplicaSetEnabled, config.AddOnManagerEnabled)
+			config.MWReplicaSetEnabled, config.AddOnManagerEnabled, config.GRPCAuthEnabled)
 		if err != nil {
 			meta.SetStatusCondition(&cm.Status.Conditions, metav1.Condition{
 				Type:    operatorapiv1.ConditionClusterManagerApplied,
@@ -143,6 +169,9 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 	}
 	if config.MWReplicaSetEnabled {
 		deployResources = append(deployResources, mwReplicaSetDeploymentFiles...)
+	}
+	if config.GRPCAuthEnabled {
+		deployResources = append(deployResources, grpcServerDeploymentFiles...)
 	}
 	for _, file := range deployResources {
 		updatedDeployment, currentGeneration, err := helpers.ApplyDeployment(
@@ -209,7 +238,7 @@ func (c *runtimeReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterM
 }
 
 // getSAs return serviceaccount names of all hub components
-func getSAs(mwctrEnabled, addonManagerEnabled bool) []string {
+func getSAs(mwctrEnabled, addonManagerEnabled, grpcAuthEnabled bool) []string {
 	sas := []string{
 		"registration-controller-sa",
 		"registration-webhook-sa",
@@ -221,6 +250,9 @@ func getSAs(mwctrEnabled, addonManagerEnabled bool) []string {
 	}
 	if addonManagerEnabled {
 		sas = append(sas, "addon-manager-controller-sa")
+	}
+	if grpcAuthEnabled {
+		sas = append(sas, "grpc-server-sa")
 	}
 	return sas
 }

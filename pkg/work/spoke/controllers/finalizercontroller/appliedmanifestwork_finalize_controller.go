@@ -30,7 +30,7 @@ type AppliedManifestWorkFinalizeController struct {
 	patcher                   patcher.Patcher[*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus]
 	appliedManifestWorkLister worklister.AppliedManifestWorkLister
 	spokeDynamicClient        dynamic.Interface
-	rateLimiter               workqueue.RateLimiter
+	rateLimiter               workqueue.TypedRateLimiter[string]
 }
 
 func NewAppliedManifestWorkFinalizeController(
@@ -47,7 +47,8 @@ func NewAppliedManifestWorkFinalizeController(
 			appliedManifestWorkClient),
 		appliedManifestWorkLister: appliedManifestWorkInformer.Lister(),
 		spokeDynamicClient:        spokeDynamicClient,
-		rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
+		// After 11 retries (approximately 1 mins), the delay reaches the maximum of 60 seconds.
+		rateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[string](50*time.Millisecond, 60*time.Second),
 	}
 
 	return factory.New().
@@ -110,7 +111,7 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 
 	// requeue the work until all applied resources are deleted and finalized if the appliedmanifestwork itself is not updated
 	if len(resourcesPendingFinalization) != 0 {
-		klog.V(4).Infof("%d resources pending deletions", len(resourcesPendingFinalization))
+		klog.V(4).Infof("%d resources pending deletions in %s", len(resourcesPendingFinalization), appliedManifestWork.Name)
 		controllerContext.Queue().AddAfter(appliedManifestWork.Name, m.rateLimiter.When(appliedManifestWork.Name))
 		return nil
 	}

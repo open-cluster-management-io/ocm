@@ -102,7 +102,7 @@ func TestFinalize(t *testing.T) {
 			},
 		},
 		{
-			name:               "requeue work when deleting resources are still visiable",
+			name:               "requeue work when deleting resources are still visible",
 			terminated:         true,
 			existingFinalizers: []string{workapiv1.AppliedManifestWorkFinalizer},
 			existingResources: []runtime.Object{
@@ -191,7 +191,7 @@ func TestFinalize(t *testing.T) {
 					*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus](
 					fakeClient.WorkV1().AppliedManifestWorks()),
 				spokeDynamicClient: fakeDynamicClient,
-				rateLimiter:        workqueue.NewItemExponentialFailureRateLimiter(0, 1*time.Second),
+				rateLimiter:        workqueue.NewTypedItemExponentialFailureRateLimiter[string](0, 1*time.Second),
 			}
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, testingWork.Name)

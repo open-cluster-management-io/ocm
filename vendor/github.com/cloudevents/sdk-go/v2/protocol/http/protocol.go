@@ -326,7 +326,7 @@ func (p *Protocol) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	if !ok {
 		rw.Header().Add("Retry-After", strconv.Itoa(int(reset)))
-		http.Error(rw, "limit exceeded", 429)
+		http.Error(rw, "limit exceeded", http.StatusTooManyRequests)
 		return
 	}
 

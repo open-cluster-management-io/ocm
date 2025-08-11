@@ -1,4 +1,4 @@
-![image](assets/ocm-logo.png)
+![OCM logo](assets/ocm-logo.png)
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/5376/badge)](https://bestpractices.coreinfrastructure.org/projects/5376)
@@ -7,73 +7,126 @@
 [![Artifact HUB Cluster Manager](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/cluster-manager)](https://artifacthub.io/packages/olm/community-operators/cluster-manager)
 [![Artifact HUB Klusterlet](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/klusterlet)](https://artifacthub.io/packages/olm/community-operators/klusterlet)
 
-Welcome! The open-cluster-management.io project is focused on enabling end-to-end visibility and control across your Kubernetes clusters.
+Open Cluster Management (OCM) is a [Cloud Native Computing Foundation (CNCF) sandbox project](https://www.cncf.io/projects/open-cluster-management) focused on multicluster and multicloud scenarios for Kubernetes applications. At its core, OCM exists to make running, managing, and utilizing heterogeneous, multicluster environments simpler.
 
-The Open Cluster Management (OCM) architecture uses a hub - agent model. The hub centralizes control of all the managed clusters. An agent, which we call the klusterlet, resides on each managed cluster to manage registration to the hub and run instructions from the hub.
+![CNCF logo](assets/cncf.png)
 
-![image](assets/cncf.png)
+## Project Goals and Objectives
 
-OCM is a [Cloud Native Computing Foundation (CNCF) sandbox project](https://www.cncf.io/projects/open-cluster-management).
+We believe that no one runs just one cluster, and making multicluster management as easy as possible encourages community growth across all projects, empowering our users and their customers. Our core goal is to "multicluster everything."
 
-You can use the [clusteradm CLI](https://github.com/open-cluster-management-io/clusteradm) to bootstrap a control plane for multicluster management. The following diagram illustrates the deployment architecture for OCM:
+OCM provides a flexible, extensible, and open model that allows any software project to easily understand how to run in a multicluster way. We align with and contribute to the SIG-Multicluster APIs for multicluster management while developing and sharing key concepts and components that make it easier and more accessible for any project, large or small, to "do multicluster."
 
-![image](assets/ocm-arch.png)
+### Differentiation in the Cloud Native Landscape
 
-To setup a multicluster environment with OCM enabled on your local machine, follow the instructions in [setup dev environment](solutions/setup-dev-environment).
+Open Cluster Management differentiates itself in several key ways:
 
-There are a number of key use cases that are enabled by this project, and are categorized to 3 sub projects.
+- **Vendor Neutral**: Avoid vendor lock-in by using APIs that are not tied to any cloud providers or proprietary platforms
+- **Standards-Based**: We provide both a reference implementation of the APIs put forward by SIG-Multicluster as well as extended capabilities to accentuate them for numerous additional use cases
+- **Plug-and-Play Architecture**: By standardizing on a single PlacementDecision API, any scheduler can publish its choices and any consumer can subscribe to them, eliminating friction and enabling true interoperability
+- **Extensible Framework**: Our add-on structure allows projects to gain the benefits of simple, secure, and vendor-neutral multicloud management with minimal code changes
 
-### Cluster Lifecycle: Cluster registration and management
+## What OCM Does
 
-OCM has a group of [APIs](https://github.com/open-cluster-management-io/api) to provide the foundational functions
-in multiple cluster management.
+OCM utilizes open APIs and an easy-to-use add-on structure to provide comprehensive multicluster management capabilities. We do this because we believe that managing multiple clusters should be simple and easy. With the variety of both free and proprietary cloud and on-premises offerings, it is important to help the community utilize these heterogeneous environments to their fullest potential.
 
-The journey of cluster management starts with [Cluster Registration](https://open-cluster-management.io/concepts/architecture/#cluster-registering-double-opt-in-handshaking) which follows a `double opt-in` protocol to establish a MTLS connection from the agent on the managed cluster (Klusterlet) to the hub (Cluster Manager). After this, users or operands on the hub can declare [ManifestWorks](https://open-cluster-management.io/concepts/manifestwork/) which contains a slice of Kubernetes resource manifests to be distributed and applied to a certain managed cluster. To schedule workloads to a certain set of clusters, users can also declare a [Placement](https://open-cluster-management.io/concepts/placement/) on the hub to dynamically select a set of clusters with certain criteria.
+Our architecture is modular and extensible, built to always model Kubernetes principles. We utilize open declarative APIs and build code with DevOps and automation. OCM runs on a hub-spoke model that can survive failure and recovery of components without interrupting workloads. It's containerized, vendor-neutral, and focuses on declarative management style aligned with GitOps principles.
 
-In addition, developers can leverage [Addon framework](https://github.com/open-cluster-management-io/addon-framework) to build their own management tools or integrate with other open source projects to extend the multicluster management capability. OCM maintaines two built-in addons for application lifecycle and security governance.
+### Core Architecture
 
-### Application Lifecycle: Delivery, upgrade, and configuration of applications on Kubernetes clusters
+The OCM architecture uses a hub-spoke model where the hub centralizes control of all managed clusters. An agent, called the klusterlet, resides on each managed cluster to manage registration to the hub and run instructions from the hub.
 
-Leverage the [Argo CD](https://argo-cd.readthedocs.io/en/stable/)
-add-on for OCM to enable decentralized, pull based application deployment to managed clusters.
+![OCM Architecture](assets/ocm-arch.png)
 
-The OCM Argo CD add-on uses a hub-spoke architecture to deliver Argo CD Applications from the OCM hub cluster to registered managed clusters. Unlike traditional push-based deployment models, this pull mechanism provides several advantages:
+## Core Components
 
-- Scalability: hub-spoke pattern may offers better scalability.
-- Security: cluster credentials doesn't have to be stored in a centralized environment may enhance security.
-- It may reduce the impact of a single point of centralized failure.
+### Cluster Inventory
 
-Using OCM APIs and components,
-Argo CD Applications can be managed centrally while being pulled and applied locally at the managed cluster level.
-See [Argo CD OCM add-on](https://github.com/open-cluster-management-io/ocm/tree/main/solutions/deploy-argocd-apps-pull/)
-for details on installing the add-on and deploying applications across multiple clusters.
+Registration of multiple clusters to a hub cluster to place them for management. For comprehensive details on cluster inventory management, see the [cluster inventory documentation](https://open-cluster-management.io/docs/concepts/cluster-inventory/). OCM implements a secure "double opt-in handshaking" protocol that requires explicit consent from both hub cluster administrators and managed cluster administrators to establish the connection. 
 
-### GRC: Governance, Risk and Compliance across Kubernetes clusters
+The registration process creates an mTLS connection between the registration-agent on the managed cluster (Klusterlet) and the registration-controller on the hub (Cluster Manager). Once registered, each managed cluster is assigned a dedicated namespace on the hub for isolation and security. The registration-controller continuously monitors cluster health and manages cluster lifecycle operations including certificate rotation and permission management.
 
-* Use prebuilt security and configuration controllers to enforce policies on Kubernetes configuration across your clusters.
+### Work Distribution
 
-Policy controllers allow the declarative expression of a desired condition that can be audited or enforced against a set of managed clusters. _Policies_ allow you to drive cross-cluster configuration or validate that a certain configuration explicitly does not exist.
+The [ManifestWork API](https://open-cluster-management.io/docs/concepts/work-distribution/) enables resources to be applied to managed clusters from a hub cluster. ManifestWork acts as a wrapper containing Kubernetes resource manifests that need to be distributed and applied to specific managed clusters.
 
-The following repositories describe the underlying API and controllers for the GRC model:
+The work-agent running on each managed cluster actively pulls ManifestWork resources from its dedicated namespace on the hub and applies them locally. This pull-based approach ensures scalability and eliminates the need to store managed cluster credentials on the hub. The API supports sophisticated features including update strategies, conflict resolution, resource ordering, and status feedback to provide comprehensive resource distribution capabilities.
 
-* [config-policy-controller](https://github.com/open-cluster-management-io/config-policy-controller)
-* [governance-policy-framework-addon](https://github.com/open-cluster-management-io/governance-policy-framework-addon)
-* [governance-policy-propagator](https://github.com/open-cluster-management-io/governance-policy-propagator)
+### Content Placement
 
-### More external integrations
+Dynamic placement of content and behavior across multiple clusters. The [Placement API](https://open-cluster-management.io/docs/concepts/content-placement/placement/) is a sophisticated scheduler for multicluster environments that operates on a Hub-Spoke model and is deeply integrated with the Work API.
 
-We are constantly working with other open source projects to make multicluster management easier.
+The Placement API allows administrators to use vendor-neutral selectors to dynamically choose clusters based on labels, resource capacity, or custom criteria. The PlacementDecision resource provides a list of selected clusters that can be consumed by any scheduler or controller.
 
-- [Submariner](https://submariner.io/) is a project that provides multicluster networking connectivity. Users can benefit from a [Submariner](https://submariner.io/) addon, which automates the deployment and management of multicluster networking.
-- [Clusternet](http://github.com/clusternet/clusternet) is another project that provides multicluster orchestration, which can be easily plug into OCM with [clusternet addon](https://github.com/skeeey/clusternet-addon)
-- [KubeVela](https://kubevela.io/) is a modern application delivery platform that makes deploying and operating applications across today's hybrid, multi-cloud environments easier, faster and more reliable. Note that OCM is also available as an [vela addon](https://github.com/kubevela/catalog/tree/master/addons/ocm-hub-control-plane) in KubeVela.
+### Add-on Framework
 
-### Get connected
+[OCM Add-ons](https://open-cluster-management.io/docs/concepts/add-on-extensibility/addon/) provide a clear framework that allows developers to easily add their software to OCM and make it multicluster aware. Add-ons are simple to write and are fully documented and maintained according to specifications in the [addon-framework](https://github.com/open-cluster-management-io/addon-framework) repository.
 
-See the following options to connect with the community:
+The framework handles the complex aspects of multicluster deployment including registration, lifecycle management, configuration distribution, and status reporting. Add-ons are used by multiple projects such as Argo, Submariner, KubeVela, and more. They are also used extensively for internal components of OCM, ensuring the framework is actively developed and maintained. With add-ons, any project can plug into OCM with minimal code and almost instantaneously become multicluster aware.
 
- - [Website](https://open-cluster-management.io)
- - [Slack](https://kubernetes.slack.com/archives/C01GE7YSUUF)
- - [Mailing group](https://groups.google.com/g/open-cluster-management)
- - [Community meetings](https://github.com/open-cluster-management-io/community/projects/1)
- - [YouTube channel](https://www.youtube.com/c/OpenClusterManagement)
+## Built-in Extensions
+
+These optional but valuable capabilities extend OCM's core functionality for specific use cases.
+
+### Cluster Lifecycle Management
+
+OCM integrates seamlessly with [Cluster API](https://cluster-api.sigs.k8s.io/) to provide comprehensive cluster lifecycle management. Cluster API is a Kubernetes sub-project focused on providing declarative APIs and tooling to simplify provisioning, upgrading, and operating multiple Kubernetes clusters.
+
+The integration allows OCM to work alongside Cluster API management planes, where clusters provisioned through Cluster API can be automatically registered with OCM for multicluster management. OCM's hub cluster can run in the same cluster as the Cluster API management plane, enabling seamless workflows from cluster creation to workload deployment and policy enforcement. See the [Cluster API integration guide](solutions/cluster-api/) for detailed setup instructions.
+
+### Application Lifecycle Management
+
+Leverage the [Argo CD](https://argo-cd.readthedocs.io/en/stable/) add-on for OCM to enable decentralized, pull-based application deployment to managed clusters. The OCM Argo CD add-on uses a hub-spoke architecture to deliver Argo CD Applications from the OCM hub cluster to registered managed clusters.
+
+Unlike traditional push-based deployment models, this pull mechanism provides several advantages:
+- **Scalability**: Hub-spoke pattern offers better scalability
+- **Security**: Cluster credentials don't have to be stored in a centralized environment
+- **Resilience**: Reduces the impact of a single point of centralized failure
+
+See [Argo CD OCM add-on](solutions/deploy-argocd-apps-pull/) for details on installing the add-on and deploying applications across multiple clusters.
+
+### Governance, Risk, and Compliance (GRC)
+
+Use prebuilt security and configuration controllers to enforce policies on Kubernetes configuration across your clusters. Policy controllers allow the declarative expression of desired conditions that can be audited or enforced against a set of managed clusters.
+
+Related repositories:
+- [config-policy-controller](https://github.com/open-cluster-management-io/config-policy-controller)
+- [governance-policy-framework-addon](https://github.com/open-cluster-management-io/governance-policy-framework-addon)
+- [governance-policy-propagator](https://github.com/open-cluster-management-io/governance-policy-propagator)
+
+## Cloud Native Use Cases
+
+Everything OCM does is Cloud Native by definition. Our comprehensive [User Scenarios](https://open-cluster-management.io/docs/scenarios/) section provides detailed examples of how OCM enables various multicluster and multicloud use cases.
+
+## Getting Started
+
+You can use the [clusteradm CLI](https://github.com/open-cluster-management-io/clusteradm) to bootstrap a control plane for multicluster management. To set up a multicluster environment with OCM enabled on your local machine, follow the instructions in [setup dev environment](solutions/setup-dev-environment).
+
+## External Integrations
+
+We constantly work with other open-source projects to make multicluster management easier:
+
+- **[Argo CD](https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/Generators-Cluster-Decision-Resource/#how-it-works)** (CNCF): OCM supplies Argo CD with ClusterDecision resources via Argo CD's Cluster Decision Resource Generator, enabling it to select target clusters for GitOps deployments
+- **[Clusternet](https://github.com/clusternet/clusternet)**: (CNCF) Multicluster orchestration that can easily plug into OCM with [clusternet addon](https://github.com/open-cluster-management-io/addon-contrib/tree/main/clusternet-addon)
+- **[KubeVela](https://kubevela.io/docs/platform-engineers/system-operation/working-with-ocm/)** (CNCF): KubeVela develops an integration addon to work with OCM supporting application deployment across multiple clusters
+- **[KubeStellar](https://docs.kubestellar.io/latest/direct/start-from-ocm/)** (CNCF): KubeStellar uses OCM as the backend of multicluster management
+- **[Kueue](https://kueue.sigs.k8s.io/docs/tasks/manage/setup_multikueue/#optional-setup-multikueue-with-open-cluster-management)** (Kubernetes SIGs): OCM supplies Kueue with a streamlined MultiKueue setup process, automated generation of MultiKueue specific Kubeconfig, and enhanced multicluster scheduling capabilities
+- **[Submariner](https://submariner.io/)**: (CNCF) Provides multicluster networking connectivity with automated deployment and management
+
+## Documentation and Resources
+
+For comprehensive information about OCM, visit our [website](https://open-cluster-management.io/) with detailed sections on [key concepts](https://open-cluster-management.io/docs/concepts/).
+
+## Community
+
+Connect with the OCM community:
+
+- [Website](https://open-cluster-management.io)
+- [Slack](https://kubernetes.slack.com/channels/open-cluster-mgmt)
+- [Mailing group](https://groups.google.com/g/open-cluster-management)
+- [Community meetings](https://calendar.google.com/calendar/u/0/embed?src=openclustermanagement@gmail.com)
+- [YouTube channel](https://www.youtube.com/c/OpenClusterManagement)
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.

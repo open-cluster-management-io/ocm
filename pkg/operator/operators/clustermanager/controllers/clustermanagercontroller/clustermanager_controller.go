@@ -56,7 +56,7 @@ type clusterManagerController struct {
 	// For testcases which don't need these functions, we could set fake funcs
 	ensureSAKubeconfigs func(ctx context.Context, clusterManagerName, clusterManagerNamespace string,
 		hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder,
-		mwctrEnabled, addonManagerEnabled bool) error
+		mwctrEnabled, addonManagerEnabled, grpcAuthEnabled bool) error
 	generateHubClusterClients func(hubConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface,
 		migrationclient.StorageVersionMigrationsGetter, error)
 	skipRemoveCRDs                bool
@@ -228,6 +228,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	config.Labels = helpers.GetClusterManagerHubLabels(clusterManager, n.enableSyncLabels)
 	config.LabelsString = helpers.GetRegistrationLabelString(config.Labels)
 
+	// Determine if the gGRPC auth is enabled
+	config.GRPCAuthEnabled = helpers.GRPCAuthEnabled(clusterManager)
+
 	// Update finalizer at first
 	if clusterManager.DeletionTimestamp.IsZero() {
 		updated, err := n.patcher.AddFinalizer(ctx, clusterManager, clusterManagerFinalizer)
@@ -357,8 +360,8 @@ func generateHubClients(hubKubeConfig *rest.Config) (kubernetes.Interface, apiex
 // Finally, a deployment on the management cluster would use the kubeconfig to access resources on the hub cluster.
 func ensureSAKubeconfigs(ctx context.Context, clusterManagerName, clusterManagerNamespace string,
 	hubKubeConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder,
-	mwctrEnabled, addonManagerEnabled bool) error {
-	for _, sa := range getSAs(mwctrEnabled, addonManagerEnabled) {
+	mwctrEnabled, addonManagerEnabled, grpcAuthEnabled bool) error {
+	for _, sa := range getSAs(mwctrEnabled, addonManagerEnabled, grpcAuthEnabled) {
 		tokenGetter := helpers.SATokenGetter(ctx, sa, clusterManagerNamespace, hubClient)
 		err := helpers.SyncKubeConfigSecret(ctx, sa+"-kubeconfig", clusterManagerNamespace,
 			"/var/run/secrets/hub/kubeconfig", &rest.Config{

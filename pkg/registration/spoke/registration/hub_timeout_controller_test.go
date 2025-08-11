@@ -19,7 +19,7 @@ func TestHubTimeoutController_Sync(t *testing.T) {
 	}{
 		{
 			name:        "not timeout",
-			waitSeconds: 2,
+			waitSeconds: 1,
 			expect:      false,
 		},
 		{

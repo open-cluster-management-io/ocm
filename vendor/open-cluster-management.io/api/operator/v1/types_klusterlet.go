@@ -1,3 +1,4 @@
+// Copyright Contributors to the Open Cluster Management project
 package v1
 
 import (
@@ -203,7 +204,7 @@ type RegistrationDriver struct {
 	// Type of the authentication used by managedcluster to register as well as pull work from hub. Possible values are csr and awsirsa.
 	// +required
 	// +kubebuilder:default:=csr
-	// +kubebuilder:validation:Enum=csr;awsirsa
+	// +kubebuilder:validation:Enum=csr;awsirsa;grpc
 	AuthType string `json:"authType,omitempty"`
 
 	// Contain the details required for registering with hub cluster (ie: an EKS cluster) using AWS IAM roles for service account.
