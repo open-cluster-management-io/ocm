@@ -190,7 +190,7 @@ func DeleteAppliedResources(
 			Namespace(resource.Namespace).
 			Get(ctx, resource.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
-			klog.V(2).Infof("Resource %v with key %s/%s is removed Successfully", gvr, resource.Namespace, resource.Name)
+			klog.Infof("Resource %v with key %s/%s is removed Successfully", gvr, resource.Namespace, resource.Name)
 			continue
 		}
 
