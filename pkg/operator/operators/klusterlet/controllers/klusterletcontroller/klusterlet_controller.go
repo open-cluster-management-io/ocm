@@ -167,6 +167,7 @@ type klusterletConfig struct {
 	Replica                                     int32
 	ClientCertExpirationSeconds                 int32
 	ClusterAnnotationsString                    string
+	ClusterLabelsString                         string
 	RegistrationKubeAPIQPS                      float32
 	RegistrationKubeAPIBurst                    int32
 	WorkKubeAPIQPS                              float32
@@ -389,6 +390,13 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			annotationsArray = append(annotationsArray, fmt.Sprintf("%s=%s", k, v))
 		}
 		config.ClusterAnnotationsString = strings.Join(annotationsArray, ",")
+
+		// construct cluster labels string, the final format is "key1=value1,key2=value2"
+		var labelsArray []string
+		for k, v := range klusterlet.Spec.RegistrationConfiguration.ClusterLabels {
+			labelsArray = append(labelsArray, fmt.Sprintf("%s=%s", k, v))
+		}
+		config.ClusterLabelsString = strings.Join(labelsArray, ",")
 	}
 
 	config.AboutAPIEnabled = helpers.FeatureGateEnabled(

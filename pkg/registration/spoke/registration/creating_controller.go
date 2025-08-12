@@ -89,11 +89,14 @@ func (c *managedClusterCreatingController) sync(ctx context.Context, syncCtx fac
 		managedCluster = decorator(managedCluster)
 	}
 
-	if len(existingCluster.Spec.ManagedClusterClientConfigs) == len(managedCluster.Spec.ManagedClusterClientConfigs) {
+	// Check if any updates are needed (ClientConfigs, Labels, or Annotations)
+	if equalClientConfigs(existingCluster.Spec.ManagedClusterClientConfigs, managedCluster.Spec.ManagedClusterClientConfigs) &&
+		equalLabels(existingCluster.Labels, managedCluster.Labels) &&
+		equalAnnotations(existingCluster.Annotations, managedCluster.Annotations) {
 		return nil
 	}
 
-	// update ManagedClusterClientConfigs in ManagedCluster
+	// update ManagedCluster (ClientConfigs, Labels, and Annotations)
 	_, err = c.hubClusterClient.ClusterV1().ManagedClusters().Update(ctx, managedCluster, metav1.UpdateOptions{})
 	// ManagedClusterClientConfigs in ManagedCluster is only allowed updated during bootstrap.
 	// After bootstrap secret expired, an unauthorized error will be got, skip it
@@ -112,15 +115,33 @@ func skipUnauthorizedError(err error) error {
 	return err
 }
 
+// AnnotationDecorator set annotations from annotation map to ManagedCluster
 func AnnotationDecorator(annotations map[string]string) ManagedClusterDecorator {
 	return func(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
-		filteredAnnotations := commonhelpers.FilterClusterAnnotations(annotations)
 		if cluster.Annotations == nil {
 			cluster.Annotations = make(map[string]string)
 		}
-		for key, value := range filteredAnnotations {
-			cluster.Annotations[key] = value
+
+		filteredAnnotations := commonhelpers.FilterClusterAnnotations(annotations)
+		for k, v := range filteredAnnotations {
+			cluster.Annotations[k] = v
 		}
+
+		return cluster
+	}
+}
+
+// LabelDecorator set labels from label map to ManagedCluster
+func LabelDecorator(labels map[string]string) ManagedClusterDecorator {
+	return func(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
+		if cluster.Labels == nil {
+			cluster.Labels = make(map[string]string)
+		}
+
+		for k, v := range labels {
+			cluster.Labels[k] = v
+		}
+
 		return cluster
 	}
 }
@@ -147,4 +168,47 @@ func ClientConfigDecorator(externalServerURLs []string, caBundle []byte) Managed
 		}
 		return cluster
 	}
+}
+
+// equalClientConfigs compares two ClientConfig slices for equality
+func equalClientConfigs(configs1, configs2 []clusterv1.ClientConfig) bool {
+	if len(configs1) != len(configs2) {
+		return false
+	}
+	for i, config1 := range configs1 {
+		config2 := configs2[i]
+		if config1.URL != config2.URL {
+			return false
+		}
+		if string(config1.CABundle) != string(config2.CABundle) {
+			return false
+		}
+	}
+	return true
+}
+
+// equalLabels compares two label maps for equality
+func equalLabels(labels1, labels2 map[string]string) bool {
+	if len(labels1) != len(labels2) {
+		return false
+	}
+	for k, v := range labels1 {
+		if labels2[k] != v {
+			return false
+		}
+	}
+	return true
+}
+
+// equalAnnotations compares two annotation maps for equality
+func equalAnnotations(annotations1, annotations2 map[string]string) bool {
+	if len(annotations1) != len(annotations2) {
+		return false
+	}
+	for k, v := range annotations1 {
+		if annotations2[k] != v {
+			return false
+		}
+	}
+	return true
 }
