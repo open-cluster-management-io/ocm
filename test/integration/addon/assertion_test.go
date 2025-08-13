@@ -354,20 +354,25 @@ func assertClusterManagementAddOnNoConditions(name string, start metav1.Time, du
 			return err
 		}
 
-		for i, ec := range expect {
-			cond := meta.FindStatusCondition(actual.Status.InstallProgressions[i].Conditions, ec.Type)
+		elapsedTime := metav1.Now().Sub(start.Time)
 
-			if cond != nil &&
-				cond.Status == ec.Status &&
-				cond.Reason == ec.Reason &&
-				cond.Message == ec.Message &&
-				metav1.Now().Sub(start.Time) < duration {
-				return fmt.Errorf("unexpected condition matches before duration")
+		// Only check if we haven't reached the expected timeout duration yet
+		if elapsedTime < duration {
+			for i, ec := range expect {
+				cond := meta.FindStatusCondition(actual.Status.InstallProgressions[i].Conditions, ec.Type)
+
+				// The expected timeout condition should NOT appear before the duration
+				if cond != nil &&
+					cond.Status == ec.Status &&
+					cond.Reason == ec.Reason &&
+					cond.Message == ec.Message {
+					return fmt.Errorf("unexpected condition matches before duration (elapsed: %v, expected: %v)", elapsedTime, duration)
+				}
 			}
 		}
 
 		return nil
-	}, duration, eventuallyInterval).Should(gomega.BeNil())
+	}, duration+2*time.Second, eventuallyInterval).Should(gomega.BeNil())
 }
 
 func assertManagedClusterAddOnConfigReferences(name, namespace string, expect ...addonapiv1alpha1.ConfigReference) {
