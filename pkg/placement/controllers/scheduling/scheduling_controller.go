@@ -297,8 +297,14 @@ func (c *schedulingController) getValidManagedClusterSetBindings(placementNamesp
 
 	var validBindings []*clusterapiv1beta2.ManagedClusterSetBinding
 	for _, binding := range bindings {
+		// defensive validation: ensure name and spec.clusterSet consistency
+		if binding.Name != binding.Spec.ClusterSet {
+			klog.Warningf("ManagedClusterSetBinding %s/%s has inconsistent name and spec.clusterSet, skipping", binding.Namespace, binding.Name)
+			continue
+		}
+
 		// ignore clustersetbinding refers to a non-existent clusterset
-		_, err := c.clusterSetLister.Get(binding.Name)
+		_, err := c.clusterSetLister.Get(binding.Spec.ClusterSet)
 		if errors.IsNotFound(err) {
 			continue
 		}
@@ -316,7 +322,7 @@ func (c *schedulingController) getEligibleClusterSets(placement *clusterapiv1bet
 	// filter out invaid clustersetbindings
 	clusterSetNames := sets.NewString()
 	for _, binding := range bindings {
-		clusterSetNames.Insert(binding.Name)
+		clusterSetNames.Insert(binding.Spec.ClusterSet)
 	}
 
 	// get intersection of clustesets bound to placement namespace and clustesets specified
