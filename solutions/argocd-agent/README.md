@@ -159,14 +159,7 @@ helm -n argocd install argocd-agent-addon charts/argocd-agent-addon \
   --set-file agent.secrets.tlskey=/tmp/tls.key \
   --set-file agent.secrets.jwtkey=/tmp/jwt.key \
   --set agent.principal.server.address="172.18.255.200" \
-  --set agent.mode="managed" \
-  --set agent.principal.redis.address="172.18.255.201:6379" \
-  --set agent.principal.redis.compressionType="gzip" \
-  --set agent.redis.username="redis-username" \
-  --set agent.redis.password="redis-password" \
-  --set agent.principal.resourceProxy.enabled=true \
-  --set agent.principal.healthCheck.enabled=true \
-  --set agent.principal.metrics.enabled=true
+  --set agent.mode="managed" # or "autonomous" for autonomous mode
 ```
 
 Validate that the Argo CD Agent principal pod is running:
