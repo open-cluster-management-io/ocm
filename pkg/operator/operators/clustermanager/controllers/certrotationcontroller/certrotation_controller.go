@@ -108,7 +108,7 @@ func (c certRotationController) sync(ctx context.Context, syncCtx factory.SyncCo
 
 		var errs []error
 		for i := range clustermanagers {
-			err = c.syncOne(ctx, syncCtx, clustermanagers[i])
+			err = c.syncOne(ctx, clustermanagers[i])
 			if err != nil {
 				errs = append(errs, err)
 			}
@@ -119,9 +119,10 @@ func (c certRotationController) sync(ctx context.Context, syncCtx factory.SyncCo
 		clustermanager, err := c.clusterManagerLister.Get(clustermanagerName)
 		// ClusterManager not found, could have been deleted, do nothing.
 		if errors.IsNotFound(err) {
-			return fmt.Errorf("no clustermanager for %s", clustermanagerName)
+			klog.V(4).Infof("ClusterManager %q not found; it may have been deleted", clustermanagerName)
+			return nil
 		}
-		err = c.syncOne(ctx, syncCtx, clustermanager)
+		err = c.syncOne(ctx, clustermanager)
 		if err != nil {
 			return err
 		}
@@ -129,7 +130,7 @@ func (c certRotationController) sync(ctx context.Context, syncCtx factory.SyncCo
 	}
 }
 
-func (c certRotationController) syncOne(ctx context.Context, syncCtx factory.SyncContext, clustermanager *operatorv1.ClusterManager) error {
+func (c certRotationController) syncOne(ctx context.Context, clustermanager *operatorv1.ClusterManager) error {
 	clustermanagerName := clustermanager.Name
 	clustermanagerNamespace := helpers.ClusterManagerNamespace(clustermanager.Name, clustermanager.Spec.DeployOption.Mode)
 
@@ -185,6 +186,11 @@ func (c certRotationController) syncOne(ctx context.Context, syncCtx factory.Syn
 
 	// delete the grpc serving secret if the grpc auth is disabled
 	if !helpers.GRPCAuthEnabled(clustermanager) {
+		if rotations, ok := c.rotationMap[clustermanager.Name]; ok {
+			rotations.targetRotations = removeRotation(rotations.targetRotations, helpers.GRPCServerSecret)
+			c.rotationMap[clustermanager.Name] = rotations
+		}
+
 		err = c.kubeClient.CoreV1().Secrets(clustermanagerNamespace).Delete(ctx, helpers.GRPCServerSecret, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			return fmt.Errorf("clean up deleted cluster-manager, deleting grpc server secret failed, err:%s", err.Error())
@@ -226,19 +232,6 @@ func (c certRotationController) syncOne(ctx context.Context, syncCtx factory.Syn
 			},
 		}
 
-		if helpers.GRPCAuthEnabled(clustermanager) {
-			// maintain the grpc serving certs
-			// TODO may support user provided certs
-			targetRotations = append(targetRotations, certrotation.TargetRotation{
-				Namespace: clustermanagerNamespace,
-				Name:      helpers.GRPCServerSecret,
-				Validity:  TargetCertValidity,
-				HostNames: helpers.GRPCServerHostNames(clustermanagerNamespace, clustermanager),
-				Lister:    c.secretInformers[helpers.GRPCServerSecret].Lister(),
-				Client:    c.kubeClient.CoreV1(),
-			})
-		}
-
 		c.rotationMap[clustermanagerName] = rotations{
 			signingRotation:  signingRotation,
 			caBundleRotation: caBundleRotation,
@@ -247,7 +240,23 @@ func (c certRotationController) syncOne(ctx context.Context, syncCtx factory.Syn
 	}
 
 	// Ensure certificates are exists
-	rotations := c.rotationMap[clustermanagerName] // reconcile cert/key pair for signer
+	rotations := c.rotationMap[clustermanagerName]
+
+	if helpers.GRPCAuthEnabled(clustermanager) && !hasRotation(rotations.targetRotations, helpers.GRPCServerSecret) {
+		// maintain the grpc serving certs
+		// TODO may support user provided certs
+		rotations.targetRotations = append(rotations.targetRotations, certrotation.TargetRotation{
+			Namespace: clustermanagerNamespace,
+			Name:      helpers.GRPCServerSecret,
+			Validity:  TargetCertValidity,
+			HostNames: helpers.GRPCServerHostNames(clustermanagerNamespace, clustermanager),
+			Lister:    c.secretInformers[helpers.GRPCServerSecret].Lister(),
+			Client:    c.kubeClient.CoreV1(),
+		})
+		c.rotationMap[clustermanagerName] = rotations
+	}
+
+	// reconcile cert/key pair for signer
 	signingCertKeyPair, err := rotations.signingRotation.EnsureSigningCertKeyPair()
 	if err != nil {
 		return err
@@ -268,4 +277,23 @@ func (c certRotationController) syncOne(ctx context.Context, syncCtx factory.Syn
 	}
 
 	return errorhelpers.NewMultiLineAggregate(errs)
+}
+
+func hasRotation(targetRotations []certrotation.TargetRotation, name string) bool {
+	for _, rotation := range targetRotations {
+		if rotation.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func removeRotation(targetRotations []certrotation.TargetRotation, name string) []certrotation.TargetRotation {
+	rs := []certrotation.TargetRotation{}
+	for _, rotation := range targetRotations {
+		if rotation.Name != name {
+			rs = append(rs, rotation)
+		}
+	}
+	return rs
 }
