@@ -59,6 +59,21 @@ func newRegistrationDeployment(desiredReplica, availableReplica int32) *appsv1.D
 	}
 }
 
+func newRegistrationWebhookDeployment(desiredReplica, availableReplica int32) *appsv1.Deployment {
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-registration-webhook", testClusterManagerName),
+			Namespace: "open-cluster-management-hub",
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &desiredReplica,
+		},
+		Status: appsv1.DeploymentStatus{
+			AvailableReplicas: availableReplica,
+		},
+	}
+}
+
 func newPlacementDeployment(desiredReplica, availableReplica int32) *appsv1.Deployment {
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -146,10 +161,32 @@ func TestSyncStatus(t *testing.T) {
 			},
 		},
 		{
+			name:            "unavailable registration webhook pods and placement functional",
+			queueKey:        testClusterManagerName,
+			clusterManagers: []runtime.Object{newClusterManager()},
+			deployments: []runtime.Object{
+				newRegistrationDeployment(3, 3),
+				newRegistrationWebhookDeployment(3, 0),
+				newPlacementDeployment(3, 3),
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				klusterlet := &operatorapiv1.Klusterlet{}
+				patchData := actions[0].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, klusterlet)
+				if err != nil {
+					t.Fatal(err)
+				}
+				expectedCondition1 := testinghelper.NamedCondition(operatorapiv1.ConditionHubRegistrationDegraded, "UnavailableRegistrationPod", metav1.ConditionTrue)
+				expectedCondition2 := testinghelper.NamedCondition(operatorapiv1.ConditionHubPlacementDegraded, "PlacementFunctional", metav1.ConditionFalse)
+				testinghelper.AssertOnlyConditions(t, klusterlet, appliedCond, expectedCondition1, expectedCondition2)
+			},
+		},
+		{
 			name:            "registration functional and no placement deployment",
 			queueKey:        testClusterManagerName,
 			clusterManagers: []runtime.Object{newClusterManager()},
-			deployments:     []runtime.Object{newRegistrationDeployment(3, 3)},
+			deployments:     []runtime.Object{newRegistrationDeployment(3, 3), newRegistrationWebhookDeployment(3, 3)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
 				klusterlet := &operatorapiv1.Klusterlet{}
