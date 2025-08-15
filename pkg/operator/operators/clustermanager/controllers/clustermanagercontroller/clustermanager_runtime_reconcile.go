@@ -28,22 +28,22 @@ import (
 var (
 	// All deployments should be deployed in the management cluster.
 	deploymentFiles = []string{
-		"cluster-manager/management/cluster-manager-registration-deployment.yaml",
-		"cluster-manager/management/cluster-manager-registration-webhook-deployment.yaml",
-		"cluster-manager/management/cluster-manager-work-webhook-deployment.yaml",
-		"cluster-manager/management/cluster-manager-placement-deployment.yaml",
+		"cluster-manager/management/registration/deployment.yaml",
+		"cluster-manager/management/registration/webhook-deployment.yaml",
+		"cluster-manager/management/work/webhook-deployment.yaml",
+		"cluster-manager/management/placement/deployment.yaml",
 	}
 
 	addOnManagerDeploymentFiles = []string{
-		"cluster-manager/management/cluster-manager-addon-manager-deployment.yaml",
+		"cluster-manager/management/addon-manager/deployment.yaml",
 	}
 
 	mwReplicaSetDeploymentFiles = []string{
-		"cluster-manager/management/cluster-manager-manifestworkreplicaset-deployment.yaml",
+		"cluster-manager/management/manifestworkreplicaset/deployment.yaml",
 	}
 
 	grpcServerDeploymentFiles = []string{
-		"cluster-manager/management/cluster-manager-grpc-server-deployment.yaml",
+		"cluster-manager/management/grpc-server/deployment.yaml",
 	}
 )
 

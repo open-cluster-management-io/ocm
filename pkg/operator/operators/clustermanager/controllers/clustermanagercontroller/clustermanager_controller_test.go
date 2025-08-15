@@ -804,12 +804,12 @@ func newFakeHubConfigWithResourceRequirement(t *testing.T, r *operatorapiv1.Reso
 
 func getManifestFiles() []string {
 	return []string{
-		"cluster-manager/management/cluster-manager-addon-manager-deployment.yaml",
-		"cluster-manager/management/cluster-manager-manifestworkreplicaset-deployment.yaml",
-		"cluster-manager/management/cluster-manager-placement-deployment.yaml",
-		"cluster-manager/management/cluster-manager-registration-deployment.yaml",
-		"cluster-manager/management/cluster-manager-registration-webhook-deployment.yaml",
-		"cluster-manager/management/cluster-manager-work-webhook-deployment.yaml",
+		"cluster-manager/management/addon-manager/deployment.yaml",
+		"cluster-manager/management/manifestworkreplicaset/deployment.yaml",
+		"cluster-manager/management/placement/deployment.yaml",
+		"cluster-manager/management/registration/deployment.yaml",
+		"cluster-manager/management/registration/webhook-deployment.yaml",
+		"cluster-manager/management/work/webhook-deployment.yaml",
 	}
 }
 
