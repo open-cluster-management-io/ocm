@@ -36,6 +36,7 @@ type SpokeAgentOptions struct {
 	MaxCustomClusterClaims       int
 	ReservedClusterClaimSuffixes []string
 	ClusterAnnotations           map[string]string
+	ClusterLabels                map[string]string
 
 	RegisterDriverOption *registerfactory.Options
 }
@@ -76,6 +77,7 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 		"A list of suffixes for reserved cluster claims.")
 	fs.StringToStringVar(&o.ClusterAnnotations, "cluster-annotations", o.ClusterAnnotations, `the annotations with the reserve
 	 prefix "agent.open-cluster-management.io" set on ManagedCluster when creating only, other actors can update it afterwards.`)
+	fs.StringToStringVar(&o.ClusterLabels, "cluster-labels", o.ClusterLabels, `the labels set on ManagedCluster when creating only, other actors can update it afterwards.`)
 
 	o.RegisterDriverOption.AddFlags(fs)
 }

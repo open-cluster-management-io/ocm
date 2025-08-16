@@ -283,6 +283,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 			o.agentOptions.SpokeClusterName,
 			[]registration.ManagedClusterDecorator{
 				registration.AnnotationDecorator(o.registrationOption.ClusterAnnotations),
+				registration.LabelDecorator(o.registrationOption.ClusterLabels),
 				registration.ClientConfigDecorator(o.registrationOption.SpokeExternalServerURLs, spokeClusterCABundle),
 				o.driver.ManagedClusterDecorator,
 			},
