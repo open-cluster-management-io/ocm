@@ -28,46 +28,48 @@ const (
 	reconcileContinue
 )
 
-type csrInfo struct {
-	name       string
-	labels     map[string]string
-	signerName string
-	username   string
-	uid        string
-	groups     []string
-	extra      map[string]authorizationv1.ExtraValue
-	request    []byte
+type CSRInfo struct {
+	Name       string
+	Labels     map[string]string
+	SignerName string
+	Username   string
+	UID        string
+	Groups     []string
+	Extra      map[string]authorizationv1.ExtraValue
+	Request    []byte
 }
 
 type approveCSRFunc func(kubernetes.Interface) error
 
 type Reconciler interface {
-	Reconcile(context.Context, csrInfo, approveCSRFunc) (reconcileState, error)
+	Reconcile(context.Context, CSRInfo, approveCSRFunc) (reconcileState, error)
 }
 
 type csrRenewalReconciler struct {
+	signer        string
 	kubeClient    kubernetes.Interface
 	eventRecorder events.Recorder
 }
 
-func NewCSRRenewalReconciler(kubeClient kubernetes.Interface, recorder events.Recorder) Reconciler {
+func NewCSRRenewalReconciler(kubeClient kubernetes.Interface, signer string, recorder events.Recorder) Reconciler {
 	return &csrRenewalReconciler{
+		signer:        signer,
 		kubeClient:    kubeClient,
 		eventRecorder: recorder.WithComponentSuffix("csr-approving-controller"),
 	}
 }
 
-func (r *csrRenewalReconciler) Reconcile(ctx context.Context, csr csrInfo, approveCSR approveCSRFunc) (reconcileState, error) {
+func (r *csrRenewalReconciler) Reconcile(ctx context.Context, csr CSRInfo, approveCSR approveCSRFunc) (reconcileState, error) {
 	logger := klog.FromContext(ctx)
 	// Check whether current csr is a valid spoker cluster csr.
-	valid, _, commonName := validateCSR(logger, csr)
+	valid, _, commonName := validateCSR(logger, r.signer, csr)
 	if !valid {
-		logger.V(4).Info("CSR was not recognized", "csrName", csr.name)
+		logger.V(4).Info("CSR was not recognized", "csrName", csr.Name)
 		return reconcileStop, nil
 	}
 
 	// Check if user name in csr is the same as commonName field in csr request.
-	if csr.username != commonName {
+	if csr.Username != commonName {
 		return reconcileContinue, nil
 	}
 
@@ -77,7 +79,7 @@ func (r *csrRenewalReconciler) Reconcile(ctx context.Context, csr csrInfo, appro
 		return reconcileContinue, err
 	}
 	if !allowed {
-		logger.V(4).Info("Managed cluster csr cannot be auto approved due to subject access review not approved", "csrName", csr.name)
+		logger.V(4).Info("Managed cluster csr cannot be auto approved due to subject access review not approved", "csrName", csr.Name)
 		return reconcileStop, nil
 	}
 
@@ -85,37 +87,40 @@ func (r *csrRenewalReconciler) Reconcile(ctx context.Context, csr csrInfo, appro
 		return reconcileContinue, err
 	}
 
-	r.eventRecorder.Eventf("ManagedClusterCSRAutoApproved", "managed cluster csr %q is auto approved by hub csr controller", csr.name)
+	r.eventRecorder.Eventf("ManagedClusterCSRAutoApproved", "managed cluster csr %q is auto approved by hub csr controller", csr.Name)
 	return reconcileStop, nil
 }
 
 type csrBootstrapReconciler struct {
+	signer        string
 	kubeClient    kubernetes.Interface
 	approvalUsers sets.Set[string]
 	eventRecorder events.Recorder
 }
 
 func NewCSRBootstrapReconciler(kubeClient kubernetes.Interface,
+	signer string,
 	approvalUsers []string,
 	recorder events.Recorder) Reconciler {
 	return &csrBootstrapReconciler{
+		signer:        signer,
 		kubeClient:    kubeClient,
 		approvalUsers: sets.New(approvalUsers...),
 		eventRecorder: recorder.WithComponentSuffix("csr-approving-controller"),
 	}
 }
 
-func (b *csrBootstrapReconciler) Reconcile(ctx context.Context, csr csrInfo, approveCSR approveCSRFunc) (reconcileState, error) {
+func (b *csrBootstrapReconciler) Reconcile(ctx context.Context, csr CSRInfo, approveCSR approveCSRFunc) (reconcileState, error) {
 	logger := klog.FromContext(ctx)
 	// Check whether current csr is a valid spoker cluster csr.
-	valid, clusterName, _ := validateCSR(logger, csr)
+	valid, clusterName, _ := validateCSR(logger, b.signer, csr)
 	if !valid {
-		logger.V(4).Info("CSR was not recognized", "csrName", csr.name)
+		logger.V(4).Info("CSR was not recognized", "csrName", csr.Name)
 		return reconcileStop, nil
 	}
 
 	// Check whether current csr can be approved.
-	if !b.approvalUsers.Has(csr.username) {
+	if !b.approvalUsers.Has(csr.Username) {
 		return reconcileContinue, nil
 	}
 
@@ -130,25 +135,25 @@ func (b *csrBootstrapReconciler) Reconcile(ctx context.Context, csr csrInfo, app
 // To validate a managed cluster csr, we check
 // 1. if the signer name in csr request is valid.
 // 2. if organization field and commonName field in csr request is valid.
-func validateCSR(logger klog.Logger, csr csrInfo) (bool, string, string) {
-	spokeClusterName, existed := csr.labels[clusterv1.ClusterNameLabelKey]
+func validateCSR(logger klog.Logger, signer string, csr CSRInfo) (bool, string, string) {
+	spokeClusterName, existed := csr.Labels[clusterv1.ClusterNameLabelKey]
 	if !existed {
 		return false, "", ""
 	}
 
-	if csr.signerName != certificatesv1.KubeAPIServerClientSignerName {
+	if csr.SignerName != signer {
 		return false, "", ""
 	}
 
-	block, _ := pem.Decode(csr.request)
+	block, _ := pem.Decode(csr.Request)
 	if block == nil || block.Type != "CERTIFICATE REQUEST" {
-		logger.V(4).Info("CSR was not recognized: PEM block type is not CERTIFICATE REQUEST", "csrName", csr.name)
+		logger.V(4).Info("CSR was not recognized: PEM block type is not CERTIFICATE REQUEST", "csrName", csr.Name)
 		return false, "", ""
 	}
 
 	x509cr, err := x509.ParseCertificateRequest(block.Bytes)
 	if err != nil {
-		logger.Error(err, "CSR was not recognized", "csrName", csr.name)
+		logger.Error(err, "CSR was not recognized", "csrName", csr.Name)
 		return false, "", ""
 	}
 
@@ -174,13 +179,13 @@ func validateCSR(logger klog.Logger, csr csrInfo) (bool, string, string) {
 
 // Using SubjectAccessReview API to check whether a spoke agent has been authorized to renew its csr,
 // a spoke agent is authorized after its spoke cluster is accepted by hub cluster admin.
-func authorize(ctx context.Context, kubeClient kubernetes.Interface, csr csrInfo) (bool, error) {
+func authorize(ctx context.Context, kubeClient kubernetes.Interface, csr CSRInfo) (bool, error) {
 	sar := &authorizationv1.SubjectAccessReview{
 		Spec: authorizationv1.SubjectAccessReviewSpec{
-			User:   csr.username,
-			UID:    csr.uid,
-			Groups: csr.groups,
-			Extra:  csr.extra,
+			User:   csr.Username,
+			UID:    csr.UID,
+			Groups: csr.Groups,
+			Extra:  csr.Extra,
 			ResourceAttributes: &authorizationv1.ResourceAttributes{
 				Group:       "register.open-cluster-management.io",
 				Resource:    "managedclusters",
@@ -197,40 +202,47 @@ func authorize(ctx context.Context, kubeClient kubernetes.Interface, csr csrInfo
 	return sar.Status.Allowed, nil
 }
 
-// newCSRInfo creates csrInfo from CertificateSigningRequest by api version(v1/v1beta1).
-func newCSRInfo(logger klog.Logger, csr any) csrInfo {
+func getCSRInfo(csr *certificatesv1.CertificateSigningRequest) CSRInfo {
 	extra := make(map[string]authorizationv1.ExtraValue)
+	for k, v := range csr.Spec.Extra {
+		extra[k] = authorizationv1.ExtraValue(v)
+	}
+	return CSRInfo{
+		Name:       csr.Name,
+		Labels:     csr.Labels,
+		SignerName: csr.Spec.SignerName,
+		Username:   csr.Spec.Username,
+		UID:        csr.Spec.UID,
+		Groups:     csr.Spec.Groups,
+		Extra:      extra,
+		Request:    csr.Spec.Request,
+	}
+}
+
+func getCSRv1beta1Info(csr *certificatesv1beta1.CertificateSigningRequest) CSRInfo {
+	extra := make(map[string]authorizationv1.ExtraValue)
+	for k, v := range csr.Spec.Extra {
+		extra[k] = authorizationv1.ExtraValue(v)
+	}
+	return CSRInfo{
+		Name:       csr.Name,
+		Labels:     csr.Labels,
+		SignerName: *csr.Spec.SignerName,
+		Username:   csr.Spec.Username,
+		UID:        csr.Spec.UID,
+		Groups:     csr.Spec.Groups,
+		Extra:      extra,
+		Request:    csr.Spec.Request,
+	}
+}
+
+func eventFilter(csr any) bool {
 	switch v := csr.(type) {
 	case *certificatesv1.CertificateSigningRequest:
-		for k, v := range v.Spec.Extra {
-			extra[k] = authorizationv1.ExtraValue(v)
-		}
-		return csrInfo{
-			name:       v.Name,
-			labels:     v.Labels,
-			signerName: v.Spec.SignerName,
-			username:   v.Spec.Username,
-			uid:        v.Spec.UID,
-			groups:     v.Spec.Groups,
-			extra:      extra,
-			request:    v.Spec.Request,
-		}
+		return v.Spec.SignerName == certificatesv1.KubeAPIServerClientSignerName
 	case *certificatesv1beta1.CertificateSigningRequest:
-		for k, v := range v.Spec.Extra {
-			extra[k] = authorizationv1.ExtraValue(v)
-		}
-		return csrInfo{
-			name:       v.Name,
-			labels:     v.Labels,
-			signerName: *v.Spec.SignerName,
-			username:   v.Spec.Username,
-			uid:        v.Spec.UID,
-			groups:     v.Spec.Groups,
-			extra:      extra,
-			request:    v.Spec.Request,
-		}
+		return *v.Spec.SignerName == certificatesv1beta1.KubeAPIServerClientSignerName
 	default:
-		logger.Error(nil, "Unsupported Type", "valueType", v)
-		return csrInfo{}
+		return false
 	}
 }

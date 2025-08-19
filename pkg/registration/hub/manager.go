@@ -60,8 +60,11 @@ type HubManagerOptions struct {
 	AutoApprovedARNPatterns    []string
 	AwsResourceTags            []string
 	Labels                     string
-	GRPCCAFile                 string
-	GRPCCAKeyFile              string
+	// TODO (skeeey) introduce hub options for different drives to group these options
+	AutoApprovedGRPCUsers []string
+	GRPCCAFile            string
+	GRPCCAKeyFile         string
+	GRPCSigningDuration   time.Duration
 }
 
 // NewHubManagerOptions returns a HubManagerOptions
@@ -71,6 +74,7 @@ func NewHubManagerOptions() *HubManagerOptions {
 			"work.open-cluster-management.io/v1/manifestworks"},
 		ImportOption:               importeroptions.New(),
 		EnabledRegistrationDrivers: []string{commonhelpers.CSRAuthType},
+		GRPCSigningDuration:        720 * time.Hour,
 	}
 }
 
@@ -93,11 +97,14 @@ func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 		"A bootstrap user list whose cluster registration requests can be automatically approved.")
 	fs.StringSliceVar(&m.AutoApprovedARNPatterns, "auto-approved-arn-patterns", m.AutoApprovedARNPatterns,
 		"A list of AWS EKS ARN patterns such that an EKS cluster will be auto approved if its ARN matches with any of the patterns")
+	fs.StringSliceVar(&m.AutoApprovedGRPCUsers, "auto-approved-grpc-users", m.AutoApprovedGRPCUsers,
+		"A bootstrap user list via gRPC whose cluster registration requests can be automatically approved.")
 	fs.StringSliceVar(&m.AwsResourceTags, "aws-resource-tags", m.AwsResourceTags, "A list of tags to apply to AWS resources created through the OCM controllers")
 	fs.StringVar(&m.Labels, "labels", m.Labels,
 		"Labels to be added to the resources created by registration controller. The format is key1=value1,key2=value2.")
 	fs.StringVar(&m.GRPCCAFile, "grpc-ca-file", m.GRPCCAFile, "ca file to sign client cert for grpc")
 	fs.StringVar(&m.GRPCCAKeyFile, "grpc-key-file", m.GRPCCAKeyFile, "ca key file to sign client cert for grpc")
+	fs.DurationVar(&m.GRPCSigningDuration, "grpc-signing-duration", m.GRPCSigningDuration, "The max length of duration signed certificates will be given.")
 	m.ImportOption.AddFlags(fs)
 }
 
@@ -202,7 +209,10 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 			drivers = append(drivers, awsIRSAHubDriver)
 		case commonhelpers.GRPCCAuthType:
 			grpcHubDriver, err := grpc.NewGRPCHubDriver(
-				kubeClient, kubeInformers, m.GRPCCAKeyFile, m.GRPCCAFile, 720*time.Hour, controllerContext.EventRecorder)
+				kubeClient, kubeInformers,
+				m.GRPCCAKeyFile, m.GRPCCAFile, m.GRPCSigningDuration,
+				m.AutoApprovedGRPCUsers,
+				controllerContext.EventRecorder)
 			if err != nil {
 				return err
 			}
