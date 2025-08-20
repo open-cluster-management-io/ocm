@@ -27,12 +27,12 @@ var (
 	// The hubWebhookResourceFiles should be deployed in the hub cluster
 	// The service should may point to a external url which represent the webhook-server's address.
 	hubRegistrationWebhookResourceFiles = []string{
-		"cluster-manager/hub/cluster-manager-registration-webhook-validatingconfiguration.yaml",
-		"cluster-manager/hub/cluster-manager-registration-webhook-mutatingconfiguration.yaml",
-		"cluster-manager/hub/cluster-manager-registration-webhook-clustersetbinding-validatingconfiguration.yaml",
+		"cluster-manager/hub/registration/webhook-validatingconfiguration.yaml",
+		"cluster-manager/hub/registration/webhook-mutatingconfiguration.yaml",
+		"cluster-manager/hub/registration/webhook-clustersetbinding-validatingconfiguration.yaml",
 	}
 	hubWorkWebhookResourceFiles = []string{
-		"cluster-manager/hub/cluster-manager-work-webhook-validatingconfiguration.yaml",
+		"cluster-manager/hub/work/webhook-validatingconfiguration.yaml",
 	}
 )
 

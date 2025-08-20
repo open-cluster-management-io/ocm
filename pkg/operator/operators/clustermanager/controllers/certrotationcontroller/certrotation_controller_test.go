@@ -130,7 +130,7 @@ func TestCertRotation(t *testing.T) {
 			},
 		},
 		{
-			name: "Sync all clustermanagaers",
+			name: "Sync all clustermanagers",
 			clusterManagers: []*operatorapiv1.ClusterManager{
 				newClusterManager(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault),
 				newClusterManager(testClusterManagerNameHosted, operatorapiv1.InstallModeHosted),
@@ -198,6 +198,153 @@ func TestCertRotation(t *testing.T) {
 
 			err := controller.Sync(context.TODO(), syncContext)
 			c.validate(t, kubeClient, err)
+		})
+	}
+}
+
+func TestCertRotationGRPCAuth(t *testing.T) {
+	namespace := helpers.ClusterManagerNamespace(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault)
+
+	cases := []struct {
+		name                  string
+		clusterManager        *operatorapiv1.ClusterManager
+		updatedClusterManager *operatorapiv1.ClusterManager
+		existingObjects       []runtime.Object
+		validate              func(t *testing.T, kubeClient kubernetes.Interface, controller *certRotationController)
+	}{
+		{
+			name: "Enable GRPC",
+			clusterManager: func() *operatorapiv1.ClusterManager {
+				cm := newClusterManager(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault)
+				cm.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+					RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+						{
+							AuthType: commonhelpers.CSRAuthType,
+						},
+					},
+				}
+				return cm
+			}(),
+			updatedClusterManager: func() *operatorapiv1.ClusterManager {
+				return newClusterManager(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault)
+			}(),
+			existingObjects: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: namespace,
+					},
+				},
+			},
+			validate: func(t *testing.T, kubeClient kubernetes.Interface, controller *certRotationController) {
+				// Check that GRPC server secret was created after update
+				_, err := kubeClient.CoreV1().Secrets(namespace).Get(context.Background(), helpers.GRPCServerSecret, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("expected grpc server secret to be created after update, but got error: %v", err)
+				}
+
+				// Check that rotation was added to the map
+				rotations, ok := controller.rotationMap[testClusterManagerNameDefault]
+				if !ok {
+					t.Fatalf("expected rotations to exist in map")
+				}
+				if !hasRotation(rotations.targetRotations, helpers.GRPCServerSecret) {
+					t.Fatalf("expected grpc server rotation to be added after update, %v", rotations)
+				}
+			},
+		},
+		{
+			name: "Disable GRPC",
+			clusterManager: func() *operatorapiv1.ClusterManager {
+				return newClusterManager(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault)
+			}(),
+			updatedClusterManager: func() *operatorapiv1.ClusterManager {
+				cm := newClusterManager(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault)
+				cm.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+					RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+						{
+							AuthType: commonhelpers.CSRAuthType,
+						},
+					},
+				}
+				return cm
+			}(),
+			existingObjects: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: namespace,
+					},
+				},
+			},
+			validate: func(t *testing.T, kubeClient kubernetes.Interface, controller *certRotationController) {
+				// Check that GRPC server secret was deleted after update
+				_, err := kubeClient.CoreV1().Secrets(namespace).Get(context.Background(), helpers.GRPCServerSecret, metav1.GetOptions{})
+				if !errors.IsNotFound(err) {
+					t.Fatalf("expected GRPC server secret to be deleted after update, but got error: %v", err)
+				}
+
+				// Check that rotation was removed from the map
+				rotations, ok := controller.rotationMap[testClusterManagerNameDefault]
+				if ok && hasRotation(rotations.targetRotations, helpers.GRPCServerSecret) {
+					t.Fatalf("expected GRPC server rotation to be removed after update")
+				}
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			kubeClient := fakekube.NewSimpleClientset(c.existingObjects...)
+
+			newOnTermInformer := func(name string) kubeinformers.SharedInformerFactory {
+				return kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, 5*time.Minute,
+					kubeinformers.WithTweakListOptions(func(options *metav1.ListOptions) {
+						options.FieldSelector = fields.OneTermEqualSelector("metadata.name", name).String()
+					}))
+			}
+
+			secretInformers := map[string]corev1informers.SecretInformer{
+				helpers.SignerSecret:              newOnTermInformer(helpers.SignerSecret).Core().V1().Secrets(),
+				helpers.RegistrationWebhookSecret: newOnTermInformer(helpers.RegistrationWebhookSecret).Core().V1().Secrets(),
+				helpers.WorkWebhookSecret:         newOnTermInformer(helpers.WorkWebhookSecret).Core().V1().Secrets(),
+				helpers.GRPCServerSecret:          newOnTermInformer(helpers.GRPCServerSecret).Core().V1().Secrets(),
+			}
+
+			configmapInformer := newOnTermInformer(helpers.CaBundleConfigmap).Core().V1().ConfigMaps()
+
+			operatorClient := fakeoperatorclient.NewSimpleClientset(c.clusterManager)
+			operatorInformers := operatorinformers.NewSharedInformerFactory(operatorClient, 5*time.Minute)
+			clusterManagerStore := operatorInformers.Operator().V1().ClusterManagers().Informer().GetStore()
+			if err := clusterManagerStore.Add(c.clusterManager); err != nil {
+				t.Fatal(err)
+			}
+
+			syncContext := testingcommon.NewFakeSyncContext(t, testClusterManagerNameDefault)
+			recorder := syncContext.Recorder()
+
+			// Create the controller to check the rotation map
+			controller := &certRotationController{
+				rotationMap:          make(map[string]rotations),
+				kubeClient:           kubeClient,
+				secretInformers:      secretInformers,
+				configMapInformer:    configmapInformer,
+				recorder:             recorder,
+				clusterManagerLister: operatorInformers.Operator().V1().ClusterManagers().Lister(),
+			}
+
+			// First sync with initial configuration
+			if err := controller.sync(context.TODO(), syncContext); err != nil {
+				t.Fatal(err)
+			}
+
+			// update the cluster manager and sync again
+			if err := clusterManagerStore.Update(c.updatedClusterManager); err != nil {
+				t.Fatal(err)
+			}
+			if err := controller.sync(context.TODO(), syncContext); err != nil {
+				t.Fatal(err)
+			}
+
+			c.validate(t, kubeClient, controller)
 		})
 	}
 }

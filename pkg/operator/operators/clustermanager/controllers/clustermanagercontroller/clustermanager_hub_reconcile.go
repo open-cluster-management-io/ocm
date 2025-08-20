@@ -28,53 +28,53 @@ var (
 	// The hubRbacResourceFiles should be deployed in the hub cluster.
 	hubRbacResourceFiles = []string{
 		// registration
-		"cluster-manager/hub/cluster-manager-registration-clusterrole.yaml",
-		"cluster-manager/hub/cluster-manager-registration-clusterrolebinding.yaml",
-		"cluster-manager/hub/cluster-manager-registration-serviceaccount.yaml",
+		"cluster-manager/hub/registration/clusterrole.yaml",
+		"cluster-manager/hub/registration/clusterrolebinding.yaml",
+		"cluster-manager/hub/registration/serviceaccount.yaml",
 		// registration-webhook
-		"cluster-manager/hub/cluster-manager-registration-webhook-clusterrole.yaml",
-		"cluster-manager/hub/cluster-manager-registration-webhook-clusterrolebinding.yaml",
-		"cluster-manager/hub/cluster-manager-registration-webhook-serviceaccount.yaml",
+		"cluster-manager/hub/registration/webhook-clusterrole.yaml",
+		"cluster-manager/hub/registration/webhook-clusterrolebinding.yaml",
+		"cluster-manager/hub/registration/webhook-serviceaccount.yaml",
 		// work-webhook
-		"cluster-manager/hub/cluster-manager-work-webhook-clusterrole.yaml",
-		"cluster-manager/hub/cluster-manager-work-webhook-clusterrolebinding.yaml",
-		"cluster-manager/hub/cluster-manager-work-webhook-serviceaccount.yaml",
+		"cluster-manager/hub/work/webhook-clusterrole.yaml",
+		"cluster-manager/hub/work/webhook-clusterrolebinding.yaml",
+		"cluster-manager/hub/work/webhook-serviceaccount.yaml",
 		// work executor admin
-		"cluster-manager/hub/cluster-manager-work-executor-admin-clusterrole.yaml",
+		"cluster-manager/hub/work/executor-admin-clusterrole.yaml",
 		// placement
-		"cluster-manager/hub/cluster-manager-placement-clusterrole.yaml",
-		"cluster-manager/hub/cluster-manager-placement-clusterrolebinding.yaml",
-		"cluster-manager/hub/cluster-manager-placement-serviceaccount.yaml",
+		"cluster-manager/hub/placement/clusterrole.yaml",
+		"cluster-manager/hub/placement/clusterrolebinding.yaml",
+		"cluster-manager/hub/placement/serviceaccount.yaml",
 	}
 
 	mwReplicaSetResourceFiles = []string{
 		// manifestworkreplicaset
-		"cluster-manager/hub/cluster-manager-manifestworkreplicaset-clusterrole.yaml",
-		"cluster-manager/hub/cluster-manager-manifestworkreplicaset-clusterrolebinding.yaml",
-		"cluster-manager/hub/cluster-manager-manifestworkreplicaset-serviceaccount.yaml",
+		"cluster-manager/hub/manifestworkreplicaset/clusterrole.yaml",
+		"cluster-manager/hub/manifestworkreplicaset/clusterrolebinding.yaml",
+		"cluster-manager/hub/manifestworkreplicaset/serviceaccount.yaml",
 	}
 
 	hubAddOnManagerRbacResourceFiles = []string{
 		// addon-manager
-		"cluster-manager/hub/cluster-manager-addon-manager-clusterrole.yaml",
-		"cluster-manager/hub/cluster-manager-addon-manager-clusterrolebinding.yaml",
-		"cluster-manager/hub/cluster-manager-addon-manager-work-executor-admin-clusterrolebinding.yaml",
-		"cluster-manager/hub/cluster-manager-addon-manager-serviceaccount.yaml",
+		"cluster-manager/hub/addon-manager/clusterrole.yaml",
+		"cluster-manager/hub/addon-manager/clusterrolebinding.yaml",
+		"cluster-manager/hub/addon-manager/work-executor-admin-clusterrolebinding.yaml",
+		"cluster-manager/hub/addon-manager/serviceaccount.yaml",
 	}
 
 	// The hubHostedWebhookServiceFiles should only be deployed on the hub cluster when the deploy mode is hosted.
 	hubDefaultWebhookServiceFiles = []string{
-		"cluster-manager/hub/cluster-manager-registration-webhook-service.yaml",
-		"cluster-manager/hub/cluster-manager-work-webhook-service.yaml",
+		"cluster-manager/hub/registration/webhook-service.yaml",
+		"cluster-manager/hub/work/webhook-service.yaml",
 	}
 	hubHostedWebhookServiceFiles = []string{
-		"cluster-manager/hub/cluster-manager-registration-webhook-service-hosted.yaml",
-		"cluster-manager/hub/cluster-manager-work-webhook-service-hosted.yaml",
+		"cluster-manager/hub/registration/webhook-service-hosted.yaml",
+		"cluster-manager/hub/work/webhook-service-hosted.yaml",
 	}
 
 	// hubHostedWebhookEndpointFiles only apply when the deploy mode is hosted and address is IPFormat.
-	hubHostedWebhookEndpointRegistration = "cluster-manager/hub/cluster-manager-registration-webhook-endpoint-hosted.yaml"
-	hubHostedWebhookEndpointWork         = "cluster-manager/hub/cluster-manager-work-webhook-endpoint-hosted.yaml"
+	hubHostedWebhookEndpointRegistration = "cluster-manager/hub/registration/webhook-endpoint-hosted.yaml"
+	hubHostedWebhookEndpointWork         = "cluster-manager/hub/work/webhook-endpoint-hosted.yaml"
 
 	grpcServerResourceFiles = []string{
 		"cluster-manager/hub/grpc-server/clusterrole.yaml",

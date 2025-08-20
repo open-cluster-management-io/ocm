@@ -8,11 +8,11 @@ for f in $HUB_CRD_FILES
 do
     if [ -f "$BASE_DIR/$(basename $f).yaml-patch" ];
     then
-        $1 -o $BASE_DIR/$(basename $f).yaml-patch < $f > ./manifests/cluster-manager/hub/$(basename $f).tmp
-        diff -N ./manifests/cluster-manager/hub/$(basename $f).tmp ./manifests/cluster-manager/hub/$(basename $f) || ( echo 'crd content is incorrect' && false )
-        rm ./manifests/cluster-manager/hub/$(basename $f).tmp
+       "$1" -o "$BASE_DIR/$(basename "$f").yaml-patch" < "$f" > "./manifests/cluster-manager/hub/crds/$(basename "$f").tmp"
+       diff -N "./manifests/cluster-manager/hub/crds/$(basename "$f").tmp" "./manifests/cluster-manager/hub/crds/$(basename "$f")" || ( echo 'crd content is incorrect' && false )
+       rm "./manifests/cluster-manager/hub/crds/$(basename "$f").tmp"
     else 
-        diff -N $f ./manifests/cluster-manager/hub/$(basename $f) || ( echo 'crd content is incorrect' && false )
+        diff -N "$f" "./manifests/cluster-manager/hub/crds/$(basename "$f")" || ( echo 'crd content is incorrect' && false )
     fi
 done
 

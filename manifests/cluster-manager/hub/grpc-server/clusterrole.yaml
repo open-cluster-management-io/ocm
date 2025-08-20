@@ -48,3 +48,6 @@ rules:
 - apiGroups: ["work.open-cluster-management.io" ]
   resources: ["manifestworks/status" ]
   verbs: ["patch", "update"]
+- apiGroups: ["authentication.k8s.io"]
+  resources: ["tokenreviews"]
+  verbs: ["create"]

@@ -86,7 +86,7 @@ jobs:
           subject-name: quay.io/open-cluster-management/${{ matrix.image-name }}
           subject-digest: ${{ env.IMAGE_DIGEST }}
           sbom-path: 'sbom.spdx.json'
-          push-to-registry: true
+          push-to-registry: false
   image-manifest:
     name: image manifest
     runs-on: ubuntu-latest
@@ -132,7 +132,7 @@ jobs:
           subject-name: quay.io/open-cluster-management/${{ matrix.image-name }}
           subject-digest: ${{ env.IMAGE_DIGEST_LATEST }}
           sbom-path: 'sbom.spdx.json'
-          push-to-registry: true
+          push-to-registry: false
   trigger-clusteradm-e2e:
     needs: [ images, image-manifest ]
     name: trigger clusteradm e2e
