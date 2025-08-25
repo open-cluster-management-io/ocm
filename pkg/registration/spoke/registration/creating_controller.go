@@ -1,6 +1,7 @@
 package registration
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"time"
@@ -180,7 +181,7 @@ func equalClientConfigs(configs1, configs2 []clusterv1.ClientConfig) bool {
 		if config1.URL != config2.URL {
 			return false
 		}
-		if string(config1.CABundle) != string(config2.CABundle) {
+		if !bytes.Equal(config1.CABundle, config2.CABundle) {
 			return false
 		}
 	}
