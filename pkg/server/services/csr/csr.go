@@ -19,7 +19,9 @@ import (
 	csrce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authn"
 
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/server/services"
 )
 
@@ -84,6 +86,11 @@ func (c *CSRService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.Ev
 
 	switch eventType.Action {
 	case types.CreateRequestAction:
+		// The agent requests a CSR, and the gRPC server creates the CSR on the hub. As a result,
+		// the username in the csr is the service account of gRPC server rather than the user of agent.
+		// The approver controller in the registration will not be able to know where this CSR originates
+		// from. Therefore, this annotation with the agent's username is added for CSR approval checks.
+		csr.Annotations = map[string]string{helpers.CSRUserAnnotation: fmt.Sprintf("%v", ctx.Value(authn.ContextUserKey))}
 		_, err := c.csrClient.CertificatesV1().CertificateSigningRequests().Create(ctx, csr, metav1.CreateOptions{})
 		return err
 	default:

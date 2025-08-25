@@ -146,11 +146,15 @@ func Test_v1beta1CSRApprovingController_sync(t *testing.T) {
 			}
 
 			ctrl := &csrApprovingController[*certificatesv1beta1.CertificateSigningRequest]{
-				lister:   informerFactory.Certificates().V1beta1().CertificateSigningRequests().Lister(),
-				approver: newCSRV1beta1Approver(kubeClient),
+				lister:        informerFactory.Certificates().V1beta1().CertificateSigningRequests().Lister(),
+				approver:      newCSRV1beta1Approver(kubeClient),
+				csrInfoGetter: getCSRv1beta1Info,
 				reconcilers: []Reconciler{
-					&csrBootstrapReconciler{},
+					&csrBootstrapReconciler{
+						signer: certificatesv1beta1.KubeAPIServerClientSignerName,
+					},
 					&csrRenewalReconciler{
+						signer:        certificatesv1beta1.KubeAPIServerClientSignerName,
 						kubeClient:    kubeClient,
 						eventRecorder: eventstesting.NewTestingEventRecorder(t),
 					},

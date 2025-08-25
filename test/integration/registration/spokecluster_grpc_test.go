@@ -19,6 +19,7 @@ import (
 	csrce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
 	eventce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
 	leasece "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/lease"
+	grpcauthn "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authn"
 	grpcoptions "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/options"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
@@ -78,7 +79,9 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 		hook, err := util.NewGRPCServerRegistrationHook(hubCfg)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		server := grpcoptions.NewServer(gRPCServerOptions).WithPreStartHooks(hook).WithService(
+		server := grpcoptions.NewServer(gRPCServerOptions).WithAuthenticator(
+			grpcauthn.NewMtlsAuthenticator(),
+		).WithPreStartHooks(hook).WithService(
 			clusterce.ManagedClusterEventDataType,
 			cluster.NewClusterService(hook.ClusterClient, hook.ClusterInformers.Cluster().V1().ManagedClusters()),
 		).WithService(
@@ -197,6 +200,121 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 				gracePeriod := 2 * 5 * util.TestLeaseDurationSeconds
 				assertAvailableCondition(grpcManagedClusterName, metav1.ConditionTrue, gracePeriod)
 				assertAvailableCondition(kubeManagedClusterName, metav1.ConditionTrue, gracePeriod)
+			})
+		})
+	})
+
+	ginkgo.Context("Certificate rotation", func() {
+		ginkgo.BeforeEach(func() {
+			postfix = rand.String(5)
+			hubOptionWithGRPC = hub.NewHubManagerOptions()
+			hubOptionWithGRPC.EnabledRegistrationDrivers = []string{helpers.GRPCCAuthType}
+			hubOptionWithGRPC.GRPCCAFile = gRPCServerOptions.ClientCAFile
+			hubOptionWithGRPC.GRPCCAKeyFile = gRPCCAKeyFile
+			hubOptionWithGRPC.GRPCSigningDuration = 5 * time.Second
+			startHub(hubOptionWithGRPC)
+
+			grpcManagedClusterName = fmt.Sprintf("%s-cert-rotation-%s", grpcTest, postfix)
+
+			hubGRPCConfigSecret = fmt.Sprintf("%s-hub-grpcconfig-secret-%s", grpcTest, postfix)
+			hubGRPCConfigDir = path.Join(util.TestDir, fmt.Sprintf("%s-grpc-%s", grpcTest, postfix), "hub-kubeconfig")
+			grpcDriverOption := factory.NewOptions()
+			grpcDriverOption.RegistrationAuth = helpers.GRPCCAuthType
+			grpcDriverOption.GRPCOption = &grpc.Option{
+				BootstrapConfigFile: bootstrapGRPCConfigFile,
+				ConfigFile:          path.Join(hubGRPCConfigDir, "config.yaml"),
+			}
+			grpcAgentOptions := &spoke.SpokeAgentOptions{
+				BootstrapKubeconfig:      bootstrapKubeConfigFile,
+				HubKubeconfigSecret:      hubGRPCConfigSecret,
+				ClusterHealthCheckPeriod: 1 * time.Minute,
+				RegisterDriverOption:     grpcDriverOption,
+			}
+			grpcCommOptions := commonoptions.NewAgentOptions()
+			grpcCommOptions.HubKubeconfigDir = hubGRPCConfigDir
+			grpcCommOptions.SpokeClusterName = grpcManagedClusterName
+			stopGRPCAgent = runAgent(fmt.Sprintf("%s-cert-rotation-agent", grpcTest), grpcAgentOptions, grpcCommOptions, spokeCfg)
+		})
+
+		ginkgo.AfterEach(func() {
+			stopGRPCAgent()
+			stopHub()
+		})
+
+		ginkgo.It("should automatically rotate the certificate when it is about to expire", func() {
+			ginkgo.By("getting managedclusters and csrs after bootstrap", func() {
+				assertManagedCluster(grpcManagedClusterName)
+			})
+
+			// simulate hub cluster admin to accept the managedcluster and approve the csr
+			ginkgo.By("accept managedclusters and approve csrs", func() {
+				err = util.AcceptManagedCluster(clusterClient, grpcManagedClusterName)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				// for gpc, the hub controller will sign the client certs, we just approve
+				// the csr here
+				csr, err := util.FindUnapprovedSpokeCSR(kubeClient, grpcManagedClusterName)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				err = util.ApproveCSR(kubeClient, csr)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			})
+
+			ginkgo.By("getting managedclusters joined condition", func() {
+				assertManagedClusterJoined(grpcManagedClusterName, hubGRPCConfigSecret)
+			})
+
+			// the agent should rotate the certificate because the certificate with a short valid time
+			// the hub controller should auto approve it
+			gomega.Eventually(func() error {
+				if _, err := util.FindAutoApprovedSpokeCSR(kubeClient, grpcManagedClusterName); err != nil {
+					return err
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+	})
+
+	ginkgo.Context("Auto approval", func() {
+		ginkgo.BeforeEach(func() {
+			postfix = rand.String(5)
+			hubOptionWithGRPC = hub.NewHubManagerOptions()
+			hubOptionWithGRPC.EnabledRegistrationDrivers = []string{helpers.GRPCCAuthType}
+			hubOptionWithGRPC.GRPCCAFile = gRPCServerOptions.ClientCAFile
+			hubOptionWithGRPC.GRPCCAKeyFile = gRPCCAKeyFile
+			hubOptionWithGRPC.AutoApprovedGRPCUsers = []string{"test-client"}
+			startHub(hubOptionWithGRPC)
+
+			grpcManagedClusterName = fmt.Sprintf("%s-auto-approval-%s", grpcTest, postfix)
+
+			hubGRPCConfigSecret = fmt.Sprintf("%s-hub-grpcconfig-secret-%s", grpcTest, postfix)
+			hubGRPCConfigDir = path.Join(util.TestDir, fmt.Sprintf("%s-grpc-%s", grpcTest, postfix), "hub-kubeconfig")
+			grpcDriverOption := factory.NewOptions()
+			grpcDriverOption.RegistrationAuth = helpers.GRPCCAuthType
+			grpcDriverOption.GRPCOption = &grpc.Option{
+				BootstrapConfigFile: bootstrapGRPCConfigFile,
+				ConfigFile:          path.Join(hubGRPCConfigDir, "config.yaml"),
+			}
+			grpcAgentOptions := &spoke.SpokeAgentOptions{
+				BootstrapKubeconfig:      bootstrapKubeConfigFile,
+				HubKubeconfigSecret:      hubGRPCConfigSecret,
+				ClusterHealthCheckPeriod: 1 * time.Minute,
+				RegisterDriverOption:     grpcDriverOption,
+			}
+			grpcCommOptions := commonoptions.NewAgentOptions()
+			grpcCommOptions.HubKubeconfigDir = hubGRPCConfigDir
+			grpcCommOptions.SpokeClusterName = grpcManagedClusterName
+			stopGRPCAgent = runAgent(fmt.Sprintf("%s-auto-approval-agent", grpcTest), grpcAgentOptions, grpcCommOptions, spokeCfg)
+		})
+
+		ginkgo.AfterEach(func() {
+			stopGRPCAgent()
+			stopHub()
+		})
+
+		ginkgo.It("should automatically approve managedcluster", func() {
+			ginkgo.By("getting managedclusters joined condition", func() {
+				assertManagedClusterJoined(grpcManagedClusterName, hubGRPCConfigSecret)
 			})
 		})
 	})

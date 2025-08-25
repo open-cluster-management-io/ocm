@@ -1,13 +1,14 @@
 package grpc
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	"golang.org/x/net/context"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -19,18 +20,23 @@ import (
 	certificatesv1listers "k8s.io/client-go/listers/certificates/v1"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	ocmfeature "open-cluster-management.io/api/feature"
 	sdkhelpers "open-cluster-management.io/sdk-go/pkg/helpers"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/register"
+	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 )
 
 type GRPCHubDriver struct {
-	controller factory.Controller
+	csrApprovingController factory.Controller
+	csrSignController      factory.Controller
 }
 
 func (c *GRPCHubDriver) Run(ctx context.Context, workers int) {
-	c.controller.Run(ctx, workers)
+	go c.csrApprovingController.Run(ctx, workers)
+	c.csrSignController.Run(ctx, workers)
 }
 
 func (c *GRPCHubDriver) Cleanup(_ context.Context, _ *clusterv1.ManagedCluster) error {
@@ -43,7 +49,18 @@ func NewGRPCHubDriver(
 	kubeInformers informers.SharedInformerFactory,
 	caKeyFile, caFile string,
 	duration time.Duration,
+	autoApprovedCSRUsers []string,
 	recorder events.Recorder) (register.HubDriver, error) {
+	csrReconciles := []csr.Reconciler{csr.NewCSRRenewalReconciler(kubeClient, helpers.GRPCCAuthSigner, recorder)}
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
+		csrReconciles = append(csrReconciles, csr.NewCSRBootstrapReconciler(
+			kubeClient,
+			helpers.GRPCCAuthSigner,
+			autoApprovedCSRUsers,
+			recorder,
+		))
+	}
+
 	caData, err := os.ReadFile(caFile)
 	if err != nil {
 		return nil, err
@@ -53,7 +70,16 @@ func NewGRPCHubDriver(
 		return nil, err
 	}
 	return &GRPCHubDriver{
-		controller: newCSRSignController(
+		csrApprovingController: csr.NewCSRApprovingController(
+			kubeInformers.Certificates().V1().CertificateSigningRequests().Informer(),
+			kubeInformers.Certificates().V1().CertificateSigningRequests().Lister(),
+			eventFilter,
+			csr.NewCSRV1Approver(kubeClient),
+			getCSRInfo,
+			csrReconciles,
+			recorder,
+		),
+		csrSignController: newCSRSignController(
 			kubeClient,
 			kubeInformers.Certificates().V1().CertificateSigningRequests(),
 			caKey, caData, duration, recorder,
@@ -155,4 +181,30 @@ func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContex
 	}
 	_, err = c.kubeClient.CertificatesV1().CertificateSigningRequests().UpdateStatus(ctx, csr, metav1.UpdateOptions{})
 	return err
+}
+
+func getCSRInfo(c *certificatesv1.CertificateSigningRequest) csr.CSRInfo {
+	extra := make(map[string]authorizationv1.ExtraValue)
+	for k, v := range c.Spec.Extra {
+		extra[k] = authorizationv1.ExtraValue(v)
+	}
+	return csr.CSRInfo{
+		Name:       c.Name,
+		Labels:     c.Labels,
+		SignerName: c.Spec.SignerName,
+		Username:   c.Annotations[helpers.CSRUserAnnotation],
+		UID:        c.Spec.UID,
+		Groups:     c.Spec.Groups,
+		Extra:      extra,
+		Request:    c.Spec.Request,
+	}
+}
+
+func eventFilter(csr any) bool {
+	switch v := csr.(type) {
+	case *certificatesv1.CertificateSigningRequest:
+		return v.Spec.SignerName == helpers.GRPCCAuthSigner
+	default:
+		return false
+	}
 }

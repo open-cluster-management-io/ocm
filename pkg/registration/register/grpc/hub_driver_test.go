@@ -151,3 +151,61 @@ func TestSignCSR(t *testing.T) {
 		})
 	}
 }
+
+func TestEventFilter(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    any
+		expected bool
+	}{
+		{
+			name:     "nil input",
+			input:    nil,
+			expected: false,
+		},
+		{
+			name: "v1 CSR with matching signer",
+			input: &certificatesv1.CertificateSigningRequest{
+				Spec: certificatesv1.CertificateSigningRequestSpec{
+					SignerName: helpers.GRPCCAuthSigner,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "v1 CSR with non-matching signer",
+			input: &certificatesv1.CertificateSigningRequest{
+				Spec: certificatesv1.CertificateSigningRequestSpec{
+					SignerName: "example.com/custom",
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := eventFilter(tt.input); got != tt.expected {
+				t.Errorf("eventFilter() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetCSRInfo(t *testing.T) {
+	csr := &certificatesv1.CertificateSigningRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				helpers.CSRUserAnnotation: "test",
+			},
+		},
+		Spec: certificatesv1.CertificateSigningRequestSpec{
+			SignerName: helpers.GRPCCAuthSigner,
+		},
+	}
+
+	info := getCSRInfo(csr)
+	if info.Username != "test" {
+		t.Errorf("unexpected username %s", info.Username)
+	}
+}
