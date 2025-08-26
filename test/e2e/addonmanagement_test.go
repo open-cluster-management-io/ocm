@@ -130,7 +130,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By(fmt.Sprintf("create the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
-		err = hub.CreateManagedClusterAddOn(universalClusterName, addOnName, "test-ns") // the install namespace will be ignored
+		err = hub.CreateManagedClusterAddOn(universalClusterName, addOnName, addonInstallNamespace)
 		if err != nil {
 			klog.Errorf("failed to create managed cluster addon %v on the managed cluster namespace %v: %v", addOnName, universalClusterName, err)
 			gomega.Expect(errors.IsAlreadyExists(err)).To(gomega.BeTrue())
