@@ -152,6 +152,10 @@ type RegistrationConfiguration struct {
 	// +optional
 	ClusterAnnotations map[string]string `json:"clusterAnnotations,omitempty"`
 
+	// ClusterLabels is labels set on ManagedCluster when creating only, other actors can update it afterwards.
+	// +optional
+	ClusterLabels map[string]string `json:"clusterLabels,omitempty"`
+
 	// KubeAPIQPS indicates the maximum QPS while talking with apiserver on the spoke cluster.
 	// If it is set empty, use the default value: 50
 	// +optional

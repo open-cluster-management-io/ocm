@@ -127,6 +127,9 @@ klusterlet:
 #     - feature: ""
 #       mode: ""
 #    clientCertExpirationSeconds: 600
+#    clusterLabels:
+#      environment: "production"
+#      region: "us-west-2"
   workConfiguration: {}
 #   featureGates:
 #     - feature: ""

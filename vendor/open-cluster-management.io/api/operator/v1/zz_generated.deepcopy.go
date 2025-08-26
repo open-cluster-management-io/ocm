@@ -657,6 +657,13 @@ func (in *RegistrationConfiguration) DeepCopyInto(out *RegistrationConfiguration
 			(*out)[key] = val
 		}
 	}
+	if in.ClusterLabels != nil {
+		in, out := &in.ClusterLabels, &out.ClusterLabels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	in.BootstrapKubeConfigs.DeepCopyInto(&out.BootstrapKubeConfigs)
 	in.RegistrationDriver.DeepCopyInto(&out.RegistrationDriver)
 	if in.ClusterClaimConfiguration != nil {

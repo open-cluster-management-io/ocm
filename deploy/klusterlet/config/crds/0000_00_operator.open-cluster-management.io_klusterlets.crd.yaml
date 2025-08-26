@@ -272,6 +272,12 @@ spec:
                     required:
                     - maxCustomClusterClaims
                     type: object
+                  clusterLabels:
+                    additionalProperties:
+                      type: string
+                    description: ClusterLabels is labels set on ManagedCluster when
+                      creating only, other actors can update it afterwards.
+                    type: object
                   featureGates:
                     description: "FeatureGates represents the list of feature gates
                       for registration\nIf it is set empty, default feature gates
