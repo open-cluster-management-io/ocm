@@ -2,7 +2,6 @@ package webhook
 
 import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	ocmfeature "open-cluster-management.io/api/feature"
 	workv1 "open-cluster-management.io/api/work/v1"
