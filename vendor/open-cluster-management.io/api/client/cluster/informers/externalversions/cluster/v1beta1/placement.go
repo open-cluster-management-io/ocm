@@ -47,13 +47,25 @@ func NewFilteredPlacementInformer(client versioned.Interface, namespace string, 
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ClusterV1beta1().Placements(namespace).List(context.TODO(), options)
+				return client.ClusterV1beta1().Placements(namespace).List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ClusterV1beta1().Placements(namespace).Watch(context.TODO(), options)
+				return client.ClusterV1beta1().Placements(namespace).Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.ClusterV1beta1().Placements(namespace).List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.ClusterV1beta1().Placements(namespace).Watch(ctx, options)
 			},
 		},
 		&apiclusterv1beta1.Placement{},

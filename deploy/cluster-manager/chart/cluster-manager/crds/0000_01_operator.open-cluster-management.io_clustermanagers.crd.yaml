@@ -91,6 +91,89 @@ spec:
                   DeployOption contains the options of deploying a cluster-manager
                   Default mode is used if DeployOption is not set.
                 properties:
+                  default:
+                    description: Default includes optional configurations for clustermanager
+                      in the Default mode.
+                    properties:
+                      registrationWebhookConfiguration:
+                        description: RegistrationWebhookConfiguration represents the
+                          customized webhook-server configuration of registration.
+                        properties:
+                          bindConfiguration:
+                            description: BindConfiguration represents server bind
+                              configuration for the webhook server
+                            properties:
+                              healthProbePort:
+                                default: 8000
+                                description: |-
+                                  HealthProbePort represents the bind port of a webhook-server's healthcheck endpoint. The default value is 8000.
+                                  Healthchecks may be disabled by setting a value less than or equal to 0.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                              hostNetwork:
+                                description: |-
+                                  HostNetwork enables running webhook pods in host networking mode.
+                                  This may be required in some installations, such as EKS with Calico CNI,
+                                  to allow the API Server to communicate with the webhook pods.
+                                type: boolean
+                              metricsPort:
+                                default: 8080
+                                description: |-
+                                  MetricsPort represents the bind port for a webhook-server's metric endpoint. The default value is 8080.
+                                  Metrics may be disabled by setting a value less than or equal to 0.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                              port:
+                                default: 9443
+                                description: Port represents the primary bind port
+                                  of a server. The default value is 9443.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                            type: object
+                        type: object
+                      workWebhookConfiguration:
+                        description: WorkWebhookConfiguration represents the customized
+                          webhook-server configuration of work.
+                        properties:
+                          bindConfiguration:
+                            description: BindConfiguration represents server bind
+                              configuration for the webhook server
+                            properties:
+                              healthProbePort:
+                                default: 8000
+                                description: |-
+                                  HealthProbePort represents the bind port of a webhook-server's healthcheck endpoint. The default value is 8000.
+                                  Healthchecks may be disabled by setting a value less than or equal to 0.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                              hostNetwork:
+                                description: |-
+                                  HostNetwork enables running webhook pods in host networking mode.
+                                  This may be required in some installations, such as EKS with Calico CNI,
+                                  to allow the API Server to communicate with the webhook pods.
+                                type: boolean
+                              metricsPort:
+                                default: 8080
+                                description: |-
+                                  MetricsPort represents the bind port for a webhook-server's metric endpoint. The default value is 8080.
+                                  Metrics may be disabled by setting a value less than or equal to 0.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                              port:
+                                default: 9443
+                                description: Port represents the primary bind port
+                                  of a server. The default value is 9443.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                            type: object
+                        type: object
+                    type: object
                   hosted:
                     description: Hosted includes configurations we need for clustermanager
                       in the Hosted mode.
@@ -106,9 +189,43 @@ spec:
                               The Address must be reachable by apiserver of the hub cluster.
                             pattern: ^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$
                             type: string
+                          bindConfiguration:
+                            description: BindConfiguration represents server bind
+                              configuration for the webhook server
+                            properties:
+                              healthProbePort:
+                                default: 8000
+                                description: |-
+                                  HealthProbePort represents the bind port of a webhook-server's healthcheck endpoint. The default value is 8000.
+                                  Healthchecks may be disabled by setting a value less than or equal to 0.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                              hostNetwork:
+                                description: |-
+                                  HostNetwork enables running webhook pods in host networking mode.
+                                  This may be required in some installations, such as EKS with Calico CNI,
+                                  to allow the API Server to communicate with the webhook pods.
+                                type: boolean
+                              metricsPort:
+                                default: 8080
+                                description: |-
+                                  MetricsPort represents the bind port for a webhook-server's metric endpoint. The default value is 8080.
+                                  Metrics may be disabled by setting a value less than or equal to 0.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                              port:
+                                default: 9443
+                                description: Port represents the primary bind port
+                                  of a server. The default value is 9443.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                            type: object
                           port:
                             default: 443
-                            description: Port represents the port of a webhook-server.
+                            description: Port represents the external port of a webhook-server.
                               The default value of Port is 443.
                             format: int32
                             maximum: 65535
@@ -127,9 +244,43 @@ spec:
                               The Address must be reachable by apiserver of the hub cluster.
                             pattern: ^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$
                             type: string
+                          bindConfiguration:
+                            description: BindConfiguration represents server bind
+                              configuration for the webhook server
+                            properties:
+                              healthProbePort:
+                                default: 8000
+                                description: |-
+                                  HealthProbePort represents the bind port of a webhook-server's healthcheck endpoint. The default value is 8000.
+                                  Healthchecks may be disabled by setting a value less than or equal to 0.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                              hostNetwork:
+                                description: |-
+                                  HostNetwork enables running webhook pods in host networking mode.
+                                  This may be required in some installations, such as EKS with Calico CNI,
+                                  to allow the API Server to communicate with the webhook pods.
+                                type: boolean
+                              metricsPort:
+                                default: 8080
+                                description: |-
+                                  MetricsPort represents the bind port for a webhook-server's metric endpoint. The default value is 8080.
+                                  Metrics may be disabled by setting a value less than or equal to 0.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                              port:
+                                default: 9443
+                                description: Port represents the primary bind port
+                                  of a server. The default value is 9443.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                            type: object
                           port:
                             default: 443
-                            description: Port represents the port of a webhook-server.
+                            description: Port represents the external port of a webhook-server.
                               The default value of Port is 443.
                             format: int32
                             maximum: 65535

@@ -46,13 +46,25 @@ func NewFilteredClusterManagementAddOnInformer(client versioned.Interface, resyn
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AddonV1alpha1().ClusterManagementAddOns().List(context.TODO(), options)
+				return client.AddonV1alpha1().ClusterManagementAddOns().List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AddonV1alpha1().ClusterManagementAddOns().Watch(context.TODO(), options)
+				return client.AddonV1alpha1().ClusterManagementAddOns().Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.AddonV1alpha1().ClusterManagementAddOns().List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.AddonV1alpha1().ClusterManagementAddOns().Watch(ctx, options)
 			},
 		},
 		&apiaddonv1alpha1.ClusterManagementAddOn{},

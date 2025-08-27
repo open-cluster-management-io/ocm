@@ -46,13 +46,25 @@ func NewFilteredAddOnTemplateInformer(client versioned.Interface, resyncPeriod t
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AddonV1alpha1().AddOnTemplates().List(context.TODO(), options)
+				return client.AddonV1alpha1().AddOnTemplates().List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AddonV1alpha1().AddOnTemplates().Watch(context.TODO(), options)
+				return client.AddonV1alpha1().AddOnTemplates().Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.AddonV1alpha1().AddOnTemplates().List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.AddonV1alpha1().AddOnTemplates().Watch(ctx, options)
 			},
 		},
 		&apiaddonv1alpha1.AddOnTemplate{},

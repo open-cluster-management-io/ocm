@@ -388,7 +388,7 @@ func isIPFormat(address string) bool {
 	return true
 }
 
-func convertWebhookConfiguration(webhookConfiguration operatorapiv1.WebhookConfiguration) manifests.Webhook {
+func convertWebhookConfiguration(webhookConfiguration operatorapiv1.HostedWebhookConfiguration) manifests.Webhook {
 	return manifests.Webhook{
 		Address:    webhookConfiguration.Address,
 		Port:       webhookConfiguration.Port,
@@ -436,7 +436,7 @@ func (n *clusterManagerController) getImagePullSecret(ctx context.Context) (stri
 func getIdentityCreatorRoleAndTags(cm operatorapiv1.ClusterManager) string {
 	if cm.Spec.RegistrationConfiguration != nil {
 		for _, registrationDriver := range cm.Spec.RegistrationConfiguration.RegistrationDrivers {
-			if registrationDriver.AuthType == commonhelper.AwsIrsaAuthType && registrationDriver.AwsIrsa != nil {
+			if registrationDriver.AuthType == operatorapiv1.AwsIrsaAuthType && registrationDriver.AwsIrsa != nil {
 				hubClusterArn := registrationDriver.AwsIrsa.HubClusterArn
 				hubClusterAccountId, hubClusterName := commonhelper.GetAwsAccountIdAndClusterName(hubClusterArn)
 				return "arn:aws:iam::" + hubClusterAccountId + ":role/" + hubClusterName + "_managed-cluster-identity-creator"

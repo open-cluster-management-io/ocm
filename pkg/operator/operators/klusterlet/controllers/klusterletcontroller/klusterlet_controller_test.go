@@ -43,7 +43,6 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/manifests"
-	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	testinghelper "open-cluster-management.io/ocm/pkg/operator/helpers/testing"
@@ -1037,7 +1036,7 @@ func TestGetServersFromKlusterlet(t *testing.T) {
 func TestAWSIrsaAuthInSingletonModeWithInvalidClusterArns(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	awsIrsaRegistrationDriver := operatorapiv1.RegistrationDriver{
-		AuthType: commonhelpers.AwsIrsaAuthType,
+		AuthType: operatorapiv1.AwsIrsaAuthType,
 		AwsIrsa: &operatorapiv1.AwsIrsa{
 			HubClusterArn:     "arn:aws:bks:us-west-2:123456789012:cluster/hub-cluster1",
 			ManagedClusterArn: "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
@@ -1068,7 +1067,7 @@ func TestAWSIrsaAuthInSingletonModeWithInvalidClusterArns(t *testing.T) {
 func TestAWSIrsaAuthInSingletonMode(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	awsIrsaRegistrationDriver := operatorapiv1.RegistrationDriver{
-		AuthType: commonhelpers.AwsIrsaAuthType,
+		AuthType: operatorapiv1.AwsIrsaAuthType,
 		AwsIrsa: &operatorapiv1.AwsIrsa{
 			HubClusterArn:     "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1",
 			ManagedClusterArn: "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
@@ -1094,13 +1093,13 @@ func TestAWSIrsaAuthInSingletonMode(t *testing.T) {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 
-	assertKlusterletDeployment(t, commonhelpers.AwsIrsaAuthType, controller.kubeClient.Actions(), createVerb, "", "cluster1", nil)
+	assertKlusterletDeployment(t, operatorapiv1.AwsIrsaAuthType, controller.kubeClient.Actions(), createVerb, "", "cluster1", nil)
 }
 
 func TestAWSIrsaAuthInNonSingletonMode(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	awsIrsaRegistrationDriver := operatorapiv1.RegistrationDriver{
-		AuthType: commonhelpers.AwsIrsaAuthType,
+		AuthType: operatorapiv1.AwsIrsaAuthType,
 		AwsIrsa: &operatorapiv1.AwsIrsa{
 			HubClusterArn:     "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1",
 			ManagedClusterArn: "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
@@ -1462,7 +1461,7 @@ func TestClusterClaimConfigInSingletonMode(t *testing.T) {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 
-	assertKlusterletDeployment(t, commonhelpers.CSRAuthType, controller.kubeClient.Actions(), createVerb,
+	assertKlusterletDeployment(t, operatorapiv1.CSRAuthType, controller.kubeClient.Actions(), createVerb,
 		"", "cluster1", claimConfig)
 }
 

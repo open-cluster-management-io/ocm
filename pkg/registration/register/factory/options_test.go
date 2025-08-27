@@ -38,7 +38,7 @@ func TestValidate(t *testing.T) {
 			name: "aws validate",
 			opt: &Options{
 				RegistrationAuth: "awsirsa",
-				AWSISRAOption:    &awsirsa.AWSOption{},
+				AWSIRSAOption:    &awsirsa.AWSOption{},
 			},
 			expectErr: true,
 		},
@@ -46,7 +46,7 @@ func TestValidate(t *testing.T) {
 			name: "aws validate pass",
 			opt: &Options{
 				RegistrationAuth: "awsirsa",
-				AWSISRAOption: &awsirsa.AWSOption{
+				AWSIRSAOption: &awsirsa.AWSOption{
 					HubClusterArn: "arn:aws:iam::123456789012:role/aws-iam-authenticator",
 				},
 			},

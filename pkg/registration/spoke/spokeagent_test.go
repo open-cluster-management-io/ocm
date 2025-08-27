@@ -19,8 +19,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	ocmfeature "open-cluster-management.io/api/feature"
+	operatorv1 "open-cluster-management.io/api/operator/v1"
 
-	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/features"
@@ -82,8 +82,8 @@ func TestValidate(t *testing.T) {
 			options: func() *SpokeAgentOptions {
 				awsDefaultCompletedOptions := NewSpokeAgentOptions()
 				awsDefaultCompletedOptions.BootstrapKubeconfig = "/spoke/bootstrap/kubeconfig"
-				awsDefaultCompletedOptions.RegisterDriverOption.RegistrationAuth = commonhelpers.AwsIrsaAuthType
-				awsDefaultCompletedOptions.RegisterDriverOption.AWSISRAOption.HubClusterArn = "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
+				awsDefaultCompletedOptions.RegisterDriverOption.RegistrationAuth = operatorv1.AwsIrsaAuthType
+				awsDefaultCompletedOptions.RegisterDriverOption.AWSIRSAOption.HubClusterArn = "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
 				return awsDefaultCompletedOptions
 			}(),
 			expectedErr: "",
@@ -93,7 +93,7 @@ func TestValidate(t *testing.T) {
 			options: func() *SpokeAgentOptions {
 				awsCompletedOptionsHubArnMissing := NewSpokeAgentOptions()
 				awsCompletedOptionsHubArnMissing.BootstrapKubeconfig = "/spoke/bootstrap/kubeconfig"
-				awsCompletedOptionsHubArnMissing.RegisterDriverOption.RegistrationAuth = commonhelpers.AwsIrsaAuthType
+				awsCompletedOptionsHubArnMissing.RegisterDriverOption.RegistrationAuth = operatorv1.AwsIrsaAuthType
 				return awsCompletedOptionsHubArnMissing
 			}(),
 			expectedErr: "EksHubClusterArn cannot be empty if RegistrationAuth is awsirsa",

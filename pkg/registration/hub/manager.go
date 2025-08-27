@@ -27,6 +27,7 @@ import (
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
+	operatorv1 "open-cluster-management.io/api/operator/v1"
 
 	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/features"
@@ -73,7 +74,7 @@ func NewHubManagerOptions() *HubManagerOptions {
 		GCResourceList: []string{"addon.open-cluster-management.io/v1alpha1/managedclusteraddons",
 			"work.open-cluster-management.io/v1/manifestworks"},
 		ImportOption:               importeroptions.New(),
-		EnabledRegistrationDrivers: []string{commonhelpers.CSRAuthType},
+		EnabledRegistrationDrivers: []string{operatorv1.CSRAuthType},
 		GRPCSigningDuration:        720 * time.Hour,
 	}
 }
@@ -191,7 +192,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	var drivers []register.HubDriver
 	for _, enabledRegistrationDriver := range m.EnabledRegistrationDrivers {
 		switch enabledRegistrationDriver {
-		case commonhelpers.CSRAuthType:
+		case operatorv1.CSRAuthType:
 			autoApprovedCSRUsers := m.ClusterAutoApprovalUsers
 			if len(m.AutoApprovedCSRUsers) > 0 {
 				autoApprovedCSRUsers = m.AutoApprovedCSRUsers
@@ -201,13 +202,13 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 				return err
 			}
 			drivers = append(drivers, csrDriver)
-		case commonhelpers.AwsIrsaAuthType:
+		case operatorv1.AwsIrsaAuthType:
 			awsIRSAHubDriver, err := awsirsa.NewAWSIRSAHubDriver(ctx, m.HubClusterArn, m.AutoApprovedARNPatterns, m.AwsResourceTags)
 			if err != nil {
 				return err
 			}
 			drivers = append(drivers, awsIRSAHubDriver)
-		case commonhelpers.GRPCCAuthType:
+		case operatorv1.GRPCAuthType:
 			grpcHubDriver, err := grpc.NewGRPCHubDriver(
 				kubeClient, kubeInformers,
 				m.GRPCCAKeyFile, m.GRPCCAFile, m.GRPCSigningDuration,

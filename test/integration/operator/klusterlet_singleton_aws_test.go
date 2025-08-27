@@ -12,7 +12,6 @@ import (
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
-	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
@@ -44,7 +43,7 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode with aws auth", func() {
 				},
 				RegistrationConfiguration: &operatorapiv1.RegistrationConfiguration{
 					RegistrationDriver: operatorapiv1.RegistrationDriver{
-						AuthType: commonhelpers.AwsIrsaAuthType,
+						AuthType: operatorapiv1.AwsIrsaAuthType,
 						AwsIrsa: &operatorapiv1.AwsIrsa{
 							HubClusterArn:     util.HubClusterArn,
 							ManagedClusterArn: util.ManagedClusterArn,

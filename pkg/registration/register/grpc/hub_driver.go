@@ -21,9 +21,9 @@ import (
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
+	operatorv1 "open-cluster-management.io/api/operator/v1"
 	sdkhelpers "open-cluster-management.io/sdk-go/pkg/helpers"
 
-	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
@@ -51,11 +51,11 @@ func NewGRPCHubDriver(
 	duration time.Duration,
 	autoApprovedCSRUsers []string,
 	recorder events.Recorder) (register.HubDriver, error) {
-	csrReconciles := []csr.Reconciler{csr.NewCSRRenewalReconciler(kubeClient, helpers.GRPCCAuthSigner, recorder)}
+	csrReconciles := []csr.Reconciler{csr.NewCSRRenewalReconciler(kubeClient, operatorv1.GRPCAuthSigner, recorder)}
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
 		csrReconciles = append(csrReconciles, csr.NewCSRBootstrapReconciler(
 			kubeClient,
-			helpers.GRPCCAuthSigner,
+			operatorv1.GRPCAuthSigner,
 			autoApprovedCSRUsers,
 			recorder,
 		))
@@ -170,7 +170,7 @@ func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContex
 	}
 
 	// Do not sign apiserver cert
-	if csr.Spec.SignerName != helpers.GRPCCAuthSigner {
+	if csr.Spec.SignerName != operatorv1.GRPCAuthSigner {
 		return nil
 	}
 
@@ -192,7 +192,7 @@ func getCSRInfo(c *certificatesv1.CertificateSigningRequest) csr.CSRInfo {
 		Name:       c.Name,
 		Labels:     c.Labels,
 		SignerName: c.Spec.SignerName,
-		Username:   c.Annotations[helpers.CSRUserAnnotation],
+		Username:   c.Annotations[operatorv1.CSRUsernameAnnotation],
 		UID:        c.Spec.UID,
 		Groups:     c.Spec.Groups,
 		Extra:      extra,
@@ -203,7 +203,7 @@ func getCSRInfo(c *certificatesv1.CertificateSigningRequest) csr.CSRInfo {
 func eventFilter(csr any) bool {
 	switch v := csr.(type) {
 	case *certificatesv1.CertificateSigningRequest:
-		return v.Spec.SignerName == helpers.GRPCCAuthSigner
+		return v.Spec.SignerName == operatorv1.GRPCAuthSigner
 	default:
 		return false
 	}

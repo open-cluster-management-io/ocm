@@ -16,7 +16,8 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 
-	"open-cluster-management.io/ocm/pkg/common/helpers"
+	operatorv1 "open-cluster-management.io/api/operator/v1"
+
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
@@ -101,7 +102,7 @@ func TestSignCSR(t *testing.T) {
 							Usages: []certificatesv1.KeyUsage{
 								certificatesv1.UsageClientAuth,
 							},
-							SignerName: helpers.GRPCCAuthSigner,
+							SignerName: operatorv1.GRPCAuthSigner,
 							Username:   "system:open-cluster-management:test",
 							Request:    request,
 						},
@@ -167,7 +168,7 @@ func TestEventFilter(t *testing.T) {
 			name: "v1 CSR with matching signer",
 			input: &certificatesv1.CertificateSigningRequest{
 				Spec: certificatesv1.CertificateSigningRequestSpec{
-					SignerName: helpers.GRPCCAuthSigner,
+					SignerName: operatorv1.GRPCAuthSigner,
 				},
 			},
 			expected: true,
@@ -196,11 +197,11 @@ func TestGetCSRInfo(t *testing.T) {
 	csr := &certificatesv1.CertificateSigningRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				helpers.CSRUserAnnotation: "test",
+				operatorv1.CSRUsernameAnnotation: "test",
 			},
 		},
 		Spec: certificatesv1.CertificateSigningRequestSpec{
-			SignerName: helpers.GRPCCAuthSigner,
+			SignerName: operatorv1.GRPCAuthSigner,
 		},
 	}
 

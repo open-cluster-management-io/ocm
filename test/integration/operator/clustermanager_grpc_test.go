@@ -17,7 +17,6 @@ import (
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
-	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
@@ -331,10 +330,10 @@ func enableGRPCAuth(operatorClient operatorclient.Interface, clusterManagerName 
 	clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
 		RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
 			{
-				AuthType: commonhelpers.CSRAuthType,
+				AuthType: operatorapiv1.CSRAuthType,
 			},
 			{
-				AuthType: commonhelpers.GRPCCAuthType,
+				AuthType: operatorapiv1.GRPCAuthType,
 			},
 		},
 	}
@@ -342,10 +341,10 @@ func enableGRPCAuth(operatorClient operatorclient.Interface, clusterManagerName 
 		clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
 			RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
 				{
-					AuthType: commonhelpers.CSRAuthType,
+					AuthType: operatorapiv1.CSRAuthType,
 				},
 				{
-					AuthType: commonhelpers.GRPCCAuthType,
+					AuthType: operatorapiv1.GRPCAuthType,
 					GRPC: &operatorapiv1.GRPCConfig{
 						AutoApprovedIdentities: autoApprovedIdentities,
 					},

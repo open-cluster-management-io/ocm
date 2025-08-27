@@ -22,6 +22,7 @@ import (
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	operatorv1 "open-cluster-management.io/api/operator/v1"
 	cloudeventsaddon "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon"
 	cloudeventscluster "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
 	cloudeventscsr "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
@@ -34,7 +35,6 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/cert"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc"
 
-	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 )
@@ -50,7 +50,7 @@ var _ register.RegisterDriver = &GRPCDriver{}
 var _ register.AddonDriver = &GRPCDriver{}
 
 func NewGRPCDriver(opt *Option, csrOption *csr.Option, secretOption register.SecretOption) (register.RegisterDriver, error) {
-	secretOption.Signer = helpers.GRPCCAuthSigner
+	secretOption.Signer = operatorv1.GRPCAuthSigner
 	csrDriver, err := csr.NewCSRDriver(csrOption, secretOption)
 	if err != nil {
 		return nil, err

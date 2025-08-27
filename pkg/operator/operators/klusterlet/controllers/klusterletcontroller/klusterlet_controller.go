@@ -351,7 +351,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		config.RegistrationKubeAPIBurst = klusterlet.Spec.RegistrationConfiguration.KubeAPIBurst
 		// Configuring Registration driver depending on registration auth
 		if &klusterlet.Spec.RegistrationConfiguration.RegistrationDriver != nil &&
-			klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType == commonhelpers.AwsIrsaAuthType {
+			klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType == operatorapiv1.AwsIrsaAuthType {
 
 			hubClusterArn := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.HubClusterArn
 			managedClusterArn := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.ManagedClusterArn
