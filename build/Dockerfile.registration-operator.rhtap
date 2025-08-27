@@ -2,6 +2,11 @@ FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.24 AS bui
 WORKDIR /go/src/open-cluster-management.io/ocm
 COPY . .
 ENV GO_PACKAGE open-cluster-management.io/ocm
+# MCE_VERSION comes from this common pipeline:
+# https://github.com/stolostron/konflux-build-catalog/blob/main/pipelines
+ARG MCE_VERSION
+ENV SOURCE_GIT_TAG=${MCE_VERSION}
+RUN echo "SOURCE_GIT_TAG=${SOURCE_GIT_TAG}"
 
 RUN GO_BUILD_PACKAGES=./cmd/registration-operator make build --warn-undefined-variables
 
