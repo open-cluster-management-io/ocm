@@ -96,6 +96,9 @@ spec:
           - "--grpc-ca-file=/var/run/secrets/hub/grpc/certs/tls.crt"
           - "--grpc-key-file=/var/run/secrets/hub/grpc/certs/tls.key"
           {{end}}
+          {{ if .GRPAutoApprovedCUsers }}
+          - "--auto-approved-grpc-users={{ .GRPAutoApprovedCUsers }}"
+          {{ end }}
         env:
           - name: POD_NAME
             valueFrom:

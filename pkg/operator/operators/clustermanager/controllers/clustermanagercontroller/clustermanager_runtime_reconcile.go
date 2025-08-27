@@ -109,7 +109,7 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 				}
 
 				config.GRPCServerImage = registrationDriver.GRPC.ImagePullSpec
-				// TODO set AutoApprovedIdentities
+				config.GRPAutoApprovedCUsers = strings.Join(registrationDriver.GRPC.AutoApprovedIdentities, ",")
 			}
 		}
 		config.EnabledRegistrationDrivers = strings.Join(enabledRegistrationDrivers, ",")
