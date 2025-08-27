@@ -102,6 +102,8 @@ Everything OCM does is Cloud Native by definition. Our comprehensive [User Scena
 
 You can use the [clusteradm CLI](https://github.com/open-cluster-management-io/clusteradm) to bootstrap a control plane for multicluster management. To set up a multicluster environment with OCM enabled on your local machine, follow the instructions in [setup dev environment](solutions/setup-dev-environment).
 
+For developers looking to contribute to OCM, see our comprehensive [Development Guide](development.md) which covers development environment setup, code standards, testing, and contribution workflows.
+
 ## External Integrations
 
 We constantly work with other open-source projects to make multicluster management easier:
