@@ -26,7 +26,7 @@ Open Cluster Management (OCM) is a CNCF sandbox project that provides multiclust
 
 ### Key Technologies
 
-- **Language**: Go 1.24+
+- **Language**: Go 1.24.0
 - **Framework**: Kubernetes operators with controller-runtime
 - **Build System**: Make with OpenShift build machinery
 - **Testing**: Ginkgo/Gomega for BDD-style tests
@@ -51,7 +51,7 @@ Open Cluster Management (OCM) is a CNCF sandbox project that provides multiclust
 
 2. **Initialize OCM control plane**:
    ```bash
-   curl -sL https://raw.githubusercontent.com/open-cluster-management/clusteradm/main/hack/install.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/open-cluster-management-io/clusteradm/main/hack/install.sh | bash
    clusteradm init --wait --bundle-version="latest"
    ```
 
@@ -154,7 +154,6 @@ kubectl edit klusterlet klusterlet           # For spoke components
 
 - **Follow standard Go conventions**: Use `gofmt`, `go vet`, and `golangci-lint`
 - **Variable naming**: Use camelCase for local variables, PascalCase for exported items
-- **Error handling**: Always handle errors explicitly, use `errors.Wrap()` for context
 - **Comments**: Write clear comments for exported functions and complex logic
 - **Interface design**: Keep interfaces small and focused (interface segregation principle)
 
@@ -202,7 +201,7 @@ make fmt-imports                # Automatically format import statements
 
 - **Files**: Use snake_case (e.g., `cluster_controller.go`)
 - **Packages**: Use lowercase, single words when possible
-- **Constants**: Use ALL_CAPS with underscores
+- **Constants**: Use CamelCase (PascalCase for exported constants); reserve ALL_CAPS only when mirroring external specs
 - **Controllers**: Suffix with `Controller` (e.g., `PlacementController`)
 - **Interfaces**: Use descriptive names, often ending with `-er` (e.g., `ClusterLister`)
 
@@ -240,8 +239,8 @@ End-to-end tests run against real clusters and require a kind cluster with prope
 
 ```bash
 # 1. Create kind cluster and set KUBECONFIG
-kind create cluster --name ocm-e2e
-export KUBECONFIG=$(kind get kubeconfig-path --name ocm-e2e)
+kind get kubeconfig --name ocm-e2e > /tmp/kubeconfig-ocm-e2e
+export KUBECONFIG=/tmp/kubeconfig-ocm-e2e
 
 # 2. Run E2E tests with required variables
 IMAGE_TAG=e2e KLUSTERLET_DEPLOY_MODE=Singleton make test-e2e
