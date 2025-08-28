@@ -21,7 +21,6 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/manifests"
-	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
@@ -91,17 +90,17 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 		for _, registrationDriver := range cm.Spec.RegistrationConfiguration.RegistrationDrivers {
 			enabledRegistrationDrivers = append(enabledRegistrationDrivers, registrationDriver.AuthType)
 			switch registrationDriver.AuthType {
-			case commonhelpers.AwsIrsaAuthType:
+			case operatorapiv1.AwsIrsaAuthType:
 				if registrationDriver.AwsIrsa != nil {
 					config.HubClusterArn = registrationDriver.AwsIrsa.HubClusterArn
 					config.AutoApprovedARNPatterns = strings.Join(registrationDriver.AwsIrsa.AutoApprovedIdentities, ",")
 					config.AwsResourceTags = strings.Join(registrationDriver.AwsIrsa.Tags, ",")
 				}
-			case commonhelpers.CSRAuthType:
+			case operatorapiv1.CSRAuthType:
 				if registrationDriver.CSR != nil {
 					config.AutoApprovedCSRUsers = strings.Join(registrationDriver.CSR.AutoApprovedIdentities, ",")
 				}
-			case commonhelpers.GRPCCAuthType:
+			case operatorapiv1.GRPCAuthType:
 				if registrationDriver.GRPC == nil {
 					// using registration image as default
 					config.GRPCServerImage = cm.Spec.RegistrationImagePullSpec

@@ -491,7 +491,7 @@ github.com/openshift/api/template
 github.com/openshift/api/template/v1
 github.com/openshift/api/user
 github.com/openshift/api/user/v1
-# github.com/openshift/build-machinery-go v0.0.0-20250530140348-dc5b2804eeee
+# github.com/openshift/build-machinery-go v0.0.0-20250602125535-1b6d00b8c37c
 ## explicit; go 1.22.0
 github.com/openshift/build-machinery-go
 github.com/openshift/build-machinery-go/make
@@ -1732,8 +1732,8 @@ open-cluster-management.io/addon-framework/pkg/agent
 open-cluster-management.io/addon-framework/pkg/assets
 open-cluster-management.io/addon-framework/pkg/index
 open-cluster-management.io/addon-framework/pkg/utils
-# open-cluster-management.io/api v1.0.1-0.20250730122947-5e3423e7794a
-## explicit; go 1.23.6
+# open-cluster-management.io/api v1.0.1-0.20250827024027-f3e5dab96ea1
+## explicit; go 1.24.0
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/client/addon/clientset/versioned
 open-cluster-management.io/api/client/addon/clientset/versioned/fake

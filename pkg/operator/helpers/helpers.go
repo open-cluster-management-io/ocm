@@ -41,8 +41,6 @@ import (
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
-
-	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 )
 
 const (
@@ -926,7 +924,7 @@ func GRPCAuthEnabled(cm *operatorapiv1.ClusterManager) bool {
 		return false
 	}
 	for _, registrationDriver := range cm.Spec.RegistrationConfiguration.RegistrationDrivers {
-		if registrationDriver.AuthType == commonhelpers.GRPCCAuthType {
+		if registrationDriver.AuthType == operatorapiv1.GRPCAuthType {
 			return true
 		}
 	}
@@ -938,7 +936,7 @@ func GRPCServerHostNames(clustermanagerNamespace string, cm *operatorapiv1.Clust
 	hostNames := []string{fmt.Sprintf("%s-grpc-server.%s.svc", cm.Name, clustermanagerNamespace)}
 	if cm.Spec.RegistrationConfiguration != nil {
 		for _, registrationDriver := range cm.Spec.RegistrationConfiguration.RegistrationDrivers {
-			if registrationDriver.AuthType != commonhelpers.GRPCCAuthType {
+			if registrationDriver.AuthType != operatorapiv1.GRPCAuthType {
 				continue
 			}
 

@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	operatorv1 "open-cluster-management.io/api/operator/v1"
 	addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon"
 	clusterce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
 	csrce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
@@ -22,7 +23,6 @@ import (
 	grpcauthn "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authn"
 	grpcoptions "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/options"
 
-	"open-cluster-management.io/ocm/pkg/common/helpers"
 	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/hub"
@@ -114,7 +114,7 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 		ginkgo.BeforeEach(func() {
 			postfix = rand.String(5)
 			hubOptionWithGRPC = hub.NewHubManagerOptions()
-			hubOptionWithGRPC.EnabledRegistrationDrivers = []string{helpers.CSRAuthType, helpers.GRPCCAuthType}
+			hubOptionWithGRPC.EnabledRegistrationDrivers = []string{operatorv1.CSRAuthType, operatorv1.GRPCAuthType}
 			hubOptionWithGRPC.GRPCCAFile = gRPCServerOptions.ClientCAFile
 			hubOptionWithGRPC.GRPCCAKeyFile = gRPCCAKeyFile
 			startHub(hubOptionWithGRPC)
@@ -125,7 +125,7 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 			hubGRPCConfigSecret = fmt.Sprintf("%s-hub-grpcconfig-secret-%s", grpcTest, postfix)
 			hubGRPCConfigDir = path.Join(util.TestDir, fmt.Sprintf("%s-grpc-%s", grpcTest, postfix), "hub-kubeconfig")
 			grpcDriverOption := factory.NewOptions()
-			grpcDriverOption.RegistrationAuth = helpers.GRPCCAuthType
+			grpcDriverOption.RegistrationAuth = operatorv1.GRPCAuthType
 			grpcDriverOption.GRPCOption = &grpc.Option{
 				BootstrapConfigFile: bootstrapGRPCConfigFile,
 				ConfigFile:          path.Join(hubGRPCConfigDir, "config.yaml"),
@@ -208,7 +208,7 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 		ginkgo.BeforeEach(func() {
 			postfix = rand.String(5)
 			hubOptionWithGRPC = hub.NewHubManagerOptions()
-			hubOptionWithGRPC.EnabledRegistrationDrivers = []string{helpers.GRPCCAuthType}
+			hubOptionWithGRPC.EnabledRegistrationDrivers = []string{operatorv1.GRPCAuthType}
 			hubOptionWithGRPC.GRPCCAFile = gRPCServerOptions.ClientCAFile
 			hubOptionWithGRPC.GRPCCAKeyFile = gRPCCAKeyFile
 			hubOptionWithGRPC.GRPCSigningDuration = 5 * time.Second
@@ -219,7 +219,7 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 			hubGRPCConfigSecret = fmt.Sprintf("%s-hub-grpcconfig-secret-%s", grpcTest, postfix)
 			hubGRPCConfigDir = path.Join(util.TestDir, fmt.Sprintf("%s-grpc-%s", grpcTest, postfix), "hub-kubeconfig")
 			grpcDriverOption := factory.NewOptions()
-			grpcDriverOption.RegistrationAuth = helpers.GRPCCAuthType
+			grpcDriverOption.RegistrationAuth = operatorv1.GRPCAuthType
 			grpcDriverOption.GRPCOption = &grpc.Option{
 				BootstrapConfigFile: bootstrapGRPCConfigFile,
 				ConfigFile:          path.Join(hubGRPCConfigDir, "config.yaml"),
@@ -279,7 +279,7 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 		ginkgo.BeforeEach(func() {
 			postfix = rand.String(5)
 			hubOptionWithGRPC = hub.NewHubManagerOptions()
-			hubOptionWithGRPC.EnabledRegistrationDrivers = []string{helpers.GRPCCAuthType}
+			hubOptionWithGRPC.EnabledRegistrationDrivers = []string{operatorv1.GRPCAuthType}
 			hubOptionWithGRPC.GRPCCAFile = gRPCServerOptions.ClientCAFile
 			hubOptionWithGRPC.GRPCCAKeyFile = gRPCCAKeyFile
 			hubOptionWithGRPC.AutoApprovedGRPCUsers = []string{"test-client"}
@@ -290,7 +290,7 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 			hubGRPCConfigSecret = fmt.Sprintf("%s-hub-grpcconfig-secret-%s", grpcTest, postfix)
 			hubGRPCConfigDir = path.Join(util.TestDir, fmt.Sprintf("%s-grpc-%s", grpcTest, postfix), "hub-kubeconfig")
 			grpcDriverOption := factory.NewOptions()
-			grpcDriverOption.RegistrationAuth = helpers.GRPCCAuthType
+			grpcDriverOption.RegistrationAuth = operatorv1.GRPCAuthType
 			grpcDriverOption.GRPCOption = &grpc.Option{
 				BootstrapConfigFile: bootstrapGRPCConfigFile,
 				ConfigFile:          path.Join(hubGRPCConfigDir, "config.yaml"),

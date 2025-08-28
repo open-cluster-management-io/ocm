@@ -47,13 +47,25 @@ func NewFilteredManagedClusterAddOnInformer(client versioned.Interface, namespac
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AddonV1alpha1().ManagedClusterAddOns(namespace).List(context.TODO(), options)
+				return client.AddonV1alpha1().ManagedClusterAddOns(namespace).List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AddonV1alpha1().ManagedClusterAddOns(namespace).Watch(context.TODO(), options)
+				return client.AddonV1alpha1().ManagedClusterAddOns(namespace).Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.AddonV1alpha1().ManagedClusterAddOns(namespace).List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.AddonV1alpha1().ManagedClusterAddOns(namespace).Watch(ctx, options)
 			},
 		},
 		&apiaddonv1alpha1.ManagedClusterAddOn{},

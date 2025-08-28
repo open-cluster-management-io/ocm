@@ -36,7 +36,6 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/manifests"
-	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
@@ -559,10 +558,10 @@ func TestSyncDeployWithGRPCAuthEnabled(t *testing.T) {
 	clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
 		RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
 			{
-				AuthType: commonhelpers.CSRAuthType,
+				AuthType: operatorapiv1.CSRAuthType,
 			},
 			{
-				AuthType: commonhelpers.GRPCCAuthType,
+				AuthType: operatorapiv1.GRPCAuthType,
 			},
 		},
 	}
@@ -623,10 +622,10 @@ func TestSyncDeleteWithGRPCAuthEnabled(t *testing.T) {
 	clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
 		RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
 			{
-				AuthType: commonhelpers.CSRAuthType,
+				AuthType: operatorapiv1.CSRAuthType,
 			},
 			{
-				AuthType: commonhelpers.GRPCCAuthType,
+				AuthType: operatorapiv1.GRPCAuthType,
 			},
 		},
 	}
