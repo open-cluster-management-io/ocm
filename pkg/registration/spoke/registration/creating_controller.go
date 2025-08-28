@@ -52,10 +52,11 @@ func NewManagedClusterCreatingController(
 }
 
 func (c *managedClusterCreatingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	logger := klog.FromContext(ctx)
 	existingCluster, err := c.hubClusterClient.ClusterV1().ManagedClusters().Get(ctx, c.clusterName, metav1.GetOptions{})
 	// ManagedCluster is only allowed created during bootstrap. After bootstrap secret expired, an unauthorized error will be got, output log at the debug level
 	if err != nil && skipUnauthorizedError(err) == nil {
-		klog.V(4).Infof("unable to get the managed cluster %q from hub: %v", c.clusterName, err)
+		logger.V(4).Info("unable to get the managed cluster from hub", "clusterName", c.clusterName, "err", err)
 		return nil
 	}
 
@@ -76,8 +77,16 @@ func (c *managedClusterCreatingController) sync(ctx context.Context, syncCtx fac
 		}
 
 		_, err = c.hubClusterClient.ClusterV1().ManagedClusters().Create(ctx, managedCluster, metav1.CreateOptions{})
-		// ManagedCluster is only allowed created during bootstrap. After bootstrap secret expired, an unauthorized error will be got, skip it
-		if skipUnauthorizedError(err) != nil {
+		if errors.IsAlreadyExists(err) {
+			logger.V(4).Info("managed cluster already exists", "clusterName", c.clusterName)
+			return nil
+		}
+
+		if err != nil {
+			// Unauthorized/Forbidden after bootstrap: skip without emitting a create event.
+			if skipUnauthorizedError(err) == nil {
+				return nil
+			}
 			return fmt.Errorf("unable to create managed cluster with name %q on hub: %w", c.clusterName, err)
 		}
 		syncCtx.Recorder().Eventf("ManagedClusterCreated", "Managed cluster %q created on hub", c.clusterName)
