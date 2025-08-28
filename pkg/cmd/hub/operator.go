@@ -5,9 +5,11 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/utils/clock"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager"
+	"open-cluster-management.io/ocm/pkg/singleton/hub"
 	"open-cluster-management.io/ocm/pkg/version"
 )
 
@@ -31,5 +33,39 @@ func NewHubOperatorCmd() *cobra.Command {
 	flags.BoolVar(&cmOptions.EnableSyncLabels, "enable-sync-labels", false,
 		"If set, will sync the labels of ClusterManager CR to all hub resources")
 	opts.AddFlags(flags)
+	return cmd
+}
+
+func NewHubManagerCmd() *cobra.Command {
+	opts := hub.NewHubOption()
+	commonOpts := opts.CommonOption
+	cmd := commonOpts.NewControllerCommandConfig("hub-manager", version.Get(), opts.RunManager, clock.RealClock{}).
+		NewCommandWithContext(context.TODO())
+	cmd.Use = "hub-manager"
+	cmd.Short = "Start the hub manager"
+
+	flags := cmd.Flags()
+	opts.AddFlags(flags)
+	return cmd
+}
+
+func NewWebhookCmd() *cobra.Command {
+	webhookOptions := commonoptions.NewWebhookOptions()
+	opts := hub.NewWebhookOptions()
+	cmd := &cobra.Command{
+		Use:   "webhook-server",
+		Short: "Start the registration webhook server",
+		RunE: func(c *cobra.Command, args []string) error {
+			if err := opts.SetupWebhookServer(webhookOptions); err != nil {
+				return err
+			}
+			return webhookOptions.RunWebhookServer(ctrl.SetupSignalHandler())
+		},
+	}
+
+	flags := cmd.Flags()
+	opts.AddFlags(flags)
+	webhookOptions.AddFlags(flags)
+
 	return cmd
 }
