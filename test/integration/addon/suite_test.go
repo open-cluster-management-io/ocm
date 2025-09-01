@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
@@ -49,6 +50,11 @@ var testAddOnConfigsImpl *testAddon
 var cancel context.CancelFunc
 var mgrContext context.Context
 var addonManager addonmanager.AddonManager
+
+func init() {
+	klog.InitFlags(nil)
+	klog.SetOutput(ginkgo.GinkgoWriter)
+}
 
 func TestIntegration(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)

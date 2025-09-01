@@ -16,6 +16,7 @@ import (
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 
+	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
@@ -26,6 +27,7 @@ const UnsupportedConfigurationType = "UnsupportedConfiguration"
 type addonOwnerController struct {
 	addonClient                  addonv1alpha1client.Interface
 	managedClusterAddonLister    addonlisterv1alpha1.ManagedClusterAddOnLister
+	managedClusterAddonIndexer   cache.Indexer
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
 	addonFilterFunc              factory.EventFilterFunc
 }
@@ -40,6 +42,7 @@ func NewAddonOwnerController(
 	c := &addonOwnerController{
 		addonClient:                  addonClient,
 		managedClusterAddonLister:    addonInformers.Lister(),
+		managedClusterAddonIndexer:   addonInformers.Informer().GetIndexer(),
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
 		addonFilterFunc:              addonFilterFunc,
 	}
@@ -47,7 +50,11 @@ func NewAddonOwnerController(
 	return factory.New().
 		WithFilteredEventsInformersQueueKeysFunc(
 			queue.QueueKeyByMetaNamespaceName,
-			c.addonFilterFunc, clusterManagementAddonInformers.Informer()).
+			c.addonFilterFunc).
+		WithInformersQueueKeysFunc(
+			addonindex.ManagedClusterAddonByNameQueueKey(addonInformers),
+			clusterManagementAddonInformers.Informer(),
+		).
 		WithInformersQueueKeysFunc(
 			queue.QueueKeyByMetaNamespaceName,
 			addonInformers.Informer()).
