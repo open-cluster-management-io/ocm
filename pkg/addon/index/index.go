@@ -102,3 +102,25 @@ func ClusterManagementAddonByPlacementDecisionQueueKey(
 		return keys
 	}
 }
+
+// ManagedClusterAddonByNameQueueKey finds all the addon using the name of the object and return all their keys.
+func ManagedClusterAddonByNameQueueKey(addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer) func(obj runtime.Object) []string {
+	return func(obj runtime.Object) []string {
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return []string{}
+		}
+		addons, err := addonInformers.Informer().GetIndexer().ByIndex(ManagedClusterAddonByName, accessor.GetName())
+		if err != nil {
+			utilruntime.HandleError(err)
+			return []string{}
+		}
+		keys := make([]string, 0, len(addons))
+		for _, addon := range addons {
+			key, _ := cache.MetaNamespaceKeyFunc(addon)
+			keys = append(keys, key)
+		}
+		return keys
+	}
+}

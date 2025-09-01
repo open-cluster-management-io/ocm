@@ -29,6 +29,7 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
+	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
@@ -59,8 +60,11 @@ func NewAddonProgressingController(
 	}
 
 	return factory.New().WithInformersQueueKeysFunc(
-		queue.QueueKeyByMetaNamespaceName,
-		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
+		queue.QueueKeyByMetaNamespaceName, addonInformers.Informer()).
+		WithInformersQueueKeysFunc(
+			addonindex.ManagedClusterAddonByNameQueueKey(addonInformers),
+			clusterManagementAddonInformers.Informer(),
+		).
 		WithFilteredEventsInformersQueueKeysFunc(
 			func(obj runtime.Object) []string {
 				accessor, _ := meta.Accessor(obj)
