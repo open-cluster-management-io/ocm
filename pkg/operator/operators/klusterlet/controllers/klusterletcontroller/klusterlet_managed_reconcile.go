@@ -185,7 +185,16 @@ func (r *managedReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.
 	// For now, whether in Default or Hosted mode, the addons could be deployed on the managed cluster.
 	namespaces := []string{config.KlusterletNamespace}
 	if !config.DisableAddonNamespace {
-		namespaces = append(namespaces, helpers.DefaultAddonNamespace)
+		// check if other klusterlet agent namespaces still exist before deleting addon namespace
+		hasOtherAgents, err := r.hasActiveKlusterletAgentNamespaces(ctx, config.KlusterletNamespace)
+		if err != nil {
+			return klusterlet, reconcileStop, fmt.Errorf("failed to check for active klusterlet agent namespaces: %v", err)
+		}
+
+		// only delete addon namespace if no other klusterlet agents exist
+		if !hasOtherAgents {
+			namespaces = append(namespaces, helpers.DefaultAddonNamespace)
+		}
 	}
 	for _, namespace := range namespaces {
 		if err := r.managedClusterClients.kubeClient.CoreV1().Namespaces().Delete(
@@ -229,4 +238,24 @@ func (r *managedReconcile) cleanUpAppliedManifestWorks(ctx context.Context, klus
 		}
 	}
 	return utilerrors.NewAggregate(errs)
+}
+
+// hasActiveKlusterletAgentNamespaces checks if there are any other klusterlet agent namespaces
+// on the managed cluster besides the one being deleted. This prevents premature deletion of
+// the shared addon namespace when multiple klusterlets (from different hubs) are using it.
+func (r *managedReconcile) hasActiveKlusterletAgentNamespaces(ctx context.Context, currentAgentNamespace string) (bool, error) {
+	// Look for namespaces with klusterlet labels
+	namespaces, err := r.managedClusterClients.kubeClient.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
+		LabelSelector: klusterletNamespaceLabelKey,
+	})
+	if err != nil {
+		return false, fmt.Errorf("failed to list klusterlet agent namespaces: %v", err)
+	}
+
+	// check if there exist namespaces other than the one being deleted
+	if len(namespaces.Items) > 1 || len(namespaces.Items) == 1 && namespaces.Items[0].Name != currentAgentNamespace {
+		return true, nil
+	}
+
+	return false, nil
 }
