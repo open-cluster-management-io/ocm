@@ -34,7 +34,10 @@ func NewSourceInformerWatcherStore(ctx context.Context) *SourceInformerWatcherSt
 	s := &SourceInformerWatcherStore{
 		baseSourceStore: baseSourceStore{
 			BaseClientWatchStore: store.BaseClientWatchStore[*workv1.ManifestWork]{},
-			receivedWorks:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "informer-watcher-store"), // nolint:staticcheck // SA1019
+			receivedWorks: workqueue.NewTypedRateLimitingQueueWithConfig(
+				workqueue.DefaultTypedControllerRateLimiter[*workv1.ManifestWork](),
+				workqueue.TypedRateLimitingQueueConfig[*workv1.ManifestWork]{Name: "informer-watcher-store"},
+			),
 		},
 		watcher: store.NewWatcher(),
 	}

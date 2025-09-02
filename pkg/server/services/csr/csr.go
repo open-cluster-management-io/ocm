@@ -20,7 +20,7 @@ import (
 	csrce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authn"
+	"open-cluster-management.io/sdk-go/pkg/server/grpc/authn"
 
 	"open-cluster-management.io/ocm/pkg/server/services"
 )

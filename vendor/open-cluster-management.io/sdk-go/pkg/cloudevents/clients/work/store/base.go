@@ -24,7 +24,7 @@ type baseSourceStore struct {
 	store.BaseClientWatchStore[*workv1.ManifestWork]
 
 	// a queue to save the received work events
-	receivedWorks workqueue.RateLimitingInterface // nolint:staticcheck // SA1019
+	receivedWorks workqueue.TypedRateLimitingInterface[*workv1.ManifestWork]
 }
 
 func (bs *baseSourceStore) HandleReceivedResource(action types.ResourceAction, work *workv1.ManifestWork) error {
@@ -39,11 +39,11 @@ func (bs *baseSourceStore) HandleReceivedResource(action types.ResourceAction, w
 
 // workProcessor process the received works from given work queue with a specific store
 type workProcessor struct {
-	works workqueue.RateLimitingInterface // nolint:staticcheck // SA1019
+	works workqueue.TypedRateLimitingInterface[*workv1.ManifestWork]
 	store store.ClientWatcherStore[*workv1.ManifestWork]
 }
 
-func newWorkProcessor(works workqueue.RateLimitingInterface, store store.ClientWatcherStore[*workv1.ManifestWork]) *workProcessor { // nolint:staticcheck // SA1019
+func newWorkProcessor(works workqueue.TypedRateLimitingInterface[*workv1.ManifestWork], store store.ClientWatcherStore[*workv1.ManifestWork]) *workProcessor {
 	return &workProcessor{
 		works: works,
 		store: store,
@@ -79,7 +79,7 @@ func (b *workProcessor) processNextWork() bool {
 	}
 	defer b.works.Done(key)
 
-	if err := b.handleWork(key.(*workv1.ManifestWork)); err != nil {
+	if err := b.handleWork(key); err != nil {
 		// we failed to handle the work, we should requeue the item to work on later
 		// this method will add a backoff to avoid hotlooping on particular items
 		b.works.AddRateLimited(key)

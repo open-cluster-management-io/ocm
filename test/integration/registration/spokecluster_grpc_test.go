@@ -9,6 +9,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -20,14 +21,17 @@ import (
 	csrce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
 	eventce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
 	leasece "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/lease"
-	grpcauthn "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authn"
-	grpcoptions "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/options"
+	pbv1 "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protobuf/v1"
+	cloudeventsgrpc "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc"
+	cemetrics "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/metrics"
+	sdkgrpc "open-cluster-management.io/sdk-go/pkg/server/grpc"
+	grpcauthn "open-cluster-management.io/sdk-go/pkg/server/grpc/authn"
 
 	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/hub"
 	"open-cluster-management.io/ocm/pkg/registration/register/factory"
-	"open-cluster-management.io/ocm/pkg/registration/register/grpc"
+	regsgrpc "open-cluster-management.io/ocm/pkg/registration/register/grpc"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/pkg/server/services/addon"
 	"open-cluster-management.io/ocm/pkg/server/services/cluster"
@@ -48,7 +52,7 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 	var stopGRPCAgent context.CancelFunc
 	var stopKubeAgent context.CancelFunc
 
-	var gRPCServerOptions *grpcoptions.GRPCServerOptions
+	var gRPCServerOptions *sdkgrpc.GRPCServerOptions
 	var gRPCCAKeyFile string
 
 	var bootstrapGRPCConfigFile string
@@ -79,24 +83,29 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 		hook, err := util.NewGRPCServerRegistrationHook(hubCfg)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		server := grpcoptions.NewServer(gRPCServerOptions).WithAuthenticator(
-			grpcauthn.NewMtlsAuthenticator(),
-		).WithPreStartHooks(hook).WithService(
-			clusterce.ManagedClusterEventDataType,
-			cluster.NewClusterService(hook.ClusterClient, hook.ClusterInformers.Cluster().V1().ManagedClusters()),
-		).WithService(
-			csrce.CSREventDataType,
-			csr.NewCSRService(hook.KubeClient, hook.KubeInformers.Certificates().V1().CertificateSigningRequests()),
-		).WithService(
-			addonce.ManagedClusterAddOnEventDataType,
-			addon.NewAddonService(hook.AddOnClient, hook.AddOnInformers.Addon().V1alpha1().ManagedClusterAddOns()),
-		).WithService(
-			eventce.EventEventDataType,
-			event.NewEventService(hook.KubeClient),
-		).WithService(
-			leasece.LeaseEventDataType,
-			lease.NewLeaseService(hook.KubeClient, hook.KubeInformers.Coordination().V1().Leases()),
-		)
+		go hook.Run(grpcServerCtx)
+
+		grpcEventServer := cloudeventsgrpc.NewGRPCBroker()
+		grpcEventServer.RegisterService(clusterce.ManagedClusterEventDataType,
+			cluster.NewClusterService(hook.ClusterClient, hook.ClusterInformers.Cluster().V1().ManagedClusters()))
+		grpcEventServer.RegisterService(csrce.CSREventDataType,
+			csr.NewCSRService(hook.KubeClient, hook.KubeInformers.Certificates().V1().CertificateSigningRequests()))
+		grpcEventServer.RegisterService(addonce.ManagedClusterAddOnEventDataType,
+			addon.NewAddonService(hook.AddOnClient, hook.AddOnInformers.Addon().V1alpha1().ManagedClusterAddOns()))
+		grpcEventServer.RegisterService(eventce.EventEventDataType,
+			event.NewEventService(hook.KubeClient))
+		grpcEventServer.RegisterService(leasece.LeaseEventDataType,
+			lease.NewLeaseService(hook.KubeClient, hook.KubeInformers.Coordination().V1().Leases()))
+
+		authorizer := util.NewMockAuthorizer()
+		server := sdkgrpc.NewGRPCServer(gRPCServerOptions).
+			WithAuthenticator(grpcauthn.NewMtlsAuthenticator()).
+			WithUnaryAuthorizer(authorizer).
+			WithStreamAuthorizer(authorizer).
+			WithRegisterFunc(func(s *grpc.Server) {
+				pbv1.RegisterCloudEventServiceServer(s, grpcEventServer)
+			}).
+			WithExtraMetrics(cemetrics.CloudEventsGRPCMetrics()...)
 
 		go func() {
 			err := server.Run(grpcServerCtx)
@@ -126,7 +135,7 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 			hubGRPCConfigDir = path.Join(util.TestDir, fmt.Sprintf("%s-grpc-%s", grpcTest, postfix), "hub-kubeconfig")
 			grpcDriverOption := factory.NewOptions()
 			grpcDriverOption.RegistrationAuth = operatorv1.GRPCAuthType
-			grpcDriverOption.GRPCOption = &grpc.Option{
+			grpcDriverOption.GRPCOption = &regsgrpc.Option{
 				BootstrapConfigFile: bootstrapGRPCConfigFile,
 				ConfigFile:          path.Join(hubGRPCConfigDir, "config.yaml"),
 			}
@@ -220,7 +229,7 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 			hubGRPCConfigDir = path.Join(util.TestDir, fmt.Sprintf("%s-grpc-%s", grpcTest, postfix), "hub-kubeconfig")
 			grpcDriverOption := factory.NewOptions()
 			grpcDriverOption.RegistrationAuth = operatorv1.GRPCAuthType
-			grpcDriverOption.GRPCOption = &grpc.Option{
+			grpcDriverOption.GRPCOption = &regsgrpc.Option{
 				BootstrapConfigFile: bootstrapGRPCConfigFile,
 				ConfigFile:          path.Join(hubGRPCConfigDir, "config.yaml"),
 			}
@@ -291,7 +300,7 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 			hubGRPCConfigDir = path.Join(util.TestDir, fmt.Sprintf("%s-grpc-%s", grpcTest, postfix), "hub-kubeconfig")
 			grpcDriverOption := factory.NewOptions()
 			grpcDriverOption.RegistrationAuth = operatorv1.GRPCAuthType
-			grpcDriverOption.GRPCOption = &grpc.Option{
+			grpcDriverOption.GRPCOption = &regsgrpc.Option{
 				BootstrapConfigFile: bootstrapGRPCConfigFile,
 				ConfigFile:          path.Join(hubGRPCConfigDir, "config.yaml"),
 			}
