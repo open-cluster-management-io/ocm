@@ -310,22 +310,22 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 
 		ginkgo.By("Check addon client certificate in secret")
 		secretName := fmt.Sprintf("%s-hub-kubeconfig", addOnName)
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			secret, err := spoke.KubeClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
 			if err != nil {
-				return false
+				return err
 			}
 			if _, ok := secret.Data[csr.TLSKeyFile]; !ok {
-				return false
+				return fmt.Errorf("secret %s/%s does not have a TLS key", addOnName, secretName)
 			}
 			if _, ok := secret.Data[csr.TLSCertFile]; !ok {
-				return false
+				return fmt.Errorf("secret %s/%s does not have a TLS certificate", addOnName, secretName)
 			}
 			if _, ok := secret.Data[register.KubeconfigFile]; !ok {
-				return false
+				return fmt.Errorf("secret %s/%s does not have a kubeconfig", addOnName, secretName)
 			}
-			return true
-		}).Should(gomega.BeTrue())
+			return nil
+		}).Should(gomega.Succeed())
 
 		ginkgo.By("Check addon status")
 		gomega.Eventually(func() error {
