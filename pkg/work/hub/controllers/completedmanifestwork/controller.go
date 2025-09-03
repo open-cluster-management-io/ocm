@@ -77,29 +77,27 @@ func (c *CompletedManifestWorkController) sync(ctx context.Context, controllerCo
 		return nil
 	}
 
-	ttlSeconds := *manifestWork.Spec.DeleteOption.TTLSecondsAfterFinished
-
 	// Find the Complete condition
 	completedCondition := meta.FindStatusCondition(manifestWork.Status.Conditions, workapiv1.WorkComplete)
 	if completedCondition == nil || completedCondition.Status != metav1.ConditionTrue {
 		return nil
 	}
 
-	// Calculate time elapsed since completion
-	completedTime := completedCondition.LastTransitionTime.Time
-	elapsedSeconds := time.Since(completedTime).Seconds()
-
-	if elapsedSeconds < float64(ttlSeconds) {
-		// Not yet time to delete, requeue after remaining time
-		remainingSeconds := float64(ttlSeconds) - elapsedSeconds
-		requeueAfter := time.Duration(remainingSeconds) * time.Second
-
-		logger.V(4).Info("ManifestWork completed, will be deleted after remaining TTL",
-			"namespace", namespace, "name", name,
-			"elapsedSeconds", int(elapsedSeconds), "remainingSeconds", int(remainingSeconds))
-
-		controllerContext.Queue().AddAfter(key, requeueAfter)
-		return nil
+	ttlSeconds := *manifestWork.Spec.DeleteOption.TTLSecondsAfterFinished
+	if ttlSeconds > 0 {
+		// Calculate time elapsed since completion
+		// Compute deadline precisely using durations and handle clock skew.
+		completedTime := completedCondition.LastTransitionTime.Time
+		ttl := time.Duration(ttlSeconds) * time.Second
+		deadline := completedTime.Add(ttl)
+		now := time.Now()
+		if now.Before(deadline) {
+			requeueAfter := time.Until(deadline)
+			logger.V(4).Info("ManifestWork completed; will be deleted after remaining TTL",
+				"namespace", namespace, "name", name, "remaining", requeueAfter)
+			controllerContext.Queue().AddAfter(key, requeueAfter)
+			return nil
+		}
 	}
 
 	// Time to delete the ManifestWork

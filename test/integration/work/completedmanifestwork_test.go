@@ -76,6 +76,7 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 			ttlSeconds := int64(5)
 			work = util.NewManifestWork(commOptions.SpokeClusterName, workName, manifests)
 			work.Spec.DeleteOption = &workapiv1.DeleteOption{
+				PropagationPolicy:       workapiv1.DeletePropagationPolicyTypeForeground,
 				TTLSecondsAfterFinished: &ttlSeconds,
 			}
 
@@ -91,7 +92,10 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 					ConditionRules: []workapiv1.ConditionRule{
 						{
 							Condition: workapiv1.WorkComplete,
-							Type:      workapiv1.WellKnownConditionsType,
+							Type:      workapiv1.CelConditionExpressionsType,
+							CelExpressions: []string{
+								"object.metadata.name == 'test-cm'",
+							},
 						},
 					},
 				},
@@ -108,14 +112,16 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			// Wait for work to be marked as complete
-			gomega.Eventually(func() bool {
+			gomega.Eventually(func() error {
 				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				if err != nil {
-					return false
+					return err
 				}
-				condition := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkComplete)
-				return condition != nil && condition.Status == metav1.ConditionTrue
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+				if meta.IsStatusConditionTrue(work.Status.Conditions, workapiv1.WorkComplete) {
+					return nil
+				}
+				return fmt.Errorf("ManifestWork %s is not complete", work.Name)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 			ginkgo.By("Verifying the ManifestWork is deleted after TTL expires")
 			// Wait for the work to be deleted (TTL + buffer time)
@@ -141,7 +147,10 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 					ConditionRules: []workapiv1.ConditionRule{
 						{
 							Condition: workapiv1.WorkComplete,
-							Type:      workapiv1.WellKnownConditionsType,
+							Type:      workapiv1.CelConditionExpressionsType,
+							CelExpressions: []string{
+								"object.metadata.name == 'test-cm'",
+							},
 						},
 					},
 				},
@@ -158,21 +167,23 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			// Wait for work to be marked as complete
-			gomega.Eventually(func() bool {
+			gomega.Eventually(func() error {
 				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				if err != nil {
-					return false
+					return err
 				}
-				condition := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkComplete)
-				return condition != nil && condition.Status == metav1.ConditionTrue
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+				if meta.IsStatusConditionTrue(work.Status.Conditions, workapiv1.WorkComplete) {
+					return nil
+				}
+				return fmt.Errorf("ManifestWork %s is not complete", work.Name)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 			ginkgo.By("Verifying the ManifestWork is NOT deleted without TTL configuration")
 			// Wait some time and verify the work still exists
 			gomega.Consistently(func() error {
 				_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				return err
-			}, 10*time.Second, eventuallyInterval).Should(gomega.BeNil())
+			}, 10*time.Second, eventuallyInterval).Should(gomega.Succeed())
 		})
 
 		ginkgo.It("should not delete the ManifestWork when it is not completed", func() {
@@ -180,6 +191,7 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 			ttlSeconds := int64(5)
 			work = util.NewManifestWork(commOptions.SpokeClusterName, workName, manifests)
 			work.Spec.DeleteOption = &workapiv1.DeleteOption{
+				PropagationPolicy:       workapiv1.DeletePropagationPolicyTypeForeground,
 				TTLSecondsAfterFinished: &ttlSeconds,
 			}
 
@@ -198,7 +210,7 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 			gomega.Consistently(func() error {
 				_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), workName, metav1.GetOptions{})
 				return err
-			}, time.Duration(ttlSeconds+5)*time.Second, eventuallyInterval).Should(gomega.BeNil())
+			}, time.Duration(ttlSeconds+5)*time.Second, eventuallyInterval).Should(gomega.Succeed())
 		})
 
 		ginkgo.It("should delete immediately when TTL is set to zero", func() {
@@ -206,6 +218,7 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 			ttlSeconds := int64(0)
 			work = util.NewManifestWork(commOptions.SpokeClusterName, workName, manifests)
 			work.Spec.DeleteOption = &workapiv1.DeleteOption{
+				PropagationPolicy:       workapiv1.DeletePropagationPolicyTypeForeground,
 				TTLSecondsAfterFinished: &ttlSeconds,
 			}
 
@@ -221,7 +234,10 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 					ConditionRules: []workapiv1.ConditionRule{
 						{
 							Condition: workapiv1.WorkComplete,
-							Type:      workapiv1.WellKnownConditionsType,
+							Type:      workapiv1.CelConditionExpressionsType,
+							CelExpressions: []string{
+								"object.metadata.name == 'test-cm'",
+							},
 						},
 					},
 				},
@@ -230,22 +246,6 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 			// Create the ManifestWork
 			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-			// Wait for work to be applied, available, and completed
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
-				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
-				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
-
-			// Wait for work to be marked as complete
-			gomega.Eventually(func() bool {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), workName, metav1.GetOptions{})
-				if err != nil {
-					return false
-				}
-				condition := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkComplete)
-				return condition != nil && condition.Status == metav1.ConditionTrue
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			ginkgo.By("Verifying the ManifestWork is deleted immediately with zero TTL")
 			// Should be deleted quickly since TTL is 0
