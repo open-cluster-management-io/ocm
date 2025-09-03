@@ -830,6 +830,94 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			return nil
 		}).ShouldNot(gomega.HaveOccurred())
 	})
+
+	ginkgo.It("ClusterManagementAddon deletion should wait for ManagedClusterAddons cleanup", func() {
+		ginkgo.By("Make sure addon is functioning before deletion")
+		configmap := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("config-%s", rand.String(6)),
+				Namespace: universalClusterName,
+			},
+			Data: map[string]string{
+				"key1": rand.String(6),
+				"key2": rand.String(6),
+			},
+		}
+
+		_, err := hub.KubeClient.CoreV1().ConfigMaps(universalClusterName).Create(
+			context.Background(), configmap, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		gomega.Eventually(func() error {
+			copyiedConfig, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
+				context.Background(), configmap.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			if !equality.Semantic.DeepEqual(copyiedConfig.Data, configmap.Data) {
+				return fmt.Errorf("expected configmap is not correct, %v", copyiedConfig.Data)
+			}
+			return nil
+		}).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Delete the ClusterManagementAddon to trigger cascading deletion")
+		err = hub.AddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(
+			context.TODO(), addOnName, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ginkgo.By("The pre-delete job should clean up the configmap")
+		gomega.Eventually(func() error {
+			_, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
+				context.Background(), configmap.Name, metav1.GetOptions{})
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				return err
+			}
+			return fmt.Errorf("the configmap should be deleted")
+		}).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("ManagedClusterAddon should eventually be deleted after pre-delete job completes")
+		gomega.Eventually(func() error {
+			_, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
+				context.TODO(), addOnName, metav1.GetOptions{})
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				return err
+			}
+			return fmt.Errorf("the ManagedClusterAddon should be deleted")
+		}).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("The pre-delete job should be cleaned up")
+		gomega.Eventually(func() error {
+			_, err := spoke.KubeClient.BatchV1().Jobs(addonInstallNamespace).Get(
+				context.Background(), "hello-template-cleanup-configmap", metav1.GetOptions{})
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				return err
+			}
+			return fmt.Errorf("the job should be deleted")
+		}).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Verify ClusterManagementAddon is deleted")
+		gomega.Eventually(func() error {
+			_, err := hub.AddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(
+				context.TODO(), addOnName, metav1.GetOptions{})
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				return err
+			}
+			return fmt.Errorf("the ClusterManagementAddon should be deleted")
+		}).ShouldNot(gomega.HaveOccurred())
+	})
 })
 
 func prepareInstallNamespace(namespace, installNamespace string) error {
