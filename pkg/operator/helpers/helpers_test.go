@@ -1957,12 +1957,17 @@ func TestGRPCServerHostNames(t *testing.T) {
 						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
 							{
 								AuthType: operatorapiv1.GRPCAuthType,
-								GRPC: &operatorapiv1.GRPCConfig{
-									EndpointExposure: &operatorapiv1.GRPCEndpointExposure{
-										Type: operatorapiv1.GRPCEndpointTypeHostname,
-										Hostname: &operatorapiv1.HostnameConfig{
-											Value: "test.example.com",
-										},
+							},
+						},
+					},
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: "grpc",
+								GRPC: &operatorapiv1.Endpoint{
+									Type: operatorapiv1.EndpointTypeHostname,
+									Hostname: &operatorapiv1.HostnameConfig{
+										Host: "test.example.com",
 									},
 								},
 							},
