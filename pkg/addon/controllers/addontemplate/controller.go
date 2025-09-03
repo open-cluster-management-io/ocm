@@ -102,12 +102,33 @@ func NewAddonTemplateController(
 
 func (c *addonTemplateController) stopUnusedManagers(
 	ctx context.Context, syncCtx factory.SyncContext, addOnName string) {
-	// TODO: check if all managed cluster addon instances are deleted
+	logger := klog.FromContext(ctx)
+
+	// Check if all managed cluster addon instances are deleted before stopping the manager
+	// This allows pre-delete jobs to complete
+	listOptions := metav1.ListOptions{
+		FieldSelector: "metadata.name=" + addOnName,
+	}
+	mcaList, err := c.addonClient.AddonV1alpha1().ManagedClusterAddOns("").List(ctx, listOptions)
+	if err != nil {
+		logger.Error(err, "Failed to list ManagedClusterAddOns", "addonName", addOnName)
+		return
+	}
+
+	// Check if there are still ManagedClusterAddOns for this addon
+	if len(mcaList.Items) > 0 {
+		logger.Info("ManagedClusterAddOn still exists, waiting for deletion",
+			"addonName", addOnName, "count", len(mcaList.Items))
+		// Requeue to check again later
+		syncCtx.Queue().AddAfter(addOnName, 10*time.Second)
+		return
+	}
+
 	stopFunc, ok := c.addonManagers[addOnName]
 	if ok {
 		stopFunc()
 		delete(c.addonManagers, addOnName)
-		klog.FromContext(ctx).Info("Stopping the manager for addon", "addonName", addOnName)
+		logger.Info("Stopping the manager for addon", "addonName", addOnName)
 	}
 }
 
