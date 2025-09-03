@@ -326,6 +326,15 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 ## explicit; go 1.20
 github.com/gorilla/websocket
+# github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
+## explicit; go 1.14
+github.com/grpc-ecosystem/go-grpc-middleware
+# github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0
+## explicit; go 1.21
+github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus
+# github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0
+## explicit; go 1.19
+github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors
 # github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 ## explicit
 github.com/grpc-ecosystem/go-grpc-prometheus
@@ -889,6 +898,10 @@ google.golang.org/grpc/keepalive
 google.golang.org/grpc/mem
 google.golang.org/grpc/metadata
 google.golang.org/grpc/peer
+google.golang.org/grpc/reflection
+google.golang.org/grpc/reflection/grpc_reflection_v1
+google.golang.org/grpc/reflection/grpc_reflection_v1alpha
+google.golang.org/grpc/reflection/internal
 google.golang.org/grpc/resolver
 google.golang.org/grpc/resolver/dns
 google.golang.org/grpc/resolver/manual
@@ -1716,7 +1729,7 @@ k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/ptr
 k8s.io/utils/trace
-# open-cluster-management.io/addon-framework v1.0.1-0.20250722093201-ee47752c02f3
+# open-cluster-management.io/addon-framework v1.0.1-0.20250811135502-4bae358d84c6
 ## explicit; go 1.24.0
 open-cluster-management.io/addon-framework/pkg/addonfactory
 open-cluster-management.io/addon-framework/pkg/addonmanager
@@ -1800,7 +1813,7 @@ open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v1.0.1-0.20250805021042-68bb7fc51d4e
+# open-cluster-management.io/sdk-go v1.0.1-0.20250901084824-d4c9f78c2e6a
 ## explicit; go 1.24.0
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
@@ -1845,12 +1858,14 @@ open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types
 open-cluster-management.io/sdk-go/pkg/cloudevents/server
 open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc
-open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authn
-open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authz
 open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authz/kube
-open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/options
+open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/metrics
 open-cluster-management.io/sdk-go/pkg/helpers
 open-cluster-management.io/sdk-go/pkg/patcher
+open-cluster-management.io/sdk-go/pkg/server/grpc
+open-cluster-management.io/sdk-go/pkg/server/grpc/authn
+open-cluster-management.io/sdk-go/pkg/server/grpc/authz
+open-cluster-management.io/sdk-go/pkg/server/grpc/metrics
 open-cluster-management.io/sdk-go/pkg/testing
 open-cluster-management.io/sdk-go/test/integration/cloudevents/util
 # sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03

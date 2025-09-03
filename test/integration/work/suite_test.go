@@ -11,6 +11,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
+	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -29,7 +30,10 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/payload"
 	sourcecodec "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/source/codec"
 	workstore "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/store"
-	grpcoptions "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/options"
+	pbv1 "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protobuf/v1"
+	cloudeventsgrpc "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc"
+	cemetrics "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/metrics"
+	sdkgrpc "open-cluster-management.io/sdk-go/pkg/server/grpc"
 
 	"open-cluster-management.io/ocm/pkg/features"
 	serviceswork "open-cluster-management.io/ocm/pkg/server/services/work"
@@ -168,10 +172,20 @@ var _ = ginkgo.BeforeSuite(func() {
 
 		hook, err := util.NewGRPCServerWorkHook(cfg)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		server := grpcoptions.NewServer(gRPCServerOptions).WithPreStartHooks(hook).WithService(
-			payload.ManifestBundleEventDataType,
-			serviceswork.NewWorkService(hook.WorkClient, hook.WorkInformers.Work().V1().ManifestWorks()),
-		)
+		go hook.Run(envCtx)
+
+		grpcEventServer := cloudeventsgrpc.NewGRPCBroker()
+		grpcEventServer.RegisterService(payload.ManifestBundleEventDataType,
+			serviceswork.NewWorkService(hook.WorkClient, hook.WorkInformers.Work().V1().ManifestWorks()))
+
+		authorizer := util.NewMockAuthorizer()
+		server := sdkgrpc.NewGRPCServer(gRPCServerOptions).
+			WithUnaryAuthorizer(authorizer).
+			WithStreamAuthorizer(authorizer).
+			WithRegisterFunc(func(s *grpc.Server) {
+				pbv1.RegisterCloudEventServiceServer(s, grpcEventServer)
+			}).
+			WithExtraMetrics(cemetrics.CloudEventsGRPCMetrics()...)
 
 		go func() {
 			err := server.Run(envCtx)

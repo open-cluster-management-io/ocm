@@ -1,6 +1,8 @@
-package options
+package grpc
 
 import (
+	"crypto/tls"
+	"fmt"
 	"math"
 	"os"
 	"time"
@@ -14,6 +16,8 @@ type GRPCServerOptions struct {
 	TLSCertFile             string        `json:"tls_cert_file" yaml:"tls_cert_file"`
 	TLSKeyFile              string        `json:"tls_key_file" yaml:"tls_key_file"`
 	ClientCAFile            string        `json:"client_ca_file" yaml:"client_ca_file"`
+	TLSMinVersion           uint16        `json:"tls_min_version" yaml:"tls_min_version"`
+	TLSMaxVersion           uint16        `json:"tls_max_version" yaml:"tls_max_version"`
 	ServerBindPort          string        `json:"server_bind_port" yaml:"server_bind_port"`
 	MaxConcurrentStreams    uint32        `json:"max_concurrent_streams" yaml:"max_concurrent_streams"`
 	MaxReceiveMessageSize   int           `json:"max_receive_message_size" yaml:"max_receive_message_size"`
@@ -44,6 +48,10 @@ func LoadGRPCServerOptions(configPath string) (*GRPCServerOptions, error) {
 		return nil, err
 	}
 
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
+
 	return opts, nil
 }
 
@@ -52,6 +60,8 @@ func NewGRPCServerOptions() *GRPCServerOptions {
 		ClientCAFile:          "/var/run/secrets/hub/grpc/ca/ca-bundle.crt",
 		TLSCertFile:           "/var/run/secrets/hub/grpc/serving-cert/tls.crt",
 		TLSKeyFile:            "/var/run/secrets/hub/grpc/serving-cert/tls.key",
+		TLSMinVersion:         tls.VersionTLS12,
+		TLSMaxVersion:         tls.VersionTLS13,
 		ServerBindPort:        "8090",
 		MaxConcurrentStreams:  math.MaxUint32,
 		MaxReceiveMessageSize: 1024 * 1024 * 4,
@@ -82,4 +92,16 @@ func (o *GRPCServerOptions) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.TLSCertFile, "grpc-tls-cert-file", o.TLSCertFile, "The path to the tls.crt file")
 	flags.StringVar(&o.TLSKeyFile, "grpc-tls-key-file", o.TLSKeyFile, "The path to the tls.key file")
 	flags.StringVar(&o.ClientCAFile, "grpc-client-ca-file", o.ClientCAFile, "The path to the client ca file, must specify if using mtls authentication type")
+}
+
+// Validate checks option ranges and cross-field constraints.
+func (o *GRPCServerOptions) Validate() error {
+	// Enforce sane floor for TLS for security posture.
+	if o.TLSMinVersion < tls.VersionTLS12 {
+		return fmt.Errorf("tls_min_version (%d) is lower than TLS 1.2 (771); minimum supported is TLS 1.2", o.TLSMinVersion)
+	}
+	if o.TLSMinVersion > o.TLSMaxVersion {
+		return fmt.Errorf("tls_min_version (%d) must be <= tls_max_version (%d)", o.TLSMinVersion, o.TLSMaxVersion)
+	}
+	return nil
 }

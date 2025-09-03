@@ -17,9 +17,6 @@ type AgentEventServer interface {
 	// RegisterService registers a backend service with a certain data type.
 	RegisterService(t types.CloudEventsDataType, service Service)
 
-	// Start initiates the EventServer to listen to agents.
-	Start(ctx context.Context, addr string)
-
 	// Subscribers returns all current subscribers who subscribe to this server.
 	Subscribers() sets.Set[string]
 }

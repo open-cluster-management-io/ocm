@@ -36,7 +36,7 @@ type cmaConfigController struct {
 	clusterManagementAddonLister  addonlisterv1alpha1.ClusterManagementAddOnLister
 	clusterManagementAddonIndexer cache.Indexer
 	configListers                 map[schema.GroupResource]dynamiclister.Lister
-	queue                         workqueue.RateLimitingInterface
+	queue                         workqueue.TypedRateLimitingInterface[string]
 	addonFilterFunc               factory.EventFilterFunc
 	configGVRs                    map[schema.GroupVersionResource]bool
 	addonPatcher                  patcher.Patcher[*addonapiv1alpha1.ClusterManagementAddOn,
