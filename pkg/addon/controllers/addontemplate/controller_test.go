@@ -25,6 +25,7 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
 func TestReconcile(t *testing.T) {
@@ -266,5 +267,125 @@ func TestRunController(t *testing.T) {
 		} else {
 			assert.Contains(t, err.Error(), c.expectedErr, "name : %s, expected error %v, but got %v", c.name, c.expectedErr, err)
 		}
+	}
+}
+
+func TestStopUnusedManagers(t *testing.T) {
+	cases := []struct {
+		name                   string
+		addonName              string
+		managedClusterAddons   []runtime.Object
+		existingManagers       map[string]context.CancelFunc
+		expectedManagerStopped bool
+		expectedRequeue        bool
+	}{
+		{
+			name:                 "no managed cluster addons, manager should be stopped",
+			addonName:            "test-addon",
+			managedClusterAddons: []runtime.Object{},
+			existingManagers: map[string]context.CancelFunc{
+				"test-addon": func() {},
+			},
+			expectedManagerStopped: true,
+			expectedRequeue:        false,
+		},
+		{
+			name:      "managed cluster addons exist, manager should not be stopped",
+			addonName: "test-addon",
+			managedClusterAddons: []runtime.Object{
+				testinghelpers.NewManagedClusterAddons("test-addon", "cluster1", nil, nil),
+			},
+			existingManagers: map[string]context.CancelFunc{
+				"test-addon": func() {},
+			},
+			expectedManagerStopped: false,
+			expectedRequeue:        true,
+		},
+		{
+			name:      "multiple managed cluster addons exist, manager should not be stopped",
+			addonName: "test-addon",
+			managedClusterAddons: []runtime.Object{
+				testinghelpers.NewManagedClusterAddons("test-addon", "cluster1", nil, nil),
+				testinghelpers.NewManagedClusterAddons("test-addon", "cluster2", nil, nil),
+			},
+			existingManagers: map[string]context.CancelFunc{
+				"test-addon": func() {},
+			},
+			expectedManagerStopped: false,
+			expectedRequeue:        true,
+		},
+		{
+			name:                   "no manager exists, should not error",
+			addonName:              "test-addon",
+			managedClusterAddons:   []runtime.Object{},
+			existingManagers:       map[string]context.CancelFunc{},
+			expectedManagerStopped: false,
+			expectedRequeue:        false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fakeAddonClient := fakeaddon.NewSimpleClientset(c.managedClusterAddons...)
+			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
+
+			fakeDynamicClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+			dynamicInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(fakeDynamicClient, 0)
+			fakeClusterClient := fakecluster.NewSimpleClientset()
+			clusterInformers := clusterv1informers.NewSharedInformerFactory(fakeClusterClient, 10*time.Minute)
+			fakeWorkClient := fakework.NewSimpleClientset()
+			workInformers := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
+			hubKubeClient := fakekube.NewSimpleClientset()
+
+			managerStopped := false
+			existingManagers := make(map[string]context.CancelFunc)
+			for name, stopFunc := range c.existingManagers {
+				existingManagers[name] = func() {
+					if name == c.addonName {
+						managerStopped = true
+					}
+					stopFunc()
+				}
+			}
+
+			controller := &addonTemplateController{
+				kubeConfig:       &rest.Config{},
+				kubeClient:       hubKubeClient,
+				addonClient:      fakeAddonClient,
+				workClient:       fakeWorkClient,
+				cmaLister:        addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+				addonManagers:    existingManagers,
+				addonInformers:   addonInformers,
+				clusterInformers: clusterInformers,
+				dynamicInformers: dynamicInformerFactory,
+				workInformers:    workInformers,
+				eventRecorder:    eventstesting.NewTestingEventRecorder(t),
+			}
+
+			ctx := context.TODO()
+			syncContext := testingcommon.NewFakeSyncContext(t, c.addonName)
+
+			controller.stopUnusedManagers(ctx, syncContext, c.addonName)
+
+			// Check if manager was stopped
+			if c.expectedManagerStopped {
+				assert.True(t, managerStopped, "expected manager to be stopped")
+				_, exists := controller.addonManagers[c.addonName]
+				assert.False(t, exists, "expected manager to be removed from map")
+			} else {
+				assert.False(t, managerStopped, "expected manager not to be stopped")
+				if len(c.existingManagers) > 0 {
+					_, exists := controller.addonManagers[c.addonName]
+					assert.True(t, exists, "expected manager to still exist in map")
+				}
+			}
+
+			// Check if requeue was called
+			if c.expectedRequeue {
+				// We can't easily test the exact requeue behavior with the fake sync context
+				// but we can verify the manager wasn't stopped when it should be requeued
+				assert.False(t, managerStopped, "manager should not be stopped when requeue is expected")
+			}
+		})
 	}
 }
