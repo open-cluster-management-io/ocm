@@ -365,8 +365,8 @@ func TestStopUnusedManagers(t *testing.T) {
 			ctx := context.TODO()
 			syncContext := testingcommon.NewFakeSyncContext(t, c.addonName)
 
-			controller.stopUnusedManagers(ctx, syncContext, c.addonName)
-
+			err := controller.stopUnusedManagers(ctx, syncContext, c.addonName)
+			assert.NoError(t, err)
 			// Check if manager was stopped
 			if c.expectedManagerStopped {
 				assert.True(t, managerStopped, "expected manager to be stopped")

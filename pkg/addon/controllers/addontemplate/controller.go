@@ -101,7 +101,7 @@ func NewAddonTemplateController(
 }
 
 func (c *addonTemplateController) stopUnusedManagers(
-	ctx context.Context, syncCtx factory.SyncContext, addOnName string) {
+	ctx context.Context, syncCtx factory.SyncContext, addOnName string) error {
 	logger := klog.FromContext(ctx)
 
 	// Check if all managed cluster addon instances are deleted before stopping the manager
@@ -111,8 +111,7 @@ func (c *addonTemplateController) stopUnusedManagers(
 	}
 	mcaList, err := c.addonClient.AddonV1alpha1().ManagedClusterAddOns("").List(ctx, listOptions)
 	if err != nil {
-		logger.Error(err, "Failed to list ManagedClusterAddOns", "addonName", addOnName)
-		return
+		return err
 	}
 
 	// Check if there are still ManagedClusterAddOns for this addon
@@ -121,7 +120,7 @@ func (c *addonTemplateController) stopUnusedManagers(
 			"addonName", addOnName, "count", len(mcaList.Items))
 		// Requeue to check again later
 		syncCtx.Queue().AddAfter(addOnName, 10*time.Second)
-		return
+		return nil
 	}
 
 	stopFunc, ok := c.addonManagers[addOnName]
@@ -130,6 +129,7 @@ func (c *addonTemplateController) stopUnusedManagers(
 		delete(c.addonManagers, addOnName)
 		logger.Info("Stopping the manager for addon", "addonName", addOnName)
 	}
+	return nil
 }
 
 func (c *addonTemplateController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
@@ -139,15 +139,13 @@ func (c *addonTemplateController) sync(ctx context.Context, syncCtx factory.Sync
 	cma, err := c.cmaLister.Get(addonName)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			c.stopUnusedManagers(ctx, syncCtx, addonName)
-			return nil
+			return c.stopUnusedManagers(ctx, syncCtx, addonName)
 		}
 		return err
 	}
 
 	if !templateagent.SupportAddOnTemplate(cma) {
-		c.stopUnusedManagers(ctx, syncCtx, cma.Name)
-		return nil
+		return c.stopUnusedManagers(ctx, syncCtx, cma.Name)
 	}
 
 	_, exist := c.addonManagers[addonName]
