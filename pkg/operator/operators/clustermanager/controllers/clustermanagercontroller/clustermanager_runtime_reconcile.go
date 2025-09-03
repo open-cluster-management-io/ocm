@@ -101,14 +101,15 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 					config.AutoApprovedCSRUsers = strings.Join(registrationDriver.CSR.AutoApprovedIdentities, ",")
 				}
 			case operatorapiv1.GRPCAuthType:
-				if registrationDriver.GRPC == nil {
+				if cm.Spec.ServerConfiguration != nil {
+					config.GRPCServerImage = cm.Spec.ServerConfiguration.ImagePullSpec
+				} else {
 					// using registration image as default
 					config.GRPCServerImage = cm.Spec.RegistrationImagePullSpec
-					continue
 				}
-
-				config.GRPCServerImage = registrationDriver.GRPC.ImagePullSpec
-				config.GRPAutoApprovedCUsers = strings.Join(registrationDriver.GRPC.AutoApprovedIdentities, ",")
+				if registrationDriver.GRPC != nil {
+					config.GRPAutoApprovedCUsers = strings.Join(registrationDriver.GRPC.AutoApprovedIdentities, ",")
+				}
 			}
 		}
 		config.EnabledRegistrationDrivers = strings.Join(enabledRegistrationDrivers, ",")

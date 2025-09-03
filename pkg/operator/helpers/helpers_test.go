@@ -1930,12 +1930,13 @@ func TestGRPCServerHostNames(t *testing.T) {
 			desiredResult: []string{"cluster-manager-grpc-server.test.svc"},
 		},
 		{
-			name: "one grpc registration driver, no hostname",
+			name: "one grpc registration driver, no server configuration",
 			cm: &operatorapiv1.ClusterManager{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-manager",
 				},
 				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: nil,
 					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
 						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
 							{AuthType: operatorapiv1.GRPCAuthType},
@@ -1947,24 +1948,61 @@ func TestGRPCServerHostNames(t *testing.T) {
 			desiredResult: []string{"cluster-manager-grpc-server.test.svc"},
 		},
 		{
-			name: "one grpc registration driver, with hostname",
+			name: "one grpc registration driver, with server configuration of https",
 			cm: &operatorapiv1.ClusterManager{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-manager",
 				},
 				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: "https",
+								HTTPS: &operatorapiv1.Endpoint{
+									Type: operatorapiv1.EndpointTypeHostname,
+									Hostname: &operatorapiv1.HostnameConfig{
+										Host: "test.example.com",
+									},
+								},
+							},
+						},
+					},
 					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
 						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
 							{
 								AuthType: operatorapiv1.GRPCAuthType,
-								GRPC: &operatorapiv1.GRPCConfig{
-									EndpointExposure: &operatorapiv1.GRPCEndpointExposure{
-										Type: operatorapiv1.GRPCEndpointTypeHostname,
-										Hostname: &operatorapiv1.HostnameConfig{
-											Value: "test.example.com",
-										},
+							},
+						},
+					},
+				},
+			},
+			namespace:     "test",
+			desiredResult: []string{"cluster-manager-grpc-server.test.svc"},
+		},
+		{
+			name: "one grpc registration driver, with server configuration of grpc",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: "grpc",
+								GRPC: &operatorapiv1.Endpoint{
+									Type: operatorapiv1.EndpointTypeHostname,
+									Hostname: &operatorapiv1.HostnameConfig{
+										Host: "test.example.com",
 									},
 								},
+							},
+						},
+					},
+					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
+						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+							{
+								AuthType: operatorapiv1.GRPCAuthType,
 							},
 						},
 					},

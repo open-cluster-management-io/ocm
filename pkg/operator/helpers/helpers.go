@@ -934,20 +934,20 @@ func GRPCAuthEnabled(cm *operatorapiv1.ClusterManager) bool {
 
 func GRPCServerHostNames(clustermanagerNamespace string, cm *operatorapiv1.ClusterManager) []string {
 	hostNames := []string{fmt.Sprintf("%s-grpc-server.%s.svc", cm.Name, clustermanagerNamespace)}
-	if cm.Spec.RegistrationConfiguration != nil {
-		for _, registrationDriver := range cm.Spec.RegistrationConfiguration.RegistrationDrivers {
-			if registrationDriver.AuthType != operatorapiv1.GRPCAuthType {
-				continue
-			}
+	if !GRPCAuthEnabled(cm) {
+		return hostNames
+	}
 
-			if registrationDriver.GRPC != nil && registrationDriver.GRPC.EndpointExposure != nil {
-				if registrationDriver.GRPC.EndpointExposure.Type == operatorapiv1.GRPCEndpointTypeHostname {
-					if registrationDriver.GRPC.EndpointExposure.Hostname != nil {
-						hostNames = append(hostNames, registrationDriver.GRPC.EndpointExposure.Hostname.Value)
-					}
+	if cm.Spec.ServerConfiguration != nil {
+		for _, endpointExposure := range cm.Spec.ServerConfiguration.EndpointsExposure {
+			if endpointExposure.Protocol == "grpc" && endpointExposure.GRPC != nil {
+				if endpointExposure.GRPC.Type == operatorapiv1.EndpointTypeHostname &&
+					endpointExposure.GRPC.Hostname != nil {
+					hostNames = append(hostNames, endpointExposure.GRPC.Hostname.Host)
 				}
 			}
 		}
 	}
+
 	return hostNames
 }
