@@ -63,6 +63,7 @@ test-cloudevents-work-mqtt-integration: ensure-kubebuilder-tools build-work-inte
 		-ginkgo.skip-file manifestworkreplicaset_test.go \
 		-ginkgo.skip-file executor_test.go \
 		-ginkgo.skip-file unmanaged_appliedwork_test.go \
+		-ginkgo.skip-file completedmanifestwork_test.go \
 		-test.driver=mqtt \
 		-v=4 ${ARGS}
 .PHONY: test-cloudevents-work-mqtt-integration
