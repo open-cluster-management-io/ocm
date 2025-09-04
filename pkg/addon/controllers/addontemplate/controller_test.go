@@ -13,6 +13,7 @@ import (
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/utils"
@@ -25,6 +26,7 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
@@ -151,6 +153,15 @@ func TestReconcile(t *testing.T) {
 
 		addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
 
+		// Add the index for ManagedClusterAddonByName
+		err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
+			cache.Indexers{
+				addonindex.ManagedClusterAddonByName: addonindex.IndexManagedClusterAddonByName,
+			})
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		for _, obj := range c.managedClusteraddon {
 			if err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
 				t.Fatal(err)
@@ -249,15 +260,16 @@ func TestRunController(t *testing.T) {
 		workInformers := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
 		hubKubeClient := fakekube.NewSimpleClientset()
 		controller := &addonTemplateController{
-			kubeConfig:       &rest.Config{},
-			kubeClient:       hubKubeClient,
-			addonClient:      fakeAddonClient,
-			cmaLister:        addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
-			addonManagers:    make(map[string]context.CancelFunc),
-			addonInformers:   addonInformers,
-			clusterInformers: clusterInformers,
-			dynamicInformers: dynamicInformerFactory,
-			workInformers:    workInformers,
+			kubeConfig:                 &rest.Config{},
+			kubeClient:                 hubKubeClient,
+			addonClient:                fakeAddonClient,
+			cmaLister:                  addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+			managedClusterAddonIndexer: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetIndexer(),
+			addonManagers:              make(map[string]context.CancelFunc),
+			addonInformers:             addonInformers,
+			clusterInformers:           clusterInformers,
+			dynamicInformers:           dynamicInformerFactory,
+			workInformers:              workInformers,
 		}
 		ctx := context.TODO()
 
@@ -348,19 +360,29 @@ func TestStopUnusedManagers(t *testing.T) {
 				}
 			}
 
+			// Add the index for ManagedClusterAddonByName
+			err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
+				cache.Indexers{
+					addonindex.ManagedClusterAddonByName: addonindex.IndexManagedClusterAddonByName,
+				})
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			controller := &addonTemplateController{
-				kubeConfig:       &rest.Config{},
-				kubeClient:       hubKubeClient,
-				addonClient:      fakeAddonClient,
-				workClient:       fakeWorkClient,
-				cmaLister:        addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
-				mcaLister:        addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				addonManagers:    existingManagers,
-				addonInformers:   addonInformers,
-				clusterInformers: clusterInformers,
-				dynamicInformers: dynamicInformerFactory,
-				workInformers:    workInformers,
-				eventRecorder:    eventstesting.NewTestingEventRecorder(t),
+				kubeConfig:                 &rest.Config{},
+				kubeClient:                 hubKubeClient,
+				addonClient:                fakeAddonClient,
+				workClient:                 fakeWorkClient,
+				cmaLister:                  addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+				mcaLister:                  addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				managedClusterAddonIndexer: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetIndexer(),
+				addonManagers:              existingManagers,
+				addonInformers:             addonInformers,
+				clusterInformers:           clusterInformers,
+				dynamicInformers:           dynamicInformerFactory,
+				workInformers:              workInformers,
+				eventRecorder:              eventstesting.NewTestingEventRecorder(t),
 			}
 
 			// Start informers and wait for cache sync
@@ -370,7 +392,7 @@ func TestStopUnusedManagers(t *testing.T) {
 
 			syncContext := testingcommon.NewFakeSyncContext(t, c.addonName)
 
-			err := controller.stopUnusedManagers(ctx, syncContext, c.addonName)
+			err = controller.stopUnusedManagers(ctx, syncContext, c.addonName)
 			assert.NoError(t, err)
 			// Check if manager was stopped
 			if c.expectedManagerStopped {
