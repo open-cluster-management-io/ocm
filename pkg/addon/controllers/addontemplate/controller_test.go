@@ -354,6 +354,7 @@ func TestStopUnusedManagers(t *testing.T) {
 				addonClient:      fakeAddonClient,
 				workClient:       fakeWorkClient,
 				cmaLister:        addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+				mcaLister:        addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 				addonManagers:    existingManagers,
 				addonInformers:   addonInformers,
 				clusterInformers: clusterInformers,
@@ -362,7 +363,11 @@ func TestStopUnusedManagers(t *testing.T) {
 				eventRecorder:    eventstesting.NewTestingEventRecorder(t),
 			}
 
+			// Start informers and wait for cache sync
 			ctx := context.TODO()
+			addonInformers.Start(ctx.Done())
+			addonInformers.WaitForCacheSync(ctx.Done())
+
 			syncContext := testingcommon.NewFakeSyncContext(t, c.addonName)
 
 			err := controller.stopUnusedManagers(ctx, syncContext, c.addonName)
