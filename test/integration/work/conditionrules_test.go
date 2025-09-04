@@ -3,7 +3,6 @@ package work
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -15,15 +14,12 @@ import (
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
-	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
-	"open-cluster-management.io/ocm/pkg/work/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
-	var o *spoke.WorkloadAgentOptions
-	var commOptions *commonoptions.AgentOptions
 	var cancel context.CancelFunc
+	var clusterName string
 
 	var workName string
 	var work *workapiv1.ManifestWork
@@ -33,22 +29,10 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 
 	ginkgo.BeforeEach(func() {
 		workName = fmt.Sprintf("condition-rules-work-%s", rand.String(5))
-		clusterName := rand.String(5)
-
-		o = spoke.NewWorkloadAgentOptions()
-		o.StatusSyncInterval = 3 * time.Second
-		o.WorkloadSourceDriver = sourceDriver
-		o.WorkloadSourceConfig = sourceConfigFileName
-		if sourceDriver != util.KubeDriver {
-			o.CloudEventsClientID = fmt.Sprintf("%s-work-agent", clusterName)
-			o.CloudEventsClientCodecs = []string{"manifestbundle"}
-		}
-
-		commOptions = commonoptions.NewAgentOptions()
-		commOptions.SpokeClusterName = clusterName
+		clusterName = rand.String(5)
 
 		ns := &corev1.Namespace{}
-		ns.Name = commOptions.SpokeClusterName
+		ns.Name = clusterName
 		_, err = spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -57,24 +41,24 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 	})
 
 	ginkgo.JustBeforeEach(func() {
-		work = util.NewManifestWork(commOptions.SpokeClusterName, workName, manifests)
+		work = util.NewManifestWork(clusterName, workName, manifests)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.AfterEach(func() {
-		err := spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), commOptions.SpokeClusterName, metav1.DeleteOptions{})
+		err := spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), clusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.Context("Job Condition Rules", func() {
 		ginkgo.BeforeEach(func() {
-			u, _, err := util.NewJob(commOptions.SpokeClusterName, "job1", "sa")
+			u, _, err := util.NewJob(clusterName, "job1", "sa")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			manifests = append(manifests, util.ToManifest(u))
 
 			var ctx context.Context
 			ctx, cancel = context.WithCancel(context.Background())
-			go startWorkAgent(ctx, o, commOptions)
+			go startWorkAgent(ctx, clusterName)
 		})
 
 		ginkgo.AfterEach(func() {
@@ -89,7 +73,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "batch",
 						Resource:  "jobs",
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      "job1",
 					},
 					UpdateStrategy: &workapiv1.UpdateStrategy{
@@ -104,7 +88,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -114,7 +98,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 
 			// Update Job status on spoke
 			gomega.Eventually(func() error {
-				job, err := spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).Get(context.Background(), "job1", metav1.GetOptions{})
+				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -122,13 +106,13 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				job.Status.Active = 1
 				job.Status.Ready = ptr.To(int32(1))
 
-				_, err = spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Check completed condition
 			gomega.Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -146,7 +130,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 
 			// Update complete condition on job
 			gomega.Eventually(func() error {
-				job, err := spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).Get(context.Background(), "job1", metav1.GetOptions{})
+				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -163,13 +147,13 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					},
 				}
 
-				_, err = spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Check if the condition is updated on work api
 			gomega.Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -211,7 +195,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -220,7 +204,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			gomega.Eventually(func() error {
-				job, err := spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).Get(context.Background(), "job1", metav1.GetOptions{})
+				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -228,13 +212,13 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				job.Status.Active = 3
 				job.Status.Conditions = []batchv1.JobCondition{}
 
-				_, err = spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Check if we get condition on work api
 			gomega.Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -253,20 +237,20 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 
 			// Set active to 1
 			gomega.Eventually(func() error {
-				job, err := spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).Get(context.Background(), "job1", metav1.GetOptions{})
+				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
 				job.Status.Active = 1
 
-				_, err = spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Check if condition is updated on work api
 			gomega.Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -290,7 +274,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "batch",
 						Resource:  "jobs",
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      "job1",
 					},
 					UpdateStrategy: &workapiv1.UpdateStrategy{
@@ -305,7 +289,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -315,7 +299,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 
 			// Update Job status on spoke
 			gomega.Eventually(func() error {
-				job, err := spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).Get(context.Background(), "job1", metav1.GetOptions{})
+				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -324,13 +308,13 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				job.Status.Ready = ptr.To(int32(1))
 				job.Status.Conditions = []batchv1.JobCondition{}
 
-				_, err = spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Check if we get condition on work api
 			gomega.Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -349,16 +333,16 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 
 	ginkgo.Context("Jobs condition rules with wildcard", func() {
 		ginkgo.BeforeEach(func() {
-			job1, _, err := util.NewJob(commOptions.SpokeClusterName, "job1", "sa")
+			job1, _, err := util.NewJob(clusterName, "job1", "sa")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			manifests = append(manifests, util.ToManifest(job1))
-			job2, _, err := util.NewJob(commOptions.SpokeClusterName, "job2", "sa")
+			job2, _, err := util.NewJob(clusterName, "job2", "sa")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			manifests = append(manifests, util.ToManifest(job2))
 
 			var ctx context.Context
 			ctx, cancel = context.WithCancel(context.Background())
-			go startWorkAgent(ctx, o, commOptions)
+			go startWorkAgent(ctx, clusterName)
 		})
 
 		ginkgo.AfterEach(func() {
@@ -388,7 +372,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -399,7 +383,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 			// Update Job status on spoke
 			gomega.Eventually(func() error {
 				// Set first job as active
-				job, err := spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).Get(context.Background(), "job1", metav1.GetOptions{})
+				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -407,13 +391,13 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				job.Status.Active = 1
 				job.Status.Ready = ptr.To(int32(1))
 
-				_, err = spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
 				if err != nil {
 					return err
 				}
 
 				// Set second job as complete
-				job, err = spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).Get(context.Background(), "job2", metav1.GetOptions{})
+				job, err = spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job2", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -430,13 +414,13 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					},
 				}
 
-				_, err = spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Check if we get conditions of jobs on work api
 			gomega.Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -504,7 +488,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(),
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(),
 				work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -516,7 +500,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 			// Update Job status on spoke
 			gomega.Eventually(func() error {
 				// Set first job as active
-				job, err := spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).Get(context.Background(), "job1", metav1.GetOptions{})
+				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -524,13 +508,13 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				job.Status.Active = 1
 				job.Status.Ready = ptr.To(int32(1))
 
-				_, err = spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
 				if err != nil {
 					return err
 				}
 
 				// Set second job as complete
-				job, err = spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).Get(context.Background(), "job2", metav1.GetOptions{})
+				job, err = spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job2", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -547,13 +531,13 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 					},
 				}
 
-				_, err = spokeKubeClient.BatchV1().Jobs(commOptions.SpokeClusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Check if we get conditions of jobs on work api
 			gomega.Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}

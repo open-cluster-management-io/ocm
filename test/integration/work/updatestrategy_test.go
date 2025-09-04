@@ -3,7 +3,6 @@ package work
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -18,60 +17,46 @@ import (
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
-	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
-	"open-cluster-management.io/ocm/pkg/work/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
-	var o *spoke.WorkloadAgentOptions
-	var commOptions *commonoptions.AgentOptions
 	var cancel context.CancelFunc
 
 	var workName string
+	var clusterName string
 	var work *workapiv1.ManifestWork
 	var manifests []workapiv1.Manifest
 
 	var err error
 
 	ginkgo.BeforeEach(func() {
-		clusterName := rand.String(5)
+		clusterName = rand.String(5)
 		workName = fmt.Sprintf("update-strategy-work-%s", rand.String(5))
 
-		o = spoke.NewWorkloadAgentOptions()
-		o.StatusSyncInterval = 3 * time.Second
-		o.WorkloadSourceDriver = sourceDriver
-		o.WorkloadSourceConfig = sourceConfigFileName
-		if sourceDriver != util.KubeDriver {
-			o.CloudEventsClientID = fmt.Sprintf("%s-work-agent", clusterName)
-			o.CloudEventsClientCodecs = []string{"manifestbundle"}
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterName},
 		}
-
-		commOptions = commonoptions.NewAgentOptions()
-		commOptions.SpokeClusterName = clusterName
-
-		ns := &corev1.Namespace{}
-		ns.Name = commOptions.SpokeClusterName
 		_, err := spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		var ctx context.Context
 		ctx, cancel = context.WithCancel(context.Background())
-		go startWorkAgent(ctx, o, commOptions)
+		go startWorkAgent(ctx, clusterName)
 
 		// reset manifests
 		manifests = nil
 	})
 
 	ginkgo.JustBeforeEach(func() {
-		work = util.NewManifestWork(commOptions.SpokeClusterName, workName, manifests)
+		work = util.NewManifestWork(clusterName, workName, manifests)
 	})
 
 	ginkgo.AfterEach(func() {
 		if cancel != nil {
 			cancel()
 		}
-		err := spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), commOptions.SpokeClusterName, metav1.DeleteOptions{})
+		err := spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), clusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
@@ -79,7 +64,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 		var object *unstructured.Unstructured
 
 		ginkgo.BeforeEach(func() {
-			object, _, err = util.NewDeployment(commOptions.SpokeClusterName, "deploy1", "sa")
+			object, _, err = util.NewDeployment(clusterName, "deploy1", "sa")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			manifests = append(manifests, util.ToManifest(object))
 		})
@@ -90,7 +75,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "apps",
 						Resource:  "deployments",
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      "deploy1",
 					},
 					UpdateStrategy: &workapiv1.UpdateStrategy{
@@ -99,7 +84,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -109,7 +94,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 			err = unstructured.SetNestedField(object.Object, int64(3), "spec", "replicas")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -122,7 +107,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 					return err
 				}
 
-				_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Patch(
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
 					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -131,7 +116,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			gomega.Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -148,14 +133,14 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 	ginkgo.Context("Read only strategy", func() {
 		var cm *corev1.ConfigMap
 		ginkgo.BeforeEach(func() {
-			cm = util.NewConfigmap(commOptions.SpokeClusterName, "cm1", map[string]string{"test": "testdata"}, []string{})
-			_, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Create(context.TODO(), cm, metav1.CreateOptions{})
+			cm = util.NewConfigmap(clusterName, "cm1", map[string]string{"test": "testdata"}, []string{})
+			_, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Create(context.TODO(), cm, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			manifests = append(manifests, util.ToManifest(cm))
 		})
 
 		ginkgo.AfterEach(func() {
-			err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Delete(context.TODO(), "cm1", metav1.DeleteOptions{})
+			err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Delete(context.TODO(), "cm1", metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 
@@ -164,7 +149,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Resource:  "configmaps",
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      "cm1",
 					},
 					UpdateStrategy: &workapiv1.UpdateStrategy{
@@ -184,7 +169,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -192,7 +177,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 
 			ginkgo.By("get configmap values from the work")
 			gomega.Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -221,20 +206,20 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 
 			ginkgo.By("update configmap")
 			gomega.Eventually(func() error {
-				cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
 				cm.Data["test"] = "testdata-updated"
 
-				_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Update(context.Background(), cm, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Update(context.Background(), cm, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			ginkgo.By("get updated configmap values from the work")
 			gomega.Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -267,7 +252,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 		var object *unstructured.Unstructured
 
 		ginkgo.BeforeEach(func() {
-			object, _, err = util.NewDeployment(commOptions.SpokeClusterName, "deploy1", "sa")
+			object, _, err = util.NewDeployment(clusterName, "deploy1", "sa")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			manifests = append(manifests, util.ToManifest(object))
 		})
@@ -278,7 +263,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "apps",
 						Resource:  "deployments",
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      "deploy1",
 					},
 					UpdateStrategy: &workapiv1.UpdateStrategy{
@@ -287,7 +272,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -296,7 +281,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 			// update work
 			err = unstructured.SetNestedField(object.Object, int64(3), "spec", "replicas")
 			gomega.Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -309,13 +294,13 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 					return err
 				}
 
-				_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Patch(
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
 					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			gomega.Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -334,7 +319,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "apps",
 						Resource:  "deployments",
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      "deploy1",
 					},
 					UpdateStrategy: &workapiv1.UpdateStrategy{
@@ -343,7 +328,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -354,7 +339,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			patch, err := object.MarshalJSON()
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			_, err = spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Patch(
+			_, err = spokeKubeClient.AppsV1().Deployments(clusterName).Patch(
 				context.Background(), "deploy1", types.ApplyPatchType, patch, metav1.PatchOptions{Force: ptr.To[bool](true), FieldManager: "test-integration"})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -362,7 +347,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 			err = unstructured.SetNestedField(object.Object, int64(3), "spec", "replicas")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -375,7 +360,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 					return err
 				}
 
-				_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Patch(
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
 					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -387,7 +372,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 			// remove the replica field and apply should work
 			unstructured.RemoveNestedField(object.Object, "spec", "replicas")
 			gomega.Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -400,7 +385,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 					return err
 				}
 
-				_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Patch(
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
 					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -415,7 +400,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "apps",
 						Resource:  "deployments",
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      "deploy1",
 					},
 					UpdateStrategy: &workapiv1.UpdateStrategy{
@@ -424,7 +409,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -434,13 +419,13 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 			objCopy := object.DeepCopy()
 			// work1 does not want to own replica field
 			unstructured.RemoveNestedField(objCopy.Object, "spec", "replicas")
-			work1 := util.NewManifestWork(commOptions.SpokeClusterName, "another", []workapiv1.Manifest{util.ToManifest(objCopy)})
+			work1 := util.NewManifestWork(clusterName, "another", []workapiv1.Manifest{util.ToManifest(objCopy)})
 			work1.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "apps",
 						Resource:  "deployments",
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      "deploy1",
 					},
 					UpdateStrategy: &workapiv1.UpdateStrategy{
@@ -453,7 +438,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work1, metav1.CreateOptions{})
+			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work1, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work1.Namespace, work1.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -463,7 +448,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 			err = unstructured.SetNestedField(object.Object, int64(3), "spec", "replicas")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -476,7 +461,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 					return err
 				}
 
-				_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Patch(
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
 					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -486,7 +471,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			gomega.Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -502,7 +487,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 			err = unstructured.SetNestedField(object.Object, "another-sa", "spec", "template", "spec", "serviceAccountName")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -515,7 +500,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 					return err
 				}
 
-				_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Patch(
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
 					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -531,7 +516,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "apps",
 						Resource:  "deployments",
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      "deploy1",
 					},
 					UpdateStrategy: &workapiv1.UpdateStrategy{
@@ -540,7 +525,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -550,13 +535,13 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 			objCopy := object.DeepCopy()
 			// work1 does not want to own replica field
 			unstructured.RemoveNestedField(objCopy.Object, "spec", "replicas")
-			work1 := util.NewManifestWork(commOptions.SpokeClusterName, "another", []workapiv1.Manifest{util.ToManifest(objCopy)})
+			work1 := util.NewManifestWork(clusterName, "another", []workapiv1.Manifest{util.ToManifest(objCopy)})
 			work1.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "apps",
 						Resource:  "deployments",
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      "deploy1",
 					},
 					UpdateStrategy: &workapiv1.UpdateStrategy{
@@ -569,14 +554,14 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work1, metav1.CreateOptions{})
+			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work1, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work1.Namespace, work1.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			gomega.Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -590,7 +575,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 
 			// update deleteOption of the first work
 			gomega.Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -603,13 +588,13 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 					return err
 				}
 
-				_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Patch(
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
 					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			gomega.Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -628,7 +613,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "apps",
 						Resource:  "deployments",
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      "deploy1",
 					},
 					UpdateStrategy: &workapiv1.UpdateStrategy{
@@ -645,7 +630,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -653,7 +638,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 
 			ginkgo.By("Update deployment replica to 2")
 			gomega.Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -663,14 +648,14 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				}
 
 				deploy.Spec.Replicas = pointer.Int32(2)
-				_, err = spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Update(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).Update(context.Background(), deploy, metav1.UpdateOptions{})
 
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			ginkgo.By("Update manifestwork with force apply to trigger a reconcile")
 			gomega.Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -682,7 +667,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 					return err
 				}
 
-				_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Patch(
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
 					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -692,7 +677,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 
 			ginkgo.By("Deployment replicas should not be updated")
 			gomega.Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -710,7 +695,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 			ginkgo.By("update manifestwork's deployment replica to 3")
 			err = unstructured.SetNestedField(object.Object, int64(3), "spec", "replicas")
 			gomega.Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -723,13 +708,13 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 					return err
 				}
 
-				_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Patch(
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
 					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			gomega.Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -748,7 +733,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "apps",
 						Resource:  "deployments",
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      "deploy1",
 					},
 					UpdateStrategy: &workapiv1.UpdateStrategy{
@@ -765,7 +750,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -773,7 +758,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 
 			ginkgo.By("Update deployment replica to 2")
 			gomega.Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -783,7 +768,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				}
 
 				deploy.Spec.Replicas = pointer.Int32(2)
-				_, err = spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Update(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).Update(context.Background(), deploy, metav1.UpdateOptions{})
 
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -794,7 +779,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 			ginkgo.By("update manifestwork's deployment replica to 3")
 			err = unstructured.SetNestedField(object.Object, int64(3), "spec", "replicas")
 			gomega.Eventually(func() error {
-				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -807,7 +792,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 					return err
 				}
 
-				_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Patch(
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
 					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -817,7 +802,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 
 			ginkgo.By("Deployment replica should not be changed")
 			gomega.Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -842,7 +827,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 			Kind:       "ManifestWork",
 		}
 
-		work := util.NewManifestWork(commOptions.SpokeClusterName, workName, []workapiv1.Manifest{util.ToManifest(nestedWork)})
+		work := util.NewManifestWork(clusterName, workName, []workapiv1.Manifest{util.ToManifest(nestedWork)})
 		work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 			{
 				ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -859,7 +844,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				},
 			},
 		}
-		_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+		_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		// make sure the nested work is created
@@ -889,23 +874,23 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 
 	ginkgo.Context("wildcard to filter all resources", func() {
 		ginkgo.BeforeEach(func() {
-			cm1 := util.NewConfigmap(commOptions.SpokeClusterName, "cm1",
+			cm1 := util.NewConfigmap(clusterName, "cm1",
 				map[string]string{"test1": "testdata", "test2": "test2"}, []string{})
-			_, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Create(context.TODO(), cm1, metav1.CreateOptions{})
+			_, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Create(context.TODO(), cm1, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			manifests = append(manifests, util.ToManifest(cm1))
 
-			cm2 := util.NewConfigmap(commOptions.SpokeClusterName, "cm2",
+			cm2 := util.NewConfigmap(clusterName, "cm2",
 				map[string]string{"test1": "testdata", "test2": "test2"}, []string{})
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Create(context.TODO(), cm2, metav1.CreateOptions{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Create(context.TODO(), cm2, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			manifests = append(manifests, util.ToManifest(cm2))
 		})
 
 		ginkgo.AfterEach(func() {
-			err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Delete(context.TODO(), "cm1", metav1.DeleteOptions{})
+			err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Delete(context.TODO(), "cm1", metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Delete(context.TODO(), "cm2", metav1.DeleteOptions{})
+			err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Delete(context.TODO(), "cm2", metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 
@@ -955,7 +940,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -963,7 +948,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 
 			ginkgo.By("get configmap values from the work")
 			gomega.Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -994,14 +979,14 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 			gomega.Eventually(func() error {
 				cmName := []string{"cm1", "cm2"}
 				for _, name := range cmName {
-					cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), name, metav1.GetOptions{})
+					cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), name, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}
 
 					cm.Data["test1"] = "testdata-updated"
 
-					_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Update(context.Background(), cm, metav1.UpdateOptions{})
+					_, err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Update(context.Background(), cm, metav1.UpdateOptions{})
 					if err != nil {
 						return err
 					}
@@ -1011,7 +996,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 
 			ginkgo.By("get updated configmap values from the work")
 			gomega.Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
