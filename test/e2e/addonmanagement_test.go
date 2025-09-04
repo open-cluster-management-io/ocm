@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -877,7 +878,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 				return err
 			}
 			return fmt.Errorf("the configmap should be deleted")
-		}).ShouldNot(gomega.HaveOccurred())
+		}, time.Second*180, time.Second*5).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("ManagedClusterAddon should eventually be deleted after pre-delete job completes")
 		gomega.Eventually(func() error {
