@@ -241,24 +241,27 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 				Name:      addOnName,
 				Namespace: universalClusterName,
 			},
-			Spec: addonv1alpha1.ManagedClusterAddOnSpec{
-				InstallNamespace: addOnName,
-			},
+			Spec: addonv1alpha1.ManagedClusterAddOnSpec{},
 		}
 		_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		created, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		created.Status = addonv1alpha1.ManagedClusterAddOnStatus{
-			Registrations: []addonv1alpha1.RegistrationConfig{
-				{
-					SignerName: certificates.KubeAPIServerClientSignerName,
+		gomega.Eventually(func() error {
+			created, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			created.Status = addonv1alpha1.ManagedClusterAddOnStatus{
+				Registrations: []addonv1alpha1.RegistrationConfig{
+					{
+						SignerName: certificates.KubeAPIServerClientSignerName,
+					},
 				},
-			},
-		}
-		_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).UpdateStatus(context.TODO(), created, metav1.UpdateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Namespace: addOnName,
+			}
+			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).UpdateStatus(context.TODO(), created, metav1.UpdateOptions{})
+			return err
+		}).Should(gomega.Succeed())
 
 		var (
 			csrs      *certificatesv1.CertificateSigningRequestList
