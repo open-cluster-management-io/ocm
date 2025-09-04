@@ -33,6 +33,11 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
+const (
+	// requeueDelay is the delay for requeuing when ManagedClusterAddOns still exist
+	requeueDelay = 10 * time.Second
+)
+
 // addonTemplateController monitors ManagedClusterAddOns on hub to get all the in-used addon templates,
 // and starts an addon manager for every addon template to handle agent requests deployed by this template
 type addonTemplateController struct {
@@ -45,6 +50,7 @@ type addonTemplateController struct {
 	workClient        workv1client.Interface
 	kubeClient        kubernetes.Interface
 	cmaLister         addonlisterv1alpha1.ClusterManagementAddOnLister
+	mcaLister         addonlisterv1alpha1.ManagedClusterAddOnLister
 	addonInformers    addoninformers.SharedInformerFactory
 	clusterInformers  clusterv1informers.SharedInformerFactory
 	dynamicInformers  dynamicinformer.DynamicSharedInformerFactory
@@ -74,6 +80,7 @@ func NewAddonTemplateController(
 		addonClient:      addonClient,
 		workClient:       workClient,
 		cmaLister:        addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+		mcaLister:        addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 		addonManagers:    make(map[string]context.CancelFunc),
 		addonInformers:   addonInformers,
 		clusterInformers: clusterInformers,
@@ -106,20 +113,25 @@ func (c *addonTemplateController) stopUnusedManagers(
 
 	// Check if all managed cluster addon instances are deleted before stopping the manager
 	// This allows pre-delete jobs to complete
-	listOptions := metav1.ListOptions{
-		FieldSelector: "metadata.name=" + addOnName,
-	}
-	mcaList, err := c.addonClient.AddonV1alpha1().ManagedClusterAddOns("").List(ctx, listOptions)
+	mcaList, err := c.mcaLister.List(labels.Everything())
 	if err != nil {
 		return err
 	}
 
+	// Filter by addon name
+	var matchingMCAs []*addonv1alpha1.ManagedClusterAddOn
+	for _, mca := range mcaList {
+		if mca.Name == addOnName {
+			matchingMCAs = append(matchingMCAs, mca)
+		}
+	}
+
 	// Check if there are still ManagedClusterAddOns for this addon
-	if len(mcaList.Items) > 0 {
+	if len(matchingMCAs) > 0 {
 		logger.Info("ManagedClusterAddOn still exists, waiting for deletion",
-			"addonName", addOnName, "count", len(mcaList.Items))
+			"addonName", addOnName, "count", len(matchingMCAs))
 		// Requeue to check again later
-		syncCtx.Queue().AddAfter(addOnName, 10*time.Second)
+		syncCtx.Queue().AddAfter(addOnName, requeueDelay)
 		return nil
 	}
 
