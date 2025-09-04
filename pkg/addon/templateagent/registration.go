@@ -91,7 +91,7 @@ func (a *CRDTemplateAgentAddon) TemplateCSRConfigurationsFunc() func(cluster *cl
 	return func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
 		template, err := a.GetDesiredAddOnTemplate(nil, cluster.Name, a.addonName)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to get addon %s template: %v", a.addonName, err))
+			a.logger.Info("CSRConfigurations failed to get addon template", "addonName", a.addonName, "error", err)
 			return nil
 		}
 		if template == nil {
@@ -168,7 +168,7 @@ func (a *CRDTemplateAgentAddon) TemplateCSRApproveCheckFunc() agent.CSRApproveFu
 
 		template, err := a.GetDesiredAddOnTemplate(addon, cluster.Name, a.addonName)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to get addon %s template: %v", a.addonName, err))
+			a.logger.Info("CSRApproveCheck failed to get addon template", "addonName", a.addonName, "error", err)
 			return false
 		}
 		if template == nil {
