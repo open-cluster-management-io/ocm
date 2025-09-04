@@ -345,7 +345,7 @@ func enableGRPCAuth(operatorClient operatorclient.Interface, clusterManagerName 
 				},
 				{
 					AuthType: operatorapiv1.GRPCAuthType,
-					GRPC: &operatorapiv1.GRPCConfig{
+					GRPC: &operatorapiv1.GRPCRegistrationConfig{
 						AutoApprovedIdentities: autoApprovedIdentities,
 					},
 				},

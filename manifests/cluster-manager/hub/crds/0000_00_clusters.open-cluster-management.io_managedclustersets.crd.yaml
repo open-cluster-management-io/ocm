@@ -127,6 +127,27 @@ spec:
                 required:
                 - selectorType
                 type: object
+              managedNamespaces:
+                description: |-
+                  managedNamespaces defines the list of namespace on the managedclusters
+                  across the clusterset to be managed.
+                items:
+                  description: |-
+                    managedNamespaces defines a namespace on the managedclusters across the
+                    clusterset to be managed by this clusterset.
+                  properties:
+                    name:
+                      description: name is the name of the namespace.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
             type: object
           status:
             description: Status represents the current status of the ManagedClusterSet

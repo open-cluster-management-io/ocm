@@ -144,26 +144,34 @@ const (
 
 // ManagedClusterStatus represents the current status of joined managed cluster.
 type ManagedClusterStatus struct {
-	// Conditions contains the different condition statuses for this managed cluster.
+	// conditions contains the different condition statuses for this managed cluster.
 	Conditions []metav1.Condition `json:"conditions"`
 
-	// Capacity represents the total resource capacity from all nodeStatuses
+	// capacity represents the total resource capacity from all nodeStatuses
 	// on the managed cluster.
 	Capacity ResourceList `json:"capacity,omitempty"`
 
-	// Allocatable represents the total allocatable resources on the managed cluster.
+	// allocatable represents the total allocatable resources on the managed cluster.
 	Allocatable ResourceList `json:"allocatable,omitempty"`
 
-	// Version represents the kubernetes version of the managed cluster.
+	// version represents the kubernetes version of the managed cluster.
 	Version ManagedClusterVersion `json:"version,omitempty"`
 
-	// ClusterClaims represents cluster information that a managed cluster claims,
+	// clusterClaims represents cluster information that a managed cluster claims,
 	// for example a unique cluster identifier (id.k8s.io) and kubernetes version
 	// (kubeversion.open-cluster-management.io). They are written from the managed
 	// cluster. The set of claims is not uniform across a fleet, some claims can be
 	// vendor or version specific and may not be included from all managed clusters.
 	// +optional
 	ClusterClaims []ManagedClusterClaim `json:"clusterClaims,omitempty"`
+
+	// managedNamespaces are a list of namespaces managed by the clustersets the
+	// cluster belongs to.
+	// +optional
+	// +listType=map
+	// +listMapKey=clusterSet
+	// +listMapKey=name
+	ManagedNamespaces []ClusterSetManagedNamespaceConfig `json:"managedNamespaces,omitempty"`
 }
 
 // ManagedClusterVersion represents version information about the managed cluster.
@@ -186,6 +194,27 @@ type ManagedClusterClaim struct {
 	// +kubebuilder:validation:MaxLength=1024
 	// +kubebuilder:validation:MinLength=1
 	Value string `json:"value,omitempty"`
+}
+
+// managedNamespaces defines a namespace on the managedclusters across the
+// clusterset to be managed by this clusterset.
+type ManagedNamespaceConfig struct {
+	// name is the name of the namespace.
+	// +required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+	Name string `json:"name"`
+}
+
+type ClusterSetManagedNamespaceConfig struct {
+	ManagedNamespaceConfig `json:",inline"`
+
+	// clusterSet represents the name of the cluster set.
+	// +required
+	ClusterSet string `json:"clusterSet"`
+
+	// conditions are the status conditions of the managed namespace
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 const (
