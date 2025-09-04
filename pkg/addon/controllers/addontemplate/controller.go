@@ -52,7 +52,6 @@ type addonTemplateController struct {
 	workClient                 workv1client.Interface
 	kubeClient                 kubernetes.Interface
 	cmaLister                  addonlisterv1alpha1.ClusterManagementAddOnLister
-	mcaLister                  addonlisterv1alpha1.ManagedClusterAddOnLister
 	managedClusterAddonIndexer cache.Indexer
 	addonInformers             addoninformers.SharedInformerFactory
 	clusterInformers           clusterv1informers.SharedInformerFactory
@@ -83,7 +82,6 @@ func NewAddonTemplateController(
 		addonClient:                addonClient,
 		workClient:                 workClient,
 		cmaLister:                  addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
-		mcaLister:                  addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 		managedClusterAddonIndexer: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetIndexer(),
 		addonManagers:              make(map[string]context.CancelFunc),
 		addonInformers:             addonInformers,

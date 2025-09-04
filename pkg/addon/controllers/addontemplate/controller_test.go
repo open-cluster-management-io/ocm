@@ -375,7 +375,6 @@ func TestStopUnusedManagers(t *testing.T) {
 				addonClient:                fakeAddonClient,
 				workClient:                 fakeWorkClient,
 				cmaLister:                  addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
-				mcaLister:                  addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 				managedClusterAddonIndexer: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetIndexer(),
 				addonManagers:              existingManagers,
 				addonInformers:             addonInformers,
