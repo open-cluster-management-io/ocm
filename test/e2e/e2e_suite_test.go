@@ -36,6 +36,9 @@ var (
 	singletonImage    string
 	images            framework.Images
 
+	// expected image tag for validation
+	expectedImageTag string
+
 	// bootstrap-hub-kubeconfig
 	// It's a secret named 'bootstrap-hub-kubeconfig' under the namespace 'open-cluster-management-agent',
 	// the content of the secret is a kubeconfig file.
@@ -56,6 +59,7 @@ func init() {
 	flag.StringVar(&registrationImage, "registration-image", "", "The image of the registration")
 	flag.StringVar(&workImage, "work-image", "", "The image of the work")
 	flag.StringVar(&singletonImage, "singleton-image", "", "The image of the klusterlet agent")
+	flag.StringVar(&expectedImageTag, "expected-image-tag", "", "The expected image tag for all OCM components (e.g., 'e2e')")
 }
 
 var hub *framework.Hub
