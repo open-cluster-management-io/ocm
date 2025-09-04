@@ -25,8 +25,8 @@ import (
 	fakework "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 

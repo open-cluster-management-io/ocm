@@ -8,7 +8,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	kubeinformers "k8s.io/client-go/informers"
@@ -131,9 +130,10 @@ func (c *addonTemplateController) stopUnusedManagers(
 
 	stopFunc, ok := c.addonManagers[addOnName]
 	if ok {
+		logger.Info("Start to stop the manager for addon", "addonName", addOnName)
 		stopFunc()
 		delete(c.addonManagers, addOnName)
-		logger.Info("Stopping the manager for addon", "addonName", addOnName)
+		logger.Info("The manager for addon stopped", "addonName", addOnName)
 	}
 	return nil
 }
@@ -249,13 +249,14 @@ func (c *addonTemplateController) runController(ctx context.Context, addonName s
 	kubeInformers.Start(ctx.Done())
 
 	// trigger the manager to reconcile for the existing managed cluster addons
-	mcas, err := c.addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister().List(labels.Everything())
+	mcas, err := c.managedClusterAddonIndexer.ByIndex(addonindex.ManagedClusterAddonByName, addonName)
 	if err != nil {
-		logger.Info("Failed to list ManagedClusterAddOns", "error", err)
+		logger.Info("Failed to list ManagedClusterAddOns by index", "error", err)
 	} else {
 		for _, mca := range mcas {
-			if mca.Name == addonName {
-				mgr.Trigger(mca.Namespace, addonName)
+			addon, ok := mca.(*addonv1alpha1.ManagedClusterAddOn)
+			if ok {
+				mgr.Trigger(addon.Namespace, addonName)
 			}
 		}
 	}
