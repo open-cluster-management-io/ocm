@@ -75,7 +75,7 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 		gomega.Expect(tempDir).ToNot(gomega.BeEmpty())
 
 		bootstrapGRPCConfigFile = path.Join(tempDir, "grpcconfig")
-		_, gRPCServerOptions, gRPCCAKeyFile, err = util.CreateGRPCConfigs(bootstrapGRPCConfigFile)
+		_, gRPCServerOptions, gRPCCAKeyFile, err = util.CreateGRPCConfigs(bootstrapGRPCConfigFile, "8090")
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		var grpcServerCtx context.Context

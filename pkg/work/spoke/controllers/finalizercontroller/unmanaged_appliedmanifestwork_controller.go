@@ -147,7 +147,7 @@ func (m *unmanagedAppliedWorkController) evictAppliedManifestWork(ctx context.Co
 	if err != nil {
 		return err
 	}
-	m.recorder.Eventf("AppliedManifestWorkEvicted", appliedManifestWork.Name,
+	m.recorder.Eventf("AppliedManifestWorkEvicted",
 		"AppliedManifestWork %s evicted by agent %s after eviction grace period", appliedManifestWork.Name, m.agentID)
 	return nil
 }
