@@ -23,11 +23,11 @@ deploy-hub: deploy-hub-helm hub-kubeconfig cluster-ip
 deploy-hub-helm: ensure-helm
 	$(HELM) install cluster-manager deploy/cluster-manager/chart/cluster-manager --namespace=open-cluster-management \
 			--create-namespace \
-			--set images.overrides.operatorImage=$(OPERATOR_IMAGE_NAME), \
+			--set images.overrides.operatorImage=$(OPERATOR_IMAGE_NAME) \
 			--set images.overrides.registrationImage=$(REGISTRATION_IMAGE) \
-			--set images.overrides.workImage=$(WORK_IMAGE),
-			--set images.overrides.placementImage=$(PLACEMENT_IMAGE), \
-			--set images.overrides.addOnManagerImage=$(ADDON_MANAGER_IMAGE), \
+			--set images.overrides.workImage=$(WORK_IMAGE) \
+			--set images.overrides.placementImage=$(PLACEMENT_IMAGE) \
+			--set images.overrides.addOnManagerImage=$(ADDON_MANAGER_IMAGE) \
 			--set replicaCount=1
 
 deploy-hub-operator: ensure-kustomize
@@ -47,7 +47,7 @@ test-e2e: deploy-hub deploy-spoke-operator-helm run-e2e
 
 run-e2e:
 	go test -c ./test/e2e
-	./e2e.test -test.v -ginkgo.v -nil-executor-validating=true -registration-image=$(REGISTRATION_IMAGE) -work-image=$(WORK_IMAGE) -singleton-image=$(OPERATOR_IMAGE_NAME) -klusterlet-deploy-mode=$(KLUSTERLET_DEPLOY_MODE)
+	./e2e.test -test.v -ginkgo.v -nil-executor-validating=true -registration-image=$(REGISTRATION_IMAGE) -work-image=$(WORK_IMAGE) -singleton-image=$(OPERATOR_IMAGE_NAME) -klusterlet-deploy-mode=$(KLUSTERLET_DEPLOY_MODE) -expected-image-tag=$(IMAGE_TAG)
 
 clean-hub: clean-hub-cr clean-hub-operator
 
@@ -70,7 +70,7 @@ deploy-spoke-operator-helm: ensure-helm
 	$(HELM) install klusterlet deploy/klusterlet/chart/klusterlet --namespace=open-cluster-management \
         --create-namespace \
         --set-file bootstrapHubKubeConfig=$(HUB_KUBECONFIG) \
-        --set klusterlet.create=false, \
+        --set klusterlet.create=false \
         --set images.overrides.operatorImage=$(OPERATOR_IMAGE_NAME) \
         --set images.overrides.registrationImage=$(REGISTRATION_IMAGE) \
         --set images.overrides.workImage=$(WORK_IMAGE)
