@@ -35,7 +35,7 @@ type addonConfigController struct {
 	addonLister                  addonlisterv1alpha1.ManagedClusterAddOnLister
 	addonIndexer                 cache.Indexer
 	configListers                map[schema.GroupResource]dynamiclister.Lister
-	queue                        workqueue.TypedRateLimitingInterface[string]
+	queue                        workqueue.RateLimitingInterface
 	addonFilterFunc              factory.EventFilterFunc
 	configGVRs                   map[schema.GroupVersionResource]bool
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
