@@ -91,6 +91,8 @@ func (l *klusterletLocker) deleteSSARChecking(klusterletName string) {
 }
 
 func (c *ssarController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
+	logger := klog.FromContext(ctx)
+
 	klusterletName := controllerContext.QueueKey()
 	if klusterletName == "" {
 		return nil
@@ -106,7 +108,7 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 
 	// if the ssar checking is already processing, requeue it after 30s.
 	if c.inSSARChecking(klusterletName) {
-		klog.V(4).Infof("Reconciling Klusterlet %q is already processing now", klusterletName)
+		logger.V(4).Info("Reconciling Klusterlet is already processing now", "name", klusterletName)
 		controllerContext.Queue().AddAfter(klusterletName, SSARReSyncTime)
 		return nil
 	}
@@ -117,7 +119,7 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 
 		newKlusterlet := klusterlet.DeepCopy()
 
-		klog.V(4).Infof("Checking hub kubeconfig for klusterlet %q", klusterletName)
+		logger.V(4).Info("Checking hub kubeconfig for klusterlet", "name", klusterletName)
 		agentNamespace := helpers.AgentNamespace(klusterlet)
 
 		hubConfigDegradedCondition := checkAgentDegradedCondition(
@@ -137,7 +139,7 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 			meta.SetStatusCondition(&newKlusterlet.Status.Conditions, hubConfigDegradedCondition)
 			_, err := c.patcher.PatchStatus(ctx, newKlusterlet, newKlusterlet.Status, klusterlet.Status)
 			if err != nil {
-				klog.Errorf("Update Klusterlet Status Failed: %v", err)
+				logger.Error(err, "Update Klusterlet Status Failed")
 				controllerContext.Queue().AddAfter(klusterletName, SSARReSyncTime)
 			}
 
@@ -172,7 +174,14 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 			})
 			_, err := c.patcher.PatchStatus(ctx, newKlusterlet, newKlusterlet.Status, klusterlet.Status)
 			if err != nil {
-				klog.Errorf("Update Klusterlet Status Failed: %v", err)
+				logger.Error(err, "Update Klusterlet Status Failed")
+				controllerContext.Queue().AddAfter(klusterletName, SSARReSyncTime)
+			}
+
+			// We need to requeue when only hubKubeConfigSecret is not authorized, since we do not know whether managercluster
+			// is accepted or permission is created.
+			if hubConfigDegradedCondition.Reason == operatorapiv1.ReasonHubKubeConfigUnauthorized &&
+				bootstrapDegradedCondition.Reason == "BootstrapSecretFunctional" {
 				controllerContext.Queue().AddAfter(klusterletName, SSARReSyncTime)
 			}
 		}
