@@ -153,11 +153,11 @@ func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 
 	template, err := a.GetDesiredAddOnTemplate(nil, "", a.addonName)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("failed to get addon %s template: %v", a.addonName, err))
+		utilruntime.HandleError(fmt.Errorf("GetAgentAddonOptions failed to get addon %s template: %v", a.addonName, err))
 		return agentAddonOptions
 	}
 	if template == nil {
-		utilruntime.HandleError(fmt.Errorf("addon %s template is nil", a.addonName))
+		utilruntime.HandleError(fmt.Errorf("GetAgentAddonOptions addon %s template is nil", a.addonName))
 		return agentAddonOptions
 	}
 	agentAddonOptions.ManifestConfigs = template.Spec.AgentSpec.ManifestConfigs

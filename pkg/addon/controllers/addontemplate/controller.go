@@ -8,12 +8,12 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
@@ -29,8 +29,14 @@ import (
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
+	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 	"open-cluster-management.io/ocm/pkg/addon/templateagent"
 	"open-cluster-management.io/ocm/pkg/common/queue"
+)
+
+const (
+	// requeueDelay is the delay for requeuing when ManagedClusterAddOns still exist
+	requeueDelay = 10 * time.Second
 )
 
 // addonTemplateController monitors ManagedClusterAddOns on hub to get all the in-used addon templates,
@@ -40,17 +46,18 @@ type addonTemplateController struct {
 	// The key is the name of the template type addon.
 	addonManagers map[string]context.CancelFunc
 
-	kubeConfig        *rest.Config
-	addonClient       addonv1alpha1client.Interface
-	workClient        workv1client.Interface
-	kubeClient        kubernetes.Interface
-	cmaLister         addonlisterv1alpha1.ClusterManagementAddOnLister
-	addonInformers    addoninformers.SharedInformerFactory
-	clusterInformers  clusterv1informers.SharedInformerFactory
-	dynamicInformers  dynamicinformer.DynamicSharedInformerFactory
-	workInformers     workv1informers.SharedInformerFactory
-	runControllerFunc runController
-	eventRecorder     events.Recorder
+	kubeConfig                 *rest.Config
+	addonClient                addonv1alpha1client.Interface
+	workClient                 workv1client.Interface
+	kubeClient                 kubernetes.Interface
+	cmaLister                  addonlisterv1alpha1.ClusterManagementAddOnLister
+	managedClusterAddonIndexer cache.Indexer
+	addonInformers             addoninformers.SharedInformerFactory
+	clusterInformers           clusterv1informers.SharedInformerFactory
+	dynamicInformers           dynamicinformer.DynamicSharedInformerFactory
+	workInformers              workv1informers.SharedInformerFactory
+	runControllerFunc          runController
+	eventRecorder              events.Recorder
 }
 
 type runController func(ctx context.Context, addonName string) error
@@ -69,17 +76,18 @@ func NewAddonTemplateController(
 	runController ...runController,
 ) factory.Controller {
 	c := &addonTemplateController{
-		kubeConfig:       hubKubeconfig,
-		kubeClient:       hubKubeClient,
-		addonClient:      addonClient,
-		workClient:       workClient,
-		cmaLister:        addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
-		addonManagers:    make(map[string]context.CancelFunc),
-		addonInformers:   addonInformers,
-		clusterInformers: clusterInformers,
-		dynamicInformers: dynamicInformers,
-		workInformers:    workInformers,
-		eventRecorder:    recorder,
+		kubeConfig:                 hubKubeconfig,
+		kubeClient:                 hubKubeClient,
+		addonClient:                addonClient,
+		workClient:                 workClient,
+		cmaLister:                  addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+		managedClusterAddonIndexer: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetIndexer(),
+		addonManagers:              make(map[string]context.CancelFunc),
+		addonInformers:             addonInformers,
+		clusterInformers:           clusterInformers,
+		dynamicInformers:           dynamicInformers,
+		workInformers:              workInformers,
+		eventRecorder:              recorder,
 	}
 
 	if len(runController) > 0 {
@@ -101,14 +109,33 @@ func NewAddonTemplateController(
 }
 
 func (c *addonTemplateController) stopUnusedManagers(
-	ctx context.Context, syncCtx factory.SyncContext, addOnName string) {
-	// TODO: check if all managed cluster addon instances are deleted
+	ctx context.Context, syncCtx factory.SyncContext, addOnName string) error {
+	logger := klog.FromContext(ctx)
+
+	// Check if all managed cluster addon instances are deleted before stopping the manager
+	// This ensures the manager continues running while ManagedClusterAddOns exist
+	addons, err := c.managedClusterAddonIndexer.ByIndex(addonindex.ManagedClusterAddonByName, addOnName)
+	if err != nil {
+		return err
+	}
+
+	// Check if there are still ManagedClusterAddOns for this addon
+	if len(addons) > 0 {
+		logger.Info("ManagedClusterAddOn still exists, waiting for deletion",
+			"addonName", addOnName, "count", len(addons))
+		// Requeue to check again later
+		syncCtx.Queue().AddAfter(addOnName, requeueDelay)
+		return nil
+	}
+
 	stopFunc, ok := c.addonManagers[addOnName]
 	if ok {
+		logger.Info("Start to stop the manager for addon", "addonName", addOnName)
 		stopFunc()
 		delete(c.addonManagers, addOnName)
-		klog.FromContext(ctx).Info("Stopping the manager for addon", "addonName", addOnName)
+		logger.Info("The manager for addon stopped", "addonName", addOnName)
 	}
+	return nil
 }
 
 func (c *addonTemplateController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
@@ -118,15 +145,13 @@ func (c *addonTemplateController) sync(ctx context.Context, syncCtx factory.Sync
 	cma, err := c.cmaLister.Get(addonName)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			c.stopUnusedManagers(ctx, syncCtx, addonName)
-			return nil
+			return c.stopUnusedManagers(ctx, syncCtx, addonName)
 		}
 		return err
 	}
 
 	if !templateagent.SupportAddOnTemplate(cma) {
-		c.stopUnusedManagers(ctx, syncCtx, cma.Name)
-		return nil
+		return c.stopUnusedManagers(ctx, syncCtx, cma.Name)
 	}
 
 	_, exist := c.addonManagers[addonName]
@@ -224,13 +249,14 @@ func (c *addonTemplateController) runController(ctx context.Context, addonName s
 	kubeInformers.Start(ctx.Done())
 
 	// trigger the manager to reconcile for the existing managed cluster addons
-	mcas, err := c.addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister().List(labels.Everything())
+	mcas, err := c.managedClusterAddonIndexer.ByIndex(addonindex.ManagedClusterAddonByName, addonName)
 	if err != nil {
-		logger.Info("Failed to list ManagedClusterAddOns", "error", err)
+		logger.Info("Failed to list ManagedClusterAddOns by index", "error", err)
 	} else {
 		for _, mca := range mcas {
-			if mca.Name == addonName {
-				mgr.Trigger(mca.Namespace, addonName)
+			addon, ok := mca.(*addonv1alpha1.ManagedClusterAddOn)
+			if ok {
+				mgr.Trigger(addon.Namespace, addonName)
 			}
 		}
 	}
