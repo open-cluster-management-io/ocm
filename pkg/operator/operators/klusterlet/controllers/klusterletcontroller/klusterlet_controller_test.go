@@ -1621,3 +1621,271 @@ func (f *fakeManagedClusterBuilder) build(_ context.Context) (*managedClusterCli
 		kubeconfigSecretCreationTime: creationTime,
 	}, nil
 }
+
+// TestHasActiveKlusterletAgentNamespaces tests the hasActiveKlusterletAgentNamespaces helper function
+func TestHasActiveKlusterletAgentNamespaces(t *testing.T) {
+	tests := []struct {
+		name                  string
+		currentAgentNamespace string
+		existingNamespaces    []runtime.Object
+		expectedResult        bool
+		expectError           bool
+	}{
+		{
+			name:                  "no other klusterlet agent namespaces exist",
+			currentAgentNamespace: "open-cluster-management-agent",
+			existingNamespaces: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "open-cluster-management-agent",
+						Labels: map[string]string{
+							klusterletNamespaceLabelKey: "klusterlet",
+						},
+					},
+				},
+			},
+			expectedResult: false,
+			expectError:    false,
+		},
+		{
+			name:                  "other klusterlet agent namespaces exist",
+			currentAgentNamespace: "open-cluster-management-agent",
+			existingNamespaces: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "open-cluster-management-agent",
+						Labels: map[string]string{
+							klusterletNamespaceLabelKey: "klusterlet",
+						},
+					},
+				},
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "open-cluster-management-agent-hosted",
+						Labels: map[string]string{
+							klusterletNamespaceLabelKey: "klusterlet-hosted",
+						},
+					},
+				},
+			},
+			expectedResult: true,
+			expectError:    false,
+		},
+		{
+			name:                  "multiple other klusterlet agent namespaces exist",
+			currentAgentNamespace: "open-cluster-management-agent-hosted1",
+			existingNamespaces: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "open-cluster-management-agent",
+						Labels: map[string]string{
+							klusterletNamespaceLabelKey: "klusterlet",
+						},
+					},
+				},
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "open-cluster-management-agent-hosted1",
+						Labels: map[string]string{
+							klusterletNamespaceLabelKey: "klusterlet-hosted1",
+						},
+					},
+				},
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "open-cluster-management-agent-hosted2",
+						Labels: map[string]string{
+							klusterletNamespaceLabelKey: "klusterlet-hosted2",
+						},
+					},
+				},
+			},
+			expectedResult: true,
+			expectError:    false,
+		},
+		{
+			name:                  "no klusterlet namespaces with labels exist",
+			currentAgentNamespace: "open-cluster-management-agent",
+			existingNamespaces: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "some-other-namespace",
+					},
+				},
+			},
+			expectedResult: false,
+			expectError:    false,
+		},
+		{
+			name:                  "namespace without klusterlet label should be ignored",
+			currentAgentNamespace: "open-cluster-management-agent",
+			existingNamespaces: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "open-cluster-management-agent",
+						Labels: map[string]string{
+							klusterletNamespaceLabelKey: "klusterlet",
+						},
+					},
+				},
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "some-namespace-without-label",
+					},
+				},
+			},
+			expectedResult: false,
+			expectError:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			fakeKubeClient := fakekube.NewSimpleClientset(tt.existingNamespaces...)
+
+			managedClusterClients := &managedClusterClients{
+				kubeClient: fakeKubeClient,
+			}
+
+			managedReconciler := &managedReconcile{
+				managedClusterClients: managedClusterClients,
+			}
+
+			hasActive, err := managedReconciler.hasActiveKlusterletAgentNamespaces(ctx, tt.currentAgentNamespace)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected an error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error but got: %v", err)
+				}
+				if hasActive != tt.expectedResult {
+					t.Errorf("Expected hasActiveKlusterletAgentNamespaces to return %t, but got %t", tt.expectedResult, hasActive)
+				}
+			}
+		})
+	}
+}
+
+// TestCleanWithMultipleKlusterletAgentNamespaces tests the clean function behavior when multiple klusterlet agent namespaces exist
+func TestCleanWithMultipleKlusterletAgentNamespaces(t *testing.T) {
+	tests := []struct {
+		name                       string
+		klusterlet                 *operatorapiv1.Klusterlet
+		existingNamespaces         []runtime.Object
+		shouldDeleteAddonNamespace bool
+		description                string
+	}{
+		{
+			name:       "should not delete addon namespace when other klusterlet agents exist",
+			klusterlet: newKlusterlet("klusterlet", "open-cluster-management-agent", "cluster1"),
+			existingNamespaces: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "open-cluster-management-agent",
+						Labels: map[string]string{
+							klusterletNamespaceLabelKey: "klusterlet",
+						},
+					},
+				},
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "open-cluster-management-agent-hosted",
+						Labels: map[string]string{
+							klusterletNamespaceLabelKey: "klusterlet-hosted",
+						},
+					},
+				},
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: helpers.DefaultAddonNamespace,
+					},
+				},
+			},
+			shouldDeleteAddonNamespace: false,
+			description:                "Other klusterlet agents still exist, so addon namespace should be preserved",
+		},
+		{
+			name:       "should delete addon namespace when no other klusterlet agents exist",
+			klusterlet: newKlusterlet("klusterlet", "open-cluster-management-agent", "cluster1"),
+			existingNamespaces: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "open-cluster-management-agent",
+						Labels: map[string]string{
+							klusterletNamespaceLabelKey: "klusterlet",
+						},
+					},
+				},
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: helpers.DefaultAddonNamespace,
+					},
+				},
+			},
+			shouldDeleteAddonNamespace: true,
+			description:                "No other klusterlet agents exist, so addon namespace should be deleted",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+
+			// Mark klusterlet for deletion
+			now := metav1.Now()
+			tt.klusterlet.DeletionTimestamp = &now
+
+			controller := newTestController(t, tt.klusterlet, syncContext.Recorder(), nil, false, tt.existingNamespaces...)
+
+			// Call the clean function through the cleanup controller
+			err := controller.cleanupController.sync(ctx, syncContext)
+			if err != nil {
+				t.Errorf("Expected no error from cleanup sync, but got: %v", err)
+			}
+
+			// Check the namespace deletion actions
+			var deletedNamespaces []string
+			for _, action := range controller.kubeClient.Actions() {
+				if action.GetVerb() == deleteVerb && action.GetResource().Resource == "namespaces" {
+					deletedNamespaces = append(deletedNamespaces, action.(clienttesting.DeleteActionImpl).Name)
+				}
+			}
+
+			// Verify addon namespace deletion behavior
+			addonNamespaceDeleted := false
+			for _, ns := range deletedNamespaces {
+				if ns == helpers.DefaultAddonNamespace {
+					addonNamespaceDeleted = true
+					break
+				}
+			}
+
+			if tt.shouldDeleteAddonNamespace {
+				if !addonNamespaceDeleted {
+					t.Errorf("Expected addon namespace to be deleted but it wasn't. %s", tt.description)
+				}
+			} else {
+				if addonNamespaceDeleted {
+					t.Errorf("Expected addon namespace NOT to be deleted but it was. %s", tt.description)
+				}
+			}
+
+			// The klusterlet's own agent namespace should always be deleted
+			agentNamespaceDeleted := false
+			for _, ns := range deletedNamespaces {
+				if ns == tt.klusterlet.Spec.Namespace {
+					agentNamespaceDeleted = true
+					break
+				}
+			}
+			if !agentNamespaceDeleted {
+				t.Errorf("Expected klusterlet agent namespace %s to be deleted but it wasn't", tt.klusterlet.Spec.Namespace)
+			}
+		})
+	}
+}
