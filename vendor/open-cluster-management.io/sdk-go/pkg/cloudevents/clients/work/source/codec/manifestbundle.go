@@ -47,6 +47,7 @@ func (c *ManifestBundleCodec) Encode(source string, eventType types.CloudEventsT
 	evt := types.NewEventBuilder(source, eventType).
 		WithClusterName(work.Namespace).
 		WithResourceID(string(work.UID)).
+		WithResourceName(work.Name).
 		WithResourceVersion(int64(resourceVersion)).
 		NewEvent()
 
@@ -92,6 +93,17 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 		return nil, fmt.Errorf("failed to get resourceid extension: %v", err)
 	}
 
+	var resourceName string
+	if v, ok := evtExtensions[types.ExtensionResourceName]; ok {
+		resourceName, err = cloudeventstypes.ToString(v)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get resourcename extension: %v", err)
+		}
+	} else {
+		// fall back to set resourceName to resourceID
+		resourceName = resourceID
+	}
+
 	resourceVersion, err := cloudeventstypes.ToInteger(evtExtensions[types.ExtensionResourceVersion])
 	if err != nil {
 		return nil, fmt.Errorf("failed to get resourceversion extension: %v", err)
@@ -119,6 +131,7 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 	}
 
 	metaObj.UID = kubetypes.UID(resourceID)
+	metaObj.Name = resourceName
 	metaObj.ResourceVersion = fmt.Sprintf("%d", resourceVersion)
 	if metaObj.Annotations == nil {
 		metaObj.Annotations = map[string]string{}
