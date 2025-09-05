@@ -44,7 +44,7 @@ spec:
     name: multikueue-config-demo2
 ---
 # OCM implements an admissioncheck controller to automate the MultiKueue setup process.
-# MultiKueueConfigs and MultiKueueClusters are generated dynamically based on OCM placement decisions.
+# MultiKueueConfig is generated dynamically based on OCM placement decisions.
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: AdmissionCheck
 metadata:
