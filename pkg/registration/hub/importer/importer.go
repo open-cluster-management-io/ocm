@@ -57,7 +57,7 @@ func init() {
 
 // KlusterletConfigRenderer renders the config for klusterlet chart.
 type KlusterletConfigRenderer func(
-	ctx context.Context, config *chart.KlusterletChartConfig) (*chart.KlusterletChartConfig, error)
+	ctx context.Context, cluster *v1.ManagedCluster, config *chart.KlusterletChartConfig) (*chart.KlusterletChartConfig, error)
 
 type Importer struct {
 	providers     []cloudproviders.Interface
@@ -186,7 +186,7 @@ func (i *Importer) reconcile(
 		},
 	}
 	for _, renderer := range i.renders {
-		klusterletChartConfig, err = renderer(ctx, klusterletChartConfig)
+		klusterletChartConfig, err = renderer(ctx, cluster, klusterletChartConfig)
 		if err != nil {
 			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 				Type:   ManagedClusterConditionImported,
