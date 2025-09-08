@@ -2,6 +2,7 @@ package addontemplate
 
 import (
 	"context"
+	"reflect"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -14,6 +15,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
@@ -52,6 +54,7 @@ type addonTemplateController struct {
 	workInformers              workv1informers.SharedInformerFactory
 	runControllerFunc          runController
 	eventRecorder              events.Recorder
+	queue                      workqueue.TypedRateLimitingInterface[any]
 }
 
 type runController func(ctx context.Context, addonName string) error
@@ -69,6 +72,9 @@ func NewAddonTemplateController(
 	recorder events.Recorder,
 	runController ...runController,
 ) factory.Controller {
+	controllerName := "addon-template-controller"
+	syncCtx := factory.NewSyncContext(controllerName, recorder)
+
 	c := &addonTemplateController{
 		kubeConfig:                 hubKubeconfig,
 		kubeClient:                 hubKubeClient,
@@ -82,6 +88,7 @@ func NewAddonTemplateController(
 		dynamicInformers:           dynamicInformers,
 		workInformers:              workInformers,
 		eventRecorder:              recorder,
+		queue:                      syncCtx.Queue(),
 	}
 
 	if len(runController) > 0 {
@@ -90,39 +97,78 @@ func NewAddonTemplateController(
 		// easy to mock in unit tests
 		c.runControllerFunc = c.runController
 	}
-	return factory.New().
+
+	controller := factory.New().
+		WithSyncContext(syncCtx).
 		WithInformersQueueKeysFunc(
 			queue.QueueKeyByMetaNamespaceName,
 			addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer()).
-		WithFilteredEventsInformersQueueKeysFunc(
-			queue.QueueKeyByMetaName,
-			func(obj interface{}) bool {
-				mca, ok := obj.(*addonv1alpha1.ManagedClusterAddOn)
-				if !ok {
-					return false
-				}
-
-				// Only process ManagedClusterAddOns that reference AddOnTemplates
-				for _, configRef := range mca.Status.ConfigReferences {
-					if configRef.ConfigGroupResource.Group == "addon.open-cluster-management.io" &&
-						configRef.ConfigGroupResource.Resource == "addontemplates" {
-						return true
-					}
-				}
-				return false
-			},
-			addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer()).
 		WithBareInformers(
+			addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer(),
 			// do not need to queue, just make sure the controller reconciles after the addonTemplate cache is synced
 			// otherwise, there will be "xx-addon-template" not found" errors in the log as the controller uses the
 			// addonTemplate lister to get the template object
 			addonInformers.Addon().V1alpha1().AddOnTemplates().Informer()).
 		WithSync(c.sync).
 		ToController("addon-template-controller", recorder)
+
+	// Add custom event handler for ManagedClusterAddon to filter configReference changes
+	_, err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			// Only handle configReference updates for AddOnTemplates
+			oldMCA, ok := oldObj.(*addonv1alpha1.ManagedClusterAddOn)
+			if !ok {
+				return
+			}
+			newMCA, ok := newObj.(*addonv1alpha1.ManagedClusterAddOn)
+			if !ok {
+				return
+			}
+
+			// Extract AddOnTemplate configReferences from both old and new
+			oldTemplateRefs := extractAddOnTemplateConfigRefs(oldMCA)
+			newTemplateRefs := extractAddOnTemplateConfigRefs(newMCA)
+
+			// Only process if AddOnTemplate configReferences changed
+			if !reflect.DeepEqual(oldTemplateRefs, newTemplateRefs) {
+				// Queue the addon name to trigger reconciliation
+				c.queue.Add(newMCA.Name)
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			mca, ok := obj.(*addonv1alpha1.ManagedClusterAddOn)
+			if !ok {
+				return
+			}
+
+			// Only process template-based addons
+			templateRefs := extractAddOnTemplateConfigRefs(mca)
+			if len(templateRefs) > 0 {
+				c.queue.Add(mca.Name)
+			}
+		},
+	})
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
+
+	return controller
+}
+
+// extractAddOnTemplateConfigRefs extracts only AddOnTemplate configReferences
+func extractAddOnTemplateConfigRefs(mca *addonv1alpha1.ManagedClusterAddOn) []addonv1alpha1.ConfigReference {
+	var templateRefs []addonv1alpha1.ConfigReference
+	for _, configRef := range mca.Status.ConfigReferences {
+		if configRef.ConfigGroupResource.Group == "addon.open-cluster-management.io" &&
+			configRef.ConfigGroupResource.Resource == "addontemplates" {
+			templateRefs = append(templateRefs, configRef)
+		}
+	}
+	return templateRefs
 }
 
 func (c *addonTemplateController) stopUnusedManagers(
-	ctx context.Context, syncCtx factory.SyncContext, addOnName string) error {
+	ctx context.Context, _ factory.SyncContext, addOnName string) error {
 	logger := klog.FromContext(ctx)
 
 	// Check if all managed cluster addon instances are deleted before stopping the manager
