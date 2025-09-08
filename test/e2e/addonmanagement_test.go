@@ -256,14 +256,14 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			copyiedConfig, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
+			copiedConfig, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
 				context.Background(), configmap.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 
-			if !equality.Semantic.DeepEqual(copyiedConfig.Data, configmap.Data) {
-				return fmt.Errorf("expected configmap is not correct, %v", copyiedConfig.Data)
+			if !equality.Semantic.DeepEqual(copiedConfig.Data, configmap.Data) {
+				return fmt.Errorf("expected configmap is not correct, %v", copiedConfig.Data)
 			}
 			return nil
 		}).ShouldNot(gomega.HaveOccurred())
@@ -849,14 +849,14 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			copyiedConfig, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
+			copiedConfig, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
 				context.Background(), configmap.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 
-			if !equality.Semantic.DeepEqual(copyiedConfig.Data, configmap.Data) {
-				return fmt.Errorf("expected configmap is not correct, %v", copyiedConfig.Data)
+			if !equality.Semantic.DeepEqual(copiedConfig.Data, configmap.Data) {
+				return fmt.Errorf("expected configmap is not correct, %v", copiedConfig.Data)
 			}
 			return nil
 		}).ShouldNot(gomega.HaveOccurred())

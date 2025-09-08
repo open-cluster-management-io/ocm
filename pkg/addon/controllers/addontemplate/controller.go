@@ -19,7 +19,6 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
@@ -32,11 +31,6 @@ import (
 	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 	"open-cluster-management.io/ocm/pkg/addon/templateagent"
 	"open-cluster-management.io/ocm/pkg/common/queue"
-)
-
-const (
-	// requeueDelay is the delay for requeuing when ManagedClusterAddOns still exist
-	requeueDelay = 10 * time.Second
 )
 
 // addonTemplateController monitors ManagedClusterAddOns on hub to get all the in-used addon templates,
@@ -96,9 +90,28 @@ func NewAddonTemplateController(
 		// easy to mock in unit tests
 		c.runControllerFunc = c.runController
 	}
-	return factory.New().WithInformersQueueKeysFunc(
-		queue.QueueKeyByMetaNamespaceName,
-		addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer()).
+	return factory.New().
+		WithInformersQueueKeysFunc(
+			queue.QueueKeyByMetaNamespaceName,
+			addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer()).
+		WithFilteredEventsInformersQueueKeysFunc(
+			queue.QueueKeyByMetaName,
+			func(obj interface{}) bool {
+				mca, ok := obj.(*addonv1alpha1.ManagedClusterAddOn)
+				if !ok {
+					return false
+				}
+
+				// Only process ManagedClusterAddOns that reference AddOnTemplates
+				for _, configRef := range mca.Status.ConfigReferences {
+					if configRef.ConfigGroupResource.Group == "addon.open-cluster-management.io" &&
+						configRef.ConfigGroupResource.Resource == "addontemplates" {
+						return true
+					}
+				}
+				return false
+			},
+			addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer()).
 		WithBareInformers(
 			// do not need to queue, just make sure the controller reconciles after the addonTemplate cache is synced
 			// otherwise, there will be "xx-addon-template" not found" errors in the log as the controller uses the
@@ -123,8 +136,7 @@ func (c *addonTemplateController) stopUnusedManagers(
 	if len(addons) > 0 {
 		logger.Info("ManagedClusterAddOn still exists, waiting for deletion",
 			"addonName", addOnName, "count", len(addons))
-		// Requeue to check again later
-		syncCtx.Queue().AddAfter(addOnName, requeueDelay)
+		// No need to requeue since we now watch ManagedClusterAddon events
 		return nil
 	}
 
@@ -213,7 +225,7 @@ func (c *addonTemplateController) runController(ctx context.Context, addonName s
 			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
 		}),
 	)
-	getValuesClosure := func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+	getValuesClosure := func(cluster *clusterv1.ManagedCluster, addon *addonv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
 		return templateagent.GetAddOnRegistriesPrivateValuesFromClusterAnnotation(klog.FromContext(ctx), cluster, addon)
 	}
 	agentAddon := templateagent.NewCRDTemplateAgentAddon(

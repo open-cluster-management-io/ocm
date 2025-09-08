@@ -352,11 +352,13 @@ func TestStopUnusedManagers(t *testing.T) {
 			managerStopped := false
 			existingManagers := make(map[string]context.CancelFunc)
 			for name, stopFunc := range c.existingManagers {
+				capturedName := name
+				capturedStopFunc := stopFunc
 				existingManagers[name] = func() {
-					if name == c.addonName {
+					if capturedName == c.addonName {
 						managerStopped = true
 					}
-					stopFunc()
+					capturedStopFunc()
 				}
 			}
 
