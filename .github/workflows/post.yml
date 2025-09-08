@@ -80,7 +80,7 @@ jobs:
           format: 'spdx-json'
           output-file: 'sbom.spdx.json'
       - name: Attest
-        uses: actions/attest-sbom@v2
+        uses: actions/attest-sbom@v3
         id: attest
         with:
           subject-name: quay.io/open-cluster-management/${{ matrix.image-name }}
@@ -126,7 +126,7 @@ jobs:
           format: 'spdx-json'
           output-file: 'sbom.spdx.json'
       - name: Attest
-        uses: actions/attest-sbom@v2
+        uses: actions/attest-sbom@v3
         id: attest
         with:
           subject-name: quay.io/open-cluster-management/${{ matrix.image-name }}

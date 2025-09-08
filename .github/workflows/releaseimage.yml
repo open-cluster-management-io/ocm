@@ -82,7 +82,7 @@ jobs:
           output-file: 'sbom.spdx.json'
           upload-release-assets: false # disable uploading SBOM to release assets for images
       - name: Attest
-        uses: actions/attest-sbom@v2
+        uses: actions/attest-sbom@v3
         id: attest
         with:
           subject-name: quay.io/open-cluster-management/${{ matrix.image-name }}
@@ -132,7 +132,7 @@ jobs:
           output-file: 'sbom.spdx.json'
           upload-release-assets: false # disable uploading SBOM to release assets for images
       - name: Attest
-        uses: actions/attest-sbom@v2
+        uses: actions/attest-sbom@v3
         id: attest
         with:
           subject-name: quay.io/open-cluster-management/${{ matrix.image-name }}

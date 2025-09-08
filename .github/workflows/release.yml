@@ -50,7 +50,7 @@ jobs:
           fetch-depth: 1
           path: go/src/open-cluster-management.io/ocm
       - name: set up Python 3.x
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           # Semantic version range syntax or exact version of a Python version
           python-version: '3.x'
@@ -84,6 +84,6 @@ jobs:
           files: |
             /home/runner/work/ocm/ocm/go/src/open-cluster-management.io/ocm/release/*.tgz
       - name: generate helm charts attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: '/home/runner/work/ocm/ocm/go/src/open-cluster-management.io/ocm/release/*.tgz'
