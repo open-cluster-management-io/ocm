@@ -34,11 +34,6 @@ func NewWorkPatch(old, new *workapiv1.ManifestWork) ([]byte, error) {
 	return patchBytes, nil
 }
 
-func AppliedManifestWorkName(sourceDriver, hubHash string, work *workapiv1.ManifestWork) string {
-	if sourceDriver != KubeDriver {
-		// if the source is not kube, the uid will be used as the manifestwork name on the agent side
-		return fmt.Sprintf("%s-%s", hubHash, work.UID)
-	}
-
+func AppliedManifestWorkName(hubHash string, work *workapiv1.ManifestWork) string {
 	return fmt.Sprintf("%s-%s", hubHash, work.Name)
 }

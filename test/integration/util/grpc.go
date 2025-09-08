@@ -97,7 +97,7 @@ func (h *GRPCServerRegistrationHook) Run(ctx context.Context) {
 	go h.AddOnInformers.Start(ctx.Done())
 }
 
-func CreateGRPCConfigs(configFileName string) (string, *sdkgrpc.GRPCServerOptions, string, error) {
+func CreateGRPCConfigs(configFileName string, port string) (string, *sdkgrpc.GRPCServerOptions, string, error) {
 	serverCertPairs, err := util.NewServerCertPairs()
 	if err != nil {
 		return "", nil, "", err
@@ -133,6 +133,7 @@ func CreateGRPCConfigs(configFileName string) (string, *sdkgrpc.GRPCServerOption
 	serverOptions.ClientCAFile = caFile
 	serverOptions.TLSCertFile = serverCertFile
 	serverOptions.TLSKeyFile = serverKeyFile
+	serverOptions.ServerBindPort = port
 
 	config := &grpc.GRPCConfig{
 		CertConfig: cert.CertConfig{

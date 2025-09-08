@@ -285,7 +285,7 @@ func NewDeployment(namespace, name, sa string) (u *unstructured.Unstructured, gv
 	return u, gvr, nil
 }
 
-func NewDaesonSet(namespace, name string) (u *unstructured.Unstructured, gvr schema.GroupVersionResource, err error) {
+func NewDaemonSet(namespace, name string) (u *unstructured.Unstructured, gvr schema.GroupVersionResource, err error) {
 	u, err = loadResourceFromJSON(daemonsetJson)
 	if err != nil {
 		return u, gvr, err

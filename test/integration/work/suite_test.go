@@ -4,9 +4,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"path"
 	"testing"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -35,10 +37,12 @@ import (
 	cemetrics "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/metrics"
 	sdkgrpc "open-cluster-management.io/sdk-go/pkg/server/grpc"
 
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
 	serviceswork "open-cluster-management.io/ocm/pkg/server/services/work"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/hub"
+	"open-cluster-management.io/ocm/pkg/work/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
@@ -164,31 +168,23 @@ var _ = ginkgo.BeforeSuite(func() {
 		hubWorkClient, err = workclientset.NewForConfig(cfg)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		sourceConfigFileName = path.Join(tempDir, "grpcconfig")
-		gRPCURL, gRPCServerOptions, _, err := util.CreateGRPCConfigs(sourceConfigFileName)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		sourceConfigFileName, hubHash = startGRPCServer(envCtx, tempDir, cfg)
 
-		hubHash = helper.HubHash(gRPCURL)
-
-		hook, err := util.NewGRPCServerWorkHook(cfg)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		go hook.Run(envCtx)
-
-		grpcEventServer := cloudeventsgrpc.NewGRPCBroker()
-		grpcEventServer.RegisterService(payload.ManifestBundleEventDataType,
-			serviceswork.NewWorkService(hook.WorkClient, hook.WorkInformers.Work().V1().ManifestWorks()))
-
-		authorizer := util.NewMockAuthorizer()
-		server := sdkgrpc.NewGRPCServer(gRPCServerOptions).
-			WithUnaryAuthorizer(authorizer).
-			WithStreamAuthorizer(authorizer).
-			WithRegisterFunc(func(s *grpc.Server) {
-				pbv1.RegisterCloudEventServiceServer(s, grpcEventServer)
-			}).
-			WithExtraMetrics(cemetrics.CloudEventsGRPCMetrics()...)
-
+		// start hub controller
 		go func() {
-			err := server.Run(envCtx)
+			// in grpc driver, hub controller still calls hub kube-apiserver.
+			sourceKubeConfigFileName := path.Join(tempDir, "kubeconfig")
+			err = util.CreateKubeconfigFile(cfg, sourceKubeConfigFileName)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			opts := hub.NewWorkHubManagerOptions()
+			opts.WorkDriver = "kube"
+			opts.WorkDriverConfig = sourceKubeConfigFileName
+			hubConfig := hub.NewWorkHubManagerConfig(opts)
+			err := hubConfig.RunWorkHubManager(envCtx, &controllercmd.ControllerContext{
+				KubeConfig:    cfg,
+				EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
+			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		}()
 	default:
@@ -222,3 +218,68 @@ var _ = ginkgo.AfterSuite(func() {
 		os.RemoveAll(tempDir)
 	}
 })
+
+type agentOptionsDecorator func(opt *spoke.WorkloadAgentOptions, commonOpt *commonoptions.AgentOptions) (
+	*spoke.WorkloadAgentOptions, *commonoptions.AgentOptions)
+
+func startWorkAgent(ctx context.Context, clusterName string, decorators ...agentOptionsDecorator) {
+	o := spoke.NewWorkloadAgentOptions()
+	o.StatusSyncInterval = 3 * time.Second
+	o.WorkloadSourceDriver = sourceDriver
+	o.WorkloadSourceConfig = sourceConfigFileName
+	if sourceDriver != util.KubeDriver {
+		o.CloudEventsClientID = fmt.Sprintf("%s-work-agent", clusterName)
+		o.CloudEventsClientCodecs = []string{"manifestbundle"}
+	}
+
+	commOptions := commonoptions.NewAgentOptions()
+	commOptions.SpokeClusterName = clusterName
+
+	for _, decorator := range decorators {
+		o, commOptions = decorator(o, commOptions)
+	}
+
+	agentConfig := spoke.NewWorkAgentConfig(commOptions, o)
+	err := agentConfig.RunWorkloadAgent(ctx, &controllercmd.ControllerContext{
+		KubeConfig:    spokeRestConfig,
+		EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
+	})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+}
+
+func startGRPCServer(ctx context.Context, temp string, cfg *rest.Config) (string, string) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	bindPort := fmt.Sprintf("%d", ln.Addr().(*net.TCPAddr).Port)
+	_ = ln.Close()
+
+	configFileName := path.Join(temp, "grpcconfig")
+	gRPCURL, gRPCServerOptions, _, err := util.CreateGRPCConfigs(configFileName, bindPort)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	hubHash := helper.HubHash(gRPCURL)
+
+	hook, err := util.NewGRPCServerWorkHook(cfg)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	go hook.Run(ctx)
+
+	grpcEventServer := cloudeventsgrpc.NewGRPCBroker()
+	grpcEventServer.RegisterService(payload.ManifestBundleEventDataType,
+		serviceswork.NewWorkService(hook.WorkClient, hook.WorkInformers.Work().V1().ManifestWorks()))
+
+	authorizer := util.NewMockAuthorizer()
+	server := sdkgrpc.NewGRPCServer(gRPCServerOptions).
+		WithUnaryAuthorizer(authorizer).
+		WithStreamAuthorizer(authorizer).
+		WithRegisterFunc(func(s *grpc.Server) {
+			pbv1.RegisterCloudEventServiceServer(s, grpcEventServer)
+		}).
+		WithExtraMetrics(cemetrics.CloudEventsGRPCMetrics()...)
+
+	go func() {
+		err := server.Run(ctx)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	}()
+
+	return configFileName, hubHash
+}
