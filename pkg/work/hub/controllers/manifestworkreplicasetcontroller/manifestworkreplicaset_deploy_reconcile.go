@@ -271,16 +271,25 @@ func CreateManifestWork(
 		return nil, fmt.Errorf("invalid cluster namespace")
 	}
 
+	// Get ManifestWorkReplicaSet labels
+	labels := mwrSet.Labels
+
 	// TODO consider how to trace the manifestworks spec changes for cloudevents work client
+
+	// Merge mwrSet.Labels with the required labels
+	mergedLabels := make(map[string]string)
+	for k, v := range labels {
+		mergedLabels[k] = v
+	}
+
+	mergedLabels[ManifestWorkReplicaSetControllerNameLabelKey] = manifestWorkReplicaSetKey(mwrSet)
+	mergedLabels[ManifestWorkReplicaSetPlacementNameLabelKey] = placementRefName
 
 	return &workv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mwrSet.Name,
 			Namespace: clusterNS,
-			Labels: map[string]string{
-				ManifestWorkReplicaSetControllerNameLabelKey: manifestWorkReplicaSetKey(mwrSet),
-				ManifestWorkReplicaSetPlacementNameLabelKey:  placementRefName,
-			},
+			Labels:    mergedLabels,
 		},
 		Spec: mwrSet.Spec.ManifestWorkTemplate,
 	}, nil
