@@ -13,6 +13,7 @@ import (
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/utils"
@@ -24,7 +25,9 @@ import (
 	fakework "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 
+	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
 func TestReconcile(t *testing.T) {
@@ -150,6 +153,15 @@ func TestReconcile(t *testing.T) {
 
 		addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
 
+		// Add the index for ManagedClusterAddonByName
+		err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
+			cache.Indexers{
+				addonindex.ManagedClusterAddonByName: addonindex.IndexManagedClusterAddonByName,
+			})
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		for _, obj := range c.managedClusteraddon {
 			if err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
 				t.Fatal(err)
@@ -248,15 +260,16 @@ func TestRunController(t *testing.T) {
 		workInformers := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
 		hubKubeClient := fakekube.NewSimpleClientset()
 		controller := &addonTemplateController{
-			kubeConfig:       &rest.Config{},
-			kubeClient:       hubKubeClient,
-			addonClient:      fakeAddonClient,
-			cmaLister:        addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
-			addonManagers:    make(map[string]context.CancelFunc),
-			addonInformers:   addonInformers,
-			clusterInformers: clusterInformers,
-			dynamicInformers: dynamicInformerFactory,
-			workInformers:    workInformers,
+			kubeConfig:                 &rest.Config{},
+			kubeClient:                 hubKubeClient,
+			addonClient:                fakeAddonClient,
+			cmaLister:                  addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+			managedClusterAddonIndexer: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetIndexer(),
+			addonManagers:              make(map[string]context.CancelFunc),
+			addonInformers:             addonInformers,
+			clusterInformers:           clusterInformers,
+			dynamicInformers:           dynamicInformerFactory,
+			workInformers:              workInformers,
 		}
 		ctx := context.TODO()
 
@@ -266,5 +279,141 @@ func TestRunController(t *testing.T) {
 		} else {
 			assert.Contains(t, err.Error(), c.expectedErr, "name : %s, expected error %v, but got %v", c.name, c.expectedErr, err)
 		}
+	}
+}
+
+func TestStopUnusedManagers(t *testing.T) {
+	cases := []struct {
+		name                   string
+		addonName              string
+		managedClusterAddons   []runtime.Object
+		existingManagers       map[string]context.CancelFunc
+		expectedManagerStopped bool
+		expectedRequeue        bool
+	}{
+		{
+			name:                 "no managed cluster addons, manager should be stopped",
+			addonName:            "test-addon",
+			managedClusterAddons: []runtime.Object{},
+			existingManagers: map[string]context.CancelFunc{
+				"test-addon": func() {},
+			},
+			expectedManagerStopped: true,
+			expectedRequeue:        false,
+		},
+		{
+			name:      "managed cluster addons exist, manager should not be stopped",
+			addonName: "test-addon",
+			managedClusterAddons: []runtime.Object{
+				testinghelpers.NewManagedClusterAddons("test-addon", "cluster1", nil, nil),
+			},
+			existingManagers: map[string]context.CancelFunc{
+				"test-addon": func() {},
+			},
+			expectedManagerStopped: false,
+			expectedRequeue:        true,
+		},
+		{
+			name:      "multiple managed cluster addons exist, manager should not be stopped",
+			addonName: "test-addon",
+			managedClusterAddons: []runtime.Object{
+				testinghelpers.NewManagedClusterAddons("test-addon", "cluster1", nil, nil),
+				testinghelpers.NewManagedClusterAddons("test-addon", "cluster2", nil, nil),
+			},
+			existingManagers: map[string]context.CancelFunc{
+				"test-addon": func() {},
+			},
+			expectedManagerStopped: false,
+			expectedRequeue:        true,
+		},
+		{
+			name:                   "no manager exists, should not error",
+			addonName:              "test-addon",
+			managedClusterAddons:   []runtime.Object{},
+			existingManagers:       map[string]context.CancelFunc{},
+			expectedManagerStopped: false,
+			expectedRequeue:        false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fakeAddonClient := fakeaddon.NewSimpleClientset(c.managedClusterAddons...)
+			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
+
+			fakeDynamicClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+			dynamicInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(fakeDynamicClient, 0)
+			fakeClusterClient := fakecluster.NewSimpleClientset()
+			clusterInformers := clusterv1informers.NewSharedInformerFactory(fakeClusterClient, 10*time.Minute)
+			fakeWorkClient := fakework.NewSimpleClientset()
+			workInformers := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
+			hubKubeClient := fakekube.NewSimpleClientset()
+
+			managerStopped := false
+			existingManagers := make(map[string]context.CancelFunc)
+			for name, stopFunc := range c.existingManagers {
+				capturedName := name
+				capturedStopFunc := stopFunc
+				existingManagers[name] = func() {
+					if capturedName == c.addonName {
+						managerStopped = true
+					}
+					capturedStopFunc()
+				}
+			}
+
+			// Add the index for ManagedClusterAddonByName
+			err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
+				cache.Indexers{
+					addonindex.ManagedClusterAddonByName: addonindex.IndexManagedClusterAddonByName,
+				})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			controller := &addonTemplateController{
+				kubeConfig:                 &rest.Config{},
+				kubeClient:                 hubKubeClient,
+				addonClient:                fakeAddonClient,
+				workClient:                 fakeWorkClient,
+				cmaLister:                  addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+				managedClusterAddonIndexer: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetIndexer(),
+				addonManagers:              existingManagers,
+				addonInformers:             addonInformers,
+				clusterInformers:           clusterInformers,
+				dynamicInformers:           dynamicInformerFactory,
+				workInformers:              workInformers,
+				eventRecorder:              eventstesting.NewTestingEventRecorder(t),
+			}
+
+			// Start informers and wait for cache sync
+			ctx := context.TODO()
+			addonInformers.Start(ctx.Done())
+			addonInformers.WaitForCacheSync(ctx.Done())
+
+			syncContext := testingcommon.NewFakeSyncContext(t, c.addonName)
+
+			err = controller.stopUnusedManagers(ctx, syncContext, c.addonName)
+			assert.NoError(t, err)
+			// Check if manager was stopped
+			if c.expectedManagerStopped {
+				assert.True(t, managerStopped, "expected manager to be stopped")
+				_, exists := controller.addonManagers[c.addonName]
+				assert.False(t, exists, "expected manager to be removed from map")
+			} else {
+				assert.False(t, managerStopped, "expected manager not to be stopped")
+				if len(c.existingManagers) > 0 {
+					_, exists := controller.addonManagers[c.addonName]
+					assert.True(t, exists, "expected manager to still exist in map")
+				}
+			}
+
+			// Check if requeue was called
+			if c.expectedRequeue {
+				// We can't easily test the exact requeue behavior with the fake sync context
+				// but we can verify the manager wasn't stopped when it should be requeued
+				assert.False(t, managerStopped, "manager should not be stopped when requeue is expected")
+			}
+		})
 	}
 }
