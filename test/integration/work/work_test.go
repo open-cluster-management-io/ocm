@@ -941,18 +941,12 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		})
 
 		ginkgo.It("should propagate labels from ManifestWork to AppliedManifestWork", func() {
-			// Add labels to the work
-			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(
-				context.Background(), work.Name, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			// Add labels to the work using Patch instead of Update
+			patchData := `{"metadata":{"labels":{"test-label":"test-value","test-label-2":"test-value-2"}}}`
 
-			updatedWork.Labels = map[string]string{
-				"test-label":   "test-value",
-				"test-label-2": "test-value-2",
-			}
-
-			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Update(
-				context.Background(), updatedWork, metav1.UpdateOptions{})
+			_, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
+				context.Background(), work.Name, types.MergePatchType,
+				[]byte(patchData), metav1.PatchOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// Verify AppliedManifestWork has the same labels
