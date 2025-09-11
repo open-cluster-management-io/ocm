@@ -24,6 +24,9 @@ type ManifestBundle struct {
 
 	// ManifestConfigs represents the configurations of manifests.
 	ManifestConfigs []workv1.ManifestConfigOption `json:"manifestConfigs,omitempty"`
+
+	// Executer represents the executor of the manifests
+	Executer *workv1.ManifestWorkExecutor `json:"executer,omitempty"`
 }
 
 // ManifestBundleStatus represents the data in a cloudevent, it contains the status of a ManifestBundle on a managed

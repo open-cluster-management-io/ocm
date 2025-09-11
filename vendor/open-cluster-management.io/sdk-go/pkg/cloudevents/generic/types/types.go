@@ -78,6 +78,9 @@ const (
 
 	// ExtensionStatusHash is the cloud event extension key of the status hash.
 	ExtensionStatusHash = "statushash"
+
+	// ExtensionWorkMeta is an extension attribute for work meta data.
+	ExtensionWorkMeta = "metadata"
 )
 
 // ResourceAction represents an action on a resource object on the source or agent.

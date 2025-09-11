@@ -3,6 +3,7 @@ package work
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/onsi/ginkgo/v2"
@@ -58,8 +59,8 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 	})
 
 	ginkgo.JustBeforeEach(func() {
-		work = util.NewManifestWork(clusterName, "", manifests)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		workName := fmt.Sprintf("executor-work-%s", utilrand.String(5))
+		work = util.NewManifestWork(clusterName, workName, manifests)
 		work.Spec.Executor = executor
 	})
 
