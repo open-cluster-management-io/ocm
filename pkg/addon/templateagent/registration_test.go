@@ -141,9 +141,16 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, nil, addonClient, addonInformerFactory, nil, nil)
 		f := agent.TemplateCSRConfigurationsFunc()
 		registrationConfigs, err := f(c.cluster, c.addon)
-		if err != nil {
-			if !strings.Contains(c.expectedErr, err.Error()) {
-				t.Fatalf("case: %s, err: %v", c.name, err)
+		if c.expectedErr == "" {
+			if err != nil {
+				t.Fatalf("case: %s, expected no error but got: %v", c.name, err)
+			}
+		} else {
+			if err == nil {
+				t.Fatalf("case: %s, expected error but got none", c.name)
+			}
+			if !strings.Contains(err.Error(), c.expectedErr) {
+				t.Fatalf("case: %s, expected error containing %q but got: %v", c.name, c.expectedErr, err)
 			}
 		}
 		if !equality.Semantic.DeepEqual(registrationConfigs, c.expectedConfigs) {
@@ -352,7 +359,7 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 				},
 			},
 			expectedCert: nil,
-			expectedErr:  `get custome signer ca open-cluster-management-hub/name1 failed, secrets "name1" not found`,
+			expectedErr:  `get custom signer ca open-cluster-management-hub/name1 failed: secrets "name1" not found`,
 		},
 		{
 			name:     "customsigner with ca secret",
@@ -415,9 +422,16 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, hubKubeClient, addonClient, addonInformerFactory, nil, nil)
 		f := agent.TemplateCSRSignFunc()
 		cert, err := f(c.cluster, c.addon, c.csr)
-		if err != nil {
-			if !strings.Contains(c.expectedErr, err.Error()) {
-				t.Fatalf("case: %s, err: %v", c.name, err)
+		if c.expectedErr == "" {
+			if err != nil {
+				t.Fatalf("case: %s, expected no error but got: %v", c.name, err)
+			}
+		} else {
+			if err == nil {
+				t.Fatalf("case: %s, expected error but got none", c.name)
+			}
+			if !strings.Contains(err.Error(), c.expectedErr) {
+				t.Fatalf("case: %s, expected error containing %q but got: %v", c.name, c.expectedErr, err)
 			}
 		}
 		if !bytes.Equal(cert, c.expectedCert) {
