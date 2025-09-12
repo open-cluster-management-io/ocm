@@ -36,7 +36,8 @@ type addonConfigController struct {
 	addonIndexer                 cache.Indexer
 	configListers                map[schema.GroupResource]dynamiclister.Lister
 	queue                        workqueue.TypedRateLimitingInterface[string]
-	addonFilterFunc              factory.EventFilterFunc
+	cmaFilterFunc                factory.EventFilterFunc
+	mcaFilterFunc                utils.ManagedClusterAddOnFilterFunc
 	configGVRs                   map[schema.GroupVersionResource]bool
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
 }
@@ -47,7 +48,8 @@ func NewAddonConfigController(
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	configInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	configGVRs map[schema.GroupVersionResource]bool,
-	addonFilterFunc factory.EventFilterFunc,
+	cmaFilterFunc factory.EventFilterFunc,
+	mcaFilterFunc utils.ManagedClusterAddOnFilterFunc,
 ) factory.Controller {
 	syncCtx := factory.NewSyncContext(controllerName)
 
@@ -57,7 +59,8 @@ func NewAddonConfigController(
 		addonIndexer:                 addonInformers.Informer().GetIndexer(),
 		configListers:                map[schema.GroupResource]dynamiclister.Lister{},
 		queue:                        syncCtx.Queue(),
-		addonFilterFunc:              addonFilterFunc,
+		cmaFilterFunc:                cmaFilterFunc,
+		mcaFilterFunc:                mcaFilterFunc,
 		configGVRs:                   configGVRs,
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
 	}
@@ -144,6 +147,16 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return err
 	}
 
+	// MCA (ManagedClusterAddOn) filter is intentionally commented out for the addon-config-controller.
+	// This is because template-based addons require this controller to set the specHash in the
+	// managedclusteraddon.status.ConfigReferences for addontemplate, regardless of the filter criteria.
+	// Consider moving logic of setting the managedclusteraddon.status.ConfigReferences for addontemplate
+	// to the addon-manager.
+	//
+	// if c.mcaFilterFunc != nil && !c.mcaFilterFunc(addon) {
+	// 	return nil
+	// }
+
 	cma, err := c.clusterManagementAddonLister.Get(addonName)
 	if errors.IsNotFound(err) {
 		// cluster management addon could be deleted, ignore
@@ -153,7 +166,7 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return err
 	}
 
-	if !c.addonFilterFunc(cma) {
+	if c.cmaFilterFunc != nil && !c.cmaFilterFunc(cma) {
 		return nil
 	}
 

@@ -6,6 +6,7 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	kubeinformers "k8s.io/client-go/informers"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
@@ -23,13 +24,19 @@ type BaseAddonManager interface {
 	Trigger(clusterName, addonName string)
 
 	// StartWithInformers starts all registered addon agent with the given informers.
+	// mcaFilterFunc is a filter function that controls which ManagedClusterAddOn objects should be processed.
+	// It can be used to filter addons or wait until addons meet specific criteria before processing.
+	// For example:
+	// - Wait for addon.status.configReferences to contain templates before processing: utils.FilterTemplateBasedAddOns
 	StartWithInformers(ctx context.Context,
 		workClient workclientset.Interface,
 		workInformers workv1informers.ManifestWorkInformer,
 		kubeInformers kubeinformers.SharedInformerFactory,
 		addonInformers addoninformers.SharedInformerFactory,
 		clusterInformers clusterv1informers.SharedInformerFactory,
-		dynamicInformers dynamicinformer.DynamicSharedInformerFactory) error
+		dynamicInformers dynamicinformer.DynamicSharedInformerFactory,
+		mcaFilterFunc utils.ManagedClusterAddOnFilterFunc,
+	) error
 }
 
 // AddonManager is the interface based on BaseAddonManager to initialize a manager on hub

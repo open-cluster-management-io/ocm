@@ -182,3 +182,5 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
 )
+
+replace open-cluster-management.io/addon-framework => github.com/zhujian7/addon-framework v0.0.0-20250912073602-0ecb984795e0
