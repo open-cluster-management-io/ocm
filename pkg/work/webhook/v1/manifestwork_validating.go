@@ -88,7 +88,7 @@ func validateExecutor(kubeClient kubernetes.Interface, work *workv1.ManifestWork
 				Type: workv1.ExecutorSubjectTypeServiceAccount,
 				ServiceAccount: &workv1.ManifestWorkSubjectServiceAccount{
 					// give the default value "system:serviceaccount::klusterlet-work-sa"
-					Namespace: "",                   // TODO: Not sure what value is reasonable
+					Namespace: "",
 					Name:      "klusterlet-work-sa", // the default sa of the work agent
 				},
 			},

@@ -34,7 +34,7 @@ type Options struct {
 
 // RunKlusterletOperator starts a new klusterlet operator
 func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
-	// Build kube client and informer for managed cluster
+	// Build kube client and informer
 	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
