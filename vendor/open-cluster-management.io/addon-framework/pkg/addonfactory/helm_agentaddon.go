@@ -208,9 +208,8 @@ func (a *HelmAgentAddon) getValues(
 	if err != nil {
 		return nil, err
 	}
-	cap := a.capabilities(cluster, addon)
 	values, err := chartutil.ToRenderValues(a.chart, overrideValues,
-		releaseOptions, cap)
+		releaseOptions, a.capabilities(cluster, addon))
 	if err != nil {
 		klog.Errorf("failed to render helm chart with values %v. err:%v", overrideValues, err)
 		return values, err

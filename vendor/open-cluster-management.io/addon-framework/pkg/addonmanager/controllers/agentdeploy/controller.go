@@ -49,7 +49,7 @@ type addonDeployController struct {
 	managedClusterAddonIndexer cache.Indexer
 	workIndexer                cache.Indexer
 	agentAddons                map[string]agent.AgentAddon
-	queue                      workqueue.TypedRateLimitingInterface[string]
+	queue                      workqueue.RateLimitingInterface
 }
 
 func NewAddonDeployController(
