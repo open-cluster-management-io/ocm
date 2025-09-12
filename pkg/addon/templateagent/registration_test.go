@@ -37,6 +37,7 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 		addon           *addonapiv1alpha1.ManagedClusterAddOn
 		template        *addonapiv1alpha1.AddOnTemplate
 		expectedConfigs []addonapiv1alpha1.RegistrationConfig
+		expectedErr     string
 	}{
 		{
 			name:            "empty",
@@ -44,6 +45,7 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 			addon:           NewFakeTemplateManagedClusterAddon("addon1", "cluster1", "", ""),
 			template:        NewFakeAddonTemplate("template1", []addonapiv1alpha1.RegistrationSpec{}),
 			expectedConfigs: []addonapiv1alpha1.RegistrationConfig{},
+			expectedErr:     "CSRConfigurations failed to get addon template for addon cluster1/addon1, template is nil",
 		},
 		{
 			name:    "kubeclient",
@@ -138,7 +140,19 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 
 		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, nil, addonClient, addonInformerFactory, nil, nil)
 		f := agent.TemplateCSRConfigurationsFunc()
-		registrationConfigs := f(c.cluster)
+		registrationConfigs, err := f(c.cluster, c.addon)
+		if c.expectedErr == "" {
+			if err != nil {
+				t.Fatalf("case: %s, expected no error but got: %v", c.name, err)
+			}
+		} else {
+			if err == nil {
+				t.Fatalf("case: %s, expected error but got none", c.name)
+			}
+			if !strings.Contains(err.Error(), c.expectedErr) {
+				t.Fatalf("case: %s, expected error containing %q but got: %v", c.name, c.expectedErr, err)
+			}
+		}
 		if !equality.Semantic.DeepEqual(registrationConfigs, c.expectedConfigs) {
 			t.Errorf("expected registrationConfigs %v, but got %v", c.expectedConfigs, registrationConfigs)
 		}
@@ -275,6 +289,7 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 		casecret     *corev1.Secret
 		csr          *certificatesv1.CertificateSigningRequest
 		expectedCert []byte
+		expectedErr  string
 	}{
 		{
 			name:    "kubeclient",
@@ -344,6 +359,7 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 				},
 			},
 			expectedCert: nil,
+			expectedErr:  `get custom signer ca open-cluster-management-hub/name1 failed: secrets "name1" not found`,
 		},
 		{
 			name:     "customsigner with ca secret",
@@ -383,6 +399,7 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 				},
 			},
 			expectedCert: nil,
+			expectedErr:  "failed to sign csr: PEM block type must be CERTIFICATE REQUEST",
 		},
 	}
 	for _, c := range cases {
@@ -404,7 +421,19 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 
 		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, hubKubeClient, addonClient, addonInformerFactory, nil, nil)
 		f := agent.TemplateCSRSignFunc()
-		cert := f(c.csr)
+		cert, err := f(c.cluster, c.addon, c.csr)
+		if c.expectedErr == "" {
+			if err != nil {
+				t.Fatalf("case: %s, expected no error but got: %v", c.name, err)
+			}
+		} else {
+			if err == nil {
+				t.Fatalf("case: %s, expected error but got none", c.name)
+			}
+			if !strings.Contains(err.Error(), c.expectedErr) {
+				t.Fatalf("case: %s, expected error containing %q but got: %v", c.name, c.expectedErr, err)
+			}
+		}
 		if !bytes.Equal(cert, c.expectedCert) {
 			t.Errorf("expected cert %v, but got %v", c.expectedCert, cert)
 		}
