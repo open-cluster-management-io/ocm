@@ -14,7 +14,10 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapiv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 
+	v1 "open-cluster-management.io/api/cluster/v1"
+
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
+	reghelpers "open-cluster-management.io/ocm/pkg/registration/helpers"
 )
 
 func TestRenderBootstrapHubKubeConfig(t *testing.T) {
@@ -81,7 +84,7 @@ func TestRenderBootstrapHubKubeConfig(t *testing.T) {
 				},
 			)
 			config := &chart.KlusterletChartConfig{}
-			config, err := RenderBootstrapHubKubeConfig(client, c.apiserverURL, c.bootstrapSA)(context.TODO(), config)
+			config, err := RenderBootstrapHubKubeConfig(client, c.apiserverURL, c.bootstrapSA)(context.TODO(), nil, config)
 			if err != nil {
 				t.Fatalf("failed to render bootstrap hub kubeconfig: %v", err)
 			}
@@ -121,7 +124,7 @@ func TestRenderImage(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			config := &chart.KlusterletChartConfig{}
 			render := RenderImage(c.image)
-			config, err := render(context.TODO(), config)
+			config, err := render(context.TODO(), nil, config)
 			if err != nil {
 				t.Fatalf("failed to render image: %v", err)
 			}
@@ -178,12 +181,108 @@ func TestRenderImagePullSecret(t *testing.T) {
 			client := kubefake.NewClientset(c.secrets...)
 			config := &chart.KlusterletChartConfig{}
 			render := RenderImagePullSecret(client, "test")
-			config, err := render(context.TODO(), config)
+			config, err := render(context.TODO(), nil, config)
 			if err != nil {
 				t.Fatalf("failed to render image: %v", err)
 			}
 			if config.Images.ImageCredentials.DockerConfigJson != c.expected {
 				t.Errorf("expected: %s, got: %s", c.expected, config.Images.ImageCredentials.DockerConfigJson)
+			}
+		})
+	}
+}
+
+func TestRenderFromConfigSecret(t *testing.T) {
+	cases := []struct {
+		name         string
+		clusterName  string
+		secret       *corev1.Secret
+		expectErr    bool
+		expectConfig *chart.KlusterletChartConfig
+	}{
+		{
+			name:        "secret not found",
+			clusterName: "test-cluster",
+			secret:      nil,
+			expectErr:   true,
+		},
+		{
+			name:        "secret found but no values key",
+			clusterName: "test-cluster",
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      reghelpers.ClusterImportConfigSecret,
+					Namespace: "test-cluster",
+				},
+				Data: map[string][]byte{},
+			},
+			expectErr: true,
+		},
+		{
+			name:        "secret found with invalid yaml",
+			clusterName: "test-cluster",
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      reghelpers.ClusterImportConfigSecret,
+					Namespace: "test-cluster",
+				},
+				Data: map[string][]byte{
+					reghelpers.ValuesYamlKey: []byte("invalid: ["),
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:        "secret found with valid yaml",
+			clusterName: "test-cluster",
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      reghelpers.ClusterImportConfigSecret,
+					Namespace: "test-cluster",
+				},
+				Data: map[string][]byte{
+					reghelpers.ValuesYamlKey: func() []byte {
+						cfg := &chart.KlusterletChartConfig{
+							BootstrapHubKubeConfig: "test-kubeconfig",
+						}
+						b, _ := yaml.Marshal(cfg)
+						return b
+					}(),
+				},
+			},
+			expectErr: false,
+			expectConfig: &chart.KlusterletChartConfig{
+				BootstrapHubKubeConfig: "test-kubeconfig",
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var objects []runtime.Object
+			if c.secret != nil {
+				objects = append(objects, c.secret)
+			}
+			client := kubefake.NewClientset(objects...)
+			render := RenderFromConfigSecret(client)
+			cluster := &v1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: c.clusterName,
+				},
+			}
+			config := &chart.KlusterletChartConfig{}
+			result, err := render(context.TODO(), cluster, config)
+			if c.expectErr {
+				if err == nil {
+					t.Errorf("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if c.expectConfig != nil && result.BootstrapHubKubeConfig != c.expectConfig.BootstrapHubKubeConfig {
+				t.Errorf("expected BootstrapHubKubeConfig: %s, got: %s", c.expectConfig.BootstrapHubKubeConfig, result.BootstrapHubKubeConfig)
 			}
 		})
 	}

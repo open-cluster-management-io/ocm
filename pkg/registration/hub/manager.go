@@ -8,6 +8,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -31,6 +32,7 @@ import (
 
 	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/features"
+	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/addon"
 	"open-cluster-management.io/ocm/pkg/registration/hub/clusterprofile"
 	"open-cluster-management.io/ocm/pkg/registration/hub/clusterrole"
@@ -168,10 +170,19 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 		}))
 	addOnInformers := addoninformers.NewSharedInformerFactory(addOnClient, 30*time.Minute)
 
+	newOneTermInformer := func(name string) kubeinformers.SharedInformerFactory {
+		return kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, 5*time.Minute,
+			kubeinformers.WithTweakListOptions(func(options *metav1.ListOptions) {
+				options.FieldSelector = fields.OneTermEqualSelector("metadata.name", name).String()
+			}))
+	}
+
+	configSecretInformer := newOneTermInformer(helpers.ClusterImportConfigSecret)
+
 	return m.RunControllerManagerWithInformers(
 		ctx, controllerContext,
-		kubeClient, metadataClient, clusterClient, clusterProfileClient, addOnClient,
-		kubeInfomers, clusterInformers, clusterProfileInformers, workInformers, addOnInformers,
+		kubeClient, metadataClient, clusterClient, clusterProfileClient, addOnClient, kubeInfomers,
+		clusterInformers, clusterProfileInformers, workInformers, addOnInformers, configSecretInformer,
 	)
 }
 
@@ -188,6 +199,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	clusterProfileInformers cpinformerv1alpha1.SharedInformerFactory,
 	workInformers workv1informers.SharedInformerFactory,
 	addOnInformers addoninformers.SharedInformerFactory,
+	configSecretInformer kubeinformers.SharedInformerFactory,
 ) error {
 	var drivers []register.HubDriver
 	for _, enabledRegistrationDriver := range m.EnabledRegistrationDrivers {
@@ -335,12 +347,15 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		providers = []cloudproviders.Interface{
 			capi.NewCAPIProvider(controllerContext.KubeConfig, clusterInformers.Cluster().V1().ManagedClusters()),
 		}
+
+		renderers, err := importeroptions.GetImporterRenderers(
+			m.ImportOption, kubeClient, controllerContext.OperatorNamespace)
+		if err != nil {
+			return err
+		}
+
 		clusterImporter = importer.NewImporter(
-			[]importer.KlusterletConfigRenderer{
-				importer.RenderBootstrapHubKubeConfig(kubeClient, m.ImportOption.APIServerURL, m.ImportOption.BootstrapSA),
-				importer.RenderImage(m.ImportOption.AgentImage),
-				importer.RenderImagePullSecret(kubeClient, controllerContext.OperatorNamespace),
-			},
+			renderers,
 			clusterClient,
 			clusterInformers.Cluster().V1().ManagedClusters(),
 			providers,
@@ -362,6 +377,10 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	go addOnInformers.Start(ctx.Done())
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.ClusterProfile) {
 		go clusterProfileInformers.Start(ctx.Done())
+	}
+
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.ClusterImporter) {
+		go configSecretInformer.Start(ctx.Done())
 	}
 
 	go managedClusterController.Run(ctx, 1)

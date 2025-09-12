@@ -14,16 +14,18 @@ import (
 	clientcmdapiv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	"k8s.io/utils/ptr"
 
+	v1 "open-cluster-management.io/api/cluster/v1"
 	sdkhelpers "open-cluster-management.io/sdk-go/pkg/helpers"
 
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
+	reghelpers "open-cluster-management.io/ocm/pkg/registration/helpers"
 )
 
 const imagePullSecretName = "open-cluster-management-image-pull-credentials"
 
 func RenderBootstrapHubKubeConfig(
 	kubeClient kubernetes.Interface, apiServerURL, bootstrapSA string) KlusterletConfigRenderer {
-	return func(ctx context.Context, config *chart.KlusterletChartConfig) (*chart.KlusterletChartConfig, error) {
+	return func(ctx context.Context, _ *v1.ManagedCluster, config *chart.KlusterletChartConfig) (*chart.KlusterletChartConfig, error) {
 		// get bootstrap token
 		bootstrapSANamespace, bootstrapSAName, err := cache.SplitMetaNamespaceKey(bootstrapSA)
 		if err != nil {
@@ -102,7 +104,7 @@ func RenderBootstrapHubKubeConfig(
 }
 
 func RenderImage(image string) KlusterletConfigRenderer {
-	return func(ctx context.Context, config *chart.KlusterletChartConfig) (*chart.KlusterletChartConfig, error) {
+	return func(ctx context.Context, _ *v1.ManagedCluster, config *chart.KlusterletChartConfig) (*chart.KlusterletChartConfig, error) {
 		if len(image) == 0 {
 			return config, nil
 		}
@@ -114,7 +116,7 @@ func RenderImage(image string) KlusterletConfigRenderer {
 }
 
 func RenderImagePullSecret(kubeClient kubernetes.Interface, namespace string) KlusterletConfigRenderer {
-	return func(ctx context.Context, config *chart.KlusterletChartConfig) (*chart.KlusterletChartConfig, error) {
+	return func(ctx context.Context, _ *v1.ManagedCluster, config *chart.KlusterletChartConfig) (*chart.KlusterletChartConfig, error) {
 		secret, err := kubeClient.CoreV1().Secrets(namespace).Get(ctx, imagePullSecretName, metav1.GetOptions{})
 		switch {
 		case errors.IsNotFound(err):
@@ -130,5 +132,28 @@ func RenderImagePullSecret(kubeClient kubernetes.Interface, namespace string) Kl
 		config.Images.ImageCredentials.CreateImageCredentials = true
 		config.Images.ImageCredentials.DockerConfigJson = string(secret.Data[corev1.DockerConfigJsonKey])
 		return config, nil
+	}
+}
+
+func RenderFromConfigSecret(kubeClient kubernetes.Interface) KlusterletConfigRenderer {
+	return func(ctx context.Context, cluster *v1.ManagedCluster,
+		config *chart.KlusterletChartConfig) (*chart.KlusterletChartConfig, error) {
+		configSecret, err := kubeClient.CoreV1().Secrets(cluster.Name).
+			Get(ctx, reghelpers.ClusterImportConfigSecret, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		valuesRaw := configSecret.Data[reghelpers.ValuesYamlKey]
+		if len(valuesRaw) == 0 {
+			return nil, fmt.Errorf("no values found in secret %s/%s", reghelpers.ClusterImportConfigSecret, reghelpers.ValuesYamlKey)
+		}
+
+		klusterletChartConfig := &chart.KlusterletChartConfig{}
+		err = yaml.Unmarshal(valuesRaw, klusterletChartConfig)
+		if err != nil {
+			return nil, fmt.Errorf("the values in the cluster import config secret is invalid: %v", err)
+		}
+
+		return klusterletChartConfig, nil
 	}
 }
