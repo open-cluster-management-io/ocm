@@ -20,6 +20,7 @@ import (
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
 
 	"open-cluster-management.io/addon-framework/pkg/index"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 // addonManager is the implementation of AddonManager with the base implementation.
@@ -122,7 +123,8 @@ func (a *addonManager) Start(ctx context.Context) error {
 		return err
 	}
 
-	err = a.StartWithInformers(ctx, workClient, workInformers.Work().V1().ManifestWorks(), kubeInformers, addonInformers, clusterInformers, dynamicInformers)
+	err = a.StartWithInformers(ctx, workClient, workInformers.Work().V1().ManifestWorks(), kubeInformers,
+		addonInformers, clusterInformers, dynamicInformers, utils.AllowAllAddOns)
 	if err != nil {
 		return err
 	}

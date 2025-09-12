@@ -29,7 +29,7 @@ type cmaManagedByController struct {
 	addonClient                  addonv1alpha1client.Interface
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
 	agentAddons                  map[string]agent.AgentAddon
-	addonFilterFunc              factory.EventFilterFunc
+	cmaFilterFunc                factory.EventFilterFunc
 	addonPatcher                 patcher.Patcher[*addonapiv1alpha1.ClusterManagementAddOn,
 		addonapiv1alpha1.ClusterManagementAddOnSpec,
 		addonapiv1alpha1.ClusterManagementAddOnStatus]
@@ -39,7 +39,7 @@ func NewCMAManagedByController(
 	addonClient addonv1alpha1client.Interface,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	agentAddons map[string]agent.AgentAddon,
-	addonFilterFunc factory.EventFilterFunc,
+	cmaFilterFunc factory.EventFilterFunc,
 ) factory.Controller {
 	syncCtx := factory.NewSyncContext(controllerName)
 
@@ -47,7 +47,7 @@ func NewCMAManagedByController(
 		addonClient:                  addonClient,
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
 		agentAddons:                  agentAddons,
-		addonFilterFunc:              addonFilterFunc,
+		cmaFilterFunc:                cmaFilterFunc,
 		addonPatcher: patcher.NewPatcher[*addonapiv1alpha1.ClusterManagementAddOn,
 			addonapiv1alpha1.ClusterManagementAddOnSpec,
 			addonapiv1alpha1.ClusterManagementAddOnStatus](addonClient.AddonV1alpha1().ClusterManagementAddOns()),
@@ -60,7 +60,7 @@ func NewCMAManagedByController(
 				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 				return []string{key}
 			},
-			c.addonFilterFunc, clusterManagementAddonInformers.Informer()).
+			c.cmaFilterFunc, clusterManagementAddonInformers.Informer()).
 		WithSync(c.sync).ToController(controllerName)
 }
 

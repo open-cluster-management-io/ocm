@@ -1729,7 +1729,7 @@ k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/ptr
 k8s.io/utils/trace
-# open-cluster-management.io/addon-framework v1.0.1-0.20250910091630-7f19b89a319b
+# open-cluster-management.io/addon-framework v1.0.1-0.20250910091630-7f19b89a319b => github.com/zhujian7/addon-framework v0.0.0-20250912073602-0ecb984795e0
 ## explicit; go 1.24.0
 open-cluster-management.io/addon-framework/pkg/addonfactory
 open-cluster-management.io/addon-framework/pkg/addonmanager
@@ -1980,3 +1980,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
 sigs.k8s.io/yaml/goyaml.v3
+# open-cluster-management.io/addon-framework => github.com/zhujian7/addon-framework v0.0.0-20250912073602-0ecb984795e0

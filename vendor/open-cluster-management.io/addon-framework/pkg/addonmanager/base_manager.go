@@ -77,7 +77,12 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 	kubeInformers kubeinformers.SharedInformerFactory,
 	addonInformers addoninformers.SharedInformerFactory,
 	clusterInformers clusterv1informers.SharedInformerFactory,
-	dynamicInformers dynamicinformer.DynamicSharedInformerFactory) error {
+	dynamicInformers dynamicinformer.DynamicSharedInformerFactory,
+	mcaFilterFunc utils.ManagedClusterAddOnFilterFunc,
+) error {
+	if mcaFilterFunc == nil {
+		mcaFilterFunc = utils.AllowAllAddOns
+	}
 
 	kubeClient, err := kubernetes.NewForConfig(a.config)
 	if err != nil {
@@ -107,6 +112,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 		workInformers,
 		a.addonAgents,
+		mcaFilterFunc,
 	)
 
 	registrationController := registration.NewAddonRegistrationController(
@@ -114,6 +120,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 		a.addonAgents,
+		mcaFilterFunc,
 	)
 
 	// This controller is used during migrating addons to be managed by addon-manager.
@@ -135,6 +142,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 			dynamicInformers,
 			a.addonConfigs,
 			utils.FilterByAddonName(a.addonAgents),
+			mcaFilterFunc,
 		)
 		managementAddonConfigController = cmaconfig.NewCMAConfigController(
 			addonClient,
@@ -159,6 +167,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 			nil,
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 			a.addonAgents,
+			mcaFilterFunc,
 		)
 		csrSignController = certificate.NewCSRSignController(
 			kubeClient,
@@ -166,6 +175,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 			kubeInformers.Certificates().V1().CertificateSigningRequests(),
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 			a.addonAgents,
+			mcaFilterFunc,
 		)
 	} else if v1beta1Supported {
 		csrApproveController = certificate.NewCSRApprovingController(
@@ -175,6 +185,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 			kubeInformers.Certificates().V1beta1().CertificateSigningRequests(),
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 			a.addonAgents,
+			mcaFilterFunc,
 		)
 	}
 
