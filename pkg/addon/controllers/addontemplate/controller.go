@@ -168,7 +168,7 @@ func (c *addonTemplateController) sync(ctx context.Context, syncCtx factory.Sync
 
 	_, exist := c.addonManagers[addonName]
 	if exist {
-		logger.Info("There already is a manager started for addon, skipping", "addonName", addonName)
+		logger.V(4).Info("There already is a manager started for addon, skipping", "addonName", addonName)
 		return nil
 	}
 
@@ -254,7 +254,7 @@ func (c *addonTemplateController) runController(ctx context.Context, addonName s
 	}
 
 	err = mgr.StartWithInformers(ctx, c.workClient, c.workInformers.Work().V1().ManifestWorks(),
-		kubeInformers, c.addonInformers, c.clusterInformers, c.dynamicInformers)
+		kubeInformers, c.addonInformers, c.clusterInformers, c.dynamicInformers, utils.FilterTemplateBasedAddOns)
 	if err != nil {
 		return err
 	}
