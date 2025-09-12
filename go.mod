@@ -39,7 +39,7 @@ require (
 	k8s.io/kube-aggregator v0.33.4
 	k8s.io/kubectl v0.33.4
 	k8s.io/utils v0.0.0-20241210054802-24370beab758
-	open-cluster-management.io/addon-framework v1.0.1-0.20250910091630-7f19b89a319b
+	open-cluster-management.io/addon-framework v1.0.1
 	open-cluster-management.io/api v1.0.1-0.20250903073454-c6702adf44cc
 	open-cluster-management.io/sdk-go v1.0.1-0.20250911065113-bff262df709b
 	sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03
@@ -119,8 +119,6 @@ require (
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
-	github.com/moby/patternmatcher v0.6.0 // indirect
-	github.com/moby/sys/user v0.4.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect

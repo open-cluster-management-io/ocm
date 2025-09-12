@@ -21,19 +21,19 @@ import (
 )
 
 type FakeSyncContext struct {
-	queue    workqueue.TypedRateLimitingInterface[string]
+	queue    workqueue.RateLimitingInterface
 	recorder events.Recorder
 }
 
 func NewFakeSyncContext(t *testing.T) *FakeSyncContext {
 	return &FakeSyncContext{
-		queue:    workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
+		queue:    workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 		recorder: NewTestingEventRecorder(t),
 	}
 }
 
-func (f FakeSyncContext) Queue() workqueue.TypedRateLimitingInterface[string] { return f.queue }
-func (f FakeSyncContext) Recorder() events.Recorder                           { return f.recorder }
+func (f FakeSyncContext) Queue() workqueue.RateLimitingInterface { return f.queue }
+func (f FakeSyncContext) Recorder() events.Recorder              { return f.recorder }
 
 func NewUnstructured(apiVersion, kind, namespace, name string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
