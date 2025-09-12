@@ -54,24 +54,20 @@ test-addon-integration: ensure-kubebuilder-tools
 .PHONY: test-addon-integration
 
 # In the cloud events scenario, skip the following tests
-# - executor_test.go, this feature is not supported yet by cloud events work client
 # - unmanaged_appliedwork_test.go, this test mainly focus on switching the hub kube-apiserver
 # - manifestworkreplicaset_test.go, this test needs to update the work status with the hub work client,
 #   cloud events work client does not support it. (TODO) may add e2e to for mwrs.
 test-cloudevents-work-mqtt-integration: ensure-kubebuilder-tools build-work-integration
 	./work-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast \
 		-ginkgo.skip-file manifestworkreplicaset_test.go \
-		-ginkgo.skip-file executor_test.go \
 		-ginkgo.skip-file unmanaged_appliedwork_test.go \
 		-test.driver=mqtt \
 		-v=4 ${ARGS}
 .PHONY: test-cloudevents-work-mqtt-integration
 
 # In the cloud events scenario, skip the following tests
-# - executor_test.go, this feature is not supported yet since the executor field is not in the manifestbundle.
 test-cloudevents-work-grpc-integration: ensure-kubebuilder-tools build-work-integration
 	./work-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast \
-		-ginkgo.skip-file executor_test.go \
 		-test.driver=grpc \
 		-v=4 ${ARGS}
 .PHONY: test-cloudevents-work-grpc-integration

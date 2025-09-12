@@ -129,6 +129,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 		// start hub controller
 		go func() {
+			defer ginkgo.GinkgoRecover()
 			opts := hub.NewWorkHubManagerOptions()
 			opts.WorkDriver = "kube"
 			opts.WorkDriverConfig = sourceConfigFileName
@@ -172,6 +173,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 		// start hub controller
 		go func() {
+			defer ginkgo.GinkgoRecover()
 			// in grpc driver, hub controller still calls hub kube-apiserver.
 			sourceKubeConfigFileName := path.Join(tempDir, "kubeconfig")
 			err = util.CreateKubeconfigFile(cfg, sourceKubeConfigFileName)
@@ -223,6 +225,7 @@ type agentOptionsDecorator func(opt *spoke.WorkloadAgentOptions, commonOpt *comm
 	*spoke.WorkloadAgentOptions, *commonoptions.AgentOptions)
 
 func startWorkAgent(ctx context.Context, clusterName string, decorators ...agentOptionsDecorator) {
+	defer ginkgo.GinkgoRecover()
 	o := spoke.NewWorkloadAgentOptions()
 	o.StatusSyncInterval = 3 * time.Second
 	o.WorkloadSourceDriver = sourceDriver
@@ -261,7 +264,10 @@ func startGRPCServer(ctx context.Context, temp string, cfg *rest.Config) (string
 
 	hook, err := util.NewGRPCServerWorkHook(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	go hook.Run(ctx)
+	go func() {
+		defer ginkgo.GinkgoRecover()
+		hook.Run(ctx)
+	}()
 
 	grpcEventServer := cloudeventsgrpc.NewGRPCBroker()
 	grpcEventServer.RegisterService(payload.ManifestBundleEventDataType,
@@ -277,6 +283,7 @@ func startGRPCServer(ctx context.Context, temp string, cfg *rest.Config) (string
 		WithExtraMetrics(cemetrics.CloudEventsGRPCMetrics()...)
 
 	go func() {
+		defer ginkgo.GinkgoRecover()
 		err := server.Run(ctx)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	}()
