@@ -1,3 +1,25 @@
+# v1.73.3 (2025-09-10)
+
+* No change notes available for this release.
+
+# v1.73.2 (2025-09-08)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.73.1 (2025-08-29)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.73.0 (2025-08-27)
+
+* **Feature**: Add support for on-demand refresh of EKS cluster insights
+* **Dependency Update**: Update to smithy-go v1.23.0.
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.72.0 (2025-08-25)
+
+* **Feature**: Remove incorrect endpoint tests
+
 # v1.71.1 (2025-08-21)
 
 * **Dependency Update**: Updated to the latest SDK module versions
