@@ -19,46 +19,45 @@ import (
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
 )
+
+const defaultGRPCServiceAccount = "system:serviceaccount:open-cluster-management-hub:grpc-server-sa"
 
 var serialNumberLimit = new(big.Int).Lsh(big.NewInt(1), 128)
 
 // DefaultSignerWithExpiry generates a signer func for addon agent to sign the csr using caKey and caData with expiry date.
 func DefaultSignerWithExpiry(caKey, caData []byte, duration time.Duration) agent.CSRSignerFunc {
-	return func(csr *certificatesv1.CertificateSigningRequest) []byte {
+	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn,
+		csr *certificatesv1.CertificateSigningRequest) ([]byte, error) {
 		blockTlsCrt, _ := pem.Decode(caData)
 		if blockTlsCrt == nil {
-			klog.Errorf("Failed to decode cert")
-			return nil
+			return nil, fmt.Errorf("failed to decode cert")
 		}
 		certs, err := x509.ParseCertificates(blockTlsCrt.Bytes)
 		if err != nil {
-			klog.Errorf("Failed to parse cert: %v", err)
-			return nil
+			return nil, fmt.Errorf("failed to parse cert: %v", err)
 		}
 
 		blockTlsKey, _ := pem.Decode(caKey)
 		if blockTlsKey == nil {
-			klog.Errorf("Failed to decode key")
-			return nil
+			return nil, fmt.Errorf("failed to decode key")
 		}
 
 		// For now only PKCS#1 is supported which assures the private key algorithm is RSA.
 		// TODO: Compatibility w/ PKCS#8 key e.g. EC algorithm
 		key, err := x509.ParsePKCS1PrivateKey(blockTlsKey.Bytes)
 		if err != nil {
-			klog.Errorf("Failed to parse key: %v", err)
-			return nil
+			return nil, fmt.Errorf("failed to parse key: %v", err)
 		}
 
 		data, err := signCSR(csr, certs[0], key, duration)
 		if err != nil {
-			klog.Errorf("Failed to sign csr: %v", err)
-			return nil
+			return nil, fmt.Errorf("failed to sign csr: %v", err)
 		}
-		return data
+		return data, nil
 	}
 }
 
@@ -170,13 +169,20 @@ func DefaultCSRApprover(agentName string) agent.CSRApproveFunc {
 		}
 
 		// check user name
-		if strings.HasPrefix(csr.Spec.Username, "system:open-cluster-management:"+cluster.Name) {
+		username := csr.Spec.Username
+		if csr.Spec.Username == defaultGRPCServiceAccount {
+			// the CSR username is the service account of gRPC server rather than the user of agent.
+			// use the CSRUsernameAnnotation that identifies the agent user who requested the CSR.
+			username = csr.Annotations[operatorapiv1.CSRUsernameAnnotation]
+		}
+
+		if strings.HasPrefix(username, "system:open-cluster-management:"+cluster.Name) {
 			klog.Info("CSR approved")
 			return true
-		} else {
-			klog.Info("CSR not approved due to illegal requester", "requester", csr.Spec.Username)
-			return false
 		}
+
+		klog.Info("CSR not approved due to illegal requester", "requester", csr.Spec.Username)
+		return false
 	}
 }
 

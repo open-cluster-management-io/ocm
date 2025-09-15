@@ -38,7 +38,6 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/manifests"
-	"open-cluster-management.io/ocm/pkg/common/helpers"
 )
 
 const nameFoo = "foo"
@@ -1832,7 +1831,7 @@ func TestGRPCAuthEnabled(t *testing.T) {
 				Spec: operatorapiv1.ClusterManagerSpec{
 					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
 						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
-							{AuthType: helpers.GRPCCAuthType},
+							{AuthType: operatorapiv1.GRPCAuthType},
 						},
 					},
 				},
@@ -1845,7 +1844,7 @@ func TestGRPCAuthEnabled(t *testing.T) {
 				Spec: operatorapiv1.ClusterManagerSpec{
 					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
 						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
-							{AuthType: helpers.CSRAuthType},
+							{AuthType: operatorapiv1.CSRAuthType},
 						},
 					},
 				},
@@ -1858,8 +1857,8 @@ func TestGRPCAuthEnabled(t *testing.T) {
 				Spec: operatorapiv1.ClusterManagerSpec{
 					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
 						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
-							{AuthType: helpers.CSRAuthType},
-							{AuthType: helpers.GRPCCAuthType},
+							{AuthType: operatorapiv1.CSRAuthType},
+							{AuthType: operatorapiv1.GRPCAuthType},
 						},
 					},
 				},
@@ -1922,7 +1921,7 @@ func TestGRPCServerHostNames(t *testing.T) {
 				Spec: operatorapiv1.ClusterManagerSpec{
 					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
 						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
-							{AuthType: helpers.CSRAuthType},
+							{AuthType: operatorapiv1.CSRAuthType},
 						},
 					},
 				},
@@ -1939,7 +1938,7 @@ func TestGRPCServerHostNames(t *testing.T) {
 				Spec: operatorapiv1.ClusterManagerSpec{
 					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
 						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
-							{AuthType: helpers.GRPCCAuthType},
+							{AuthType: operatorapiv1.GRPCAuthType},
 						},
 					},
 				},
@@ -1957,13 +1956,18 @@ func TestGRPCServerHostNames(t *testing.T) {
 					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
 						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
 							{
-								AuthType: helpers.GRPCCAuthType,
-								GRPC: &operatorapiv1.GRPCConfig{
-									EndpointExposure: &operatorapiv1.GRPCEndpointExposure{
-										Type: operatorapiv1.GRPCEndpointTypeHostname,
-										Hostname: &operatorapiv1.HostnameConfig{
-											Value: "test.example.com",
-										},
+								AuthType: operatorapiv1.GRPCAuthType,
+							},
+						},
+					},
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: "grpc",
+								GRPC: &operatorapiv1.Endpoint{
+									Type: operatorapiv1.EndpointTypeHostname,
+									Hostname: &operatorapiv1.HostnameConfig{
+										Host: "test.example.com",
 									},
 								},
 							},

@@ -3,7 +3,7 @@ package work
 import (
 	"context"
 	"encoding/json"
-	"time"
+	"fmt"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/onsi/ginkgo/v2"
@@ -17,18 +17,15 @@ import (
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
-	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
-	"open-cluster-management.io/ocm/pkg/work/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
-	var o *spoke.WorkloadAgentOptions
-	var commOptions *commonoptions.AgentOptions
 	var cancel context.CancelFunc
 
 	var work *workapiv1.ManifestWork
+	var clusterName string
 	var manifests []workapiv1.Manifest
 	var executor *workapiv1.ManifestWorkExecutor
 
@@ -38,25 +35,23 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 	executorName := "test-executor"
 
 	ginkgo.BeforeEach(func() {
-		o = spoke.NewWorkloadAgentOptions()
-		o.StatusSyncInterval = 3 * time.Second
-		o.WorkloadSourceDriver = sourceDriver
-		o.WorkloadSourceConfig = sourceConfigFileName
-
 		err := features.SpokeMutableFeatureGate.Set("ExecutorValidatingCaches=true")
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		ginkgo.DeferCleanup(func() {
+			_ = features.SpokeMutableFeatureGate.Set("ExecutorValidatingCaches=false")
+		})
 
-		commOptions = commonoptions.NewAgentOptions()
-		commOptions.SpokeClusterName = utilrand.String(5)
+		clusterName = utilrand.String(5)
 
-		ns := &corev1.Namespace{}
-		ns.Name = commOptions.SpokeClusterName
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterName},
+		}
 		_, err = spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		var ctx context.Context
 		ctx, cancel = context.WithCancel(context.Background())
-		go startWorkAgent(ctx, o, commOptions)
+		go startWorkAgent(ctx, clusterName)
 
 		// reset manifests
 		manifests = nil
@@ -64,8 +59,8 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 	})
 
 	ginkgo.JustBeforeEach(func() {
-		work = util.NewManifestWork(commOptions.SpokeClusterName, "", manifests)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		workName := fmt.Sprintf("executor-work-%s", utilrand.String(5))
+		work = util.NewManifestWork(clusterName, workName, manifests)
 		work.Spec.Executor = executor
 	})
 
@@ -74,21 +69,21 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 			cancel()
 		}
 		err := spokeKubeClient.CoreV1().Namespaces().Delete(
-			context.Background(), commOptions.SpokeClusterName, metav1.DeleteOptions{})
+			context.Background(), clusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.Context("Apply the resource with executor", func() {
 		ginkgo.BeforeEach(func() {
 			manifests = []workapiv1.Manifest{
-				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm1, map[string]string{"a": "b"}, []string{})),
-				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm2, map[string]string{"c": "d"}, []string{})),
+				util.ToManifest(util.NewConfigmap(clusterName, cm1, map[string]string{"a": "b"}, []string{})),
+				util.ToManifest(util.NewConfigmap(clusterName, cm2, map[string]string{"c": "d"}, []string{})),
 			}
 			executor = &workapiv1.ManifestWorkExecutor{
 				Subject: workapiv1.ManifestWorkExecutorSubject{
 					Type: workapiv1.ExecutorSubjectTypeServiceAccount,
 					ServiceAccount: &workapiv1.ManifestWorkSubjectServiceAccount{
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      executorName,
 					},
 				},
@@ -96,7 +91,7 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 		})
 
 		ginkgo.It("Executor does not have permission", func() {
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
 				context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -112,10 +107,10 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 		})
 
 		ginkgo.It("Executor does not have permission to partial resources", func() {
-			_, err = spokeKubeClient.RbacV1().Roles(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
 				context.TODO(), &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      roleName,
 					},
 					Rules: []rbacv1.PolicyRule{
@@ -128,16 +123,16 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 					},
 				}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			_, err = spokeKubeClient.RbacV1().RoleBindings(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
 				context.TODO(), &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      roleName,
 					},
 					Subjects: []rbacv1.Subject{
 						{
 							Kind:      "ServiceAccount",
-							Namespace: commOptions.SpokeClusterName,
+							Namespace: clusterName,
 							Name:      executorName,
 						},
 					},
@@ -149,7 +144,7 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
 				context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -163,19 +158,19 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 			// ensure configmap cm1 exist and cm2 not exist
 			util.AssertExistenceOfConfigMaps(
 				[]workapiv1.Manifest{
-					util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm1, map[string]string{"a": "b"}, []string{})),
+					util.ToManifest(util.NewConfigmap(clusterName, cm1, map[string]string{"a": "b"}, []string{})),
 				}, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 			util.AssertNonexistenceOfConfigMaps(
 				[]workapiv1.Manifest{
-					util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm2, map[string]string{"a": "b"}, []string{})),
+					util.ToManifest(util.NewConfigmap(clusterName, cm2, map[string]string{"a": "b"}, []string{})),
 				}, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 
 		ginkgo.It("Executor has permission for all resources", func() {
-			_, err = spokeKubeClient.RbacV1().Roles(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
 				context.TODO(), &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      roleName,
 					},
 					Rules: []rbacv1.PolicyRule{
@@ -188,16 +183,16 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 					},
 				}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			_, err = spokeKubeClient.RbacV1().RoleBindings(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
 				context.TODO(), &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      roleName,
 					},
 					Subjects: []rbacv1.Subject{
 						{
 							Kind:      "ServiceAccount",
-							Namespace: commOptions.SpokeClusterName,
+							Namespace: clusterName,
 							Name:      executorName,
 						},
 					},
@@ -209,7 +204,7 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
 				context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -228,14 +223,14 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 	ginkgo.Context("Apply the resource with executor deleting validating", func() {
 		ginkgo.BeforeEach(func() {
 			manifests = []workapiv1.Manifest{
-				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm1, map[string]string{"a": "b"}, []string{})),
-				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm2, map[string]string{"c": "d"}, []string{})),
+				util.ToManifest(util.NewConfigmap(clusterName, cm1, map[string]string{"a": "b"}, []string{})),
+				util.ToManifest(util.NewConfigmap(clusterName, cm2, map[string]string{"c": "d"}, []string{})),
 			}
 			executor = &workapiv1.ManifestWorkExecutor{
 				Subject: workapiv1.ManifestWorkExecutorSubject{
 					Type: workapiv1.ExecutorSubjectTypeServiceAccount,
 					ServiceAccount: &workapiv1.ManifestWorkSubjectServiceAccount{
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      executorName,
 					},
 				},
@@ -243,10 +238,10 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 		})
 
 		ginkgo.It("Executor does not have delete permission and delete option is foreground", func() {
-			_, err = spokeKubeClient.RbacV1().Roles(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
 				context.TODO(), &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      roleName,
 					},
 					Rules: []rbacv1.PolicyRule{
@@ -259,16 +254,16 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 					},
 				}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			_, err = spokeKubeClient.RbacV1().RoleBindings(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
 				context.TODO(), &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      roleName,
 					},
 					Subjects: []rbacv1.Subject{
 						{
 							Kind:      "ServiceAccount",
-							Namespace: commOptions.SpokeClusterName,
+							Namespace: clusterName,
 							Name:      executorName,
 						},
 					},
@@ -280,7 +275,7 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
 				context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -296,10 +291,10 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 		})
 
 		ginkgo.It("Executor does not have delete permission and delete option is orphan", func() {
-			_, err = spokeKubeClient.RbacV1().Roles(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
 				context.TODO(), &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      roleName,
 					},
 					Rules: []rbacv1.PolicyRule{
@@ -312,16 +307,16 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 					},
 				}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			_, err = spokeKubeClient.RbacV1().RoleBindings(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
 				context.TODO(), &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      roleName,
 					},
 					Subjects: []rbacv1.Subject{
 						{
 							Kind:      "ServiceAccount",
-							Namespace: commOptions.SpokeClusterName,
+							Namespace: clusterName,
 							Name:      executorName,
 						},
 					},
@@ -336,7 +331,7 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 			work.Spec.DeleteOption = &workapiv1.DeleteOption{
 				PropagationPolicy: workapiv1.DeletePropagationPolicyTypeOrphan,
 			}
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
 				context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -352,10 +347,10 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 		})
 
 		ginkgo.It("Executor does not have delete permission and delete option is selectively orphan", func() {
-			_, err = spokeKubeClient.RbacV1().Roles(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
 				context.TODO(), &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      roleName,
 					},
 					Rules: []rbacv1.PolicyRule{
@@ -368,16 +363,16 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 					},
 				}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			_, err = spokeKubeClient.RbacV1().RoleBindings(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
 				context.TODO(), &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      roleName,
 					},
 					Subjects: []rbacv1.Subject{
 						{
 							Kind:      "ServiceAccount",
-							Namespace: commOptions.SpokeClusterName,
+							Namespace: clusterName,
 							Name:      executorName,
 						},
 					},
@@ -395,13 +390,13 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 					OrphaningRules: []workapiv1.OrphaningRule{
 						{
 							Resource:  "configmaps",
-							Namespace: commOptions.SpokeClusterName,
+							Namespace: clusterName,
 							Name:      cm1,
 						},
 					},
 				},
 			}
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
 				context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -415,11 +410,11 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 			// ensure configmap cm1 exist and cm2 not exist
 			util.AssertExistenceOfConfigMaps(
 				[]workapiv1.Manifest{
-					util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm1, map[string]string{"a": "b"}, []string{})),
+					util.ToManifest(util.NewConfigmap(clusterName, cm1, map[string]string{"a": "b"}, []string{})),
 				}, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 			util.AssertNonexistenceOfConfigMaps(
 				[]workapiv1.Manifest{
-					util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm2, map[string]string{"a": "b"}, []string{})),
+					util.ToManifest(util.NewConfigmap(clusterName, cm2, map[string]string{"a": "b"}, []string{})),
 				}, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 	})
@@ -427,20 +422,20 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 	ginkgo.Context("Apply the resource with executor escalation validating", func() {
 		ginkgo.BeforeEach(func() {
 			manifests = []workapiv1.Manifest{
-				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm1, map[string]string{"a": "b"}, []string{})),
-				util.ToManifest(util.NewRoleForManifest(commOptions.SpokeClusterName, "role-cm-creator", rbacv1.PolicyRule{
+				util.ToManifest(util.NewConfigmap(clusterName, cm1, map[string]string{"a": "b"}, []string{})),
+				util.ToManifest(util.NewRoleForManifest(clusterName, "role-cm-creator", rbacv1.PolicyRule{
 					Verbs:     []string{"create", "update", "patch", "get", "list", "delete"},
 					APIGroups: []string{""},
 					Resources: []string{"configmaps"},
 				})),
-				util.ToManifest(util.NewRoleBindingForManifest(commOptions.SpokeClusterName, "role-cm-creator-binding",
+				util.ToManifest(util.NewRoleBindingForManifest(clusterName, "role-cm-creator-binding",
 					rbacv1.RoleRef{
 						Kind: "Role",
 						Name: "role-cm-creator",
 					},
 					rbacv1.Subject{
 						Kind:      "ServiceAccount",
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      executorName,
 					})),
 			}
@@ -448,7 +443,7 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 				Subject: workapiv1.ManifestWorkExecutorSubject{
 					Type: workapiv1.ExecutorSubjectTypeServiceAccount,
 					ServiceAccount: &workapiv1.ManifestWorkSubjectServiceAccount{
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      executorName,
 					},
 				},
@@ -456,11 +451,11 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 		})
 
 		ginkgo.It("no permission", func() {
-			_, err = spokeKubeClient.RbacV1().Roles(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
 				context.TODO(), &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      roleName,
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 					},
 					Rules: []rbacv1.PolicyRule{
 						{
@@ -472,16 +467,16 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 					},
 				}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			_, err = spokeKubeClient.RbacV1().RoleBindings(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
 				context.TODO(), &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      roleName,
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 					},
 					Subjects: []rbacv1.Subject{
 						{
 							Kind:      "ServiceAccount",
-							Namespace: commOptions.SpokeClusterName,
+							Namespace: clusterName,
 							Name:      executorName,
 						},
 					},
@@ -493,7 +488,7 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
 				context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -509,16 +504,16 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 			// ensure configmap not exist
 			util.AssertNonexistenceOfConfigMaps(
 				[]workapiv1.Manifest{
-					util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm1, map[string]string{"a": "b"}, []string{})),
+					util.ToManifest(util.NewConfigmap(clusterName, cm1, map[string]string{"a": "b"}, []string{})),
 				}, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 
 		ginkgo.It("no permission for already existing resource", func() {
-			_, err = spokeKubeClient.RbacV1().Roles(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
 				context.TODO(), &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      roleName,
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 					},
 					Rules: []rbacv1.PolicyRule{
 						{
@@ -530,16 +525,16 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 					},
 				}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			_, err = spokeKubeClient.RbacV1().RoleBindings(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
 				context.TODO(), &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      roleName,
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 					},
 					Subjects: []rbacv1.Subject{
 						{
 							Kind:      "ServiceAccount",
-							Namespace: commOptions.SpokeClusterName,
+							Namespace: clusterName,
 							Name:      executorName,
 						},
 					},
@@ -552,11 +547,11 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// make the role exist with lower permission
-			_, err = spokeKubeClient.RbacV1().Roles(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
 				context.TODO(), &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "role-cm-creator",
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 					},
 					Rules: []rbacv1.PolicyRule{
 						{
@@ -568,7 +563,7 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
 				context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -585,16 +580,16 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 			// ensure configmap not exist
 			util.AssertNonexistenceOfConfigMaps(
 				[]workapiv1.Manifest{
-					util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm1, map[string]string{"a": "b"}, []string{})),
+					util.ToManifest(util.NewConfigmap(clusterName, cm1, map[string]string{"a": "b"}, []string{})),
 				}, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 
 		ginkgo.It("with permission", func() {
-			_, err = spokeKubeClient.RbacV1().Roles(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
 				context.TODO(), &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      roleName,
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 					},
 					Rules: []rbacv1.PolicyRule{
 						{
@@ -611,16 +606,16 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 					},
 				}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			_, err = spokeKubeClient.RbacV1().RoleBindings(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
 				context.TODO(), &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      roleName,
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 					},
 					Subjects: []rbacv1.Subject{
 						{
 							Kind:      "ServiceAccount",
-							Namespace: commOptions.SpokeClusterName,
+							Namespace: clusterName,
 							Name:      executorName,
 						},
 					},
@@ -632,7 +627,7 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
 				context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -648,16 +643,16 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 			// ensure configmaps exist
 			util.AssertExistenceOfConfigMaps(
 				[]workapiv1.Manifest{
-					util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm1, map[string]string{"a": "b"}, []string{})),
+					util.ToManifest(util.NewConfigmap(clusterName, cm1, map[string]string{"a": "b"}, []string{})),
 				}, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 
 		ginkgo.It("with permission for already exist resource", func() {
-			_, err = spokeKubeClient.RbacV1().Roles(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
 				context.TODO(), &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      roleName,
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 					},
 					Rules: []rbacv1.PolicyRule{
 						{
@@ -674,16 +669,16 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 					},
 				}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			_, err = spokeKubeClient.RbacV1().RoleBindings(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().RoleBindings(clusterName).Create(
 				context.TODO(), &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      roleName,
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 					},
 					Subjects: []rbacv1.Subject{
 						{
 							Kind:      "ServiceAccount",
-							Namespace: commOptions.SpokeClusterName,
+							Namespace: clusterName,
 							Name:      executorName,
 						},
 					},
@@ -696,11 +691,11 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// make the role exist with lower permission
-			_, err = spokeKubeClient.RbacV1().Roles(commOptions.SpokeClusterName).Create(
+			_, err = spokeKubeClient.RbacV1().Roles(clusterName).Create(
 				context.TODO(), &rbacv1.Role{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "role-cm-creator",
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 					},
 					Rules: []rbacv1.PolicyRule{
 						{
@@ -712,7 +707,7 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
 				context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -728,7 +723,7 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 			// ensure configmaps exist
 			util.AssertExistenceOfConfigMaps(
 				[]workapiv1.Manifest{
-					util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm1, map[string]string{"a": "b"}, []string{})),
+					util.ToManifest(util.NewConfigmap(clusterName, cm1, map[string]string{"a": "b"}, []string{})),
 				}, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 	})
@@ -782,13 +777,13 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 		}
 		ginkgo.BeforeEach(func() {
 			manifests = []workapiv1.Manifest{
-				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm1, map[string]string{"a": "b"}, []string{})),
+				util.ToManifest(util.NewConfigmap(clusterName, cm1, map[string]string{"a": "b"}, []string{})),
 			}
 			executor = &workapiv1.ManifestWorkExecutor{
 				Subject: workapiv1.ManifestWorkExecutorSubject{
 					Type: workapiv1.ExecutorSubjectTypeServiceAccount,
 					ServiceAccount: &workapiv1.ManifestWorkSubjectServiceAccount{
-						Namespace: commOptions.SpokeClusterName,
+						Namespace: clusterName,
 						Name:      executorName,
 					},
 				},
@@ -796,7 +791,7 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 		})
 
 		ginkgo.It("Permission change", func() {
-			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
 				context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -810,8 +805,8 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 			ginkgo.By("ensure configmaps do not exist")
 			util.AssertNonexistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
-			createRBAC(commOptions.SpokeClusterName, executorName)
-			addConfigMapToManifestWork(hubWorkClient, work.Name, commOptions.SpokeClusterName, cm2)
+			createRBAC(clusterName, executorName)
+			addConfigMapToManifestWork(hubWorkClient, work.Name, clusterName, cm2)
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
 				metav1.ConditionTrue, []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue},
@@ -823,8 +818,8 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 			ginkgo.By("ensure configmaps cm1 and cm2 exist")
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
-			deleteRBAC(commOptions.SpokeClusterName)
-			addConfigMapToManifestWork(hubWorkClient, work.Name, commOptions.SpokeClusterName, "cm3")
+			deleteRBAC(clusterName)
+			addConfigMapToManifestWork(hubWorkClient, work.Name, clusterName, "cm3")
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
 				metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionFalse, metav1.ConditionFalse,
@@ -836,15 +831,15 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 			ginkgo.By("ensure configmap cm1 cm2 exist(will not delete the applied resource even the permison is revoked) but cm3 does not exist")
 			util.AssertExistenceOfConfigMaps(
 				[]workapiv1.Manifest{
-					util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm1, map[string]string{"a": "b"}, nil)),
+					util.ToManifest(util.NewConfigmap(clusterName, cm1, map[string]string{"a": "b"}, nil)),
 				}, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 			util.AssertExistenceOfConfigMaps(
 				[]workapiv1.Manifest{
-					util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm2, map[string]string{"a": "b"}, nil)),
+					util.ToManifest(util.NewConfigmap(clusterName, cm2, map[string]string{"a": "b"}, nil)),
 				}, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 			util.AssertNonexistenceOfConfigMaps(
 				[]workapiv1.Manifest{
-					util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, "cm3", map[string]string{"a": "b"}, nil)),
+					util.ToManifest(util.NewConfigmap(clusterName, "cm3", map[string]string{"a": "b"}, nil)),
 				}, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 	})

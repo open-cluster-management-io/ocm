@@ -8,3 +8,11 @@ coverage:
 
 ignore:
   - "**/*generated*.go"
+  - "**/*_test.go"
+  - "test/**"
+  - "pkg/*/testing/**"
+  - "pkg/work/spoke/spoketesting/**"
+  - "pkg/work/hub/test/**"
+  - "pkg/addon/templateagent/testmanifests/**"
+  - "manifests/**"
+  - "deploy/**"

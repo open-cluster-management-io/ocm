@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,6 +37,9 @@ var (
 	singletonImage    string
 	images            framework.Images
 
+	// expected image tag for validation
+	expectedImageTag string
+
 	// bootstrap-hub-kubeconfig
 	// It's a secret named 'bootstrap-hub-kubeconfig' under the namespace 'open-cluster-management-agent',
 	// the content of the secret is a kubeconfig file.
@@ -56,6 +60,7 @@ func init() {
 	flag.StringVar(&registrationImage, "registration-image", "", "The image of the registration")
 	flag.StringVar(&workImage, "work-image", "", "The image of the work")
 	flag.StringVar(&singletonImage, "singleton-image", "", "The image of the klusterlet agent")
+	flag.StringVar(&expectedImageTag, "expected-image-tag", "", "The expected image tag for all OCM components (e.g., 'e2e')")
 }
 
 var hub *framework.Hub
@@ -155,6 +160,9 @@ var _ = BeforeSuite(func() {
 		return hub.CheckHubReady()
 	}).Should(Succeed())
 
+	By("Validate image configuration")
+	validateImageConfiguration()
+
 	By("Create a universal Klusterlet/managedcluster")
 	framework.CreateAndApproveKlusterlet(
 		hub, spoke,
@@ -200,3 +208,194 @@ var _ = AfterSuite(func() {
 	By(fmt.Sprintf("clean klusterlet %v resources after the test case", universalKlusterletName))
 	framework.CleanKlusterletRelatedResources(hub, spoke, universalKlusterletName, universalClusterName)
 })
+
+// validateImageConfiguration validates that all image configurations use the expected tag
+func validateImageConfiguration() {
+	if expectedImageTag == "" {
+		By("Skipping image validation: no expected image tag specified")
+		return
+	}
+
+	By(fmt.Sprintf("Validating image configuration uses expected tag: %s", expectedImageTag))
+
+	// Validate test image variables
+	validateTestImageVariables()
+
+	// Validate ClusterManager spec after it's deployed
+	Eventually(validateClusterManagerImageSpecs).Should(Succeed())
+
+	// Validate actual deployment containers
+	validateDeploymentContainers()
+}
+
+func validateTestImageVariables() {
+	if registrationImage != "" && !strings.HasSuffix(registrationImage, ":"+expectedImageTag) {
+		Fail(fmt.Sprintf("registrationImage does not end with expected tag: %s (actual: %s)", expectedImageTag, registrationImage))
+	}
+
+	if workImage != "" && !strings.HasSuffix(workImage, ":"+expectedImageTag) {
+		Fail(fmt.Sprintf("workImage does not end with expected tag: %s (actual: %s)", expectedImageTag, workImage))
+	}
+
+	if singletonImage != "" && !strings.HasSuffix(singletonImage, ":"+expectedImageTag) {
+		Fail(fmt.Sprintf("singletonImage does not end with expected tag: %s (actual: %s)", expectedImageTag, singletonImage))
+	}
+}
+
+func validateClusterManagerImageSpecs() error {
+	ctx := context.TODO()
+
+	// Get the ClusterManager resource
+	clusterManager, err := hub.OperatorClient.OperatorV1().ClusterManagers().Get(ctx, "cluster-manager", metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get ClusterManager: %v", err)
+	}
+
+	// Check each imagePullSpec field
+	spec := clusterManager.Spec
+
+	if spec.RegistrationImagePullSpec != "" {
+		if err := validateImageTagInSpec(spec.RegistrationImagePullSpec, "registrationImagePullSpec"); err != nil {
+			return err
+		}
+	}
+
+	if spec.WorkImagePullSpec != "" {
+		if err := validateImageTagInSpec(spec.WorkImagePullSpec, "workImagePullSpec"); err != nil {
+			return err
+		}
+	}
+
+	if spec.PlacementImagePullSpec != "" {
+		if err := validateImageTagInSpec(spec.PlacementImagePullSpec, "placementImagePullSpec"); err != nil {
+			return err
+		}
+	}
+
+	if spec.AddOnManagerImagePullSpec != "" {
+		if err := validateImageTagInSpec(spec.AddOnManagerImagePullSpec, "addOnManagerImagePullSpec"); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateImageTagInSpec(imageSpec, fieldName string) error {
+	if !strings.HasSuffix(imageSpec, ":"+expectedImageTag) {
+		return fmt.Errorf("ClusterManager.spec.%s does not end with expected tag: %s (actual: %s)",
+			fieldName, expectedImageTag, imageSpec)
+	}
+	return nil
+}
+
+func validateDeploymentContainers() {
+	By("Validating deployment container images")
+
+	validateClusterManagerImageTags()
+	validateKlusterletImageTags()
+}
+
+func validateClusterManagerImageTags() {
+	By("Checking cluster-manager deployment containers")
+	ctx := context.TODO()
+
+	Eventually(func() error {
+		deployment, err := hub.KubeClient.AppsV1().Deployments("open-cluster-management").Get(ctx, "cluster-manager", metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get cluster-manager deployment: %v", err)
+		}
+
+		for _, container := range deployment.Spec.Template.Spec.Containers {
+			if err := validateImageTag(container.Image, container.Name, "cluster-manager"); err != nil {
+				return err
+			}
+		}
+
+		// Also check init containers if any
+		for _, container := range deployment.Spec.Template.Spec.InitContainers {
+			if err := validateImageTag(container.Image, container.Name, "cluster-manager"); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}).Should(Succeed())
+}
+
+func validateKlusterletImageTags() {
+	By("Checking klusterlet deployment containers")
+	ctx := context.TODO()
+
+	Eventually(func() error {
+		deployment, err := hub.KubeClient.AppsV1().Deployments("open-cluster-management").Get(ctx, "klusterlet", metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get klusterlet deployment: %v", err)
+		}
+
+		for _, container := range deployment.Spec.Template.Spec.Containers {
+			if err := validateImageTag(container.Image, container.Name, "klusterlet"); err != nil {
+				return err
+			}
+		}
+
+		// Also check init containers if any
+		for _, container := range deployment.Spec.Template.Spec.InitContainers {
+			if err := validateImageTag(container.Image, container.Name, "klusterlet"); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}).Should(Succeed())
+}
+
+func validateImageTag(image, containerName, deploymentName string) error {
+	// Extract the tag from the image
+	// Image format: registry/repo:tag or registry/repo@digest
+	var actualTag string
+
+	switch {
+	case strings.Contains(image, "@"):
+		// Handle digest format (registry/repo@sha256:...)
+		return fmt.Errorf("container %s in %s deployment uses digest format (%s), cannot validate tag",
+			containerName, deploymentName, image)
+	case strings.Contains(image, ":"):
+		// Handle tag format (registry/repo:tag)
+		parts := strings.Split(image, ":")
+		actualTag = parts[len(parts)-1]
+	default:
+		// No tag specified, defaults to "latest"
+		actualTag = "latest"
+	}
+
+	// Only validate OCM-related images (skip system images like kube-rbac-proxy, etc.)
+	if isOCMImage(image) {
+		if actualTag != expectedImageTag {
+			return fmt.Errorf("container %s in %s deployment has incorrect image tag: expected %s, got %s (image: %s)",
+				containerName, deploymentName, expectedImageTag, actualTag, image)
+		}
+	}
+
+	return nil
+}
+
+func isOCMImage(image string) bool {
+	// Check if this is an OCM component image
+	ocmPatterns := []string{
+		"open-cluster-management",
+		"registration",
+		"work",
+		"placement",
+		"addon-manager",
+		"klusterlet",
+	}
+
+	for _, pattern := range ocmPatterns {
+		if strings.Contains(image, pattern) {
+			return true
+		}
+	}
+
+	return false
+}

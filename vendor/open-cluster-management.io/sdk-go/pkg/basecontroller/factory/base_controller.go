@@ -147,12 +147,7 @@ func (c *baseController) processNextWorkItem(queueCtx context.Context) {
 	defer c.syncContext.Queue().Done(key)
 
 	syncCtx := c.syncContext.(syncContext)
-	var ok bool
-	queueKey, ok := key.(string)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("%q controller failed to process key %q (not a string)", c.name, key))
-		return
-	}
+	queueKey := key
 
 	if err := c.sync(queueCtx, syncCtx, queueKey); err != nil {
 		if klog.V(4).Enabled() || key != "key" {

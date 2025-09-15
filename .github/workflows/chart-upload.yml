@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
           path: go/src/open-cluster-management.io/ocm
@@ -38,7 +38,7 @@ jobs:
     steps:
       - name: submit cluster-manager chart to OCM chart repo
         if: github.event_name != 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.OCM_BOT_PAT }}
           script: |
@@ -61,7 +61,7 @@ jobs:
             }
       - name: submit klusterlet chart to OCM chart repo
         if: github.event_name != 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.OCM_BOT_PAT }}
           script: |

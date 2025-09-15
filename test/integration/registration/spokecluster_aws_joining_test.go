@@ -12,6 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/clientcmd"
 
+	operatorv1 "open-cluster-management.io/api/operator/v1"
+
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/hub"
@@ -34,7 +36,7 @@ var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 		stopHub()
 
 		awsHubOption := hub.NewHubManagerOptions()
-		awsHubOption.EnabledRegistrationDrivers = []string{helpers.CSRAuthType, helpers.AwsIrsaAuthType}
+		awsHubOption.EnabledRegistrationDrivers = []string{operatorv1.CSRAuthType, operatorv1.AwsIrsaAuthType}
 		awsHubOption.HubClusterArn = "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
 		awsHubOption.AutoApprovedARNPatterns = []string{"arn:aws:eks:us-west-2:123456789012:cluster/.*"}
 		startHub(awsHubOption)
@@ -64,8 +66,8 @@ var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 			// run registration agent
 			agentOptions := &spoke.SpokeAgentOptions{
 				RegisterDriverOption: &registerfactory.Options{
-					RegistrationAuth: helpers.AwsIrsaAuthType,
-					AWSISRAOption: &awsirsa.AWSOption{
+					RegistrationAuth: operatorv1.AwsIrsaAuthType,
+					AWSIRSAOption: &awsirsa.AWSOption{
 						HubClusterArn:            hubClusterArn,
 						ManagedClusterArn:        managedClusterArn,
 						ManagedClusterRoleSuffix: managedClusterRoleSuffix,
@@ -185,7 +187,7 @@ var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 
 		})
 
-		ginkgo.It("managedcluster should join successfully with auto approval of manged cluster in patterns for aws flow", func() {
+		ginkgo.It("managedcluster should join successfully with auto approval of managed cluster in patterns for aws flow", func() {
 
 			managedClusterArn := "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1"
 			managedClusterRoleSuffix := "7f8141296c75f2871e3d030f85c35692"
@@ -194,8 +196,8 @@ var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 			// run registration agent
 			agentOptions := &spoke.SpokeAgentOptions{
 				RegisterDriverOption: &registerfactory.Options{
-					RegistrationAuth: helpers.AwsIrsaAuthType,
-					AWSISRAOption: &awsirsa.AWSOption{
+					RegistrationAuth: operatorv1.AwsIrsaAuthType,
+					AWSIRSAOption: &awsirsa.AWSOption{
 						HubClusterArn:            hubClusterArn,
 						ManagedClusterArn:        managedClusterArn,
 						ManagedClusterRoleSuffix: managedClusterRoleSuffix,
@@ -218,11 +220,17 @@ var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 				if err != nil {
 					return false
 				}
-				return cluster.Spec.HubAcceptsClient
+				// Check for the presence of expected AWS IRSA annotations
+				_, hasArn := cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+awsirsa.ManagedClusterArn]
+				_, hasRole := cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+awsirsa.ManagedClusterIAMRoleSuffix]
+				if hasArn && hasRole {
+					return cluster.Spec.HubAcceptsClient
+				}
+				return false
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 		})
 
-		ginkgo.It("managedcluster should join successfully with auto approval rejected of manged cluster not in patterns for aws flow", func() {
+		ginkgo.It("managedcluster should not join successfully with auto approval rejected of managed cluster not in patterns for aws flow", func() {
 
 			managedClusterArn := "arn:aws:eks:us-west-1:123456789012:cluster/managed-cluster2"
 			managedClusterRoleSuffix := "7f8141296c75f2871e3d030f85c35692"
@@ -231,8 +239,8 @@ var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 			// run registration agent
 			agentOptions := &spoke.SpokeAgentOptions{
 				RegisterDriverOption: &registerfactory.Options{
-					RegistrationAuth: helpers.AwsIrsaAuthType,
-					AWSISRAOption: &awsirsa.AWSOption{
+					RegistrationAuth: operatorv1.AwsIrsaAuthType,
+					AWSIRSAOption: &awsirsa.AWSOption{
 						HubClusterArn:            hubClusterArn,
 						ManagedClusterArn:        managedClusterArn,
 						ManagedClusterRoleSuffix: managedClusterRoleSuffix,
@@ -255,12 +263,24 @@ var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
+			// Wait for the managed cluster to have AWS IRSA annotations populated
+			gomega.Eventually(func() bool {
+				cluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
+				if err != nil {
+					return false
+				}
+				// Check for the presence of expected AWS IRSA annotations
+				_, hasArn := cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+awsirsa.ManagedClusterArn]
+				_, hasRole := cluster.Annotations[operatorv1.ClusterAnnotationsKeyPrefix+"/"+awsirsa.ManagedClusterIAMRoleSuffix]
+				return hasArn && hasRole
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue(), "ManagedCluster should have AWS IRSA annotations")
+
 			// The ManagedCluster CR should never be accepted
 			gomega.Consistently(func() bool {
 				cluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cluster.Spec.HubAcceptsClient
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeFalse())
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeFalse(), "HubAcceptsClient should never become true for ARN not matching auto-approval pattern")
 		})
 	}
 

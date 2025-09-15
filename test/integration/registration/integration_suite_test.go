@@ -24,8 +24,8 @@ import (
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
+	operatorv1 "open-cluster-management.io/api/operator/v1"
 
-	"open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/hub"
@@ -209,7 +209,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	var ctx context.Context
 
 	hubOption = hub.NewHubManagerOptions()
-	hubOption.EnabledRegistrationDrivers = []string{helpers.CSRAuthType}
+	hubOption.EnabledRegistrationDrivers = []string{operatorv1.CSRAuthType}
 	hubOption.ClusterAutoApprovalUsers = []string{util.AutoApprovalBootstrapUser}
 
 	startHub = func(m *hub.HubManagerOptions) {

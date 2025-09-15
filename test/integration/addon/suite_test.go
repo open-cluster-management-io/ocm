@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
@@ -49,6 +50,11 @@ var testAddOnConfigsImpl *testAddon
 var cancel context.CancelFunc
 var mgrContext context.Context
 var addonManager addonmanager.AddonManager
+
+func init() {
+	klog.InitFlags(nil)
+	klog.SetOutput(ginkgo.GinkgoWriter)
+}
 
 func TestIntegration(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
@@ -151,14 +157,16 @@ func (t *testAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 
 	if len(t.registrations) > 0 {
 		option.Registration = &agent.RegistrationOption{
-			CSRConfigurations: func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
-				return t.registrations[cluster.Name]
+			CSRConfigurations: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn,
+			) ([]addonapiv1alpha1.RegistrationConfig, error) {
+				return t.registrations[cluster.Name], nil
 			},
-			CSRApproveCheck: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
+			CSRApproveCheck: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn,
+				csr *certificatesv1.CertificateSigningRequest) bool {
 				return t.approveCSR
 			},
-			CSRSign: func(csr *certificatesv1.CertificateSigningRequest) []byte {
-				return t.cert
+			CSRSign: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) ([]byte, error) {
+				return t.cert, nil
 			},
 		}
 	}

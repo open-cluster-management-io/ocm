@@ -3,6 +3,7 @@ package v1beta2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "open-cluster-management.io/api/cluster/v1"
 )
 
 // ExclusiveClusterSetLabel LabelKey
@@ -48,6 +49,13 @@ type ManagedClusterSetSpec struct {
 	// +optional
 	// +kubebuilder:default:={selectorType: ExclusiveClusterSetLabel}
 	ClusterSelector ManagedClusterSelector `json:"clusterSelector,omitempty"`
+
+	// managedNamespaces defines the list of namespace on the managedclusters
+	// across the clusterset to be managed.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	ManagedNamespaces []v1.ManagedNamespaceConfig `json:"managedNamespaces,omitempty"`
 }
 
 // ManagedClusterSelector represents a selector of ManagedClusters

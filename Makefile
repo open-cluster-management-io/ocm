@@ -25,6 +25,10 @@ HELM?=$(PERMANENT_TMP_GOPATH)/bin/helm
 HELM_VERSION?=v3.14.0
 helm_gen_dir:=$(dir $(HELM))
 
+GOLANGCI_LINT?=$(PERMANENT_TMP_GOPATH)/bin/golangci-lint
+GOLANGCI_LINT_VERSION?=v2.4.0
+golangci_lint_gen_dir:=$(dir $(GOLANGCI_LINT))
+
 # RELEASED_CSV_VERSION indicates the last released operator version.
 # can find the released operator version from
 # https://github.com/k8s-operatorhub/community-operators/tree/main/operators/cluster-manager
@@ -85,18 +89,17 @@ update-csv: ensure-operator-sdk ensure-helm
 verify-crds:
 	bash -x hack/verify-crds.sh $(YAML_PATCH)
 
-verify-gocilint:
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.6
-	golangci-lint run --timeout=5m --modules-download-mode vendor ./...
+verify-gocilint: ensure-golangci-lint
+	$(GOLANGCI_LINT) run --timeout=5m --modules-download-mode vendor ./...
 
 install-golang-gci:
-	go install github.com/daixiang0/gci@v0.13.6
+	go install github.com/daixiang0/gci@v0.13.7
 
 fmt-imports: install-golang-gci
-	gci write --skip-generated -s standard -s default -s "prefix(open-cluster-management.io)" -s "prefix(open-cluster-management.io/ocm)" cmd pkg test dependencymagnet
+	gci write --skip-generated -s standard -s default -s "prefix(open-cluster-management.io)" -s localmodule cmd pkg test dependencymagnet
 
 verify-fmt-imports: install-golang-gci
-	@output=$$(gci diff --skip-generated -s standard -s default -s "prefix(open-cluster-management.io)" -s "prefix(open-cluster-management.io/ocm)" cmd pkg test dependencymagnet); \
+	@output=$$(gci diff --skip-generated -s standard -s default -s "prefix(open-cluster-management.io)" -s localmodule cmd pkg test dependencymagnet); \
 	if [ -n "$$output" ]; then \
 	    echo "Diff output is not empty: $$output"; \
 	    echo "Please run 'make fmt-imports' to format the golang files imports automatically."; \
@@ -128,4 +131,13 @@ ifeq "" "$(wildcard $(HELM))"
 	chmod +x '$(HELM)';
 else
 	$(info Using existing helm from "$(HELM)")
+endif
+
+ensure-golangci-lint:
+ifeq "" "$(wildcard $(GOLANGCI_LINT))"
+	$(info Installing golangci-lint into '$(GOLANGCI_LINT)')
+	mkdir -p '$(golangci_lint_gen_dir)'
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b '$(golangci_lint_gen_dir)' $(GOLANGCI_LINT_VERSION)
+else
+	$(info Using existing golangci-lint from "$(GOLANGCI_LINT)")
 endif

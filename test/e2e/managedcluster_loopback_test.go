@@ -3,8 +3,6 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"reflect"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -15,8 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/util/retry"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -41,23 +37,23 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 				Value: clusterId,
 			},
 		}
-		// delete the claim if exists
-		// TODO use spoke cluster client
-		err := hub.ClusterClient.ClusterV1alpha1().ClusterClaims().Delete(context.TODO(), claim.Name, metav1.DeleteOptions{})
-		if !errors.IsNotFound(err) {
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		}
 		// create the claim
-		err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-			var err error
-			_, err = hub.ClusterClient.ClusterV1alpha1().ClusterClaims().Create(context.TODO(), claim, metav1.CreateOptions{})
-			if err != nil {
-				return false, err
+		gomega.Eventually(func() error {
+			existing, err := hub.ClusterClient.ClusterV1alpha1().ClusterClaims().Get(context.TODO(), claim.Name, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				_, err = hub.ClusterClient.ClusterV1alpha1().ClusterClaims().Create(context.TODO(), claim, metav1.CreateOptions{})
+				return err
 			}
-
-			return true, nil
-		})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			if err != nil {
+				return err
+			}
+			if existing.Spec.Value != clusterId {
+				existing.Spec.Value = clusterId
+				_, err = hub.ClusterClient.ClusterV1alpha1().ClusterClaims().Update(context.TODO(), existing, metav1.UpdateOptions{})
+				return err
+			}
+			return nil
+		}).Should(gomega.Succeed())
 	})
 
 	ginkgo.It("Should register the hub as a managed cluster", func() {
@@ -73,152 +69,160 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		)
 
 		ginkgo.By(fmt.Sprintf("Waiting for ManagedCluster %q to exist", universalClusterName))
-		err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
+		gomega.Eventually(func() error {
 			var err error
 			managedCluster, err = managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
-			if errors.IsNotFound(err) {
-				return false, nil
-			}
-			if err != nil {
-				return false, err
-			}
-			return true, nil
-		})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			return err
+		}).Should(gomega.Succeed())
 
 		ginkgo.By("Waiting for ManagedCluster to have HubAccepted=true")
-		err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
+		gomega.Eventually(func() error {
 			var err error
 			managedCluster, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
-				return false, err
+				return err
 			}
 
 			if meta.IsStatusConditionTrue(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted) {
-				return true, nil
+				return nil
 			}
 
-			return false, nil
-		})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			return fmt.Errorf("ManagedCluster %q is not yet HubAccepted", universalClusterName)
+		}).Should(gomega.Succeed())
 
 		ginkgo.By("Waiting for ManagedCluster to join the hub cluser")
-		err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
+		gomega.Eventually(func() error {
 			var err error
 			managedCluster, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
-				return false, err
+				return err
 			}
 
-			return meta.IsStatusConditionTrue(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined), nil
-		})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			if !meta.IsStatusConditionTrue(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined) {
+				return fmt.Errorf("ManagedCluster %q is not joined", universalClusterName)
+			}
+			return nil
+		}).Should(gomega.Succeed())
 
 		ginkgo.By("Waiting for ManagedCluster available")
-		err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
+		gomega.Eventually(func() error {
 			managedCluster, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
-				return false, err
+				return err
 			}
 
-			return meta.IsStatusConditionTrue(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable), nil
-		})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			if meta.IsStatusConditionTrue(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable) {
+				return nil
+			}
+			return fmt.Errorf("ManagedCluster %q is not available", universalClusterName)
+		}).Should(gomega.Succeed())
 
 		leaseName := "managed-cluster-lease"
 		ginkgo.By(fmt.Sprintf("Make sure ManagedCluster lease %q exists", leaseName))
 		var lastRenewTime *metav1.MicroTime
-		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+		gomega.Eventually(func() error {
 			lease, err := hub.KubeClient.CoordinationV1().Leases(universalClusterName).Get(context.TODO(), leaseName, metav1.GetOptions{})
 			if err != nil {
-				return false, err
+				return err
+			}
+			if lease.Spec.RenewTime == nil {
+				return fmt.Errorf("ManagedCluster lease %q RenewTime is nil", leaseName)
 			}
 			lastRenewTime = lease.Spec.RenewTime
-			return true, nil
-		})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			return nil
+		}).Should(gomega.Succeed())
 
 		ginkgo.By(fmt.Sprintf("Make sure ManagedCluster lease %q is updated", leaseName))
-		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+		gomega.Eventually(func() error {
 			lease, err := hub.KubeClient.CoordinationV1().Leases(universalClusterName).Get(context.TODO(), leaseName, metav1.GetOptions{})
 			if err != nil {
-				return false, err
+				return err
+			}
+			if lastRenewTime == nil || lease.Spec.RenewTime == nil {
+				return fmt.Errorf("ManagedCluster lease %q RenewTime is nil", leaseName)
 			}
 			leaseUpdated := lastRenewTime.Before(lease.Spec.RenewTime)
 			if leaseUpdated {
 				lastRenewTime = lease.Spec.RenewTime
+			} else {
+				return fmt.Errorf("ManagedCluster lease %q is not updated", leaseName)
 			}
-			return leaseUpdated, nil
-		})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			return nil
+		}).Should(gomega.Succeed())
 
 		ginkgo.By(fmt.Sprintf("Make sure ManagedCluster lease %q is updated again", leaseName))
-		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+		gomega.Eventually(func() error {
 			lease, err := hub.KubeClient.CoordinationV1().Leases(universalClusterName).Get(context.TODO(), leaseName, metav1.GetOptions{})
 			if err != nil {
-				return false, err
+				return err
 			}
-			return lastRenewTime.Before(lease.Spec.RenewTime), nil
-		})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			if lastRenewTime == nil || lease.Spec.RenewTime == nil {
+				return fmt.Errorf("ManagedCluster lease %q RenewTime is nil", leaseName)
+			}
+			if lastRenewTime.Before(lease.Spec.RenewTime) {
+				return nil
+			}
+			return fmt.Errorf("ManagedCluster lease %q is not updated", leaseName)
+		}).Should(gomega.Succeed())
 
 		ginkgo.By("Make sure ManagedCluster is still available")
-		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+		gomega.Eventually(func() error {
 			managedCluster, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
 			if err != nil {
-				return false, err
+				return err
 			}
 
-			return meta.IsStatusConditionTrue(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable), nil
-		})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			if meta.IsStatusConditionTrue(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable) {
+				return nil
+			}
+			return fmt.Errorf("ManagedCluster %q is not available", universalClusterName)
+		}).Should(gomega.Succeed())
 
 		// make sure the cpu and memory are still in the status, for compatibility
 		ginkgo.By("Make sure cpu and memory exist in status")
-		err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 30*time.Second, true,
-			func(ctx context.Context) (bool, error) {
-				managedCluster, err := managedClusters.Get(ctx, universalClusterName, metav1.GetOptions{})
-				if err != nil {
-					return false, err
-				}
+		gomega.Eventually(func() error {
+			managedCluster, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
 
-				if _, exist := managedCluster.Status.Allocatable[clusterv1.ResourceCPU]; !exist {
-					return false, fmt.Errorf("Resource %v doesn't exist in Allocatable", clusterv1.ResourceCPU)
-				}
+			if _, exist := managedCluster.Status.Allocatable[clusterv1.ResourceCPU]; !exist {
+				return fmt.Errorf("Resource %v doesn't exist in Allocatable", clusterv1.ResourceCPU)
+			}
 
-				if _, exist := managedCluster.Status.Allocatable[clusterv1.ResourceMemory]; !exist {
-					return false, fmt.Errorf("Resource %v doesn't exist in Allocatable", clusterv1.ResourceMemory)
-				}
+			if _, exist := managedCluster.Status.Allocatable[clusterv1.ResourceMemory]; !exist {
+				return fmt.Errorf("Resource %v doesn't exist in Allocatable", clusterv1.ResourceMemory)
+			}
 
-				if _, exist := managedCluster.Status.Capacity[clusterv1.ResourceCPU]; !exist {
-					return false, fmt.Errorf("Resource %v doesn't exist in Capacity", clusterv1.ResourceCPU)
-				}
+			if _, exist := managedCluster.Status.Capacity[clusterv1.ResourceCPU]; !exist {
+				return fmt.Errorf("Resource %v doesn't exist in Capacity", clusterv1.ResourceCPU)
+			}
 
-				if _, exist := managedCluster.Status.Capacity[clusterv1.ResourceMemory]; !exist {
-					return false, fmt.Errorf("Resource %v doesn't exist in Capacity", clusterv1.ResourceMemory)
-				}
+			if _, exist := managedCluster.Status.Capacity[clusterv1.ResourceMemory]; !exist {
+				return fmt.Errorf("Resource %v doesn't exist in Capacity", clusterv1.ResourceMemory)
+			}
 
-				return true, nil
-			})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			return nil
+		}).Should(gomega.Succeed())
 
 		ginkgo.By("Make sure ClusterClaims are synced")
-		clusterClaims := []clusterv1.ManagedClusterClaim{
-			{
-				Name:  "id.k8s.io",
-				Value: clusterId,
-			},
-		}
-		err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 30*time.Second, true,
-			func(ctx context.Context) (bool, error) {
-				managedCluster, err := managedClusters.Get(ctx, universalClusterName, metav1.GetOptions{})
-				if err != nil {
-					return false, err
+		gomega.Eventually(func() error {
+			mc, err := managedClusters.Get(context.TODO(), universalClusterName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			found := false
+			for _, c := range mc.Status.ClusterClaims {
+				if c.Name == "id.k8s.io" && c.Value == clusterId {
+					found = true
+					break
 				}
-
-				return reflect.DeepEqual(clusterClaims, managedCluster.Status.ClusterClaims), nil
-			})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			}
+			if !found {
+				return fmt.Errorf("expected claim id.k8s.io=%s not found; got: %+v", clusterId, mc.Status.ClusterClaims)
+			}
+			return nil
+		}).Should(gomega.Succeed())
 
 		ginkgo.By("Create addon on hub")
 		addOnName := fmt.Sprintf("loopback-e2e-addon-%v", suffix)
@@ -237,24 +241,27 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 				Name:      addOnName,
 				Namespace: universalClusterName,
 			},
-			Spec: addonv1alpha1.ManagedClusterAddOnSpec{
-				InstallNamespace: addOnName,
-			},
+			Spec: addonv1alpha1.ManagedClusterAddOnSpec{},
 		}
 		_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		created, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		created.Status = addonv1alpha1.ManagedClusterAddOnStatus{
-			Registrations: []addonv1alpha1.RegistrationConfig{
-				{
-					SignerName: certificates.KubeAPIServerClientSignerName,
+		gomega.Eventually(func() error {
+			created, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			created.Status = addonv1alpha1.ManagedClusterAddOnStatus{
+				Registrations: []addonv1alpha1.RegistrationConfig{
+					{
+						SignerName: certificates.KubeAPIServerClientSignerName,
+					},
 				},
-			},
-		}
-		_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).UpdateStatus(context.TODO(), created, metav1.UpdateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Namespace: addOnName,
+			}
+			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).UpdateStatus(context.TODO(), created, metav1.UpdateOptions{})
+			return err
+		}).Should(gomega.Succeed())
 
 		var (
 			csrs      *certificatesv1.CertificateSigningRequestList
@@ -262,31 +269,32 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		)
 
 		ginkgo.By(fmt.Sprintf("Waiting for the CSR for addOn %q to exist", addOnName))
-		err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 90*time.Second, true,
-			func(ctx context.Context) (bool, error) {
-				var err error
-				csrs, err = csrClient.List(ctx, metav1.ListOptions{
-					LabelSelector: fmt.Sprintf("open-cluster-management.io/cluster-name=%s,open-cluster-management.io/addon-name=%s", universalClusterName, addOnName),
-				})
-				if err != nil {
-					return false, err
-				}
-
-				if len(csrs.Items) >= 1 {
-					return true, nil
-				}
-
-				return false, nil
+		gomega.Eventually(func() error {
+			var err error
+			csrs, err = csrClient.List(context.TODO(), metav1.ListOptions{
+				LabelSelector: fmt.Sprintf("open-cluster-management.io/cluster-name=%s,open-cluster-management.io/addon-name=%s", universalClusterName, addOnName),
 			})
+			if err != nil {
+				return err
+			}
+
+			if len(csrs.Items) >= 1 {
+				return nil
+			}
+
+			return fmt.Errorf("csr is not created for cluster %s", universalClusterName)
+		}).Should(gomega.Succeed())
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By("Approving all pending CSRs")
 		for i := range csrs.Items {
 			csr := &csrs.Items[i]
 
-			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			gomega.Eventually(func() error {
 				csr, err = csrClient.Get(context.TODO(), csr.Name, metav1.GetOptions{})
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				if err != nil {
+					return err
+				}
 
 				if helpers.IsCSRInTerminalState(&csr.Status) {
 					return nil
@@ -300,28 +308,27 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 				})
 				_, err := csrClient.UpdateApproval(context.TODO(), csr.Name, csr, metav1.UpdateOptions{})
 				return err
-			})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			}).Should(gomega.Succeed())
 		}
 
 		ginkgo.By("Check addon client certificate in secret")
 		secretName := fmt.Sprintf("%s-hub-kubeconfig", addOnName)
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			secret, err := spoke.KubeClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
 			if err != nil {
-				return false
+				return err
 			}
 			if _, ok := secret.Data[csr.TLSKeyFile]; !ok {
-				return false
+				return fmt.Errorf("secret %s/%s does not have a TLS key", addOnName, secretName)
 			}
 			if _, ok := secret.Data[csr.TLSCertFile]; !ok {
-				return false
+				return fmt.Errorf("secret %s/%s does not have a TLS certificate", addOnName, secretName)
 			}
 			if _, ok := secret.Data[register.KubeconfigFile]; !ok {
-				return false
+				return fmt.Errorf("secret %s/%s does not have a kubeconfig", addOnName, secretName)
 			}
-			return true
-		}).Should(gomega.BeTrue())
+			return nil
+		}).Should(gomega.Succeed())
 
 		ginkgo.By("Check addon status")
 		gomega.Eventually(func() error {

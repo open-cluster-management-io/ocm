@@ -21,7 +21,6 @@ import (
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
-	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
@@ -46,10 +45,10 @@ func newClusterManager(name string, mode operatorapiv1.InstallMode) *operatorapi
 			RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
 				RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
 					{
-						AuthType: commonhelpers.GRPCCAuthType,
+						AuthType: operatorapiv1.GRPCAuthType,
 					},
 					{
-						AuthType: commonhelpers.CSRAuthType,
+						AuthType: operatorapiv1.CSRAuthType,
 					},
 				},
 			},
@@ -219,7 +218,7 @@ func TestCertRotationGRPCAuth(t *testing.T) {
 				cm.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
 					RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
 						{
-							AuthType: commonhelpers.CSRAuthType,
+							AuthType: operatorapiv1.CSRAuthType,
 						},
 					},
 				}
@@ -262,7 +261,7 @@ func TestCertRotationGRPCAuth(t *testing.T) {
 				cm.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
 					RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
 						{
-							AuthType: commonhelpers.CSRAuthType,
+							AuthType: operatorapiv1.CSRAuthType,
 						},
 					},
 				}

@@ -42,6 +42,7 @@ type HubConfig struct {
 	LabelsString                      string
 	GRPCAuthEnabled                   bool
 	GRPCServerImage                   string
+	GRPCAutoApprovedUsers             string
 }
 
 type Webhook struct {

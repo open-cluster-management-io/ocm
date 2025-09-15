@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
@@ -21,13 +22,30 @@ func (hub *Hub) CreateManagedClusterAddOn(managedClusterNamespace, addOnName, in
 				Namespace: managedClusterNamespace,
 				Name:      addOnName,
 			},
-			Spec: addonv1alpha1.ManagedClusterAddOnSpec{
-				InstallNamespace: installNamespace,
-			},
+			Spec: addonv1alpha1.ManagedClusterAddOnSpec{},
 		},
 		metav1.CreateOptions{},
 	)
-	return err
+
+	if err != nil {
+		return err
+	}
+
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		addOn, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterNamespace).Get(
+			context.TODO(), addOnName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if addOn.Status.Namespace == installNamespace {
+			return nil
+		}
+		addOn.Status.Namespace = installNamespace
+		_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterNamespace).UpdateStatus(
+			context.TODO(), addOn, metav1.UpdateOptions{})
+		return err
+	})
 }
 
 func (hub *Hub) CreateManagedClusterAddOnLease(addOnInstallNamespace, addOnName string) error {

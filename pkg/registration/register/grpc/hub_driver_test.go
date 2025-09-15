@@ -16,7 +16,8 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 
-	"open-cluster-management.io/ocm/pkg/common/helpers"
+	operatorv1 "open-cluster-management.io/api/operator/v1"
+
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
@@ -101,7 +102,7 @@ func TestSignCSR(t *testing.T) {
 							Usages: []certificatesv1.KeyUsage{
 								certificatesv1.UsageClientAuth,
 							},
-							SignerName: helpers.GRPCCAuthSigner,
+							SignerName: operatorv1.GRPCAuthSigner,
 							Username:   "system:open-cluster-management:test",
 							Request:    request,
 						},
@@ -149,5 +150,63 @@ func TestSignCSR(t *testing.T) {
 
 			c.validateActions(t, csrClient.Actions())
 		})
+	}
+}
+
+func TestEventFilter(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    any
+		expected bool
+	}{
+		{
+			name:     "nil input",
+			input:    nil,
+			expected: false,
+		},
+		{
+			name: "v1 CSR with matching signer",
+			input: &certificatesv1.CertificateSigningRequest{
+				Spec: certificatesv1.CertificateSigningRequestSpec{
+					SignerName: operatorv1.GRPCAuthSigner,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "v1 CSR with non-matching signer",
+			input: &certificatesv1.CertificateSigningRequest{
+				Spec: certificatesv1.CertificateSigningRequestSpec{
+					SignerName: "example.com/custom",
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := eventFilter(tt.input); got != tt.expected {
+				t.Errorf("eventFilter() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetCSRInfo(t *testing.T) {
+	csr := &certificatesv1.CertificateSigningRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				operatorv1.CSRUsernameAnnotation: "test",
+			},
+		},
+		Spec: certificatesv1.CertificateSigningRequestSpec{
+			SignerName: operatorv1.GRPCAuthSigner,
+		},
+	}
+
+	info := getCSRInfo(csr)
+	if info.Username != "test" {
+		t.Errorf("unexpected username %s", info.Username)
 	}
 }

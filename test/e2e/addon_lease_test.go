@@ -68,7 +68,7 @@ var _ = ginkgo.Describe("Addon Health Check", ginkgo.Label("addon-lease"), func(
 					return err
 				}
 				if !meta.IsStatusConditionTrue(found.Status.Conditions, "Available") {
-					return fmt.Errorf("condition should be available")
+					return fmt.Errorf("condition should be available, got %v", found.Status.Conditions)
 				}
 				return nil
 			}).Should(gomega.Succeed())

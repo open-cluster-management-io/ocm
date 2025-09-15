@@ -11,17 +11,17 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
-	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("ClusterManager with GRPC registration enabled", ginkgo.Ordered, func() {
+var _ = ginkgo.Describe("ClusterManager with GRPC registration enabled", ginkgo.Ordered, ginkgo.Label("grpc-test"), func() {
 	var cancel context.CancelFunc
 
 	var hubGRPCServerClusterRole = fmt.Sprintf("open-cluster-management:%s-grpc-server", clusterManagerName)
@@ -51,7 +51,7 @@ var _ = ginkgo.Describe("ClusterManager with GRPC registration enabled", ginkgo.
 		ginkgo.It("should deploy and clean hub component successfully", func() {
 			ginkgo.By("Enable grpc auth for clustermanager", func() {
 				gomega.Eventually(func() error {
-					return enableGRPCAuth(operatorClient, clusterManagerName)
+					return enableGRPCAuth(operatorClient, clusterManagerName, "user1", "user2")
 				}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 			})
 
@@ -59,7 +59,12 @@ var _ = ginkgo.Describe("ClusterManager with GRPC registration enabled", ginkgo.
 				assertGRPCServerResources(kubeClient, hubNamespace,
 					hubGRPCServerClusterRole, hubGRPCServerClusterRoleBinding, hubGRPCServerService,
 					hubGRPCServerServiceAccount, hubGRPCServerDeployment, hubGRPCServerSecret,
-					hubRegistrationDeployment)
+					hubRegistrationDeployment,
+					[]string{
+						"--grpc-ca-file=/var/run/secrets/hub/grpc/certs/tls.crt",
+						"--grpc-key-file=/var/run/secrets/hub/grpc/certs/tls.key",
+						"--auto-approved-grpc-users=user1,user2",
+					})
 			})
 
 			ginkgo.By("Remove grpc auth from clustermanager", func() {
@@ -130,7 +135,11 @@ var _ = ginkgo.Describe("ClusterManager with GRPC registration enabled", ginkgo.
 				assertGRPCServerResources(hostedKubeClient, hubNamespaceHosted,
 					hubGRPCServerClusterRole, hubGRPCServerClusterRoleBinding, hubGRPCServerService,
 					hubGRPCServerServiceAccount, hubGRPCServerDeployment, hubGRPCServerSecret,
-					hubRegistrationDeployment)
+					hubRegistrationDeployment,
+					[]string{
+						"--grpc-ca-file=/var/run/secrets/hub/grpc/certs/tls.crt",
+						"--grpc-key-file=/var/run/secrets/hub/grpc/certs/tls.key",
+					})
 			})
 
 			ginkgo.By("Remove grpc auth from clustermanager", func() {
@@ -152,7 +161,8 @@ var _ = ginkgo.Describe("ClusterManager with GRPC registration enabled", ginkgo.
 func assertGRPCServerResources(kubeClient kubernetes.Interface, hubNamespace string,
 	hubGRPCServerClusterRole, hubGRPCServerClusterRoleBinding, hubGRPCServerService,
 	hubGRPCServerServiceAccount, hubGRPCServerDeployment, hubGRPCServerSecret,
-	hubRegistrationDeployment string) {
+	hubRegistrationDeployment string,
+	expectedArgs []string) {
 	gomega.Eventually(func() error {
 		if _, err := kubeClient.CoreV1().Namespaces().Get(context.Background(), hubNamespace, metav1.GetOptions{}); err != nil {
 			return err
@@ -211,6 +221,13 @@ func assertGRPCServerResources(kubeClient kubernetes.Interface, hubNamespace str
 
 		if !hasGRPCServerSinger(deploy) {
 			return fmt.Errorf("no grpc-server-singer")
+		}
+
+		args := sets.New(deploy.Spec.Template.Spec.Containers[0].Args...)
+		for _, arg := range expectedArgs {
+			if !args.Has(arg) {
+				return fmt.Errorf("expected arg %s not found", arg)
+			}
 		}
 
 		return nil
@@ -302,7 +319,8 @@ func assertNoGRPCServerResources(kubeClient kubernetes.Interface, hubNamespace s
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 }
 
-func enableGRPCAuth(operatorClient operatorclient.Interface, clusterManagerName string) error {
+func enableGRPCAuth(operatorClient operatorclient.Interface, clusterManagerName string,
+	autoApprovedIdentities ...string) error {
 	clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(),
 		clusterManagerName, metav1.GetOptions{})
 	if err != nil {
@@ -312,12 +330,27 @@ func enableGRPCAuth(operatorClient operatorclient.Interface, clusterManagerName 
 	clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
 		RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
 			{
-				AuthType: commonhelpers.CSRAuthType,
+				AuthType: operatorapiv1.CSRAuthType,
 			},
 			{
-				AuthType: commonhelpers.GRPCCAuthType,
+				AuthType: operatorapiv1.GRPCAuthType,
 			},
 		},
+	}
+	if len(autoApprovedIdentities) != 0 {
+		clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+			RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+				{
+					AuthType: operatorapiv1.CSRAuthType,
+				},
+				{
+					AuthType: operatorapiv1.GRPCAuthType,
+					GRPC: &operatorapiv1.GRPCRegistrationConfig{
+						AutoApprovedIdentities: autoApprovedIdentities,
+					},
+				},
+			},
+		}
 	}
 	_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(),
 		clusterManager, metav1.UpdateOptions{})

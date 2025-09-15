@@ -45,7 +45,7 @@ spec:
               that govern registration and work distribution for attached Klusterlets.
             properties:
               addOnManagerConfiguration:
-                description: AddOnManagerConfiguration contains the configuration
+                description: addOnManagerConfiguration contains the configuration
                   of addon manager
                 properties:
                   featureGates:
@@ -81,16 +81,99 @@ spec:
                 type: object
               addOnManagerImagePullSpec:
                 default: quay.io/open-cluster-management/addon-manager
-                description: AddOnManagerImagePullSpec represents the desired image
+                description: addOnManagerImagePullSpec represents the desired image
                   configuration of addon manager controller/webhook installed on hub.
                 type: string
               deployOption:
                 default:
                   mode: Default
                 description: |-
-                  DeployOption contains the options of deploying a cluster-manager
+                  deployOption contains the options of deploying a cluster-manager
                   Default mode is used if DeployOption is not set.
                 properties:
+                  default:
+                    description: Default includes optional configurations for clustermanager
+                      in the Default mode.
+                    properties:
+                      registrationWebhookConfiguration:
+                        description: RegistrationWebhookConfiguration represents the
+                          customized webhook-server configuration of registration.
+                        properties:
+                          bindConfiguration:
+                            description: BindConfiguration represents server bind
+                              configuration for the webhook server
+                            properties:
+                              healthProbePort:
+                                default: 8000
+                                description: |-
+                                  HealthProbePort represents the bind port of a webhook-server's healthcheck endpoint. The default value is 8000.
+                                  Healthchecks may be disabled by setting a value less than or equal to 0.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                              hostNetwork:
+                                description: |-
+                                  HostNetwork enables running webhook pods in host networking mode.
+                                  This may be required in some installations, such as EKS with Calico CNI,
+                                  to allow the API Server to communicate with the webhook pods.
+                                type: boolean
+                              metricsPort:
+                                default: 8080
+                                description: |-
+                                  MetricsPort represents the bind port for a webhook-server's metric endpoint. The default value is 8080.
+                                  Metrics may be disabled by setting a value less than or equal to 0.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                              port:
+                                default: 9443
+                                description: Port represents the primary bind port
+                                  of a server. The default value is 9443.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                            type: object
+                        type: object
+                      workWebhookConfiguration:
+                        description: WorkWebhookConfiguration represents the customized
+                          webhook-server configuration of work.
+                        properties:
+                          bindConfiguration:
+                            description: BindConfiguration represents server bind
+                              configuration for the webhook server
+                            properties:
+                              healthProbePort:
+                                default: 8000
+                                description: |-
+                                  HealthProbePort represents the bind port of a webhook-server's healthcheck endpoint. The default value is 8000.
+                                  Healthchecks may be disabled by setting a value less than or equal to 0.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                              hostNetwork:
+                                description: |-
+                                  HostNetwork enables running webhook pods in host networking mode.
+                                  This may be required in some installations, such as EKS with Calico CNI,
+                                  to allow the API Server to communicate with the webhook pods.
+                                type: boolean
+                              metricsPort:
+                                default: 8080
+                                description: |-
+                                  MetricsPort represents the bind port for a webhook-server's metric endpoint. The default value is 8080.
+                                  Metrics may be disabled by setting a value less than or equal to 0.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                              port:
+                                default: 9443
+                                description: Port represents the primary bind port
+                                  of a server. The default value is 9443.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                            type: object
+                        type: object
+                    type: object
                   hosted:
                     description: Hosted includes configurations we need for clustermanager
                       in the Hosted mode.
@@ -106,9 +189,43 @@ spec:
                               The Address must be reachable by apiserver of the hub cluster.
                             pattern: ^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$
                             type: string
+                          bindConfiguration:
+                            description: BindConfiguration represents server bind
+                              configuration for the webhook server
+                            properties:
+                              healthProbePort:
+                                default: 8000
+                                description: |-
+                                  HealthProbePort represents the bind port of a webhook-server's healthcheck endpoint. The default value is 8000.
+                                  Healthchecks may be disabled by setting a value less than or equal to 0.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                              hostNetwork:
+                                description: |-
+                                  HostNetwork enables running webhook pods in host networking mode.
+                                  This may be required in some installations, such as EKS with Calico CNI,
+                                  to allow the API Server to communicate with the webhook pods.
+                                type: boolean
+                              metricsPort:
+                                default: 8080
+                                description: |-
+                                  MetricsPort represents the bind port for a webhook-server's metric endpoint. The default value is 8080.
+                                  Metrics may be disabled by setting a value less than or equal to 0.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                              port:
+                                default: 9443
+                                description: Port represents the primary bind port
+                                  of a server. The default value is 9443.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                            type: object
                           port:
                             default: 443
-                            description: Port represents the port of a webhook-server.
+                            description: Port represents the external port of a webhook-server.
                               The default value of Port is 443.
                             format: int32
                             maximum: 65535
@@ -127,9 +244,43 @@ spec:
                               The Address must be reachable by apiserver of the hub cluster.
                             pattern: ^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$
                             type: string
+                          bindConfiguration:
+                            description: BindConfiguration represents server bind
+                              configuration for the webhook server
+                            properties:
+                              healthProbePort:
+                                default: 8000
+                                description: |-
+                                  HealthProbePort represents the bind port of a webhook-server's healthcheck endpoint. The default value is 8000.
+                                  Healthchecks may be disabled by setting a value less than or equal to 0.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                              hostNetwork:
+                                description: |-
+                                  HostNetwork enables running webhook pods in host networking mode.
+                                  This may be required in some installations, such as EKS with Calico CNI,
+                                  to allow the API Server to communicate with the webhook pods.
+                                type: boolean
+                              metricsPort:
+                                default: 8080
+                                description: |-
+                                  MetricsPort represents the bind port for a webhook-server's metric endpoint. The default value is 8080.
+                                  Metrics may be disabled by setting a value less than or equal to 0.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                              port:
+                                default: 9443
+                                description: Port represents the primary bind port
+                                  of a server. The default value is 9443.
+                                format: int32
+                                maximum: 65535
+                                type: integer
+                            type: object
                           port:
                             default: 443
-                            description: Port represents the port of a webhook-server.
+                            description: Port represents the external port of a webhook-server.
                               The default value of Port is 443.
                             format: int32
                             maximum: 65535
@@ -155,7 +306,7 @@ spec:
                 - mode
                 type: object
               nodePlacement:
-                description: NodePlacement enables explicit control over the scheduling
+                description: nodePlacement enables explicit control over the scheduling
                   of the deployed pods.
                 properties:
                   nodeSelector:
@@ -209,11 +360,11 @@ spec:
                 type: object
               placementImagePullSpec:
                 default: quay.io/open-cluster-management/placement
-                description: PlacementImagePullSpec represents the desired image configuration
+                description: placementImagePullSpec represents the desired image configuration
                   of placement controller/webhook installed on hub.
                 type: string
               registrationConfiguration:
-                description: RegistrationConfiguration contains the configuration
+                description: registrationConfiguration contains the configuration
                   of registration
                 properties:
                   autoApproveUsers:
@@ -263,15 +414,16 @@ spec:
                       properties:
                         authType:
                           default: csr
-                          description: Type of the authentication used by hub to initialize
-                            the Hub cluster. Possible values are csr and awsirsa.
+                          description: |-
+                            authType is the type of the authentication used by hub to initialize the Hub cluster.
+                            Possible values are csr, awsirsa and grpc.
                           enum:
                           - csr
                           - awsirsa
                           - grpc
                           type: string
                         awsirsa:
-                          description: AwsIrsa represents the configuration for awsirsa
+                          description: awsirsa represents the configuration for awsirsa
                             driver.
                           properties:
                             autoApprovedIdentities:
@@ -295,7 +447,7 @@ spec:
                               type: array
                           type: object
                         csr:
-                          description: CSR represents the configuration for csr driver.
+                          description: csr represents the configuration for csr driver.
                           properties:
                             autoApprovedIdentities:
                               description: AutoApprovedIdentities represent a list
@@ -305,7 +457,7 @@ spec:
                               type: array
                           type: object
                         grpc:
-                          description: GRPC represents the configuration for gRPC
+                          description: grpc represents the configuration for gRPC
                             driver.
                           properties:
                             autoApprovedIdentities:
@@ -314,35 +466,6 @@ spec:
                               items:
                                 type: string
                               type: array
-                            endpointExposure:
-                              description: EndpointExposure represents the configuration
-                                for endpoint exposure.
-                              properties:
-                                hostname:
-                                  description: Hostname points to a fixed hostname
-                                    for serving agents' handshakes.
-                                  properties:
-                                    value:
-                                      type: string
-                                  required:
-                                  - value
-                                  type: object
-                                type:
-                                  default: hostname
-                                  description: |-
-                                    Type specifies how the gRPC endpoint is exposed.
-                                    You may need to apply an object to expose the gRPC endpoint, for example: a route.
-                                  enum:
-                                  - hostname
-                                  type: string
-                              required:
-                              - type
-                              type: object
-                            imagePullSpec:
-                              default: quay.io/open-cluster-management/registration
-                              description: ImagePullSpec represents the desired image
-                                of the gRPC broker installed on hub.
-                              type: string
                           type: object
                       required:
                       - authType
@@ -354,7 +477,7 @@ spec:
                 type: object
               registrationImagePullSpec:
                 default: quay.io/open-cluster-management/registration
-                description: RegistrationImagePullSpec represents the desired image
+                description: registrationImagePullSpec represents the desired image
                   of registration controller/webhook installed on hub.
                 type: string
               resourceRequirement:
@@ -430,10 +553,120 @@ spec:
                     - ResourceRequirement
                     type: string
                 type: object
+              serverConfiguration:
+                description: serverConfiguration contains the configuration for http/grpc
+                  server.
+                properties:
+                  endpointsExposure:
+                    description: endpointsExposure represents the configuration for
+                      endpoints exposure of the server.
+                    items:
+                      properties:
+                        grpc:
+                          description: grpc represents the configuration for grpc
+                            endpoint.
+                          properties:
+                            hostname:
+                              description: hostname points to a fixed hostname for
+                                serving agents' handshakes.
+                              properties:
+                                caBundle:
+                                  description: caBundle of the endpoint.
+                                  format: byte
+                                  type: string
+                                host:
+                                  description: host is the host name of the endpoint.
+                                  type: string
+                              required:
+                              - host
+                              type: object
+                            type:
+                              default: hostname
+                              description: |-
+                                type specifies how the endpoint is exposed.
+                                You may need to apply an object to expose the endpoint, for example: a route.
+                              enum:
+                              - hostname
+                              type: string
+                          required:
+                          - type
+                          type: object
+                        https:
+                          description: https represents the configuration for https
+                            endpoint.
+                          properties:
+                            hostname:
+                              description: hostname points to a fixed hostname for
+                                serving agents' handshakes.
+                              properties:
+                                caBundle:
+                                  description: caBundle of the endpoint.
+                                  format: byte
+                                  type: string
+                                host:
+                                  description: host is the host name of the endpoint.
+                                  type: string
+                              required:
+                              - host
+                              type: object
+                            type:
+                              default: hostname
+                              description: |-
+                                type specifies how the endpoint is exposed.
+                                You may need to apply an object to expose the endpoint, for example: a route.
+                              enum:
+                              - hostname
+                              type: string
+                          required:
+                          - type
+                          type: object
+                        protocol:
+                          default: grpc
+                          description: protocol is the protocol used for the endpoint,
+                            could be https or grpc.
+                          enum:
+                          - grpc
+                          - https
+                          type: string
+                        usage:
+                          description: |-
+                            usage defines the usage of the endpoint. It could be "agentToHub" indicating the endpoint is used
+                            for communication between agent and hub, or "consumer" indicating the endpoint is used for external consumer.
+                          type: string
+                      required:
+                      - protocol
+                      type: object
+                    type: array
+                  featureGates:
+                    description: featureGates represents the features enabled for
+                      the server
+                    items:
+                      properties:
+                        feature:
+                          description: Feature is the key of feature gate. e.g. featuregate/Foo.
+                          type: string
+                        mode:
+                          default: Disable
+                          description: |-
+                            Mode is either Enable, Disable, "" where "" is Disable by default.
+                            In Enable mode, a valid feature gate `featuregate/Foo` will be set to "--featuregate/Foo=true".
+                            In Disable mode, a valid feature gate `featuregate/Foo` will be set to "--featuregate/Foo=false".
+                          enum:
+                          - Enable
+                          - Disable
+                          type: string
+                      required:
+                      - feature
+                      type: object
+                    type: array
+                  imagePullSpec:
+                    description: imagePullSpec is the image for the server
+                    type: string
+                type: object
               workConfiguration:
                 default:
                   workDriver: kube
-                description: WorkConfiguration contains the configuration of work
+                description: workConfiguration contains the configuration of work
                 properties:
                   featureGates:
                     description: "FeatureGates represents the list of feature gates
@@ -485,7 +718,7 @@ spec:
                 type: object
               workImagePullSpec:
                 default: quay.io/open-cluster-management/work
-                description: WorkImagePullSpec represents the desired image configuration
+                description: workImagePullSpec represents the desired image configuration
                   of work controller/webhook installed on hub.
                 type: string
             type: object

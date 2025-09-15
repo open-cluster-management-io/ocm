@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: install Go
         uses: actions/setup-go@v5
         with:
@@ -52,7 +52,7 @@ jobs:
         image-name: [ registration-operator, registration, work, placement, addon-manager ]
     steps:
       - name: checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: install Go
         uses: actions/setup-go@v5
         with:
@@ -80,7 +80,7 @@ jobs:
           format: 'spdx-json'
           output-file: 'sbom.spdx.json'
       - name: Attest
-        uses: actions/attest-sbom@v2
+        uses: actions/attest-sbom@v3
         id: attest
         with:
           subject-name: quay.io/open-cluster-management/${{ matrix.image-name }}
@@ -96,7 +96,7 @@ jobs:
     needs: [ images ]
     steps:
       - name: checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       # Step to install Skopeo
       - name: Install Skopeo and jq
         run: |
@@ -126,7 +126,7 @@ jobs:
           format: 'spdx-json'
           output-file: 'sbom.spdx.json'
       - name: Attest
-        uses: actions/attest-sbom@v2
+        uses: actions/attest-sbom@v3
         id: attest
         with:
           subject-name: quay.io/open-cluster-management/${{ matrix.image-name }}

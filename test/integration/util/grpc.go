@@ -23,7 +23,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/cert"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc"
-	grpcoptions "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/options"
+	sdkgrpc "open-cluster-management.io/sdk-go/pkg/server/grpc"
 	"open-cluster-management.io/sdk-go/test/integration/cloudevents/util"
 )
 
@@ -97,7 +97,7 @@ func (h *GRPCServerRegistrationHook) Run(ctx context.Context) {
 	go h.AddOnInformers.Start(ctx.Done())
 }
 
-func CreateGRPCConfigs(configFileName string) (string, *grpcoptions.GRPCServerOptions, string, error) {
+func CreateGRPCConfigs(configFileName string, port string) (string, *sdkgrpc.GRPCServerOptions, string, error) {
 	serverCertPairs, err := util.NewServerCertPairs()
 	if err != nil {
 		return "", nil, "", err
@@ -129,10 +129,11 @@ func CreateGRPCConfigs(configFileName string) (string, *grpcoptions.GRPCServerOp
 		return "", nil, "", err
 	}
 
-	serverOptions := grpcoptions.NewGRPCServerOptions()
+	serverOptions := sdkgrpc.NewGRPCServerOptions()
 	serverOptions.ClientCAFile = caFile
 	serverOptions.TLSCertFile = serverCertFile
 	serverOptions.TLSKeyFile = serverKeyFile
+	serverOptions.ServerBindPort = port
 
 	config := &grpc.GRPCConfig{
 		CertConfig: cert.CertConfig{

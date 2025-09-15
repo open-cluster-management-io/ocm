@@ -57,6 +57,9 @@ const (
 	// ExtensionResourceID is the cloud event extension key of the resource ID.
 	ExtensionResourceID = "resourceid"
 
+	// ExtensionResourceName is the cloud event extension key of the resource name.
+	ExtensionResourceName = "resourcename"
+
 	// ExtensionResourceVersion is the cloud event extension key of the resource version.
 	ExtensionResourceVersion = "resourceversion"
 
@@ -75,6 +78,9 @@ const (
 
 	// ExtensionStatusHash is the cloud event extension key of the status hash.
 	ExtensionStatusHash = "statushash"
+
+	// ExtensionWorkMeta is an extension attribute for work meta data.
+	ExtensionWorkMeta = "metadata"
 )
 
 // ResourceAction represents an action on a resource object on the source or agent.
@@ -228,6 +234,7 @@ type EventBuilder struct {
 	clusterName       string
 	originalSource    string
 	resourceID        string
+	resourceName      string
 	sequenceID        string
 	resourceVersion   *int64
 	eventType         CloudEventsType
@@ -243,6 +250,11 @@ func NewEventBuilder(source string, eventType CloudEventsType) *EventBuilder {
 
 func (b *EventBuilder) WithResourceID(resourceID string) *EventBuilder {
 	b.resourceID = resourceID
+	return b
+}
+
+func (b *EventBuilder) WithResourceName(resourceName string) *EventBuilder {
+	b.resourceName = resourceName
 	return b
 }
 
@@ -283,6 +295,13 @@ func (b *EventBuilder) NewEvent() cloudevents.Event {
 
 	if len(b.resourceID) != 0 {
 		evt.SetExtension(ExtensionResourceID, b.resourceID)
+	}
+
+	if len(b.resourceName) != 0 {
+		evt.SetExtension(ExtensionResourceName, b.resourceName)
+	} else {
+		// if resourceName is not set, uses resourceID as the resourceName
+		evt.SetExtension(ExtensionResourceName, b.resourceID)
 	}
 
 	if b.resourceVersion != nil {

@@ -4,18 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/cloudevents/sdk-go/v2/binding"
 	cloudeventstypes "github.com/cloudevents/sdk-go/v2/types"
 	"github.com/google/uuid"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -44,20 +41,17 @@ var _ server.AgentEventServer = &GRPCBroker{}
 // It broadcasts resource spec to agents and listens for resource status updates from them.
 type GRPCBroker struct {
 	pbv1.UnimplementedCloudEventServiceServer
-	grpcServer  *grpc.Server
 	services    map[types.CloudEventsDataType]server.Service
 	subscribers map[string]*subscriber // registered subscribers
 	mu          sync.RWMutex
 }
 
 // NewGRPCBroker creates a new gRPC broker with the given gRPC server.
-func NewGRPCBroker(srv *grpc.Server) server.AgentEventServer {
+func NewGRPCBroker() *GRPCBroker {
 	broker := &GRPCBroker{
-		grpcServer:  srv,
 		subscribers: make(map[string]*subscriber),
 		services:    make(map[types.CloudEventsDataType]server.Service),
 	}
-	pbv1.RegisterCloudEventServiceServer(broker.grpcServer, broker)
 	return broker
 }
 
@@ -76,26 +70,6 @@ func (bkr *GRPCBroker) Subscribers() sets.Set[string] {
 	}
 
 	return subscribers
-}
-
-// Start starts the gRPC broker at the given address
-func (bkr *GRPCBroker) Start(ctx context.Context, addr string) {
-	logger := klog.FromContext(ctx)
-	logger.Info("Starting gRPC broker at addr", "addr", addr)
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		utilruntime.Must(fmt.Errorf("failed to listen: %v", err))
-	}
-	go func() {
-		if err := bkr.grpcServer.Serve(lis); err != nil {
-			utilruntime.Must(fmt.Errorf("failed to serve gRPC broker: %v", err))
-		}
-	}()
-
-	// wait until context is canceled
-	<-ctx.Done()
-	klog.Infof("Shutting down gRPC broker")
-	bkr.grpcServer.GracefulStop()
 }
 
 // Publish in stub implementation for agent publish resource status.

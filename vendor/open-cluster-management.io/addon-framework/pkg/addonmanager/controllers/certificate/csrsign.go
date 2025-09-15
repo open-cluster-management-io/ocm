@@ -116,7 +116,7 @@ func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContex
 	}
 
 	// Get ManagedCluster
-	_, err = c.managedClusterLister.Get(clusterName)
+	cluster, err := c.managedClusterLister.Get(clusterName)
 	if errors.IsNotFound(err) {
 		return nil
 	}
@@ -124,7 +124,7 @@ func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContex
 		return err
 	}
 
-	_, err = c.managedClusterAddonLister.ManagedClusterAddOns(clusterName).Get(addonName)
+	addon, err := c.managedClusterAddonLister.ManagedClusterAddOns(clusterName).Get(addonName)
 	if errors.IsNotFound(err) {
 		return nil
 	}
@@ -136,7 +136,10 @@ func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContex
 		return nil
 	}
 
-	csr.Status.Certificate = registrationOption.CSRSign(csr)
+	csr.Status.Certificate, err = registrationOption.CSRSign(cluster, addon, csr)
+	if err != nil {
+		return fmt.Errorf("failed to sign addon csr %q: %v", csr.Name, err)
+	}
 	if len(csr.Status.Certificate) == 0 {
 		return fmt.Errorf("invalid client certificate generated for addon csr %q", csr.Name)
 	}

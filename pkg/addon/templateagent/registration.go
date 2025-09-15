@@ -16,7 +16,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
@@ -86,16 +85,18 @@ func (a *CRDTemplateAgentAddon) GetDesiredAddOnTemplate(addon *addonapiv1alpha1.
 	return a.getDesiredAddOnTemplateInner(cma.Name, configReferences)
 }
 
-func (a *CRDTemplateAgentAddon) TemplateCSRConfigurationsFunc() func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
+func (a *CRDTemplateAgentAddon) TemplateCSRConfigurationsFunc() agent.CSRConfigurationsFunc {
 
-	return func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
-		template, err := a.GetDesiredAddOnTemplate(nil, cluster.Name, a.addonName)
+	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn,
+	) ([]addonapiv1alpha1.RegistrationConfig, error) {
+		template, err := a.GetDesiredAddOnTemplate(addon, cluster.Name, a.addonName)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to get addon %s template: %v", a.addonName, err))
-			return nil
+			return nil, fmt.Errorf("CSRConfigurations failed to get addon template for addon %s/%s: %v",
+				cluster.Name, a.addonName, err)
 		}
 		if template == nil {
-			return nil
+			return nil, fmt.Errorf("CSRConfigurations failed to get addon template for addon %s/%s, template is nil",
+				cluster.Name, a.addonName)
 		}
 
 		contain := func(rcs []addonapiv1alpha1.RegistrationConfig, signerName string) bool {
@@ -112,7 +113,11 @@ func (a *CRDTemplateAgentAddon) TemplateCSRConfigurationsFunc() func(cluster *cl
 			switch registration.Type {
 			case addonapiv1alpha1.RegistrationTypeKubeClient:
 				if !contain(registrationConfigs, certificatesv1.KubeAPIServerClientSignerName) {
-					configs := agent.KubeClientSignerConfigurations(a.addonName, a.agentName)(cluster)
+					configs, err := agent.KubeClientSignerConfigurations(a.addonName, a.agentName)(cluster, addon)
+					if err != nil {
+						return nil, fmt.Errorf("failed to get kube signer config for %s/%s: %v",
+							cluster.Name, a.addonName, err)
+					}
 					registrationConfigs = append(registrationConfigs, configs...)
 				}
 
@@ -121,18 +126,23 @@ func (a *CRDTemplateAgentAddon) TemplateCSRConfigurationsFunc() func(cluster *cl
 					continue
 				}
 				if !contain(registrationConfigs, registration.CustomSigner.SignerName) {
-					configs := CustomSignerConfigurations(
+					configs, err := CustomSignerConfigurations(
 						a.addonName, a.agentName, registration.CustomSigner)(cluster)
+					if err != nil {
+						return nil, fmt.Errorf("failed to get custom signer config for %s/%s: %v",
+							cluster.Name, a.addonName, err)
+					}
 					registrationConfigs = append(registrationConfigs, configs...)
 				}
 
 			default:
-				utilruntime.HandleError(fmt.Errorf("unsupported registration type %s", registration.Type))
+				a.logger.Info("CSRConfigurations unsupported registration type",
+					"clusterName", cluster.Name, "addonName", a.addonName, "type", registration.Type)
 			}
 
 		}
 
-		return registrationConfigs
+		return registrationConfigs, nil
 	}
 }
 
@@ -140,14 +150,13 @@ func (a *CRDTemplateAgentAddon) TemplateCSRConfigurationsFunc() func(cluster *cl
 // for CustomSigner type registration addon
 func CustomSignerConfigurations(addonName, agentName string,
 	customSignerConfig *addonapiv1alpha1.CustomSignerRegistrationConfig,
-) func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
-	return func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
+) func(cluster *clusterv1.ManagedCluster) ([]addonapiv1alpha1.RegistrationConfig, error) {
+	return func(cluster *clusterv1.ManagedCluster) ([]addonapiv1alpha1.RegistrationConfig, error) {
 		if customSignerConfig == nil {
-			utilruntime.HandleError(fmt.Errorf("custome signer is nil"))
+			return nil, fmt.Errorf("custom signer config is nil")
 		}
 		config := addonapiv1alpha1.RegistrationConfig{
 			SignerName: customSignerConfig.SignerName,
-			// TODO: confirm the subject
 			Subject: addonapiv1alpha1.Subject{
 				User:   agent.DefaultUser(cluster.Name, addonName, agentName),
 				Groups: agent.DefaultGroups(cluster.Name, addonName),
@@ -157,7 +166,7 @@ func CustomSignerConfigurations(addonName, agentName string,
 			config.Subject = *customSignerConfig.Subject
 		}
 
-		return []addonapiv1alpha1.RegistrationConfig{config}
+		return []addonapiv1alpha1.RegistrationConfig{config}, nil
 	}
 }
 
@@ -168,10 +177,13 @@ func (a *CRDTemplateAgentAddon) TemplateCSRApproveCheckFunc() agent.CSRApproveFu
 
 		template, err := a.GetDesiredAddOnTemplate(addon, cluster.Name, a.addonName)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to get addon %s template: %v", a.addonName, err))
+			a.logger.Info("CSRApproveCheck failed to get addon template",
+				"clusterName", cluster.Name, "addonName", a.addonName, "error", err)
 			return false
 		}
 		if template == nil {
+			a.logger.Info("CSRApproveCheck failed to get addon template, template is nil",
+				"clusterName", cluster.Name, "addonName", a.addonName)
 			return false
 		}
 
@@ -192,7 +204,8 @@ func (a *CRDTemplateAgentAddon) TemplateCSRApproveCheckFunc() agent.CSRApproveFu
 				}
 
 			default:
-				utilruntime.HandleError(fmt.Errorf("unsupported registration type %s", registration.Type))
+				a.logger.Info("CSRApproveCheck unsupported registration type",
+					"clusterName", cluster.Name, "addonName", a.addonName, "type", registration.Type)
 			}
 
 		}
@@ -232,21 +245,16 @@ func CustomerSignerCSRApprover(logger klog.Logger, agentName string) agent.CSRAp
 
 func (a *CRDTemplateAgentAddon) TemplateCSRSignFunc() agent.CSRSignerFunc {
 
-	return func(csr *certificatesv1.CertificateSigningRequest) []byte {
-		// TODO: consider to change the agent.CSRSignerFun to accept parameter addon
-		getClusterName := func(userName string) string {
-			return csr.Labels[clusterv1.ClusterNameLabelKey]
-		}
-
-		clusterName := getClusterName(csr.Spec.Username)
-		template, err := a.GetDesiredAddOnTemplate(nil, clusterName, a.addonName)
+	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn,
+		csr *certificatesv1.CertificateSigningRequest) ([]byte, error) {
+		template, err := a.GetDesiredAddOnTemplate(addon, cluster.Name, a.addonName)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to get template for addon %s in cluster %s: %v",
-				a.addonName, clusterName, err))
-			return nil
+			return nil, fmt.Errorf("CSRSign failed to get template for addon %s/%s: %v",
+				cluster.Name, a.addonName, err)
 		}
 		if template == nil {
-			return nil
+			return nil, fmt.Errorf("CSRSign failed to get addon template for addon %s/%s, template is nil",
+				cluster.Name, a.addonName)
 		}
 
 		for _, registration := range template.Spec.Registration {
@@ -259,31 +267,33 @@ func (a *CRDTemplateAgentAddon) TemplateCSRSignFunc() agent.CSRSignerFunc {
 					continue
 				}
 				if csr.Spec.SignerName == registration.CustomSigner.SignerName {
-					return CustomSignerWithExpiry(a.hubKubeClient, registration.CustomSigner, 24*time.Hour)(csr)
+					return CustomSignerWithExpiry(a.hubKubeClient, registration.CustomSigner, 24*time.Hour)(cluster, addon, csr)
 				}
 
 			default:
-				utilruntime.HandleError(fmt.Errorf("unsupported registration type %s", registration.Type))
+				a.logger.Info("CSRSign unsupported registration type",
+					"clusterName", cluster.Name, "addonName", a.addonName, "type", registration.Type)
 			}
 
 		}
 
-		return nil
+		return nil, nil
 	}
 }
 
 func CustomSignerWithExpiry(
 	kubeclient kubernetes.Interface,
 	customSignerConfig *addonapiv1alpha1.CustomSignerRegistrationConfig,
-	duration time.Duration) agent.CSRSignerFunc {
-	return func(csr *certificatesv1.CertificateSigningRequest) []byte {
+	duration time.Duration,
+) agent.CSRSignerFunc {
+	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn,
+		csr *certificatesv1.CertificateSigningRequest) ([]byte, error) {
 		if customSignerConfig == nil {
-			utilruntime.HandleError(fmt.Errorf("custome signer is nil"))
-			return nil
+			return nil, fmt.Errorf("custom signer config is nil")
 		}
 
 		if csr.Spec.SignerName != customSignerConfig.SignerName {
-			return nil
+			return nil, nil
 		}
 
 		secretNamespace := AddonManagerNamespace()
@@ -293,18 +303,16 @@ func CustomSignerWithExpiry(
 		caSecret, err := kubeclient.CoreV1().Secrets(secretNamespace).Get(
 			context.TODO(), customSignerConfig.SigningCA.Name, metav1.GetOptions{})
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("get custome signer ca %s/%s failed, %v",
-				secretNamespace, customSignerConfig.SigningCA.Name, err))
-			return nil
+			return nil, fmt.Errorf("get custom signer ca %s/%s failed: %w",
+				secretNamespace, customSignerConfig.SigningCA.Name, err)
 		}
 
 		caData, caKey, err := extractCAdata(caSecret.Data[corev1.TLSCertKey], caSecret.Data[corev1.TLSPrivateKeyKey])
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("get ca %s/%s data failed, %v",
-				secretNamespace, customSignerConfig.SigningCA.Name, err))
-			return nil
+			return nil, fmt.Errorf("get ca %s/%s data failed: %w",
+				secretNamespace, customSignerConfig.SigningCA.Name, err)
 		}
-		return utils.DefaultSignerWithExpiry(caKey, caData, duration)(csr)
+		return utils.DefaultSignerWithExpiry(caKey, caData, duration)(cluster, addon, csr)
 	}
 }
 
@@ -348,10 +356,12 @@ func (a *CRDTemplateAgentAddon) TemplatePermissionConfigFunc() agent.PermissionC
 	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
 		template, err := a.GetDesiredAddOnTemplate(addon, cluster.Name, a.addonName)
 		if err != nil {
-			return err
+			return fmt.Errorf("PermissionConfig failed to get addon template for addon %s/%s: %v",
+				cluster.Name, a.addonName, err)
 		}
 		if template == nil {
-			return nil
+			return fmt.Errorf("PermissionConfig failed to get addon template for addon %s/%s, template is nil",
+				cluster.Name, a.addonName)
 		}
 
 		for _, registration := range template.Spec.Registration {
@@ -371,7 +381,8 @@ func (a *CRDTemplateAgentAddon) TemplatePermissionConfigFunc() agent.PermissionC
 				continue
 
 			default:
-				utilruntime.HandleError(fmt.Errorf("unsupported registration type %s", registration.Type))
+				a.logger.Info("PermissionConfig unsupported registration type",
+					"clusterName", cluster.Name, "addonName", a.addonName, "type", registration.Type)
 			}
 
 		}

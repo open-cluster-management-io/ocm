@@ -269,8 +269,29 @@ func CleanKlusterletRelatedResources(
 	klusterletName, managedClusterName string) {
 	Expect(klusterletName).NotTo(Equal(""))
 
+	// clean the managed clusters at first.
+	err := hub.ClusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(), managedClusterName, metav1.DeleteOptions{})
+	if apierrors.IsNotFound(err) {
+		klog.Infof("managed cluster %s already absent", managedClusterName)
+	} else {
+		Expect(err).To(BeNil())
+	}
+
+	Eventually(func() error {
+		_, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), managedClusterName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			klog.Infof("managed cluster %s deleted successfully", managedClusterName)
+			return nil
+		}
+		if err != nil {
+			klog.Infof("get managed cluster %s error: %v", klusterletName, err)
+			return err
+		}
+		return fmt.Errorf("managed cluster %s still exists", managedClusterName)
+	}).Should(Succeed())
+
 	// clean the klusterlet
-	err := spoke.OperatorClient.OperatorV1().Klusterlets().Delete(context.TODO(), klusterletName, metav1.DeleteOptions{})
+	err = spoke.OperatorClient.OperatorV1().Klusterlets().Delete(context.TODO(), klusterletName, metav1.DeleteOptions{})
 	if apierrors.IsNotFound(err) {
 		return
 	}
@@ -287,25 +308,5 @@ func CleanKlusterletRelatedResources(
 			return err
 		}
 		return fmt.Errorf("klusterlet %s still exists", klusterletName)
-	}).Should(Succeed())
-
-	// clean the managed clusters
-	err = hub.ClusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(), managedClusterName, metav1.DeleteOptions{})
-	if apierrors.IsNotFound(err) {
-		return
-	}
-	Expect(err).To(BeNil())
-
-	Eventually(func() error {
-		_, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), managedClusterName, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			klog.Infof("managed cluster %s deleted successfully", managedClusterName)
-			return nil
-		}
-		if err != nil {
-			klog.Infof("get managed cluster %s error: %v", klusterletName, err)
-			return err
-		}
-		return fmt.Errorf("managed cluster %s still exists", managedClusterName)
 	}).Should(Succeed())
 }

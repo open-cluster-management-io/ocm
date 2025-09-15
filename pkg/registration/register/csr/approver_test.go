@@ -9,6 +9,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	certificatesv1 "k8s.io/api/certificates/v1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -205,17 +206,20 @@ func TestSync(t *testing.T) {
 
 			recorder := eventstesting.NewTestingEventRecorder(t)
 			ctrl := &csrApprovingController[*certificatesv1.CertificateSigningRequest]{
-				lister:   informerFactory.Certificates().V1().CertificateSigningRequests().Lister(),
-				approver: newCSRV1Approver(kubeClient),
+				lister:        informerFactory.Certificates().V1().CertificateSigningRequests().Lister(),
+				approver:      NewCSRV1Approver(kubeClient),
+				csrInfoGetter: getCSRInfo,
 				reconcilers: []Reconciler{
 					&csrBootstrapReconciler{
+						signer:        certificatesv1.KubeAPIServerClientSignerName,
 						kubeClient:    kubeClient,
 						eventRecorder: recorder,
 						approvalUsers: sets.Set[string]{},
 					},
-					NewCSRRenewalReconciler(kubeClient, recorder),
+					NewCSRRenewalReconciler(kubeClient, certificatesv1.KubeAPIServerClientSignerName, recorder),
 					NewCSRBootstrapReconciler(
 						kubeClient,
+						certificatesv1.KubeAPIServerClientSignerName,
 						c.approvalUsers,
 						recorder,
 					),
@@ -317,7 +321,7 @@ func TestIsSpokeClusterClientCertRenewal(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			isRenewal, clusterName, commonName := validateCSR(logger, newCSRInfo(logger, testinghelpers.NewCSR(c.csr)))
+			isRenewal, clusterName, commonName := validateCSR(logger, certificatesv1.KubeAPIServerClientSignerName, getCSRInfo(testinghelpers.NewCSR(c.csr)))
 			if isRenewal != c.isRenewal {
 				t.Errorf("expected %t, but failed", c.isRenewal)
 			}
@@ -345,5 +349,69 @@ func TestNewApprover(t *testing.T) {
 	_, err = NewCSRHubDriver(kubeClient, informerFactory, []string{}, recorder)
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func TestEventFilter(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    any
+		expected bool
+	}{
+		{
+			name:     "nil input",
+			input:    nil,
+			expected: false,
+		},
+		{
+			name: "v1 CSR with matching signer",
+			input: &certificatesv1.CertificateSigningRequest{
+				Spec: certificatesv1.CertificateSigningRequestSpec{
+					SignerName: certificatesv1.KubeAPIServerClientSignerName,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "v1 CSR with non-matching signer",
+			input: &certificatesv1.CertificateSigningRequest{
+				Spec: certificatesv1.CertificateSigningRequestSpec{
+					SignerName: "example.com/custom",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "v1beta1 CSR with matching signer",
+			input: func() *certificatesv1beta1.CertificateSigningRequest {
+				signer := certificatesv1beta1.KubeAPIServerClientSignerName
+				return &certificatesv1beta1.CertificateSigningRequest{
+					Spec: certificatesv1beta1.CertificateSigningRequestSpec{
+						SignerName: &signer,
+					},
+				}
+			}(),
+			expected: true,
+		},
+		{
+			name: "v1beta1 CSR with non-matching signer",
+			input: func() *certificatesv1beta1.CertificateSigningRequest {
+				signer := "example.com/custom"
+				return &certificatesv1beta1.CertificateSigningRequest{
+					Spec: certificatesv1beta1.CertificateSigningRequestSpec{
+						SignerName: &signer,
+					},
+				}
+			}(),
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := eventFilter(tt.input); got != tt.expected {
+				t.Errorf("eventFilter() = %v, want %v", got, tt.expected)
+			}
+		})
 	}
 }

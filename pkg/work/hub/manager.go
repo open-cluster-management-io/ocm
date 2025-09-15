@@ -91,8 +91,7 @@ func (c *WorkHubManagerConfig) RunWorkHubManager(ctx context.Context, controller
 
 		watcherStore = store.NewSourceInformerWatcherStore(ctx)
 
-		_, config, err := generic.NewConfigLoader(c.workOptions.WorkDriver, c.workOptions.WorkDriverConfig).
-			LoadConfig()
+		_, config, err := generic.NewConfigLoader(c.workOptions.WorkDriver, c.workOptions.WorkDriverConfig).LoadConfig()
 		if err != nil {
 			return err
 		}

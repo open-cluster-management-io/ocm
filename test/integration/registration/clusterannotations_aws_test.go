@@ -10,7 +10,6 @@ import (
 
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 
-	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
 	registerfactory "open-cluster-management.io/ocm/pkg/registration/register/factory"
@@ -30,8 +29,8 @@ var _ = ginkgo.Describe("Cluster Annotations for aws", func() {
 		hubClusterArn := "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1"
 		agentOptions := &spoke.SpokeAgentOptions{
 			RegisterDriverOption: &registerfactory.Options{
-				RegistrationAuth: commonhelpers.AwsIrsaAuthType,
-				AWSISRAOption: &aws_irsa.AWSOption{
+				RegistrationAuth: operatorv1.AwsIrsaAuthType,
+				AWSIRSAOption: &aws_irsa.AWSOption{
 					HubClusterArn:            hubClusterArn,
 					ManagedClusterArn:        managedClusterArn,
 					ManagedClusterRoleSuffix: managedClusterRoleSuffix,

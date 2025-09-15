@@ -29,6 +29,8 @@ type CSR interface {
 	*certificatesv1.CertificateSigningRequest | *certificatesv1beta1.CertificateSigningRequest
 }
 
+type CSRInfoGetter[T CSR] func(c T) CSRInfo
+
 type CSRLister[T CSR] interface {
 	Get(name string) (T, error)
 }
@@ -40,26 +42,30 @@ type csrApprover[T CSR] interface {
 
 // csrApprovingController auto approve the renewal CertificateSigningRequests for an accepted spoke cluster on the hub.
 type csrApprovingController[T CSR] struct {
-	lister      CSRLister[T]
-	approver    csrApprover[T]
-	reconcilers []Reconciler
+	lister        CSRLister[T]
+	approver      csrApprover[T]
+	csrInfoGetter CSRInfoGetter[T]
+	reconcilers   []Reconciler
 }
 
 // NewCSRApprovingController creates a new csr approving controller
 func NewCSRApprovingController[T CSR](
 	csrInformer cache.SharedIndexInformer,
 	lister CSRLister[T],
+	eventFilter factory.EventFilterFunc,
 	approver csrApprover[T],
+	csrInfoGetter CSRInfoGetter[T],
 	reconcilers []Reconciler,
 	recorder events.Recorder) factory.Controller {
 	c := &csrApprovingController[T]{
-		lister:      lister,
-		approver:    approver,
-		reconcilers: reconcilers,
+		lister:        lister,
+		approver:      approver,
+		csrInfoGetter: csrInfoGetter,
+		reconcilers:   reconcilers,
 	}
 
 	return factory.New().
-		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, csrInformer).
+		WithFilteredEventsInformersQueueKeysFunc(queue.QueueKeyByMetaName, eventFilter, csrInformer).
 		WithSync(c.sync).
 		ToController("CSRApprovingController", recorder)
 }
@@ -81,7 +87,7 @@ func (c *csrApprovingController[T]) sync(ctx context.Context, syncCtx factory.Sy
 		return nil
 	}
 
-	csrInfo := newCSRInfo(logger, csr)
+	csrInfo := c.csrInfoGetter(csr)
 	for _, r := range c.reconcilers {
 		state, err := r.Reconcile(ctx, csrInfo, c.approver.approve(ctx, csr))
 		if err != nil {
@@ -102,7 +108,7 @@ type csrV1Approver struct {
 	kubeClient kubernetes.Interface
 }
 
-func newCSRV1Approver(client kubernetes.Interface) *csrV1Approver {
+func NewCSRV1Approver(client kubernetes.Interface) *csrV1Approver {
 	return &csrV1Approver{kubeClient: client}
 }
 
@@ -155,8 +161,7 @@ func (c *csrV1beta1Approver) approve(ctx context.Context, csr *certificatesv1bet
 }
 
 type CSRHubDriver struct {
-	controller           factory.Controller
-	autoApprovedCSRUsers []string
+	controller factory.Controller
 }
 
 func (c *CSRHubDriver) Run(ctx context.Context, workers int) {
@@ -174,13 +179,13 @@ func NewCSRHubDriver(
 	kubeInformers informers.SharedInformerFactory,
 	autoApprovedCSRUsers []string,
 	recorder events.Recorder) (register.HubDriver, error) {
-	csrDriverForHub := &CSRHubDriver{
-		autoApprovedCSRUsers: autoApprovedCSRUsers,
-	}
-	csrReconciles := []Reconciler{NewCSRRenewalReconciler(kubeClient, recorder)}
+	csrDriverForHub := &CSRHubDriver{}
+
+	csrReconciles := []Reconciler{NewCSRRenewalReconciler(kubeClient, certificatesv1.KubeAPIServerClientSignerName, recorder)}
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
 		csrReconciles = append(csrReconciles, NewCSRBootstrapReconciler(
 			kubeClient,
+			certificatesv1.KubeAPIServerClientSignerName,
 			autoApprovedCSRUsers,
 			recorder,
 		))
@@ -193,10 +198,12 @@ func NewCSRHubDriver(
 		}
 
 		if !v1CSRSupported && v1beta1CSRSupported {
-			csrDriverForHub.controller = NewCSRApprovingController[*certificatesv1beta1.CertificateSigningRequest](
+			csrDriverForHub.controller = NewCSRApprovingController(
 				kubeInformers.Certificates().V1beta1().CertificateSigningRequests().Informer(),
 				kubeInformers.Certificates().V1beta1().CertificateSigningRequests().Lister(),
+				eventFilter,
 				newCSRV1beta1Approver(kubeClient),
+				getCSRv1beta1Info,
 				csrReconciles,
 				recorder,
 			)
@@ -205,10 +212,12 @@ func NewCSRHubDriver(
 		}
 	}
 
-	csrDriverForHub.controller = NewCSRApprovingController[*certificatesv1.CertificateSigningRequest](
+	csrDriverForHub.controller = NewCSRApprovingController(
 		kubeInformers.Certificates().V1().CertificateSigningRequests().Informer(),
 		kubeInformers.Certificates().V1().CertificateSigningRequests().Lister(),
-		newCSRV1Approver(kubeClient),
+		eventFilter,
+		NewCSRV1Approver(kubeClient),
+		getCSRInfo,
 		csrReconciles,
 		recorder,
 	)
