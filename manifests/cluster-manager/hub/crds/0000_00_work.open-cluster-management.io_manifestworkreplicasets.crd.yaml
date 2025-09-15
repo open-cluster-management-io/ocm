@@ -73,12 +73,12 @@ spec:
                 - Foreground
                 type: string
               manifestWorkTemplate:
-                description: ManifestWorkTemplate is the ManifestWorkSpec that will
+                description: manifestWorkTemplate is the ManifestWorkSpec that will
                   be used to generate a per-cluster ManifestWork
                 properties:
                   deleteOption:
                     description: |-
-                      DeleteOption represents deletion strategy when the manifestwork is deleted.
+                      deleteOption represents deletion strategy when the manifestwork is deleted.
                       Foreground deletion strategy is applied to all the resource in this manifestwork if it is not set.
                     properties:
                       propagationPolicy:
@@ -190,7 +190,7 @@ spec:
                         type: object
                     type: object
                   manifestConfigs:
-                    description: ManifestConfigs represents the configurations of
+                    description: manifestConfigs represents the configurations of
                       manifests defined in workload field.
                     items:
                       description: ManifestConfigOption represents the configurations
@@ -407,11 +407,11 @@ spec:
                       type: object
                     type: array
                   workload:
-                    description: Workload represents the manifest workload to be deployed
+                    description: workload represents the manifest workload to be deployed
                       on a managed cluster.
                     properties:
                       manifests:
-                        description: Manifests represents a list of kuberenetes resources
+                        description: manifests represents a list of kubernetes resources
                           to be deployed on a managed cluster.
                         items:
                           description: Manifest represents a resource to be deployed
@@ -424,7 +424,7 @@ spec:
                 type: object
               placementRefs:
                 description: |-
-                  PacementRefs is a list of the names of the Placement resource, from which a PlacementDecision will be found and used
+                  placementRefs is a list of the names of the Placement resource, from which a PlacementDecision will be found and used
                   to distribute the ManifestWork.
                 items:
                   description: localPlacementReference is the name of a Placement
@@ -443,7 +443,7 @@ spec:
                         clusters by Placement and DecisionStrategy.
                       properties:
                         all:
-                          description: All defines required fields for RolloutStrategy
+                          description: all defines required fields for RolloutStrategy
                             type All
                           properties:
                             maxFailures:
@@ -490,7 +490,7 @@ spec:
                               type: string
                           type: object
                         progressive:
-                          description: Progressive defines required fields for RolloutStrategy
+                          description: progressive defines required fields for RolloutStrategy
                             type Progressive
                           properties:
                             mandatoryDecisionGroups:
@@ -506,13 +506,13 @@ spec:
                                 properties:
                                   groupIndex:
                                     description: |-
-                                      GroupIndex of the decision group should match the placementDecisions label value with label key
+                                      groupIndex of the decision group should match the placementDecisions label value with label key
                                       cluster.open-cluster-management.io/decision-group-index
                                     format: int32
                                     type: integer
                                   groupName:
                                     description: |-
-                                      GroupName of the decision group should match the placementDecisions label value with label key
+                                      groupName of the decision group should match the placementDecisions label value with label key
                                       cluster.open-cluster-management.io/decision-group-name
                                     type: string
                                 type: object
@@ -522,7 +522,7 @@ spec:
                               - type: integer
                               - type: string
                               description: |-
-                                MaxConcurrency is the max number of clusters to deploy workload concurrently. The default value
+                                maxConcurrency is the max number of clusters to deploy workload concurrently. The default value
                                 for MaxConcurrency is determined from the clustersPerDecisionGroup defined in the
                                 placement->DecisionStrategy.
                               pattern: ^((100|[0-9]{1,2})%|[0-9]+)$
@@ -571,7 +571,7 @@ spec:
                               type: string
                           type: object
                         progressivePerGroup:
-                          description: ProgressivePerGroup defines required fields
+                          description: progressivePerGroup defines required fields
                             for RolloutStrategy type ProgressivePerGroup
                           properties:
                             mandatoryDecisionGroups:
@@ -587,13 +587,13 @@ spec:
                                 properties:
                                   groupIndex:
                                     description: |-
-                                      GroupIndex of the decision group should match the placementDecisions label value with label key
+                                      groupIndex of the decision group should match the placementDecisions label value with label key
                                       cluster.open-cluster-management.io/decision-group-index
                                     format: int32
                                     type: integer
                                   groupName:
                                     description: |-
-                                      GroupName of the decision group should match the placementDecisions label value with label key
+                                      groupName of the decision group should match the placementDecisions label value with label key
                                       cluster.open-cluster-management.io/decision-group-name
                                     type: string
                                 type: object

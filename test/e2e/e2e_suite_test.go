@@ -148,13 +148,15 @@ var _ = BeforeSuite(func() {
 	Eventually(func() error {
 		return hub.EnableHubWorkFeature("ManifestWorkReplicaSet")
 	}).Should(Succeed())
-	Eventually(func() error {
-		return hub.CheckHubReady()
-	}).Should(Succeed())
 
 	By("Enable ClusterImporter Feature")
 	Eventually(func() error {
 		return hub.EnableHubRegistrationFeature("ClusterImporter")
+	}).Should(Succeed())
+
+	By("Enable CleanUpCompletedManifestWork feature gate")
+	Eventually(func() error {
+		return hub.EnableHubWorkFeature("CleanUpCompletedManifestWork")
 	}).Should(Succeed())
 	Eventually(func() error {
 		return hub.CheckHubReady()

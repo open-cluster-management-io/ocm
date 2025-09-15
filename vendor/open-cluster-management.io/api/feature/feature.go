@@ -88,6 +88,11 @@ const (
 
 	// ClusterImporter will enable the auto import of managed cluster for certain cluster providers, e.g. cluster-api.
 	ClusterImporter featuregate.Feature = "ClusterImporter"
+
+	// CleanUpCompletedManifestWork will delete manifestworks which have Completed status after a specified TTL seconds.
+	// When enabled, the work controller will automatically clean up completed manifest works based on the configured
+	// time-to-live duration to prevent accumulation of old completed resources.
+	CleanUpCompletedManifestWork featuregate.Feature = "CleanUpCompletedManifestWork"
 )
 
 // DefaultSpokeRegistrationFeatureGates consists of all known ocm-registration
@@ -120,9 +125,10 @@ var DefaultHubAddonManagerFeatureGates = map[featuregate.Feature]featuregate.Fea
 // DefaultHubWorkFeatureGates consists of all known acm work wehbook feature keys.
 // To add a new feature, define a key for it above and add it here.
 var DefaultHubWorkFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	NilExecutorValidating:  {Default: false, PreRelease: featuregate.Alpha},
-	ManifestWorkReplicaSet: {Default: false, PreRelease: featuregate.Alpha},
-	CloudEventsDrivers:     {Default: false, PreRelease: featuregate.Alpha},
+	NilExecutorValidating:        {Default: false, PreRelease: featuregate.Alpha},
+	ManifestWorkReplicaSet:       {Default: false, PreRelease: featuregate.Alpha},
+	CloudEventsDrivers:           {Default: false, PreRelease: featuregate.Alpha},
+	CleanUpCompletedManifestWork: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 // DefaultSpokeWorkFeatureGates consists of all known ocm work feature keys for work agent.

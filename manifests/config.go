@@ -19,7 +19,7 @@ type HubConfig struct {
 	WorkFeatureGates               []string
 	AddOnManagerImage              string
 	AddOnManagerEnabled            bool
-	MWReplicaSetEnabled            bool
+	WorkControllerEnabled          bool
 	ClusterProfileEnabled          bool
 	AgentImage                     string
 	CloudEventsDriverEnabled       bool

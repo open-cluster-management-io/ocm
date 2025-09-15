@@ -72,7 +72,7 @@ spec:
             properties:
               clusterSets:
                 description: |-
-                  ClusterSets represent the ManagedClusterSets from which the ManagedClusters are selected.
+                  clusterSets represent the ManagedClusterSets from which the ManagedClusters are selected.
                   If the slice is empty, ManagedClusters will be selected from the ManagedClusterSets bound to the placement
                   namespace, otherwise ManagedClusters will be selected from the intersection of this slice and the
                   ManagedClusterSets bound to the placement namespace.
@@ -80,12 +80,12 @@ spec:
                   type: string
                 type: array
               decisionStrategy:
-                description: DecisionStrategy divide the created placement decision
-                  to groups and define number of clusters per decision group.
+                description: decisionStrategy divides the created placement decisions
+                  into groups and defines the number of clusters per decision group.
                 properties:
                   groupStrategy:
-                    description: GroupStrategy define strategies to divide selected
-                      clusters to decision groups.
+                    description: groupStrategy defines strategies to divide selected
+                      clusters into decision groups.
                     properties:
                       clustersPerDecisionGroup:
                         anyOf:
@@ -93,7 +93,7 @@ spec:
                         - type: string
                         default: 100%
                         description: |-
-                          ClustersPerDecisionGroup is a specific number or percentage of the total selected clusters.
+                          clustersPerDecisionGroup is a specific number or percentage of the total selected clusters.
                           The specific number will divide the placementDecisions to decisionGroups each group has max number of clusters
                           equal to that specific number.
                           The percentage will divide the placementDecisions to decisionGroups each group has max number of clusters based
@@ -109,7 +109,7 @@ spec:
                         x-kubernetes-int-or-string: true
                       decisionGroups:
                         description: |-
-                          DecisionGroups represents a list of predefined groups to put decision results.
+                          decisionGroups represents a list of predefined groups to put decision results.
                           Decision groups will be constructed based on the DecisionGroups field at first. The clusters not included in the
                           DecisionGroups will be divided to other decision groups afterwards. Each decision group should not have the number
                           of clusters larger than the ClustersPerDecisionGroup.
@@ -118,11 +118,11 @@ spec:
                             will be added to placementDecisions with groupName label.
                           properties:
                             groupClusterSelector:
-                              description: LabelSelector to select clusters subset
-                                by label.
+                              description: groupClusterSelector selects a subset of
+                                clusters by labels.
                               properties:
                                 claimSelector:
-                                  description: ClaimSelector represents a selector
+                                  description: claimSelector represents a selector
                                     of ManagedClusters by clusterClaims in status
                                   properties:
                                     matchExpressions:
@@ -160,7 +160,7 @@ spec:
                                       type: array
                                   type: object
                                 labelSelector:
-                                  description: LabelSelector represents a selector
+                                  description: labelSelector represents a selector
                                     of ManagedClusters by label
                                   properties:
                                     matchExpressions:
@@ -209,9 +209,9 @@ spec:
                                   x-kubernetes-map-type: atomic
                               type: object
                             groupName:
-                              description: Group name to be added as label value to
-                                the created placement Decisions labels with label
-                                key cluster.open-cluster-management.io/decision-group-name
+                              description: |-
+                                groupName to set as the label value on created PlacementDecision
+                                resources using the label key cluster.open-cluster-management.io/decision-group-name.
                               pattern: ^[a-zA-Z0-9][-A-Za-z0-9_.]{0,61}[a-zA-Z0-9]$
                               type: string
                           required:
@@ -223,7 +223,7 @@ spec:
                 type: object
               numberOfClusters:
                 description: |-
-                  NumberOfClusters represents the desired number of ManagedClusters to be selected which meet the
+                  numberOfClusters represents the desired number of ManagedClusters to be selected which meet the
                   placement requirements.
                   1) If not specified, all ManagedClusters which meet the placement requirements (including ClusterSets,
                      and Predicates) will be selected;
@@ -237,14 +237,14 @@ spec:
                 format: int32
                 type: integer
               predicates:
-                description: Predicates represent a slice of predicates to select
+                description: predicates represent a slice of predicates to select
                   ManagedClusters. The predicates are ORed.
                 items:
                   description: ClusterPredicate represents a predicate to select ManagedClusters.
                   properties:
                     requiredClusterSelector:
                       description: |-
-                        RequiredClusterSelector represents a selector of ManagedClusters by label and claim. If specified,
+                        requiredClusterSelector represents a selector of ManagedClusters by label and claim. If specified,
                         1) Any ManagedCluster, which does not match the selector, should not be selected by this ClusterPredicate;
                         2) If a selected ManagedCluster (of this ClusterPredicate) ceases to match the selector (e.g. due to
                            an update) of any ClusterPredicate, it will be eventually removed from the placement decisions;
@@ -252,7 +252,7 @@ spec:
                            be selected or at least has a chance to be selected (when NumberOfClusters is specified);
                       properties:
                         celSelector:
-                          description: CelSelector represents a selector of ManagedClusters
+                          description: celSelector represents a selector of ManagedClusters
                             by CEL expressions on ManagedCluster fields
                           properties:
                             celExpressions:
@@ -261,7 +261,7 @@ spec:
                               type: array
                           type: object
                         claimSelector:
-                          description: ClaimSelector represents a selector of ManagedClusters
+                          description: claimSelector represents a selector of ManagedClusters
                             by clusterClaims in status
                           properties:
                             matchExpressions:
@@ -298,7 +298,7 @@ spec:
                               type: array
                           type: object
                         labelSelector:
-                          description: LabelSelector represents a selector of ManagedClusters
+                          description: labelSelector represents a selector of ManagedClusters
                             by label
                           properties:
                             matchExpressions:
@@ -349,7 +349,7 @@ spec:
                 type: array
               prioritizerPolicy:
                 description: |-
-                  PrioritizerPolicy defines the policy of the prioritizers.
+                  prioritizerPolicy defines the policy of the prioritizers.
                   If this field is unset, then default prioritizer mode and configurations are used.
                   Referring to PrioritizerPolicy to see more description about Mode and Configurations.
                 properties:
@@ -359,7 +359,7 @@ spec:
                         of prioritizer
                       properties:
                         scoreCoordinate:
-                          description: ScoreCoordinate represents the configuration
+                          description: scoreCoordinate represents the configuration
                             of the prioritizer and score source.
                           properties:
                             addOn:
@@ -368,13 +368,13 @@ spec:
                               properties:
                                 resourceName:
                                   description: |-
-                                    ResourceName defines the resource name of the AddOnPlacementScore.
+                                    resourceName defines the resource name of the AddOnPlacementScore.
                                     The placement prioritizer selects AddOnPlacementScore CR by this name.
                                   type: string
                                 scoreName:
                                   description: |-
-                                    ScoreName defines the score name inside AddOnPlacementScore.
-                                    AddOnPlacementScore contains a list of score name and score value, ScoreName specify the score to be used by
+                                    scoreName defines the score name inside AddOnPlacementScore.
+                                    AddOnPlacementScore contains a list of score names and values; scoreName specifies the score to be used by
                                     the prioritizer.
                                   type: string
                               required:
@@ -392,7 +392,7 @@ spec:
                             type:
                               default: BuiltIn
                               description: |-
-                                Type defines the type of the prioritizer score.
+                                type defines the type of the prioritizer score.
                                 Type is either "BuiltIn", "AddOn" or "", where "" is "BuiltIn" by default.
                                 When the type is "BuiltIn", need to specify a BuiltIn prioritizer name in BuiltIn.
                                 When the type is "AddOn", need to configure the score source in AddOn.
@@ -406,7 +406,7 @@ spec:
                         weight:
                           default: 1
                           description: |-
-                            Weight defines the weight of the prioritizer score. The value must be ranged in [-10,10].
+                            weight defines the weight of the prioritizer score. The value must be ranged in [-10,10].
                             Each prioritizer will calculate an integer score of a cluster in the range of [-100, 100].
                             The final score of a cluster will be sum(weight * prioritizer_score).
                             A higher weight indicates that the prioritizer weights more in the cluster selection,
@@ -434,7 +434,7 @@ spec:
                 type: object
               spreadPolicy:
                 description: |-
-                  SpreadPolicy defines how placement decisions should be distributed among a
+                  spreadPolicy defines how placement decisions should be distributed among a
                   set of ManagedClusters.
                 properties:
                   spreadConstraints:
@@ -490,7 +490,7 @@ spec:
                 type: object
               tolerations:
                 description: |-
-                  Tolerations are applied to placements, and allow (but do not require) the managed clusters with
+                  tolerations are applied to placements, and allow (but do not require) the managed clusters with
                   certain taints to be selected by placements with matching tolerations.
                 items:
                   description: |-
@@ -634,7 +634,7 @@ spec:
                   type: object
                 type: array
               numberOfSelectedClusters:
-                description: NumberOfSelectedClusters represents the number of selected
+                description: numberOfSelectedClusters represents the number of selected
                   ManagedClusters
                 format: int32
                 type: integer

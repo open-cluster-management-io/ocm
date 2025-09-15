@@ -38,7 +38,7 @@ const (
 
 // PlacementDecisionStatus represents the current status of the PlacementDecision.
 type PlacementDecisionStatus struct {
-	// Decisions is a slice of decisions according to a placement
+	// decisions is a slice of decisions according to a placement
 	// The number of decisions should not be larger than 100
 	// +kubebuilder:validation:Required
 	// +required
@@ -48,13 +48,13 @@ type PlacementDecisionStatus struct {
 // ClusterDecision represents a decision from a placement
 // An empty ClusterDecision indicates it is not scheduled yet.
 type ClusterDecision struct {
-	// ClusterName is the name of the ManagedCluster. If it is not empty, its value should be unique cross all
+	// clusterName is the name of the ManagedCluster. If it is not empty, its value should be unique across all
 	// placement decisions for the Placement.
 	// +kubebuilder:validation:Required
 	// +required
 	ClusterName string `json:"clusterName"`
 
-	// Reason represents the reason why the ManagedCluster is selected.
+	// reason represents the reason why the ManagedCluster is selected.
 	// +kubebuilder:validation:Required
 	// +required
 	Reason string `json:"reason"`

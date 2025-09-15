@@ -55,10 +55,10 @@ type ManifestWorkReplicaSet struct {
 
 // ManifestWorkReplicaSetSpec defines the desired state of ManifestWorkReplicaSet
 type ManifestWorkReplicaSetSpec struct {
-	// ManifestWorkTemplate is the ManifestWorkSpec that will be used to generate a per-cluster ManifestWork
+	// manifestWorkTemplate is the ManifestWorkSpec that will be used to generate a per-cluster ManifestWork
 	ManifestWorkTemplate work.ManifestWorkSpec `json:"manifestWorkTemplate"`
 
-	// PacementRefs is a list of the names of the Placement resource, from which a PlacementDecision will be found and used
+	// placementRefs is a list of the names of the Placement resource, from which a PlacementDecision will be found and used
 	// to distribute the ManifestWork.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1

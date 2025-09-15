@@ -201,7 +201,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		workFeatureGates = clusterManager.Spec.WorkConfiguration.FeatureGates
 	}
 	config.WorkFeatureGates, workFeatureMsgs = helpers.ConvertToFeatureGateFlags("Work", workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates)
-	config.MWReplicaSetEnabled = helpers.FeatureGateEnabled(workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.ManifestWorkReplicaSet)
+	// start work controller if ManifestWorkReplicaSet or CleanUpCompletedManifestWork is enabled
+	config.WorkControllerEnabled = helpers.FeatureGateEnabled(workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.ManifestWorkReplicaSet) ||
+		helpers.FeatureGateEnabled(workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.CleanUpCompletedManifestWork)
 	config.CloudEventsDriverEnabled = helpers.FeatureGateEnabled(workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.CloudEventsDrivers)
 
 	var addonFeatureGates []operatorapiv1.FeatureGate
@@ -360,8 +362,8 @@ func generateHubClients(hubKubeConfig *rest.Config) (kubernetes.Interface, apiex
 // Finally, a deployment on the management cluster would use the kubeconfig to access resources on the hub cluster.
 func ensureSAKubeconfigs(ctx context.Context, clusterManagerName, clusterManagerNamespace string,
 	hubKubeConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder,
-	mwctrEnabled, addonManagerEnabled, grpcAuthEnabled bool) error {
-	for _, sa := range getSAs(mwctrEnabled, addonManagerEnabled, grpcAuthEnabled) {
+	workControllerEnabled, addonManagerEnabled, grpcAuthEnabled bool) error {
+	for _, sa := range getSAs(workControllerEnabled, addonManagerEnabled, grpcAuthEnabled) {
 		tokenGetter := helpers.SATokenGetter(ctx, sa, clusterManagerNamespace, hubClient)
 		err := helpers.SyncKubeConfigSecret(ctx, sa+"-kubeconfig", clusterManagerNamespace,
 			"/var/run/secrets/hub/kubeconfig", &rest.Config{

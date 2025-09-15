@@ -65,10 +65,10 @@ spec:
               clusterSelector:
                 default:
                   selectorType: ExclusiveClusterSetLabel
-                description: ClusterSelector represents a selector of ManagedClusters
+                description: clusterSelector represents a selector of ManagedClusters
                 properties:
                   labelSelector:
-                    description: LabelSelector define the general labelSelector which
+                    description: labelSelector define the general labelSelector which
                       clusterset will use to select target managedClusters
                     properties:
                       matchExpressions:
@@ -117,7 +117,7 @@ spec:
                   selectorType:
                     default: ExclusiveClusterSetLabel
                     description: |-
-                      SelectorType could only be "ExclusiveClusterSetLabel" or "LabelSelector"
+                      selectorType could only be "ExclusiveClusterSetLabel" or "LabelSelector"
                       "ExclusiveClusterSetLabel" means to use label "cluster.open-cluster-management.io/clusterset:<ManagedClusterSet Name>"" to select target clusters.
                       "LabelSelector" means use labelSelector to select target managedClusters
                     enum:

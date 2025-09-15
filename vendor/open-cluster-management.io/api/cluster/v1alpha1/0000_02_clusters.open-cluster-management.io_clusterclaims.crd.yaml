@@ -46,7 +46,7 @@ spec:
             description: Spec defines the attributes of the ClusterClaim.
             properties:
               value:
-                description: Value is a claim-dependent string
+                description: value is a claim-dependent string
                 maxLength: 1024
                 minLength: 1
                 type: string

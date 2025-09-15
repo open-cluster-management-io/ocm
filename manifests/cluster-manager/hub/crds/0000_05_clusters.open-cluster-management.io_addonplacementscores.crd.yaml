@@ -108,10 +108,10 @@ spec:
                     value.
                   properties:
                     name:
-                      description: Name is the name of the score
+                      description: name is the name of the score
                       type: string
                     value:
-                      description: Value is the value of the score. The score range
+                      description: value is the value of the score. The score range
                         is from -100 to 100.
                       format: int32
                       maximum: 100
@@ -127,7 +127,7 @@ spec:
                 x-kubernetes-list-type: map
               validUntil:
                 description: |-
-                  ValidUntil defines the valid time of the scores.
+                  validUntil defines the valid time of the scores.
                   After this time, the scores are considered to be invalid by placement. nil means never expire.
                   The controller owning this resource should keep the scores up-to-date.
                 format: date-time
