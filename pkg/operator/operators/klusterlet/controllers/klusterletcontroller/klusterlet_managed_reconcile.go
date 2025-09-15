@@ -60,7 +60,6 @@ func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 	if !config.DisableAddonNamespace {
 		// For now, whether in Default or Hosted mode, the addons will be deployed on the managed cluster.
 		// sync image pull secret from management cluster to managed cluster for addon namespace
-		// TODO(zhujian7): In the future, we may consider deploy addons on the management cluster in Hosted mode.
 		// Ensure the addon namespace on the managed cluster
 		if err := ensureNamespace(
 			ctx,

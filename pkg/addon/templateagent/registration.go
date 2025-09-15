@@ -157,7 +157,6 @@ func CustomSignerConfigurations(addonName, agentName string,
 		}
 		config := addonapiv1alpha1.RegistrationConfig{
 			SignerName: customSignerConfig.SignerName,
-			// TODO: confirm the subject
 			Subject: addonapiv1alpha1.Subject{
 				User:   agent.DefaultUser(cluster.Name, addonName, agentName),
 				Groups: agent.DefaultGroups(cluster.Name, addonName),
