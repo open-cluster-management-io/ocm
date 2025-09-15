@@ -1,4 +1,4 @@
-package completedmanifestwork
+package manifestworkgarbagecollection
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
-func TestCompletedManifestWorkController(t *testing.T) {
+func TestManifestWorkGarbageCollectionController(t *testing.T) {
 	cases := []struct {
 		name                   string
 		works                  []runtime.Object
@@ -80,7 +80,7 @@ func TestCompletedManifestWorkController(t *testing.T) {
 			fakeWorkClient := fakeworkclient.NewSimpleClientset(c.works...)
 			workInformerFactory := workinformers.NewSharedInformerFactory(fakeWorkClient, time.Minute*10)
 
-			controller := &CompletedManifestWorkController{
+			controller := &ManifestWorkGarbageCollectionController{
 				workClient: fakeWorkClient,
 				workLister: workInformerFactory.Work().V1().ManifestWorks().Lister(),
 			}
@@ -127,12 +127,12 @@ func TestCompletedManifestWorkController(t *testing.T) {
 	}
 }
 
-func TestNewCompletedManifestWorkController(t *testing.T) {
+func TestNewManifestWorkGarbageCollectionController(t *testing.T) {
 	fakeWorkClient := fakeworkclient.NewSimpleClientset()
 	workInformerFactory := workinformers.NewSharedInformerFactory(fakeWorkClient, time.Minute*10)
 	recorder := events.NewInMemoryRecorder("test", clock.RealClock{})
 
-	ctrl := NewCompletedManifestWorkController(
+	ctrl := NewManifestWorkGarbageCollectionController(
 		recorder,
 		fakeWorkClient,
 		workInformerFactory.Work().V1().ManifestWorks(),

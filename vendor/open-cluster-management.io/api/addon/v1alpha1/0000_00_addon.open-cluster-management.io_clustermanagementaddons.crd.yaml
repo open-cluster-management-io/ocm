@@ -148,7 +148,7 @@ spec:
                             The rollout strategy only watches the addon configurations defined in ClusterManagementAddOn.
                           properties:
                             all:
-                              description: All defines required fields for RolloutStrategy
+                              description: all defines required fields for RolloutStrategy
                                 type All
                               properties:
                                 maxFailures:
@@ -195,7 +195,7 @@ spec:
                                   type: string
                               type: object
                             progressive:
-                              description: Progressive defines required fields for
+                              description: progressive defines required fields for
                                 RolloutStrategy type Progressive
                               properties:
                                 mandatoryDecisionGroups:
@@ -211,13 +211,13 @@ spec:
                                     properties:
                                       groupIndex:
                                         description: |-
-                                          GroupIndex of the decision group should match the placementDecisions label value with label key
+                                          groupIndex of the decision group should match the placementDecisions label value with label key
                                           cluster.open-cluster-management.io/decision-group-index
                                         format: int32
                                         type: integer
                                       groupName:
                                         description: |-
-                                          GroupName of the decision group should match the placementDecisions label value with label key
+                                          groupName of the decision group should match the placementDecisions label value with label key
                                           cluster.open-cluster-management.io/decision-group-name
                                         type: string
                                     type: object
@@ -227,7 +227,7 @@ spec:
                                   - type: integer
                                   - type: string
                                   description: |-
-                                    MaxConcurrency is the max number of clusters to deploy workload concurrently. The default value
+                                    maxConcurrency is the max number of clusters to deploy workload concurrently. The default value
                                     for MaxConcurrency is determined from the clustersPerDecisionGroup defined in the
                                     placement->DecisionStrategy.
                                   pattern: ^((100|[0-9]{1,2})%|[0-9]+)$
@@ -276,7 +276,7 @@ spec:
                                   type: string
                               type: object
                             progressivePerGroup:
-                              description: ProgressivePerGroup defines required fields
+                              description: progressivePerGroup defines required fields
                                 for RolloutStrategy type ProgressivePerGroup
                               properties:
                                 mandatoryDecisionGroups:
@@ -292,13 +292,13 @@ spec:
                                     properties:
                                       groupIndex:
                                         description: |-
-                                          GroupIndex of the decision group should match the placementDecisions label value with label key
+                                          groupIndex of the decision group should match the placementDecisions label value with label key
                                           cluster.open-cluster-management.io/decision-group-index
                                         format: int32
                                         type: integer
                                       groupName:
                                         description: |-
-                                          GroupName of the decision group should match the placementDecisions label value with label key
+                                          groupName of the decision group should match the placementDecisions label value with label key
                                           cluster.open-cluster-management.io/decision-group-name
                                         type: string
                                     type: object

@@ -38,15 +38,15 @@ type RolloutStrategy struct {
 	// +optional
 	Type RolloutType `json:"type,omitempty"`
 
-	// All defines required fields for RolloutStrategy type All
+	// all defines required fields for RolloutStrategy type All
 	// +optional
 	All *RolloutAll `json:"all,omitempty"`
 
-	// Progressive defines required fields for RolloutStrategy type Progressive
+	// progressive defines required fields for RolloutStrategy type Progressive
 	// +optional
 	Progressive *RolloutProgressive `json:"progressive,omitempty"`
 
-	// ProgressivePerGroup defines required fields for RolloutStrategy type ProgressivePerGroup
+	// progressivePerGroup defines required fields for RolloutStrategy type ProgressivePerGroup
 	// +optional
 	ProgressivePerGroup *RolloutProgressivePerGroup `json:"progressivePerGroup,omitempty"`
 }
@@ -95,12 +95,12 @@ type RolloutConfig struct {
 // MandatoryDecisionGroup set the decision group name or group index.
 // GroupName is considered first to select the decisionGroups then GroupIndex.
 type MandatoryDecisionGroup struct {
-	// GroupName of the decision group should match the placementDecisions label value with label key
+	// groupName of the decision group should match the placementDecisions label value with label key
 	// cluster.open-cluster-management.io/decision-group-name
 	// +optional
 	GroupName string `json:"groupName,omitempty"`
 
-	// GroupIndex of the decision group should match the placementDecisions label value with label key
+	// groupIndex of the decision group should match the placementDecisions label value with label key
 	// cluster.open-cluster-management.io/decision-group-index
 	// +optional
 	GroupIndex int32 `json:"groupIndex,omitempty"`
@@ -139,7 +139,7 @@ type RolloutProgressive struct {
 	// +optional
 	MandatoryDecisionGroups `json:",inline"`
 
-	// MaxConcurrency is the max number of clusters to deploy workload concurrently. The default value
+	// maxConcurrency is the max number of clusters to deploy workload concurrently. The default value
 	// for MaxConcurrency is determined from the clustersPerDecisionGroup defined in the
 	// placement->DecisionStrategy.
 	// +kubebuilder:validation:Pattern="^((100|[0-9]{1,2})%|[0-9]+)$"

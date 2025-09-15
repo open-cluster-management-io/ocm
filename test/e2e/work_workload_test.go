@@ -768,6 +768,109 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 		})
 	})
 
+	ginkgo.Context("CleanUpCompletedManifestWork feature", func() {
+		ginkgo.It("Should cleanup manifestwork with TTL after job completion", func() {
+			ginkgo.By("Create manifestwork with job that sleeps 5 seconds")
+			jobName := fmt.Sprintf("sleep-job-%s", nameSuffix)
+			sleepJob := newSleepJob(jobName, 10)
+			objects := []runtime.Object{
+				sleepJob,
+			}
+			work := newManifestWork(universalClusterName, workName, objects...)
+
+			// Set TTL for cleanup after completion
+			ttlSeconds := int64(3)
+			work.Spec.DeleteOption = &workapiv1.DeleteOption{
+				PropagationPolicy:       workapiv1.DeletePropagationPolicyTypeForeground,
+				TTLSecondsAfterFinished: &ttlSeconds,
+			}
+
+			// Configure CEL condition for completion when job succeeds
+			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "batch",
+						Resource:  "jobs",
+						Name:      jobName,
+						Namespace: "default",
+					},
+					ConditionRules: []workapiv1.ConditionRule{
+						{
+							Condition: workapiv1.WorkComplete,
+							Type:      workapiv1.CelConditionExpressionsType,
+							CelExpressions: []string{
+								"object.status.conditions.exists(c, c.type == 'Complete' && c.status == 'True')",
+							},
+							Message: "Job completed successfully",
+						},
+					},
+				},
+			}
+
+			work, err = hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			ginkgo.By("Wait for job to be applied and running")
+			gomega.Eventually(func() error {
+				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if !meta.IsStatusConditionTrue(actualWork.Status.Conditions, workapiv1.WorkApplied) {
+					return fmt.Errorf("work not applied yet")
+				}
+				if !meta.IsStatusConditionTrue(actualWork.Status.Conditions, workapiv1.WorkAvailable) {
+					return fmt.Errorf("work not available yet")
+				}
+				return nil
+			}).Should(gomega.Succeed())
+
+			// Verify job pod was created
+			gomega.Eventually(func() error {
+				pods, err := spoke.KubeClient.CoreV1().Pods("default").List(context.Background(), metav1.ListOptions{
+					LabelSelector: fmt.Sprintf("job=%s", jobName),
+				})
+				if err != nil {
+					return err
+				}
+				if len(pods.Items) == 0 {
+					return fmt.Errorf("job pod not found")
+				}
+				return nil
+			}).Should(gomega.Succeed())
+
+			ginkgo.By("Wait for job to complete and manifestwork to be marked complete")
+			gomega.Eventually(func() error {
+				actualWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if !meta.IsStatusConditionTrue(actualWork.Status.Conditions, workapiv1.WorkComplete) {
+					return fmt.Errorf("work not complete yet")
+				}
+				return nil
+			}, 90*time.Second, 1*time.Second).Should(gomega.Succeed())
+
+			ginkgo.By("Wait for manifestwork to be deleted after TTL")
+			gomega.Eventually(func() error {
+				currentWork, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				if err != nil {
+					return err
+				}
+				return fmt.Errorf("manifestwork still exists %v, %v", currentWork.DeletionTimestamp, currentWork.Status.Conditions)
+			}, 30*time.Second, 2*time.Second).Should(gomega.Succeed())
+
+			ginkgo.By("Verify job resources are cleaned up")
+			gomega.Eventually(func() bool {
+				_, err := spoke.KubeClient.BatchV1().Jobs("default").Get(context.Background(), jobName, metav1.GetOptions{})
+				return errors.IsNotFound(err)
+			}).Should(gomega.BeTrue())
+		})
+	})
+
 	ginkgo.Context("ManifestWork server side apply", func() {
 		ginkgo.It("should ignore fields with certain field", func() {
 			deployment := newDeployment("busybox-ssa")
@@ -977,6 +1080,43 @@ func newNamespace(name string) *corev1.Namespace {
 }
 
 func newJob(name string) *batchv1.Job {
+	manualSelector := true
+	job := &batchv1.Job{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Job",
+			APIVersion: "batch/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      name,
+		},
+		Spec: batchv1.JobSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"job": name},
+			},
+			ManualSelector: &manualSelector,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"job": name},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:    "pi",
+							Image:   "perl",
+							Command: []string{"perl", "-Mbignum=bpi", "-wle", "print bpi(2000)"},
+						},
+					},
+					RestartPolicy: corev1.RestartPolicyNever,
+				},
+			},
+		},
+	}
+
+	return job
+}
+
+func newSleepJob(name string, sleepSeconds int) *batchv1.Job {
 	maunualSelector := true
 	job := &batchv1.Job{
 		TypeMeta: metav1.TypeMeta{
@@ -999,9 +1139,10 @@ func newJob(name string) *batchv1.Job {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:    "pi",
-							Image:   "perl",
-							Command: []string{"perl", "-Mbignum=bpi", "-wle", "print bpi(2000)"},
+							Name:    "sleeper",
+							Image:   "quay.io/asmacdo/busybox",
+							Command: []string{"/bin/sh"},
+							Args:    []string{"-c", fmt.Sprintf("echo 'Starting sleep job'; sleep %d; echo 'Sleep job completed'", sleepSeconds)},
 						},
 					},
 					RestartPolicy: corev1.RestartPolicyNever,

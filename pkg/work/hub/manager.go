@@ -12,6 +12,7 @@ import (
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workv1informer "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
+	ocmfeature "open-cluster-management.io/api/feature"
 	workapplier "open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work"
@@ -19,7 +20,8 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/store"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 
-	"open-cluster-management.io/ocm/pkg/work/hub/controllers/completedmanifestwork"
+	"open-cluster-management.io/ocm/pkg/features"
+	"open-cluster-management.io/ocm/pkg/work/hub/controllers/manifestworkgarbagecollection"
 	"open-cluster-management.io/ocm/pkg/work/hub/controllers/manifestworkreplicasetcontroller"
 )
 
@@ -130,7 +132,7 @@ func RunControllerManagerWithInformers(
 		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
 	)
 
-	completedManifestWorkController := completedmanifestwork.NewCompletedManifestWorkController(
+	manifestWorkGarbageCollectionController := manifestworkgarbagecollection.NewManifestWorkGarbageCollectionController(
 		controllerContext.EventRecorder,
 		workClient,
 		workInformer,
@@ -138,8 +140,12 @@ func RunControllerManagerWithInformers(
 
 	go clusterInformers.Start(ctx.Done())
 	go replicaSetInformerFactory.Start(ctx.Done())
-	go manifestWorkReplicaSetController.Run(ctx, 5)
-	go completedManifestWorkController.Run(ctx, 1)
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManifestWorkReplicaSet) {
+		go manifestWorkReplicaSetController.Run(ctx, 5)
+	}
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.CleanUpCompletedManifestWork) {
+		go manifestWorkGarbageCollectionController.Run(ctx, 5)
+	}
 
 	go workInformer.Informer().Run(ctx.Done())
 

@@ -1,4 +1,4 @@
-package completedmanifestwork
+package manifestworkgarbagecollection
 
 import (
 	"context"
@@ -22,19 +22,19 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
-// CompletedManifestWorkController is to delete the manifestworks when it has the completed condition.
-type CompletedManifestWorkController struct {
+// ManifestWorkGarbageCollectionController is to delete the manifestworks when it has the completed condition.
+type ManifestWorkGarbageCollectionController struct {
 	workClient workclientset.Interface
 	workLister worklisters.ManifestWorkLister
 }
 
-// NewCompletedManifestWorkController creates a new CompletedManifestWorkController
-func NewCompletedManifestWorkController(
+// NewManifestWorkGarbageCollectionController creates a new ManifestWorkGarbageCollectionController
+func NewManifestWorkGarbageCollectionController(
 	recorder events.Recorder,
 	workClient workclientset.Interface,
 	manifestWorkInformer workinformers.ManifestWorkInformer,
 ) factory.Controller {
-	controller := &CompletedManifestWorkController{
+	controller := &ManifestWorkGarbageCollectionController{
 		workClient: workClient,
 		workLister: manifestWorkInformer.Lister(),
 	}
@@ -45,11 +45,11 @@ func NewCompletedManifestWorkController(
 			manifestWorkInformer.Informer(),
 		).
 		WithSync(controller.sync).
-		ToController("CompletedManifestWorkController", recorder)
+		ToController("ManifestWorkGarbageCollectionController", recorder)
 }
 
 // sync is the main reconcile loop for completed ManifestWork TTL
-func (c *CompletedManifestWorkController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
+func (c *ManifestWorkGarbageCollectionController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	key := controllerContext.QueueKey()
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Reconciling ManifestWork for TTL processing", "key", key)
