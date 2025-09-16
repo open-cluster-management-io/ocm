@@ -53,7 +53,7 @@ func AgentInstallNamespaceFromDeploymentConfigFunc(
 		// so we can use the default namespace.
 		// TODO: Find a way to distinguish between the above two cases
 		if config == nil {
-			klog.InfoS("Addon deployment config is nil, return an empty string for agent install namespace",
+			klog.V(4).InfoS("Addon deployment config is nil, return an empty string for agent install namespace",
 				"addonNamespace", addon.Namespace, "addonName", addon.Name)
 			return "", nil
 		}

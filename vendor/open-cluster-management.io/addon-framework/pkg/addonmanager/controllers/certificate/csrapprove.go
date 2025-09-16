@@ -27,6 +27,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
@@ -58,6 +59,7 @@ type csrApprovingController struct {
 	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
 	csrLister                 certificateslisters.CertificateSigningRequestLister
 	csrListerBeta             v1beta1certificateslisters.CertificateSigningRequestLister
+	mcaFilterFunc             utils.ManagedClusterAddOnFilterFunc
 }
 
 // NewCSRApprovingController creates a new csr approving controller
@@ -68,6 +70,7 @@ func NewCSRApprovingController(
 	csrBetaInformer v1beta1certificatesinformers.CertificateSigningRequestInformer,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	agentAddons map[string]agent.AgentAddon,
+	mcaFilterFunc utils.ManagedClusterAddOnFilterFunc,
 ) factory.Controller {
 	if (csrV1Informer != nil) == (csrBetaInformer != nil) {
 		klog.Fatalf("V1 and V1beta1 CSR informer cannot be present or absent at the same time")
@@ -77,6 +80,7 @@ func NewCSRApprovingController(
 		agentAddons:               agentAddons,
 		managedClusterLister:      clusterInformers.Lister(),
 		managedClusterAddonLister: addonInformers.Lister(),
+		mcaFilterFunc:             mcaFilterFunc,
 	}
 	var csrInformer cache.SharedIndexInformer
 	if csrV1Informer != nil {
@@ -161,6 +165,9 @@ func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncC
 	}
 	if err != nil {
 		return err
+	}
+	if c.mcaFilterFunc != nil && !c.mcaFilterFunc(managedClusterAddon) {
+		return nil
 	}
 
 	if registrationOption.CSRApproveCheck == nil {

@@ -168,7 +168,7 @@ func (c *addonTemplateController) sync(ctx context.Context, syncCtx factory.Sync
 
 	_, exist := c.addonManagers[addonName]
 	if exist {
-		logger.Info("There already is a manager started for addon, skipping", "addonName", addonName)
+		logger.V(4).Info("There already is a manager started for addon, skipping", "addonName", addonName)
 		return nil
 	}
 
@@ -206,7 +206,7 @@ func (c *addonTemplateController) startManager(
 
 func (c *addonTemplateController) runController(ctx context.Context, addonName string) error {
 	logger := klog.FromContext(ctx)
-	mgr, err := addonmanager.New(c.kubeConfig)
+	mgr, err := addonmanager.NewWithOptionFuncs(c.kubeConfig, addonmanager.WithTemplateMode(true))
 	if err != nil {
 		return err
 	}
