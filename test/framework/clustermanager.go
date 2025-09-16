@@ -15,6 +15,9 @@ func (hub *Hub) GetCluserManager() (*operatorapiv1.ClusterManager, error) {
 }
 
 func CheckClusterManagerStatus(cm *operatorapiv1.ClusterManager) error {
+	if cm.Status.ObservedGeneration != cm.Generation {
+		return fmt.Errorf("clusterManager generation does not match ObservedGeneration")
+	}
 	if meta.IsStatusConditionFalse(cm.Status.Conditions, "Applied") {
 		return fmt.Errorf("components of cluster manager are not all applied")
 	}

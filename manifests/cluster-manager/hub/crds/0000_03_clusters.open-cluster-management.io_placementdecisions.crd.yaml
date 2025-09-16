@@ -48,7 +48,7 @@ spec:
             properties:
               decisions:
                 description: |-
-                  Decisions is a slice of decisions according to a placement
+                  decisions is a slice of decisions according to a placement
                   The number of decisions should not be larger than 100
                 items:
                   description: |-
@@ -57,11 +57,11 @@ spec:
                   properties:
                     clusterName:
                       description: |-
-                        ClusterName is the name of the ManagedCluster. If it is not empty, its value should be unique cross all
+                        clusterName is the name of the ManagedCluster. If it is not empty, its value should be unique across all
                         placement decisions for the Placement.
                       type: string
                     reason:
-                      description: Reason represents the reason why the ManagedCluster
+                      description: reason represents the reason why the ManagedCluster
                         is selected.
                       type: string
                   required:

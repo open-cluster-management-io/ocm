@@ -37,8 +37,8 @@ var (
 		"cluster-manager/management/addon-manager/deployment.yaml",
 	}
 
-	mwReplicaSetDeploymentFiles = []string{
-		"cluster-manager/management/manifestworkreplicaset/deployment.yaml",
+	workControllerDeploymentFiles = []string{
+		"cluster-manager/management/work/deployment.yaml",
 	}
 
 	grpcServerDeploymentFiles = []string{
@@ -69,9 +69,9 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 		}
 	}
 
-	// Remove ManifestWokReplicaSet deployment if feature not enabled
-	if !config.MWReplicaSetEnabled {
-		_, _, err := cleanResources(ctx, c.kubeClient, cm, config, mwReplicaSetDeploymentFiles...)
+	// Remove work-controller deployment if feature not enabled
+	if !config.WorkControllerEnabled {
+		_, _, err := cleanResources(ctx, c.kubeClient, cm, config, workControllerDeploymentFiles...)
 		if err != nil {
 			return cm, reconcileStop, err
 		}
@@ -123,7 +123,7 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 		clusterManagerNamespace := helpers.ClusterManagerNamespace(cm.Name, cm.Spec.DeployOption.Mode)
 		err := c.ensureSAKubeconfigs(ctx, cm.Name, clusterManagerNamespace,
 			c.hubKubeConfig, c.hubKubeClient, c.kubeClient, c.recorder,
-			config.MWReplicaSetEnabled, config.AddOnManagerEnabled, config.GRPCAuthEnabled)
+			config.WorkControllerEnabled, config.AddOnManagerEnabled, config.GRPCAuthEnabled)
 		if err != nil {
 			meta.SetStatusCondition(&cm.Status.Conditions, metav1.Condition{
 				Type:    operatorapiv1.ConditionClusterManagerApplied,
@@ -168,8 +168,8 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 	if config.AddOnManagerEnabled {
 		deployResources = append(deployResources, addOnManagerDeploymentFiles...)
 	}
-	if config.MWReplicaSetEnabled {
-		deployResources = append(deployResources, mwReplicaSetDeploymentFiles...)
+	if config.WorkControllerEnabled {
+		deployResources = append(deployResources, workControllerDeploymentFiles...)
 	}
 	if config.GRPCAuthEnabled {
 		deployResources = append(deployResources, grpcServerDeploymentFiles...)

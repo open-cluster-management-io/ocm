@@ -804,7 +804,7 @@ func newFakeHubConfigWithResourceRequirement(t *testing.T, r *operatorapiv1.Reso
 func getManifestFiles() []string {
 	return []string{
 		"cluster-manager/management/addon-manager/deployment.yaml",
-		"cluster-manager/management/manifestworkreplicaset/deployment.yaml",
+		"cluster-manager/management/work/deployment.yaml",
 		"cluster-manager/management/placement/deployment.yaml",
 		"cluster-manager/management/registration/deployment.yaml",
 		"cluster-manager/management/registration/webhook-deployment.yaml",
@@ -819,5 +819,158 @@ func newSecret(name, namespace string) *corev1.Secret {
 			Namespace: namespace,
 		},
 		Data: map[string][]byte{},
+	}
+}
+
+// TestWorkControllerEnabledByFeatureGates tests that work controller is enabled when specific feature gates are enabled
+func TestWorkControllerEnabledByFeatureGates(t *testing.T) {
+	tests := []struct {
+		name                   string
+		featureGates           []operatorapiv1.FeatureGate
+		expectedWorkController bool
+		description            string
+	}{
+		{
+			name: "ManifestWorkReplicaSet feature gate enabled",
+			featureGates: []operatorapiv1.FeatureGate{
+				{Feature: string(ocmfeature.ManifestWorkReplicaSet), Mode: operatorapiv1.FeatureGateModeTypeEnable},
+			},
+			expectedWorkController: true,
+			description:            "Work controller should be enabled when ManifestWorkReplicaSet feature gate is enabled",
+		},
+		{
+			name: "CleanUpCompletedManifestWork feature gate enabled",
+			featureGates: []operatorapiv1.FeatureGate{
+				{Feature: string(ocmfeature.CleanUpCompletedManifestWork), Mode: operatorapiv1.FeatureGateModeTypeEnable},
+			},
+			expectedWorkController: true,
+			description:            "Work controller should be enabled when CleanUpCompletedManifestWork feature gate is enabled",
+		},
+		{
+			name: "Both ManifestWorkReplicaSet and CleanUpCompletedManifestWork enabled",
+			featureGates: []operatorapiv1.FeatureGate{
+				{Feature: string(ocmfeature.ManifestWorkReplicaSet), Mode: operatorapiv1.FeatureGateModeTypeEnable},
+				{Feature: string(ocmfeature.CleanUpCompletedManifestWork), Mode: operatorapiv1.FeatureGateModeTypeEnable},
+			},
+			expectedWorkController: true,
+			description:            "Work controller should be enabled when both feature gates are enabled",
+		},
+		{
+			name: "ManifestWorkReplicaSet disabled, CleanUpCompletedManifestWork enabled",
+			featureGates: []operatorapiv1.FeatureGate{
+				{Feature: string(ocmfeature.ManifestWorkReplicaSet), Mode: operatorapiv1.FeatureGateModeTypeDisable},
+				{Feature: string(ocmfeature.CleanUpCompletedManifestWork), Mode: operatorapiv1.FeatureGateModeTypeEnable},
+			},
+			expectedWorkController: true,
+			description:            "Work controller should be enabled when at least one required feature gate is enabled",
+		},
+		{
+			name: "ManifestWorkReplicaSet enabled, CleanUpCompletedManifestWork disabled",
+			featureGates: []operatorapiv1.FeatureGate{
+				{Feature: string(ocmfeature.ManifestWorkReplicaSet), Mode: operatorapiv1.FeatureGateModeTypeEnable},
+				{Feature: string(ocmfeature.CleanUpCompletedManifestWork), Mode: operatorapiv1.FeatureGateModeTypeDisable},
+			},
+			expectedWorkController: true,
+			description:            "Work controller should be enabled when at least one required feature gate is enabled",
+		},
+		{
+			name: "Both ManifestWorkReplicaSet and CleanUpCompletedManifestWork disabled",
+			featureGates: []operatorapiv1.FeatureGate{
+				{Feature: string(ocmfeature.ManifestWorkReplicaSet), Mode: operatorapiv1.FeatureGateModeTypeDisable},
+				{Feature: string(ocmfeature.CleanUpCompletedManifestWork), Mode: operatorapiv1.FeatureGateModeTypeDisable},
+			},
+			expectedWorkController: false,
+			description:            "Work controller should be disabled when both feature gates are disabled",
+		},
+		{
+			name: "Only other feature gates enabled",
+			featureGates: []operatorapiv1.FeatureGate{
+				{Feature: string(ocmfeature.CloudEventsDrivers), Mode: operatorapiv1.FeatureGateModeTypeEnable},
+			},
+			expectedWorkController: false,
+			description:            "Work controller should be disabled when only unrelated feature gates are enabled",
+		},
+		{
+			name:                   "No work feature gates specified",
+			featureGates:           []operatorapiv1.FeatureGate{},
+			expectedWorkController: false,
+			description:            "Work controller should be disabled when no work feature gates are specified",
+		},
+		{
+			name: "ManifestWorkReplicaSet enabled with other feature gates",
+			featureGates: []operatorapiv1.FeatureGate{
+				{Feature: string(ocmfeature.ManifestWorkReplicaSet), Mode: operatorapiv1.FeatureGateModeTypeEnable},
+				{Feature: string(ocmfeature.CloudEventsDrivers), Mode: operatorapiv1.FeatureGateModeTypeEnable},
+			},
+			expectedWorkController: true,
+			description:            "Work controller should be enabled when ManifestWorkReplicaSet is enabled regardless of other feature gates",
+		},
+		{
+			name: "CleanUpCompletedManifestWork enabled with other feature gates",
+			featureGates: []operatorapiv1.FeatureGate{
+				{Feature: string(ocmfeature.CleanUpCompletedManifestWork), Mode: operatorapiv1.FeatureGateModeTypeEnable},
+				{Feature: string(ocmfeature.CloudEventsDrivers), Mode: operatorapiv1.FeatureGateModeTypeDisable},
+			},
+			expectedWorkController: true,
+			description:            "Work controller should be enabled when CleanUpCompletedManifestWork is enabled regardless of other feature gates",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			clusterManager := &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-cluster-manager",
+					Finalizers: []string{clusterManagerFinalizer},
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					RegistrationImagePullSpec: "testregistration",
+					DeployOption: operatorapiv1.ClusterManagerDeployOption{
+						Mode: operatorapiv1.InstallModeDefault,
+					},
+					WorkConfiguration: &operatorapiv1.WorkConfiguration{
+						FeatureGates: test.featureGates,
+						WorkDriver:   operatorapiv1.WorkDriverTypeKube,
+					},
+				},
+			}
+
+			tc := newTestController(t, clusterManager)
+			setup(t, tc, nil)
+
+			syncContext := testingcommon.NewFakeSyncContext(t, "test-cluster-manager")
+
+			// Call sync to trigger the feature gate processing
+			err := tc.clusterManagerController.sync(ctx, syncContext)
+			if err != nil {
+				t.Fatalf("Expected no error when sync, %v", err)
+			}
+
+			// Check if work controller deployment is created or not based on feature gates
+			clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
+			workControllerDeploymentName := clusterManager.Name + "-work-controller"
+
+			var workControllerDeploymentFound bool
+			kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...)
+			for _, action := range kubeActions {
+				if action.GetVerb() == createVerb {
+					object := action.(clienttesting.CreateActionImpl).Object
+					if deployment, ok := object.(*appsv1.Deployment); ok {
+						if deployment.Name == workControllerDeploymentName && deployment.Namespace == clusterManagerNamespace {
+							workControllerDeploymentFound = true
+							break
+						}
+					}
+				}
+			}
+
+			if test.expectedWorkController && !workControllerDeploymentFound {
+				t.Errorf("Test %q failed: %s, but work controller deployment was not created", test.name, test.description)
+			}
+
+			if !test.expectedWorkController && workControllerDeploymentFound {
+				t.Errorf("Test %q failed: %s, but work controller deployment was created", test.name, test.description)
+			}
+		})
 	}
 }

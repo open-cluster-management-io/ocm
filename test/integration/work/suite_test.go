@@ -114,7 +114,17 @@ var _ = ginkgo.BeforeSuite(func() {
 	err = workapiv1.Install(scheme.Scheme)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeWorkFeatureGates)
+	err = features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeWorkFeatureGates)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	err = features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubWorkFeatureGates)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	// enable ManifestWorkReplicaSet feature gate
+	err = features.HubMutableFeatureGate.Set("ManifestWorkReplicaSet=true")
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	// enable CleanUpCompletedManifestWork feature gate
+	err = features.HubMutableFeatureGate.Set("CleanUpCompletedManifestWork=true")
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	switch sourceDriver {
 	case util.KubeDriver:

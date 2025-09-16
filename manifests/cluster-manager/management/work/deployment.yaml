@@ -60,6 +60,11 @@ spec:
         args:
           - "/work"
           - "manager"
+          {{ if gt (len .WorkFeatureGates) 0 }}
+          {{range .WorkFeatureGates}}
+          - {{ . }}
+          {{ end }}
+          {{ end }}
           {{ if .CloudEventsDriverEnabled }}
           - "--work-driver={{ .WorkDriver }}"
           {{ if ne .WorkDriver "kube" }}

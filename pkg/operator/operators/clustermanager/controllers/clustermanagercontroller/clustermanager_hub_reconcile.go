@@ -47,11 +47,11 @@ var (
 		"cluster-manager/hub/placement/serviceaccount.yaml",
 	}
 
-	mwReplicaSetResourceFiles = []string{
+	workControllerResourceFiles = []string{
 		// manifestworkreplicaset
-		"cluster-manager/hub/manifestworkreplicaset/clusterrole.yaml",
-		"cluster-manager/hub/manifestworkreplicaset/clusterrolebinding.yaml",
-		"cluster-manager/hub/manifestworkreplicaset/serviceaccount.yaml",
+		"cluster-manager/hub/work/clusterrole.yaml",
+		"cluster-manager/hub/work/clusterrolebinding.yaml",
+		"cluster-manager/hub/work/serviceaccount.yaml",
 	}
 
 	hubAddOnManagerRbacResourceFiles = []string{
@@ -100,9 +100,9 @@ func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 		}
 	}
 
-	// Remove ManifestWokReplicaSet deployment if feature not enabled
-	if !config.MWReplicaSetEnabled {
-		_, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, mwReplicaSetResourceFiles...)
+	// Remove work-controller deployment if feature not enabled
+	if !config.WorkControllerEnabled {
+		_, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, workControllerResourceFiles...)
 		if err != nil {
 			return cm, reconcileStop, err
 		}
@@ -168,8 +168,8 @@ func getHubResources(mode operatorapiv1.InstallMode, config manifests.HubConfig)
 		hubResources = append(hubResources, hubAddOnManagerRbacResourceFiles...)
 	}
 
-	if config.MWReplicaSetEnabled {
-		hubResources = append(hubResources, mwReplicaSetResourceFiles...)
+	if config.WorkControllerEnabled {
+		hubResources = append(hubResources, workControllerResourceFiles...)
 	}
 
 	if config.GRPCAuthEnabled {

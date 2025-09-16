@@ -32,17 +32,17 @@ type AddOnTemplate struct {
 
 // AddOnTemplateSpec defines the template of an addon agent which will be deployed on managed clusters.
 type AddOnTemplateSpec struct {
-	// AddonName represents the name of the addon which the template belongs to
+	// addonName represents the name of the addon which the template belongs to
 	// +kubebuilder:validation:Required
 	// +required
 	AddonName string `json:"addonName"`
 
-	// AgentSpec describes what/how the kubernetes resources of the addon agent to be deployed on a managed cluster.
+	// agentSpec describes what/how the kubernetes resources of the addon agent to be deployed on a managed cluster.
 	// +kubebuilder:validation:Required
 	// +required
 	AgentSpec work.ManifestWorkSpec `json:"agentSpec"`
 
-	// Registration holds the registration configuration for the addon
+	// registration holds the registration configuration for the addon
 	// +optional
 	Registration []RegistrationSpec `json:"registration"`
 }

@@ -30,7 +30,7 @@ type ManagedClusterSetBinding struct {
 
 // ManagedClusterSetBindingSpec defines the attributes of ManagedClusterSetBinding.
 type ManagedClusterSetBindingSpec struct {
-	// ClusterSet is the name of the ManagedClusterSet to bind. It must match the
+	// clusterSet is the name of the ManagedClusterSet to bind. It must match the
 	// instance name of the ManagedClusterSetBinding and cannot change once created.
 	// User is allowed to set this field if they have an RBAC rule to CREATE on the
 	// virtual subresource of managedclustersets/bind.

@@ -29,7 +29,7 @@ type Klusterlet struct {
 
 // KlusterletSpec represents the desired deployment configuration of Klusterlet agent.
 type KlusterletSpec struct {
-	// Namespace is the namespace to deploy the agent on the managed cluster.
+	// namespace is the namespace to deploy the agent on the managed cluster.
 	// The namespace must have a prefix of "open-cluster-management-", and if it is not set,
 	// the namespace of "open-cluster-management-agent" is used to deploy agent.
 	// In addition, the add-ons are deployed to the namespace of "{Namespace}-addon".
@@ -57,7 +57,7 @@ type KlusterletSpec struct {
 	// +optional
 	ImagePullSpec string `json:"imagePullSpec,omitempty"`
 
-	// ClusterName is the name of the managed cluster to be created on hub.
+	// clusterName is the name of the managed cluster to be created on hub.
 	// The Klusterlet agent generates a random name if it is not set, or discovers the appropriate cluster name on OpenShift.
 	// +optional
 	// +kubebuilder:validation:MaxLength=63
