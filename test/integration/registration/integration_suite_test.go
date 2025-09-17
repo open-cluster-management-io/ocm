@@ -29,6 +29,7 @@ import (
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/hub"
+	importoptions "open-cluster-management.io/ocm/pkg/registration/hub/importer/options"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/addon"
@@ -217,6 +218,7 @@ var _ = ginkgo.BeforeSuite(func() {
 		go func() {
 			defer ginkgo.GinkgoRecover()
 			m.ImportOption.APIServerURL = cfg.Host
+			m.ImportOption.ImporterRenderers = []string{importoptions.RenderFromConfigSecret}
 			err := m.RunControllerManager(ctx, &controllercmd.ControllerContext{
 				KubeConfig:    cfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
