@@ -39,8 +39,13 @@ import (
 )
 
 const (
-	kluterletNamespace              = "open-cluster-management-agent"
+	klusterletNamespace             = "open-cluster-management-agent"
 	ManagedClusterConditionImported = "ManagedClusterImportSucceeded"
+
+	// clusterImportConfigSecret is the name of the secret containing cluster import configuration
+	clusterImportConfigSecret = "cluster-import-config"
+	// valuesYamlKey is the key for the values.yaml data in the cluster import config secret
+	valuesYamlKey = "values.yaml"
 )
 
 var (
@@ -55,9 +60,13 @@ func init() {
 	utilruntime.Must(operatorv1.Install(genericScheme))
 }
 
-// KlusterletConfigRenderer renders the config for klusterlet chart.
+// KlusterletConfigRenderer renders config for the klusterlet chart.
+// Contract:
+// - Overlay onto the provided config and return it; do not replace it with a fresh struct.
+// - Preserve fields already populated by the caller unless explicitly overridden.
+// - Must return a non-nil config if err is nil.
 type KlusterletConfigRenderer func(
-	ctx context.Context, config *chart.KlusterletChartConfig) (*chart.KlusterletChartConfig, error)
+	ctx context.Context, cluster *v1.ManagedCluster, config *chart.KlusterletChartConfig) (*chart.KlusterletChartConfig, error)
 
 type Importer struct {
 	providers     []cloudproviders.Interface
@@ -186,7 +195,7 @@ func (i *Importer) reconcile(
 		},
 	}
 	for _, renderer := range i.renders {
-		klusterletChartConfig, err = renderer(ctx, klusterletChartConfig)
+		klusterletChartConfig, err = renderer(ctx, cluster, klusterletChartConfig)
 		if err != nil {
 			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 				Type:   ManagedClusterConditionImported,
@@ -198,7 +207,7 @@ func (i *Importer) reconcile(
 			return cluster, err
 		}
 	}
-	crdObjs, rawObjs, err := chart.RenderKlusterletChart(klusterletChartConfig, kluterletNamespace)
+	crdObjs, rawObjs, err := chart.RenderKlusterletChart(klusterletChartConfig, klusterletNamespace)
 	if err != nil {
 		return cluster, err
 	}

@@ -170,8 +170,8 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 
 	return m.RunControllerManagerWithInformers(
 		ctx, controllerContext,
-		kubeClient, metadataClient, clusterClient, clusterProfileClient, addOnClient,
-		kubeInfomers, clusterInformers, clusterProfileInformers, workInformers, addOnInformers,
+		kubeClient, metadataClient, clusterClient, clusterProfileClient, addOnClient, kubeInfomers,
+		clusterInformers, clusterProfileInformers, workInformers, addOnInformers,
 	)
 }
 
@@ -335,12 +335,15 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		providers = []cloudproviders.Interface{
 			capi.NewCAPIProvider(controllerContext.KubeConfig, clusterInformers.Cluster().V1().ManagedClusters()),
 		}
+
+		renderers, err := importeroptions.GetImporterRenderers(
+			m.ImportOption, kubeClient, controllerContext.OperatorNamespace)
+		if err != nil {
+			return err
+		}
+
 		clusterImporter = importer.NewImporter(
-			[]importer.KlusterletConfigRenderer{
-				importer.RenderBootstrapHubKubeConfig(kubeClient, m.ImportOption.APIServerURL, m.ImportOption.BootstrapSA),
-				importer.RenderImage(m.ImportOption.AgentImage),
-				importer.RenderImagePullSecret(kubeClient, controllerContext.OperatorNamespace),
-			},
+			renderers,
 			clusterClient,
 			clusterInformers.Cluster().V1().ManagedClusters(),
 			providers,

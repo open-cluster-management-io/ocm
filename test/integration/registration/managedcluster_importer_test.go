@@ -119,10 +119,15 @@ var _ = ginkgo.Describe("Cluster Auto Importer", func() {
 		})
 
 		ginkgo.It("Should import CAPI cluster", func() {
+			ginkgo.By("create cluster import config secret")
+			configSecret := util.GetClusterImportConfigSecret(managedClusterName)
+			_, err := kubeClient.CoreV1().Secrets(managedClusterName).Create(context.TODO(), configSecret, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 			ginkgo.By("Create CAPI cluster")
 			capiCluster := testingcommon.NewUnstructured(
 				"cluster.x-k8s.io/v1beta1", "Cluster", managedClusterName, managedClusterName)
-			_, err := dynamicClient.Resource(capi.ClusterAPIGVR).Namespace(managedClusterName).Create(
+			_, err = dynamicClient.Resource(capi.ClusterAPIGVR).Namespace(managedClusterName).Create(
 				context.TODO(), capiCluster, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
