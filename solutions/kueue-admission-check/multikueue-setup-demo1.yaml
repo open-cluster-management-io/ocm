@@ -22,6 +22,7 @@ spec:
         nominalQuota: 3
   admissionChecks:
   - multikueue-demo1
+  - multikueue-config-demo1
 ---
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: LocalQueue
@@ -40,34 +41,17 @@ spec:
   parameters:
     apiGroup: kueue.x-k8s.io
     kind: MultiKueueConfig
-    name: multikueue-config-demo1
+    name: default
 ---
+# OCM implements an Admissioncheck controller to automate the MultiKueue setup process.
+# MultiKueueConfig is generated dynamically based on OCM placement decisions.
 apiVersion: kueue.x-k8s.io/v1beta1
-kind: MultiKueueConfig
+kind: AdmissionCheck
 metadata:
-  name:  multikueue-config-demo1
+  name: multikueue-config-demo1
 spec:
-  clusters:
-  - multikueue-config-demo1-cluster1
-  - multikueue-config-demo1-cluster2
----
-apiVersion: kueue.x-k8s.io/v1beta1
-kind: MultiKueueCluster
-metadata:
-  name: multikueue-config-demo1-cluster1
-spec:
-  kubeConfig:
-    locationType: Secret
-    location: multikueue-cluster1
-    # a secret called " multikueue-cluster1" should be created in the namespace the kueue
-    # controller manager runs into, holding the kubeConfig needed to connect to the
-    # worker cluster in the "kubeconfig" key;
----
-apiVersion: kueue.x-k8s.io/v1beta1
-kind: MultiKueueCluster
-metadata:
-  name: multikueue-config-demo1-cluster2
-spec:
-  kubeConfig:
-    locationType: Secret
-    location: multikueue-cluster2
+  controllerName: open-cluster-management.io/placement
+  parameters:
+    apiGroup: cluster.open-cluster-management.io
+    kind: Placement
+    name: default
