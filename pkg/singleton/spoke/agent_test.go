@@ -1,7 +1,10 @@
 package spoke
 
 import (
+	"context"
 	"testing"
+
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	registration "open-cluster-management.io/ocm/pkg/registration/spoke"
@@ -72,4 +75,53 @@ func TestAgentConfigWithNilInputs(t *testing.T) {
 
 	// The internal configs might be nil or might handle nil inputs gracefully
 	// Just verify the struct was created
+}
+
+func TestRunSpokeAgentSignature(t *testing.T) {
+	// Test that RunSpokeAgent has the correct signature and can be called
+	// This is a compile-time assertion that validates the method signature
+	var _ func(*AgentConfig, context.Context, *controllercmd.ControllerContext) error = (*AgentConfig).RunSpokeAgent
+
+	// Test that the config struct is properly set up for RunSpokeAgent
+	agentOption := commonoptions.NewAgentOptions()
+	registrationOption := registration.NewSpokeAgentOptions()
+	workOption := work.NewWorkloadAgentOptions()
+	cancel := func() {}
+
+	config := NewAgentConfig(agentOption, registrationOption, workOption, cancel)
+
+	// Just verify the config was created - the compile-time assertion above
+	// ensures the method signature is correct
+	if config == nil {
+		t.Error("Config should not be nil")
+	}
+}
+
+func TestAgentConfigFields(t *testing.T) {
+	// Test the struct fields and configuration setup
+	agentOption := commonoptions.NewAgentOptions()
+	registrationOption := registration.NewSpokeAgentOptions()
+	workOption := work.NewWorkloadAgentOptions()
+	cancel := func() {}
+
+	config := NewAgentConfig(agentOption, registrationOption, workOption, cancel)
+
+	// Test that the configuration was set up properly
+	if config.registrationConfig == nil {
+		t.Error("registrationConfig should not be nil")
+	}
+
+	if config.workConfig == nil {
+		t.Error("workConfig should not be nil")
+	}
+
+	// Test HealthCheckers method delegates to registration config
+	healthCheckers := config.HealthCheckers()
+	// This should not panic and should return the same as the registration config
+	registrationHealthCheckers := config.registrationConfig.HealthCheckers()
+
+	if len(healthCheckers) != len(registrationHealthCheckers) {
+		t.Errorf("HealthCheckers delegation failed: expected %d, got %d",
+			len(registrationHealthCheckers), len(healthCheckers))
+	}
 }
