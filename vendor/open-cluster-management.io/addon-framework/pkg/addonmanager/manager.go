@@ -122,8 +122,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 		return err
 	}
 
-	err = a.StartWithInformers(ctx, workClient, workInformers.Work().V1().ManifestWorks(), kubeInformers,
-		addonInformers, clusterInformers, dynamicInformers)
+	err = a.StartWithInformers(ctx, workClient, workInformers.Work().V1().ManifestWorks(), kubeInformers, addonInformers, clusterInformers, dynamicInformers)
 	if err != nil {
 		return err
 	}
@@ -140,14 +139,5 @@ func (a *addonManager) Start(ctx context.Context) error {
 func New(config *rest.Config) (AddonManager, error) {
 	return &addonManager{
 		NewBaseAddonManagerImpl(config),
-	}, nil
-}
-
-// NewWithOptionFuncs returns a new Manager for creating addon agents with OptionFunc functions.
-func NewWithOptionFuncs(config *rest.Config, optionFuncs ...OptionFunc) (AddonManager, error) {
-	manager := NewBaseAddonManagerImpl(config)
-	manager.ApplyOptionFuncs(optionFuncs...)
-	return &addonManager{
-		manager,
 	}, nil
 }
