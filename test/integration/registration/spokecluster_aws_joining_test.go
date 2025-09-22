@@ -257,7 +257,7 @@ var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 			cancel := runAgent("joiningtest", agentOptions, commOptions, spokeCfg)
 			defer cancel()
 
-			fmt.Printf("testing flaky test attempt 1\n")
+			fmt.Printf("testing flaky test attempt 2\n")
 			// The ManagedCluster CR should be created
 			gomega.Eventually(func() error {
 				_, err := util.GetManagedCluster(clusterClient, managedClusterName)
