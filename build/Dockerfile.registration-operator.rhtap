@@ -13,6 +13,7 @@ RUN GO_BUILD_PACKAGES=./cmd/registration-operator make build --warn-undefined-va
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 LABEL \
+      url="https://github.com/stolostron/ocm" \
       name="multicluster-engine/registration-operator-rhel9" \
       summary="registration-operator" \
       description="registration-operator" \

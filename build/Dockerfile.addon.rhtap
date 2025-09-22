@@ -8,6 +8,7 @@ RUN GO_BUILD_PACKAGES=./cmd/addon make build --warn-undefined-variables
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 LABEL \
+      url="https://github.com/stolostron/ocm" \
       name="multicluster-engine/addon-manager-rhel9" \
       summary="addon-manager" \
       description="addon-manager" \

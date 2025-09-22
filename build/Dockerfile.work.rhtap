@@ -8,6 +8,7 @@ RUN GO_BUILD_PACKAGES=./cmd/work make build --warn-undefined-variables
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 LABEL \
+      url="https://github.com/stolostron/ocm" \
       name="multicluster-engine/work-rhel9" \
       summary="work" \
       description="work" \
