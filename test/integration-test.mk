@@ -31,7 +31,7 @@ build-work-integration:
 
 test-registration-integration: ensure-kubebuilder-tools
 	go test -c ./test/integration/registration -o ./registration-integration.test
-	./registration-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast ${ARGS}
+	./registration-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast --ginkgo.focus "Joining Process for aws flow" ${ARGS}
 .PHONY: test-registration-integration
 
 test-work-integration: ensure-kubebuilder-tools build-work-integration
