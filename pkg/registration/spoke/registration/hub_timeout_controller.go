@@ -21,6 +21,8 @@ type hubTimeoutController struct {
 	timeoutSeconds     int32
 	lastLeaseRenewTime time.Time
 	handleTimeout      func(ctx context.Context) error
+
+	startTime time.Time
 }
 
 func NewHubTimeoutController(
@@ -35,6 +37,7 @@ func NewHubTimeoutController(
 		timeoutSeconds: timeoutSeconds,
 		handleTimeout:  handleTimeout,
 		leaseClient:    leaseClient,
+		startTime:      time.Now(),
 	}
 	return factory.New().WithSync(c.sync).ResyncEvery(time.Minute).
 		ToController("HubTimeoutController", recorder)
@@ -43,6 +46,12 @@ func NewHubTimeoutController(
 func (c *hubTimeoutController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	logger := klog.FromContext(ctx)
 	if c.handleTimeout == nil {
+		return nil
+	}
+
+	// If `startTime` within 60s, skip the timeout check.
+	// This is to wait for the first lease update. Otherwise, if old lease is already expired, it will be treated as timeout immediately.
+	if time.Since(c.startTime) < time.Minute {
 		return nil
 	}
 
