@@ -25,7 +25,7 @@ import (
 )
 
 // use ordered container since we need to run beforeAll to restart the hub with aws option
-ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
+var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 	var bootstrapKubeconfig string
 	var managedClusterName string
 	var hubKubeconfigSecret string
