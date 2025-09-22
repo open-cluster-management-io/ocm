@@ -25,7 +25,7 @@ import (
 )
 
 // use ordered container since we need to run beforeAll to restart the hub with aws option
-var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
+ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 	var bootstrapKubeconfig string
 	var managedClusterName string
 	var hubKubeconfigSecret string
@@ -257,6 +257,7 @@ var _ = ginkgo.Describe("Joining Process for aws flow", ginkgo.Ordered, func() {
 			cancel := runAgent("joiningtest", agentOptions, commOptions, spokeCfg)
 			defer cancel()
 
+			fmt.Printf("testing flaky test attempt 1\n")
 			// The ManagedCluster CR should be created
 			gomega.Eventually(func() error {
 				_, err := util.GetManagedCluster(clusterClient, managedClusterName)
