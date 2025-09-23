@@ -411,6 +411,20 @@ func TestKlusterletConfig(t *testing.T) {
 			},
 			expectedObjCnt: 7,
 		},
+		{
+			name:      "create namespace with bootstrap secret and grpc config",
+			namespace: "open-cluster-management-agent",
+			chartConfig: func() *KlusterletChartConfig {
+				config := NewDefaultKlusterletChartConfig()
+				config.Klusterlet.ClusterName = "testCluster"
+				config.Klusterlet.Mode = operatorv1.InstallModeSingleton
+				config.CreateNamespace = true
+				config.BootstrapHubKubeConfig = "kubeconfig"
+				config.GRPCConfig = "grpcconfig"
+				return config
+			},
+			expectedObjCnt: 7,
+		},
 	}
 
 	for _, c := range cases {
@@ -568,6 +582,13 @@ func TestKlusterletConfig(t *testing.T) {
 						data := object.Data["kubeconfig"]
 						if base64.StdEncoding.EncodeToString(data) == "" {
 							t.Errorf("failed to render kubeconfig")
+						}
+
+						if config.GRPCConfig != "" {
+							grpcConfig := object.Data["config.yaml"]
+							if base64.StdEncoding.EncodeToString(grpcConfig) == "" {
+								t.Errorf("failed to render grpc config")
+							}
 						}
 					}
 				}
