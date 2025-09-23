@@ -13,8 +13,10 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
@@ -67,6 +69,9 @@ var _ = ginkgo.Describe("start hub manager", func() {
 		opts.WorkDriver = "kube"
 		opts.WorkDriverConfig = sourceConfigFileName
 		hubConfig := NewWorkHubManagerConfig(opts)
+
+		err := features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubWorkFeatureGates)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// start hub controller
 		go func() {

@@ -61,6 +61,7 @@ test-cloudevents-work-mqtt-integration: ensure-kubebuilder-tools build-work-inte
 	./work-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast \
 		-ginkgo.skip-file manifestworkreplicaset_test.go \
 		-ginkgo.skip-file unmanaged_appliedwork_test.go \
+		-ginkgo.skip-file manifestworkgarbagecollection_test.go \
 		-test.driver=mqtt \
 		-v=4 ${ARGS}
 .PHONY: test-cloudevents-work-mqtt-integration

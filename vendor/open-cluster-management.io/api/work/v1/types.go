@@ -35,15 +35,15 @@ const (
 
 // ManifestWorkSpec represents a desired configuration of manifests to be deployed on the managed cluster.
 type ManifestWorkSpec struct {
-	// Workload represents the manifest workload to be deployed on a managed cluster.
+	// workload represents the manifest workload to be deployed on a managed cluster.
 	Workload ManifestsTemplate `json:"workload,omitempty"`
 
-	// DeleteOption represents deletion strategy when the manifestwork is deleted.
+	// deleteOption represents deletion strategy when the manifestwork is deleted.
 	// Foreground deletion strategy is applied to all the resource in this manifestwork if it is not set.
 	// +optional
 	DeleteOption *DeleteOption `json:"deleteOption,omitempty"`
 
-	// ManifestConfigs represents the configurations of manifests defined in workload field.
+	// manifestConfigs represents the configurations of manifests defined in workload field.
 	// +optional
 	ManifestConfigs []ManifestConfigOption `json:"manifestConfigs,omitempty"`
 
@@ -65,7 +65,7 @@ type Manifest struct {
 
 // ManifestsTemplate represents the manifest workload to be deployed on a managed cluster.
 type ManifestsTemplate struct {
-	// Manifests represents a list of kuberenetes resources to be deployed on a managed cluster.
+	// manifests represents a list of kubernetes resources to be deployed on a managed cluster.
 	// +optional
 	Manifests []Manifest `json:"manifests,omitempty"`
 }
