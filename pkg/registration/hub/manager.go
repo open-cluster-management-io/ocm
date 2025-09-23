@@ -276,6 +276,13 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		controllerContext.EventRecorder,
 	)
 
+	managedNamespaceController := managedcluster.NewManagedNamespaceController(
+		clusterClient,
+		clusterInformers.Cluster().V1().ManagedClusters(),
+		clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
+		controllerContext.EventRecorder,
+	)
+
 	managedClusterSetBindingController := managedclustersetbinding.NewManagedClusterSetBindingController(
 		clusterClient,
 		clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
@@ -373,6 +380,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	go leaseController.Run(ctx, 1)
 	go clockSyncController.Run(ctx, 1)
 	go managedClusterSetController.Run(ctx, 1)
+	go managedNamespaceController.Run(ctx, 1)
 	go managedClusterSetBindingController.Run(ctx, 1)
 	go clusterroleController.Run(ctx, 1)
 	go addOnHealthCheckController.Run(ctx, 1)

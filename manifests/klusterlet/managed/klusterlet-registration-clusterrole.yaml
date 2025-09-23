@@ -16,6 +16,10 @@ rules:
 - apiGroups: [""]
   resources: ["nodes"]
   verbs: ["get", "list", "watch"]
+# Allow agent to create/get/list/update/watch/patch namespaces
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["create", "get", "list", "update", "watch", "patch"]
 # Allow agent to list clusterclaims
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["clusterclaims"]

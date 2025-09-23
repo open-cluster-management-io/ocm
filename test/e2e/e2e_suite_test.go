@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"crypto/sha256"
 	"flag"
 	"fmt"
 	"os"
@@ -14,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/clientcmd"
 
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
@@ -39,6 +41,9 @@ var (
 
 	// expected image tag for validation
 	expectedImageTag string
+
+	// hub hash
+	hubHash string
 
 	// bootstrap-hub-kubeconfig
 	// It's a secret named 'bootstrap-hub-kubeconfig' under the namespace 'open-cluster-management-agent',
@@ -126,6 +131,13 @@ var _ = BeforeSuite(func() {
 	// The secret will used via copy and create another secret in other ns, so we need to clean the resourceVersion and namespace
 	bootstrapHubKubeConfigSecret.ObjectMeta.ResourceVersion = ""
 	bootstrapHubKubeConfigSecret.ObjectMeta.Namespace = ""
+
+	By("Calculate Hub Hash")
+	kubeconfigData, err := clientcmd.Load(bootstrapHubKubeConfigSecret.Data["kubeconfig"])
+	Expect(err).NotTo(HaveOccurred())
+	kubeconfig, err := clientcmd.NewDefaultClientConfig(*kubeconfigData, nil).ClientConfig()
+	Expect(err).NotTo(HaveOccurred())
+	hubHash = fmt.Sprintf("%x", sha256.Sum256([]byte(kubeconfig.Host)))
 
 	By("Check Hub Ready")
 	Eventually(func() error {

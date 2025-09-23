@@ -102,9 +102,10 @@ func (c *globalManagedClusterSetController) applyGlobalClusterSet(ctx context.Co
 		return nil
 	}
 
-	// if globalClusterSet.Spec is changed, rollback the change by update it to the original value.
-	if !equality.Semantic.DeepEqual(globalClusterSet.Spec, GlobalManagedClusterSet.Spec) {
-		globalClusterSet.Spec = GlobalManagedClusterSet.Spec
+	// if globalClusterSet.Spec.ClusterSelector is changed, rollback the change.
+	// Fields except Spec.ClusterSelector are editable.
+	if !equality.Semantic.DeepEqual(globalClusterSet.Spec.ClusterSelector, GlobalManagedClusterSet.Spec.ClusterSelector) {
+		globalClusterSet.Spec.ClusterSelector = GlobalManagedClusterSet.Spec.ClusterSelector
 
 		_, err := c.clusterSetClient.ManagedClusterSets().Update(ctx, globalClusterSet, metav1.UpdateOptions{})
 		if err != nil {
