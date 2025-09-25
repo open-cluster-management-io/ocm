@@ -868,6 +868,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 	})
 
 	ginkgo.Context("Work completion", func() {
+
 		ginkgo.BeforeEach(func() {
 			manifests = []workapiv1.Manifest{
 				util.ToManifest(util.NewConfigmap(clusterName, cm1, map[string]string{"a": "b"}, nil)),
@@ -937,6 +938,29 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		})
+
+		ginkgo.It("should propagate labels from ManifestWork to AppliedManifestWork", func() {
+			// Add labels to the work using Patch instead of Update
+			patchData := `{"metadata":{"labels":{"test-label":"test-value","test-label-2":"test-value-2"}}}`
+
+			_, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
+				context.Background(), work.Name, types.MergePatchType,
+				[]byte(patchData), metav1.PatchOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Verify AppliedManifestWork has the same labels
+			gomega.Eventually(func() bool {
+				appliedWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(
+					context.Background(), appliedManifestWorkName, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+
+				// Check if labels match
+				return appliedWork.Labels["test-label"] == "test-value" &&
+					appliedWork.Labels["test-label-2"] == "test-value-2"
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 		})
 	})
 })

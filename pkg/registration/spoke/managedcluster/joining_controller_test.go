@@ -10,7 +10,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeinformers "k8s.io/client-go/informers"
-	fakekube "k8s.io/client-go/kubernetes/fake"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	aboutclusterfake "sigs.k8s.io/about-api/pkg/generated/clientset/versioned/fake"
@@ -85,7 +84,7 @@ func TestSyncManagedCluster(t *testing.T) {
 				}
 			}
 
-			fakeHubClient := fakekube.NewSimpleClientset()
+			fakeHubClient := kubefake.NewSimpleClientset()
 			ctx := context.TODO()
 			hubEventRecorder, err := helpers.NewEventRecorder(ctx,
 				clusterscheme.Scheme, fakeHubClient.EventsV1(), "test")
@@ -94,8 +93,11 @@ func TestSyncManagedCluster(t *testing.T) {
 			}
 			ctrl := newManagedClusterStatusController(
 				testinghelpers.TestManagedClusterName,
+				"test-hub-hash",
 				clusterClient,
+				kubefake.NewSimpleClientset(),
 				clusterInformerFactory.Cluster().V1().ManagedClusters(),
+				kubeInformerFactory.Core().V1().Namespaces(),
 				discoveryClient,
 				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
 				clusterPropertyInformerFactory.About().V1alpha1().ClusterProperties(),

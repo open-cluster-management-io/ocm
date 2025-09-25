@@ -59,7 +59,7 @@ metadata:
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
     containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2025-09-03T08:04:12Z"
+    createdAt: "2025-09-15T05:44:58Z"
     description: Manages the installation and upgrade of the ClusterManager.
     operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -158,6 +158,7 @@ spec:
           - work-driver-config
           - open-cluster-management-image-pull-credentials
           - grpc-server-serving-cert
+          - cluster-import-config
           resources:
           - secrets
           verbs:

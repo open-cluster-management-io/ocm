@@ -65,6 +65,10 @@ type KlusterletChartConfig struct {
 	// BootstrapHubKubeConfig should be the kubeConfig file of the hub cluster via setting --set-file=<the kubeConfig file of hub cluster> optional
 	BootstrapHubKubeConfig string `json:"bootstrapHubKubeConfig,omitempty"`
 
+	// GRPCConfig includes the information needed to build connect to gRPC server in the bootstrap secret for
+	// cluster importing via setting --set-file=<the grpc config file> optional.
+	GRPCConfig string `json:"grpcConfig,omitempty"`
+
 	// when MultipleHubs feature gate in klusterlet.registrationConfiguration is enabled, need to set multiple bootstrap hub kubeConfigs here.
 	MultiHubBootstrapHubKubeConfigs []BootStrapKubeConfig `json:"multiHubBootstrapHubKubeConfigs,omitempty"`
 
@@ -81,6 +85,7 @@ type BootStrapKubeConfig struct {
 	Name string `json:"name,omitempty"`
 	// the kubeConfig file of the hub cluster
 	KubeConfig string `json:"kubeConfig,omitempty"`
+	// TODO: add grpcConfig to support multiHubBootstrapHubKubeConfigs
 }
 
 type ImagesConfig struct {

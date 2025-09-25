@@ -170,8 +170,8 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 
 	return m.RunControllerManagerWithInformers(
 		ctx, controllerContext,
-		kubeClient, metadataClient, clusterClient, clusterProfileClient, addOnClient,
-		kubeInfomers, clusterInformers, clusterProfileInformers, workInformers, addOnInformers,
+		kubeClient, metadataClient, clusterClient, clusterProfileClient, addOnClient, kubeInfomers,
+		clusterInformers, clusterProfileInformers, workInformers, addOnInformers,
 	)
 }
 
@@ -276,6 +276,13 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		controllerContext.EventRecorder,
 	)
 
+	managedNamespaceController := managedcluster.NewManagedNamespaceController(
+		clusterClient,
+		clusterInformers.Cluster().V1().ManagedClusters(),
+		clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
+		controllerContext.EventRecorder,
+	)
+
 	managedClusterSetBindingController := managedclustersetbinding.NewManagedClusterSetBindingController(
 		clusterClient,
 		clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
@@ -335,12 +342,15 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		providers = []cloudproviders.Interface{
 			capi.NewCAPIProvider(controllerContext.KubeConfig, clusterInformers.Cluster().V1().ManagedClusters()),
 		}
+
+		renderers, err := importeroptions.GetImporterRenderers(
+			m.ImportOption, kubeClient, controllerContext.OperatorNamespace)
+		if err != nil {
+			return err
+		}
+
 		clusterImporter = importer.NewImporter(
-			[]importer.KlusterletConfigRenderer{
-				importer.RenderBootstrapHubKubeConfig(kubeClient, m.ImportOption.APIServerURL, m.ImportOption.BootstrapSA),
-				importer.RenderImage(m.ImportOption.AgentImage),
-				importer.RenderImagePullSecret(kubeClient, controllerContext.OperatorNamespace),
-			},
+			renderers,
 			clusterClient,
 			clusterInformers.Cluster().V1().ManagedClusters(),
 			providers,
@@ -370,6 +380,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	go leaseController.Run(ctx, 1)
 	go clockSyncController.Run(ctx, 1)
 	go managedClusterSetController.Run(ctx, 1)
+	go managedNamespaceController.Run(ctx, 1)
 	go managedClusterSetBindingController.Run(ctx, 1)
 	go clusterroleController.Run(ctx, 1)
 	go addOnHealthCheckController.Run(ctx, 1)

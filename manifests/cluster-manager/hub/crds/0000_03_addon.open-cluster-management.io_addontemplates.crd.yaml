@@ -50,16 +50,16 @@ spec:
               addon agent resources yaml description.
             properties:
               addonName:
-                description: AddonName represents the name of the addon which the
+                description: addonName represents the name of the addon which the
                   template belongs to
                 type: string
               agentSpec:
-                description: AgentSpec describes what/how the kubernetes resources
+                description: agentSpec describes what/how the kubernetes resources
                   of the addon agent to be deployed on a managed cluster.
                 properties:
                   deleteOption:
                     description: |-
-                      DeleteOption represents deletion strategy when the manifestwork is deleted.
+                      deleteOption represents deletion strategy when the manifestwork is deleted.
                       Foreground deletion strategy is applied to all the resource in this manifestwork if it is not set.
                     properties:
                       propagationPolicy:
@@ -171,7 +171,7 @@ spec:
                         type: object
                     type: object
                   manifestConfigs:
-                    description: ManifestConfigs represents the configurations of
+                    description: manifestConfigs represents the configurations of
                       manifests defined in workload field.
                     items:
                       description: ManifestConfigOption represents the configurations
@@ -388,11 +388,11 @@ spec:
                       type: object
                     type: array
                   workload:
-                    description: Workload represents the manifest workload to be deployed
+                    description: workload represents the manifest workload to be deployed
                       on a managed cluster.
                     properties:
                       manifests:
-                        description: Manifests represents a list of kuberenetes resources
+                        description: manifests represents a list of kubernetes resources
                           to be deployed on a managed cluster.
                         items:
                           description: Manifest represents a resource to be deployed
@@ -404,7 +404,7 @@ spec:
                     type: object
                 type: object
               registration:
-                description: Registration holds the registration configuration for
+                description: registration holds the registration configuration for
                   the addon
                 items:
                   description: |-

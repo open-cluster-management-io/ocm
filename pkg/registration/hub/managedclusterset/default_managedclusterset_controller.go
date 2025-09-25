@@ -102,9 +102,10 @@ func (c *defaultManagedClusterSetController) syncDefaultClusterSet(ctx context.C
 		return nil
 	}
 
-	// if defaultClusterSet.Spec is changed, rollback the change by update it to the original value.
-	if !equality.Semantic.DeepEqual(defaultClusterSet.Spec, DefaultManagedClusterSet.Spec) {
-		defaultClusterSet.Spec = DefaultManagedClusterSet.Spec
+	// if defaultClusterSet.Spec.ClusterSelector is changed, rollback the change.
+	// All fields except Spec.ClusterSelector are editable.
+	if !equality.Semantic.DeepEqual(defaultClusterSet.Spec.ClusterSelector, DefaultManagedClusterSet.Spec.ClusterSelector) {
+		defaultClusterSet.Spec.ClusterSelector = DefaultManagedClusterSet.Spec.ClusterSelector
 
 		_, err := c.clusterSetClient.ManagedClusterSets().Update(ctx, defaultClusterSet, metav1.UpdateOptions{})
 		if err != nil {

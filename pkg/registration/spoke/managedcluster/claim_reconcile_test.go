@@ -206,8 +206,11 @@ func TestSync(t *testing.T) {
 			}
 			ctrl := newManagedClusterStatusController(
 				testinghelpers.TestManagedClusterName,
+				"test-hub-hash",
 				clusterClient,
+				kubefake.NewSimpleClientset(),
 				clusterInformerFactory.Cluster().V1().ManagedClusters(),
+				kubeInformerFactory.Core().V1().Namespaces(),
 				discoveryClient,
 				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
 				clusterPropertyInformerFactory.About().V1alpha1().ClusterProperties(),
@@ -582,8 +585,11 @@ func TestExposeClaims(t *testing.T) {
 			}
 			ctrl := newManagedClusterStatusController(
 				testinghelpers.TestManagedClusterName,
+				"test-hub-hash",
 				clusterClient,
+				kubefake.NewSimpleClientset(),
 				clusterInformerFactory.Cluster().V1().ManagedClusters(),
+				kubeInformerFactory.Core().V1().Namespaces(),
 				discoveryClient,
 				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
 				clusterPropertyInformerFactory.About().V1alpha1().ClusterProperties(),

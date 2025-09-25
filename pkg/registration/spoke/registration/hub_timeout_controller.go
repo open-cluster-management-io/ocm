@@ -21,6 +21,8 @@ type hubTimeoutController struct {
 	timeoutSeconds     int32
 	lastLeaseRenewTime time.Time
 	handleTimeout      func(ctx context.Context) error
+
+	startTime time.Time
 }
 
 func NewHubTimeoutController(
@@ -35,6 +37,7 @@ func NewHubTimeoutController(
 		timeoutSeconds: timeoutSeconds,
 		handleTimeout:  handleTimeout,
 		leaseClient:    leaseClient,
+		startTime:      time.Now(),
 	}
 	return factory.New().WithSync(c.sync).ResyncEvery(time.Minute).
 		ToController("HubTimeoutController", recorder)
@@ -55,6 +58,25 @@ func (c *hubTimeoutController) sync(ctx context.Context, syncCtx factory.SyncCon
 		}
 	} else {
 		c.lastLeaseRenewTime = lease.Spec.RenewTime.Time
+	}
+
+	// If `startTime` within 10s, skip the timeout check.
+	// This handles cases where old leases remain due to incomplete cleanup.
+	//
+	// Example scenario:
+	// 1. ManagedCluster-A is connected to Hub1 with an active lease
+	// 2. Hub1 unexpectedly fails (power outage) - no cleanup opportunity
+	// 3. ManagedCluster-A detects timeout and switches to Hub2
+	// 4. Hub1 comes back online with the old stale lease still present
+	// 5. ManagedCluster-A migrates back to Hub1 (which has the expired lease)
+	// 6. With this grace period: lease controller gets time to update the lease
+	//    before timeout checks begin, preventing false timeouts. Otherwise,
+	//    timeout controller runs immediately and detects the stale lease as
+	//    expired, triggering an unwanted timeout
+	//
+	// This also applies to migration scenarios where cleanup is incomplete.
+	if time.Since(c.startTime) < time.Second*10 {
+		return nil
 	}
 
 	if isTimeout(time.Now(), c.lastLeaseRenewTime, c.timeoutSeconds) {

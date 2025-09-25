@@ -78,6 +78,10 @@ enableSyncLabels: false
 # should be the kubeConfig file of the hub cluster via setting --set-file=<the kubeConfig file of hub cluster> optional
 bootstrapHubKubeConfig: ""
 
+# grpcConfig includes the information needed to build connect to gRPC server in the bootstrap secret for
+# cluster importing via setting --set-file=<the grpc config file> optional.
+grpcConfig: ""
+
 # when MultipleHubs feature gate in klusterlet.registrationConfiguration is enabled, could set multiple bootstrap hub kubeConfigs here.
 # otherwise can create these kubeConfig secret in the klusterlet.namespace manually on the managed cluster.
 multiHubBootstrapHubKubeConfigs:

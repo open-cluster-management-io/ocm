@@ -139,7 +139,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	}
 
 	// Apply appliedManifestWork
-	appliedManifestWork, err := m.applyAppliedManifestWork(ctx, manifestWork.Name, m.hubHash, m.agentID)
+	appliedManifestWork, err := m.applyAppliedManifestWork(ctx, manifestWork.Name, m.hubHash, m.agentID, manifestWork.ObjectMeta.Labels)
 	if err != nil {
 		return err
 	}
@@ -187,11 +187,13 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	return nil
 }
 
-func (m *ManifestWorkController) applyAppliedManifestWork(ctx context.Context, workName, hubHash, agentID string) (*workapiv1.AppliedManifestWork, error) {
+func (m *ManifestWorkController) applyAppliedManifestWork(ctx context.Context, workName,
+	hubHash, agentID string, labels map[string]string) (*workapiv1.AppliedManifestWork, error) {
 	appliedManifestWorkName := fmt.Sprintf("%s-%s", m.hubHash, workName)
 	requiredAppliedWork := &workapiv1.AppliedManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       appliedManifestWorkName,
+			Labels:     labels,
 			Finalizers: []string{workapiv1.AppliedManifestWorkFinalizer},
 		},
 		Spec: workapiv1.AppliedManifestWorkSpec{

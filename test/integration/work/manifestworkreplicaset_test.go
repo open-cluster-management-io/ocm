@@ -129,6 +129,7 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			gomega.Eventually(assertWorksByReplicaSet(clusterNames, manifestWorkReplicaSet, 3), eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+			gomega.Eventually(assertWorksSameLabelAsReplicaSet(manifestWorkReplicaSet), eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 			gomega.Eventually(assertSummary(workapiv1alpha1.ManifestWorkReplicaSetSummary{
 				Total: 3,
 			}, manifestWorkReplicaSet), eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
@@ -449,6 +450,27 @@ func assertWorksByReplicaSet(clusterNames sets.Set[string], mwrs *workapiv1alpha
 			}
 		}
 
+		return nil
+	}
+}
+
+func assertWorksSameLabelAsReplicaSet(mwrs *workapiv1alpha1.ManifestWorkReplicaSet) func() error {
+	return func() error {
+		key := fmt.Sprintf("%s.%s", mwrs.Namespace, mwrs.Name)
+		works, err := hubWorkClient.WorkV1().ManifestWorks(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("work.open-cluster-management.io/manifestworkreplicaset=%s", key),
+		})
+		if err != nil {
+			return err
+		}
+
+		for _, work := range works.Items {
+			for k, v := range mwrs.Labels {
+				if work.Labels[k] != v {
+					return fmt.Errorf("label %s mismatch: expected %s, got %s", k, v, work.Labels[k])
+				}
+			}
+		}
 		return nil
 	}
 }

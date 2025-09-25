@@ -26,13 +26,47 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
+// Option contains configuration options for BaseAddonManagerImpl.
+type Option struct {
+	// TemplateBasedAddOn configures whether the manager is handling template-based addons.
+	//   - true: all ManagedClusterAddOn controllers except "addon-config-controller" will only process addons
+	//     when the referenced AddOnTemplate resources in their status.configReferences are properly set;
+	//     the "addon-config-controller" is responsible for setting these values
+	//   - false: process all addons without waiting for template configuration
+	//
+	// This prevents premature processing of template-based addons before their configurations
+	// are fully ready, avoiding unnecessary errors and retries.
+	// See https://github.com/open-cluster-management-io/ocm/issues/1181 for more context.
+	TemplateBasedAddOn bool
+}
+
+// OptionFunc is a function that modifies Option.
+type OptionFunc func(*Option)
+
+// WithTemplateMode returns an OptionFunc that sets the template mode.
+func WithTemplateMode(enabled bool) OptionFunc {
+	return func(option *Option) {
+		option.TemplateBasedAddOn = enabled
+	}
+}
+
+// WithOption returns an OptionFunc that applies the given Option struct.
+func WithOption(opt *Option) OptionFunc {
+	return func(option *Option) {
+		if opt != nil {
+			*option = *opt
+		}
+	}
+}
+
 // BaseAddonManagerImpl is the base implementation of BaseAddonManager
 // that manages the addon agents and configs.
 type BaseAddonManagerImpl struct {
-	addonAgents  map[string]agent.AgentAddon
-	addonConfigs map[schema.GroupVersionResource]bool
-	config       *rest.Config
-	syncContexts []factory.SyncContext
+	addonAgents        map[string]agent.AgentAddon
+	addonConfigs       map[schema.GroupVersionResource]bool
+	config             *rest.Config
+	syncContexts       []factory.SyncContext
+	templateBasedAddOn bool
 }
 
 // NewBaseAddonManagerImpl creates a new BaseAddonManagerImpl instance with the given config.
@@ -43,6 +77,15 @@ func NewBaseAddonManagerImpl(config *rest.Config) *BaseAddonManagerImpl {
 		addonConfigs: map[schema.GroupVersionResource]bool{},
 		addonAgents:  map[string]agent.AgentAddon{},
 	}
+}
+
+// ApplyOptionFuncs applies OptionFunc functions to create and configure options.
+func (a *BaseAddonManagerImpl) ApplyOptionFuncs(optionFuncs ...OptionFunc) {
+	option := &Option{}
+	for _, fn := range optionFuncs {
+		fn(option)
+	}
+	a.templateBasedAddOn = option.TemplateBasedAddOn
 }
 
 func (a *BaseAddonManagerImpl) GetConfig() *rest.Config {
@@ -77,7 +120,13 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 	kubeInformers kubeinformers.SharedInformerFactory,
 	addonInformers addoninformers.SharedInformerFactory,
 	clusterInformers clusterv1informers.SharedInformerFactory,
-	dynamicInformers dynamicinformer.DynamicSharedInformerFactory) error {
+	dynamicInformers dynamicinformer.DynamicSharedInformerFactory,
+) error {
+	// Determine the appropriate filter function based on templateBasedAddOn field
+	mcaFilterFunc := utils.AllowAllAddOns
+	if a.templateBasedAddOn {
+		mcaFilterFunc = utils.FilterTemplateBasedAddOns
+	}
 
 	kubeClient, err := kubernetes.NewForConfig(a.config)
 	if err != nil {
@@ -107,6 +156,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 		workInformers,
 		a.addonAgents,
+		mcaFilterFunc,
 	)
 
 	registrationController := registration.NewAddonRegistrationController(
@@ -114,6 +164,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 		a.addonAgents,
+		mcaFilterFunc,
 	)
 
 	// This controller is used during migrating addons to be managed by addon-manager.
@@ -128,6 +179,13 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 
 	var addonConfigController, managementAddonConfigController factory.Controller
 	if len(a.addonConfigs) != 0 {
+		// ManagedClusterAddOn filter is intentionally disabled for the addon-config-controller.
+		// This is because template-based addons require this controller to set the specHash in
+		// managedclusteraddon.status.configReferences for addontemplates. Without this, all other
+		// ManagedClusterAddOn controllers would wait indefinitely for the template configurations
+		// to be applied.
+		// Consider moving the logic of setting managedclusteraddon.status.configReferences
+		// for addontemplates to the ocm addon-manager.
 		addonConfigController = addonconfig.NewAddonConfigController(
 			addonClient,
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
@@ -159,6 +217,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 			nil,
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 			a.addonAgents,
+			mcaFilterFunc,
 		)
 		csrSignController = certificate.NewCSRSignController(
 			kubeClient,
@@ -166,6 +225,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 			kubeInformers.Certificates().V1().CertificateSigningRequests(),
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 			a.addonAgents,
+			mcaFilterFunc,
 		)
 	} else if v1beta1Supported {
 		csrApproveController = certificate.NewCSRApprovingController(
@@ -175,6 +235,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 			kubeInformers.Certificates().V1beta1().CertificateSigningRequests(),
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 			a.addonAgents,
+			mcaFilterFunc,
 		)
 	}
 

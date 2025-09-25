@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
@@ -13,6 +12,7 @@ import (
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workv1informer "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
+	ocmfeature "open-cluster-management.io/api/feature"
 	workapplier "open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work"
@@ -20,6 +20,8 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/store"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 
+	"open-cluster-management.io/ocm/pkg/features"
+	"open-cluster-management.io/ocm/pkg/work/hub/controllers/manifestworkgarbagecollection"
 	"open-cluster-management.io/ocm/pkg/work/hub/controllers/manifestworkreplicasetcontroller"
 )
 
@@ -51,22 +53,6 @@ func (c *WorkHubManagerConfig) RunWorkHubManager(ctx context.Context, controller
 	if err != nil {
 		return err
 	}
-
-	// we need a separated filtered manifestwork informers so we only watch the manifestworks that manifestworkreplicaset cares.
-	// This could reduce a lot of memory consumptions
-	workInformOption := workinformers.WithTweakListOptions(
-		func(listOptions *metav1.ListOptions) {
-			selector := &metav1.LabelSelector{
-				MatchExpressions: []metav1.LabelSelectorRequirement{
-					{
-						Key:      manifestworkreplicasetcontroller.ManifestWorkReplicaSetControllerNameLabelKey,
-						Operator: metav1.LabelSelectorOpExists,
-					},
-				},
-			}
-			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
-		},
-	)
 
 	var workClient workclientset.Interface
 	var watcherStore *store.SourceInformerWatcherStore
@@ -108,7 +94,7 @@ func (c *WorkHubManagerConfig) RunWorkHubManager(ctx context.Context, controller
 		workClient = clientHolder.WorkInterface()
 	}
 
-	factory := workinformers.NewSharedInformerFactoryWithOptions(workClient, 30*time.Minute, workInformOption)
+	factory := workinformers.NewSharedInformerFactoryWithOptions(workClient, 30*time.Minute)
 	informer := factory.Work().V1().ManifestWorks()
 
 	// For cloudevents work client, we use the informer store as the client store
@@ -146,9 +132,20 @@ func RunControllerManagerWithInformers(
 		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
 	)
 
+	manifestWorkGarbageCollectionController := manifestworkgarbagecollection.NewManifestWorkGarbageCollectionController(
+		controllerContext.EventRecorder,
+		workClient,
+		workInformer,
+	)
+
 	go clusterInformers.Start(ctx.Done())
 	go replicaSetInformerFactory.Start(ctx.Done())
-	go manifestWorkReplicaSetController.Run(ctx, 5)
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManifestWorkReplicaSet) {
+		go manifestWorkReplicaSetController.Run(ctx, 5)
+	}
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.CleanUpCompletedManifestWork) {
+		go manifestWorkGarbageCollectionController.Run(ctx, 5)
+	}
 
 	go workInformer.Informer().Run(ctx.Done())
 
