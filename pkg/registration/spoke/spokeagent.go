@@ -2,6 +2,7 @@ package spoke
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"time"
@@ -9,11 +10,14 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 	aboutclient "sigs.k8s.io/about-api/pkg/generated/clientset/versioned"
 	aboutinformers "sigs.k8s.io/about-api/pkg/generated/informers/externalversions"
@@ -358,11 +362,33 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	if err != nil {
 		return fmt.Errorf("failed to create event recorder: %w", err)
 	}
+
+	// get hub hash for namespace management
+	hubHash, err := o.getHubHash()
+	if err != nil {
+		return fmt.Errorf("failed to get hub hash: %w", err)
+	}
+
+	// create filtered namespace informer for hub-specific namespaces
+	hubClusterSetLabel := managedcluster.GetHubClusterSetLabel(hubHash)
+	labelSelector := labels.SelectorFromSet(labels.Set{hubClusterSetLabel: "true"})
+	filteredNamespaceInformerFactory := informers.NewSharedInformerFactoryWithOptions(
+		spokeKubeClient,
+		10*time.Minute,
+		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+			options.LabelSelector = labelSelector.String()
+		}),
+	)
+
 	// create NewManagedClusterStatusController to update the spoke cluster status
+	// now includes managed namespace reconciler
 	managedClusterHealthCheckController := managedcluster.NewManagedClusterStatusController(
 		o.agentOptions.SpokeClusterName,
+		hubHash,
 		hubClient.ClusterClient,
+		spokeKubeClient,
 		hubClient.ClusterInformer,
+		filteredNamespaceInformerFactory.Core().V1().Namespaces(),
 		spokeKubeClient.Discovery(),
 		spokeClusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
 		aboutInformers.About().V1alpha1().ClusterProperties(),
@@ -437,6 +463,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	go hubClient.AddonInformer.Informer().Run(ctx.Done())
 
 	go spokeKubeInformerFactory.Start(ctx.Done())
+	go filteredNamespaceInformerFactory.Start(ctx.Done())
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
 		go spokeClusterInformerFactory.Start(ctx.Done())
 	}
@@ -490,4 +517,12 @@ func (o *SpokeAgentConfig) getSpokeClusterCABundle(kubeConfig *rest.Config) ([]b
 		return nil, err
 	}
 	return data, nil
+}
+
+func (o *SpokeAgentConfig) getHubHash() (string, error) {
+	kubeConfig, err := clientcmd.BuildConfigFromFlags("", o.currentBootstrapKubeConfig)
+	if err != nil {
+		return "", fmt.Errorf("unable to load bootstrap kubeconfig: %w", err)
+	}
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(kubeConfig.Host))), nil
 }

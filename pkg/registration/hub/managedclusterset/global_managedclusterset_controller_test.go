@@ -13,6 +13,7 @@ import (
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
@@ -40,15 +41,15 @@ func TestSyncGlobalClusterSet(t *testing.T) {
 			},
 		},
 		{
-			name:               "sync edited global cluster set",
+			name:               "sync edited cluster selector in global cluster set",
 			existingClusterSet: newGlobalManagedClusterSet(GlobalManagedClusterSetName, editedGlobalManagedClusterSetSpec, false),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 
 				testingcommon.AssertActions(t, actions, "update")
 				clusterset := actions[0].(clienttesting.UpdateAction).GetObject().(*clusterv1beta2.ManagedClusterSet)
-				// if spec not rollbacked, error
-				if !equality.Semantic.DeepEqual(clusterset.Spec, GlobalManagedClusterSet.Spec) {
-					t.Errorf("Failed to rollback global managed cluster set spec after it is edited")
+				// if cluster selector not rollbacked, error
+				if !equality.Semantic.DeepEqual(clusterset.Spec.ClusterSelector, GlobalManagedClusterSet.Spec.ClusterSelector) {
+					t.Errorf("Failed to rollback global managed cluster set cluster selector after it is edited")
 				}
 			},
 		},
@@ -69,6 +70,30 @@ func TestSyncGlobalClusterSet(t *testing.T) {
 				GlobalManagedClusterSetName, autoUpdateAnnotation, "false", GlobalManagedClusterSet.Spec, false),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertNoActions(t, actions)
+			},
+		},
+		{
+			name:               "sync global cluster set with edited managed namespaces - no rollback",
+			existingClusterSet: newGlobalManagedClusterSetWithManagedNamespaces(GlobalManagedClusterSetName, GlobalManagedClusterSet.Spec.ClusterSelector, false),
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				// Since only ClusterSelector is protected, editing ManagedNamespaces should not trigger rollback
+				testingcommon.AssertNoActions(t, actions)
+			},
+		},
+		{
+			name:               "sync global cluster set with edited cluster selector and managed namespaces - only cluster selector rollback",
+			existingClusterSet: newGlobalManagedClusterSetWithManagedNamespacesAndEditedSelector(GlobalManagedClusterSetName, false),
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "update")
+				clusterset := actions[0].(clienttesting.UpdateAction).GetObject().(*clusterv1beta2.ManagedClusterSet)
+				// Only cluster selector should be rollbacked, managed namespaces should remain
+				if !equality.Semantic.DeepEqual(clusterset.Spec.ClusterSelector, GlobalManagedClusterSet.Spec.ClusterSelector) {
+					t.Errorf("Failed to rollback global managed cluster set cluster selector")
+				}
+				// Managed namespaces should be preserved
+				if len(clusterset.Spec.ManagedNamespaces) == 0 {
+					t.Errorf("ManagedNamespaces should be preserved during cluster selector rollback")
+				}
 			},
 		},
 	}
@@ -129,6 +154,63 @@ func newGlobalManagedClusterSetWithAnnotation(
 			Annotations: map[string]string{
 				k: v,
 			},
+		},
+		Spec: spec,
+	}
+	if terminating {
+		now := metav1.Now()
+		clusterSet.DeletionTimestamp = &now
+	}
+
+	return clusterSet
+}
+
+func newGlobalManagedClusterSetWithManagedNamespaces(
+	name string, clusterSelector clusterv1beta2.ManagedClusterSelector, terminating bool) *clusterv1beta2.ManagedClusterSet {
+	spec := clusterv1beta2.ManagedClusterSetSpec{
+		ClusterSelector: clusterSelector,
+		ManagedNamespaces: []clusterv1.ManagedNamespaceConfig{
+			{
+				Name: "test-namespace-1",
+			},
+			{
+				Name: "test-namespace-2",
+			},
+		},
+	}
+	clusterSet := &clusterv1beta2.ManagedClusterSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: spec,
+	}
+	if terminating {
+		now := metav1.Now()
+		clusterSet.DeletionTimestamp = &now
+	}
+
+	return clusterSet
+}
+
+func newGlobalManagedClusterSetWithManagedNamespacesAndEditedSelector(
+	name string, terminating bool) *clusterv1beta2.ManagedClusterSet {
+	editedSelector := clusterv1beta2.ManagedClusterSelector{
+		SelectorType: "non-LegacyClusterSetLabel",
+	}
+	spec := clusterv1beta2.ManagedClusterSetSpec{
+		ClusterSelector: editedSelector,
+		ManagedNamespaces: []clusterv1.ManagedNamespaceConfig{
+			{
+				Name: "test-namespace-1",
+			},
+			{
+				Name: "test-namespace-2",
+			},
+		},
+	}
+	clusterSet := &clusterv1beta2.ManagedClusterSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
 		},
 		Spec: spec,
 	}

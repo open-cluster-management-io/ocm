@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/discovery"
 	corev1informers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/kubernetes"
 	kevents "k8s.io/client-go/tools/events"
 	aboutv1alpha1informer "sigs.k8s.io/about-api/pkg/generated/informers/externalversions/apis/v1alpha1"
 
@@ -52,8 +53,11 @@ const (
 // NewManagedClusterStatusController creates a managed cluster status controller on managed cluster.
 func NewManagedClusterStatusController(
 	clusterName string,
+	hubHash string,
 	hubClusterClient clientset.Interface,
+	spokeKubeClient kubernetes.Interface,
 	hubClusterInformer clusterv1informer.ManagedClusterInformer,
+	spokeNamespaceInformer corev1informers.NamespaceInformer,
 	managedClusterDiscoveryClient discovery.DiscoveryInterface,
 	claimInformer clusterv1alpha1informer.ClusterClaimInformer,
 	propertyInformer aboutv1alpha1informer.ClusterPropertyInformer,
@@ -65,8 +69,11 @@ func NewManagedClusterStatusController(
 	hubEventRecorder kevents.EventRecorder) factory.Controller {
 	c := newManagedClusterStatusController(
 		clusterName,
+		hubHash,
 		hubClusterClient,
+		spokeKubeClient,
 		hubClusterInformer,
+		spokeNamespaceInformer,
 		managedClusterDiscoveryClient,
 		claimInformer,
 		propertyInformer,
@@ -78,7 +85,7 @@ func NewManagedClusterStatusController(
 	)
 
 	controllerFactory := factory.New().
-		WithInformers(hubClusterInformer.Informer(), nodeInformer.Informer()).
+		WithInformers(hubClusterInformer.Informer(), nodeInformer.Informer(), spokeNamespaceInformer.Informer()).
 		WithSync(c.sync).ResyncEvery(resyncInterval)
 
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
@@ -93,8 +100,11 @@ func NewManagedClusterStatusController(
 
 func newManagedClusterStatusController(
 	clusterName string,
+	hubHash string,
 	hubClusterClient clientset.Interface,
+	spokeKubeClient kubernetes.Interface,
 	hubClusterInformer clusterv1informer.ManagedClusterInformer,
+	spokeNamespaceInformer corev1informers.NamespaceInformer,
 	managedClusterDiscoveryClient discovery.DiscoveryInterface,
 	claimInformer clusterv1alpha1informer.ClusterClaimInformer,
 	propertyInformer aboutv1alpha1informer.ClusterPropertyInformer,
@@ -115,6 +125,12 @@ func newManagedClusterStatusController(
 				maxCustomClusterClaims:       maxCustomClusterClaims,
 				reservedClusterClaimSuffixes: reservedClusterClaimSuffixes,
 				aboutLister:                  propertyInformer.Lister(),
+			},
+			&managedNamespaceReconcile{
+				hubClusterSetLabel:   GetHubClusterSetLabel(hubHash),
+				spokeKubeClient:      spokeKubeClient,
+				spokeNamespaceLister: spokeNamespaceInformer.Lister(),
+				eventRecorder:        recorder,
 			},
 		},
 		hubClusterLister: hubClusterInformer.Lister(),
