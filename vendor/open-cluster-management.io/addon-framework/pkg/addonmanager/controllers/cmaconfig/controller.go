@@ -36,8 +36,8 @@ type cmaConfigController struct {
 	clusterManagementAddonLister  addonlisterv1alpha1.ClusterManagementAddOnLister
 	clusterManagementAddonIndexer cache.Indexer
 	configListers                 map[schema.GroupResource]dynamiclister.Lister
-	queue                         workqueue.TypedRateLimitingInterface[string]
-	cmaFilterFunc                 factory.EventFilterFunc
+	queue                         workqueue.RateLimitingInterface
+	addonFilterFunc               factory.EventFilterFunc
 	configGVRs                    map[schema.GroupVersionResource]bool
 	addonPatcher                  patcher.Patcher[*addonapiv1alpha1.ClusterManagementAddOn,
 		addonapiv1alpha1.ClusterManagementAddOnSpec,
@@ -49,7 +49,7 @@ func NewCMAConfigController(
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	configInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	configGVRs map[schema.GroupVersionResource]bool,
-	cmaFilterFunc factory.EventFilterFunc,
+	addonFilterFunc factory.EventFilterFunc,
 ) factory.Controller {
 	syncCtx := factory.NewSyncContext(controllerName)
 
@@ -59,7 +59,7 @@ func NewCMAConfigController(
 		clusterManagementAddonIndexer: clusterManagementAddonInformers.Informer().GetIndexer(),
 		configListers:                 map[schema.GroupResource]dynamiclister.Lister{},
 		queue:                         syncCtx.Queue(),
-		cmaFilterFunc:                 cmaFilterFunc,
+		addonFilterFunc:               addonFilterFunc,
 		configGVRs:                    configGVRs,
 		addonPatcher: patcher.NewPatcher[*addonapiv1alpha1.ClusterManagementAddOn,
 			addonapiv1alpha1.ClusterManagementAddOnSpec,
@@ -145,7 +145,7 @@ func (c *cmaConfigController) sync(ctx context.Context, syncCtx factory.SyncCont
 		return err
 	}
 
-	if c.cmaFilterFunc != nil && !c.cmaFilterFunc(cma) {
+	if !c.addonFilterFunc(cma) {
 		return nil
 	}
 

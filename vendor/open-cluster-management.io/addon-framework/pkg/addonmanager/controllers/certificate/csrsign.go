@@ -22,7 +22,6 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	"open-cluster-management.io/addon-framework/pkg/utils"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
@@ -33,7 +32,6 @@ type csrSignController struct {
 	managedClusterLister      clusterlister.ManagedClusterLister
 	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
 	csrLister                 certificateslisters.CertificateSigningRequestLister
-	mcaFilterFunc             utils.ManagedClusterAddOnFilterFunc
 }
 
 // NewCSRApprovingController creates a new csr approving controller
@@ -43,7 +41,6 @@ func NewCSRSignController(
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	agentAddons map[string]agent.AgentAddon,
-	mcaFilterFunc utils.ManagedClusterAddOnFilterFunc,
 ) factory.Controller {
 	c := &csrSignController{
 		kubeClient:                kubeClient,
@@ -51,7 +48,6 @@ func NewCSRSignController(
 		managedClusterLister:      clusterInformers.Lister(),
 		managedClusterAddonLister: addonInformers.Lister(),
 		csrLister:                 csrInformer.Lister(),
-		mcaFilterFunc:             mcaFilterFunc,
 	}
 	return factory.New().
 		WithFilteredEventsInformersQueueKeysFunc(
@@ -120,7 +116,7 @@ func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContex
 	}
 
 	// Get ManagedCluster
-	cluster, err := c.managedClusterLister.Get(clusterName)
+	_, err = c.managedClusterLister.Get(clusterName)
 	if errors.IsNotFound(err) {
 		return nil
 	}
@@ -128,25 +124,19 @@ func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContex
 		return err
 	}
 
-	addon, err := c.managedClusterAddonLister.ManagedClusterAddOns(clusterName).Get(addonName)
+	_, err = c.managedClusterAddonLister.ManagedClusterAddOns(clusterName).Get(addonName)
 	if errors.IsNotFound(err) {
 		return nil
 	}
 	if err != nil {
 		return err
-	}
-	if c.mcaFilterFunc != nil && !c.mcaFilterFunc(addon) {
-		return nil
 	}
 
 	if registrationOption.CSRSign == nil {
 		return nil
 	}
 
-	csr.Status.Certificate, err = registrationOption.CSRSign(cluster, addon, csr)
-	if err != nil {
-		return fmt.Errorf("failed to sign addon csr %q: %v", csr.Name, err)
-	}
+	csr.Status.Certificate = registrationOption.CSRSign(csr)
 	if len(csr.Status.Certificate) == 0 {
 		return fmt.Errorf("invalid client certificate generated for addon csr %q", csr.Name)
 	}
