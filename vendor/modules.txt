@@ -7,6 +7,8 @@ cloud.google.com/go/compute/metadata
 # dario.cat/mergo v1.0.1
 ## explicit; go 1.13
 dario.cat/mergo
+# github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6
+## explicit; go 1.20
 # github.com/BurntSushi/toml v1.5.0
 ## explicit; go 1.18
 github.com/BurntSushi/toml
@@ -20,6 +22,8 @@ github.com/Masterminds/semver/v3
 # github.com/Masterminds/sprig/v3 v3.3.0
 ## explicit; go 1.21
 github.com/Masterminds/sprig/v3
+# github.com/Microsoft/go-winio v0.6.2
+## explicit; go 1.21
 # github.com/Microsoft/hcsshim v0.12.9
 ## explicit; go 1.22
 # github.com/NYTimes/gziphandler v1.1.1
@@ -177,6 +181,8 @@ github.com/cloudevents/sdk-go/v2/types
 ## explicit; go 1.17
 github.com/confluentinc/confluent-kafka-go/v2/kafka
 github.com/confluentinc/confluent-kafka-go/v2/kafka/librdkafka_vendor
+# github.com/containerd/errdefs/pkg v0.3.0
+## explicit; go 1.22
 # github.com/coreos/go-semver v0.3.1
 ## explicit; go 1.8
 github.com/coreos/go-semver/semver
@@ -190,7 +196,7 @@ github.com/cyphar/filepath-securejoin
 # github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/docker/docker v27.1.2+incompatible
+# github.com/docker/docker v28.4.0+incompatible
 ## explicit
 # github.com/eclipse/paho.golang v0.21.0
 ## explicit; go 1.21
@@ -371,10 +377,8 @@ github.com/mitchellh/copystructure
 github.com/mitchellh/reflectwalk
 # github.com/moby/docker-image-spec v1.3.1
 ## explicit; go 1.18
-# github.com/moby/patternmatcher v0.6.0
-## explicit; go 1.19
-# github.com/moby/sys/user v0.4.0
-## explicit; go 1.17
+# github.com/moby/go-archive v0.1.0
+## explicit; go 1.23.0
 # github.com/mochi-mqtt/server/v2 v2.7.9
 ## explicit; go 1.21
 github.com/mochi-mqtt/server/v2
