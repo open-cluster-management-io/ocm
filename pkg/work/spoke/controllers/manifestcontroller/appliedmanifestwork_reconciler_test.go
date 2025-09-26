@@ -241,7 +241,7 @@ func TestSyncManifestWork(t *testing.T) {
 				reconcilers: []workReconcile{
 					&appliedManifestWorkReconciler{
 						spokeDynamicClient: fakeDynamicClient,
-						rateLimiter:        workqueue.NewItemExponentialFailureRateLimiter(0, 1*time.Second),
+						rateLimiter:        workqueue.NewTypedItemExponentialFailureRateLimiter[string](0, 1*time.Second),
 					},
 				},
 				hubHash: "test",

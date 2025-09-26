@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/workqueue"
@@ -91,7 +92,7 @@ func NewManifestWorkController(
 			},
 			&appliedManifestWorkReconciler{
 				spokeDynamicClient: spokeDynamicClient,
-				rateLimiter:        workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
+				rateLimiter:        workqueue.NewTypedItemExponentialFailureRateLimiter[string](5*time.Millisecond, 1000*time.Second),
 			},
 		},
 	}
@@ -145,7 +146,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	}
 	newAppliedManifestWork := appliedManifestWork.DeepCopy()
 
-	var requeueTime = ResyncInterval
+	var requeueTime = wait.Jitter(ResyncInterval, 0.3)
 	var errs []error
 	for _, reconciler := range m.reconcilers {
 		manifestWork, newAppliedManifestWork, err = reconciler.reconcile(

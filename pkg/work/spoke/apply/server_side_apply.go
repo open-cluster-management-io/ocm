@@ -115,9 +115,9 @@ func (c *ServerSideApply) Apply(
 		Namespace(required.GetNamespace()).
 		Apply(ctx, required.GetName(), required, metav1.ApplyOptions{FieldManager: fieldManager, Force: force})
 	resourceKey, _ := cache.MetaNamespaceKeyFunc(required)
-	recorder.Eventf(fmt.Sprintf(
-		"Server Side Applied %s %s", required.GetKind(), resourceKey),
-		"Patched with field manager %s, err %v", fieldManager, err)
+	logger.Info(
+		"Server Side Applied", "kind", required.GetKind(), "key", resourceKey,
+		"fieldManager", fieldManager, "error", err)
 
 	if errors.IsConflict(err) {
 		return obj, &ServerSideApplyConflictError{ssaErr: err}
