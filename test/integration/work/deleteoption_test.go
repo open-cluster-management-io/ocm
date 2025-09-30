@@ -246,7 +246,7 @@ var _ = ginkgo.Describe("ManifestWork Delete Option", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Ensure the configmap is kept and tracked by anotherappliedmanifestwork
-			gomega.Eventually(func() error {
+			gomega.Consistently(func() error {
 				configMap, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(
 					context.Background(), cm1, metav1.GetOptions{})
 				if err != nil {

@@ -44,6 +44,7 @@ func (m *manifestworkReconciler) reconcile(
 	controllerContext factory.SyncContext,
 	manifestWork *workapiv1.ManifestWork,
 	appliedManifestWork *workapiv1.AppliedManifestWork) (*workapiv1.ManifestWork, *workapiv1.AppliedManifestWork, error) {
+	logger := klog.FromContext(ctx)
 	// We creat a ownerref instead of controller ref since multiple controller can declare the ownership of a manifests
 	owner := helper.NewAppliedManifestWorkOwner(appliedManifestWork)
 
@@ -63,7 +64,7 @@ func (m *manifestworkReconciler) reconcile(
 		return nil
 	})
 	if err != nil {
-		klog.Errorf("failed to apply resource with error %v", err)
+		logger.Error(err, "failed to apply resource")
 	}
 
 	var newManifestConditions []workapiv1.ManifestCondition
@@ -83,7 +84,7 @@ func (m *manifestworkReconciler) reconcile(
 		// and requeue the item
 		var authError *basic.NotAllowedError
 		if errors.As(result.Error, &authError) {
-			klog.V(2).Infof("apply work %s fails with err: %v", manifestWork.Name, result.Error)
+			logger.V(2).Info("apply work fails", "name", manifestWork.Name, "error", result.Error)
 			result.Error = nil
 
 			if authError.RequeueTime < requeueTime {
@@ -160,7 +161,7 @@ func (m *manifestworkReconciler) applyOneManifest(
 	workStatus workapiv1.ManifestWorkStatus,
 	recorder events.Recorder,
 	owner metav1.OwnerReference) applyResult {
-
+	logger := klog.FromContext(ctx)
 	result := applyResult{}
 
 	// parse the required and set resource meta
@@ -172,7 +173,7 @@ func (m *manifestworkReconciler) applyOneManifest(
 
 	// ignore the required object UID to avoid UID precondition failed error
 	if len(required.GetUID()) != 0 {
-		klog.Warningf("Ignore the UID %s for the manifest index %d", required.GetUID(), index)
+		logger.Info("Ignore the UID for the manifest index", "uid", required.GetUID(), "index", index)
 		required.SetUID("")
 	}
 

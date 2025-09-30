@@ -13,9 +13,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
@@ -26,8 +28,6 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
-	"open-cluster-management.io/ocm/pkg/common/queue"
-	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
 )
@@ -72,6 +72,8 @@ func NewManifestWorkController(
 	restMapper meta.RESTMapper,
 	validator auth.ExecutorValidator) factory.Controller {
 
+	syncCtx := factory.NewSyncContext("manifestwork-controller", recorder)
+
 	controller := &ManifestWorkController{
 		manifestWorkPatcher: patcher.NewPatcher[
 			*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
@@ -97,12 +99,46 @@ func NewManifestWorkController(
 		},
 	}
 
+	_, err := manifestWorkInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			accessor, err := meta.Accessor(obj)
+			if err != nil {
+				utilruntime.HandleError(err)
+			}
+			if commonhelper.HasFinalizer(accessor.GetFinalizers(), workapiv1.ManifestWorkFinalizer) {
+				syncCtx.Queue().Add(accessor.GetName())
+			}
+		},
+		UpdateFunc: func(old, new interface{}) {
+			newAccessor, err := meta.Accessor(new)
+			if err != nil {
+				utilruntime.HandleError(err)
+			}
+			oldAccessor, err := meta.Accessor(old)
+			if err != nil {
+				utilruntime.HandleError(err)
+			}
+			if commonhelper.HasFinalizer(newAccessor.GetFinalizers(), workapiv1.ManifestWorkFinalizer) {
+				syncCtx.Queue().Add(newAccessor.GetName())
+				return
+			}
+			if newAccessor.GetGeneration() != oldAccessor.GetGeneration() {
+				syncCtx.Queue().Add(newAccessor.GetName())
+			}
+		},
+	})
+
+	if err != nil {
+		utilruntime.Must(err)
+	}
+
 	return factory.New().
-		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, manifestWorkInformer.Informer()).
-		WithFilteredEventsInformersQueueKeyFunc(
-			helper.AppliedManifestworkQueueKeyFunc(hubHash),
-			helper.AppliedManifestworkHubHashFilter(hubHash),
+		WithBareInformers(
+			manifestWorkInformer.Informer()).
+		// we do not need to reconcile with event of appliedemanifestwork, just ensure cache is synced.
+		WithBareInformers(
 			appliedManifestWorkInformer.Informer()).
+		WithSyncContext(syncCtx).
 		WithSync(controller.sync).ResyncEvery(ResyncInterval).ToController("ManifestWorkAgent", recorder)
 }
 
@@ -110,8 +146,10 @@ func NewManifestWorkController(
 // 1. ManifestWork API changes
 // 2. Resources defined in manifest changed on spoke
 func (m *ManifestWorkController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
+	logger := klog.FromContext(ctx).WithName("ManifestWorkController")
+
 	manifestWorkName := controllerContext.QueueKey()
-	klog.V(5).Infof("Reconciling ManifestWork %q", manifestWorkName)
+	logger.V(4).Info("Reconciling ManifestWork", "name", manifestWorkName)
 
 	oldManifestWork, err := m.manifestWorkLister.Get(manifestWorkName)
 	if apierrors.IsNotFound(err) {
@@ -162,28 +200,23 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	}
 
 	// Update work status
-	mwUpdated, err := m.manifestWorkPatcher.PatchStatus(ctx, manifestWork, manifestWork.Status, oldManifestWork.Status)
+	_, err = m.manifestWorkPatcher.PatchStatus(ctx, manifestWork, manifestWork.Status, oldManifestWork.Status)
 	if err != nil {
 		return err
 	}
 
-	amwUpdated, err := m.appliedManifestWorkPatcher.PatchStatus(
+	_, err = m.appliedManifestWorkPatcher.PatchStatus(
 		ctx, newAppliedManifestWork, newAppliedManifestWork.Status, appliedManifestWork.Status)
 	if err != nil {
 		return err
 	}
 
 	if len(errs) > 0 {
-		klog.Errorf("Reconcile work %s fails with err: %v", manifestWorkName, errs)
 		return utilerrors.NewAggregate(errs)
 	}
 
-	// we do not need to requeue when manifestwork/appliedmanifestwork are updated, since a following
-	// reconcile will be executed with update event, and the requeue can be set in this following reconcile
-	// if needed.
-	if !mwUpdated && !amwUpdated {
-		controllerContext.Queue().AddAfter(manifestWorkName, requeueTime)
-	}
+	logger.V(2).Info("Requeue manifestwork", "name", manifestWork.Name, "requeue time", requeueTime)
+	controllerContext.Queue().AddAfter(manifestWorkName, requeueTime)
 
 	return nil
 }

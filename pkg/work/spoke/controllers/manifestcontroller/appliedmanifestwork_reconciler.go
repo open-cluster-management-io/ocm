@@ -32,6 +32,7 @@ func (m *appliedManifestWorkReconciler) reconcile(
 	controllerContext factory.SyncContext,
 	manifestWork *workapiv1.ManifestWork,
 	appliedManifestWork *workapiv1.AppliedManifestWork) (*workapiv1.ManifestWork, *workapiv1.AppliedManifestWork, error) {
+	logger := klog.FromContext(ctx)
 	if !appliedManifestWork.DeletionTimestamp.IsZero() {
 		return manifestWork, appliedManifestWork, nil
 	}
@@ -65,9 +66,9 @@ func (m *appliedManifestWorkReconciler) reconcile(
 			Namespace(resourceStatus.ResourceMeta.Namespace).
 			Get(context.TODO(), resourceStatus.ResourceMeta.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
-			klog.V(2).Infof(
-				"Resource %v with key %s/%s does not exist",
-				gvr, resourceStatus.ResourceMeta.Namespace, resourceStatus.ResourceMeta.Name)
+			logger.V(2).Info(
+				"Resource with key does not exist", "gvr",
+				gvr, "namespace", resourceStatus.ResourceMeta.Namespace, "name", resourceStatus.ResourceMeta.Name)
 			continue
 		}
 
