@@ -99,33 +99,11 @@ func NewManifestWorkController(
 		},
 	}
 
+	// only trigger reconcile when:
+	// 1. creat event and the manifestwork has the finalizer set already.
 	_, err := manifestWorkInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			accessor, err := meta.Accessor(obj)
-			if err != nil {
-				utilruntime.HandleError(err)
-			}
-			if commonhelper.HasFinalizer(accessor.GetFinalizers(), workapiv1.ManifestWorkFinalizer) {
-				syncCtx.Queue().Add(accessor.GetName())
-			}
-		},
-		UpdateFunc: func(old, new interface{}) {
-			newAccessor, err := meta.Accessor(new)
-			if err != nil {
-				utilruntime.HandleError(err)
-			}
-			oldAccessor, err := meta.Accessor(old)
-			if err != nil {
-				utilruntime.HandleError(err)
-			}
-			if commonhelper.HasFinalizer(newAccessor.GetFinalizers(), workapiv1.ManifestWorkFinalizer) {
-				syncCtx.Queue().Add(newAccessor.GetName())
-				return
-			}
-			if newAccessor.GetGeneration() != oldAccessor.GetGeneration() {
-				syncCtx.Queue().Add(newAccessor.GetName())
-			}
-		},
+		AddFunc:    onAddFunc(syncCtx.Queue()),
+		UpdateFunc: onUpdateFunc(syncCtx.Queue()),
 	})
 
 	if err != nil {
@@ -134,10 +112,10 @@ func NewManifestWorkController(
 
 	return factory.New().
 		WithBareInformers(
-			manifestWorkInformer.Informer()).
-		// we do not need to reconcile with event of appliedemanifestwork, just ensure cache is synced.
-		WithBareInformers(
-			appliedManifestWorkInformer.Informer()).
+			manifestWorkInformer.Informer(),
+			// we do not need to reconcile with event of appliedemanifestwork, just ensure cache is synced.
+			appliedManifestWorkInformer.Informer(),
+		).
 		WithSyncContext(syncCtx).
 		WithSync(controller.sync).ResyncEvery(ResyncInterval).ToController("ManifestWorkAgent", recorder)
 }
@@ -248,4 +226,43 @@ func (m *ManifestWorkController) applyAppliedManifestWork(ctx context.Context, w
 
 	_, err = m.appliedManifestWorkPatcher.PatchSpec(ctx, appliedManifestWork, requiredAppliedWork.Spec, appliedManifestWork.Spec)
 	return appliedManifestWork, err
+}
+
+func onAddFunc(queue workqueue.RateLimitingInterface) func(obj interface{}) {
+	return func(obj interface{}) {
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return
+		}
+		if commonhelper.HasFinalizer(accessor.GetFinalizers(), workapiv1.ManifestWorkFinalizer) {
+			queue.Add(accessor.GetName())
+		}
+	}
+}
+
+func onUpdateFunc(queue workqueue.RateLimitingInterface) func(oldObj, newObj interface{}) {
+	return func(oldObj, newObj interface{}) {
+		newAccessor, err := meta.Accessor(newObj)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return
+		}
+		oldAccessor, err := meta.Accessor(oldObj)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return
+		}
+		// enqueue when finalizer is added or generation is changed.
+		if !commonhelper.HasFinalizer(newAccessor.GetFinalizers(), workapiv1.ManifestWorkFinalizer) {
+			return
+		}
+		if !commonhelper.HasFinalizer(oldAccessor.GetFinalizers(), workapiv1.ManifestWorkFinalizer) {
+			queue.Add(newAccessor.GetName())
+			return
+		}
+		if newAccessor.GetGeneration() != oldAccessor.GetGeneration() {
+			queue.Add(newAccessor.GetName())
+		}
+	}
 }
