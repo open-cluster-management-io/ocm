@@ -1,32 +1,56 @@
 {
-  $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  baseBranches: ["main", "/^backplane-2\\.[4-9]$/"],
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  baseBranchPatterns: [
+    'main',
+    '/^backplane-2\\.[4-9]$/',
+  ],
   packageRules: [
     {
-      matchManagers: ["dockerfile"],
+      matchManagers: [
+        'dockerfile',
+      ],
       enabled: false,
     },
     {
-      matchBaseBranches: ["main", "/^backplane-2\\.[4-9]$/"],
-      matchManagers: ["tekton"],
+      matchBaseBranches: [
+        'main',
+        '/^backplane-2\\.[4-9]$/',
+      ],
+      matchManagers: [
+        'tekton',
+      ],
       enabled: true,
-      addLabels: ["ok-to-test", "approved", "lgtm"],
+      addLabels: [
+        'ok-to-test',
+        'approved',
+        'lgtm',
+      ],
     },
     {
-      matchManagers: ["gomod"],
+      matchManagers: [
+        'gomod',
+      ],
       enabled: false,
-      groupName: "go dependencies",
-      groupSlug: "go-deps",
+      groupName: 'go dependencies',
+      groupSlug: 'go-deps',
     },
     {
-      matchManagers: ["gomod"],
-      matchDepTypes: ["indirect"],
+      matchManagers: [
+        'gomod',
+      ],
+      matchDepTypes: [
+        'indirect',
+      ],
       enabled: false,
     },
   ],
-  rebaseWhen: "behind-base-branch",
-  recreateWhen: "never",
-  addLabels: ["ok-to-test"],
-  timezone: "Asia/Shanghai",
-  schedule: ["every monday"],
+  rebaseWhen: 'behind-base-branch',
+  recreateWhen: 'never',
+  addLabels: [
+    'ok-to-test',
+  ],
+  timezone: 'Asia/Shanghai',
+  schedule: [
+    'on monday',
+  ],
 }
