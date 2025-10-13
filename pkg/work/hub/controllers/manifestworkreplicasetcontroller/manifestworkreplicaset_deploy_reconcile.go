@@ -36,6 +36,31 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 	var plcsSummary []workapiv1alpha1.PlacementSummary
 	minRequeue := maxRequeueTime
 	count, total := 0, 0
+
+	// Clean up ManifestWorks from placements no longer in the spec
+	currentPlacementNames := sets.New[string]()
+	for _, placementRef := range mwrSet.Spec.PlacementRefs {
+		currentPlacementNames.Insert(placementRef.Name)
+	}
+
+	// Get all ManifestWorks belonging to this ManifestWorkReplicaSet
+	allManifestWorks, err := listManifestWorksByManifestWorkReplicaSet(mwrSet, d.manifestWorkLister)
+	if err != nil {
+		return mwrSet, reconcileContinue, fmt.Errorf("failed to list manifestworks: %w", err)
+	}
+
+	// Delete ManifestWorks that belong to placements no longer in the spec
+	for _, mw := range allManifestWorks {
+		placementName, ok := mw.Labels[ManifestWorkReplicaSetPlacementNameLabelKey]
+		if !ok || !currentPlacementNames.Has(placementName) {
+			// This ManifestWork belongs to a placement that's no longer in the spec, delete it
+			err := d.workApplier.Delete(ctx, mw.Namespace, mw.Name)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to delete manifestwork %s/%s for removed placement %s: %w", mw.Namespace, mw.Name, placementName, err))
+			}
+		}
+	}
+
 	// Getting the placements and the created ManifestWorks related to each placement
 	for _, placementRef := range mwrSet.Spec.PlacementRefs {
 		var existingRolloutClsStatus []clustersdkv1alpha1.ClusterRolloutStatus

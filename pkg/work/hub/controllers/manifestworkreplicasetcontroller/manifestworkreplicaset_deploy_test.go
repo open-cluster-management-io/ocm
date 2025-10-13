@@ -629,3 +629,157 @@ func TestRequeueWithProgressDeadline(t *testing.T) {
 		t.Errorf("expect to get err %t", err)
 	}
 }
+
+func TestDeployReconcileDeletesOrphanedManifestWorks(t *testing.T) {
+	// Create a ManifestWorkReplicaSet that references placement2
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test2")
+
+	// Create ManifestWorks for both placement1 (old, should be deleted) and placement2 (current, should be kept)
+	mwOldPlacement, _ := CreateManifestWork(mwrSet, "cls1", "place-test1")
+	mwCurrentPlacement, _ := CreateManifestWork(mwrSet, "cls2", "place-test2")
+
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet, mwOldPlacement, mwCurrentPlacement)
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
+
+	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mwOldPlacement); err != nil {
+		t.Fatal(err)
+	}
+	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mwCurrentPlacement); err != nil {
+		t.Fatal(err)
+	}
+	if err := workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetStore().Add(mwrSet); err != nil {
+		t.Fatal(err)
+	}
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	// Create placement2 (the current placement in the spec)
+	placement2, placementDecision2 := helpertest.CreateTestPlacement("place-test2", "default", "cls2")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placement2, placementDecision2)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Second)
+
+	if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement2); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision2); err != nil {
+		t.Fatal(err)
+	}
+
+	placementLister := clusterInformerFactory.Cluster().V1beta1().Placements().Lister()
+	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
+
+	pmwDeployController := deployReconciler{
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: placementDecisionLister,
+		placementLister:     placementLister,
+	}
+
+	// Run reconcile
+	_, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that the ManifestWork from the old placement (place-test1) was deleted
+	deletedMW, err := fWorkClient.WorkV1().ManifestWorks("cls1").Get(context.TODO(), mwrSet.Name, metav1.GetOptions{})
+	if err == nil {
+		t.Fatalf("Expected ManifestWork for old placement to be deleted, but it still exists: %v", deletedMW)
+	}
+
+	// Verify that the ManifestWork from the current placement (place-test2) still exists
+	currentMW, err := fWorkClient.WorkV1().ManifestWorks("cls2").Get(context.TODO(), mwrSet.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Expected ManifestWork for current placement to exist, but got error: %v", err)
+	}
+	if currentMW == nil {
+		t.Fatal("Expected ManifestWork for current placement to exist, but it is nil")
+	}
+
+	// Verify the placement label is correct
+	if currentMW.Labels[ManifestWorkReplicaSetPlacementNameLabelKey] != "place-test2" {
+		t.Fatalf("Expected placement label to be 'place-test2', got '%s'", currentMW.Labels[ManifestWorkReplicaSetPlacementNameLabelKey])
+	}
+}
+
+func TestDeployReconcileWithMultiplePlacementChanges(t *testing.T) {
+	// Create a ManifestWorkReplicaSet that references both placement2 and placement3
+	allRollOut := clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All}
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSetWithRollOutStrategy("mwrSet-test", "default",
+		map[string]clusterv1alpha1.RolloutStrategy{"place-test2": allRollOut, "place-test3": allRollOut})
+
+	// Create ManifestWorks for placement1 (old), placement2 (current), and placement3 (current)
+	mwOldPlacement, _ := CreateManifestWork(mwrSet, "cls1", "place-test1")
+	mwCurrentPlacement2, _ := CreateManifestWork(mwrSet, "cls2", "place-test2")
+	mwCurrentPlacement3, _ := CreateManifestWork(mwrSet, "cls3", "place-test3")
+
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet, mwOldPlacement, mwCurrentPlacement2, mwCurrentPlacement3)
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
+
+	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mwOldPlacement); err != nil {
+		t.Fatal(err)
+	}
+	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mwCurrentPlacement2); err != nil {
+		t.Fatal(err)
+	}
+	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mwCurrentPlacement3); err != nil {
+		t.Fatal(err)
+	}
+	if err := workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetStore().Add(mwrSet); err != nil {
+		t.Fatal(err)
+	}
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	// Create placement2 and placement3 (the current placements in the spec)
+	placement2, placementDecision2 := helpertest.CreateTestPlacement("place-test2", "default", "cls2")
+	placement3, placementDecision3 := helpertest.CreateTestPlacement("place-test3", "default", "cls3")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placement2, placementDecision2, placement3, placementDecision3)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Second)
+
+	if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement2); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision2); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement3); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision3); err != nil {
+		t.Fatal(err)
+	}
+
+	placementLister := clusterInformerFactory.Cluster().V1beta1().Placements().Lister()
+	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
+
+	pmwDeployController := deployReconciler{
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: placementDecisionLister,
+		placementLister:     placementLister,
+	}
+
+	// Run reconcile
+	_, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that the ManifestWork from the old placement (place-test1) was deleted
+	_, err = fWorkClient.WorkV1().ManifestWorks("cls1").Get(context.TODO(), mwrSet.Name, metav1.GetOptions{})
+	if err == nil {
+		t.Fatal("Expected ManifestWork for old placement to be deleted, but it still exists")
+	}
+
+	// Verify that ManifestWorks from current placements (place-test2 and place-test3) still exist
+	currentMW2, err := fWorkClient.WorkV1().ManifestWorks("cls2").Get(context.TODO(), mwrSet.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Expected ManifestWork for placement2 to exist, but got error: %v", err)
+	}
+	assert.Equal(t, currentMW2.Labels[ManifestWorkReplicaSetPlacementNameLabelKey], "place-test2")
+
+	currentMW3, err := fWorkClient.WorkV1().ManifestWorks("cls3").Get(context.TODO(), mwrSet.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Expected ManifestWork for placement3 to exist, but got error: %v", err)
+	}
+	assert.Equal(t, currentMW3.Labels[ManifestWorkReplicaSetPlacementNameLabelKey], "place-test3")
+}
