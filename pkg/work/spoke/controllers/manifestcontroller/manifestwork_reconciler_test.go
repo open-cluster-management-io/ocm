@@ -89,7 +89,7 @@ func (t *testController) toController() *ManifestWorkController {
 }
 
 func (t *testController) withKubeObject(objects ...runtime.Object) *testController {
-	kubeClient := fakekube.NewSimpleClientset(objects...)
+	kubeClient := fakekube.NewClientset(objects...)
 	t.kubeClient = kubeClient
 	return t
 }
@@ -933,12 +933,17 @@ func TestOnUpdateFunc(t *testing.T) {
 		expectQueued bool
 	}{
 		{
-			name: "object with finalizer and generation change should be queued",
+			name: "object with finalizer and spec change should be queued",
 			oldObj: &workapiv1.ManifestWork{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "test-work",
 					Generation: 1,
 					Finalizers: []string{workapiv1.ManifestWorkFinalizer},
+				},
+				Spec: workapiv1.ManifestWorkSpec{
+					DeleteOption: &workapiv1.DeleteOption{
+						PropagationPolicy: workapiv1.DeletePropagationPolicyTypeForeground,
+					},
 				},
 			},
 			newObj: &workapiv1.ManifestWork{
@@ -946,6 +951,11 @@ func TestOnUpdateFunc(t *testing.T) {
 					Name:       "test-work",
 					Generation: 2,
 					Finalizers: []string{workapiv1.ManifestWorkFinalizer},
+				},
+				Spec: workapiv1.ManifestWorkSpec{
+					DeleteOption: &workapiv1.DeleteOption{
+						PropagationPolicy: workapiv1.DeletePropagationPolicyTypeOrphan,
+					},
 				},
 			},
 			expectQueued: true,

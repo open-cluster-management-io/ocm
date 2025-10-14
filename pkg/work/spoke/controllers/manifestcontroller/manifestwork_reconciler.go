@@ -43,7 +43,8 @@ func (m *manifestworkReconciler) reconcile(
 	ctx context.Context,
 	controllerContext factory.SyncContext,
 	manifestWork *workapiv1.ManifestWork,
-	appliedManifestWork *workapiv1.AppliedManifestWork) (*workapiv1.ManifestWork, *workapiv1.AppliedManifestWork, error) {
+	appliedManifestWork *workapiv1.AppliedManifestWork,
+	_ []applyResult) (*workapiv1.ManifestWork, *workapiv1.AppliedManifestWork, []applyResult, error) {
 	logger := klog.FromContext(ctx)
 	// We creat a ownerref instead of controller ref since multiple controller can declare the ownership of a manifests
 	owner := helper.NewAppliedManifestWorkOwner(appliedManifestWork)
@@ -84,7 +85,7 @@ func (m *manifestworkReconciler) reconcile(
 		// and requeue the item
 		var authError *basic.NotAllowedError
 		if errors.As(result.Error, &authError) {
-			logger.V(2).Info("apply work fails", "name", manifestWork.Name, "error", result.Error)
+			logger.V(2).Info("apply work failed", "name", manifestWork.Name, "error", result.Error)
 			result.Error = nil
 
 			if authError.RequeueTime < requeueTime {
@@ -122,12 +123,12 @@ func (m *manifestworkReconciler) reconcile(
 		err = utilerrors.NewAggregate(errs)
 	} else if requeueTime != ResyncInterval {
 		err = commonhelper.NewRequeueError(
-			fmt.Sprintf("requeu work %s due to authorization err", manifestWork.Name),
+			fmt.Sprintf("requeue work %s due to authorization error", manifestWork.Name),
 			requeueTime,
 		)
 	}
 
-	return manifestWork, appliedManifestWork, err
+	return manifestWork, appliedManifestWork, resourceResults, err
 }
 
 func (m *manifestworkReconciler) applyManifests(

@@ -254,7 +254,7 @@ var _ = ginkgo.Describe("ManifestWork Delete Option", func() {
 				}
 
 				if currentUID != configMap.UID {
-					return fmt.Errorf("UID should be equal")
+					return fmt.Errorf("UID should not be changed in configmap")
 				}
 
 				anotherAppliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(
@@ -269,7 +269,7 @@ var _ = ginkgo.Describe("ManifestWork Delete Option", func() {
 					}
 
 					if appliedResource.UID != string(currentUID) {
-						return fmt.Errorf("UID should be equal")
+						return fmt.Errorf("UID should not be changed in appliedmanifestwork, got %v, should be %s", appliedResource.UID, currentUID)
 					}
 				}
 

@@ -9,6 +9,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/pkg/errors"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,8 +41,11 @@ var (
 )
 
 type workReconcile interface {
-	reconcile(ctx context.Context, controllerContext factory.SyncContext, mw *workapiv1.ManifestWork,
-		amw *workapiv1.AppliedManifestWork) (*workapiv1.ManifestWork, *workapiv1.AppliedManifestWork, error)
+	reconcile(ctx context.Context,
+		controllerContext factory.SyncContext,
+		mw *workapiv1.ManifestWork,
+		amw *workapiv1.AppliedManifestWork,
+		results []applyResult) (*workapiv1.ManifestWork, *workapiv1.AppliedManifestWork, []applyResult, error)
 }
 
 // ManifestWorkController is to reconcile the workload resources
@@ -99,16 +103,11 @@ func NewManifestWorkController(
 		},
 	}
 
-	// only trigger reconcile when:
-	// 1. creat event and the manifestwork has the finalizer set already.
 	_, err := manifestWorkInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    onAddFunc(syncCtx.Queue()),
 		UpdateFunc: onUpdateFunc(syncCtx.Queue()),
 	})
-
-	if err != nil {
-		utilruntime.Must(err)
-	}
+	utilruntime.Must(err)
 
 	return factory.New().
 		WithBareInformers(
@@ -164,9 +163,10 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 
 	var requeueTime = wait.Jitter(ResyncInterval, 0.3)
 	var errs []error
+	var results []applyResult
 	for _, reconciler := range m.reconcilers {
-		manifestWork, newAppliedManifestWork, err = reconciler.reconcile(
-			ctx, controllerContext, manifestWork, newAppliedManifestWork)
+		manifestWork, newAppliedManifestWork, results, err = reconciler.reconcile(
+			ctx, controllerContext, manifestWork, newAppliedManifestWork, results)
 		var rqe commonhelper.RequeueError
 		if err != nil && errors.As(err, &rqe) {
 			if requeueTime > rqe.RequeueTime {
@@ -243,26 +243,25 @@ func onAddFunc(queue workqueue.RateLimitingInterface) func(obj interface{}) {
 
 func onUpdateFunc(queue workqueue.RateLimitingInterface) func(oldObj, newObj interface{}) {
 	return func(oldObj, newObj interface{}) {
-		newAccessor, err := meta.Accessor(newObj)
-		if err != nil {
-			utilruntime.HandleError(err)
+		newWork, ok := newObj.(*workapiv1.ManifestWork)
+		if !ok {
 			return
 		}
-		oldAccessor, err := meta.Accessor(oldObj)
-		if err != nil {
-			utilruntime.HandleError(err)
+		oldWork, ok := oldObj.(*workapiv1.ManifestWork)
+		if !ok {
 			return
 		}
-		// enqueue when finalizer is added or generation is changed.
-		if !commonhelper.HasFinalizer(newAccessor.GetFinalizers(), workapiv1.ManifestWorkFinalizer) {
+		// enqueue when finalizer is added, spec or label is changed.
+		if !commonhelper.HasFinalizer(newWork.GetFinalizers(), workapiv1.ManifestWorkFinalizer) {
 			return
 		}
-		if !commonhelper.HasFinalizer(oldAccessor.GetFinalizers(), workapiv1.ManifestWorkFinalizer) {
-			queue.Add(newAccessor.GetName())
+		if !commonhelper.HasFinalizer(oldWork.GetFinalizers(), workapiv1.ManifestWorkFinalizer) {
+			queue.Add(newWork.GetName())
 			return
 		}
-		if newAccessor.GetGeneration() != oldAccessor.GetGeneration() {
-			queue.Add(newAccessor.GetName())
+		if !apiequality.Semantic.DeepEqual(newWork.Spec, oldWork.Spec) ||
+			!apiequality.Semantic.DeepEqual(newWork.Labels, oldWork.Labels) {
+			queue.Add(newWork.GetName())
 		}
 	}
 }

@@ -3,7 +3,6 @@ package manifestcontroller
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"sort"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -11,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/workqueue"
@@ -31,10 +31,11 @@ func (m *appliedManifestWorkReconciler) reconcile(
 	ctx context.Context,
 	controllerContext factory.SyncContext,
 	manifestWork *workapiv1.ManifestWork,
-	appliedManifestWork *workapiv1.AppliedManifestWork) (*workapiv1.ManifestWork, *workapiv1.AppliedManifestWork, error) {
+	appliedManifestWork *workapiv1.AppliedManifestWork,
+	results []applyResult) (*workapiv1.ManifestWork, *workapiv1.AppliedManifestWork, []applyResult, error) {
 	logger := klog.FromContext(ctx)
 	if !appliedManifestWork.DeletionTimestamp.IsZero() {
-		return manifestWork, appliedManifestWork, nil
+		return manifestWork, appliedManifestWork, results, nil
 	}
 
 	// In a case where a managed cluster switches to a new hub with the same hub hash, the same manifestworks
@@ -43,7 +44,7 @@ func (m *appliedManifestWorkReconciler) reconcile(
 	// before the manifestworks are applied the first time.
 	if appliedCondition := meta.FindStatusCondition(manifestWork.Status.Conditions, workapiv1.WorkApplied); appliedCondition == nil {
 		// if the manifestwork has not been applied on the managed cluster yet, do nothing
-		return manifestWork, appliedManifestWork, nil
+		return manifestWork, appliedManifestWork, results, nil
 	}
 
 	// get the latest applied resources from the manifests in resource status. We get this from status instead of
@@ -51,47 +52,34 @@ func (m *appliedManifestWorkReconciler) reconcile(
 	// maintained by the manifest work.
 	var appliedResources []workapiv1.AppliedManifestResourceMeta
 	var errs []error
-	for _, resourceStatus := range manifestWork.Status.ResourceStatus.Manifests {
-		gvr := schema.GroupVersionResource{
-			Group:    resourceStatus.ResourceMeta.Group,
-			Version:  resourceStatus.ResourceMeta.Version,
-			Resource: resourceStatus.ResourceMeta.Resource,
-		}
-		if len(gvr.Resource) == 0 || len(gvr.Version) == 0 || len(resourceStatus.ResourceMeta.Name) == 0 {
-			continue
-		}
-
-		u, err := m.spokeDynamicClient.
-			Resource(gvr).
-			Namespace(resourceStatus.ResourceMeta.Namespace).
-			Get(context.TODO(), resourceStatus.ResourceMeta.Name, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+	for _, result := range results {
+		uid, err := m.getUIDFromResult(ctx, result)
+		switch {
+		case errors.IsNotFound(err):
 			logger.V(2).Info(
-				"Resource with key does not exist", "gvr",
-				gvr, "namespace", resourceStatus.ResourceMeta.Namespace, "name", resourceStatus.ResourceMeta.Name)
+				"Resource with key does not exist",
+				"namespace", result.resourceMeta.Namespace, "name", result.resourceMeta.Name)
 			continue
-		}
-
-		if err != nil {
+		case err != nil:
 			errs = append(errs, fmt.Errorf(
-				"failed to get resource %v with key %s/%s: %w",
-				gvr, resourceStatus.ResourceMeta.Namespace, resourceStatus.ResourceMeta.Name, err))
+				"failed to get resource with key %s/%s: %w",
+				result.resourceMeta.Namespace, result.resourceMeta.Name, err))
 			continue
 		}
 
 		appliedResources = append(appliedResources, workapiv1.AppliedManifestResourceMeta{
 			ResourceIdentifier: workapiv1.ResourceIdentifier{
-				Group:     resourceStatus.ResourceMeta.Group,
-				Resource:  resourceStatus.ResourceMeta.Resource,
-				Namespace: resourceStatus.ResourceMeta.Namespace,
-				Name:      resourceStatus.ResourceMeta.Name,
+				Group:     result.resourceMeta.Group,
+				Resource:  result.resourceMeta.Resource,
+				Namespace: result.resourceMeta.Namespace,
+				Name:      result.resourceMeta.Name,
 			},
-			Version: resourceStatus.ResourceMeta.Version,
-			UID:     string(u.GetUID()),
+			Version: result.resourceMeta.Version,
+			UID:     string(uid),
 		})
 	}
 	if len(errs) != 0 {
-		return manifestWork, appliedManifestWork, utilerrors.NewAggregate(errs)
+		return manifestWork, appliedManifestWork, results, utilerrors.NewAggregate(errs)
 	}
 
 	owner := helper.NewAppliedManifestWorkOwner(appliedManifestWork)
@@ -104,7 +92,7 @@ func (m *appliedManifestWorkReconciler) reconcile(
 	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(
 		ctx, noLongerMaintainedResources, reason, m.spokeDynamicClient, controllerContext.Recorder(), *owner)
 	if len(errs) != 0 {
-		return manifestWork, appliedManifestWork, utilerrors.NewAggregate(errs)
+		return manifestWork, appliedManifestWork, results, utilerrors.NewAggregate(errs)
 	}
 
 	appliedResources = append(appliedResources, resourcesPendingFinalization...)
@@ -125,17 +113,16 @@ func (m *appliedManifestWorkReconciler) reconcile(
 		}
 	})
 
-	willSkipStatusUpdate := reflect.DeepEqual(appliedManifestWork.Status.AppliedResources, appliedResources)
-	if willSkipStatusUpdate {
-		// requeue the work if there exists any resource pending for finalization
-		var err error
-		if len(resourcesPendingFinalization) != 0 {
-			err = commonhelper.NewRequeueError(
-				"requeue due to pending deleting resources",
-				m.rateLimiter.When(manifestWork.Name),
-			)
-		}
-		return manifestWork, appliedManifestWork, err
+	// update appliedmanifestwork status with latest applied resources. if this conflicts, we'll try again later
+	// for retrying update without reassessing the status can cause overwriting of valid information.
+	appliedManifestWork.Status.AppliedResources = appliedResources
+
+	// requeue the work if there exists any resource pending for finalization
+	if len(resourcesPendingFinalization) != 0 {
+		return manifestWork, appliedManifestWork, results, commonhelper.NewRequeueError(
+			"requeue due to pending deleting resources",
+			m.rateLimiter.When(manifestWork.Name),
+		)
 	}
 
 	// reset the rate limiter for the manifest work
@@ -143,8 +130,35 @@ func (m *appliedManifestWorkReconciler) reconcile(
 		m.rateLimiter.Forget(manifestWork.Name)
 	}
 
-	// update appliedmanifestwork status with latest applied resources. if this conflicts, we'll try again later
-	// for retrying update without reassessing the status can cause overwriting of valid information.
-	appliedManifestWork.Status.AppliedResources = appliedResources
-	return manifestWork, appliedManifestWork, nil
+	return manifestWork, appliedManifestWork, results, nil
+}
+
+// getUIDFromResult get uid of the resource from result at first, call api to get if it is not in the result
+func (m *appliedManifestWorkReconciler) getUIDFromResult(ctx context.Context, result applyResult) (types.UID, error) {
+	if result.Error == nil {
+		accessor, err := meta.Accessor(result.Result)
+		if err == nil && accessor.GetUID() != "" {
+			return accessor.GetUID(), nil
+		}
+	}
+
+	gvr := schema.GroupVersionResource{
+		Group:    result.resourceMeta.Group,
+		Version:  result.resourceMeta.Version,
+		Resource: result.resourceMeta.Resource,
+	}
+	if len(gvr.Resource) == 0 || len(gvr.Version) == 0 || len(result.resourceMeta.Name) == 0 {
+		return "", fmt.Errorf("resource with key %s/%s not found", result.resourceMeta.Namespace, result.resourceMeta.Name)
+	}
+
+	// get object if cannot get the object from the result.
+	u, err := m.spokeDynamicClient.
+		Resource(gvr).
+		Namespace(result.resourceMeta.Namespace).
+		Get(ctx, result.resourceMeta.Name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	return u.GetUID(), nil
 }
