@@ -181,11 +181,8 @@ func toSubjectAccessReview(clusterName string, user string, groups []string, eve
 				Namespace: clusterName,
 			},
 			Groups: groups,
+			User:   user,
 		},
-	}
-
-	if len(sar.Spec.Groups) == 0 {
-		sar.Spec.User = user
 	}
 
 	if eventsType.SubResource == types.SubResourceStatus {

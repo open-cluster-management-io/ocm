@@ -63,7 +63,6 @@ func (c *ManifestBundleCodec) Encode(source string, eventType types.CloudEventsT
 	evt := types.NewEventBuilder(source, eventType).
 		WithResourceID(string(work.UID)).
 		WithStatusUpdateSequenceID(sequenceGenerator.Generate().String()).
-		WithResourceName(work.Name).
 		WithResourceVersion(resourceVersion).
 		WithClusterName(work.Namespace).
 		WithOriginalSource(originalSource).
@@ -113,17 +112,6 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 		return nil, fmt.Errorf("failed to get resourceid extension: %v", err)
 	}
 
-	var resourceName string
-	if v, ok := evtExtensions[types.ExtensionResourceName]; ok {
-		resourceName, err = cloudeventstypes.ToString(v)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get resourcename extension: %v", err)
-		}
-	} else {
-		// fall back to set resourceName to resourceID
-		resourceName = resourceID
-	}
-
 	resourceVersion, err := cloudeventstypes.ToInteger(evtExtensions[types.ExtensionResourceVersion])
 	if err != nil {
 		return nil, fmt.Errorf("failed to get resourceversion extension: %v", err)
@@ -147,7 +135,9 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 	}
 
 	metaObj.UID = kubetypes.UID(resourceID)
-	metaObj.Name = resourceName
+	if len(metaObj.Name) == 0 {
+		metaObj.Name = resourceID
+	}
 	metaObj.Namespace = clusterName
 	metaObj.ResourceVersion = fmt.Sprintf("%d", resourceVersion)
 	// if generation is not set, set it the same as resourceVersion

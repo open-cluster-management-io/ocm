@@ -155,8 +155,8 @@ func (b *workProcessor) handleWork(work *workv1.ManifestWork) error {
 		return nil
 	}
 
-	// the work has been handled by agent, we ensure a finalizer on the work
-	updatedWork.Finalizers = utils.EnsureResourceFinalizer(updatedWork.Finalizers)
+	// the work has been handled by agent, we ensure the manifestwork finalizer on the work
+	updatedWork.Finalizers = utils.EnsureManifestWorkFinalizer(updatedWork.Finalizers)
 	updatedWork.Annotations[common.CloudEventsSequenceIDAnnotationKey] = sequenceID
 	updatedWork.Status = work.Status
 	// update the work with status in the local cache.

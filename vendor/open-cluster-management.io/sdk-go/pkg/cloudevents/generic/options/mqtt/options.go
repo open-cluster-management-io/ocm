@@ -231,7 +231,11 @@ func (o *MQTTOptions) GetCloudEventsProtocol(
 		OnClientError: errorHandler,
 	}
 
-	opts := []cloudeventsmqtt.Option{cloudeventsmqtt.WithConnect(o.GetMQTTConnectOption(clientID))}
+	opts := []cloudeventsmqtt.Option{
+		cloudeventsmqtt.WithConnect(o.GetMQTTConnectOption(clientID)),
+		cloudeventsmqtt.WithDebugLogger(&PahoDebugLogger{}),
+		cloudeventsmqtt.WithErrorLogger(&PahoErrorLogger{}),
+	}
 	opts = append(opts, clientOpts...)
 	return cloudeventsmqtt.New(ctx, config, opts...)
 }

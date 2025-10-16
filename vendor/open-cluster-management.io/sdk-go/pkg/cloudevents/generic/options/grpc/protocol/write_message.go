@@ -136,13 +136,13 @@ func (b *pbEventWriter) SetAttribute(attribute spec.Attribute, value interface{}
 		}
 	case spec.Time:
 		if value == nil {
-			delete(b.Attributes, prefix+time)
+			delete(b.Attributes, prefix+timestamp)
 		} else {
 			attrVal, err := attributeFor(value)
 			if err != nil {
 				return err
 			}
-			b.Attributes[prefix+time] = attrVal
+			b.Attributes[prefix+timestamp] = attrVal
 		}
 	default:
 		if value == nil {

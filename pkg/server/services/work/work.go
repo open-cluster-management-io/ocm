@@ -126,7 +126,7 @@ func (w *WorkService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.E
 	case types.UpdateRequestAction:
 		// the work was deleted by agent, remove its finalizers
 		if meta.IsStatusConditionTrue(work.Status.Conditions, common.ResourceDeleted) {
-			return workPatcher.RemoveFinalizer(ctx, last, common.ResourceFinalizer)
+			return workPatcher.RemoveFinalizer(ctx, last, workv1.ManifestWorkFinalizer)
 		}
 
 		if last.Generation > int64(resourceVersion) {
@@ -134,8 +134,8 @@ func (w *WorkService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.E
 			return nil
 		}
 
-		// the work was handled by agent, ensure it has the resource finalizer
-		if _, err := workPatcher.AddFinalizer(ctx, last, common.ResourceFinalizer); err != nil {
+		// the work was handled by agent, ensure it has the manifestwork finalizer
+		if _, err := workPatcher.AddFinalizer(ctx, last, workv1.ManifestWorkFinalizer); err != nil {
 			return err
 		}
 

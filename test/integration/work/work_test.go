@@ -18,7 +18,6 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/common"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/work/spoke"
@@ -47,9 +46,6 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 
 	ginkgo.BeforeEach(func() {
 		expectedFinalizer = workapiv1.ManifestWorkFinalizer
-		if sourceDriver != util.KubeDriver {
-			expectedFinalizer = common.ResourceFinalizer
-		}
 		workName = fmt.Sprintf("work-%s", rand.String(5))
 		clusterName = rand.String(5)
 

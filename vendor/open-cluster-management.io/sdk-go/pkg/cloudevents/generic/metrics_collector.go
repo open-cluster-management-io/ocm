@@ -17,7 +17,7 @@ const (
 const (
 	metricsSourceLabel         = "source"
 	metricsOriginalSourceLabel = "original_source"
-	metricsClusterLabel        = "cluster"
+	metricsConsumerLabel       = "consumer"
 	metricsDataTypeLabel       = "type"
 	metricsSubResourceLabel    = "subresource"
 	metricsActionLabel         = "action"
@@ -28,20 +28,36 @@ const (
 
 const noneOriginalSource = "none"
 
-// cloudeventsReceivedMetricsLabels - Array of labels added to cloudevents received metrics:
-var cloudeventsReceivedMetricsLabels = []string{
+// cloudeventsReceivedBySourceMetricsLabels - Array of labels added to cloudevents received by source metrics:
+var cloudeventsReceivedBySourceMetricsLabels = []string{
 	metricsSourceLabel,      // source
-	metricsClusterLabel,     // cluster
+	metricsConsumerLabel,    // consumer
 	metricsDataTypeLabel,    // data type, e.g. manifests, manifestbundles
 	metricsSubResourceLabel, // subresource, eg, spec or status
 	metricsActionLabel,      // action, eg, create, update, delete, resync_request, resync_response
 }
 
-// cloudeventsSentMetricsLabels - Array of labels added to cloudevents sent metrics:
-var cloudeventsSentMetricsLabels = []string{
+// cloudeventsReceivedByClientMetricsLabels - Array of labels added to cloudevents received by client metrics:
+var cloudeventsReceivedByClientMetricsLabels = []string{
+	metricsSourceLabel,      // source
+	metricsDataTypeLabel,    // data type, e.g. manifests, manifestbundles
+	metricsSubResourceLabel, // subresource, eg, spec or status
+	metricsActionLabel,      // action, eg, create, update, delete, resync_request, resync_response
+}
+
+// cloudeventsSentFromSourceMetricsLabels - Array of labels added to cloudevents sent from source metrics:
+var cloudeventsSentFromSourceMetricsLabels = []string{
+	metricsSourceLabel,      // source
+	metricsConsumerLabel,    // consumer
+	metricsDataTypeLabel,    // data type, e.g. manifests, manifestbundles
+	metricsSubResourceLabel, // subresource, eg, spec or status
+	metricsActionLabel,      // action, eg, create, update, delete, resync_request, resync_response
+}
+
+// cloudeventsSentFromClientMetricsLabels - Array of labels added to cloudevents sent from client metrics:
+var cloudeventsSentFromClientMetricsLabels = []string{
 	metricsSourceLabel,         // source
 	metricsOriginalSourceLabel, // original source, if no, set to "none"
-	metricsClusterLabel,        // cluster
 	metricsDataTypeLabel,       // data type, e.g. manifests, manifestbundles
 	metricsSubResourceLabel,    // subresource, eg, spec or status
 	metricsActionLabel,         // action, eg, create, update, delete, resync_request, resync_response
@@ -50,7 +66,7 @@ var cloudeventsSentMetricsLabels = []string{
 // cloudeventsResyncMetricsLabels - Array of labels added to cloudevents resync metrics:
 var cloudeventsResyncMetricsLabels = []string{
 	metricsSourceLabel,   // source
-	metricsClusterLabel,  // cluster
+	metricsConsumerLabel, // consumer
 	metricsDataTypeLabel, // data type, e.g. manifests, manifestbundles
 }
 
@@ -75,34 +91,60 @@ const (
 	workProcessedCounter       = "processed_total"
 )
 
-// The cloudevents received counter metric is a counter with a base metric name of 'received_total'
-// and a help string of 'The total number of received CloudEvents.'
-// For example, 2 CloudEvents received from source1 to agent on cluster1 with data type manifests, one for resource create,
-// another for resource updatewould result in the following metrics:
-// cloudevents_received_total{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifests",subresource="spec",action="create"} 1
-// cloudevents_received_total{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifests",subresource="spec",action="update"} 1
-var cloudeventsReceivedCounterMetric = prometheus.NewCounterVec(
+// The cloudevents received by source counter metric is a counter with a base metric name of 'received_by_source_total'
+// and a help string of 'The total number of CloudEvents received by source.'
+// For example, 2 CloudEvents received from agent to source with consumer1 for data type manifests, one for resource create,
+// another for resource update would result in the following metrics:
+// cloudevents_received_total{source="agent1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifests",subresource="spec",action="create"} 1
+// cloudevents_received_total{source="agent1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifests",subresource="spec",action="update"} 1
+var cloudeventsReceivedBySourceCounterMetric = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Subsystem: cloudeventsMetricsSubsystem,
 		Name:      receivedCounterMetric,
-		Help:      "The total number of received CloudEvents.",
+		Help:      "The total number of CloudEvents received by source.",
 	},
-	cloudeventsReceivedMetricsLabels,
+	cloudeventsReceivedBySourceMetricsLabels,
 )
 
-// The cloudevents sent counter metric is a counter with a base metric name of 'sent_total'
-// and a help string of 'The total number of sent CloudEvents.'
-// For example, 1 cloudevent sent from source1 with data type manifestbundles for resource spec create (original source is empty),
-// and 2 CloudEvents sent from agent on cluster1 back to source1 for resource status update would result in the following metrics:
-// cloudevents_sent_total{source="source1",original_source="none",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",subresource="spec",action="create"} 1
-// cloudevents_sent_total{source="cluster1-work-agent",original_source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",subresource="status",action="update"} 2
-var cloudeventsSentCounterMetric = prometheus.NewCounterVec(
+// The cloudevents received by agent counter metric is a counter with a base metric name of 'received_by_agent_total'
+// and a help string of 'The total number of CloudEvents received by agent.'
+// For example, 2 CloudEvents received from source1 by agent with data type manifests, one for resource create,
+// another for resource update would result in the following metrics:
+// cloudevents_received_total{source="source1",type="io.open-cluster-management.works.v1alpha1.manifests",subresource="spec",action="create"} 1
+// cloudevents_received_total{source="source1",type="io.open-cluster-management.works.v1alpha1.manifests",subresource="spec",action="update"} 1
+var cloudeventsReceivedByClientCounterMetric = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Subsystem: cloudeventsMetricsSubsystem,
+		Name:      receivedCounterMetric,
+		Help:      "The total number of CloudEvents received by client.",
+	},
+	cloudeventsReceivedByClientMetricsLabels,
+)
+
+// The cloudevents sent from source counter metric is a counter with a base metric name of 'sent_from_source_total'
+// and a help string of 'The total number of CloudEvents sent from source.'
+// For example, 1 cloudevent sent from source1 to consumer1 with data type manifestbundles for resource spec create would result in the following metrics:
+// cloudevents_sent_total{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",subresource="spec",action="create"} 1
+var cloudeventsSentFromSourceCounterMetric = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Subsystem: cloudeventsMetricsSubsystem,
 		Name:      sentCounterMetric,
-		Help:      "The total number of sent CloudEvents.",
+		Help:      "The total number of CloudEvents sent from source.",
 	},
-	cloudeventsSentMetricsLabels,
+	cloudeventsSentFromSourceMetricsLabels,
+)
+
+// The cloudevents sent from agent counter metric is a counter with a base metric name of 'sent_from_agent_total'
+// and a help string of 'The total number of CloudEvents sent from agent.'
+// For example, 2 CloudEvents sent from consumer1-work-agent back to source1 for resource status update would result in the following metrics:
+// cloudevents_sent_total{source="consumer1-work-agent",original_source="source1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",subresource="status",action="update"} 2
+var cloudeventsSentFromClientCounterMetric = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Subsystem: cloudeventsMetricsSubsystem,
+		Name:      sentCounterMetric,
+		Help:      "The total number of CloudEvents sent from client.",
+	},
+	cloudeventsSentFromClientMetricsLabels,
 )
 
 // The resource spec resync duration metric is a histogram with a base metric name of 'resource_spec_resync_duration_second'
@@ -111,16 +153,16 @@ var cloudeventsSentCounterMetric = prometheus.NewCounterVec(
 // 2. the total sum of all observed values, exposed as 'resource_spec_resync_duration_seconds_sum'
 // 3. the count of events that have been observed, exposed as 'resource_spec_resync_duration_seconds_count' (identical to 'resource_spec_resync_duration_seconds_bucket{le="+Inf"}' above)
 // For example, 2 resource spec resync for manifests type that have been observed, one taking 0.5s and the other taking 0.7s, would result in the following metrics:
-// resource_spec_resync_duration_seconds_bucket{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifests",le="0.1"} 0
-// resource_spec_resync_duration_seconds_bucket{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifests",le="0.2"} 0
-// resource_spec_resync_duration_seconds_bucket{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifests",le="0.5"} 1
-// resource_spec_resync_duration_seconds_bucket{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifests",le="1.0"} 2
-// resource_spec_resync_duration_seconds_bucket{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifests",le="2.0"} 2
-// resource_spec_resync_duration_seconds_bucket{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifests",le="10.0"} 2
-// resource_spec_resync_duration_seconds_bucket{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifests",le="30.0"} 2
-// resource_spec_resync_duration_seconds_bucket{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifests",le="+Inf"} 2
-// resource_spec_resync_duration_seconds_sum{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifests"} 1.2
-// resource_spec_resync_duration_seconds_count{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifests"} 2
+// resource_spec_resync_duration_seconds_bucket{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifests",le="0.1"} 0
+// resource_spec_resync_duration_seconds_bucket{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifests",le="0.2"} 0
+// resource_spec_resync_duration_seconds_bucket{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifests",le="0.5"} 1
+// resource_spec_resync_duration_seconds_bucket{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifests",le="1.0"} 2
+// resource_spec_resync_duration_seconds_bucket{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifests",le="2.0"} 2
+// resource_spec_resync_duration_seconds_bucket{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifests",le="10.0"} 2
+// resource_spec_resync_duration_seconds_bucket{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifests",le="30.0"} 2
+// resource_spec_resync_duration_seconds_bucket{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifests",le="+Inf"} 2
+// resource_spec_resync_duration_seconds_sum{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifests"} 1.2
+// resource_spec_resync_duration_seconds_count{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifests"} 2
 var resourceSpecResyncDurationMetric = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Subsystem: resourcesMetricsSubsystem,
@@ -145,16 +187,16 @@ var resourceSpecResyncDurationMetric = prometheus.NewHistogramVec(
 // 2. the total sum of all observed values, exposed as 'resource_status_resync_duration_seconds_sum'
 // 3. the count of events that have been observed, exposed as 'resource_status_resync_duration_seconds_count' (identical to 'resource_status_resync_duration_seconds_bucket{le="+Inf"}' above)
 // For example, 2 resource status resync for manifestbundles type that have been observed, one taking 0.5s and the other taking 1.1s, would result in the following metrics:
-// resource_status_resync_duration_seconds_bucket{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",le="0.1"} 0
-// resource_status_resync_duration_seconds_bucket{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",le="0.2"} 0
-// resource_status_resync_duration_seconds_bucket{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",le="0.5"} 1
-// resource_status_resync_duration_seconds_bucket{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",le="1.0"} 1
-// resource_status_resync_duration_seconds_bucket{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",le="2.0"} 2
-// resource_status_resync_duration_seconds_bucket{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",le="10.0"} 2
-// resource_status_resync_duration_seconds_bucket{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",le="30.0"} 2
-// resource_status_resync_duration_seconds_bucket{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",le="+Inf"} 2
-// resource_status_resync_duration_seconds_sum{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifestbundles"} 1.6
-// resource_status_resync_duration_seconds_count{source="source1",cluster="cluster1",type="io.open-cluster-management.works.v1alpha1.manifestbundles"} 2
+// resource_status_resync_duration_seconds_bucket{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",le="0.1"} 0
+// resource_status_resync_duration_seconds_bucket{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",le="0.2"} 0
+// resource_status_resync_duration_seconds_bucket{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",le="0.5"} 1
+// resource_status_resync_duration_seconds_bucket{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",le="1.0"} 1
+// resource_status_resync_duration_seconds_bucket{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",le="2.0"} 2
+// resource_status_resync_duration_seconds_bucket{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",le="10.0"} 2
+// resource_status_resync_duration_seconds_bucket{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",le="30.0"} 2
+// resource_status_resync_duration_seconds_bucket{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifestbundles",le="+Inf"} 2
+// resource_status_resync_duration_seconds_sum{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifestbundles"} 1.6
+// resource_status_resync_duration_seconds_count{source="source1",consumer="consumer1",type="io.open-cluster-management.works.v1alpha1.manifestbundles"} 2
 var resourceStatusResyncDurationMetric = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Subsystem: resourcesMetricsSubsystem,
@@ -195,69 +237,93 @@ var workProcessedCounterMetric = prometheus.NewCounterVec(
 	workMetricsLabels,
 )
 
-// Register the metrics:
-func RegisterCloudEventsMetrics(register prometheus.Registerer) {
-	register.MustRegister(cloudeventsReceivedCounterMetric)
-	register.MustRegister(cloudeventsSentCounterMetric)
-	register.MustRegister(resourceSpecResyncDurationMetric)
+// Register the metrics
+func RegisterClientCloudEventsMetrics(register prometheus.Registerer) {
+	register.MustRegister(cloudeventsReceivedByClientCounterMetric)
+	register.MustRegister(cloudeventsSentFromClientCounterMetric)
 	register.MustRegister(resourceStatusResyncDurationMetric)
-	register.MustRegister(clientReconnectedCounterMetric)
 	register.MustRegister(workProcessedCounterMetric)
 }
 
-// Unregister the metrics:
-func UnregisterCloudEventsMetrics(register prometheus.Registerer) {
-	register.Unregister(cloudeventsReceivedCounterMetric)
-	register.Unregister(cloudeventsSentCounterMetric)
-	register.Unregister(resourceStatusResyncDurationMetric)
-	register.Unregister(resourceStatusResyncDurationMetric)
-	register.Unregister(clientReconnectedCounterMetric)
-	register.Unregister(workProcessedCounterMetric)
+// Register the metrics
+func RegisterSourceCloudEventsMetrics(register prometheus.Registerer) {
+	register.MustRegister(cloudeventsReceivedBySourceCounterMetric)
+	register.MustRegister(cloudeventsSentFromSourceCounterMetric)
+	register.MustRegister(resourceSpecResyncDurationMetric)
+	register.MustRegister(clientReconnectedCounterMetric)
 }
 
-// ResetCloudEventsMetrics resets all collectors
-func ResetCloudEventsMetrics() {
-	cloudeventsReceivedCounterMetric.Reset()
-	cloudeventsSentCounterMetric.Reset()
+// ResetSourceCloudEventsMetrics resets all collectors from source
+func ResetSourceCloudEventsMetrics() {
+	cloudeventsReceivedBySourceCounterMetric.Reset()
+	cloudeventsSentFromSourceCounterMetric.Reset()
 	resourceSpecResyncDurationMetric.Reset()
-	resourceStatusResyncDurationMetric.Reset()
 	clientReconnectedCounterMetric.Reset()
+}
+
+// ResetClientCloudEventsMetrics resets all collectors from client
+func ResetClientCloudEventsMetrics() {
+	cloudeventsReceivedByClientCounterMetric.Reset()
+	cloudeventsSentFromClientCounterMetric.Reset()
+	resourceStatusResyncDurationMetric.Reset()
 	workProcessedCounterMetric.Reset()
 }
 
-// increaseCloudEventsReceivedCounter increases the cloudevents sent counter metric:
-func increaseCloudEventsReceivedCounter(source, cluster, dataType, subresource, action string) {
+// increaseCloudEventsReceivedBySourceCounter increases the cloudevents received by source counter metric:
+func increaseCloudEventsReceivedBySourceCounter(source, consumer, dataType, subresource, action string) {
 	labels := prometheus.Labels{
 		metricsSourceLabel:      source,
-		metricsClusterLabel:     cluster,
+		metricsConsumerLabel:    consumer,
 		metricsDataTypeLabel:    dataType,
 		metricsSubResourceLabel: subresource,
 		metricsActionLabel:      action,
 	}
-	cloudeventsReceivedCounterMetric.With(labels).Inc()
+	cloudeventsReceivedBySourceCounterMetric.With(labels).Inc()
 }
 
-// increaseCloudEventsSentCounter increases the cloudevents sent counter metric:
-func increaseCloudEventsSentCounter(source, originalSource, cluster, dataType, subresource, action string) {
+// increaseCloudEventsReceivedByAgentCounter increases the cloudevents received by agent counter metric:
+func increaseCloudEventsReceivedByAgentCounter(source, dataType, subresource, action string) {
+	labels := prometheus.Labels{
+		metricsSourceLabel:      source,
+		metricsDataTypeLabel:    dataType,
+		metricsSubResourceLabel: subresource,
+		metricsActionLabel:      action,
+	}
+	cloudeventsReceivedByClientCounterMetric.With(labels).Inc()
+}
+
+// increaseCloudEventsSentFromSourceCounter increases the cloudevents sent from source counter metric:
+func increaseCloudEventsSentFromSourceCounter(source, consumer, dataType, subresource, action string) {
+	labels := prometheus.Labels{
+		metricsSourceLabel:      source,
+		metricsConsumerLabel:    consumer,
+		metricsDataTypeLabel:    dataType,
+		metricsSubResourceLabel: subresource,
+		metricsActionLabel:      action,
+	}
+	cloudeventsSentFromSourceCounterMetric.With(labels).Inc()
+}
+
+// increaseCloudEventsSentFromAgentCounter increases the cloudevents sent from agent counter metric:
+func increaseCloudEventsSentFromAgentCounter(source, originalSource, dataType, subresource, action string) {
 	if originalSource == "" {
 		originalSource = noneOriginalSource
 	}
 	labels := prometheus.Labels{
 		metricsSourceLabel:         source,
 		metricsOriginalSourceLabel: originalSource,
-		metricsClusterLabel:        cluster,
 		metricsDataTypeLabel:       dataType,
 		metricsSubResourceLabel:    subresource,
 		metricsActionLabel:         action,
 	}
-	cloudeventsSentCounterMetric.With(labels).Inc()
+	cloudeventsSentFromClientCounterMetric.With(labels).Inc()
 }
 
 // updateResourceSpecResyncDurationMetric updates the resource spec resync duration metric:
-func updateResourceSpecResyncDurationMetric(source, cluster, dataType string, startTime time.Time) {
+func updateResourceSpecResyncDurationMetric(source, consumer, dataType string, startTime time.Time) {
 	labels := prometheus.Labels{
 		metricsSourceLabel:   source,
-		metricsClusterLabel:  cluster,
+		metricsConsumerLabel: consumer,
 		metricsDataTypeLabel: dataType,
 	}
 	duration := time.Since(startTime)
@@ -265,10 +331,10 @@ func updateResourceSpecResyncDurationMetric(source, cluster, dataType string, st
 }
 
 // updateResourceStatusResyncDurationMetric updates the resource status resync duration metric:
-func updateResourceStatusResyncDurationMetric(source, cluster, dataType string, startTime time.Time) {
+func updateResourceStatusResyncDurationMetric(source, consumer, dataType string, startTime time.Time) {
 	labels := prometheus.Labels{
 		metricsSourceLabel:   source,
-		metricsClusterLabel:  cluster,
+		metricsConsumerLabel: consumer,
 		metricsDataTypeLabel: dataType,
 	}
 	duration := time.Since(startTime)

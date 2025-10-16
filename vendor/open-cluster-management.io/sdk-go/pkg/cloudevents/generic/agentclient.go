@@ -111,7 +111,7 @@ func (c *CloudEventAgentClient[T]) Resync(ctx context.Context, source string) er
 		return err
 	}
 
-	increaseCloudEventsSentCounter(evt.Source(), source, c.clusterName, c.codec.EventDataType().String(), string(eventType.SubResource), string(eventType.Action))
+	increaseCloudEventsSentFromAgentCounter(evt.Source(), source, c.codec.EventDataType().String(), string(eventType.SubResource), string(eventType.Action))
 
 	return nil
 }
@@ -132,7 +132,7 @@ func (c *CloudEventAgentClient[T]) Publish(ctx context.Context, eventType types.
 	}
 
 	originalSource, _ := cloudeventstypes.ToString(evt.Context.GetExtensions()[types.ExtensionOriginalSource])
-	increaseCloudEventsSentCounter(evt.Source(), originalSource, c.clusterName, eventType.CloudEventsDataType.String(), string(eventType.SubResource), string(eventType.Action))
+	increaseCloudEventsSentFromAgentCounter(evt.Source(), originalSource, eventType.CloudEventsDataType.String(), string(eventType.SubResource), string(eventType.Action))
 
 	return nil
 }
@@ -153,7 +153,7 @@ func (c *CloudEventAgentClient[T]) receive(ctx context.Context, evt cloudevents.
 		return
 	}
 
-	increaseCloudEventsReceivedCounter(evt.Source(), c.clusterName, eventType.CloudEventsDataType.String(), string(eventType.SubResource), string(eventType.Action))
+	increaseCloudEventsReceivedByAgentCounter(evt.Source(), eventType.CloudEventsDataType.String(), string(eventType.SubResource), string(eventType.Action))
 
 	if eventType.Action == types.ResyncRequestAction {
 		if eventType.SubResource != types.SubResourceStatus {

@@ -36,6 +36,9 @@ type Pinger interface {
 	// PacketSent is called when a packet is sent to the server.
 	PacketSent()
 
+	// PacketReceived is called when a packet (possibly a PINGRESP) is received from the server
+	PacketReceived()
+
 	// PingResp is called when a PINGRESP is received from the server.
 	PingResp()
 
@@ -46,8 +49,9 @@ type Pinger interface {
 
 // DefaultPinger is the default implementation of Pinger.
 type DefaultPinger struct {
-	lastPacketSent   time.Time
-	lastPingResponse time.Time
+	lastPacketSent     time.Time
+	lastPacketReceived time.Time
+	lastPingResponse   time.Time
 
 	debug log.Logger
 
@@ -87,16 +91,28 @@ func (p *DefaultPinger) Run(ctx context.Context, conn net.Conn, keepAlive uint16
 
 	interval := time.Duration(keepAlive) * time.Second
 	timer := time.NewTimer(0) // Immediately send first pingreq
+	// If timer is not stopped, it cannot be garbage collected until it fires.
+	defer timer.Stop()
 	var lastPingSent time.Time
+	// errCh should be buffered, so that the goroutine sending the error does not block if the context is cancelled
+	errCh := make(chan error, 1)
 	for {
 		select {
 		case <-ctx.Done():
-			timer.Stop() // We don't care if the timer has fired
 			return nil
 		case t := <-timer.C:
 			p.mu.Lock()
 			lastPingResponse := p.lastPingResponse
-			pingDue := p.lastPacketSent.Add(interval)
+			// The MQTT Spec only requires that a ping be sent if no control packets have been SENT within the keepalive
+			// period (MQTT-3.1.2-20). Only sending PING in that one case can cause issues if the only activity is
+			// outgoing messages, a half-open connection should result in a TCP timeout but this can take a long time
+			//(issue #288). To address this we PING if we have not both sent, and received, packets within keepAlive.
+			var pingDue time.Time
+			if p.lastPacketSent.Before(p.lastPacketReceived) {
+				pingDue = p.lastPacketSent.Add(interval)
+			} else {
+				pingDue = p.lastPacketReceived.Add(interval)
+			}
 			p.mu.Unlock()
 
 			if !lastPingSent.IsZero() && lastPingSent.After(lastPingResponse) {
@@ -109,13 +125,20 @@ func (p *DefaultPinger) Run(ctx context.Context, conn net.Conn, keepAlive uint16
 				timer.Reset(pingDue.Sub(t))
 				continue
 			}
-
-			lastPingSent = time.Now() // set before sending because WriteTo may return after PINGRESP is handled
-			if _, err := packets.NewControlPacket(packets.PINGREQ).WriteTo(conn); err != nil {
-				p.debug.Printf("DefaultPinger packet write error: %v", err)
-				return fmt.Errorf("failed to send PINGREQ: %w", err)
-			}
+			lastPingSent = time.Now()
+			go func() {
+				// WriteTo may not complete within KeepAlive period due to slow/unstable network.
+				// For instance, if a huge message is sent over a very slow link at the same time as PINGREQ packet,
+				// the Write operation may block for longer than KeepAlive interval.
+				// Note: connection closure unblocks the Write operation. So, the goroutine is not leaked.
+				if _, err := packets.NewControlPacket(packets.PINGREQ).WriteTo(conn); err != nil {
+					p.debug.Printf("DefaultPinger packet write error: %v", err)
+					errCh <- fmt.Errorf("failed to send PINGREQ: %w", err)
+				}
+			}()
 			timer.Reset(interval)
+		case err := <-errCh:
+			return err
 		}
 	}
 }
@@ -124,6 +147,12 @@ func (p *DefaultPinger) PacketSent() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.lastPacketSent = time.Now()
+}
+
+func (p *DefaultPinger) PacketReceived() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.lastPacketReceived = time.Now()
 }
 
 func (p *DefaultPinger) PingResp() {
