@@ -34,10 +34,9 @@ import (
 )
 
 var (
-	// ResyncInterval defines the maximum interval for resyncing a ManifestWork. It is used to:
-	//   1) Set the `ResyncEvery` for the `ManifestWorkAgent` controller;
-	//   2) Requeue a ManifestWork after it has been successfully reconciled.
-	ResyncInterval = 5 * time.Minute
+	// ResyncInterval defines the base interval for periodic reconciliation via AddAfter.
+	// Used to requeue a ManifestWork after it has been successfully reconciled.
+	ResyncInterval = 4 * time.Minute
 )
 
 type workReconcile interface {
@@ -116,7 +115,7 @@ func NewManifestWorkController(
 			appliedManifestWorkInformer.Informer(),
 		).
 		WithSyncContext(syncCtx).
-		WithSync(controller.sync).ResyncEvery(ResyncInterval).ToController("ManifestWorkAgent", recorder)
+		WithSync(controller.sync).ToController("ManifestWorkAgent", recorder)
 }
 
 // sync is the main reconcile loop for manifest work. It is triggered in two scenarios
@@ -161,7 +160,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	}
 	newAppliedManifestWork := appliedManifestWork.DeepCopy()
 
-	var requeueTime = wait.Jitter(ResyncInterval, 0.3)
+	var requeueTime = wait.Jitter(ResyncInterval, 0.5)
 	var errs []error
 	var results []applyResult
 	for _, reconciler := range m.reconcilers {
