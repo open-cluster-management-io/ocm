@@ -105,7 +105,7 @@ func (c *CloudEventSourceClient[T]) Resync(ctx context.Context, clusterName stri
 		return err
 	}
 
-	increaseCloudEventsSentCounter(evt.Source(), "", clusterName, c.codec.EventDataType().String(), string(eventType.SubResource), string(eventType.Action))
+	increaseCloudEventsSentFromSourceCounter(evt.Source(), clusterName, c.codec.EventDataType().String(), string(eventType.SubResource), string(eventType.Action))
 
 	return nil
 }
@@ -130,7 +130,7 @@ func (c *CloudEventSourceClient[T]) Publish(ctx context.Context, eventType types
 	}
 
 	clusterName := evt.Context.GetExtensions()[types.ExtensionClusterName].(string)
-	increaseCloudEventsSentCounter(evt.Source(), "", clusterName, eventType.CloudEventsDataType.String(), string(eventType.SubResource), string(eventType.Action))
+	increaseCloudEventsSentFromSourceCounter(evt.Source(), clusterName, eventType.CloudEventsDataType.String(), string(eventType.SubResource), string(eventType.Action))
 
 	return nil
 }
@@ -158,7 +158,7 @@ func (c *CloudEventSourceClient[T]) receive(ctx context.Context, evt cloudevents
 		cn = ""
 	}
 
-	increaseCloudEventsReceivedCounter(evt.Source(), cn, eventType.CloudEventsDataType.String(), string(eventType.SubResource), string(eventType.Action))
+	increaseCloudEventsReceivedBySourceCounter(evt.Source(), cn, eventType.CloudEventsDataType.String(), string(eventType.SubResource), string(eventType.Action))
 
 	if eventType.Action == types.ResyncRequestAction {
 		if eventType.SubResource != types.SubResourceSpec {
@@ -290,7 +290,7 @@ func (c *CloudEventSourceClient[T]) respondResyncSpecRequest(
 		if err := c.publish(ctx, evt); err != nil {
 			return err
 		}
-		increaseCloudEventsSentCounter(evt.Source(), "", fmt.Sprintf("%s", clusterName), evtDataType.String(), string(eventType.SubResource), string(eventType.Action))
+		increaseCloudEventsSentFromSourceCounter(evt.Source(), fmt.Sprintf("%s", clusterName), evtDataType.String(), string(eventType.SubResource), string(eventType.Action))
 	}
 
 	return nil

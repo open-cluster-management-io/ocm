@@ -7,6 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/heartbeat"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/metrics"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -41,16 +44,18 @@ var _ server.AgentEventServer = &GRPCBroker{}
 // It broadcasts resource spec to agents and listens for resource status updates from them.
 type GRPCBroker struct {
 	pbv1.UnimplementedCloudEventServiceServer
-	services    map[types.CloudEventsDataType]server.Service
-	subscribers map[string]*subscriber // registered subscribers
-	mu          sync.RWMutex
+	services               map[types.CloudEventsDataType]server.Service
+	subscribers            map[string]*subscriber // registered subscribers
+	heartbeatCheckInterval time.Duration
+	mu                     sync.RWMutex
 }
 
 // NewGRPCBroker creates a new gRPC broker with the given gRPC server.
 func NewGRPCBroker() *GRPCBroker {
 	broker := &GRPCBroker{
-		subscribers: make(map[string]*subscriber),
-		services:    make(map[types.CloudEventsDataType]server.Service),
+		subscribers:            make(map[string]*subscriber),
+		services:               make(map[types.CloudEventsDataType]server.Service),
+		heartbeatCheckInterval: 10 * time.Second,
 	}
 	return broker
 }
@@ -131,6 +136,7 @@ func (bkr *GRPCBroker) register(
 	}
 
 	klog.V(4).Infof("register a subscriber %s (cluster name = %s)", id, clusterName)
+	metrics.IncGRPCCESubscribersMetric(clusterName, dataType.String())
 
 	return id, errChan
 }
@@ -144,6 +150,7 @@ func (bkr *GRPCBroker) unregister(id string) {
 	if sub, exists := bkr.subscribers[id]; exists {
 		close(sub.errChan)
 		delete(bkr.subscribers, id)
+		metrics.DecGRPCCESubscribersMetric(sub.clusterName, sub.dataType.String())
 	}
 }
 
@@ -160,6 +167,52 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 	if err != nil {
 		return fmt.Errorf("invalid subscription request: invalid data type %v", err)
 	}
+
+	ctx, cancel := context.WithCancel(subServer.Context())
+	defer cancel()
+
+	// TODO make the channel size configurable
+	eventCh := make(chan *pbv1.CloudEvent, 100)
+
+	hearbeater := heartbeat.NewHeartbeater(bkr.heartbeatCheckInterval, 10)
+	sendErrCh := make(chan error, 1)
+
+	// send events
+	// The grpc send is not concurrency safe and non-blocking, see: https://github.com/grpc/grpc-go/blob/v1.75.1/stream.go#L1571
+	// Return the error without wrapping, as it includes the gRPC error code and message for further handling.
+	// For unrecoverable errors, such as a connection closed by an intermediate proxy, push the error to subscriber's
+	// error channel to unregister the subscriber.
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case evt := <-hearbeater.Heartbeat():
+				if err := subServer.Send(evt); err != nil {
+					klog.Errorf("failed to send heartbeat: %v", err)
+					// Unblock producers (handler select) and exit heartbeat ticker.
+					cancel()
+					select {
+					case sendErrCh <- err:
+					default:
+					}
+					return
+				}
+			case evt := <-eventCh:
+				if err := subServer.Send(evt); err != nil {
+					klog.Errorf("failed to send event: %v", err)
+					// Unblock producers (handler select) and exit heartbeat ticker.
+					cancel()
+					select {
+					case sendErrCh <- err:
+					default:
+					}
+					return
+				}
+			}
+		}
+	}()
+
 	subscriberID, errChan := bkr.register(subReq.ClusterName, *dataType, func(evt *cloudevents.Event) error {
 		// WARNING: don't use "pbEvt, err := pb.ToProto(evt)" to convert cloudevent to protobuf
 		pbEvt := &pbv1.CloudEvent{}
@@ -170,16 +223,16 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 
 		// send the cloudevent to the subscriber
 		klog.V(4).Infof("sending the event to spec subscribers, %s", evt.Context)
-		if err := subServer.Send(pbEvt); err != nil {
-			klog.Errorf("failed to send grpc event, %v", err)
-			// Return the error without wrapping, as it includes the gRPC error code and message for further handling.
-			// For unrecoverable errors, such as a connection closed by an intermediate proxy, push the error to subscriber's
-			// error channel to unregister the subscriber.
-			return err
+		select {
+		case eventCh <- pbEvt:
+		case <-ctx.Done():
+			return status.Error(codes.Unavailable, "stream context canceled")
 		}
 
 		return nil
 	})
+
+	go hearbeater.Start(ctx)
 
 	select {
 	case err := <-errChan:
@@ -188,7 +241,11 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 		klog.Errorf("unregister subscriber %s, error= %v", subscriberID, err)
 		bkr.unregister(subscriberID)
 		return err
-	case <-subServer.Context().Done():
+	case err := <-sendErrCh:
+		klog.Errorf("failed to send event, unregister subscriber %s, error=%v", subscriberID, err)
+		bkr.unregister(subscriberID)
+		return err
+	case <-ctx.Done():
 		// The context of the stream has been canceled or completed.
 		// This could happen if:
 		// - The client closed the connection or canceled the stream.

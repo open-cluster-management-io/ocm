@@ -21,7 +21,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/common"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 )
 
@@ -223,23 +222,6 @@ func CompareSnowflakeSequenceIDs(last, current string) (bool, error) {
 func UID(sourceID, groupResource, namespace, name string) string {
 	id := fmt.Sprintf("%s-%s-%s-%s", sourceID, groupResource, namespace, name)
 	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(id)).String()
-}
-
-// EnsureResourceFinalizer ensures the resource finalizer in the given finalizers
-func EnsureResourceFinalizer(finalizers []string) []string {
-	has := false
-	for _, f := range finalizers {
-		if f == common.ResourceFinalizer {
-			has = true
-			break
-		}
-	}
-
-	if !has {
-		finalizers = append(finalizers, common.ResourceFinalizer)
-	}
-
-	return finalizers
 }
 
 func IsStatusPatch(subresources []string) bool {

@@ -97,7 +97,7 @@ func AuthResponseFromPacketAuth(a *packets.Auth) *AuthResponse {
 // returns a paho library AuthResponse
 func AuthResponseFromPacketDisconnect(d *packets.Disconnect) *AuthResponse {
 	return &AuthResponse{
-		Success:    true,
+		Success:    false,
 		ReasonCode: d.ReasonCode,
 		Properties: &AuthProperties{
 			ReasonString: d.Properties.ReasonString,

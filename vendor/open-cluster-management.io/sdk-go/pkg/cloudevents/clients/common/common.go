@@ -30,8 +30,6 @@ const CloudEventsOriginalSourceLabelKey = "cloudevents.open-cluster-management.i
 // ResourceDeleted represents a resource is deleted.
 const ResourceDeleted = "Deleted"
 
-const ResourceFinalizer = "cloudevents.open-cluster-management.io/resource-cleanup"
-
 var ManagedClusterGK = schema.GroupKind{Group: clusterv1.GroupName, Kind: "ManagedCluster"}
 var ManagedClusterGR = schema.GroupResource{Group: clusterv1.GroupName, Resource: "managedclusters"}
 

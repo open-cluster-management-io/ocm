@@ -158,10 +158,10 @@ github.com/cespare/xxhash/v2
 # github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20240413090539-7fef29478991
 ## explicit; go 1.18
 github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2
-# github.com/cloudevents/sdk-go/protocol/mqtt_paho/v2 v2.0.0-20241008145627-6bcc075b5b6c
-## explicit; go 1.21
+# github.com/cloudevents/sdk-go/protocol/mqtt_paho/v2 v2.0.0-20250922144431-372892d7c84d
+## explicit; go 1.23.0
 github.com/cloudevents/sdk-go/protocol/mqtt_paho/v2
-# github.com/cloudevents/sdk-go/v2 v2.16.1
+# github.com/cloudevents/sdk-go/v2 v2.16.2
 ## explicit; go 1.23.0
 github.com/cloudevents/sdk-go/v2
 github.com/cloudevents/sdk-go/v2/binding
@@ -198,8 +198,8 @@ github.com/cyphar/filepath-securejoin
 github.com/davecgh/go-spew/spew
 # github.com/docker/docker v28.4.0+incompatible
 ## explicit
-# github.com/eclipse/paho.golang v0.21.0
-## explicit; go 1.21
+# github.com/eclipse/paho.golang v0.23.0
+## explicit; go 1.24.0
 github.com/eclipse/paho.golang/packets
 github.com/eclipse/paho.golang/paho
 github.com/eclipse/paho.golang/paho/log
@@ -1817,7 +1817,7 @@ open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v1.0.1-0.20250911065113-bff262df709b
+# open-cluster-management.io/sdk-go v1.0.1-0.20251016065040-b82d34b3c2c2
 ## explicit; go 1.24.0
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
@@ -1863,6 +1863,7 @@ open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types
 open-cluster-management.io/sdk-go/pkg/cloudevents/server
 open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc
 open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authz/kube
+open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/heartbeat
 open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/metrics
 open-cluster-management.io/sdk-go/pkg/helpers
 open-cluster-management.io/sdk-go/pkg/patcher

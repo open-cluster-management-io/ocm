@@ -274,7 +274,7 @@ func TestHandleStatusUpdate(t *testing.T) {
 						Name:       "test-work",
 						Namespace:  "test-cluster",
 						Generation: 1,
-						Finalizers: []string{common.ResourceFinalizer},
+						Finalizers: []string{workv1.ManifestWorkFinalizer},
 					},
 				},
 			},
