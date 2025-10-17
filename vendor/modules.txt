@@ -1733,8 +1733,8 @@ k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/ptr
 k8s.io/utils/trace
-# open-cluster-management.io/addon-framework v1.0.1-0.20250916042555-c8a4fa748ce9
-## explicit; go 1.24.0
+# open-cluster-management.io/addon-framework v1.0.1
+## explicit; go 1.23.6
 open-cluster-management.io/addon-framework/pkg/addonfactory
 open-cluster-management.io/addon-framework/pkg/addonmanager
 open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting

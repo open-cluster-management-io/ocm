@@ -29,7 +29,6 @@ type addonRegistrationController struct {
 	managedClusterLister      clusterlister.ManagedClusterLister
 	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
 	agentAddons               map[string]agent.AgentAddon
-	mcaFilterFunc             utils.ManagedClusterAddOnFilterFunc
 }
 
 func NewAddonRegistrationController(
@@ -37,14 +36,12 @@ func NewAddonRegistrationController(
 	clusterInformers clusterinformers.ManagedClusterInformer,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	agentAddons map[string]agent.AgentAddon,
-	mcaFilterFunc utils.ManagedClusterAddOnFilterFunc,
 ) factory.Controller {
 	c := &addonRegistrationController{
 		addonClient:               addonClient,
 		managedClusterLister:      clusterInformers.Lister(),
 		managedClusterAddonLister: addonInformers.Lister(),
 		agentAddons:               agentAddons,
-		mcaFilterFunc:             mcaFilterFunc,
 	}
 
 	return factory.New().WithFilteredEventsInformersQueueKeysFunc(
@@ -97,10 +94,6 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 		return err
 	}
 
-	if c.mcaFilterFunc != nil && !c.mcaFilterFunc(managedClusterAddon) {
-		return nil
-	}
-
 	managedClusterAddonCopy := managedClusterAddon.DeepCopy()
 
 	// wait until the mca's ownerref is set.
@@ -126,10 +119,7 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 
 	statusChanged, err := addonPatcher.PatchStatus(ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status)
 	if statusChanged {
-		if err != nil {
-			return fmt.Errorf("failed to patch status(supported configs) of managedclusteraddon: %w", err)
-		}
-		return nil
+		return err
 	}
 
 	// if supported configs not change, continue to patch condition RegistrationApplied, status.Registrations and status.Namespace
@@ -142,10 +132,7 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 			Message: "Registration of the addon agent is configured",
 		})
 		_, err = addonPatcher.PatchStatus(ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status)
-		if err != nil {
-			return fmt.Errorf("failed to patch status condition(registrationOption nil) of managedclusteraddon: %w", err)
-		}
-		return nil
+		return err
 	}
 
 	if registrationOption.PermissionConfig != nil {
@@ -159,7 +146,7 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 			})
 			if _, patchErr := addonPatcher.PatchStatus(
 				ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status); patchErr != nil {
-				return fmt.Errorf("failed to patch status condition (set permission for hub agent) of managedclusteraddon: %w", patchErr)
+				return patchErr
 			}
 			return err
 		}
@@ -173,16 +160,10 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 			Message: "Registration of the addon agent is configured",
 		})
 		_, err = addonPatcher.PatchStatus(ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status)
-		if err != nil {
-			return fmt.Errorf("failed to patch status condition(CSRConfigurations nil) of managedclusteraddon: %w", err)
-		}
-		return nil
+		return err
 	}
 
-	configs, err := registrationOption.CSRConfigurations(managedCluster, managedClusterAddonCopy)
-	if err != nil {
-		return fmt.Errorf("failed to get csr configurations: %w", err)
-	}
+	configs := registrationOption.CSRConfigurations(managedCluster)
 	managedClusterAddonCopy.Status.Registrations = configs
 
 	var agentInstallNamespace string
@@ -210,8 +191,6 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 	})
 
 	_, err = addonPatcher.PatchStatus(ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status)
-	if err != nil {
-		return fmt.Errorf("failed to patch status condition(successfully configured) of managedclusteraddon: %w", err)
-	}
-	return nil
+
+	return err
 }
