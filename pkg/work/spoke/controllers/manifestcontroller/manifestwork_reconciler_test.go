@@ -19,6 +19,7 @@ import (
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/workqueue"
 
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
@@ -88,7 +89,7 @@ func (t *testController) toController() *ManifestWorkController {
 }
 
 func (t *testController) withKubeObject(objects ...runtime.Object) *testController {
-	kubeClient := fakekube.NewSimpleClientset(objects...)
+	kubeClient := fakekube.NewClientset(objects...)
 	t.kubeClient = kubeClient
 	return t
 }
@@ -836,6 +837,252 @@ func TestManageOwner(t *testing.T) {
 
 			if !equality.Semantic.DeepEqual(owner, c.expectOwner) {
 				t.Errorf("Expect owner is %v, but got %v", c.expectOwner, owner)
+			}
+		})
+	}
+}
+
+func TestOnAddFunc(t *testing.T) {
+	cases := []struct {
+		name         string
+		obj          interface{}
+		expectQueued bool
+	}{
+		{
+			name: "object with finalizer should be queued",
+			obj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Finalizers: []string{workapiv1.ManifestWorkFinalizer},
+				},
+			},
+			expectQueued: true,
+		},
+		{
+			name: "object without finalizer should not be queued",
+			obj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Finalizers: []string{},
+				},
+			},
+			expectQueued: false,
+		},
+		{
+			name: "object with other finalizers should not be queued",
+			obj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Finalizers: []string{"other.finalizer"},
+				},
+			},
+			expectQueued: false,
+		},
+		{
+			name: "object with multiple finalizers including manifest work finalizer should be queued",
+			obj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Finalizers: []string{"other.finalizer", workapiv1.ManifestWorkFinalizer},
+				},
+			},
+			expectQueued: true,
+		},
+		{
+			name:         "invalid object should not queue anything",
+			obj:          "invalid-object",
+			expectQueued: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+			addFunc := onAddFunc(queue)
+
+			addFunc(c.obj)
+
+			queueLen := queue.Len()
+
+			if c.expectQueued && queueLen == 0 {
+				t.Errorf("Expected object to be queued but queue is empty")
+			}
+			if !c.expectQueued && queueLen > 0 {
+				t.Errorf("Expected object not to be queued but queue has %d items", queueLen)
+			}
+
+			if queueLen > 0 {
+				item, _ := queue.Get()
+				queue.Done(item)
+				if c.expectQueued {
+					expectedName := c.obj.(*workapiv1.ManifestWork).Name
+					if item != expectedName {
+						t.Errorf("Expected queued item to be %s but got %s", expectedName, item)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestOnUpdateFunc(t *testing.T) {
+	cases := []struct {
+		name         string
+		oldObj       interface{}
+		newObj       interface{}
+		expectQueued bool
+	}{
+		{
+			name: "object with finalizer and spec change should be queued",
+			oldObj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Generation: 1,
+					Finalizers: []string{workapiv1.ManifestWorkFinalizer},
+				},
+				Spec: workapiv1.ManifestWorkSpec{
+					DeleteOption: &workapiv1.DeleteOption{
+						PropagationPolicy: workapiv1.DeletePropagationPolicyTypeForeground,
+					},
+				},
+			},
+			newObj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Generation: 2,
+					Finalizers: []string{workapiv1.ManifestWorkFinalizer},
+				},
+				Spec: workapiv1.ManifestWorkSpec{
+					DeleteOption: &workapiv1.DeleteOption{
+						PropagationPolicy: workapiv1.DeletePropagationPolicyTypeOrphan,
+					},
+				},
+			},
+			expectQueued: true,
+		},
+		{
+			name: "object with finalizer added should be queued",
+			oldObj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Generation: 1,
+					Finalizers: []string{},
+				},
+			},
+			newObj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Generation: 1,
+					Finalizers: []string{workapiv1.ManifestWorkFinalizer},
+				},
+			},
+			expectQueued: true,
+		},
+		{
+			name: "object with finalizer but no generation change should not be queued",
+			oldObj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Generation: 1,
+					Finalizers: []string{workapiv1.ManifestWorkFinalizer},
+				},
+			},
+			newObj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Generation: 1,
+					Finalizers: []string{workapiv1.ManifestWorkFinalizer},
+				},
+			},
+			expectQueued: false,
+		},
+		{
+			name: "object without finalizer should not be queued",
+			oldObj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Generation: 1,
+					Finalizers: []string{},
+				},
+			},
+			newObj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Generation: 2,
+					Finalizers: []string{},
+				},
+			},
+			expectQueued: false,
+		},
+		{
+			name: "object where finalizer was removed should not be queued",
+			oldObj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Generation: 1,
+					Finalizers: []string{workapiv1.ManifestWorkFinalizer},
+				},
+			},
+			newObj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Generation: 2,
+					Finalizers: []string{},
+				},
+			},
+			expectQueued: false,
+		},
+		{
+			name: "invalid new object should not queue anything",
+			oldObj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Generation: 1,
+					Finalizers: []string{workapiv1.ManifestWorkFinalizer},
+				},
+			},
+			newObj:       "invalid-object",
+			expectQueued: false,
+		},
+		{
+			name:   "invalid old object should not queue anything",
+			oldObj: "invalid-object",
+			newObj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Generation: 2,
+					Finalizers: []string{workapiv1.ManifestWorkFinalizer},
+				},
+			},
+			expectQueued: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+			updateFunc := onUpdateFunc(queue)
+
+			updateFunc(c.oldObj, c.newObj)
+
+			queueLen := queue.Len()
+
+			if c.expectQueued && queueLen == 0 {
+				t.Errorf("Expected object to be queued but queue is empty")
+			}
+			if !c.expectQueued && queueLen > 0 {
+				t.Errorf("Expected object not to be queued but queue has %d items", queueLen)
+			}
+
+			if queueLen > 0 {
+				item, _ := queue.Get()
+				queue.Done(item)
+				if c.expectQueued {
+					expectedName := c.newObj.(*workapiv1.ManifestWork).Name
+					if item != expectedName {
+						t.Errorf("Expected queued item to be %s but got %s", expectedName, item)
+					}
+				}
 			}
 		})
 	}

@@ -69,7 +69,7 @@ func AssertWorkCondition(namespace, name string, workClient workclientset.Interf
 
 		// check manifest status conditions
 		if ok := HaveManifestCondition(work.Status.ResourceStatus.Manifests, expectedType, expectedManifestStatuses); !ok {
-			return fmt.Errorf("condition %s does not exist, got %v ", expectedType, work.Status.ResourceStatus.Manifests)
+			return fmt.Errorf("condition %s with statuses %v does not exist, got %v ", expectedType, expectedManifestStatuses, work.Status.ResourceStatus.Manifests)
 		}
 
 		// check work status condition

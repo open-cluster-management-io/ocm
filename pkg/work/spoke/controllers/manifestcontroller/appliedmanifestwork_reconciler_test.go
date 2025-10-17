@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/openshift/library-go/pkg/controller/factory"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -26,18 +27,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
-func newManifest(group, version, resource, namespace, name string) workapiv1.ManifestCondition {
-	return workapiv1.ManifestCondition{
-		ResourceMeta: workapiv1.ManifestResourceMeta{
-			Group:     group,
-			Version:   version,
-			Resource:  resource,
-			Namespace: namespace,
-			Name:      name,
-		},
-	}
-}
-
 func TestSyncManifestWork(t *testing.T) {
 	uid := types.UID("test")
 	appliedWork := spoketesting.NewAppliedManifestWork("test", 0, uid)
@@ -48,7 +37,7 @@ func TestSyncManifestWork(t *testing.T) {
 		applied                            bool
 		existingResources                  []runtime.Object
 		appliedResources                   []workapiv1.AppliedManifestResourceMeta
-		manifests                          []workapiv1.ManifestCondition
+		appliedResults                     []applyResult
 		validateAppliedManifestWorkActions func(t *testing.T, actions []clienttesting.Action)
 		expectedDeleteActions              []clienttesting.DeleteActionImpl
 		expectedQueueLen                   int
@@ -70,7 +59,12 @@ func TestSyncManifestWork(t *testing.T) {
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
 			},
-			manifests:                          []workapiv1.ManifestCondition{newManifest("", "v1", "secrets", "ns1", "n1")},
+			appliedResults: []applyResult{
+				{
+					resourceMeta: workapiv1.ManifestResourceMeta{Resource: "secrets", Version: "v1", Namespace: "ns1", Name: "n1"},
+					Result:       testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
+				},
+			},
 			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
 		},
 		{
@@ -90,11 +84,23 @@ func TestSyncManifestWork(t *testing.T) {
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "secrets", Namespace: "ns3", Name: "n3"}, UID: "ns3-n3"},
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "secrets", Namespace: "ns4", Name: "n4"}, UID: "ns4-n4"},
 			},
-			manifests: []workapiv1.ManifestCondition{
-				newManifest("", "v1", "secrets", "ns1", "n1"),
-				newManifest("", "v1", "secrets", "ns2", "n2"),
-				newManifest("", "v1", "secrets", "ns5", "n5"),
-				newManifest("", "v1", "secrets", "ns6", "n6"),
+			appliedResults: []applyResult{
+				{
+					resourceMeta: workapiv1.ManifestResourceMeta{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1"},
+					Result:       testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
+				},
+				{
+					resourceMeta: workapiv1.ManifestResourceMeta{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2"},
+					Result:       testingcommon.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2", *owner),
+				},
+				{
+					resourceMeta: workapiv1.ManifestResourceMeta{Version: "v1", Resource: "secrets", Namespace: "ns5", Name: "n5"},
+					Result:       testingcommon.NewUnstructuredSecret("ns5", "n5", false, "ns5-n5", *owner),
+				},
+				{
+					resourceMeta: workapiv1.ManifestResourceMeta{Version: "v1", Resource: "secrets", Namespace: "ns6", Name: "n6"},
+					Result:       testingcommon.NewUnstructuredSecret("ns6", "n6", false, "ns6-n6", *owner),
+				},
 			},
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
@@ -118,6 +124,7 @@ func TestSyncManifestWork(t *testing.T) {
 				clienttesting.NewDeleteAction(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}, "ns3", "n3"),
 				clienttesting.NewDeleteAction(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}, "ns4", "n4"),
 			},
+			expectedQueueLen: 1,
 		},
 		{
 			name:    "requeue work when applied resource for stale manifest is deleting",
@@ -132,9 +139,15 @@ func TestSyncManifestWork(t *testing.T) {
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "ns2-n2"},
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns3", Name: "n3"}, UID: "ns3-n3"},
 			},
-			manifests: []workapiv1.ManifestCondition{
-				newManifest("", "v1", "secrets", "ns1", "n1"),
-				newManifest("", "v1", "secrets", "ns2", "n2"),
+			appliedResults: []applyResult{
+				{
+					resourceMeta: workapiv1.ManifestResourceMeta{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1"},
+					Result:       testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
+				},
+				{
+					resourceMeta: workapiv1.ManifestResourceMeta{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2"},
+					Result:       testingcommon.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2", *owner),
+				},
 			},
 			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
 			expectedQueueLen:                   1,
@@ -151,9 +164,15 @@ func TestSyncManifestWork(t *testing.T) {
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns3", Name: "n3"}, UID: "ns3-n3"},
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns4", Name: "n4"}, UID: "ns4-n4"},
 			},
-			manifests: []workapiv1.ManifestCondition{
-				newManifest("", "v1", "secrets", "ns1", "n1"),
-				newManifest("", "v1", "secrets", "ns5", "n5"),
+			appliedResults: []applyResult{
+				{
+					resourceMeta: workapiv1.ManifestResourceMeta{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1"},
+					Result:       testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
+				},
+				{
+					resourceMeta: workapiv1.ManifestResourceMeta{Version: "v1", Resource: "secrets", Namespace: "ns5", Name: "n5"},
+					Result:       testingcommon.NewUnstructuredSecret("ns5", "n5", false, "ns5-n5", *owner),
+				},
 			},
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
@@ -181,9 +200,15 @@ func TestSyncManifestWork(t *testing.T) {
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "ns2-n2"},
 			},
-			manifests: []workapiv1.ManifestCondition{
-				newManifest("", "v1", "secrets", "ns1", "n1"),
-				newManifest("", "v1", "secrets", "ns2", "n2"),
+			appliedResults: []applyResult{
+				{
+					resourceMeta: workapiv1.ManifestResourceMeta{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1"},
+					Result:       testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
+				},
+				{
+					resourceMeta: workapiv1.ManifestResourceMeta{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2"},
+					Result:       testingcommon.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2-updated", *owner),
+				},
 			},
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
@@ -196,9 +221,32 @@ func TestSyncManifestWork(t *testing.T) {
 					{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
 					{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "ns2-n2-updated"},
 				}) {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(work.Status.AppliedResources)
 				}
 			},
+		},
+		{
+			name:    "resource uid is missing",
+			applied: true,
+			existingResources: []runtime.Object{
+				testingcommon.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
+				testingcommon.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2", *owner),
+			},
+			appliedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "ns2-n2"},
+			},
+			appliedResults: []applyResult{
+				{
+					resourceMeta: workapiv1.ManifestResourceMeta{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1"},
+					Result:       testingcommon.NewUnstructuredSecret("ns1", "n1", false, "", *owner),
+				},
+				{
+					resourceMeta: workapiv1.ManifestResourceMeta{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2"},
+					Result:       testingcommon.NewUnstructuredSecret("ns2", "n2", false, "", *owner),
+				},
+			},
+			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
 		},
 	}
 
@@ -216,7 +264,6 @@ func TestSyncManifestWork(t *testing.T) {
 			}
 			testingAppliedWork := appliedWork.DeepCopy()
 			testingAppliedWork.Status.AppliedResources = c.appliedResources
-			testingWork.Status.ResourceStatus.Manifests = c.manifests
 
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), c.existingResources...)
 			fakeClient := fakeworkclient.NewSimpleClientset(testingWork, testingAppliedWork)
@@ -239,9 +286,12 @@ func TestSyncManifestWork(t *testing.T) {
 					fakeClient.WorkV1().AppliedManifestWorks()),
 				appliedManifestWorkLister: informerFactory.Work().V1().AppliedManifestWorks().Lister(),
 				reconcilers: []workReconcile{
+					&testReconciler{
+						results: c.appliedResults,
+					},
 					&appliedManifestWorkReconciler{
 						spokeDynamicClient: fakeDynamicClient,
-						rateLimiter:        workqueue.NewItemExponentialFailureRateLimiter(0, 1*time.Second),
+						rateLimiter:        workqueue.NewTypedItemExponentialFailureRateLimiter[string](0, 1*time.Second),
 					},
 				},
 				hubHash: "test",
@@ -270,4 +320,16 @@ func TestSyncManifestWork(t *testing.T) {
 			}
 		})
 	}
+}
+
+type testReconciler struct {
+	results []applyResult
+}
+
+func (r *testReconciler) reconcile(_ context.Context,
+	_ factory.SyncContext,
+	mw *workapiv1.ManifestWork,
+	amw *workapiv1.AppliedManifestWork,
+	_ []applyResult) (*workapiv1.ManifestWork, *workapiv1.AppliedManifestWork, []applyResult, error) {
+	return mw, amw, r.results, nil
 }
