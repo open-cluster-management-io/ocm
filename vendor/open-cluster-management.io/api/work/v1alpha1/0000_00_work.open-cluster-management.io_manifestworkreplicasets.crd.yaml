@@ -741,7 +741,7 @@ spec:
                       description: Summary totals of resulting ManifestWorks for the
                         placement
                       properties:
-                        Applied:
+                        applied:
                           description: 'Applied is the number of ManifestWorks with
                             condition Applied: true'
                           type: integer
@@ -763,7 +763,7 @@ spec:
               summary:
                 description: Summary totals of resulting ManifestWorks for all placements
                 properties:
-                  Applied:
+                  applied:
                     description: 'Applied is the number of ManifestWorks with condition
                       Applied: true'
                     type: integer

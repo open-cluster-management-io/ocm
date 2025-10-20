@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -49,6 +50,7 @@ func NewAgentAddonFactory(addonName string, fs embed.FS, dir string) *AgentAddon
 	s := runtime.NewScheme()
 	_ = scheme.AddToScheme(s)
 	_ = apiextensionsv1.AddToScheme(s)
+	_ = apiextensionsv1beta1.AddToScheme(s)
 
 	return &AgentAddonFactory{
 		fs:  fs,
@@ -72,6 +74,7 @@ func (f *AgentAddonFactory) WithScheme(s *runtime.Scheme) *AgentAddonFactory {
 	f.scheme = s
 	_ = scheme.AddToScheme(f.scheme)
 	_ = apiextensionsv1.AddToScheme(f.scheme)
+	_ = apiextensionsv1beta1.AddToScheme(f.scheme)
 	return f
 }
 

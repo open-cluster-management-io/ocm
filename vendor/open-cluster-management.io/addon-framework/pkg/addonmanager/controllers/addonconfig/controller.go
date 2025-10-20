@@ -35,8 +35,8 @@ type addonConfigController struct {
 	addonLister                  addonlisterv1alpha1.ManagedClusterAddOnLister
 	addonIndexer                 cache.Indexer
 	configListers                map[schema.GroupResource]dynamiclister.Lister
-	queue                        workqueue.TypedRateLimitingInterface[string]
-	cmaFilterFunc                factory.EventFilterFunc
+	queue                        workqueue.RateLimitingInterface
+	addonFilterFunc              factory.EventFilterFunc
 	configGVRs                   map[schema.GroupVersionResource]bool
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
 }
@@ -47,7 +47,7 @@ func NewAddonConfigController(
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	configInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	configGVRs map[schema.GroupVersionResource]bool,
-	cmaFilterFunc factory.EventFilterFunc,
+	addonFilterFunc factory.EventFilterFunc,
 ) factory.Controller {
 	syncCtx := factory.NewSyncContext(controllerName)
 
@@ -57,7 +57,7 @@ func NewAddonConfigController(
 		addonIndexer:                 addonInformers.Informer().GetIndexer(),
 		configListers:                map[schema.GroupResource]dynamiclister.Lister{},
 		queue:                        syncCtx.Queue(),
-		cmaFilterFunc:                cmaFilterFunc,
+		addonFilterFunc:              addonFilterFunc,
 		configGVRs:                   configGVRs,
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
 	}
@@ -153,7 +153,7 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return err
 	}
 
-	if c.cmaFilterFunc != nil && !c.cmaFilterFunc(cma) {
+	if !c.addonFilterFunc(cma) {
 		return nil
 	}
 

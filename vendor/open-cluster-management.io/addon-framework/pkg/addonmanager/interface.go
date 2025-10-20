@@ -29,8 +29,7 @@ type BaseAddonManager interface {
 		kubeInformers kubeinformers.SharedInformerFactory,
 		addonInformers addoninformers.SharedInformerFactory,
 		clusterInformers clusterv1informers.SharedInformerFactory,
-		dynamicInformers dynamicinformer.DynamicSharedInformerFactory,
-	) error
+		dynamicInformers dynamicinformer.DynamicSharedInformerFactory) error
 }
 
 // AddonManager is the interface based on BaseAddonManager to initialize a manager on hub

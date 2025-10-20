@@ -517,6 +517,12 @@ const (
 	// WorkManifestsComplete represents that all completable manifests in the work
 	// have the Complete condition
 	WorkManifestsComplete string = "ManifestsComplete"
+	// WorkProgressingReasonApplying indicates resources are being applied
+	WorkProgressingReasonApplying string = "Applying"
+	// WorkProgressingReasonCompleted indicates all resources are applied and available
+	WorkProgressingReasonCompleted string = "Completed"
+	// WorkProgressingReasonFailed indicates the work failed to apply
+	WorkProgressingReasonFailed string = "Failed"
 )
 
 // ManifestCondition represents the conditions of the resources deployed on a
