@@ -1,3 +1,20 @@
+# v1.74.3 (2025-10-16)
+
+* **Dependency Update**: Bump minimum Go version to 1.23.
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.74.2 (2025-09-26)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.74.1 (2025-09-23)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.74.0 (2025-09-22)
+
+* **Feature**: Adds support for RepairConfig overrides and configurations in EKS Managed Node Groups.
+
 # v1.73.3 (2025-09-10)
 
 * No change notes available for this release.
