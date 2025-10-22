@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/eclipse/paho.golang/paho"
+	"github.com/eclipse/paho.golang/paho/log"
 )
 
 // Option is the function signature required to be considered an mqtt_paho.Option.
@@ -43,6 +44,24 @@ func WithSubscribe(subscribeOpt *paho.Subscribe) Option {
 			return fmt.Errorf("the paho.Subscribe option must not be nil")
 		}
 		p.subscribeOption = subscribeOpt
+		return nil
+	}
+}
+
+// WithDebugLogger enable the debug logger for the paho mqtt client.
+// This option is optional and can be used to enable detailed logging of paho the mqtt client.
+func WithDebugLogger(logger log.Logger) Option {
+	return func(p *Protocol) error {
+		p.client.SetDebugLogger(logger)
+		return nil
+	}
+}
+
+// WithErrorLogger enable the error logger for the paho mqtt client.
+// This option is optional and can be used to enable error logging of paho the mqtt client.
+func WithErrorLogger(logger log.Logger) Option {
+	return func(p *Protocol) error {
+		p.client.SetErrorLogger(logger)
 		return nil
 	}
 }

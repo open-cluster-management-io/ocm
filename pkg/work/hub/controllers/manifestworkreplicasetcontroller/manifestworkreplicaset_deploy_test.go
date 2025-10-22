@@ -19,6 +19,7 @@ import (
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
+	clustersdkv1alpha1 "open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1"
 	workapplier "open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
@@ -590,7 +591,21 @@ func TestRequeueWithProgressDeadline(t *testing.T) {
 		},
 	}
 	mw, _ := CreateManifestWork(mwrSet, "cls1", "place-test")
-	apimeta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionFalse, Reason: "ApplyTest"})
+	// Set Progressing=True AND Degraded=True to simulate a failed work (matching new logic)
+	apimeta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
+		Type:               workapiv1.WorkProgressing,
+		Status:             metav1.ConditionTrue,
+		Reason:             "Applying",
+		ObservedGeneration: mw.Generation,
+		LastTransitionTime: metav1.NewTime(time.Now()),
+	})
+	apimeta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
+		Type:               workapiv1.WorkDegraded,
+		Status:             metav1.ConditionTrue,
+		Reason:             "ApplyFailed",
+		ObservedGeneration: mw.Generation,
+		LastTransitionTime: metav1.NewTime(time.Now()),
+	})
 	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet, mw)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
 
@@ -627,5 +642,467 @@ func TestRequeueWithProgressDeadline(t *testing.T) {
 	var rqe helpers.RequeueError
 	if !errors.As(err, &rqe) {
 		t.Errorf("expect to get err %t", err)
+	}
+}
+
+func TestDeployReconcileDeletesOrphanedManifestWorks(t *testing.T) {
+	// Create a ManifestWorkReplicaSet that references placement2
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test2")
+
+	// Create ManifestWorks for both placement1 (old, should be deleted) and placement2 (current, should be kept)
+	mwOldPlacement, _ := CreateManifestWork(mwrSet, "cls1", "place-test1")
+	mwCurrentPlacement, _ := CreateManifestWork(mwrSet, "cls2", "place-test2")
+
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet, mwOldPlacement, mwCurrentPlacement)
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
+
+	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mwOldPlacement); err != nil {
+		t.Fatal(err)
+	}
+	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mwCurrentPlacement); err != nil {
+		t.Fatal(err)
+	}
+	if err := workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetStore().Add(mwrSet); err != nil {
+		t.Fatal(err)
+	}
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	// Create placement2 (the current placement in the spec)
+	placement2, placementDecision2 := helpertest.CreateTestPlacement("place-test2", "default", "cls2")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placement2, placementDecision2)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Second)
+
+	if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement2); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision2); err != nil {
+		t.Fatal(err)
+	}
+
+	placementLister := clusterInformerFactory.Cluster().V1beta1().Placements().Lister()
+	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
+
+	pmwDeployController := deployReconciler{
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: placementDecisionLister,
+		placementLister:     placementLister,
+	}
+
+	// Run reconcile
+	_, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that the ManifestWork from the old placement (place-test1) was deleted
+	deletedMW, err := fWorkClient.WorkV1().ManifestWorks("cls1").Get(context.TODO(), mwrSet.Name, metav1.GetOptions{})
+	if err == nil {
+		t.Fatalf("Expected ManifestWork for old placement to be deleted, but it still exists: %v", deletedMW)
+	}
+
+	// Verify that the ManifestWork from the current placement (place-test2) still exists
+	currentMW, err := fWorkClient.WorkV1().ManifestWorks("cls2").Get(context.TODO(), mwrSet.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Expected ManifestWork for current placement to exist, but got error: %v", err)
+	}
+	if currentMW == nil {
+		t.Fatal("Expected ManifestWork for current placement to exist, but it is nil")
+	}
+
+	// Verify the placement label is correct
+	if currentMW.Labels[ManifestWorkReplicaSetPlacementNameLabelKey] != "place-test2" {
+		t.Fatalf("Expected placement label to be 'place-test2', got '%s'", currentMW.Labels[ManifestWorkReplicaSetPlacementNameLabelKey])
+	}
+}
+
+func TestDeployReconcileWithMultiplePlacementChanges(t *testing.T) {
+	// Create a ManifestWorkReplicaSet that references both placement2 and placement3
+	allRollOut := clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All}
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSetWithRollOutStrategy("mwrSet-test", "default",
+		map[string]clusterv1alpha1.RolloutStrategy{"place-test2": allRollOut, "place-test3": allRollOut})
+
+	// Create ManifestWorks for placement1 (old), placement2 (current), and placement3 (current)
+	mwOldPlacement, _ := CreateManifestWork(mwrSet, "cls1", "place-test1")
+	mwCurrentPlacement2, _ := CreateManifestWork(mwrSet, "cls2", "place-test2")
+	mwCurrentPlacement3, _ := CreateManifestWork(mwrSet, "cls3", "place-test3")
+
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet, mwOldPlacement, mwCurrentPlacement2, mwCurrentPlacement3)
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
+
+	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mwOldPlacement); err != nil {
+		t.Fatal(err)
+	}
+	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mwCurrentPlacement2); err != nil {
+		t.Fatal(err)
+	}
+	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mwCurrentPlacement3); err != nil {
+		t.Fatal(err)
+	}
+	if err := workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetStore().Add(mwrSet); err != nil {
+		t.Fatal(err)
+	}
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	// Create placement2 and placement3 (the current placements in the spec)
+	placement2, placementDecision2 := helpertest.CreateTestPlacement("place-test2", "default", "cls2")
+	placement3, placementDecision3 := helpertest.CreateTestPlacement("place-test3", "default", "cls3")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placement2, placementDecision2, placement3, placementDecision3)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Second)
+
+	if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement2); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision2); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement3); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision3); err != nil {
+		t.Fatal(err)
+	}
+
+	placementLister := clusterInformerFactory.Cluster().V1beta1().Placements().Lister()
+	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
+
+	pmwDeployController := deployReconciler{
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: placementDecisionLister,
+		placementLister:     placementLister,
+	}
+
+	// Run reconcile
+	_, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that the ManifestWork from the old placement (place-test1) was deleted
+	_, err = fWorkClient.WorkV1().ManifestWorks("cls1").Get(context.TODO(), mwrSet.Name, metav1.GetOptions{})
+	if err == nil {
+		t.Fatal("Expected ManifestWork for old placement to be deleted, but it still exists")
+	}
+
+	// Verify that ManifestWorks from current placements (place-test2 and place-test3) still exist
+	currentMW2, err := fWorkClient.WorkV1().ManifestWorks("cls2").Get(context.TODO(), mwrSet.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Expected ManifestWork for placement2 to exist, but got error: %v", err)
+	}
+	assert.Equal(t, currentMW2.Labels[ManifestWorkReplicaSetPlacementNameLabelKey], "place-test2")
+
+	currentMW3, err := fWorkClient.WorkV1().ManifestWorks("cls3").Get(context.TODO(), mwrSet.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Expected ManifestWork for placement3 to exist, but got error: %v", err)
+	}
+	assert.Equal(t, currentMW3.Labels[ManifestWorkReplicaSetPlacementNameLabelKey], "place-test3")
+}
+func TestClusterRolloutStatusFunc(t *testing.T) {
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	now := metav1.Now()
+	creationTime := metav1.NewTime(now.Add(-5 * time.Minute))
+
+	tests := []struct {
+		name                   string
+		manifestWork           *workapiv1.ManifestWork
+		expectedStatus         clustersdkv1alpha1.RolloutStatus
+		expectedLastTransition *metav1.Time
+	}{
+		{
+			name: "no progressing condition - should return ToApply",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        1,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{},
+				},
+			},
+			expectedStatus:         clustersdkv1alpha1.ToApply,
+			expectedLastTransition: nil,
+		},
+		{
+			name: "progressing condition with unobserved generation - should return ToApply",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        2,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkProgressing,
+							Status:             metav1.ConditionFalse,
+							ObservedGeneration: 1,
+							LastTransitionTime: now,
+							Reason:             "Completed",
+						},
+					},
+				},
+			},
+			expectedStatus:         clustersdkv1alpha1.ToApply,
+			expectedLastTransition: nil,
+		},
+		{
+			name: "degraded condition with unobserved generation - should return ToApply",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        2,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkProgressing,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applying",
+						},
+						{
+							Type:               workapiv1.WorkDegraded,
+							Status:             metav1.ConditionTrue,
+							LastTransitionTime: now,
+							Reason:             "Failed",
+							ObservedGeneration: 1,
+						},
+					},
+				},
+			},
+			expectedStatus:         clustersdkv1alpha1.ToApply,
+			expectedLastTransition: nil,
+		},
+		{
+			name: "progressing true with current generation - should return Progressing",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        2,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkProgressing,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applying",
+						},
+					},
+				},
+			},
+			expectedStatus:         clustersdkv1alpha1.Progressing,
+			expectedLastTransition: &now,
+		},
+		{
+			name: "progressing true and degraded true - should return Failed",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        2,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkProgressing,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applying",
+						},
+						{
+							Type:               workapiv1.WorkDegraded,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Failed",
+						},
+					},
+				},
+			},
+			expectedStatus:         clustersdkv1alpha1.Failed,
+			expectedLastTransition: &now,
+		},
+		{
+			name: "progressing true but degraded false - should return Progressing",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        2,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkProgressing,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applying",
+						},
+						{
+							Type:               workapiv1.WorkDegraded,
+							Status:             metav1.ConditionFalse,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Healthy",
+						},
+					},
+				},
+			},
+			expectedStatus:         clustersdkv1alpha1.Progressing,
+			expectedLastTransition: &now,
+		},
+		{
+			name: "progressing true with degraded unknown - should return Progressing",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        2,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkProgressing,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applying",
+						},
+						{
+							Type:               workapiv1.WorkDegraded,
+							Status:             metav1.ConditionUnknown,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Unknown",
+						},
+					},
+				},
+			},
+			expectedStatus:         clustersdkv1alpha1.Progressing,
+			expectedLastTransition: &now,
+		},
+		{
+			name: "progressing false - should return Succeeded",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        2,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkProgressing,
+							Status:             metav1.ConditionFalse,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Completed",
+						},
+					},
+				},
+			},
+			expectedStatus:         clustersdkv1alpha1.Succeeded,
+			expectedLastTransition: &now,
+		},
+		{
+			name: "progressing false with degraded true - should return Succeeded",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        2,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkProgressing,
+							Status:             metav1.ConditionFalse,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Completed",
+						},
+						{
+							Type:               workapiv1.WorkDegraded,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Failed",
+						},
+					},
+				},
+			},
+			expectedStatus:         clustersdkv1alpha1.Succeeded,
+			expectedLastTransition: &now,
+		},
+		{
+			name: "progressing unknown status - should return Progressing",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        2,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkProgressing,
+							Status:             metav1.ConditionUnknown,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Unknown",
+						},
+					},
+				},
+			},
+			expectedStatus:         clustersdkv1alpha1.Progressing,
+			expectedLastTransition: &now,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet, tt.manifestWork)
+			workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
+			mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+			placement, placementDecision := helpertest.CreateTestPlacement("place-test", "default", "cls1")
+			fClusterClient := fakeclusterclient.NewSimpleClientset(placement, placementDecision)
+			clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Second)
+
+			placementLister := clusterInformerFactory.Cluster().V1beta1().Placements().Lister()
+			placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
+
+			reconciler := deployReconciler{
+				workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+				manifestWorkLister:  mwLister,
+				placeDecisionLister: placementDecisionLister,
+				placementLister:     placementLister,
+			}
+
+			status, _ := reconciler.clusterRolloutStatusFunc(tt.manifestWork.Namespace, *tt.manifestWork)
+			assert.Equal(t, tt.expectedStatus, status.Status)
+			assert.Equal(t, tt.manifestWork.Namespace, status.ClusterName)
+			assert.Equal(t, tt.expectedLastTransition, status.LastTransitionTime,
+				"LastTransitionTime should match for test: %s", tt.name)
+		})
 	}
 }

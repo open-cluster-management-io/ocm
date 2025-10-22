@@ -246,7 +246,7 @@ var _ = ginkgo.Describe("ManifestWork Delete Option", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Ensure the configmap is kept and tracked by anotherappliedmanifestwork
-			gomega.Eventually(func() error {
+			gomega.Consistently(func() error {
 				configMap, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(
 					context.Background(), cm1, metav1.GetOptions{})
 				if err != nil {
@@ -254,7 +254,7 @@ var _ = ginkgo.Describe("ManifestWork Delete Option", func() {
 				}
 
 				if currentUID != configMap.UID {
-					return fmt.Errorf("UID should be equal")
+					return fmt.Errorf("UID should not be changed in configmap")
 				}
 
 				anotherAppliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(
@@ -269,7 +269,7 @@ var _ = ginkgo.Describe("ManifestWork Delete Option", func() {
 					}
 
 					if appliedResource.UID != string(currentUID) {
-						return fmt.Errorf("UID should be equal")
+						return fmt.Errorf("UID should not be changed in appliedmanifestwork, got %v, should be %s", appliedResource.UID, currentUID)
 					}
 				}
 

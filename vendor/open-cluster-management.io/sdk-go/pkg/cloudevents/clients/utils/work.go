@@ -48,3 +48,20 @@ func EncodeManifests(work *workv1.ManifestWork) error {
 
 	return nil
 }
+
+// EnsureManifestWorkFinalizer ensures the manifestwork finalizer in the given finalizers
+func EnsureManifestWorkFinalizer(finalizers []string) []string {
+	has := false
+	for _, f := range finalizers {
+		if f == workv1.ManifestWorkFinalizer {
+			has = true
+			break
+		}
+	}
+
+	if !has {
+		finalizers = append(finalizers, workv1.ManifestWorkFinalizer)
+	}
+
+	return finalizers
+}

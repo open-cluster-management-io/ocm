@@ -86,6 +86,7 @@ spec:
               installNamespace:
                 default: open-cluster-management-agent-addon
                 description: |-
+                  Deprecated: Use AddonDeploymentConfig instead.
                   installNamespace is the namespace on the managed cluster to install the addon agent.
                   If it is not set, open-cluster-management-agent-addon namespace is used to install the addon agent.
                 maxLength: 63

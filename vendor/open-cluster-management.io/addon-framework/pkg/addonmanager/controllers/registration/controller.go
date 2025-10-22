@@ -185,21 +185,28 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 	}
 	managedClusterAddonCopy.Status.Registrations = configs
 
-	var agentInstallNamespace string
+	// explicitly set the default namespace value, since the mca.spec.installNamespace is deprceated and
+	//  the addonDeploymentConfig.spec.agentInstallNamespace could be empty
+	managedClusterAddonCopy.Status.Namespace = "open-cluster-management-agent-addon"
+
+	// Set the default namespace to registrationOption.Namespace
+	if len(registrationOption.Namespace) > 0 {
+		managedClusterAddonCopy.Status.Namespace = registrationOption.Namespace
+	}
+
+	if len(managedClusterAddonCopy.Spec.InstallNamespace) > 0 {
+		managedClusterAddonCopy.Status.Namespace = managedClusterAddonCopy.Spec.InstallNamespace
+	}
+
 	if registrationOption.AgentInstallNamespace != nil {
-		agentInstallNamespace, err = registrationOption.AgentInstallNamespace(managedClusterAddonCopy)
+		ns, err := registrationOption.AgentInstallNamespace(managedClusterAddonCopy)
 		if err != nil {
 			return err
 		}
-	}
-
-	// Set the default namespace to registrationOption.Namespace
-	managedClusterAddonCopy.Status.Namespace = registrationOption.Namespace
-	// Override if agentInstallNamespace or InstallNamespace is specified
-	if len(agentInstallNamespace) > 0 {
-		managedClusterAddonCopy.Status.Namespace = agentInstallNamespace
-	} else if len(managedClusterAddonCopy.Spec.InstallNamespace) > 0 {
-		managedClusterAddonCopy.Status.Namespace = managedClusterAddonCopy.Spec.InstallNamespace
+		// Override if agentInstallNamespace or InstallNamespace is specified
+		if len(ns) > 0 {
+			managedClusterAddonCopy.Status.Namespace = ns
+		}
 	}
 
 	meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{

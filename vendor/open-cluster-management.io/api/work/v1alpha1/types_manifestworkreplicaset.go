@@ -132,7 +132,7 @@ type ManifestWorkReplicaSetSummary struct {
 	// TODO: Degraded is the number of ManifestWorks with condition Degraded: true
 	Degraded int `json:"degraded"`
 	// Applied is the number of ManifestWorks with condition Applied: true
-	Applied int `json:"Applied"`
+	Applied int `json:"applied"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

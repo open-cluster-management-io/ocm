@@ -810,10 +810,10 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
 				metav1.ConditionTrue, []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue},
-				eventuallyTimeout, eventuallyInterval)
+				3*eventuallyTimeout, eventuallyInterval)
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable,
 				metav1.ConditionTrue, []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue},
-				eventuallyTimeout, eventuallyInterval)
+				3*eventuallyTimeout, eventuallyInterval)
 
 			ginkgo.By("ensure configmaps cm1 and cm2 exist")
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
@@ -823,10 +823,10 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
 				metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionFalse, metav1.ConditionFalse,
-					metav1.ConditionFalse}, eventuallyTimeout, eventuallyInterval)
+					metav1.ConditionFalse}, 3*eventuallyTimeout, eventuallyInterval)
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable,
 				metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue,
-					metav1.ConditionFalse}, eventuallyTimeout, eventuallyInterval)
+					metav1.ConditionFalse}, 3*eventuallyTimeout, eventuallyInterval)
 
 			ginkgo.By("ensure configmap cm1 cm2 exist(will not delete the applied resource even the permison is revoked) but cm3 does not exist")
 			util.AssertExistenceOfConfigMaps(

@@ -88,24 +88,30 @@ func (s *clusterManagerStatusController) sync(ctx context.Context, controllerCon
 // updateStatusOfRegistration checks registration deployment status and updates condition of clustermanager
 func (s *clusterManagerStatusController) updateStatusOfRegistration(clusterManagerName, clusterManagerNamespace string) metav1.Condition {
 	// Check registration deployment status
-	registrationDeploymentName := fmt.Sprintf("%s-registration-controller", clusterManagerName)
-	registrationDeployment, err := s.deploymentLister.Deployments(clusterManagerNamespace).Get(registrationDeploymentName)
-	if err != nil {
-		return metav1.Condition{
-			Type:    operatorapiv1.ConditionHubRegistrationDegraded,
-			Status:  metav1.ConditionTrue,
-			Reason:  operatorapiv1.ReasonGetRegistrationDeploymentFailed,
-			Message: fmt.Sprintf("Failed to get registration deployment %q %q: %v", clusterManagerNamespace, registrationDeploymentName, err),
-		}
+	deployments := []string{
+		fmt.Sprintf("%s-registration-controller", clusterManagerName),
+		fmt.Sprintf("%s-registration-webhook", clusterManagerName),
 	}
 
-	if unavailablePod := helpers.NumOfUnavailablePod(registrationDeployment); unavailablePod > 0 {
-		return metav1.Condition{
-			Type:   operatorapiv1.ConditionHubRegistrationDegraded,
-			Status: metav1.ConditionTrue,
-			Reason: operatorapiv1.ReasonUnavailableRegistrationPod,
-			Message: fmt.Sprintf("%v of requested instances are unavailable of registration deployment %q %q",
-				unavailablePod, clusterManagerNamespace, registrationDeploymentName),
+	for _, deploymentName := range deployments {
+		registrationDeployment, err := s.deploymentLister.Deployments(clusterManagerNamespace).Get(deploymentName)
+		if err != nil {
+			return metav1.Condition{
+				Type:    operatorapiv1.ConditionHubRegistrationDegraded,
+				Status:  metav1.ConditionTrue,
+				Reason:  operatorapiv1.ReasonGetRegistrationDeploymentFailed,
+				Message: fmt.Sprintf("Failed to get registration deployment %q %q: %v", clusterManagerNamespace, deploymentName, err),
+			}
+		}
+
+		if unavailablePod := helpers.NumOfUnavailablePod(registrationDeployment); unavailablePod > 0 {
+			return metav1.Condition{
+				Type:   operatorapiv1.ConditionHubRegistrationDegraded,
+				Status: metav1.ConditionTrue,
+				Reason: operatorapiv1.ReasonUnavailableRegistrationPod,
+				Message: fmt.Sprintf("%v of requested instances are unavailable of registration deployment %q %q",
+					unavailablePod, clusterManagerNamespace, deploymentName),
+			}
 		}
 	}
 

@@ -201,6 +201,168 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 				Available: 0,
 			}, manifestWorkReplicaSet), eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 		})
+
+		ginkgo.It("should delete manifestworks from old placement when placementRef changes", func() {
+			// Create first placement and placementDecision
+			placement1 := &clusterv1beta1.Placement{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-placement-1",
+					Namespace: namespaceName,
+				},
+			}
+			_, err := hubClusterClient.ClusterV1beta1().Placements(placement1.Namespace).Create(context.TODO(), placement1, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			placementDecision1 := &clusterv1beta1.PlacementDecision{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-placement-decision-1",
+					Namespace: namespaceName,
+					Labels: map[string]string{
+						clusterv1beta1.PlacementLabel:          placement1.Name,
+						clusterv1beta1.DecisionGroupIndexLabel: "0",
+					},
+				},
+			}
+			decision1, err := hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision1.Namespace).Create(
+				context.TODO(), placementDecision1, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Create clusters for first placement
+			cluster1Names := sets.New[string]()
+			for i := 0; i < 2; i++ {
+				clusterName := "cluster-placement1-" + utilrand.String(5)
+				ns := &corev1.Namespace{}
+				ns.Name = clusterName
+				_, err = spokeKubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				decision1.Status.Decisions = append(decision1.Status.Decisions, clusterv1beta1.ClusterDecision{ClusterName: clusterName})
+				cluster1Names.Insert(clusterName)
+			}
+			_, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision1.Namespace).UpdateStatus(context.TODO(), decision1, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Create manifestWorkReplicaSet with first placement
+			manifests := []workapiv1.Manifest{
+				util.ToManifest(util.NewConfigmap("defaut", cm1, map[string]string{"a": "b"}, nil)),
+			}
+			placementRef1 := workapiv1alpha1.LocalPlacementReference{
+				Name:            placement1.Name,
+				RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All},
+			}
+
+			manifestWorkReplicaSet := &workapiv1alpha1.ManifestWorkReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-work",
+					Namespace: namespaceName,
+				},
+				Spec: workapiv1alpha1.ManifestWorkReplicaSetSpec{
+					ManifestWorkTemplate: workapiv1.ManifestWorkSpec{
+						Workload: workapiv1.ManifestsTemplate{
+							Manifests: manifests,
+						},
+					},
+					PlacementRefs: []workapiv1alpha1.LocalPlacementReference{placementRef1},
+				},
+			}
+
+			_, err = hubWorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespaceName).Create(context.TODO(), manifestWorkReplicaSet, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Verify manifestworks are created for first placement
+			gomega.Eventually(func() error {
+				key := fmt.Sprintf("%s.%s", manifestWorkReplicaSet.Namespace, manifestWorkReplicaSet.Name)
+				works, err := hubWorkClient.WorkV1().ManifestWorks(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
+					LabelSelector: fmt.Sprintf("work.open-cluster-management.io/manifestworkreplicaset=%s,work.open-cluster-management.io/placementname=%s", key, placement1.Name),
+				})
+				if err != nil {
+					return err
+				}
+				if len(works.Items) != 2 {
+					return fmt.Errorf("expected 2 manifestworks, got %d", len(works.Items))
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+			ginkgo.By("Create second placement and update manifestWorkReplicaSet to use it")
+			placement2 := &clusterv1beta1.Placement{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-placement-2",
+					Namespace: namespaceName,
+				},
+			}
+			_, err = hubClusterClient.ClusterV1beta1().Placements(placement2.Namespace).Create(context.TODO(), placement2, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			placementDecision2 := &clusterv1beta1.PlacementDecision{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-placement-decision-2",
+					Namespace: namespaceName,
+					Labels: map[string]string{
+						clusterv1beta1.PlacementLabel:          placement2.Name,
+						clusterv1beta1.DecisionGroupIndexLabel: "0",
+					},
+				},
+			}
+			decision2, err := hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision2.Namespace).Create(
+				context.TODO(), placementDecision2, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Create clusters for second placement
+			cluster2Names := sets.New[string]()
+			for i := 0; i < 2; i++ {
+				clusterName := "cluster-placement2-" + utilrand.String(5)
+				ns := &corev1.Namespace{}
+				ns.Name = clusterName
+				_, err = spokeKubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				decision2.Status.Decisions = append(decision2.Status.Decisions, clusterv1beta1.ClusterDecision{ClusterName: clusterName})
+				cluster2Names.Insert(clusterName)
+			}
+			_, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision2.Namespace).UpdateStatus(context.TODO(), decision2, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Update manifestWorkReplicaSet to use second placement
+			placementRef2 := workapiv1alpha1.LocalPlacementReference{
+				Name:            placement2.Name,
+				RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All},
+			}
+
+			mwrs, err := hubWorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespaceName).Get(context.TODO(), manifestWorkReplicaSet.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			mwrs.Spec.PlacementRefs = []workapiv1alpha1.LocalPlacementReference{placementRef2}
+			_, err = hubWorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespaceName).Update(context.TODO(), mwrs, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			ginkgo.By("Verify manifestworks from first placement are deleted")
+			gomega.Eventually(func() error {
+				key := fmt.Sprintf("%s.%s", manifestWorkReplicaSet.Namespace, manifestWorkReplicaSet.Name)
+				works, err := hubWorkClient.WorkV1().ManifestWorks(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
+					LabelSelector: fmt.Sprintf("work.open-cluster-management.io/manifestworkreplicaset=%s,work.open-cluster-management.io/placementname=%s", key, placement1.Name),
+				})
+				if err != nil {
+					return err
+				}
+				if len(works.Items) != 0 {
+					return fmt.Errorf("expected 0 manifestworks for placement1, got %d", len(works.Items))
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+			ginkgo.By("Verify manifestworks for second placement are created")
+			gomega.Eventually(func() error {
+				key := fmt.Sprintf("%s.%s", manifestWorkReplicaSet.Namespace, manifestWorkReplicaSet.Name)
+				works, err := hubWorkClient.WorkV1().ManifestWorks(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
+					LabelSelector: fmt.Sprintf("work.open-cluster-management.io/manifestworkreplicaset=%s,work.open-cluster-management.io/placementname=%s", key, placement2.Name),
+				})
+				if err != nil {
+					return err
+				}
+				if len(works.Items) != 2 {
+					return fmt.Errorf("expected 2 manifestworks for placement2, got %d", len(works.Items))
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		})
 	})
 
 	ginkgo.It("rollout progressive", func() {
@@ -224,8 +386,12 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		for _, work := range works.Items {
 			workCopy := work.DeepCopy()
-			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "ApplyTest"})
-			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "ApplyTest"})
+			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
+				Type:               workapiv1.WorkProgressing,
+				Status:             metav1.ConditionFalse,
+				Reason:             "AppliedManifestWorkComplete",
+				ObservedGeneration: workCopy.Generation,
+			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			_, err := hubWorkClient.WorkV1().ManifestWorks(workCopy.Namespace).UpdateStatus(context.TODO(), workCopy, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -238,8 +404,12 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		for _, work := range works.Items {
 			workCopy := work.DeepCopy()
-			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "ApplyTest"})
-			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "ApplyTest"})
+			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
+				Type:               workapiv1.WorkProgressing,
+				Status:             metav1.ConditionFalse,
+				Reason:             "AppliedManifestWorkComplete",
+				ObservedGeneration: workCopy.Generation,
+			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			_, err := hubWorkClient.WorkV1().ManifestWorks(workCopy.Namespace).UpdateStatus(context.TODO(), workCopy, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -271,7 +441,18 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		for _, work := range works.Items {
 			workCopy := work.DeepCopy()
-			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionFalse, Reason: "ApplyTest"})
+			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
+				Type:               workapiv1.WorkProgressing,
+				Status:             metav1.ConditionTrue,
+				Reason:             "Applying",
+				ObservedGeneration: workCopy.Generation,
+			})
+			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
+				Type:               workapiv1.WorkDegraded,
+				Status:             metav1.ConditionTrue,
+				Reason:             "ApplyFailed",
+				ObservedGeneration: workCopy.Generation,
+			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			_, err := hubWorkClient.WorkV1().ManifestWorks(workCopy.Namespace).UpdateStatus(context.TODO(), workCopy, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -318,7 +499,12 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 			workCopy := work.DeepCopy()
 			meta.SetStatusCondition(
 				&workCopy.Status.Conditions,
-				metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "ApplyTest"})
+				metav1.Condition{
+					Type:               workapiv1.WorkProgressing,
+					Status:             metav1.ConditionFalse,
+					Reason:             "AppliedManifestWorkComplete",
+					ObservedGeneration: workCopy.Generation,
+				})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			_, err := hubWorkClient.WorkV1().
 				ManifestWorks(workCopy.Namespace).UpdateStatus(context.TODO(), workCopy, metav1.UpdateOptions{})
@@ -380,7 +566,20 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 			workCopy := work.DeepCopy()
 			meta.SetStatusCondition(
 				&workCopy.Status.Conditions,
-				metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionFalse, Reason: "ApplyTest"})
+				metav1.Condition{
+					Type:               workapiv1.WorkProgressing,
+					Status:             metav1.ConditionTrue,
+					Reason:             "Applying",
+					ObservedGeneration: workCopy.Generation,
+				})
+			meta.SetStatusCondition(
+				&workCopy.Status.Conditions,
+				metav1.Condition{
+					Type:               workapiv1.WorkDegraded,
+					Status:             metav1.ConditionTrue,
+					Reason:             "ApplyFailed",
+					ObservedGeneration: workCopy.Generation,
+				})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			_, err := hubWorkClient.WorkV1().
 				ManifestWorks(workCopy.Namespace).UpdateStatus(context.TODO(), workCopy, metav1.UpdateOptions{})

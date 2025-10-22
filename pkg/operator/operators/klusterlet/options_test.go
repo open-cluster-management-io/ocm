@@ -58,6 +58,7 @@ var _ = ginkgo.Describe("start klusterlet", func() {
 
 		// start hub controller
 		go func() {
+			defer ginkgo.GinkgoRecover()
 			o := &Options{EnableSyncLabels: true}
 			err := o.RunKlusterletOperator(ctx, &controllercmd.ControllerContext{
 				KubeConfig:    cfg,

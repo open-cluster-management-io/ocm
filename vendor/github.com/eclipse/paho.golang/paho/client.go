@@ -31,13 +31,6 @@ import (
 	"github.com/eclipse/paho.golang/paho/session/state"
 )
 
-type MQTTVersion byte
-
-const (
-	MQTTv311 MQTTVersion = 4
-	MQTTv5   MQTTVersion = 5
-)
-
 const defaultSendAckInterval = 50 * time.Millisecond
 
 var (
@@ -91,7 +84,8 @@ type (
 		PacketTimeout time.Duration
 		// OnServerDisconnect is called only when a packets.DISCONNECT is received from server
 		OnServerDisconnect func(*Disconnect)
-		// OnClientError is for example called on net.Error
+		// OnClientError is for example called on net.Error. Note that this may be called multiple times and may be
+		// called following a successful `Disconnect`. See autopaho.errorHandler for an example.
 		OnClientError func(error)
 		// PublishHook allows a user provided function to be called before
 		// a Publish packet is sent allowing it to inspect or modify the
@@ -500,6 +494,7 @@ func (c *Client) incoming(ctx context.Context) {
 				go c.error(err)
 				return
 			}
+			c.config.PingHandler.PacketReceived()
 			switch recv.Type {
 			case packets.CONNACK:
 				c.debug.Println("received CONNACK (unexpected)")
@@ -815,7 +810,7 @@ func (c *Client) Unsubscribe(ctx context.Context, u *Unsubscribe) (*Unsuback, er
 
 // Publish is used to send a publication to the MQTT server.
 // It is passed a pre-prepared Publish packet and blocks waiting for the appropriate response, or for the timeout to fire.
-// Any response message is returned from the function, along with any errors.
+// A PublishResponse is returned, which is relevant for QOS1+. For QOS0, a default success response is returned.
 // Note that a message may still be delivered even if Publish times out (once the message is part of the session state,
 // it may even be delivered following an application restart).
 // Warning: Publish may outlive the connection when QOS1+ (managed in `session_state`)
@@ -838,7 +833,7 @@ type PublishOptions struct {
 
 // PublishWithOptions is used to send a publication to the MQTT server (with options to customise its behaviour)
 // It is passed a pre-prepared Publish packet and, by default, blocks waiting for the appropriate response, or for the
-// timeout to fire.
+// timeout to fire. A PublishResponse is returned, which is relevant for QOS1+. For QOS0, a default success response is returned.
 // Note that a message may still be delivered even if Publish times out (once the message is part of the session state,
 // it may even be delivered following an application restart).
 // Warning: Publish may outlive the connection when QOS1+ (managed in `session_state`)
@@ -874,7 +869,7 @@ func (c *Client) PublishWithOptions(ctx context.Context, p *Publish, o PublishOp
 			return nil, err
 		}
 		c.config.PingHandler.PacketSent()
-		return nil, nil
+		return &PublishResponse{}, nil
 	case 1, 2:
 		return c.publishQoS12(ctx, pb, o)
 	}

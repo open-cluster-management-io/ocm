@@ -54,10 +54,12 @@ type AddOnDeploymentConfigSpec struct {
 	ProxyConfig ProxyConfig `json:"proxyConfig,omitempty"`
 
 	// AgentInstallNamespace is the namespace where the add-on agent should be installed on the managed cluster.
+	// For template-type addons: set to empty string "" to use the namespace defined in the addonTemplate.
+	// For non-template addons: defaults to "open-cluster-management-agent-addon" if not specified.
 	// +optional
 	// +kubebuilder:default=open-cluster-management-agent-addon
 	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+	// +kubebuilder:validation:Pattern=^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$
 	AgentInstallNamespace string `json:"agentInstallNamespace,omitempty"`
 
 	// ResourceRequirements specify the resources required by add-on agents.

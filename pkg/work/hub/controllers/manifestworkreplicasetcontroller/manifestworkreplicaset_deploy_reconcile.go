@@ -36,6 +36,31 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 	var plcsSummary []workapiv1alpha1.PlacementSummary
 	minRequeue := maxRequeueTime
 	count, total := 0, 0
+
+	// Clean up ManifestWorks from placements no longer in the spec
+	currentPlacementNames := sets.New[string]()
+	for _, placementRef := range mwrSet.Spec.PlacementRefs {
+		currentPlacementNames.Insert(placementRef.Name)
+	}
+
+	// Get all ManifestWorks belonging to this ManifestWorkReplicaSet
+	allManifestWorks, err := listManifestWorksByManifestWorkReplicaSet(mwrSet, d.manifestWorkLister)
+	if err != nil {
+		return mwrSet, reconcileContinue, fmt.Errorf("failed to list manifestworks: %w", err)
+	}
+
+	// Delete ManifestWorks that belong to placements no longer in the spec
+	for _, mw := range allManifestWorks {
+		placementName, ok := mw.Labels[ManifestWorkReplicaSetPlacementNameLabelKey]
+		if !ok || !currentPlacementNames.Has(placementName) {
+			// This ManifestWork belongs to a placement that's no longer in the spec, delete it
+			err := d.workApplier.Delete(ctx, mw.Namespace, mw.Name)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to delete manifestwork %s/%s for removed placement %s: %w", mw.Namespace, mw.Name, placementName, err))
+			}
+		}
+	}
+
 	// Getting the placements and the created ManifestWorks related to each placement
 	for _, placementRef := range mwrSet.Spec.PlacementRefs {
 		var existingRolloutClsStatus []clustersdkv1alpha1.ClusterRolloutStatus
@@ -184,41 +209,54 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 }
 
 func (d *deployReconciler) clusterRolloutStatusFunc(clusterName string, manifestWork workv1.ManifestWork) (clustersdkv1alpha1.ClusterRolloutStatus, error) {
+	// Initialize default status as ToApply, LastTransitionTime is not needed for ToApply status.
 	clsRolloutStatus := clustersdkv1alpha1.ClusterRolloutStatus{
-		ClusterName:        clusterName,
-		LastTransitionTime: &manifestWork.CreationTimestamp,
-		// Default status is ToApply
-		Status: clustersdkv1alpha1.ToApply,
+		ClusterName: clusterName,
+		Status:      clustersdkv1alpha1.ToApply,
 	}
 
-	appliedCondition := apimeta.FindStatusCondition(manifestWork.Status.Conditions, workv1.WorkApplied)
+	// Get all relevant conditions
+	progressingCond := apimeta.FindStatusCondition(manifestWork.Status.Conditions, workv1.WorkProgressing)
+	degradedCond := apimeta.FindStatusCondition(manifestWork.Status.Conditions, workv1.WorkDegraded)
 
-	// Applied condition not exist return status as ToApply.
-	if appliedCondition == nil { //nolint:gocritic
+	// Return ToApply if:
+	// - No Progressing condition exists yet (work hasn't been reconciled by agent)
+	// - Progressing condition hasn't observed the latest spec
+	// - Degraded condition exists but hasn't observed the latest spec
+	//   (Degraded is optional, but if it exists, we wait for it to catch up)
+	if progressingCond == nil ||
+		progressingCond.ObservedGeneration != manifestWork.Generation ||
+		(degradedCond != nil && degradedCond.ObservedGeneration != manifestWork.Generation) {
 		return clsRolloutStatus, nil
-	} else if appliedCondition.Status == metav1.ConditionTrue ||
-		apimeta.IsStatusConditionTrue(manifestWork.Status.Conditions, workv1.WorkProgressing) {
-		// Applied OR Progressing conditions status true return status as Progressing
-		// ManifestWork Progressing status is not defined however the check is made for future work availability.
+	}
+
+	// Agent has observed the latest spec, determine status based on Progressing and Degraded conditions.
+	// Degraded is an optional condition only used to determine Failed case.
+	// - Progressing=True + Degraded=True → Failed (work is progressing but degraded)
+	// - Progressing=True (not degraded) → Progressing
+	// - Progressing=False → Succeeded
+	// - Unknown state → Progressing (conservative fallback)
+	//
+	// LastTransitionTime is used by rollout strategies to calculate:
+	// - Timeout for Progressing and Failed statuses
+	// - Minimum success time (soak time) for Succeeded status
+	switch {
+	case progressingCond.Status == metav1.ConditionTrue && degradedCond != nil && degradedCond.Status == metav1.ConditionTrue:
+		clsRolloutStatus.Status = clustersdkv1alpha1.Failed
+		clsRolloutStatus.LastTransitionTime = &degradedCond.LastTransitionTime
+
+	case progressingCond.Status == metav1.ConditionTrue:
 		clsRolloutStatus.Status = clustersdkv1alpha1.Progressing
-	} else if appliedCondition.Status == metav1.ConditionFalse {
-		// Applied Condition status false return status as failed
-		clsRolloutStatus.Status = clustersdkv1alpha1.Failed
-		clsRolloutStatus.LastTransitionTime = &appliedCondition.LastTransitionTime
-		return clsRolloutStatus, nil
-	}
+		clsRolloutStatus.LastTransitionTime = &progressingCond.LastTransitionTime
 
-	// Available condition return status as Succeeded
-	if apimeta.IsStatusConditionTrue(manifestWork.Status.Conditions, workv1.WorkAvailable) {
+	case progressingCond.Status == metav1.ConditionFalse:
 		clsRolloutStatus.Status = clustersdkv1alpha1.Succeeded
-		return clsRolloutStatus, nil
-	}
+		clsRolloutStatus.LastTransitionTime = &progressingCond.LastTransitionTime
 
-	// Degraded condition return status as Failed
-	// ManifestWork Degraded status is not defined however the check is made for future work availability.
-	if apimeta.IsStatusConditionTrue(manifestWork.Status.Conditions, workv1.WorkDegraded) {
-		clsRolloutStatus.Status = clustersdkv1alpha1.Failed
-		clsRolloutStatus.LastTransitionTime = &appliedCondition.LastTransitionTime
+	default:
+		// Unknown state, conservatively treat as still progressing
+		clsRolloutStatus.Status = clustersdkv1alpha1.Progressing
+		clsRolloutStatus.LastTransitionTime = &progressingCond.LastTransitionTime
 	}
 
 	return clsRolloutStatus, nil

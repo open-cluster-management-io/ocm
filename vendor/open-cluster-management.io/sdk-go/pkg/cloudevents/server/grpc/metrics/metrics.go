@@ -22,30 +22,42 @@ const grpcCEMetricsSubsystem = "grpc_server_ce"
 
 // Names of the labels added to metrics:
 const (
-	grpcCEMetricsClusterLabel  = "cluster"
+	grpcCEMetricsClusterLabel  = "consumer"
 	grpcCEMetricsDataTypeLabel = "data_type"
 	grpcCEMetricsMethodLabel   = "method"
 	grpcMetricsCodeLabel       = "grpc_code"
 )
 
-// grpcCEMetricsLabels - Array of labels added to grpc server metrics for cloudevents:
-var grpcCEMetricsLabels = []string{
+// grpcCEMetricsCommonLabels - Array of common labels added to grpc server metrics for cloudevents:
+var grpcCEMetricsCommonLabels = []string{
 	grpcCEMetricsClusterLabel,
 	grpcCEMetricsDataTypeLabel,
-	grpcCEMetricsMethodLabel,
 }
 
+// grpcCEMetricsHandlerLabels - Array of handler labels added to grpc server metrics for cloudevents:
+var grpcCEMetricsHandlerLabels = append(grpcCEMetricsCommonLabels, grpcCEMetricsMethodLabel)
+
 // grpcCEMetricsAllLabels - Array of all labels added to grpc server metrics for cloudevents:
-var grpcCEMetricsAllLabels = append(grpcCEMetricsLabels, grpcMetricsCodeLabel)
+var grpcCEMetricsAllLabels = append(grpcCEMetricsHandlerLabels, grpcMetricsCodeLabel)
 
 // Names of the grpc server metrics for cloudevents:
 const (
+	subscribersMetric          = "subscribers"
 	calledCountMetric          = "called_total"
 	processedCountMetric       = "processed_total"
 	processingDurationMetric   = "processing_duration_seconds"
 	messageReceivedCountMetric = "msg_received_total"
 	messageSentCountMetric     = "msg_sent_total"
 )
+
+// grpcCESubscribersMetric is a gauge metric that tracks the number of registered
+// subscribers for cloudevents on the gRPC server.
+var grpcCESubscribersMetric = k8smetrics.NewGaugeVec(&k8smetrics.GaugeOpts{
+	Subsystem:      grpcCEMetricsSubsystem,
+	Name:           subscribersMetric,
+	StabilityLevel: k8smetrics.ALPHA,
+	Help:           "Number of registered subscribers for cloudevents on the grpc server.",
+}, grpcCEMetricsCommonLabels)
 
 // grpcCECalledCountMetric is a counter metric that tracks the total number of
 // RPC requests for cloudevents called on the gRPC server.
@@ -54,7 +66,7 @@ var grpcCECalledCountMetric = k8smetrics.NewCounterVec(&k8smetrics.CounterOpts{
 	Name:           calledCountMetric,
 	StabilityLevel: k8smetrics.ALPHA,
 	Help:           "Total number of RPC requests for cloudevents called on the grpc server.",
-}, grpcCEMetricsLabels)
+}, grpcCEMetricsHandlerLabels)
 
 // grpcCEMessageReceivedCountMetric is a counter metric that tracks the total number of
 // messages for cloudevents received on the gRPC server.
@@ -63,7 +75,7 @@ var grpcCEMessageReceivedCountMetric = k8smetrics.NewCounterVec(&k8smetrics.Coun
 	Name:           messageReceivedCountMetric,
 	StabilityLevel: k8smetrics.ALPHA,
 	Help:           "Total number of messages for cloudevents received on the gRPC server.",
-}, grpcCEMetricsLabels)
+}, grpcCEMetricsHandlerLabels)
 
 // grpcCEMessageSentCountMetric is a counter metric that tracks the total number of
 // messages for cloudevents sent by the gRPC server.
@@ -72,7 +84,7 @@ var grpcCEMessageSentCountMetric = k8smetrics.NewCounterVec(&k8smetrics.CounterO
 	Name:           messageSentCountMetric,
 	StabilityLevel: k8smetrics.ALPHA,
 	Help:           "Total number of messages for cloudevents sent by the gRPC server.",
-}, grpcCEMetricsLabels)
+}, grpcCEMetricsHandlerLabels)
 
 // grpcCEProcessedCountMetric is a counter metric that tracks the total number of
 // RPC requests for cloudevents processed on the server, regardless of success or failure.
@@ -280,10 +292,21 @@ func SplitMethod(fullMethod string) (service, method string) {
 // Register all the grpc server metrics for cloudevents.
 func CloudEventsGRPCMetrics() []k8smetrics.Registerable {
 	return []k8smetrics.Registerable{
+		grpcCESubscribersMetric,
 		grpcCECalledCountMetric,
 		grpcCEProcessedCountMetric,
 		grpcCEProcessingDurationMetric,
 		grpcCEMessageReceivedCountMetric,
 		grpcCEMessageSentCountMetric,
 	}
+}
+
+// IncGRPCCESubscribersMetric increments the grpcCESubscribersMetric by 1 for the given cluster and dataType.
+func IncGRPCCESubscribersMetric(cluster, dataType string) {
+	grpcCESubscribersMetric.WithLabelValues(cluster, dataType).Inc()
+}
+
+// DecGRPCCESubscribersMetric decrements the grpcCESubscribersMetric by 1 for the given cluster and dataType.
+func DecGRPCCESubscribersMetric(cluster, dataType string) {
+	grpcCESubscribersMetric.WithLabelValues(cluster, dataType).Dec()
 }

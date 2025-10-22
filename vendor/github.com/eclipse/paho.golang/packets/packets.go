@@ -448,11 +448,19 @@ func writeUint32(u uint32, b *bytes.Buffer) error {
 }
 
 func writeString(s string, b *bytes.Buffer) {
+	// Due to the 16 bit header strings are limited to 65535 bytes
+	if len(s) > 65535 {
+		s = s[:65535]
+	}
 	writeUint16(uint16(len(s)), b)
 	b.WriteString(s)
 }
 
 func writeBinary(d []byte, b *bytes.Buffer) {
+	// Due to the 16 bit header strings are limited to 65535 bytes
+	if len(d) > 65535 {
+		d = d[:65535]
+	}
 	writeUint16(uint16(len(d)), b)
 	b.Write(d)
 }

@@ -68,9 +68,14 @@ const (
 // Unpack is the implementation of the interface required function for a packet
 func (d *Disconnect) Unpack(r *bytes.Buffer) error {
 	var err error
+	noProps := r.Len() == 1
 	d.ReasonCode, err = r.ReadByte()
 	if err != nil {
 		return err
+	}
+
+	if noProps {
+		return nil
 	}
 
 	err = d.Properties.Unpack(r, DISCONNECT)

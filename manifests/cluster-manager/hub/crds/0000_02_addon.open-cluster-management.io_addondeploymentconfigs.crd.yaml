@@ -41,10 +41,12 @@ spec:
             properties:
               agentInstallNamespace:
                 default: open-cluster-management-agent-addon
-                description: AgentInstallNamespace is the namespace where the add-on
-                  agent should be installed on the managed cluster.
+                description: |-
+                  AgentInstallNamespace is the namespace where the add-on agent should be installed on the managed cluster.
+                  For template-type addons: set to empty string "" to use the namespace defined in the addonTemplate.
+                  For non-template addons: defaults to "open-cluster-management-agent-addon" if not specified.
                 maxLength: 63
-                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$
                 type: string
               customizedVariables:
                 description: |-
