@@ -386,8 +386,12 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		for _, work := range works.Items {
 			workCopy := work.DeepCopy()
-			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "ApplyTest"})
-			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "ApplyTest"})
+			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
+				Type:               workapiv1.WorkProgressing,
+				Status:             metav1.ConditionFalse,
+				Reason:             "AppliedManifestWorkComplete",
+				ObservedGeneration: workCopy.Generation,
+			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			_, err := hubWorkClient.WorkV1().ManifestWorks(workCopy.Namespace).UpdateStatus(context.TODO(), workCopy, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -400,8 +404,12 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		for _, work := range works.Items {
 			workCopy := work.DeepCopy()
-			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "ApplyTest"})
-			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "ApplyTest"})
+			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
+				Type:               workapiv1.WorkProgressing,
+				Status:             metav1.ConditionFalse,
+				Reason:             "AppliedManifestWorkComplete",
+				ObservedGeneration: workCopy.Generation,
+			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			_, err := hubWorkClient.WorkV1().ManifestWorks(workCopy.Namespace).UpdateStatus(context.TODO(), workCopy, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -433,7 +441,18 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		for _, work := range works.Items {
 			workCopy := work.DeepCopy()
-			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionFalse, Reason: "ApplyTest"})
+			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
+				Type:               workapiv1.WorkProgressing,
+				Status:             metav1.ConditionTrue,
+				Reason:             "Applying",
+				ObservedGeneration: workCopy.Generation,
+			})
+			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
+				Type:               workapiv1.WorkDegraded,
+				Status:             metav1.ConditionTrue,
+				Reason:             "ApplyFailed",
+				ObservedGeneration: workCopy.Generation,
+			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			_, err := hubWorkClient.WorkV1().ManifestWorks(workCopy.Namespace).UpdateStatus(context.TODO(), workCopy, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -480,7 +499,12 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 			workCopy := work.DeepCopy()
 			meta.SetStatusCondition(
 				&workCopy.Status.Conditions,
-				metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "ApplyTest"})
+				metav1.Condition{
+					Type:               workapiv1.WorkProgressing,
+					Status:             metav1.ConditionFalse,
+					Reason:             "AppliedManifestWorkComplete",
+					ObservedGeneration: workCopy.Generation,
+				})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			_, err := hubWorkClient.WorkV1().
 				ManifestWorks(workCopy.Namespace).UpdateStatus(context.TODO(), workCopy, metav1.UpdateOptions{})
@@ -542,7 +566,20 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 			workCopy := work.DeepCopy()
 			meta.SetStatusCondition(
 				&workCopy.Status.Conditions,
-				metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionFalse, Reason: "ApplyTest"})
+				metav1.Condition{
+					Type:               workapiv1.WorkProgressing,
+					Status:             metav1.ConditionTrue,
+					Reason:             "Applying",
+					ObservedGeneration: workCopy.Generation,
+				})
+			meta.SetStatusCondition(
+				&workCopy.Status.Conditions,
+				metav1.Condition{
+					Type:               workapiv1.WorkDegraded,
+					Status:             metav1.ConditionTrue,
+					Reason:             "ApplyFailed",
+					ObservedGeneration: workCopy.Generation,
+				})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			_, err := hubWorkClient.WorkV1().
 				ManifestWorks(workCopy.Namespace).UpdateStatus(context.TODO(), workCopy, metav1.UpdateOptions{})

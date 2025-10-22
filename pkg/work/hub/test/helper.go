@@ -104,6 +104,12 @@ func CreateTestManifestWork(name, namespace string, placementName string, cluste
 		Type:   workapiv1.WorkAvailable,
 		Status: metav1.ConditionTrue,
 	})
+	meta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
+		Type:               workapiv1.WorkProgressing,
+		Status:             metav1.ConditionFalse,
+		Reason:             "AppliedManifestWorkComplete",
+		ObservedGeneration: mw.Generation,
+	})
 
 	return mw
 }
