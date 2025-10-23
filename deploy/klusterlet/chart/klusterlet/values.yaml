@@ -11,13 +11,26 @@ images:
   # registry and tag work on all images, but the image will be replaced by overrides if the image in overrides is not empty.
   # The registry name must NOT contain a trailing slash.
   registry: quay.io/open-cluster-management
-  # The image tag is the appVersion by default, can be replaced by this version.
+  # The image tag is the appVersion by default, can be replaced by this version, for example v1.0.0.
   tag: ""
   imagePullPolicy: IfNotPresent
   # The image pull secret name is open-cluster-management-image-pull-credentials.
   # Please set the userName/password or the dockerConfigJson if you use a private image registry.
   # The registry will be set in the generated credential if you set userName/password.
-  # Suggest to use dockerConfigJson if you set overrides here.
+  # Suggest to use dockerConfigJson if you set overrides here,
+  # For example: 
+  # --set-file images.imageCredentials.dockerConfigJson=<your dockerConfigJson file> ,
+  # or set the json context in values.yaml file 
+  # dockerConfigJson: |
+  #   {
+  #     "auths": {
+  #       "<your registry>": {
+  #         "auth": "xxx",
+  #         "email": "xxx"
+  #     }
+  #   }
+  # }
+  #
   # The image pull secret is fixed into the serviceAccount, you can also set
   # `createImageCredentials` to `false` and create the pull secret manually.
   imageCredentials:
@@ -75,11 +88,30 @@ affinity:
 # enableSyncLabels is to enable the feature which can sync the labels from klusterlet to all agent resources.
 enableSyncLabels: false
 
-# should be the kubeConfig file of the hub cluster via setting --set-file=<the kubeConfig file of hub cluster> optional
+# The content of the kubeConfig for the hub cluster. Can be set via --set-file bootstrapHubKubeConfig=<path to hub cluster kubeConfig file>
+# or set the kubeConfig content directly here.
+# bootstrapHubKubeConfig: |
+#   apiVersion: v1
+#   clusters:
+#   - cluster:
+#       certificate-authority-data: xxx
+#       server: <hub apiserver>
+#     name: xx
+#   contexts:
+#   - context:
+#   ...
 bootstrapHubKubeConfig: ""
 
-# grpcConfig includes the information needed to build connect to gRPC server in the bootstrap secret for
-# cluster importing via setting --set-file=<the grpc config file> optional.
+# grpcConfig includes the information needed to build connection to gRPC server in the bootstrap secret for
+# cluster importing. Can be set via --set-file grpcConfig=<path to grpc config file>
+# or set the grpcConfig content directly here.
+# caData is the PEM-encoded certificate authority certificates with base64 encoding for the gRPC server.
+# The default caData can be got on the Hub cluster by `kubectl get configmaps -n open-cluster-management-hub ca-bundle-configmap -o jsonpath='{.data.ca-bundle\.crt}'`.
+# token can be got on the Hub cluster by `clusteradm get token`. 
+# grpcConfig: |
+#   caData: xxx 
+#   token: xxx 
+#   url: <grpc server URL on the Hub cluster> # required
 grpcConfig: ""
 
 # when MultipleHubs feature gate in klusterlet.registrationConfiguration is enabled, could set multiple bootstrap hub kubeConfigs here.
@@ -90,8 +122,8 @@ multiHubBootstrapHubKubeConfigs:
 #  - name: xxx
 #    kubeConfig: xxx
 
-# should be the kubeConfig file of the managed cluster via setting --set-file=<the kubeConfig file of managed cluster>
-# only need to set in the hosted mode. optional
+# The content of the kubeConfig for the managed cluster. Can be set via --set-file externalManagedKubeConfig=<path to managed cluster kubeConfig file>
+# Only needed in Hosted or SingletonHosted mode. Optional.
 externalManagedKubeConfig: ""
 
 # only install the klusterlet CR if set true.
