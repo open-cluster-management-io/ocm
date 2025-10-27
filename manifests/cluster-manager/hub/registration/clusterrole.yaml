@@ -134,8 +134,9 @@ rules:
   verbs: ["update", "patch"]
 {{end}}
 {{if .GRPCAuthEnabled}}
+# Allow hub to approve/sign certificates that are signed by grpc
 - apiGroups: ["certificates.k8s.io"]
   resources: ["signers"]
   resourceNames: ["open-cluster-management.io/grpc"]
-  verbs: ["sign"]
+  verbs: ["approve", "sign"]
 {{end}}
