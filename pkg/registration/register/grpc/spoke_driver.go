@@ -86,6 +86,32 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 		clusterClient, 10*time.Minute).Cluster().V1().ManagedClusters()
 	clusterWatchStore.SetInformer(clusterInformers.Informer())
 
+	csrClientHolder, err := cloudeventscsr.NewAgentClientHolder(ctx,
+		cloudeventsoptions.NewGenericClientOptions(
+			config,
+			cloudeventscsr.NewCSRCodec(),
+			secretOption.ClusterName,
+		).WithClusterName(secretOption.ClusterName),
+	)
+	if err != nil {
+		return nil, err
+	}
+	csrControl := &ceCSRControl{csrClientHolder: csrClientHolder}
+	if err := d.csrDriver.SetCSRControl(csrControl, secretOption.ClusterName); err != nil {
+		return nil, err
+	}
+	d.control = csrControl
+
+	// Initialize the cluster client and CSR control in the bootstrap phase.
+	// Other clients should not be initialized, since they require
+	// permissions that are not allowed in the bootstrap phase.
+	if bootstrapped {
+		return &register.Clients{
+			ClusterClient:   clusterClient,
+			ClusterInformer: clusterInformers,
+		}, nil
+	}
+
 	leaseWatchStore := cloudeventsstore.NewSimpleStore[*coordv1.Lease]()
 	leaseClient, err := cloudeventslease.NewLeaseClient(
 		ctx,
@@ -127,22 +153,6 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 		addonClient, 10*time.Minute, addoninformers.WithNamespace(secretOption.ClusterName)).
 		Addon().V1alpha1().ManagedClusterAddOns()
 	addonWatchStore.SetInformer(addonInformer.Informer())
-
-	csrClientHolder, err := cloudeventscsr.NewAgentClientHolder(ctx,
-		cloudeventsoptions.NewGenericClientOptions(
-			config,
-			cloudeventscsr.NewCSRCodec(),
-			secretOption.ClusterName,
-		).WithClusterName(secretOption.ClusterName),
-	)
-	if err != nil {
-		return nil, err
-	}
-	csrControl := &ceCSRControl{csrClientHolder: csrClientHolder}
-	if err := d.csrDriver.SetCSRControl(csrControl, secretOption.ClusterName); err != nil {
-		return nil, err
-	}
-	d.control = csrControl
 
 	clients := &register.Clients{
 		ClusterClient:   clusterClient,
