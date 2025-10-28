@@ -1,4 +1,4 @@
-# Deploy applications with Argo CD
+# Deploy applications with Argo CD Push Model
 
 The script and instructions provided in this doc help you to setup an Open Cluster Management (OCM) environment with Kind clusters and integrate it with Argo CD. And then you can deploy Argo CD applications to OCM managed clusters.
 
