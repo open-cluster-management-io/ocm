@@ -1,4 +1,4 @@
-# OCM Argo CD Add-on
+# OCM Argo CD Basic Pull Model
 The [Open Cluster Management (OCM)](https://open-cluster-management.io/)
 [Argo CD](https://argo-cd.readthedocs.io/en/stable/) add-on uses the hub-spoke pattern
 or pull model mechanism for decentralized resource delivery to remote clusters.
@@ -6,6 +6,9 @@ By using OCM APIs and components,
 the Argo CD Applications will be pulled from the multi-cluster control plane hub cluster down to the registered OCM managed clusters.
 To try it out, check out the [Getting Started Guide](getting-started.md).
 
+## Quick Start
+
+See the [Getting Started](./getting-started.md) for a quick start guide.
 
 ## Overview
 The current Argo CD resource delivery is primarily pushing resources from a centralized cluster to the remote/managed clusters.
@@ -29,6 +32,7 @@ The OCM agent on the Managed cluster will see the ManifestWork on the Hub cluste
 The Managed cluster with the OCM Argo CD add-on enabled will automatically have an Argo CD instance installed.
 The Argo CD application controller from the instance will be able to reconcile the Application CR on the managed cluster.
 
-## Quick Start
+## OCM Argo CD Advanced Pull Model
 
-See the [Getting Started](./getting-started.md) for a quick start guide.
+See [argocd-pull-integration](https://github.com/open-cluster-management-io/argocd-pull-integration)
+for more details.

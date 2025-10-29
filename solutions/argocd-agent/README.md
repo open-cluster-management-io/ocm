@@ -1,4 +1,4 @@
-# OCM and Argo CD Agent Integration for Highly Scalable Application Deployment
+# OCM Argo CD Advanced Pull Model (Argo CD Agent)
 
 
 ## Table of Contents
@@ -26,6 +26,9 @@ and automate lifecycle management of its components.
 Once set up, it will also guide you through deploying applications using the configured environment.
 
 ![OCM with Argo CD Agent Architecture](./assets/argocd-agent-ocm-architecture.drawio.png)
+
+See [argocd-pull-integration](https://github.com/open-cluster-management-io/argocd-pull-integration)
+for full details.
 
 ## Benefits of Using the OCM Argo CD Agent AddOn
 
@@ -73,134 +76,42 @@ Refer to the [Quick Start guide](https://open-cluster-management.io/docs/getting
 - The Hub cluster must have a load balancer.
 Refer to the [Additional Resources](#additional-resources) for more details.
 
-- Generate the necessary cryptographic keys and certificates (CA, TLS, and JWT)
-to secure communication and authentication between the Argo CD Agent components (hub principal and spoke agents).
-Refer to the [Additional Resources](#additional-resources) for more details.
-
 - [Helm CLI](https://helm.sh/).
 
 
 ## Setup Guide
 
-### Deploy Argo CD on the Hub Cluster
-
-Deploy an Argo CD instance on the hub cluster,
-excluding compute intensive components like the application controller.
-
-```shell
-# kubectl config use-context <hub-cluster>
-kubectl create namespace argocd
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-
-kubectl scale -n argocd statefulset argocd-application-controller --replicas=0
-```
-
-See the
-[Argo CD website](https://argo-cd.readthedocs.io/en/stable/getting_started/#1-install-argo-cd)
-for more details.
-
-Validate that the Argo CD pods are running:
-
-```shell
-kubectl -n argocd get pod
-
-NAME                                                READY   STATUS    RESTARTS   AGE
-argocd-applicationset-controller-5985fcc8f9-99qkh   1/1     Running   0          31s
-argocd-dex-server-58f697b95f-xx7ld                  1/1     Running   0          31s
-argocd-redis-66d85c4b6d-hmcdg                       1/1     Running   0          31s
-argocd-repo-server-7fcd864f4c-vpfst                 1/1     Running   0          31s
-argocd-server-85db89dd5-qbgsm                       1/1     Running   0          31s
-```
-
-This may take a few minutes to complete.
-
 ### Deploy OCM Argo CD AddOn on the Hub Cluster
 
-Clone the `addon-contrib` repo:
-
 ```shell
-git clone git@github.com:open-cluster-management-io/addon-contrib.git
-cd addon-contrib/argocd-agent-addon
+# kubectl config use-context <hub-cluster>
+helm repo add ocm https://open-cluster-management.io/helm-charts
+helm repo update
+helm search repo ocm
+helm install argocd-agent-addon ocm/argocd-agent-addon
 ```
 
-Deploy the OCM Argo CD AddOn on the hub cluster.
-This will deploy opinionated Argo CD instances to all managed clusters,
-including compute intensive components like the application controller.
+Validate that the Argo CD Agent AddOn is successfully deployed and available:
 
 ```shell
 # kubectl config use-context <hub-cluster>
-helm -n argocd install argocd-addon charts/argocd-addon
-```
-
-Validate that the Argo CD AddOn is successfully deployed and available:
-
-```shell
 kubectl get managedclusteraddon --all-namespaces
 
-NAMESPACE   NAME           AVAILABLE   DEGRADED   PROGRESSING
-cluster1    argocd         True                   False
+NAMESPACE   NAME                  AVAILABLE   DEGRADED   PROGRESSING
+cluster1    argocd-agent-addon    True                   False
 ```
 
 This may take a few minutes to complete.
-
-### Deploy OCM Argo CD Agent AddOn on the Hub Cluster
-
-To deploy the OCM Argo CD Agent AddOn on the hub cluster, follow the steps below. This process deploys:
-- The **Argo CD Agent principal component** on the hub cluster.
-- The **Argo CD Agent agent component** on all managed clusters.
-
-Run the following `helm` command:
-
-```shell
-helm -n argocd install argocd-agent-addon charts/argocd-agent-addon \
-  --set-file agent.secrets.cacrt=/tmp/ca.crt \
-  --set-file agent.secrets.cakey=/tmp/ca.key \
-  --set-file agent.secrets.tlscrt=/tmp/tls.crt \
-  --set-file agent.secrets.tlskey=/tmp/tls.key \
-  --set-file agent.secrets.jwtkey=/tmp/jwt.key \
-  --set agent.principal.server.address="172.18.255.200" \
-  --set agent.mode="managed" # or "autonomous" for autonomous mode
-```
 
 Validate that the Argo CD Agent principal pod is running:
 
 ```shell
+# kubectl config use-context <hub-cluster>
 kubectl -n argocd get pod
 
 NAME                                                       READY   STATUS    RESTARTS   AGE
 argocd-agent-principal-5c47c7c6d5-mpts4                    1/1     Running   0          88s
 ```
-
-Validate that the Argo CD Agent Addon is successfully deployed and available:
-
-```shell
-kubectl get managedclusteraddon --all-namespaces
-
-NAMESPACE   NAME           AVAILABLE   DEGRADED   PROGRESSING
-cluster1    argocd         True                   False
-cluster1    argocd-agent   True                   False
-```
-
-This may take a few minutes to complete.
-
-**Notes:** 
-
-1. Refer to the [Additional Resources](#additional-resources)
-section for examples on generating the necessary cryptographic keys and certificates.
-
-2. The `agent.principal.server.address` value must correspond to the external IP of the `argocd-agent-principal` service.
-Use the following command to retrieve it:
-
-```shell
-kubectl -n argocd get svc argocd-agent-principal
-
-Example output:
-NAME                     TYPE           CLUSTER-IP      EXTERNAL-IP      PORT(S)         AGE
-argocd-agent-principal   LoadBalancer   10.96.149.226   172.18.255.200   443:32104/TCP   37h
-```   
-
-3. For details on operational modes and guidance on selecting the appropriate `agent.mode` (e.g., `managed` or `autonomous`),
-refer to the [Argo CD Agent website](https://argocd-agent.readthedocs.io/latest/concepts/agent-modes/).
 
 ## Deploying Applications
 
@@ -227,7 +138,7 @@ spec:
     targetRevision: HEAD
     path: guestbook
   destination:
-    server: https://kubernetes.default.svc
+    server: https://<principal-external-ip:port>?agentName=<managed cluster name> # For example, https://172.18.255.200:443?agentName=cluster1
     namespace: guestbook
   syncPolicy:
     syncOptions:
@@ -256,50 +167,6 @@ kubectl -n cluster1 get app
 NAME        SYNC STATUS   HEALTH STATUS
 guestbook   Synced        Healthy
 ```
-
-### Autonomous Mode
-
-Refer to the [Argo CD Agent website](https://argocd-agent.readthedocs.io/latest/concepts/agent-modes/)
-for more details about the `autonomous` mode.
-
-To deploy an Argo CD Application in `autonomous` mode using the Argo CD Agent,
-create the application on the `managed` cluster:
-
-```shell
-# kubectl config use-context <managed-cluster>
-kubectl apply -f - <<EOF
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: guestbook
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: https://github.com/argoproj/argocd-example-apps
-    targetRevision: HEAD
-    path: guestbook
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: guestbook
-  syncPolicy:
-    syncOptions:
-    - CreateNamespace=true
-    automated:
-      prune: true
-EOF
-```
-
-Validate that the application has been successfully synchronized back to the hub cluster:
-
-```shell
-# kubectl config use-context <hub-cluster>
-kubectl -n cluster1 get app
-
-NAME        SYNC STATUS   HEALTH STATUS
-guestbook   Synced        Healthy
-```
-
 
 ## Additional Resources
 
@@ -333,29 +200,4 @@ spec:
   ipAddressPools:
   - kind-address-pool
 EOF
-```
-
-### Generate Keys and Certificates (CA, TLS, and JWT)
-
-Run the following commands to generate the necessary cryptographic keys and certificates (CA, TLS, and JWT):
-
-```shell
-openssl genrsa -out /tmp/jwt.key 2048
-openssl genpkey -algorithm RSA -out /tmp/ca.key
-openssl req -new -x509 -key /tmp/ca.key -out /tmp/ca.crt -days 365 -subj "/C=/ST=/L=/O=/OU=/CN=CA"
-openssl genpkey -algorithm RSA -out /tmp/tls.key
-openssl req -new -key /tmp/tls.key -out /tmp/tls.csr -subj "/C=/ST=/L=/O=/OU=/CN=principal"
-cat <<EOF > /tmp/openssl_ext.cnf
-[ req ]
-distinguished_name = req_distinguished_name
-x509_extensions = v3_req
-prompt = no
-
-[ req_distinguished_name ]
-CN = principal
-
-[ v3_req ]
-subjectAltName = IP:172.18.255.200 # Replace with the intented Argo CD Agent principal IP
-EOF
-openssl x509 -req -in /tmp/tls.csr -CA /tmp/ca.crt -CAkey /tmp/ca.key -CAcreateserial -out /tmp/tls.crt -days 365 -extfile /tmp/openssl_ext.cnf -extensions v3_req
 ```
