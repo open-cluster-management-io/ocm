@@ -70,20 +70,22 @@ enabling efficient templating for deployment modifications.
 
 ## Prerequisites
 
+- [Helm CLI](https://helm.sh/).
+
 - Setup an OCM environment with at least two clusters (one hub and at least one managed).
 Refer to the [Quick Start guide](https://open-cluster-management.io/docs/getting-started/quick-start/) for more details.
 
-- The Hub cluster must have a load balancer.
+- **The Hub cluster must have a load balancer.**
 Refer to the [Additional Resources](#additional-resources) for more details.
-
-- [Helm CLI](https://helm.sh/).
 
 
 ## Setup Guide
 
-### Deploy OCM Argo CD AddOn on the Hub Cluster
+### Deploy OCM Argo CD AddOn Managers on the Hub Cluster
 
 ```shell
+# After OCM and load balancer setup:
+#
 # kubectl config use-context <hub-cluster>
 helm repo add ocm https://open-cluster-management.io/helm-charts
 helm repo update
@@ -101,16 +103,39 @@ NAMESPACE   NAME                  AVAILABLE   DEGRADED   PROGRESSING
 cluster1    argocd-agent-addon    True                   False
 ```
 
-This may take a few minutes to complete.
+**This may take a few minutes to complete. Check GitOpsCluster for progress:**
 
-Validate that the Argo CD Agent principal pod is running:
+```shell
+# kubectl config use-context <hub-cluster>
+kubectl -n argocd get gitopscluster gitops-cluster -o yaml
+...
+  - lastTransitionTime: "2025-10-30T03:38:38Z"
+    message: Addon configured for 1 clusters
+    observedGeneration: 2
+    reason: Success
+    status: "True"
+    type: AddonConfigured
+```
+
+On the hub cluster, validate that the Argo CD Agent principal pod is running successfully:
 
 ```shell
 # kubectl config use-context <hub-cluster>
 kubectl -n argocd get pod
 
 NAME                                                       READY   STATUS    RESTARTS   AGE
+...
 argocd-agent-principal-5c47c7c6d5-mpts4                    1/1     Running   0          88s
+```
+
+On the managed cluster, validate that the Argo CD Agent agent pod is running successfully:
+```shell
+# kubectl config use-context <managed-cluster>
+kubectl -n argocd get pod
+
+NAME                                                   READY   STATUS    RESTARTS   AGE
+...
+argocd-agent-agent-68bdb5dc87-7zb4h                    1/1     Running   0          88s
 ```
 
 ## Deploying Applications
@@ -121,7 +146,31 @@ Refer to the [Argo CD Agent website](https://argocd-agent.readthedocs.io/latest/
 for more details about the `managed` mode.
 
 To deploy an Argo CD Application in `managed` mode using the Argo CD Agent,
-create the application on the `hub` cluster:
+first propagate an AppProject from `hub` cluster to the managed cluster by creating or updating a `hub` AppProject
+
+```shell
+# kubectl config use-context <hub-cluster>
+kubectl apply -f - <<EOF
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: default
+  namespace: argocd
+spec:
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  destinations:
+    - namespace: '*'
+      server: '*'
+  sourceNamespaces:
+    - '*'
+  sourceRepos:
+    - '*'
+EOF
+```
+
+then create the application on the **hub cluster**:
 
 ```shell
 # kubectl config use-context <hub-cluster>
@@ -130,7 +179,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: guestbook
-  namespace: cluster1 # replace with your managed cluster name
+  namespace: cluster1 # replace with managed cluster name
 spec:
   project: default
   source:
@@ -138,7 +187,7 @@ spec:
     targetRevision: HEAD
     path: guestbook
   destination:
-    server: https://<principal-external-ip:port>?agentName=<managed cluster name> # For example, https://172.18.255.200:443?agentName=cluster1
+    server: https://172.18.255.200:443?agentName=cluster1 # Replace with https://<principal-external-ip:port>?agentName=<managed-cluster-name>
     namespace: guestbook
   syncPolicy:
     syncOptions:
@@ -148,17 +197,22 @@ spec:
 EOF
 ```
 
-Validate that the Argo CD Application has been successfully propagated to the managed cluster:
+Validate that the Argo CD AppProject and Application has been successfully propagated to the **managed cluster**:
 
 ```shell
 # kubectl config use-context <managed-cluster>
+kubectl -n argocd get appproj
+
+NAME      AGE
+default   88s
+
 kubectl -n argocd get app
 
 NAME        SYNC STATUS   HEALTH STATUS
 guestbook   Synced        Healthy
 ```
 
-Validate that the application has been successfully synchronized back to the hub cluster:
+Validate that the application has been successfully synchronized back to the **hub cluster**:
 
 ```shell
 # kubectl config use-context <hub-cluster>
