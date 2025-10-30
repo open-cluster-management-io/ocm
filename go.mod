@@ -6,7 +6,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.39.4
 	github.com/aws/aws-sdk-go-v2/config v1.31.15
 	github.com/aws/aws-sdk-go-v2/service/eks v1.74.5
-	github.com/aws/aws-sdk-go-v2/service/iam v1.48.1
+	github.com/aws/aws-sdk-go-v2/service/iam v1.49.0
 	github.com/aws/smithy-go v1.23.1
 	github.com/cloudevents/sdk-go/v2 v2.16.2
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
