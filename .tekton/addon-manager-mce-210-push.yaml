@@ -7,10 +7,8 @@ metadata:
     build.appstudio.redhat.com/target_branch: "{{target_branch}}"
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression:
-      event == "push" && target_branch
-      == "main"
-  creationTimestamp: null
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "backplane-2.10"
+  creationTimestamp:
   labels:
     appstudio.openshift.io/application: release-mce-210
     appstudio.openshift.io/component: addon-manager-mce-210
@@ -19,41 +17,41 @@ metadata:
   namespace: crt-redhat-acm-tenant
 spec:
   params:
-    - name: git-url
-      value: "{{source_url}}"
-    - name: revision
-      value: "{{revision}}"
-    - name: output-image
-      value: quay.io/redhat-user-workloads/crt-redhat-acm-tenant/addon-manager-mce-210:{{revision}}
-    - name: build-platforms
-      value:
-        - linux/x86_64
-        - linux/arm64
-        - linux/ppc64le
-        - linux/s390x
-    - name: dockerfile
-      value: build/Dockerfile.addon.rhtap
-    - name: path-context
-      value: .
-    - name: send-slack-notification
-      value: true
-    - name: konflux-application-name
-      value: release-mce-210 # Need to be updated for each release
-    - name: slack-member-id
-      value: U02CRCBPXK4 # zhujian7, The slack member id of the current component owner
+  - name: git-url
+    value: "{{source_url}}"
+  - name: revision
+    value: "{{revision}}"
+  - name: output-image
+    value: quay.io/redhat-user-workloads/crt-redhat-acm-tenant/addon-manager-mce-210:{{revision}}
+  - name: build-platforms
+    value:
+    - linux/x86_64
+    - linux/arm64
+    - linux/ppc64le
+    - linux/s390x
+  - name: dockerfile
+    value: build/Dockerfile.addon.rhtap
+  - name: path-context
+    value: .
+  - name: send-slack-notification
+    value: true
+  - name: konflux-application-name
+    value: release-mce-210   # Need to be updated for each release
+  - name: slack-member-id
+    value: U02CRCBPXK4   # zhujian7, The slack member id of the current component owner
   pipelineRef:
     resolver: git
     params:
-      - name: url
-        value: "https://github.com/stolostron/konflux-build-catalog.git"
-      - name: revision
-        value: main
-      - name: pathInRepo
-        value: pipelines/common_mce_2.10.yaml
+    - name: url
+      value: "https://github.com/stolostron/konflux-build-catalog.git"
+    - name: revision
+      value: main
+    - name: pathInRepo
+      value: pipelines/common_mce_2.10.yaml
   taskRunTemplate:
     serviceAccountName: build-pipeline-addon-manager-mce-210
   workspaces:
-    - name: git-auth
-      secret:
-        secretName: "{{ git_auth_secret }}"
+  - name: git-auth
+    secret:
+      secretName: "{{ git_auth_secret }}"
 status: {}
