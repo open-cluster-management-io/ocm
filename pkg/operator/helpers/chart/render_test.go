@@ -121,6 +121,36 @@ func TestClusterManagerConfig(t *testing.T) {
 			},
 			expectedObjCnt: 9,
 		},
+		{
+			name:      "enable grpc ",
+			namespace: "multicluster-engine",
+			chartConfig: func() *ClusterManagerChartConfig {
+				config := NewDefaultClusterManagerChartConfig()
+				config.CreateBootstrapSA = true
+				config.ClusterManager.RegistrationConfiguration.RegistrationDrivers = append(
+					config.ClusterManager.RegistrationConfiguration.RegistrationDrivers, operatorv1.RegistrationDriverHub{
+						AuthType: "grpc",
+						GRPC:     &operatorv1.GRPCRegistrationConfig{AutoApprovedIdentities: []string{"user:test"}},
+					})
+
+				config.ClusterManager.ServerConfiguration = operatorv1.ServerConfiguration{
+					EndpointsExposure: []operatorv1.EndpointExposure{
+						{
+							Usage:    "",
+							Protocol: "grpc",
+							GRPC: &operatorv1.Endpoint{
+								Type: "hostname",
+								Hostname: &operatorv1.HostnameConfig{
+									Host: "host.com",
+								},
+							},
+						},
+					},
+				}
+				return config
+			},
+			expectedObjCnt: 8,
+		},
 	}
 
 	for _, c := range cases {
@@ -200,6 +230,14 @@ func TestClusterManagerConfig(t *testing.T) {
 					if !config.CreateBootstrapSA && !config.CreateBootstrapToken {
 						if len(object.Spec.RegistrationConfiguration.AutoApproveUsers) != 0 {
 							t.Errorf("failed to render auto approve users")
+						}
+					}
+					registrationDrivers := config.ClusterManager.RegistrationConfiguration.RegistrationDrivers
+					for _, driver := range registrationDrivers {
+						if driver.AuthType == operatorv1.GRPCAuthType {
+							if len(config.ClusterManager.ServerConfiguration.EndpointsExposure) == 0 {
+								t.Errorf("failed to render serverConfiguration")
+							}
 						}
 					}
 				case *corev1.Secret:
