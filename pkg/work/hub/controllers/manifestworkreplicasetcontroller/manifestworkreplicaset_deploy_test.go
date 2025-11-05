@@ -591,6 +591,14 @@ func TestRequeueWithProgressDeadline(t *testing.T) {
 		},
 	}
 	mw, _ := CreateManifestWork(mwrSet, "cls1", "place-test")
+	// Set Applied=True first to ensure work has been applied by hub controller
+	apimeta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
+		Type:               workapiv1.WorkApplied,
+		Status:             metav1.ConditionTrue,
+		Reason:             "Applied",
+		ObservedGeneration: mw.Generation,
+		LastTransitionTime: metav1.NewTime(time.Now()),
+	})
 	// Set Progressing=True AND Degraded=True to simulate a failed work (matching new logic)
 	apimeta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
 		Type:               workapiv1.WorkProgressing,
@@ -850,7 +858,7 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 			expectedLastTransition: nil,
 		},
 		{
-			name: "degraded condition with unobserved generation - should return ToApply",
+			name: "no Applied condition with stale Degraded - should return ToApply",
 			manifestWork: &workapiv1.ManifestWork{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-mw",
@@ -892,6 +900,13 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 				Status: workapiv1.ManifestWorkStatus{
 					Conditions: []metav1.Condition{
 						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
+						{
 							Type:               workapiv1.WorkProgressing,
 							Status:             metav1.ConditionTrue,
 							ObservedGeneration: 2,
@@ -916,6 +931,13 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 				Status: workapiv1.ManifestWorkStatus{
 					Conditions: []metav1.Condition{
 						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
+						{
 							Type:               workapiv1.WorkProgressing,
 							Status:             metav1.ConditionTrue,
 							ObservedGeneration: 2,
@@ -936,68 +958,6 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 			expectedLastTransition: &now,
 		},
 		{
-			name: "progressing true but degraded false - should return Progressing",
-			manifestWork: &workapiv1.ManifestWork{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "test-mw",
-					Namespace:         "cls1",
-					Generation:        2,
-					CreationTimestamp: creationTime,
-				},
-				Status: workapiv1.ManifestWorkStatus{
-					Conditions: []metav1.Condition{
-						{
-							Type:               workapiv1.WorkProgressing,
-							Status:             metav1.ConditionTrue,
-							ObservedGeneration: 2,
-							LastTransitionTime: now,
-							Reason:             "Applying",
-						},
-						{
-							Type:               workapiv1.WorkDegraded,
-							Status:             metav1.ConditionFalse,
-							ObservedGeneration: 2,
-							LastTransitionTime: now,
-							Reason:             "Healthy",
-						},
-					},
-				},
-			},
-			expectedStatus:         clustersdkv1alpha1.Progressing,
-			expectedLastTransition: &now,
-		},
-		{
-			name: "progressing true with degraded unknown - should return Progressing",
-			manifestWork: &workapiv1.ManifestWork{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "test-mw",
-					Namespace:         "cls1",
-					Generation:        2,
-					CreationTimestamp: creationTime,
-				},
-				Status: workapiv1.ManifestWorkStatus{
-					Conditions: []metav1.Condition{
-						{
-							Type:               workapiv1.WorkProgressing,
-							Status:             metav1.ConditionTrue,
-							ObservedGeneration: 2,
-							LastTransitionTime: now,
-							Reason:             "Applying",
-						},
-						{
-							Type:               workapiv1.WorkDegraded,
-							Status:             metav1.ConditionUnknown,
-							ObservedGeneration: 2,
-							LastTransitionTime: now,
-							Reason:             "Unknown",
-						},
-					},
-				},
-			},
-			expectedStatus:         clustersdkv1alpha1.Progressing,
-			expectedLastTransition: &now,
-		},
-		{
 			name: "progressing false - should return Succeeded",
 			manifestWork: &workapiv1.ManifestWork{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1008,6 +968,13 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 				},
 				Status: workapiv1.ManifestWorkStatus{
 					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
 						{
 							Type:               workapiv1.WorkProgressing,
 							Status:             metav1.ConditionFalse,
@@ -1032,6 +999,13 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 				},
 				Status: workapiv1.ManifestWorkStatus{
 					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
 						{
 							Type:               workapiv1.WorkProgressing,
 							Status:             metav1.ConditionFalse,
@@ -1064,6 +1038,13 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 				Status: workapiv1.ManifestWorkStatus{
 					Conditions: []metav1.Condition{
 						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
+						{
 							Type:               workapiv1.WorkProgressing,
 							Status:             metav1.ConditionUnknown,
 							ObservedGeneration: 2,
@@ -1075,6 +1056,130 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 			},
 			expectedStatus:         clustersdkv1alpha1.Progressing,
 			expectedLastTransition: &now,
+		},
+		{
+			name: "WorkApplied Status=False with current generation - should return ToApply",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        2,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionFalse,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "ApplyFailed",
+						},
+						{
+							Type:               workapiv1.WorkProgressing,
+							Status:             metav1.ConditionFalse,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Completed",
+						},
+					},
+				},
+			},
+			expectedStatus:         clustersdkv1alpha1.ToApply,
+			expectedLastTransition: nil,
+		},
+		{
+			name: "WorkApplied Status=Unknown with current generation - should return ToApply",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        2,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionUnknown,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "ApplyStatusUnknown",
+						},
+						{
+							Type:               workapiv1.WorkProgressing,
+							Status:             metav1.ConditionFalse,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Completed",
+						},
+					},
+				},
+			},
+			expectedStatus:         clustersdkv1alpha1.ToApply,
+			expectedLastTransition: nil,
+		},
+		{
+			name: "WorkApplied with stale ObservedGeneration (old gen 1, current gen 2) - should return ToApply",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        2,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 1,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
+						{
+							Type:               workapiv1.WorkProgressing,
+							Status:             metav1.ConditionFalse,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Completed",
+						},
+					},
+				},
+			},
+			expectedStatus:         clustersdkv1alpha1.ToApply,
+			expectedLastTransition: nil,
+		},
+		{
+			name: "Progressing with old ObservedGeneration but newer WorkApplied - should return ToApply",
+			manifestWork: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-mw",
+					Namespace:         "cls1",
+					Generation:        3,
+					CreationTimestamp: creationTime,
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 3,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
+						{
+							Type:               workapiv1.WorkProgressing,
+							Status:             metav1.ConditionFalse,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Completed",
+						},
+					},
+				},
+			},
+			expectedStatus:         clustersdkv1alpha1.ToApply,
+			expectedLastTransition: nil,
 		},
 	}
 
@@ -1103,6 +1208,341 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 			assert.Equal(t, tt.manifestWork.Namespace, status.ClusterName)
 			assert.Equal(t, tt.expectedLastTransition, status.LastTransitionTime,
 				"LastTransitionTime should match for test: %s", tt.name)
+		})
+	}
+}
+
+func TestShouldReturnToApply(t *testing.T) {
+	now := metav1.Now()
+	generation := int64(2)
+
+	tests := []struct {
+		name         string
+		generation   int64
+		appliedCond  *metav1.Condition
+		progressCond *metav1.Condition
+		degradedCond *metav1.Condition
+		expected     bool
+		description  string
+	}{
+		{
+			name:         "applied condition is nil - should return true",
+			generation:   generation,
+			appliedCond:  nil,
+			progressCond: &metav1.Condition{Type: workapiv1.WorkProgressing, Status: metav1.ConditionTrue, ObservedGeneration: generation},
+			degradedCond: nil,
+			expected:     true,
+			description:  "When Applied condition doesn't exist, work hasn't been applied by hub controller yet",
+		},
+		{
+			name:       "applied condition has stale generation - should return true",
+			generation: generation,
+			appliedCond: &metav1.Condition{
+				Type:               workapiv1.WorkApplied,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: 1,
+				LastTransitionTime: now,
+			},
+			progressCond: &metav1.Condition{Type: workapiv1.WorkProgressing, Status: metav1.ConditionTrue, ObservedGeneration: generation},
+			degradedCond: nil,
+			expected:     true,
+			description:  "When Applied condition hasn't observed latest spec, work needs to be reapplied",
+		},
+		{
+			name:       "applied condition is false - should return true",
+			generation: generation,
+			appliedCond: &metav1.Condition{
+				Type:               workapiv1.WorkApplied,
+				Status:             metav1.ConditionFalse,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			progressCond: &metav1.Condition{Type: workapiv1.WorkProgressing, Status: metav1.ConditionTrue, ObservedGeneration: generation},
+			degradedCond: nil,
+			expected:     true,
+			description:  "When Applied condition is False, work failed to apply",
+		},
+		{
+			name:       "progressing condition is nil - should return true",
+			generation: generation,
+			appliedCond: &metav1.Condition{
+				Type:               workapiv1.WorkApplied,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			progressCond: nil,
+			degradedCond: nil,
+			expected:     true,
+			description:  "When Progressing condition doesn't exist, work hasn't been reconciled by agent yet",
+		},
+		{
+			name:       "progressing condition has stale generation - should return true",
+			generation: generation,
+			appliedCond: &metav1.Condition{
+				Type:               workapiv1.WorkApplied,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			progressCond: &metav1.Condition{
+				Type:               workapiv1.WorkProgressing,
+				Status:             metav1.ConditionFalse,
+				ObservedGeneration: 1,
+				LastTransitionTime: now,
+			},
+			degradedCond: nil,
+			expected:     true,
+			description:  "When Progressing condition hasn't observed latest spec, agent hasn't reconciled the new work yet",
+		},
+		{
+			name:       "degraded condition exists with stale generation - should return true",
+			generation: generation,
+			appliedCond: &metav1.Condition{
+				Type:               workapiv1.WorkApplied,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			progressCond: &metav1.Condition{
+				Type:               workapiv1.WorkProgressing,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			degradedCond: &metav1.Condition{
+				Type:               workapiv1.WorkDegraded,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: 1,
+				LastTransitionTime: now,
+			},
+			expected:    true,
+			description: "When Degraded condition exists but hasn't observed latest spec, we wait for it to catch up",
+		},
+		{
+			name:       "all conditions ready - should return false",
+			generation: generation,
+			appliedCond: &metav1.Condition{
+				Type:               workapiv1.WorkApplied,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			progressCond: &metav1.Condition{
+				Type:               workapiv1.WorkProgressing,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			degradedCond: nil,
+			expected:     false,
+			description:  "When all conditions are current, proceed with rollout status evaluation",
+		},
+		{
+			name:       "all conditions ready including degraded - should return false",
+			generation: generation,
+			appliedCond: &metav1.Condition{
+				Type:               workapiv1.WorkApplied,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			progressCond: &metav1.Condition{
+				Type:               workapiv1.WorkProgressing,
+				Status:             metav1.ConditionFalse,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			degradedCond: &metav1.Condition{
+				Type:               workapiv1.WorkDegraded,
+				Status:             metav1.ConditionFalse,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			expected:    false,
+			description: "When all conditions including Degraded are current, proceed with rollout status evaluation",
+		},
+		{
+			name:       "applied condition status unknown - should return true",
+			generation: generation,
+			appliedCond: &metav1.Condition{
+				Type:               workapiv1.WorkApplied,
+				Status:             metav1.ConditionUnknown,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			progressCond: &metav1.Condition{
+				Type:               workapiv1.WorkProgressing,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			degradedCond: nil,
+			expected:     true,
+			description:  "When Applied condition status is Unknown even with current generation, work is not ready to apply",
+		},
+		{
+			name:       "degraded ahead of applied generation - should return true",
+			generation: generation,
+			appliedCond: &metav1.Condition{
+				Type:               workapiv1.WorkApplied,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: 1,
+				LastTransitionTime: now,
+			},
+			progressCond: &metav1.Condition{
+				Type:               workapiv1.WorkProgressing,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: 1,
+				LastTransitionTime: now,
+			},
+			degradedCond: &metav1.Condition{
+				Type:               workapiv1.WorkDegraded,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			expected:    true,
+			description: "When Degraded is ahead of Applied generation, wait for Applied to catch up",
+		},
+		{
+			name:       "applied and progressing both stale but degraded current - should return true",
+			generation: generation,
+			appliedCond: &metav1.Condition{
+				Type:               workapiv1.WorkApplied,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: 1,
+				LastTransitionTime: now,
+			},
+			progressCond: &metav1.Condition{
+				Type:               workapiv1.WorkProgressing,
+				Status:             metav1.ConditionFalse,
+				ObservedGeneration: 1,
+				LastTransitionTime: now,
+			},
+			degradedCond: &metav1.Condition{
+				Type:               workapiv1.WorkDegraded,
+				Status:             metav1.ConditionFalse,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			expected:    true,
+			description: "When both Applied and Progressing are stale, return ToApply regardless of Degraded status",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := shouldReturnToApply(tt.generation, tt.appliedCond, tt.progressCond, tt.degradedCond)
+			assert.Equal(t, tt.expected, result, tt.description)
+		})
+	}
+}
+
+func TestIsConditionReady(t *testing.T) {
+	now := metav1.Now()
+	generation := int64(2)
+
+	tests := []struct {
+		name        string
+		condition   *metav1.Condition
+		generation  int64
+		requireTrue bool
+		expected    bool
+		description string
+	}{
+		{
+			name:        "nil condition - should return false",
+			condition:   nil,
+			generation:  generation,
+			requireTrue: false,
+			expected:    false,
+			description: "When condition doesn't exist, it's not ready",
+		},
+		{
+			name: "stale observed generation - should return false",
+			condition: &metav1.Condition{
+				Type:               workapiv1.WorkProgressing,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: 1,
+				LastTransitionTime: now,
+			},
+			generation:  generation,
+			requireTrue: false,
+			expected:    false,
+			description: "When condition hasn't observed latest generation, it's not ready",
+		},
+		{
+			name: "current generation but status not true when required - should return false",
+			condition: &metav1.Condition{
+				Type:               workapiv1.WorkApplied,
+				Status:             metav1.ConditionFalse,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			generation:  generation,
+			requireTrue: true,
+			expected:    false,
+			description: "When requireTrue is set and status is False, condition is not ready",
+		},
+		{
+			name: "current generation but status unknown when required true - should return false",
+			condition: &metav1.Condition{
+				Type:               workapiv1.WorkApplied,
+				Status:             metav1.ConditionUnknown,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			generation:  generation,
+			requireTrue: true,
+			expected:    false,
+			description: "When requireTrue is set and status is Unknown, condition is not ready",
+		},
+		{
+			name: "current generation and status true when required - should return true",
+			condition: &metav1.Condition{
+				Type:               workapiv1.WorkApplied,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			generation:  generation,
+			requireTrue: true,
+			expected:    true,
+			description: "When condition has current generation and status is True when required, it's ready",
+		},
+		{
+			name: "current generation and status false when not requiring true - should return true",
+			condition: &metav1.Condition{
+				Type:               workapiv1.WorkProgressing,
+				Status:             metav1.ConditionFalse,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			generation:  generation,
+			requireTrue: false,
+			expected:    true,
+			description: "When requireTrue is false, any status with current generation is ready",
+		},
+		{
+			name: "current generation and status true when not requiring true - should return true",
+			condition: &metav1.Condition{
+				Type:               workapiv1.WorkProgressing,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: generation,
+				LastTransitionTime: now,
+			},
+			generation:  generation,
+			requireTrue: false,
+			expected:    true,
+			description: "When requireTrue is false, any status with current generation is ready",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isConditionReady(tt.condition, tt.generation, tt.requireTrue)
+			assert.Equal(t, tt.expected, result, tt.description)
 		})
 	}
 }

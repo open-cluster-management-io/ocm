@@ -387,6 +387,12 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 		for _, work := range works.Items {
 			workCopy := work.DeepCopy()
 			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
+				Type:               workapiv1.WorkApplied,
+				Status:             metav1.ConditionTrue,
+				Reason:             "AppliedManifestWorkComplete",
+				ObservedGeneration: workCopy.Generation,
+			})
+			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
 				Type:               workapiv1.WorkProgressing,
 				Status:             metav1.ConditionFalse,
 				Reason:             "AppliedManifestWorkComplete",
@@ -404,6 +410,12 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		for _, work := range works.Items {
 			workCopy := work.DeepCopy()
+			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
+				Type:               workapiv1.WorkApplied,
+				Status:             metav1.ConditionTrue,
+				Reason:             "AppliedManifestWorkComplete",
+				ObservedGeneration: workCopy.Generation,
+			})
 			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
 				Type:               workapiv1.WorkProgressing,
 				Status:             metav1.ConditionFalse,
@@ -441,6 +453,12 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		for _, work := range works.Items {
 			workCopy := work.DeepCopy()
+			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
+				Type:               workapiv1.WorkApplied,
+				Status:             metav1.ConditionTrue,
+				Reason:             "Applied",
+				ObservedGeneration: workCopy.Generation,
+			})
 			meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{
 				Type:               workapiv1.WorkProgressing,
 				Status:             metav1.ConditionTrue,
@@ -497,6 +515,14 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		for _, work := range works.Items {
 			workCopy := work.DeepCopy()
+			meta.SetStatusCondition(
+				&workCopy.Status.Conditions,
+				metav1.Condition{
+					Type:               workapiv1.WorkApplied,
+					Status:             metav1.ConditionTrue,
+					Reason:             "Applied",
+					ObservedGeneration: workCopy.Generation,
+				})
 			meta.SetStatusCondition(
 				&workCopy.Status.Conditions,
 				metav1.Condition{
@@ -564,6 +590,14 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		for _, work := range works.Items {
 			workCopy := work.DeepCopy()
+			meta.SetStatusCondition(
+				&workCopy.Status.Conditions,
+				metav1.Condition{
+					Type:               workapiv1.WorkApplied,
+					Status:             metav1.ConditionTrue,
+					Reason:             "Applied",
+					ObservedGeneration: workCopy.Generation,
+				})
 			meta.SetStatusCondition(
 				&workCopy.Status.Conditions,
 				metav1.Condition{
