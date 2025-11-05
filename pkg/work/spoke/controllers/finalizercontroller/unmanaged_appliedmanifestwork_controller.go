@@ -30,10 +30,11 @@ const (
 	// If the AppliedManifestWork eviction grace period is set with a value that is larger than or equal to
 	// the bound, the eviction feature will be disabled.
 	EvictionGracePeriodBound = 100 * 365 * 24 * time.Hour
+
+	unManagedAppliedManifestWork = "UnManagedAppliedManifestWork"
 )
 
 type unmanagedAppliedWorkController struct {
-	recorder                  events.Recorder
 	manifestWorkLister        worklister.ManifestWorkNamespaceLister
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
 	patcher                   patcher.Patcher[*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus]
@@ -63,7 +64,6 @@ func NewUnManagedAppliedWorkController(
 	hubHash, agentID string,
 ) factory.Controller {
 	controller := &unmanagedAppliedWorkController{
-		recorder:                  recorder,
 		manifestWorkLister:        manifestWorkLister,
 		appliedManifestWorkClient: appliedManifestWorkClient,
 		patcher: patcher.NewPatcher[
@@ -84,12 +84,17 @@ func NewUnManagedAppliedWorkController(
 		WithFilteredEventsInformersQueueKeysFunc(
 			queue.QueueKeyByMetaName,
 			helper.AppliedManifestworkAgentIDFilter(agentID), appliedManifestWorkInformer.Informer()).
-		WithSync(controller.sync).ToController("UnManagedAppliedManifestWork", recorder)
+		WithSync(controller.sync).ToController(unManagedAppliedManifestWork, recorder)
 }
 
 func (m *unmanagedAppliedWorkController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	appliedManifestWorkName := controllerContext.QueueKey()
-	klog.V(5).Infof("Reconciling AppliedManifestWork %q", appliedManifestWorkName)
+
+	logger := klog.FromContext(ctx).WithName(appliedManifestWorkFinalizer).
+		WithValues(unManagedAppliedManifestWork, appliedManifestWorkName)
+	ctx = klog.NewContext(ctx, logger)
+
+	logger.V(5).Info("Reconciling AppliedManifestWork")
 
 	appliedManifestWork, err := m.appliedManifestWorkLister.Get(appliedManifestWorkName)
 	if errors.IsNotFound(err) {
@@ -133,6 +138,8 @@ func (m *unmanagedAppliedWorkController) evictAppliedManifestWork(ctx context.Co
 	controllerContext factory.SyncContext, appliedManifestWork *workapiv1.AppliedManifestWork) error {
 	now := time.Now()
 
+	logger := klog.FromContext(ctx)
+
 	evictionStartTime := appliedManifestWork.Status.EvictionStartTime
 	if evictionStartTime == nil {
 		return m.patchEvictionStartTime(ctx, appliedManifestWork, &metav1.Time{Time: now})
@@ -147,8 +154,7 @@ func (m *unmanagedAppliedWorkController) evictAppliedManifestWork(ctx context.Co
 	if err != nil {
 		return err
 	}
-	m.recorder.Eventf("AppliedManifestWorkEvicted",
-		"AppliedManifestWork %s evicted by agent %s after eviction grace period", appliedManifestWork.Name, m.agentID)
+	logger.Info("AppliedManifestWork evicted after eviction grace period", "agentID", m.agentID)
 	return nil
 }
 

@@ -85,7 +85,7 @@ func (m *manifestworkReconciler) reconcile(
 		// and requeue the item
 		var authError *basic.NotAllowedError
 		if errors.As(result.Error, &authError) {
-			logger.V(2).Info("apply work failed", "name", manifestWork.Name, "error", result.Error)
+			logger.V(2).Info("apply work failed", "error", result.Error)
 			result.Error = nil
 
 			if authError.RequeueTime < requeueTime {

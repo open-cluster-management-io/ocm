@@ -17,6 +17,8 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
+const manifestWorkAddFinalizerController = "ManifestWorkAddFinalizerController"
+
 // AddFinalizerController is to add the cluster.open-cluster-management.io/manifest-work-cleanup finalizer to manifestworks.
 type AddFinalizerController struct {
 	patcher            patcher.Patcher[*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus]
@@ -40,12 +42,14 @@ func NewAddFinalizerController(
 
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, manifestWorkInformer.Informer()).
-		WithSync(controller.sync).ToController("ManifestWorkAddFinalizerController", recorder)
+		WithSync(controller.sync).ToController(manifestWorkAddFinalizerController, recorder)
 }
 
 func (m *AddFinalizerController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	manifestWorkName := controllerContext.QueueKey()
-	klog.V(5).Infof("Reconciling ManifestWork %q", manifestWorkName)
+	logger := klog.FromContext(ctx).WithName(manifestWorkAddFinalizerController).
+		WithValues("manifestWorkName", manifestWorkName)
+	logger.V(5).Info("Reconciling ManifestWork")
 
 	manifestWork, err := m.manifestWorkLister.Get(manifestWorkName)
 	if errors.IsNotFound(err) {

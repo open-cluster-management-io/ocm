@@ -101,6 +101,7 @@ func (v *sarCacheValidator) Start(ctx context.Context) {
 func (v *sarCacheValidator) Validate(ctx context.Context, executor *workapiv1.ManifestWorkExecutor,
 	gvr schema.GroupVersionResource, namespace, name string,
 	ownedByTheWork bool, obj *unstructured.Unstructured) error {
+	logger := klog.FromContext(ctx)
 	if executor == nil {
 		return nil
 	}
@@ -128,7 +129,8 @@ func (v *sarCacheValidator) Validate(ctx context.Context, executor *workapiv1.Ma
 			return err
 		}
 	} else {
-		klog.V(4).Infof("Get auth from cache executor %s, dimension: %+v allow: %v", executorKey, dimension, *allowed)
+		logger.V(4).Info("Get auth from cache executor",
+			"executorKey", executorKey, "dimension", dimension, "allowed", *allowed)
 		if !*allowed {
 			return &basic.NotAllowedError{
 				Err: fmt.Errorf("not allowed to apply the resource %s %s, %s %s",

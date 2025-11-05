@@ -14,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/jsonpath"
 	"k8s.io/klog/v2"
 
@@ -45,7 +44,7 @@ func (c *ServerSideApply) Apply(
 	requiredOriginal *unstructured.Unstructured,
 	owner metav1.OwnerReference,
 	applyOption *workapiv1.ManifestConfigOption,
-	recorder events.Recorder) (runtime.Object, error) {
+	_ events.Recorder) (runtime.Object, error) {
 	logger := klog.FromContext(ctx)
 	// Currently, if the required object has zero creationTime in metadata, it will cause
 	// kube-apiserver to increment generation even if nothing else changes. more details see:
@@ -114,10 +113,9 @@ func (c *ServerSideApply) Apply(
 		Resource(gvr).
 		Namespace(required.GetNamespace()).
 		Apply(ctx, required.GetName(), required, metav1.ApplyOptions{FieldManager: fieldManager, Force: force})
-	resourceKey, _ := cache.MetaNamespaceKeyFunc(required)
-	recorder.Eventf(fmt.Sprintf(
-		"Server Side Applied %s %s", required.GetKind(), resourceKey),
-		"Patched with field manager %s, err %v", fieldManager, err)
+	logger.Info("Server side applied",
+		"kind", required.GetKind(), "resourceNamespace", required.GetNamespace(),
+		"resourceName", required.GetName(), "fieldManager", fieldManager)
 
 	if errors.IsConflict(err) {
 		return obj, &ServerSideApplyConflictError{ssaErr: err}

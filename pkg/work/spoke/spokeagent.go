@@ -6,11 +6,11 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
@@ -61,6 +61,10 @@ func NewWorkAgentConfig(commonOpts *options.AgentOptions, opts *WorkloadAgentOpt
 
 // RunWorkloadAgent starts the controllers on agent to process work from hub.
 func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+	// setting up contextual logger
+	logger := klog.NewKlogr()
+	ctx = klog.NewContext(ctx, logger)
+
 	// load spoke client config and create spoke clients,
 	// the work agent may not running in the spoke/managed cluster.
 	spokeRestConfig, err := o.agentOptions.SpokeKubeConfig(controllerContext.KubeConfig)
@@ -103,7 +107,7 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		return err
 	}
 
-	hubHost, hubWorkClient, hubWorkInformer, err := o.newWorkClientAndInformer(ctx, restMapper)
+	hubHost, hubWorkClient, hubWorkInformer, err := o.newWorkClientAndInformer(ctx)
 	if err != nil {
 		return err
 	}
@@ -199,7 +203,6 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 
 func (o *WorkAgentConfig) newWorkClientAndInformer(
 	ctx context.Context,
-	restMapper meta.RESTMapper,
 ) (string, workv1client.ManifestWorkInterface, workv1informers.ManifestWorkInformer, error) {
 	var workClient workclientset.Interface
 	var watcherStore *store.AgentInformerWatcherStore

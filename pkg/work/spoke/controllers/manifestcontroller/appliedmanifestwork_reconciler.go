@@ -58,7 +58,7 @@ func (m *appliedManifestWorkReconciler) reconcile(
 		case errors.IsNotFound(err):
 			logger.V(2).Info(
 				"Resource with key does not exist",
-				"namespace", result.resourceMeta.Namespace, "name", result.resourceMeta.Name)
+				"resourceNamespace", result.resourceMeta.Namespace, "resourceName", result.resourceMeta.Name)
 			continue
 		case err != nil:
 			errs = append(errs, fmt.Errorf(
@@ -90,7 +90,7 @@ func (m *appliedManifestWorkReconciler) reconcile(
 	reason := fmt.Sprintf("it is no longer maintained by manifestwork %s", manifestWork.Name)
 
 	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(
-		ctx, noLongerMaintainedResources, reason, m.spokeDynamicClient, controllerContext.Recorder(), *owner)
+		ctx, noLongerMaintainedResources, reason, m.spokeDynamicClient, *owner)
 	if len(errs) != 0 {
 		return manifestWork, appliedManifestWork, results, utilerrors.NewAggregate(errs)
 	}
