@@ -41,4 +41,8 @@ spec:
   addOnManagerConfiguration:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with .Values.clusterManager.serverConfiguration }}
+  serverConfiguration:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 {{- end }}

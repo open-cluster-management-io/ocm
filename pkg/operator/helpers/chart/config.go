@@ -141,6 +141,10 @@ type ClusterManagerConfig struct {
 	// +optional
 	AddOnManagerConfiguration operatorv1.AddOnManagerConfiguration `json:"addOnManagerConfiguration,omitempty"`
 
+	// ServerConfiguration contains the configuration of http/grpc server.
+	// +optional
+	ServerConfiguration operatorv1.ServerConfiguration `json:"serverConfiguration,omitempty"`
+
 	// ResourceRequirement specify QoS classes of deployments managed by clustermanager.
 	// It applies to all the containers in the deployments.
 	// +optional
