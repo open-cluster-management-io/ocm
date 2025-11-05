@@ -124,15 +124,21 @@ func (c *leaseController) sync(ctx context.Context, syncCtx factory.SyncContext)
 	}
 
 	now := time.Now()
-	if !now.Before(observedLease.Spec.RenewTime.Add(gracePeriod)) {
+	leaseExpired := !now.Before(observedLease.Spec.RenewTime.Add(gracePeriod))
+
+	if leaseExpired {
 		// the lease is not updated constantly, change the cluster available condition to unknown
 		if err := c.updateClusterStatus(ctx, cluster); err != nil {
 			return err
 		}
+		// Requeue after grace period. Recovery will be detected immediately via lease watch.
+		syncCtx.Queue().AddAfter(clusterName, gracePeriod)
+	} else {
+		// Lease is fresh, requeue exactly when it will expire to detect expiration immediately
+		timeUntilExpiry := observedLease.Spec.RenewTime.Add(gracePeriod).Sub(now)
+		syncCtx.Queue().AddAfter(clusterName, timeUntilExpiry)
 	}
 
-	// always requeue this cluster to check its lease constantly
-	syncCtx.Queue().AddAfter(clusterName, gracePeriod)
 	return nil
 }
 
