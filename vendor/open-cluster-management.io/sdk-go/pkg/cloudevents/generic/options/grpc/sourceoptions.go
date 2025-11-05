@@ -11,33 +11,33 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
-type gRPCSourceOptions struct {
+type gRPCSourceTransport struct {
 	GRPCOptions
-	errorChan chan error // grpc client connection doesn't have error channel, it will handle reconnecting automatically
-	sourceID  string
+	errorChan         chan error
+	sourceID          string
+	protocol          *protocol.Protocol
+	cloudEventsClient cloudevents.Client
+	dataType          types.CloudEventsDataType
 }
 
-func NewSourceOptions(gRPCOptions *GRPCOptions, sourceID string) *options.CloudEventsSourceOptions {
+func NewSourceOptions(gRPCOptions *GRPCOptions,
+	sourceID string, dataType types.CloudEventsDataType) *options.CloudEventsSourceOptions {
 	return &options.CloudEventsSourceOptions{
-		CloudEventsOptions: &gRPCSourceOptions{
+		CloudEventsTransport: &gRPCSourceTransport{
 			GRPCOptions: *gRPCOptions,
 			errorChan:   make(chan error),
 			sourceID:    sourceID,
+			dataType:    dataType,
 		},
 		SourceID: sourceID,
 	}
 }
 
-func (o *gRPCSourceOptions) WithContext(ctx context.Context, evtCtx cloudevents.EventContext) (context.Context, error) {
-	// grpc source client doesn't need to update topic in the context
-	return ctx, nil
-}
-
-func (o *gRPCSourceOptions) Protocol(ctx context.Context, dataType types.CloudEventsDataType) (options.CloudEventsProtocol, error) {
+func (o *gRPCSourceTransport) Connect(ctx context.Context) error {
 	opts := []protocol.Option{
 		protocol.WithSubscribeOption(&protocol.SubscribeOption{
 			Source:   o.sourceID,
-			DataType: dataType.String(),
+			DataType: o.dataType.String(),
 		}),
 		protocol.WithReconnectErrorChan(o.errorChan),
 	}
@@ -58,11 +58,33 @@ func (o *gRPCSourceOptions) Protocol(ctx context.Context, dataType types.CloudEv
 		opts...,
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return receiver, nil
+
+	o.protocol = receiver
+	o.cloudEventsClient, err = cloudevents.NewClient(o.protocol)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (o *gRPCSourceOptions) ErrorChan() <-chan error {
+func (o *gRPCSourceTransport) Send(ctx context.Context, evt cloudevents.Event) error {
+	if err := o.cloudEventsClient.Send(ctx, evt); cloudevents.IsUndelivered(err) {
+		return err
+	}
+	return nil
+}
+
+func (o *gRPCSourceTransport) Receive(ctx context.Context, fn options.ReceiveHandlerFn) error {
+	return o.cloudEventsClient.StartReceiver(ctx, fn)
+}
+
+func (o *gRPCSourceTransport) Close(ctx context.Context) error {
+	return o.protocol.Close(ctx)
+}
+
+func (o *gRPCSourceTransport) ErrorChan() <-chan error {
 	return o.errorChan
 }

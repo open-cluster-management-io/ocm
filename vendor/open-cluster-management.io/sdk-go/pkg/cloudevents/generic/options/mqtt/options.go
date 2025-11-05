@@ -15,7 +15,6 @@ import (
 	"github.com/eclipse/paho.golang/paho"
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/errors"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/cert"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
@@ -219,7 +218,7 @@ func (o *MQTTOptions) GetCloudEventsProtocol(
 	clientID string,
 	errorHandler func(error),
 	clientOpts ...cloudeventsmqtt.Option,
-) (options.CloudEventsProtocol, error) {
+) (*cloudeventsmqtt.Protocol, error) {
 	netConn, err := o.Dialer.Dial()
 	if err != nil {
 		return nil, err

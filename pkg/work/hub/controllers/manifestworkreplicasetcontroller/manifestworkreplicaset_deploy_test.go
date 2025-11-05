@@ -591,6 +591,14 @@ func TestRequeueWithProgressDeadline(t *testing.T) {
 		},
 	}
 	mw, _ := CreateManifestWork(mwrSet, "cls1", "place-test")
+	// Set Applied=True first to ensure work has been applied by hub controller
+	apimeta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
+		Type:               workapiv1.WorkApplied,
+		Status:             metav1.ConditionTrue,
+		Reason:             "Applied",
+		ObservedGeneration: mw.Generation,
+		LastTransitionTime: metav1.NewTime(time.Now()),
+	})
 	// Set Progressing=True AND Degraded=True to simulate a failed work (matching new logic)
 	apimeta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
 		Type:               workapiv1.WorkProgressing,
@@ -892,6 +900,13 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 				Status: workapiv1.ManifestWorkStatus{
 					Conditions: []metav1.Condition{
 						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
+						{
 							Type:               workapiv1.WorkProgressing,
 							Status:             metav1.ConditionTrue,
 							ObservedGeneration: 2,
@@ -915,6 +930,13 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 				},
 				Status: workapiv1.ManifestWorkStatus{
 					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
 						{
 							Type:               workapiv1.WorkProgressing,
 							Status:             metav1.ConditionTrue,
@@ -947,6 +969,13 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 				Status: workapiv1.ManifestWorkStatus{
 					Conditions: []metav1.Condition{
 						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
+						{
 							Type:               workapiv1.WorkProgressing,
 							Status:             metav1.ConditionTrue,
 							ObservedGeneration: 2,
@@ -977,6 +1006,13 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 				},
 				Status: workapiv1.ManifestWorkStatus{
 					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
 						{
 							Type:               workapiv1.WorkProgressing,
 							Status:             metav1.ConditionTrue,
@@ -1009,6 +1045,13 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 				Status: workapiv1.ManifestWorkStatus{
 					Conditions: []metav1.Condition{
 						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
+						{
 							Type:               workapiv1.WorkProgressing,
 							Status:             metav1.ConditionFalse,
 							ObservedGeneration: 2,
@@ -1032,6 +1075,13 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 				},
 				Status: workapiv1.ManifestWorkStatus{
 					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
 						{
 							Type:               workapiv1.WorkProgressing,
 							Status:             metav1.ConditionFalse,
@@ -1063,6 +1113,13 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 				},
 				Status: workapiv1.ManifestWorkStatus{
 					Conditions: []metav1.Condition{
+						{
+							Type:               workapiv1.WorkApplied,
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 2,
+							LastTransitionTime: now,
+							Reason:             "Applied",
+						},
 						{
 							Type:               workapiv1.WorkProgressing,
 							Status:             metav1.ConditionUnknown,

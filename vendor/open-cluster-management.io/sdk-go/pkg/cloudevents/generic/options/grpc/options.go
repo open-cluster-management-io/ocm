@@ -19,7 +19,6 @@ import (
 	"google.golang.org/grpc/keepalive"
 	"gopkg.in/yaml.v2"
 
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/cert"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protocol"
 )
@@ -255,7 +254,7 @@ func NewGRPCOptions() *GRPCOptions {
 	return &GRPCOptions{}
 }
 
-func (o *GRPCOptions) GetCloudEventsProtocol(ctx context.Context, errorHandler func(error), clientOpts ...protocol.Option) (options.CloudEventsProtocol, error) {
+func (o *GRPCOptions) GetCloudEventsProtocol(ctx context.Context, errorHandler func(error), clientOpts ...protocol.Option) (*protocol.Protocol, error) {
 	conn, err := o.Dialer.Dial()
 	if err != nil {
 		return nil, err

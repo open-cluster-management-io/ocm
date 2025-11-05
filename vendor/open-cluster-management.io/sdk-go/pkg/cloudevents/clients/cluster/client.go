@@ -24,14 +24,14 @@ import (
 // ManagedClusterClient implements the ManagedClusterInterface. It sends the ManagedCluster status back to source by
 // CloudEventAgentClient.
 type ManagedClusterClient struct {
-	cloudEventsClient *generic.CloudEventAgentClient[*clusterv1.ManagedCluster]
+	cloudEventsClient generic.CloudEventsClient[*clusterv1.ManagedCluster]
 	watcherStore      store.ClientWatcherStore[*clusterv1.ManagedCluster]
 }
 
 var _ clusterv1client.ManagedClusterInterface = &ManagedClusterClient{}
 
 func NewManagedClusterClient(
-	cloudEventsClient *generic.CloudEventAgentClient[*clusterv1.ManagedCluster],
+	cloudEventsClient generic.CloudEventsClient[*clusterv1.ManagedCluster],
 	watcherStore store.ClientWatcherStore[*clusterv1.ManagedCluster],
 	clusterName string,
 ) *ManagedClusterClient {
