@@ -113,9 +113,20 @@ clusterManager:
       mode: Enable
     registrationDrivers:
     - authType: csr
+#   - authType: grpc
+#   grpc:
+#     autoApprovedIdentities:
+#     - system:serviceaccount:open-cluster-management:agent-registration-bootstrap
   workConfiguration:
     workDriver: kube
   addOnManagerConfiguration: {}
 #   featureGates:
 #     - feature: ""
 #       mode: ""
+# serverConfiguration:
+#   endpointsExposure:
+#   - protocol: grpc
+#     grpc:
+#       type: hostname
+#       hostname:
+#         host: grpc-server-open-cluster-management-hub.apps.server-foundation-sno-lite-w8rlq.dev04.red-chesterfield.com
