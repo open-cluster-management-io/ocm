@@ -153,7 +153,7 @@ func (v *SarValidator) CheckEscalation(ctx context.Context, sa *workapiv1.Manife
 	})
 	if apierrors.IsForbidden(err) {
 		logger.Info("not allowed to apply the resource",
-			"gvr", gvr, "resourceNamespace", namespace, "resourceName", name, "error", err)
+			"gvr", gvr.String(), "resourceNamespace", namespace, "resourceName", name, "error", err)
 		return &NotAllowedError{
 			Err: fmt.Errorf("not allowed to apply the resource %s %s, %s %s, error: permission escalation",
 				gvr.Group, gvr.Resource, namespace, name),

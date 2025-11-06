@@ -114,7 +114,7 @@ func (c *ServerSideApply) Apply(
 		Namespace(required.GetNamespace()).
 		Apply(ctx, required.GetName(), required, metav1.ApplyOptions{FieldManager: fieldManager, Force: force})
 	logger.Info("Server side applied",
-		"kind", required.GetKind(), "resourceNamespace", required.GetNamespace(),
+		"gvr", gvr.String(), "resourceNamespace", required.GetNamespace(),
 		"resourceName", required.GetName(), "fieldManager", fieldManager)
 
 	if errors.IsConflict(err) {

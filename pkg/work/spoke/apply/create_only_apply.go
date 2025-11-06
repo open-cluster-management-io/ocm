@@ -44,7 +44,7 @@ func (c *CreateOnlyApply) Apply(ctx context.Context,
 			ctx, resourcemerge.WithCleanLabelsAndAnnotations(required).(*unstructured.Unstructured), metav1.CreateOptions{})
 		if err != nil {
 			logger.Info("Resource created because of missing",
-				"kind", required.GetKind(), "resourceNamespace", required.GetNamespace(), "resourceName", required.GetName())
+				"gvr", gvr.String(), "resourceNamespace", required.GetNamespace(), "resourceName", required.GetName())
 		}
 	}
 

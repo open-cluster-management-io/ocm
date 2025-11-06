@@ -91,7 +91,7 @@ func (m *unmanagedAppliedWorkController) sync(ctx context.Context, controllerCon
 	appliedManifestWorkName := controllerContext.QueueKey()
 
 	logger := klog.FromContext(ctx).WithName(appliedManifestWorkFinalizer).
-		WithValues(unManagedAppliedManifestWork, appliedManifestWorkName)
+		WithValues("appliedManifestWorkName", appliedManifestWorkName)
 	ctx = klog.NewContext(ctx, logger)
 
 	logger.V(5).Info("Reconciling AppliedManifestWork")

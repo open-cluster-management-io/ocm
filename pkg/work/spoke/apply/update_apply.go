@@ -92,7 +92,7 @@ func (c *UpdateApply) applyUnstructured(
 		actual, err := c.dynamicClient.Resource(gvr).Namespace(required.GetNamespace()).Create(
 			ctx, resourcemerge.WithCleanLabelsAndAnnotations(required).(*unstructured.Unstructured), metav1.CreateOptions{})
 		logger.Info("Created resource because it was missing",
-			"kind", required.GetKind(), "resourceNamespace", required.GetNamespace(), "resourceName", required.GetName())
+			"gvr", gvr.String(), "resourceNamespace", required.GetNamespace(), "resourceName", required.GetName())
 		cache.UpdateCachedResourceMetadata(required, actual)
 		return actual, true, err
 	}
@@ -131,7 +131,7 @@ func (c *UpdateApply) applyUnstructured(
 	actual, err := c.dynamicClient.Resource(gvr).Namespace(required.GetNamespace()).Update(
 		ctx, required, metav1.UpdateOptions{})
 	logger.Info("Updated resource",
-		"kind", required.GetKind(), "resourceNamespace", required.GetNamespace(), "resourceName", required.GetName())
+		"gvr", gvr.String(), "resourceNamespace", required.GetNamespace(), "resourceName", required.GetName())
 	cache.UpdateCachedResourceMetadata(required, actual)
 	return actual, true, err
 }

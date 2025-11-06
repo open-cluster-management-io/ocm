@@ -2,6 +2,7 @@ package spoke
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -63,6 +64,10 @@ func NewWorkAgentConfig(commonOpts *options.AgentOptions, opts *WorkloadAgentOpt
 func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	// setting up contextual logger
 	logger := klog.NewKlogr()
+	podName := os.Getenv("POD_NAME")
+	if podName != "" {
+		logger = logger.WithValues("podName", podName)
+	}
 	ctx = klog.NewContext(ctx, logger)
 
 	// load spoke client config and create spoke clients,

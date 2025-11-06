@@ -190,8 +190,8 @@ func DeleteAppliedResources(
 			Namespace(resource.Namespace).
 			Get(ctx, resource.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
-			logger.Info("Resource is removed Successfully",
-				"gvr", gvr, "resourceNamespace", resource.Namespace, "resourceName", resource.Name)
+			logger.Info("Resource is removed successfully",
+				"gvr", gvr.String(), "resourceNamespace", resource.Namespace, "resourceName", resource.Name)
 			continue
 		}
 
@@ -258,7 +258,7 @@ func DeleteAppliedResources(
 
 		resourcesPendingFinalization = append(resourcesPendingFinalization, resource)
 		logger.Info("Deleted resource",
-			"gvr", gvr, "resourceNamespace", resource.Namespace, "resourceName", resource.Name, "reason", reason)
+			"gvr", gvr.String(), "resourceNamespace", resource.Namespace, "resourceName", resource.Name, "reason", reason)
 	}
 
 	return resourcesPendingFinalization, errs
@@ -437,7 +437,7 @@ func ApplyOwnerReferences(ctx context.Context, dynamicClient dynamic.Interface, 
 	}
 
 	logger.V(2).Info("Patching resource",
-		"gvr", gvr, "resourceNamespace", accessor.GetNamespace(), "resourceName", accessor.GetName(), "patch", string(patchData))
+		"gvr", gvr.String(), "resourceNamespace", accessor.GetNamespace(), "resourceName", accessor.GetName(), "patch", string(patchData))
 	_, err = dynamicClient.Resource(gvr).Namespace(accessor.GetNamespace()).Patch(ctx, accessor.GetName(), types.MergePatchType, patchData, metav1.PatchOptions{})
 	return err
 }

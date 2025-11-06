@@ -70,7 +70,7 @@ func (m *ManifestWorkFinalizeController) sync(ctx context.Context, controllerCon
 	appliedManifestWorkName := fmt.Sprintf("%s-%s", m.hubHash, manifestWorkName)
 
 	logger := klog.FromContext(ctx).WithName(appliedManifestWorkFinalizer).
-		WithValues(manifestWorkFinalizer, appliedManifestWorkName, "manifestWorkName", manifestWorkName)
+		WithValues("appliedManifestWorkName", appliedManifestWorkName, "manifestWorkName", manifestWorkName)
 	ctx = klog.NewContext(ctx, logger)
 
 	logger.V(5).Info("Reconciling ManifestWork")

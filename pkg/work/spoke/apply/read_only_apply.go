@@ -20,13 +20,13 @@ func NewReadOnlyApply() *ReadOnlyApply {
 }
 
 func (c *ReadOnlyApply) Apply(ctx context.Context,
-	_ schema.GroupVersionResource,
+	gvr schema.GroupVersionResource,
 	required *unstructured.Unstructured,
 	_ metav1.OwnerReference,
 	_ *workapiv1.ManifestConfigOption,
 	_ events.Recorder) (runtime.Object, error) {
 	logger := klog.FromContext(ctx)
 	logger.Info("Noop because its read-only",
-		"kind", required.GetKind(), "resourceNamespace", required.GetNamespace(), "resourceName", required.GetName())
+		"gvr", gvr.String(), "resourceNamespace", required.GetNamespace(), "resourceName", required.GetName())
 	return required, nil
 }

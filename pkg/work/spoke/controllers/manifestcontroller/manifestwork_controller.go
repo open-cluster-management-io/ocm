@@ -126,7 +126,7 @@ func NewManifestWorkController(
 func (m *ManifestWorkController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	manifestWorkName := controllerContext.QueueKey()
 	logger := klog.FromContext(ctx).WithName(controllerName).WithValues("manifestWorkName", manifestWorkName)
-	logger.V(4).Info("Reconciling ManifestWork")
+	logger.V(5).Info("Reconciling ManifestWork")
 	ctx = klog.NewContext(ctx, logger)
 
 	oldManifestWork, err := m.manifestWorkLister.Get(manifestWorkName)
