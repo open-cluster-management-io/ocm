@@ -24,6 +24,8 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/helper"
 )
 
+const appliedManifestWorkFinalizer = "AppliedManifestWorkFinalizer"
+
 // AppliedManifestWorkFinalizeController handles cleanup of appliedmanifestwork resources before deletion is allowed.
 // It should handle all appliedmanifestworks belonging to this agent identified by the agentID.
 type AppliedManifestWorkFinalizeController struct {
@@ -54,12 +56,15 @@ func NewAppliedManifestWorkFinalizeController(
 	return factory.New().
 		WithFilteredEventsInformersQueueKeysFunc(queue.QueueKeyByMetaName,
 			helper.AppliedManifestworkAgentIDFilter(agentID), appliedManifestWorkInformer.Informer()).
-		WithSync(controller.sync).ToController("AppliedManifestWorkFinalizer", recorder)
+		WithSync(controller.sync).ToController(appliedManifestWorkFinalizer, recorder)
 }
 
 func (m *AppliedManifestWorkFinalizeController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	appliedManifestWorkName := controllerContext.QueueKey()
-	klog.V(5).Infof("Reconciling AppliedManifestWork %q", appliedManifestWorkName)
+	logger := klog.FromContext(ctx).WithName(appliedManifestWorkFinalizer).
+		WithValues("appliedManifestWorkName", appliedManifestWorkName)
+	logger.V(5).Info("Reconciling AppliedManifestWork")
+	ctx = klog.NewContext(ctx, logger)
 
 	appliedManifestWork, err := m.appliedManifestWorkLister.Get(appliedManifestWorkName)
 	if errors.IsNotFound(err) {
@@ -77,6 +82,7 @@ func (m *AppliedManifestWorkFinalizeController) sync(ctx context.Context, contro
 // before removing finalizer from appliedmanifestwork
 func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx context.Context,
 	controllerContext factory.SyncContext, originalManifestWork *workapiv1.AppliedManifestWork) error {
+	logger := klog.FromContext(ctx)
 	appliedManifestWork := originalManifestWork.DeepCopy()
 
 	// no work to do until we're deleted
@@ -96,7 +102,7 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 	// scoped resource correctly.
 	reason := fmt.Sprintf("manifestwork %s is terminating", appliedManifestWork.Spec.ManifestWorkName)
 	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(
-		ctx, appliedManifestWork.Status.AppliedResources, reason, m.spokeDynamicClient, controllerContext.Recorder(), *owner)
+		ctx, appliedManifestWork.Status.AppliedResources, reason, m.spokeDynamicClient, *owner)
 	appliedManifestWork.Status.AppliedResources = resourcesPendingFinalization
 	updatedAppliedManifestWork, err := m.patcher.PatchStatus(ctx, appliedManifestWork, appliedManifestWork.Status, originalManifestWork.Status)
 	if err != nil {
@@ -111,7 +117,7 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 
 	// requeue the work until all applied resources are deleted and finalized if the appliedmanifestwork itself is not updated
 	if len(resourcesPendingFinalization) != 0 {
-		klog.V(4).Infof("%d resources pending deletions in %s", len(resourcesPendingFinalization), appliedManifestWork.Name)
+		logger.V(4).Info("resources pending deletions", "numOfResources", len(resourcesPendingFinalization))
 		controllerContext.Queue().AddAfter(appliedManifestWork.Name, m.rateLimiter.When(appliedManifestWork.Name))
 		return nil
 	}

@@ -23,6 +23,8 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/helper"
 )
 
+const manifestWorkFinalizer = "ManifestWorkFinalizer"
+
 // ManifestWorkFinalizeController handles cleanup of manifestwork resources before deletion is allowed.
 type ManifestWorkFinalizeController struct {
 	patcher                   patcher.Patcher[*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus]
@@ -60,13 +62,18 @@ func NewManifestWorkFinalizeController(
 			helper.AppliedManifestworkQueueKeyFunc(hubHash),
 			helper.AppliedManifestworkHubHashFilter(hubHash),
 			appliedManifestWorkInformer.Informer()).
-		WithSync(controller.sync).ToController("ManifestWorkFinalizer", recorder)
+		WithSync(controller.sync).ToController(manifestWorkFinalizer, recorder)
 }
 
 func (m *ManifestWorkFinalizeController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	manifestWorkName := controllerContext.QueueKey()
 	appliedManifestWorkName := fmt.Sprintf("%s-%s", m.hubHash, manifestWorkName)
-	klog.V(5).Infof("Reconciling ManifestWork %q", manifestWorkName)
+
+	logger := klog.FromContext(ctx).WithName(appliedManifestWorkFinalizer).
+		WithValues("appliedManifestWorkName", appliedManifestWorkName, "manifestWorkName", manifestWorkName)
+	ctx = klog.NewContext(ctx, logger)
+
+	logger.V(5).Info("Reconciling ManifestWork")
 
 	manifestWork, err := m.manifestWorkLister.Get(manifestWorkName)
 

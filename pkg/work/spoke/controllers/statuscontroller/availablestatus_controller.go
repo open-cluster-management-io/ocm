@@ -31,7 +31,11 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/spoke/statusfeedback"
 )
 
-const statusFeedbackConditionType = "StatusFeedbackSynced"
+const (
+	statusFeedbackConditionType = "StatusFeedbackSynced"
+
+	controllerName = "AvailableStatusController"
+)
 
 // AvailableStatusController is to update the available status conditions of both manifests and manifestworks.
 // It is also used to get the status value based on status feedback configuration and get condition values
@@ -74,11 +78,16 @@ func NewAvailableStatusController(
 
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, manifestWorkInformer.Informer()).
-		WithSync(controller.sync).ToController("AvailableStatusController", recorder), nil
+		WithSync(controller.sync).ToController(controllerName, recorder), nil
 }
 
 func (c *AvailableStatusController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	manifestWorkName := controllerContext.QueueKey()
+
+	logger := klog.FromContext(ctx).WithName(controllerName).WithValues("manifestWorkName", manifestWorkName)
+	logger.V(4).Info("Reconciling ManifestWork")
+	ctx = klog.NewContext(ctx, logger)
+
 	// sync a particular manifestwork
 	manifestWork, err := c.manifestWorkLister.Get(manifestWorkName)
 	if errors.IsNotFound(err) {
@@ -100,7 +109,6 @@ func (c *AvailableStatusController) sync(ctx context.Context, controllerContext 
 }
 
 func (c *AvailableStatusController) syncManifestWork(ctx context.Context, originalManifestWork *workapiv1.ManifestWork) error {
-	klog.V(5).Infof("Reconciling ManifestWork %q", originalManifestWork.Name)
 	manifestWork := originalManifestWork.DeepCopy()
 
 	// do nothing when finalizer is not added.

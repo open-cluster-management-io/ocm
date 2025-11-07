@@ -39,6 +39,8 @@ var (
 	ResyncInterval = 4 * time.Minute
 )
 
+const controllerName = "ManifestWorkController"
+
 type workReconcile interface {
 	reconcile(ctx context.Context,
 		controllerContext factory.SyncContext,
@@ -115,17 +117,17 @@ func NewManifestWorkController(
 			appliedManifestWorkInformer.Informer(),
 		).
 		WithSyncContext(syncCtx).
-		WithSync(controller.sync).ToController("ManifestWorkAgent", recorder)
+		WithSync(controller.sync).ToController(controllerName, recorder)
 }
 
 // sync is the main reconcile loop for manifest work. It is triggered in two scenarios
 // 1. ManifestWork API changes
 // 2. Resources defined in manifest changed on spoke
 func (m *ManifestWorkController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	logger := klog.FromContext(ctx).WithName("ManifestWorkController")
-
 	manifestWorkName := controllerContext.QueueKey()
-	logger.V(4).Info("Reconciling ManifestWork", "name", manifestWorkName)
+	logger := klog.FromContext(ctx).WithName(controllerName).WithValues("manifestWorkName", manifestWorkName)
+	logger.V(5).Info("Reconciling ManifestWork")
+	ctx = klog.NewContext(ctx, logger)
 
 	oldManifestWork, err := m.manifestWorkLister.Get(manifestWorkName)
 	if apierrors.IsNotFound(err) {
@@ -192,7 +194,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 		return utilerrors.NewAggregate(errs)
 	}
 
-	logger.V(2).Info("Requeue manifestwork", "name", manifestWork.Name, "requeue time", requeueTime)
+	logger.V(2).Info("Requeue manifestwork", "requeue time", requeueTime)
 	controllerContext.Queue().AddAfter(manifestWorkName, requeueTime)
 
 	return nil

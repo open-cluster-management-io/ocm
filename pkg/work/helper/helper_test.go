@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -342,7 +341,7 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(scheme, c.existingResources...)
-			actual, err := DeleteAppliedResources(context.TODO(), c.resourcesToRemove, "testing", fakeDynamicClient, eventstesting.NewTestingEventRecorder(t), c.owner)
+			actual, err := DeleteAppliedResources(context.TODO(), c.resourcesToRemove, "testing", fakeDynamicClient, c.owner)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}

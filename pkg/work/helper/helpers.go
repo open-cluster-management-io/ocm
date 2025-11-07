@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -169,10 +168,11 @@ func DeleteAppliedResources(
 	resources []workapiv1.AppliedManifestResourceMeta,
 	reason string,
 	dynamicClient dynamic.Interface,
-	recorder events.Recorder,
 	owner metav1.OwnerReference) ([]workapiv1.AppliedManifestResourceMeta, []error) {
 	var resourcesPendingFinalization []workapiv1.AppliedManifestResourceMeta
 	var errs []error
+
+	logger := klog.FromContext(ctx)
 
 	// set owner to be removed
 	ownerCopy := owner.DeepCopy()
@@ -190,7 +190,8 @@ func DeleteAppliedResources(
 			Namespace(resource.Namespace).
 			Get(ctx, resource.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
-			klog.Infof("Resource %v with key %s/%s is removed Successfully", gvr, resource.Namespace, resource.Name)
+			logger.Info("Resource is removed successfully",
+				"gvr", gvr.String(), "resourceNamespace", resource.Namespace, "resourceName", resource.Name)
 			continue
 		}
 
@@ -256,7 +257,8 @@ func DeleteAppliedResources(
 		}
 
 		resourcesPendingFinalization = append(resourcesPendingFinalization, resource)
-		recorder.Eventf("ResourceDeleted", "Deleted resource %v with key %s/%s because %s.", gvr, resource.Namespace, resource.Name, reason)
+		logger.Info("Deleted resource",
+			"gvr", gvr.String(), "resourceNamespace", resource.Namespace, "resourceName", resource.Name, "reason", reason)
 	}
 
 	return resourcesPendingFinalization, errs
@@ -409,6 +411,8 @@ func FindManifestCondition(resourceMeta workapiv1.ManifestResourceMeta, manifest
 
 func ApplyOwnerReferences(ctx context.Context, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource,
 	existing runtime.Object, requiredOwner metav1.OwnerReference) error {
+	logger := klog.FromContext(ctx)
+
 	accessor, err := meta.Accessor(existing)
 	if err != nil {
 		return fmt.Errorf("type %t cannot be accessed: %v", existing, err)
@@ -432,7 +436,8 @@ func ApplyOwnerReferences(ctx context.Context, dynamicClient dynamic.Interface, 
 		return err
 	}
 
-	klog.V(2).Infof("Patching resource %v %s/%s with patch %s", gvr, accessor.GetNamespace(), accessor.GetName(), string(patchData))
+	logger.V(2).Info("Patching resource",
+		"gvr", gvr.String(), "resourceNamespace", accessor.GetNamespace(), "resourceName", accessor.GetName(), "patch", string(patchData))
 	_, err = dynamicClient.Resource(gvr).Namespace(accessor.GetNamespace()).Patch(ctx, accessor.GetName(), types.MergePatchType, patchData, metav1.PatchOptions{})
 	return err
 }

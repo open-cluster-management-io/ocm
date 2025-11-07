@@ -134,7 +134,7 @@ func (v *SarValidator) CheckSubjectAccessReviews(ctx context.Context, sa *workap
 // CheckEscalation checks whether the sa is escalated to operate the gvr(RBAC) resources.
 func (v *SarValidator) CheckEscalation(ctx context.Context, sa *workapiv1.ManifestWorkSubjectServiceAccount,
 	gvr schema.GroupVersionResource, namespace, name string, obj *unstructured.Unstructured) error {
-
+	logger := klog.FromContext(ctx)
 	if gvr.Group != "rbac.authorization.k8s.io" {
 		return nil
 	}
@@ -152,8 +152,8 @@ func (v *SarValidator) CheckEscalation(ctx context.Context, sa *workapiv1.Manife
 		DryRun: []string{"All"},
 	})
 	if apierrors.IsForbidden(err) {
-		klog.Infof("not allowed to apply the resource %s %s, %s %s, error: %s",
-			gvr.Group, gvr.Resource, namespace, name, err.Error())
+		logger.Info("not allowed to apply the resource",
+			"gvr", gvr.String(), "resourceNamespace", namespace, "resourceName", name, "error", err)
 		return &NotAllowedError{
 			Err: fmt.Errorf("not allowed to apply the resource %s %s, %s %s, error: permission escalation",
 				gvr.Group, gvr.Resource, namespace, name),

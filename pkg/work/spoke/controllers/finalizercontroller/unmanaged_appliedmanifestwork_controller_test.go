@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
@@ -275,7 +274,6 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 			}
 
 			controller := &unmanagedAppliedWorkController{
-				recorder:                  eventstesting.NewTestingEventRecorder(t),
 				manifestWorkLister:        informerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks("test"),
 				appliedManifestWorkClient: fakeClient.WorkV1().AppliedManifestWorks(),
 				patcher: patcher.NewPatcher[
