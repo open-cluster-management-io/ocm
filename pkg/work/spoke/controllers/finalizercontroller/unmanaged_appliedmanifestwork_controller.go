@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -19,6 +18,7 @@ import (
 	workinformer "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -77,19 +77,17 @@ func NewUnManagedAppliedWorkController(
 	}
 
 	return factory.New().
-		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
+		WithInformersQueueKeysFunc(func(obj runtime.Object) []string {
 			accessor, _ := meta.Accessor(obj)
-			return fmt.Sprintf("%s-%s", hubHash, accessor.GetName())
+			return []string{fmt.Sprintf("%s-%s", hubHash, accessor.GetName())}
 		}, manifestWorkInformer.Informer()).
 		WithFilteredEventsInformersQueueKeysFunc(
 			queue.QueueKeyByMetaName,
 			helper.AppliedManifestworkAgentIDFilter(agentID), appliedManifestWorkInformer.Informer()).
-		WithSync(controller.sync).ToController(unManagedAppliedManifestWork, recorder)
+		WithSync(controller.sync).ToController(unManagedAppliedManifestWork)
 }
 
-func (m *unmanagedAppliedWorkController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	appliedManifestWorkName := controllerContext.QueueKey()
-
+func (m *unmanagedAppliedWorkController) sync(ctx context.Context, controllerContext factory.SyncContext, appliedManifestWorkName string) error {
 	logger := klog.FromContext(ctx).WithName(appliedManifestWorkFinalizer).
 		WithValues("appliedManifestWorkName", appliedManifestWorkName)
 	ctx = klog.NewContext(ctx, logger)

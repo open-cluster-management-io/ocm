@@ -26,7 +26,7 @@ import (
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
-	"open-cluster-management.io/ocm/pkg/common/helpers"
+	"open-cluster-management.io/ocm/pkg/common/recorder"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
@@ -320,7 +320,7 @@ func TestHealthCheck(t *testing.T) {
 			fakeHubClient := kubefake.NewSimpleClientset()
 
 			ctx := context.TODO()
-			hubEventRecorder, err := helpers.NewEventRecorder(ctx,
+			hubEventRecorder, err := recorder.NewEventRecorder(ctx,
 				clusterscheme.Scheme, fakeHubClient.EventsV1(), "test")
 			if err != nil {
 				t.Fatal(err)

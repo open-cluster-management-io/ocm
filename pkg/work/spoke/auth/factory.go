@@ -55,7 +55,8 @@ func NewFactory(
 }
 
 func (f *validatorFactory) NewExecutorValidator(ctx context.Context, isCacheValidator bool) ExecutorValidator {
-	klog.Infof("Executor caches enabled: %v", isCacheValidator)
+	logger := klog.FromContext(ctx)
+	logger.Info("Executor caches enabled", "cacheValidator", isCacheValidator)
 	sarValidator := basic.NewSARValidator(f.config, f.kubeClient)
 	if !isCacheValidator {
 		return sarValidator

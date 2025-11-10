@@ -22,7 +22,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
-	"open-cluster-management.io/ocm/pkg/common/helpers"
+	"open-cluster-management.io/ocm/pkg/common/recorder"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
@@ -174,7 +174,7 @@ func TestSync(t *testing.T) {
 
 			ctx := context.TODO()
 			syncCtx := testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName)
-			mcEventRecorder, err := helpers.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient.EventsV1(), "test")
+			mcEventRecorder, err := recorder.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient.EventsV1(), "test")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -288,7 +288,7 @@ func TestRequeueTime(t *testing.T) {
 			}
 
 			ctx := context.TODO()
-			mcEventRecorder, err := helpers.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient.EventsV1(), "test")
+			mcEventRecorder, err := recorder.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient.EventsV1(), "test")
 			if err != nil {
 				t.Fatal(err)
 			}

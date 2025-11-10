@@ -14,7 +14,7 @@ import (
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 
-	"open-cluster-management.io/ocm/pkg/common/helpers"
+	"open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/scheduling"
 	"open-cluster-management.io/ocm/pkg/placement/debugger"
@@ -44,7 +44,7 @@ func RunControllerManagerWithInformers(
 	clusterClient clusterclient.Interface,
 	clusterInformers clusterinformers.SharedInformerFactory,
 ) error {
-	recorder, err := helpers.NewEventRecorder(ctx, clusterscheme.Scheme, kubeClient.EventsV1(), "placement-controller")
+	recorder, err := recorder.NewEventRecorder(ctx, clusterscheme.Scheme, kubeClient.EventsV1(), "placement-controller")
 	if err != nil {
 		return err
 	}
