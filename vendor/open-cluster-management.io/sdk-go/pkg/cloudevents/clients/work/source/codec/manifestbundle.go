@@ -3,8 +3,6 @@ package codec
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
-
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	cloudeventstypes "github.com/cloudevents/sdk-go/v2/types"
 
@@ -36,15 +34,10 @@ func (c *ManifestBundleCodec) Encode(source string, eventType types.CloudEventsT
 		return nil, fmt.Errorf("unsupported cloudevents data type %s", eventType.CloudEventsDataType)
 	}
 
-	resourceVersion, err := strconv.Atoi(work.ResourceVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert resource version %s to int: %v", work.ResourceVersion, err)
-	}
-
 	evt := types.NewEventBuilder(source, eventType).
 		WithClusterName(work.Namespace).
 		WithResourceID(string(work.UID)).
-		WithResourceVersion(int64(resourceVersion)).
+		WithResourceVersion(work.Generation).
 		NewEvent()
 
 	// set the work's meta data to its cloud event
@@ -120,7 +113,7 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 	if len(metaObj.Name) == 0 {
 		metaObj.Name = resourceID
 	}
-	metaObj.ResourceVersion = fmt.Sprintf("%d", resourceVersion)
+	metaObj.Generation = int64(resourceVersion)
 	if metaObj.Annotations == nil {
 		metaObj.Annotations = map[string]string{}
 	}

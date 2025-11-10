@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -17,6 +16,7 @@ import (
 	workinformer "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
@@ -56,13 +56,11 @@ func NewAppliedManifestWorkFinalizeController(
 	return factory.New().
 		WithFilteredEventsInformersQueueKeysFunc(queue.QueueKeyByMetaName,
 			helper.AppliedManifestworkAgentIDFilter(agentID), appliedManifestWorkInformer.Informer()).
-		WithSync(controller.sync).ToController(appliedManifestWorkFinalizer, recorder)
+		WithSync(controller.sync).ToController(appliedManifestWorkFinalizer)
 }
 
-func (m *AppliedManifestWorkFinalizeController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	appliedManifestWorkName := controllerContext.QueueKey()
-	logger := klog.FromContext(ctx).WithName(appliedManifestWorkFinalizer).
-		WithValues("appliedManifestWorkName", appliedManifestWorkName)
+func (m *AppliedManifestWorkFinalizeController) sync(ctx context.Context, controllerContext factory.SyncContext, appliedManifestWorkName string) error {
+	logger := klog.FromContext(ctx).WithValues("appliedManifestWorkName", appliedManifestWorkName)
 	logger.V(5).Info("Reconciling AppliedManifestWork")
 	ctx = klog.NewContext(ctx, logger)
 

@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	rbacapiv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -18,6 +17,7 @@ import (
 	"k8s.io/klog/v2"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/store"
 )
@@ -108,7 +108,7 @@ func newControllerInner(controller *CacheController,
 	}
 
 	cacheControllerName := "ManifestWorkExecutorCache"
-	syncCtx := factory.NewSyncContext(cacheControllerName, recorder)
+	syncCtx := factory.NewSyncContext(cacheControllerName)
 
 	_, err = rbInformer.Informer().AddEventHandler(&roleBindingEventHandler{
 		enqueueUpsertFunc: controller.bindingResourceUpsertEnqueueFn(syncCtx),
@@ -137,7 +137,7 @@ func newControllerInner(controller *CacheController,
 		WithBareInformers(rbInformer.Informer(), crbInformer.Informer()).
 		WithSync(controller.sync).
 		ResyncEvery(ResyncInterval). // cleanup unnecessary cache every ResyncInterval
-		ToController(cacheControllerName, recorder)
+		ToController(cacheControllerName)
 }
 
 func (c *CacheController) roleEnqueueFu(rbIndexer cache.Indexer) func(runtime.Object) []string {
@@ -254,14 +254,15 @@ func getInterestedExecutors(subjects []rbacapiv1.Subject, executorCaches *store.
 
 // sync is the main reconcile loop for executors. It is triggered when RBAC resources(
 // role, rolebinding, clusterrole, clusterrolebinding) for the executor changed
-func (c *CacheController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	executorKey := controllerContext.QueueKey()
-	klog.V(4).Infof("Executor cache sync, executorKey: %v", executorKey)
+func (c *CacheController) sync(ctx context.Context, _ factory.SyncContext, executorKey string) error {
+	logger := klog.FromContext(ctx).WithValues("executorKey", executorKey)
+	ctx = klog.NewContext(ctx, logger)
+	logger.V(4).Info("Executor cache sync")
 	if executorKey == "key" {
 		// cleanup unnecessary cache
-		klog.V(4).Infof("There are %v cache items before cleanup", c.executorCaches.Count())
+		logger.V(4).Info("Cache items before cleanup", "count", c.executorCaches.Count())
 		c.cleanupUnnecessaryCache()
-		klog.V(4).Infof("There are %v cache items after cleanup", c.executorCaches.Count())
+		logger.V(4).Info("Cache items after cleanup", "count", c.executorCaches.Count())
 		return nil
 	}
 
@@ -277,6 +278,7 @@ func (c *CacheController) sync(ctx context.Context, controllerContext factory.Sy
 
 func (c *CacheController) iterateCacheItemsFn(ctx context.Context,
 	executorKey, saNamespace, saName string) func(v store.CacheValue) error {
+	logger := klog.FromContext(ctx)
 	return func(v store.CacheValue) error {
 		err := c.sarCheckerFn(ctx, &workapiv1.ManifestWorkSubjectServiceAccount{
 			Namespace: saNamespace,
@@ -288,8 +290,7 @@ func (c *CacheController) iterateCacheItemsFn(ctx context.Context,
 		},
 			v.Dimension.Namespace, v.Dimension.Name, store.GetOwnedByWork(v.Dimension.ExecuteAction))
 
-		klog.V(4).Infof("Update executor cache for executorKey: %s, dimension: %+v result: %v",
-			executorKey, v.Dimension, err)
+		logger.V(4).Info("Update executor cache", "dimension", v.Dimension, "error", err)
 		updateSARCheckResultToCache(c.executorCaches, executorKey, v.Dimension, err)
 		return nil
 	}

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/openshift/library-go/pkg/controller/factory"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -20,6 +19,7 @@ import (
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
@@ -297,8 +297,8 @@ func TestSyncManifestWork(t *testing.T) {
 				hubHash: "test",
 			}
 
-			controllerContext := testingcommon.NewFakeSyncContext(t, testingWork.Name)
-			err := controller.sync(context.TODO(), controllerContext)
+			controllerContext := testingcommon.NewFakeSDKSyncContext(t, testingWork.Name)
+			err := controller.sync(context.TODO(), controllerContext, testingWork.Name)
 			if err != nil {
 				t.Fatal(err)
 			}

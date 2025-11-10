@@ -3,7 +3,6 @@ package finalizercontroller
 import (
 	"context"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
@@ -12,6 +11,7 @@ import (
 	workinformer "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -42,13 +42,11 @@ func NewAddFinalizerController(
 
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, manifestWorkInformer.Informer()).
-		WithSync(controller.sync).ToController(manifestWorkAddFinalizerController, recorder)
+		WithSync(controller.sync).ToController(manifestWorkAddFinalizerController)
 }
 
-func (m *AddFinalizerController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	manifestWorkName := controllerContext.QueueKey()
-	logger := klog.FromContext(ctx).WithName(manifestWorkAddFinalizerController).
-		WithValues("manifestWorkName", manifestWorkName)
+func (m *AddFinalizerController) sync(ctx context.Context, _ factory.SyncContext, manifestWorkName string) error {
+	logger := klog.FromContext(ctx).WithValues("manifestWorkName", manifestWorkName)
 	logger.V(5).Info("Reconciling ManifestWork")
 
 	manifestWork, err := m.manifestWorkLister.Get(manifestWorkName)

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -8,8 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
-
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/utils"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
@@ -17,40 +16,40 @@ import (
 
 // AgentInformerWatcherStore extends the BaseClientWatchStore.
 
-// It gets/lists the resources from the given informer store and send
+// It gets/lists the resources from the given local store and send
 // the resource add/update/delete event to the watch channel directly.
 //
 // It is used for building resource agent client.
 type AgentInformerWatcherStore[T generic.ResourceObject] struct {
 	BaseClientWatchStore[T]
 	Watcher *Watcher
-
-	informer cache.SharedIndexInformer
 }
 
 func NewAgentInformerWatcherStore[T generic.ResourceObject]() *AgentInformerWatcherStore[T] {
 	return &AgentInformerWatcherStore[T]{
-		BaseClientWatchStore: BaseClientWatchStore[T]{},
-		Watcher:              NewWatcher(),
+		BaseClientWatchStore: BaseClientWatchStore[T]{
+			Store: cache.NewStore(cache.MetaNamespaceKeyFunc),
+		},
+		Watcher: NewWatcher(),
 	}
 }
 
 func (s *AgentInformerWatcherStore[T]) Add(resource runtime.Object) error {
 	s.Watcher.Receive(watch.Event{Type: watch.Added, Object: resource})
-	return nil
+	return s.Store.Add(resource)
 }
 
 func (s *AgentInformerWatcherStore[T]) Update(resource runtime.Object) error {
 	s.Watcher.Receive(watch.Event{Type: watch.Modified, Object: resource})
-	return nil
+	return s.Store.Update(resource)
 }
 
 func (s *AgentInformerWatcherStore[T]) Delete(resource runtime.Object) error {
 	s.Watcher.Receive(watch.Event{Type: watch.Deleted, Object: resource})
-	return nil
+	return s.Store.Delete(resource)
 }
 
-func (s *AgentInformerWatcherStore[T]) HandleReceivedResource(action types.ResourceAction, resource T) error {
+func (s *AgentInformerWatcherStore[T]) HandleReceivedResource(ctx context.Context, action types.ResourceAction, resource T) error {
 	switch action {
 	case types.Added:
 		newObj, err := utils.ToRuntimeObject(resource)
@@ -60,23 +59,22 @@ func (s *AgentInformerWatcherStore[T]) HandleReceivedResource(action types.Resou
 
 		return s.Add(newObj)
 	case types.Modified:
-		newObj, err := meta.Accessor(resource)
+		accessor, err := meta.Accessor(resource)
 		if err != nil {
 			return err
 		}
 
-		lastObj, exists, err := s.Get(newObj.GetNamespace(), newObj.GetName())
+		lastObj, exists, err := s.Get(accessor.GetNamespace(), accessor.GetName())
 		if err != nil {
 			return err
 		}
 		if !exists {
-			return fmt.Errorf("the resource %s/%s does not exist", newObj.GetNamespace(), newObj.GetName())
+			return fmt.Errorf("the resource %s/%s does not exist", accessor.GetNamespace(), accessor.GetName())
 		}
 
-		// prevent the resource from being updated if it is deleting
+		// if resource is deleting, keep the deletion timestamp
 		if !lastObj.GetDeletionTimestamp().IsZero() {
-			klog.Warningf("the resource %s/%s is deleting, ignore the update", newObj.GetNamespace(), newObj.GetName())
-			return nil
+			accessor.SetDeletionTimestamp(lastObj.GetDeletionTimestamp())
 		}
 
 		updated, err := utils.ToRuntimeObject(resource)
@@ -95,10 +93,6 @@ func (s *AgentInformerWatcherStore[T]) HandleReceivedResource(action types.Resou
 			return nil
 		}
 
-		if len(newObj.GetFinalizers()) != 0 {
-			return nil
-		}
-
 		last, exists, err := s.Get(newObj.GetNamespace(), newObj.GetName())
 		if err != nil {
 			return err
@@ -112,6 +106,19 @@ func (s *AgentInformerWatcherStore[T]) HandleReceivedResource(action types.Resou
 			return err
 		}
 
+		// trigger an update event if the object is deleting.
+		// Only need to update generation/finalizer/deletionTimeStamp of the object.
+		if len(newObj.GetFinalizers()) != 0 {
+			accessor, err := meta.Accessor(deletingObj)
+			if err != nil {
+				return err
+			}
+			accessor.SetDeletionTimestamp(newObj.GetDeletionTimestamp())
+			accessor.SetFinalizers(newObj.GetFinalizers())
+			accessor.SetGeneration(newObj.GetGeneration())
+			return s.Update(deletingObj)
+		}
+
 		return s.Delete(deletingObj)
 	default:
 		return fmt.Errorf("unsupported resource action %s", action)
@@ -123,11 +130,5 @@ func (s *AgentInformerWatcherStore[T]) GetWatcher(namespace string, opts metav1.
 }
 
 func (s *AgentInformerWatcherStore[T]) HasInitiated() bool {
-	return s.Initiated && s.informer.HasSynced()
-}
-
-func (s *AgentInformerWatcherStore[T]) SetInformer(informer cache.SharedIndexInformer) {
-	s.informer = informer
-	s.Store = informer.GetStore()
-	s.Initiated = true
+	return true
 }
