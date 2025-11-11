@@ -218,13 +218,22 @@ func (d *deployReconciler) clusterRolloutStatusFunc(clusterName string, manifest
 	// Get all relevant conditions
 	progressingCond := apimeta.FindStatusCondition(manifestWork.Status.Conditions, workv1.WorkProgressing)
 	degradedCond := apimeta.FindStatusCondition(manifestWork.Status.Conditions, workv1.WorkDegraded)
+	appliedCond := apimeta.FindStatusCondition(manifestWork.Status.Conditions, workv1.WorkApplied)
 
 	// Return ToApply if:
+	// - No Applied condition exists yet (work hasn't been applied by hub controller)
+	// - Applied condition hasn't observed the latest spec
 	// - No Progressing condition exists yet (work hasn't been reconciled by agent)
 	// - Progressing condition hasn't observed the latest spec
 	// - Degraded condition exists but hasn't observed the latest spec
 	//   (Degraded is optional, but if it exists, we wait for it to catch up)
-	if progressingCond == nil ||
+	//
+	// IMPORTANT: Check Applied condition FIRST to ensure the work has been properly applied
+	// before checking agent-side conditions. This prevents using stale timestamps from
+	// previous generations when conditions update their ObservedGeneration without changing Status.
+	if appliedCond == nil ||
+		appliedCond.ObservedGeneration != manifestWork.Generation ||
+		progressingCond == nil ||
 		progressingCond.ObservedGeneration != manifestWork.Generation ||
 		(degradedCond != nil && degradedCond.ObservedGeneration != manifestWork.Generation) {
 		return clsRolloutStatus, nil

@@ -23,7 +23,7 @@ import (
 
 // ManagedClusterAddOnClient implements the ManagedClusterAddonInterface.
 type ManagedClusterAddOnClient struct {
-	cloudEventsClient *generic.CloudEventAgentClient[*addonapiv1alpha1.ManagedClusterAddOn]
+	cloudEventsClient generic.CloudEventsClient[*addonapiv1alpha1.ManagedClusterAddOn]
 	watcherStore      store.ClientWatcherStore[*addonapiv1alpha1.ManagedClusterAddOn]
 	namespace         string
 }
@@ -31,7 +31,7 @@ type ManagedClusterAddOnClient struct {
 var _ addonv1alpha1client.ManagedClusterAddOnInterface = &ManagedClusterAddOnClient{}
 
 func NewManagedClusterAddOnClient(
-	cloudEventsClient *generic.CloudEventAgentClient[*addonapiv1alpha1.ManagedClusterAddOn],
+	cloudEventsClient generic.CloudEventsClient[*addonapiv1alpha1.ManagedClusterAddOn],
 	watcherStore store.ClientWatcherStore[*addonapiv1alpha1.ManagedClusterAddOn],
 ) *ManagedClusterAddOnClient {
 	return &ManagedClusterAddOnClient{

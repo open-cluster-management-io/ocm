@@ -23,14 +23,14 @@ import (
 // CSRClient implements the CSRInterface. It sends the csr to source by
 // CloudEventAgentClient.
 type CSRClient struct {
-	cloudEventsClient *generic.CloudEventAgentClient[*certificatev1.CertificateSigningRequest]
+	cloudEventsClient generic.CloudEventsClient[*certificatev1.CertificateSigningRequest]
 	watcherStore      store.ClientWatcherStore[*certificatev1.CertificateSigningRequest]
 }
 
 var _ cache.ListerWatcher = &CSRClient{}
 
 func NewCSRClient(
-	cloudEventsClient *generic.CloudEventAgentClient[*certificatev1.CertificateSigningRequest],
+	cloudEventsClient generic.CloudEventsClient[*certificatev1.CertificateSigningRequest],
 	watcherStore store.ClientWatcherStore[*certificatev1.CertificateSigningRequest],
 	clusterName string,
 ) *CSRClient {

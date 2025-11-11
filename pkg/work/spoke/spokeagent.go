@@ -23,7 +23,7 @@ import (
 	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/agent/codec"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/store"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/builder"
 
 	"open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
@@ -234,7 +234,7 @@ func (o *WorkAgentConfig) newWorkClientAndInformer(
 
 		watcherStore = store.NewAgentInformerWatcherStore()
 
-		serverHost, config, err := generic.NewConfigLoader(o.workOptions.WorkloadSourceDriver, o.workOptions.WorkloadSourceConfig).
+		serverHost, config, err := builder.NewConfigLoader(o.workOptions.WorkloadSourceDriver, o.workOptions.WorkloadSourceConfig).
 			LoadConfig()
 		if err != nil {
 			return "", nil, nil, err

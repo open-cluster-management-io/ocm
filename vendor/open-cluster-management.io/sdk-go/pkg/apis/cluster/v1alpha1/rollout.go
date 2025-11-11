@@ -50,8 +50,10 @@ type ClusterRolloutStatus struct {
 	// Used to calculate timeout for progressing and failed status and minimum success time (i.e. soak
 	// time) for succeeded status.
 	LastTransitionTime *metav1.Time
-	// TimeOutTime is the timeout time when the status is progressing or failed (optional field).
-	TimeOutTime *metav1.Time
+	// RecheckTime is the time when the cluster should be rechecked (optional field).
+	// For succeeded status, tracks when the minSuccessTime (soak time) period ends.
+	// For progressing/failed status, tracks when the timeout occurs.
+	RecheckTime *metav1.Time
 }
 
 // RolloutResult contains list of clusters that are timeOut, removed and required to rollOut. A
@@ -306,24 +308,24 @@ func progressivePerCluster(
 			failureBreach = failureCount > maxFailures
 		}
 
-		// Return if the list of exsiting rollout clusters has reached the target rollout size
+		// Return if the list of existing rollout clusters has reached the target rollout size
 		if len(rolloutClusters) >= rolloutSize {
 			return RolloutResult{
 				ClustersToRollout: rolloutClusters,
 				ClustersTimeOut:   timeoutClusters,
 				MaxFailureBreach:  failureBreach,
-				RecheckAfter:      minRecheckAfter(rolloutClusters, minSuccessTime),
+				RecheckAfter:      minRecheckAfter(rolloutClusters),
 			}
 		}
 	}
 
-	// Return if the exsiting rollout clusters maxFailures is breached.
+	// Return if the existing rollout clusters maxFailures is breached.
 	if failureBreach {
 		return RolloutResult{
 			ClustersToRollout: rolloutClusters,
 			ClustersTimeOut:   timeoutClusters,
 			MaxFailureBreach:  failureBreach,
-			RecheckAfter:      minRecheckAfter(rolloutClusters, minSuccessTime),
+			RecheckAfter:      minRecheckAfter(rolloutClusters),
 		}
 	}
 
@@ -352,7 +354,7 @@ func progressivePerCluster(
 			return RolloutResult{
 				ClustersToRollout: rolloutClusters,
 				ClustersTimeOut:   timeoutClusters,
-				RecheckAfter:      minRecheckAfter(rolloutClusters, minSuccessTime),
+				RecheckAfter:      minRecheckAfter(rolloutClusters),
 			}
 		}
 	}
@@ -360,7 +362,7 @@ func progressivePerCluster(
 	return RolloutResult{
 		ClustersToRollout: rolloutClusters,
 		ClustersTimeOut:   timeoutClusters,
-		RecheckAfter:      minRecheckAfter(rolloutClusters, minSuccessTime),
+		RecheckAfter:      minRecheckAfter(rolloutClusters),
 	}
 }
 
@@ -430,7 +432,7 @@ func progressivePerGroup(
 					ClustersToRollout: rolloutClusters,
 					ClustersTimeOut:   timeoutClusters,
 					MaxFailureBreach:  failureBreach,
-					RecheckAfter:      minRecheckAfter(rolloutClusters, minSuccessTime),
+					RecheckAfter:      minRecheckAfter(rolloutClusters),
 				}
 			}
 		}
@@ -440,7 +442,7 @@ func progressivePerGroup(
 		ClustersToRollout: rolloutClusters,
 		ClustersTimeOut:   timeoutClusters,
 		MaxFailureBreach:  failureBreach,
-		RecheckAfter:      minRecheckAfter(rolloutClusters, minSuccessTime),
+		RecheckAfter:      minRecheckAfter(rolloutClusters),
 	}
 }
 
@@ -470,8 +472,10 @@ func determineRolloutStatus(
 	case Succeeded:
 		// If the cluster succeeded but is still within the MinSuccessTime (i.e. "soak" time),
 		// still add it to the list of rolloutClusters
-		minSuccessTimeTime := getTimeOutTime(status.LastTransitionTime, minSuccessTime)
-		if RolloutClock.Now().Before(minSuccessTimeTime.Time) {
+		minSuccessTimeTime := calculateRecheckTime(status.LastTransitionTime, minSuccessTime)
+		if minSuccessTimeTime != nil && RolloutClock.Now().Before(minSuccessTimeTime.Time) {
+			// Set RecheckTime to track when the soak period ends
+			status.RecheckTime = minSuccessTimeTime
 			rolloutClusters = append(rolloutClusters, *status)
 		}
 
@@ -479,8 +483,8 @@ func determineRolloutStatus(
 	case TimeOut, Skip:
 		return rolloutClusters, timeoutClusters
 	default: // For progressing, failed, or unknown status.
-		timeOutTime := getTimeOutTime(status.LastTransitionTime, timeout)
-		status.TimeOutTime = timeOutTime
+		timeOutTime := calculateRecheckTime(status.LastTransitionTime, timeout)
+		status.RecheckTime = timeOutTime
 		// check if current time is before the timeout time
 		if timeOutTime == nil || RolloutClock.Now().Before(timeOutTime.Time) {
 			rolloutClusters = append(rolloutClusters, *status)
@@ -493,20 +497,21 @@ func determineRolloutStatus(
 	return rolloutClusters, timeoutClusters
 }
 
-// getTimeOutTime calculates the timeout time given a start time and duration, instantiating the
-// RolloutClock if a start time isn't provided.
-func getTimeOutTime(startTime *metav1.Time, timeout time.Duration) *metav1.Time {
-	var timeoutTime time.Time
-	// if timeout is not set (default to maxTimeDuration), the timeout time should not be set
-	if timeout == maxTimeDuration {
+// calculateRecheckTime calculates the recheck time by adding a duration to a start time.
+// If startTime is nil, it uses the current time from RolloutClock.
+// If duration is maxTimeDuration (indicating no timeout/soak period), it returns nil.
+func calculateRecheckTime(startTime *metav1.Time, duration time.Duration) *metav1.Time {
+	var recheckTime time.Time
+	// if duration is not set (default to maxTimeDuration), the recheck time should not be set
+	if duration == maxTimeDuration {
 		return nil
 	}
 	if startTime == nil {
-		timeoutTime = RolloutClock.Now().Add(timeout)
+		recheckTime = RolloutClock.Now().Add(duration)
 	} else {
-		timeoutTime = startTime.Add(timeout)
+		recheckTime = startTime.Add(duration)
 	}
-	return &metav1.Time{Time: timeoutTime}
+	return &metav1.Time{Time: recheckTime}
 }
 
 // calculateRolloutSize calculates the maximum portion from a total number of clusters by parsing a
@@ -598,19 +603,21 @@ func decisionGroupsToGroupKeys(decisionsGroup []clusterv1alpha1.MandatoryDecisio
 	return result
 }
 
-func minRecheckAfter(rolloutClusters []ClusterRolloutStatus, minSuccessTime time.Duration) *time.Duration {
-	var minRecheckAfter *time.Duration
+func minRecheckAfter(rolloutClusters []ClusterRolloutStatus) *time.Duration {
+	var minDuration *time.Duration
+
 	for _, r := range rolloutClusters {
-		if r.TimeOutTime != nil {
-			timeOut := r.TimeOutTime.Sub(RolloutClock.Now())
-			if minRecheckAfter == nil || *minRecheckAfter > timeOut {
-				minRecheckAfter = &timeOut
+		// Check RecheckTime for both Progressing/Failed clusters (timeout) and Succeeded clusters (soak period)
+		if r.RecheckTime != nil {
+			recheckDuration := r.RecheckTime.Sub(RolloutClock.Now())
+			// Only consider positive durations (future recheck times)
+			if recheckDuration > 0 {
+				if minDuration == nil || *minDuration > recheckDuration {
+					minDuration = &recheckDuration
+				}
 			}
 		}
 	}
-	if minSuccessTime != 0 && (minRecheckAfter == nil || minSuccessTime < *minRecheckAfter) {
-		minRecheckAfter = &minSuccessTime
-	}
 
-	return minRecheckAfter
+	return minDuration
 }
