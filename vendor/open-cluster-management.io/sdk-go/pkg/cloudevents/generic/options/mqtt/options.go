@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"k8s.io/klog/v2"
 	"net"
 	"os"
 	"regexp"
@@ -15,7 +16,6 @@ import (
 	"github.com/eclipse/paho.golang/paho"
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/errors"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/cert"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
@@ -219,7 +219,9 @@ func (o *MQTTOptions) GetCloudEventsProtocol(
 	clientID string,
 	errorHandler func(error),
 	clientOpts ...cloudeventsmqtt.Option,
-) (options.CloudEventsProtocol, error) {
+) (*cloudeventsmqtt.Protocol, error) {
+	logger := klog.FromContext(ctx)
+
 	netConn, err := o.Dialer.Dial()
 	if err != nil {
 		return nil, err
@@ -233,8 +235,8 @@ func (o *MQTTOptions) GetCloudEventsProtocol(
 
 	opts := []cloudeventsmqtt.Option{
 		cloudeventsmqtt.WithConnect(o.GetMQTTConnectOption(clientID)),
-		cloudeventsmqtt.WithDebugLogger(&PahoDebugLogger{}),
-		cloudeventsmqtt.WithErrorLogger(&PahoErrorLogger{}),
+		cloudeventsmqtt.WithDebugLogger(&PahoDebugLogger{logger: logger}),
+		cloudeventsmqtt.WithErrorLogger(&PahoErrorLogger{logger: logger}),
 	}
 	opts = append(opts, clientOpts...)
 	return cloudeventsmqtt.New(ctx, config, opts...)

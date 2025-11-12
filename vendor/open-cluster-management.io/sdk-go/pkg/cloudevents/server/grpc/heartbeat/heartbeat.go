@@ -2,8 +2,8 @@ package heartbeat
 
 import (
 	"context"
-	cecontext "github.com/cloudevents/sdk-go/v2/context"
 	"github.com/google/uuid"
+	"k8s.io/klog/v2"
 	pbv1 "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protobuf/v1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"time"
@@ -23,7 +23,7 @@ func NewHeartbeater(interval time.Duration, cacheSize int) *Heartbeater {
 }
 
 func (h *Heartbeater) Start(ctx context.Context) {
-	logger := cecontext.LoggerFrom(ctx)
+	logger := klog.FromContext(ctx)
 
 	ticker := time.NewTicker(h.interval)
 	defer ticker.Stop()
@@ -40,7 +40,7 @@ func (h *Heartbeater) Start(ctx context.Context) {
 			select {
 			case h.output <- heartbeat:
 			default:
-				logger.Warn("send channel is full, dropping heartbeat")
+				logger.Info("send channel is full, dropping heartbeat")
 			}
 		case <-ctx.Done():
 			return

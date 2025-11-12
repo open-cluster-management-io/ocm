@@ -73,6 +73,6 @@ func (e *EventService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.
 	}
 }
 
-func (e *EventService) RegisterHandler(handler server.EventHandler) {
+func (e *EventService) RegisterHandler(ctx context.Context, handler server.EventHandler) {
 	// do nothing
 }

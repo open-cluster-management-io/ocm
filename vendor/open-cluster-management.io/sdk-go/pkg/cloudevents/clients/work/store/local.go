@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -88,10 +89,10 @@ func NewSourceLocalWatcherStore(ctx context.Context, listFunc ListLocalWorksFunc
 	}
 
 	// start a goroutine to process the received work events from the work queue with current store.
-	go newWorkProcessor(s.receivedWorks, s).run(ctx.Done())
+	go newWorkProcessor(s.receivedWorks, s).run(ctx)
 
 	// start a goroutine to handle the events that are produced by work client
-	go wait.Until(s.processLoop, time.Second, ctx.Done())
+	go wait.UntilWithContext(ctx, s.processLoop, time.Second)
 
 	return s, nil
 }
@@ -161,7 +162,8 @@ func (s *SourceLocalWatcherStore) GetWatcher(namespace string, opts metav1.ListO
 }
 
 // processLoop drains the work event queue and send the event to the watch channel.
-func (s *SourceLocalWatcherStore) processLoop() {
+func (s *SourceLocalWatcherStore) processLoop(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	for {
 		// this will be blocked until the event queue has events
 		obj, err := s.eventQueue.Pop(func(interface{}, bool) error {
@@ -173,23 +175,23 @@ func (s *SourceLocalWatcherStore) processLoop() {
 				return
 			}
 
-			klog.Warningf("failed to pop the %v requeue it, %v", obj, err)
+			logger.Error(err, "failed to pop the object, requeue it", "object", obj)
 			// this is the safe way to re-enqueue.
 			if err := s.eventQueue.Add(obj); err != nil {
-				klog.Errorf("failed to requeue the obj %v, %v", obj, err)
+				logger.Error(err, "failed to requeue the obj", "object", obj)
 				return
 			}
 		}
 
 		evt, ok := obj.(*watchEvent)
 		if !ok {
-			klog.Errorf("unknown the object type %T from the event queue", obj)
+			logger.Error(errors.New("unknown the object type from the event queue"), "", "object", obj)
 			return
 		}
 
 		obj, exists, err := s.Store.GetByKey(evt.Key)
 		if err != nil {
-			klog.Errorf("failed to get the work %s, %v", evt.Key, err)
+			logger.Error(err, "failed to get the work", "key", evt.Key)
 			return
 		}
 
@@ -197,7 +199,7 @@ func (s *SourceLocalWatcherStore) processLoop() {
 			if evt.Type == watch.Deleted {
 				namespace, name, err := cache.SplitMetaNamespaceKey(evt.Key)
 				if err != nil {
-					klog.Errorf("unexpected event key %s, %v", evt.Key, err)
+					logger.Error(err, "unexpected event key", "key", evt.Key)
 					return
 				}
 
@@ -215,13 +217,13 @@ func (s *SourceLocalWatcherStore) processLoop() {
 				return
 			}
 
-			klog.Errorf("the work %s does not exist in the cache", evt.Key)
+			logger.Error(errors.New("the work does not exist in the cache"), "", "key", evt.Key)
 			return
 		}
 
 		work, ok := obj.(*workv1.ManifestWork)
 		if !ok {
-			klog.Errorf("unknown the object type %T from the cache", obj)
+			logger.Error(fmt.Errorf("unknown object type %T from the cache", obj), "")
 			return
 		}
 
