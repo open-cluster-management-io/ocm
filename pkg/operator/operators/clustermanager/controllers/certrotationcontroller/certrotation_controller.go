@@ -239,21 +239,34 @@ func (c certRotationController) syncOne(ctx context.Context, clustermanager *ope
 		}
 	}
 
+	var errs []error
 	// Ensure certificates are exists
 	rotations := c.rotationMap[clustermanagerName]
 
-	if helpers.GRPCAuthEnabled(clustermanager) && !hasRotation(rotations.targetRotations, helpers.GRPCServerSecret) {
+	if helpers.GRPCAuthEnabled(clustermanager) {
 		// maintain the grpc serving certs
 		// TODO may support user provided certs
-		rotations.targetRotations = append(rotations.targetRotations, certrotation.TargetRotation{
-			Namespace: clustermanagerNamespace,
-			Name:      helpers.GRPCServerSecret,
-			Validity:  TargetCertValidity,
-			HostNames: helpers.GRPCServerHostNames(clustermanagerNamespace, clustermanager),
-			Lister:    c.secretInformers[helpers.GRPCServerSecret].Lister(),
-			Client:    c.kubeClient.CoreV1(),
-		})
-		c.rotationMap[clustermanagerName] = rotations
+		hostNames, grpcErr := helpers.GRPCServerHostNames(c.kubeClient, clustermanagerNamespace, clustermanager)
+		if grpcErr != nil {
+			errs = append(errs, grpcErr)
+		} else if hasRotation(rotations.targetRotations, helpers.GRPCServerSecret) {
+			for i := range rotations.targetRotations {
+				if rotations.targetRotations[i].Name == helpers.GRPCServerSecret {
+					rotations.targetRotations[i].HostNames = hostNames
+					break
+				}
+			}
+		} else {
+			rotations.targetRotations = append(rotations.targetRotations, certrotation.TargetRotation{
+				Namespace: clustermanagerNamespace,
+				Name:      helpers.GRPCServerSecret,
+				Validity:  TargetCertValidity,
+				HostNames: hostNames,
+				Lister:    c.secretInformers[helpers.GRPCServerSecret].Lister(),
+				Client:    c.kubeClient.CoreV1(),
+			})
+			c.rotationMap[clustermanagerName] = rotations
+		}
 	}
 
 	// reconcile cert/key pair for signer
@@ -269,7 +282,6 @@ func (c certRotationController) syncOne(ctx context.Context, clustermanager *ope
 	}
 
 	// reconcile target cert/key pairs
-	var errs []error
 	for _, targetRotation := range rotations.targetRotations {
 		if err := targetRotation.EnsureTargetCertKeyPair(signingCertKeyPair, cabundleCerts); err != nil {
 			errs = append(errs, err)

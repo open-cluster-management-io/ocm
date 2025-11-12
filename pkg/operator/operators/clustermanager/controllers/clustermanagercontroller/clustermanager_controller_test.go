@@ -822,6 +822,141 @@ func newSecret(name, namespace string) *corev1.Secret {
 	}
 }
 
+// TestGRPCServiceLoadBalancerType tests that the GRPC service is of LoadBalancer type when configured
+func TestGRPCServiceLoadBalancerType(t *testing.T) {
+	tests := []struct {
+		name                string
+		clusterManager      *operatorapiv1.ClusterManager
+		expectedServiceType corev1.ServiceType
+		expectedPort        int32
+		description         string
+	}{
+		{
+			name: "GRPC service with LoadBalancer type",
+			clusterManager: func() *operatorapiv1.ClusterManager {
+				cm := newClusterManager("testhub")
+				cm.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+					RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+						{
+							AuthType: operatorapiv1.GRPCAuthType,
+						},
+					},
+				}
+				cm.Spec.ServerConfiguration = &operatorapiv1.ServerConfiguration{
+					EndpointsExposure: []operatorapiv1.EndpointExposure{
+						{
+							Protocol: "grpc",
+							GRPC: &operatorapiv1.Endpoint{
+								Type: operatorapiv1.EndpointTypeLoadBalancer,
+							},
+						},
+					},
+				}
+				return cm
+			}(),
+			expectedServiceType: corev1.ServiceTypeLoadBalancer,
+			expectedPort:        443,
+			description:         "GRPC service should be LoadBalancer type when endpoint type is loadBalancer",
+		},
+		{
+			name: "GRPC service with ClusterIP type (hostname endpoint)",
+			clusterManager: func() *operatorapiv1.ClusterManager {
+				cm := newClusterManager("testhub")
+				cm.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+					RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+						{
+							AuthType: operatorapiv1.GRPCAuthType,
+						},
+					},
+				}
+				cm.Spec.ServerConfiguration = &operatorapiv1.ServerConfiguration{
+					EndpointsExposure: []operatorapiv1.EndpointExposure{
+						{
+							Protocol: "grpc",
+							GRPC: &operatorapiv1.Endpoint{
+								Type: operatorapiv1.EndpointTypeHostname,
+								Hostname: &operatorapiv1.HostnameConfig{
+									Host: "grpc.example.com",
+								},
+							},
+						},
+					},
+				}
+				return cm
+			}(),
+			expectedServiceType: corev1.ServiceTypeClusterIP,
+			expectedPort:        8090,
+			description:         "GRPC service should be ClusterIP type when endpoint type is hostname",
+		},
+		{
+			name: "GRPC service with default ClusterIP type (no server configuration)",
+			clusterManager: func() *operatorapiv1.ClusterManager {
+				cm := newClusterManager("testhub")
+				cm.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+					RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+						{
+							AuthType: operatorapiv1.GRPCAuthType,
+						},
+					},
+				}
+				return cm
+			}(),
+			expectedServiceType: corev1.ServiceTypeClusterIP,
+			expectedPort:        8090,
+			description:         "GRPC service should be ClusterIP type when no server configuration is specified",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tc := newTestController(t, test.clusterManager)
+			clusterManagerNamespace := helpers.ClusterManagerNamespace(test.clusterManager.Name, test.clusterManager.Spec.DeployOption.Mode)
+			cd := setDeployment(test.clusterManager.Name, clusterManagerNamespace)
+			setup(t, tc, cd)
+
+			syncContext := testingcommon.NewFakeSyncContext(t, test.clusterManager.Name)
+
+			// Call sync to create resources
+			err := tc.clusterManagerController.sync(ctx, syncContext)
+			if err != nil {
+				t.Fatalf("Expected no error when sync, %v", err)
+			}
+
+			// Find the GRPC service in the created objects
+			grpcServiceName := test.clusterManager.Name + "-grpc-server"
+			var grpcServiceFound bool
+			var actualServiceType corev1.ServiceType
+			var actualServicePort int32
+
+			kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...)
+			for _, action := range kubeActions {
+				if action.GetVerb() == createVerb {
+					object := action.(clienttesting.CreateActionImpl).Object
+					if service, ok := object.(*corev1.Service); ok {
+						if service.Name == grpcServiceName && service.Namespace == clusterManagerNamespace {
+							grpcServiceFound = true
+							actualServiceType = service.Spec.Type
+							actualServicePort = service.Spec.Ports[0].Port
+							break
+						}
+					}
+				}
+			}
+
+			if !grpcServiceFound {
+				t.Fatalf("Test %q failed: GRPC service %s not found in namespace %s", test.name, grpcServiceName, clusterManagerNamespace)
+			}
+
+			if actualServiceType != test.expectedServiceType {
+				t.Errorf("Test %q failed: %s. Expected service type %q, but got %q", test.name, test.description, test.expectedServiceType, actualServiceType)
+			}
+			if actualServicePort != test.expectedPort {
+				t.Errorf("Test %q failed: Expected service port %d, but got %d", test.name, test.expectedPort, actualServicePort)
+			}
+		})
+	}
+}
+
 // TestWorkControllerEnabledByFeatureGates tests that work controller is enabled when specific feature gates are enabled
 func TestWorkControllerEnabledByFeatureGates(t *testing.T) {
 	tests := []struct {
