@@ -3,7 +3,7 @@ package heartbeat
 import (
 	"context"
 	"fmt"
-	cecontext "github.com/cloudevents/sdk-go/v2/context"
+	"k8s.io/klog/v2"
 	pbv1 "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protobuf/v1"
 	"time"
 )
@@ -45,7 +45,7 @@ func (hc *HealthChecker) Start(ctx context.Context) {
 }
 
 func (hc *HealthChecker) check(ctx context.Context) {
-	logger := cecontext.LoggerFrom(ctx)
+	logger := klog.FromContext(ctx)
 	// if no heartbeat was received duration the serverHealthinessTimeout, send the
 	// timeout error to reconnectErrorChan
 	timer := time.NewTimer(hc.healthinessTimout)
@@ -54,7 +54,7 @@ func (hc *HealthChecker) check(ctx context.Context) {
 	for {
 		select {
 		case heartbeat := <-hc.heartbeatChan:
-			logger.Debugf("heartbeat received %v", heartbeat)
+			logger.V(4).Info("heartbeat received", "heartbeat", heartbeat)
 
 			// reset timer safely
 			if !timer.Stop() {
@@ -77,11 +77,11 @@ func (hc *HealthChecker) check(ctx context.Context) {
 }
 
 func (hc *HealthChecker) bypass(ctx context.Context) {
-	logger := cecontext.LoggerFrom(ctx)
+	logger := klog.FromContext(ctx)
 	for {
 		select {
 		case msg := <-hc.heartbeatChan:
-			logger.Debugf("heartbeat received %v", msg)
+			logger.V(4).Info("heartbeat received", "heartbeat", msg)
 		case <-ctx.Done():
 			return
 		}

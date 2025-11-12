@@ -3,8 +3,6 @@ package codec
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
-
 	"github.com/bwmarrin/snowflake"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	cloudeventstypes "github.com/cloudevents/sdk-go/v2/types"
@@ -50,11 +48,6 @@ func (c *ManifestBundleCodec) Encode(source string, eventType types.CloudEventsT
 		return nil, fmt.Errorf("unsupported cloudevents data type %s", eventType.CloudEventsDataType)
 	}
 
-	resourceVersion, err := strconv.ParseInt(work.ResourceVersion, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse the resourceversion of the work %s, %v", work.UID, err)
-	}
-
 	originalSource, ok := work.Labels[common.CloudEventsOriginalSourceLabelKey]
 	if !ok {
 		return nil, fmt.Errorf("failed to find originalsource from the work %s", work.UID)
@@ -63,7 +56,7 @@ func (c *ManifestBundleCodec) Encode(source string, eventType types.CloudEventsT
 	evt := types.NewEventBuilder(source, eventType).
 		WithResourceID(string(work.UID)).
 		WithStatusUpdateSequenceID(sequenceGenerator.Generate().String()).
-		WithResourceVersion(resourceVersion).
+		WithResourceVersion(work.Generation).
 		WithClusterName(work.Namespace).
 		WithOriginalSource(originalSource).
 		NewEvent()
@@ -139,8 +132,10 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 		metaObj.Name = resourceID
 	}
 	metaObj.Namespace = clusterName
-	metaObj.ResourceVersion = fmt.Sprintf("%d", resourceVersion)
-	// if generation is not set, set it the same as resourceVersion
+	// This is explicitly set to empty since it will be managed by local client.
+	metaObj.ResourceVersion = ""
+	// The resourceVersion in cloudevent actually sematically equals to generation, since it increments when
+	// spec changes
 	if metaObj.Generation == 0 {
 		metaObj.Generation = int64(resourceVersion)
 	}

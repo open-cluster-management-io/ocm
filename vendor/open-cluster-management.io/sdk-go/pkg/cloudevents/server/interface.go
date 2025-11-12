@@ -15,7 +15,7 @@ type AgentEventServer interface {
 	EventHandler
 
 	// RegisterService registers a backend service with a certain data type.
-	RegisterService(t types.CloudEventsDataType, service Service)
+	RegisterService(ctx context.Context, t types.CloudEventsDataType, service Service)
 
 	// Subscribers returns all current subscribers who subscribe to this server.
 	Subscribers() sets.Set[string]

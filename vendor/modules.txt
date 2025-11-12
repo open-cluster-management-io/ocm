@@ -22,10 +22,6 @@ github.com/Masterminds/semver/v3
 # github.com/Masterminds/sprig/v3 v3.3.0
 ## explicit; go 1.21
 github.com/Masterminds/sprig/v3
-# github.com/Microsoft/go-winio v0.6.2
-## explicit; go 1.21
-# github.com/Microsoft/hcsshim v0.12.9
-## explicit; go 1.22
 # github.com/NYTimes/gziphandler v1.1.1
 ## explicit; go 1.11
 github.com/NYTimes/gziphandler
@@ -155,9 +151,6 @@ github.com/cenkalti/backoff/v4
 # github.com/cespare/xxhash/v2 v2.3.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
-# github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20240413090539-7fef29478991
-## explicit; go 1.18
-github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2
 # github.com/cloudevents/sdk-go/protocol/mqtt_paho/v2 v2.0.0-20250922144431-372892d7c84d
 ## explicit; go 1.23.0
 github.com/cloudevents/sdk-go/protocol/mqtt_paho/v2
@@ -177,12 +170,6 @@ github.com/cloudevents/sdk-go/v2/event/datacodec/xml
 github.com/cloudevents/sdk-go/v2/protocol
 github.com/cloudevents/sdk-go/v2/protocol/http
 github.com/cloudevents/sdk-go/v2/types
-# github.com/confluentinc/confluent-kafka-go/v2 v2.3.0
-## explicit; go 1.17
-github.com/confluentinc/confluent-kafka-go/v2/kafka
-github.com/confluentinc/confluent-kafka-go/v2/kafka/librdkafka_vendor
-# github.com/containerd/errdefs/pkg v0.3.0
-## explicit; go 1.22
 # github.com/coreos/go-semver v0.3.1
 ## explicit; go 1.8
 github.com/coreos/go-semver/semver
@@ -196,8 +183,6 @@ github.com/cyphar/filepath-securejoin
 # github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/docker/docker v28.4.0+incompatible
-## explicit
 # github.com/eclipse/paho.golang v0.23.0
 ## explicit; go 1.24.0
 github.com/eclipse/paho.golang/packets
@@ -375,10 +360,6 @@ github.com/mitchellh/copystructure
 # github.com/mitchellh/reflectwalk v1.0.2
 ## explicit
 github.com/mitchellh/reflectwalk
-# github.com/moby/docker-image-spec v1.3.1
-## explicit; go 1.18
-# github.com/moby/go-archive v0.1.0
-## explicit; go 1.23.0
 # github.com/mochi-mqtt/server/v2 v2.7.9
 ## explicit; go 1.21
 github.com/mochi-mqtt/server/v2
@@ -1821,7 +1802,7 @@ open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v1.1.0
+# open-cluster-management.io/sdk-go v1.1.1-0.20251117075350-a9794783fa67
 ## explicit; go 1.24.0
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
@@ -1855,15 +1836,19 @@ open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/source/codec
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/store
 open-cluster-management.io/sdk-go/pkg/cloudevents/constants
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic
+open-cluster-management.io/sdk-go/pkg/cloudevents/generic/clients
+open-cluster-management.io/sdk-go/pkg/cloudevents/generic/metrics
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options
+open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/builder
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/cert
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protobuf/v1
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protocol
-open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/kafka
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt
+open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/v2/grpc
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types
+open-cluster-management.io/sdk-go/pkg/cloudevents/generic/utils
 open-cluster-management.io/sdk-go/pkg/cloudevents/server
 open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc
 open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/authz/kube

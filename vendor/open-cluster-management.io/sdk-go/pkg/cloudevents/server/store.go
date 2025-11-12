@@ -21,5 +21,5 @@ type Service interface {
 	HandleStatusUpdate(ctx context.Context, evt *cloudevents.Event) error
 
 	// RegisterHandler register the handler to the service.
-	RegisterHandler(handler EventHandler)
+	RegisterHandler(ctx context.Context, handler EventHandler)
 }

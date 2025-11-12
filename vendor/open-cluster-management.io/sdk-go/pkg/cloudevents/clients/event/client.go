@@ -19,11 +19,11 @@ import (
 )
 
 type EventClient struct {
-	cloudEventsClient *generic.CloudEventAgentClient[*eventv1.Event]
+	cloudEventsClient generic.CloudEventsClient[*eventv1.Event]
 	namespace         string
 }
 
-func NewEventClient(cloudEventsClient *generic.CloudEventAgentClient[*eventv1.Event]) *EventClient {
+func NewEventClient(cloudEventsClient generic.CloudEventsClient[*eventv1.Event]) *EventClient {
 	return &EventClient{
 		cloudEventsClient: cloudEventsClient,
 	}
