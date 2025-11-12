@@ -3,6 +3,7 @@ package certrotationcontroller
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -57,7 +58,7 @@ type certRotationController struct {
 type rotations struct {
 	signingRotation  certrotation.SigningRotation
 	caBundleRotation certrotation.CABundleRotation
-	targetRotations  []certrotation.TargetRotation
+	targetRotations  map[string]certrotation.TargetRotation
 }
 
 func NewCertRotationController(
@@ -186,9 +187,8 @@ func (c certRotationController) syncOne(ctx context.Context, clustermanager *ope
 
 	// delete the grpc serving secret if the grpc auth is disabled
 	if !helpers.GRPCAuthEnabled(clustermanager) {
-		if rotations, ok := c.rotationMap[clustermanager.Name]; ok {
-			rotations.targetRotations = removeRotation(rotations.targetRotations, helpers.GRPCServerSecret)
-			c.rotationMap[clustermanager.Name] = rotations
+		if _, ok := c.rotationMap[clustermanager.Name]; ok {
+			delete(c.rotationMap[clustermanager.Name].targetRotations, helpers.GRPCServerSecret)
 		}
 
 		err = c.kubeClient.CoreV1().Secrets(clustermanagerNamespace).Delete(ctx, helpers.GRPCServerSecret, metav1.DeleteOptions{})
@@ -213,8 +213,8 @@ func (c certRotationController) syncOne(ctx context.Context, clustermanager *ope
 			Lister:    c.configMapInformer.Lister(),
 			Client:    c.kubeClient.CoreV1(),
 		}
-		targetRotations := []certrotation.TargetRotation{
-			{
+		targetRotations := map[string]certrotation.TargetRotation{
+			helpers.RegistrationWebhookSecret: {
 				Namespace: clustermanagerNamespace,
 				Name:      helpers.RegistrationWebhookSecret,
 				Validity:  TargetCertValidity,
@@ -222,7 +222,7 @@ func (c certRotationController) syncOne(ctx context.Context, clustermanager *ope
 				Lister:    c.secretInformers[helpers.RegistrationWebhookSecret].Lister(),
 				Client:    c.kubeClient.CoreV1(),
 			},
-			{
+			helpers.WorkWebhookSecret: {
 				Namespace: clustermanagerNamespace,
 				Name:      helpers.WorkWebhookSecret,
 				Validity:  TargetCertValidity,
@@ -239,61 +239,53 @@ func (c certRotationController) syncOne(ctx context.Context, clustermanager *ope
 		}
 	}
 
+	var errs []error
 	// Ensure certificates are exists
-	rotations := c.rotationMap[clustermanagerName]
+	cmRotations := c.rotationMap[clustermanagerName]
 
-	if helpers.GRPCAuthEnabled(clustermanager) && !hasRotation(rotations.targetRotations, helpers.GRPCServerSecret) {
+	if helpers.GRPCAuthEnabled(clustermanager) {
 		// maintain the grpc serving certs
 		// TODO may support user provided certs
-		rotations.targetRotations = append(rotations.targetRotations, certrotation.TargetRotation{
-			Namespace: clustermanagerNamespace,
-			Name:      helpers.GRPCServerSecret,
-			Validity:  TargetCertValidity,
-			HostNames: helpers.GRPCServerHostNames(clustermanagerNamespace, clustermanager),
-			Lister:    c.secretInformers[helpers.GRPCServerSecret].Lister(),
-			Client:    c.kubeClient.CoreV1(),
-		})
-		c.rotationMap[clustermanagerName] = rotations
+		hostNames, grpcErr := helpers.GRPCServerHostNames(c.kubeClient, clustermanagerNamespace, clustermanager)
+		if grpcErr != nil {
+			errs = append(errs, grpcErr)
+		} else if targetRotation, ok := cmRotations.targetRotations[helpers.GRPCServerSecret]; ok {
+			if !slices.Equal(targetRotation.HostNames, hostNames) {
+				targetRotation.HostNames = hostNames
+				cmRotations.targetRotations[helpers.GRPCServerSecret] = targetRotation
+				klog.Warningf("the hosts of grpc server are changed, will update the grpc serving cert")
+			}
+
+		} else {
+			c.rotationMap[clustermanagerName].targetRotations[helpers.GRPCServerSecret] = certrotation.TargetRotation{
+				Namespace: clustermanagerNamespace,
+				Name:      helpers.GRPCServerSecret,
+				Validity:  TargetCertValidity,
+				HostNames: hostNames,
+				Lister:    c.secretInformers[helpers.GRPCServerSecret].Lister(),
+				Client:    c.kubeClient.CoreV1(),
+			}
+		}
 	}
 
 	// reconcile cert/key pair for signer
-	signingCertKeyPair, err := rotations.signingRotation.EnsureSigningCertKeyPair()
+	signingCertKeyPair, err := cmRotations.signingRotation.EnsureSigningCertKeyPair()
 	if err != nil {
 		return err
 	}
 
 	// reconcile ca bundle
-	cabundleCerts, err := rotations.caBundleRotation.EnsureConfigMapCABundle(signingCertKeyPair)
+	cabundleCerts, err := cmRotations.caBundleRotation.EnsureConfigMapCABundle(signingCertKeyPair)
 	if err != nil {
 		return err
 	}
 
 	// reconcile target cert/key pairs
-	var errs []error
-	for _, targetRotation := range rotations.targetRotations {
+	for _, targetRotation := range cmRotations.targetRotations {
 		if err := targetRotation.EnsureTargetCertKeyPair(signingCertKeyPair, cabundleCerts); err != nil {
 			errs = append(errs, err)
 		}
 	}
 
 	return errorhelpers.NewMultiLineAggregate(errs)
-}
-
-func hasRotation(targetRotations []certrotation.TargetRotation, name string) bool {
-	for _, rotation := range targetRotations {
-		if rotation.Name == name {
-			return true
-		}
-	}
-	return false
-}
-
-func removeRotation(targetRotations []certrotation.TargetRotation, name string) []certrotation.TargetRotation {
-	rs := []certrotation.TargetRotation{}
-	for _, rotation := range targetRotations {
-		if rotation.Name != name {
-			rs = append(rs, rotation)
-		}
-	}
-	return rs
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 
@@ -932,16 +933,82 @@ func GRPCAuthEnabled(cm *operatorapiv1.ClusterManager) bool {
 	return false
 }
 
-func GRPCServerHostNames(clustermanagerNamespace string, cm *operatorapiv1.ClusterManager) []string {
-	hostNames := []string{fmt.Sprintf("%s-grpc-server.%s.svc", cm.Name, clustermanagerNamespace)}
+func GRPCServerHostNames(kubeClient kubernetes.Interface, clusterManagerNamespace string, cm *operatorapiv1.ClusterManager) ([]string, error) {
+	hostNames := []string{fmt.Sprintf("%s-grpc-server.%s.svc", cm.Name, clusterManagerNamespace)}
 	if cm.Spec.ServerConfiguration != nil {
 		for _, endpoint := range cm.Spec.ServerConfiguration.EndpointsExposure {
-			if endpoint.Protocol == "grpc" && endpoint.GRPC != nil && endpoint.GRPC.Type == operatorapiv1.EndpointTypeHostname {
-				if endpoint.GRPC.Hostname != nil && strings.TrimSpace(endpoint.GRPC.Hostname.Host) != "" {
+			if endpoint.Protocol != operatorapiv1.GRPCAuthType {
+				continue
+			}
+			if endpoint.GRPC == nil {
+				continue
+			}
+			switch endpoint.GRPC.Type {
+			case operatorapiv1.EndpointTypeHostname:
+				if endpoint.GRPC.Hostname != nil &&
+					strings.TrimSpace(endpoint.GRPC.Hostname.Host) != "" &&
+					!slices.Contains(hostNames, endpoint.GRPC.Hostname.Host) {
 					hostNames = append(hostNames, endpoint.GRPC.Hostname.Host)
 				}
+
+			case operatorapiv1.EndpointTypeLoadBalancer:
+				if endpoint.GRPC.LoadBalancer != nil &&
+					strings.TrimSpace(endpoint.GRPC.LoadBalancer.Host) != "" &&
+					!slices.Contains(hostNames, endpoint.GRPC.LoadBalancer.Host) {
+					hostNames = append(hostNames, endpoint.GRPC.LoadBalancer.Host)
+				}
+
+				serviceName := fmt.Sprintf("%s-grpc-server", cm.Name)
+				gRPCService, err := kubeClient.CoreV1().Services(clusterManagerNamespace).
+					Get(context.TODO(), serviceName, metav1.GetOptions{})
+				if err != nil {
+					return hostNames, fmt.Errorf("failed to find service %s in namespace %s",
+						serviceName, clusterManagerNamespace)
+				}
+
+				if len(gRPCService.Status.LoadBalancer.Ingress) == 0 {
+					return hostNames, fmt.Errorf("failed to find ingress in the status of the service %s in namespace %s",
+						serviceName, clusterManagerNamespace)
+				}
+
+				if len(gRPCService.Status.LoadBalancer.Ingress[0].IP) == 0 &&
+					len(gRPCService.Status.LoadBalancer.Ingress[0].Hostname) == 0 {
+					return hostNames, fmt.Errorf("failed to find ip or hostname in the ingress "+
+						"in the status of the service %s in namespace %s", serviceName, clusterManagerNamespace)
+				}
+
+				if len(gRPCService.Status.LoadBalancer.Ingress[0].IP) != 0 &&
+					!slices.Contains(hostNames, gRPCService.Status.LoadBalancer.Ingress[0].IP) {
+					hostNames = append(hostNames, gRPCService.Status.LoadBalancer.Ingress[0].IP)
+				}
+
+				if len(gRPCService.Status.LoadBalancer.Ingress[0].Hostname) != 0 &&
+					!slices.Contains(hostNames, gRPCService.Status.LoadBalancer.Ingress[0].Hostname) {
+					hostNames = append(hostNames, gRPCService.Status.LoadBalancer.Ingress[0].Hostname)
+				}
+
+			case operatorapiv1.EndpointTypeRoute:
+				// TODO: append route.host to the hostName
 			}
 		}
 	}
-	return hostNames
+
+	return hostNames, nil
+}
+
+func GRPCServerEndpointType(cm *operatorapiv1.ClusterManager) string {
+	if cm.Spec.ServerConfiguration != nil {
+		// there is only one gRPC endpoint in EndpointsExposure
+		for _, endpoint := range cm.Spec.ServerConfiguration.EndpointsExposure {
+			if endpoint.Protocol != operatorapiv1.GRPCAuthType {
+				continue
+			}
+			if endpoint.GRPC == nil {
+				return string(operatorapiv1.EndpointTypeHostname)
+			}
+			return string(endpoint.GRPC.Type)
+		}
+	}
+
+	return string(operatorapiv1.EndpointTypeHostname)
 }
