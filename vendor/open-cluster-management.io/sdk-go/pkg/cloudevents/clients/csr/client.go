@@ -23,14 +23,14 @@ import (
 // CSRClient implements the CSRInterface. It sends the csr to source by
 // CloudEventAgentClient.
 type CSRClient struct {
-	cloudEventsClient *generic.CloudEventAgentClient[*certificatev1.CertificateSigningRequest]
+	cloudEventsClient generic.CloudEventsClient[*certificatev1.CertificateSigningRequest]
 	watcherStore      store.ClientWatcherStore[*certificatev1.CertificateSigningRequest]
 }
 
 var _ cache.ListerWatcher = &CSRClient{}
 
 func NewCSRClient(
-	cloudEventsClient *generic.CloudEventAgentClient[*certificatev1.CertificateSigningRequest],
+	cloudEventsClient generic.CloudEventsClient[*certificatev1.CertificateSigningRequest],
 	watcherStore store.ClientWatcherStore[*certificatev1.CertificateSigningRequest],
 	clusterName string,
 ) *CSRClient {
@@ -65,6 +65,12 @@ func (c *CSRClient) Create(ctx context.Context, csr *certificatev1.CertificateSi
 
 	if err := c.cloudEventsClient.Publish(ctx, eventType, csr); err != nil {
 		return nil, cloudeventserrors.ToStatusError(common.CSRGR, csr.Name, err)
+	}
+
+	// we need to add to the store here since grpc driver may call this when it cannot
+	// get from lister.
+	if err := c.watcherStore.Add(csr); err != nil {
+		return nil, errors.NewInternalError(err)
 	}
 
 	return csr.DeepCopy(), nil

@@ -25,7 +25,7 @@ import (
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	ocmfeature "open-cluster-management.io/api/feature"
 
-	"open-cluster-management.io/ocm/pkg/common/helpers"
+	"open-cluster-management.io/ocm/pkg/common/recorder"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/features"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
@@ -199,7 +199,7 @@ func TestSync(t *testing.T) {
 
 			fakeHubClient := kubefake.NewClientset()
 			ctx := context.TODO()
-			hubEventRecorder, err := helpers.NewEventRecorder(ctx,
+			hubEventRecorder, err := recorder.NewEventRecorder(ctx,
 				clusterscheme.Scheme, fakeHubClient.EventsV1(), "test")
 			if err != nil {
 				t.Fatal(err)
@@ -578,7 +578,7 @@ func TestExposeClaims(t *testing.T) {
 
 			fakeHubClient := kubefake.NewClientset()
 			ctx := context.TODO()
-			hubEventRecorder, err := helpers.NewEventRecorder(ctx,
+			hubEventRecorder, err := recorder.NewEventRecorder(ctx,
 				clusterscheme.Scheme, fakeHubClient.EventsV1(), "test")
 			if err != nil {
 				t.Fatal(err)

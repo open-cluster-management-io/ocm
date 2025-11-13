@@ -20,7 +20,7 @@ import (
 )
 
 type LeaseClient struct {
-	cloudEventsClient *generic.CloudEventAgentClient[*coordinationv1.Lease]
+	cloudEventsClient generic.CloudEventsClient[*coordinationv1.Lease]
 	watcherStore      store.ClientWatcherStore[*coordinationv1.Lease]
 	namespace         string
 }

@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -30,6 +29,7 @@ import (
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	clustersdkv1beta1 "open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 const (
@@ -298,14 +298,14 @@ func GuessObjectGroupVersionKind(object runtime.Object) (*schema.GroupVersionKin
 }
 
 // AppliedManifestworkQueueKeyFunc return manifestwork key from appliedmanifestwork
-func AppliedManifestworkQueueKeyFunc(hubhash string) factory.ObjectQueueKeyFunc {
-	return func(obj runtime.Object) string {
+func AppliedManifestworkQueueKeyFunc(hubhash string) factory.ObjectQueueKeysFunc {
+	return func(obj runtime.Object) []string {
 		accessor, _ := meta.Accessor(obj)
 		if !strings.HasPrefix(accessor.GetName(), hubhash) {
-			return ""
+			return []string{}
 		}
 
-		return strings.TrimPrefix(accessor.GetName(), hubhash+"-")
+		return []string{strings.TrimPrefix(accessor.GetName(), hubhash+"-")}
 	}
 }
 

@@ -14,15 +14,17 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
-type mqttSourceOptions struct {
+type mqttSourceTransport struct {
 	MQTTOptions
-	errorChan chan error
-	sourceID  string
-	clientID  string
+	protocol          *cloudeventsmqtt.Protocol
+	cloudEventsClient cloudevents.Client
+	errorChan         chan error
+	sourceID          string
+	clientID          string
 }
 
 func NewSourceOptions(mqttOptions *MQTTOptions, clientID, sourceID string) *options.CloudEventsSourceOptions {
-	mqttSourceOptions := &mqttSourceOptions{
+	mqttSourceOptions := &mqttSourceTransport{
 		MQTTOptions: *mqttOptions,
 		errorChan:   make(chan error),
 		sourceID:    sourceID,
@@ -30,12 +32,12 @@ func NewSourceOptions(mqttOptions *MQTTOptions, clientID, sourceID string) *opti
 	}
 
 	return &options.CloudEventsSourceOptions{
-		CloudEventsOptions: mqttSourceOptions,
-		SourceID:           mqttSourceOptions.sourceID,
+		CloudEventsTransport: mqttSourceOptions,
+		SourceID:             mqttSourceOptions.sourceID,
 	}
 }
 
-func (o *mqttSourceOptions) WithContext(ctx context.Context, evtCtx cloudevents.EventContext) (context.Context, error) {
+func (o *mqttSourceTransport) WithContext(ctx context.Context, evtCtx cloudevents.EventContext) (context.Context, error) {
 	topic, err := getSourcePubTopic(ctx)
 	if err != nil {
 		return nil, err
@@ -70,14 +72,14 @@ func (o *mqttSourceOptions) WithContext(ctx context.Context, evtCtx cloudevents.
 	return cloudeventscontext.WithTopic(ctx, eventsTopic), nil
 }
 
-func (o *mqttSourceOptions) Protocol(ctx context.Context, dataType types.CloudEventsDataType) (options.CloudEventsProtocol, error) {
+func (o *mqttSourceTransport) Connect(ctx context.Context) error {
 	topicSource, err := getSourceFromEventsTopic(o.Topics.AgentEvents)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if topicSource != o.sourceID {
-		return nil, fmt.Errorf("the topic source %q does not match with the client sourceID %q",
+		return fmt.Errorf("the topic source %q does not match with the client sourceID %q",
 			o.Topics.AgentEvents, o.sourceID)
 	}
 
@@ -97,7 +99,7 @@ func (o *mqttSourceOptions) Protocol(ctx context.Context, dataType types.CloudEv
 		})
 	}
 
-	receiver, err := o.GetCloudEventsProtocol(
+	protocol, err := o.GetCloudEventsProtocol(
 		ctx,
 		o.clientID,
 		func(err error) {
@@ -107,11 +109,37 @@ func (o *mqttSourceOptions) Protocol(ctx context.Context, dataType types.CloudEv
 		cloudeventsmqtt.WithSubscribe(subscribe),
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return receiver, nil
+
+	o.protocol = protocol
+	o.cloudEventsClient, err = cloudevents.NewClient(o.protocol)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func (o *mqttSourceOptions) ErrorChan() <-chan error {
+func (o *mqttSourceTransport) Send(ctx context.Context, evt cloudevents.Event) error {
+	sendingCtx, err := o.WithContext(ctx, evt.Context)
+	if err != nil {
+		return err
+	}
+
+	if err := o.cloudEventsClient.Send(sendingCtx, evt); cloudevents.IsUndelivered(err) {
+		return err
+	}
+	return nil
+}
+
+func (o *mqttSourceTransport) Receive(ctx context.Context, fn options.ReceiveHandlerFn) error {
+	return o.cloudEventsClient.StartReceiver(ctx, fn)
+}
+
+func (o *mqttSourceTransport) Close(ctx context.Context) error {
+	return o.protocol.Close(ctx)
+}
+
+func (o *mqttSourceTransport) ErrorChan() <-chan error {
 	return o.errorChan
 }

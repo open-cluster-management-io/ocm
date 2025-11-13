@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -18,6 +17,7 @@ import (
 
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/basic"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/store"

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -22,6 +21,7 @@ import (
 	workinformer "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
@@ -78,13 +78,11 @@ func NewAvailableStatusController(
 
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, manifestWorkInformer.Informer()).
-		WithSync(controller.sync).ToController(controllerName, recorder), nil
+		WithSync(controller.sync).ToController(controllerName), nil
 }
 
-func (c *AvailableStatusController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	manifestWorkName := controllerContext.QueueKey()
-
-	logger := klog.FromContext(ctx).WithName(controllerName).WithValues("manifestWorkName", manifestWorkName)
+func (c *AvailableStatusController) sync(ctx context.Context, controllerContext factory.SyncContext, manifestWorkName string) error {
+	logger := klog.FromContext(ctx).WithValues("manifestWorkName", manifestWorkName)
 	logger.V(4).Info("Reconciling ManifestWork")
 	ctx = klog.NewContext(ctx, logger)
 

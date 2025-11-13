@@ -90,32 +90,34 @@ func (s *AddonService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.
 	}
 }
 
-func (s *AddonService) RegisterHandler(handler server.EventHandler) {
-	if _, err := s.addonInformer.Informer().AddEventHandler(s.EventHandlerFuncs(handler)); err != nil {
-		klog.Errorf("failed to register addon informer event handler, %v", err)
+func (s *AddonService) RegisterHandler(ctx context.Context, handler server.EventHandler) {
+	logger := klog.FromContext(ctx)
+	if _, err := s.addonInformer.Informer().AddEventHandler(s.EventHandlerFuncs(ctx, handler)); err != nil {
+		logger.Error(err, "failed to register addon informer event handler")
 	}
 }
 
-func (s *AddonService) EventHandlerFuncs(handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
+func (s *AddonService) EventHandlerFuncs(ctx context.Context, handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
+	logger := klog.FromContext(ctx)
 	return &cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
 			if err != nil {
-				klog.Errorf("failed to get key for addon %v", err)
+				logger.Error(err, "failed to get key for addon")
 				return
 			}
-			if err := handler.OnCreate(context.Background(), addonce.ManagedClusterAddOnEventDataType, key); err != nil {
-				klog.Error(err)
+			if err := handler.OnCreate(ctx, addonce.ManagedClusterAddOnEventDataType, key); err != nil {
+				logger.Error(err, "failed to create addon", "key", key)
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(newObj)
 			if err != nil {
-				klog.Errorf("failed to get key for addon %v", err)
+				logger.Error(err, "failed to get key for addon")
 				return
 			}
-			if err := handler.OnUpdate(context.Background(), addonce.ManagedClusterAddOnEventDataType, key); err != nil {
-				klog.Error(err)
+			if err := handler.OnUpdate(ctx, addonce.ManagedClusterAddOnEventDataType, key); err != nil {
+				logger.Error(err, "failed to update addon", "key", key)
 			}
 		},
 	}

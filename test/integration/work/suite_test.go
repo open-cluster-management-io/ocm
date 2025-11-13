@@ -274,14 +274,15 @@ func startGRPCServer(ctx context.Context, temp string, cfg *rest.Config) (string
 
 	hook, err := util.NewGRPCServerWorkHook(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	grpcEventServer := cloudeventsgrpc.NewGRPCBroker()
+	grpcEventServer.RegisterService(ctx, payload.ManifestBundleEventDataType,
+		serviceswork.NewWorkService(hook.WorkClient, hook.WorkInformers.Work().V1().ManifestWorks()))
+
 	go func() {
 		defer ginkgo.GinkgoRecover()
 		hook.Run(ctx)
 	}()
-
-	grpcEventServer := cloudeventsgrpc.NewGRPCBroker()
-	grpcEventServer.RegisterService(payload.ManifestBundleEventDataType,
-		serviceswork.NewWorkService(hook.WorkClient, hook.WorkInformers.Work().V1().ManifestWorks()))
 
 	authorizer := util.NewMockAuthorizer()
 	server := sdkgrpc.NewGRPCServer(gRPCServerOptions).

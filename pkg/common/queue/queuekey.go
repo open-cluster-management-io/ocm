@@ -7,7 +7,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func FileterByLabel(key string) factory.EventFilterFunc {
+func FileterByLabel(key string) func(obj interface{}) bool {
 	return func(obj interface{}) bool {
 		accessor, _ := meta.Accessor(obj)
 		return len(accessor.GetLabels()) > 0 && len(accessor.GetLabels()[key]) > 0

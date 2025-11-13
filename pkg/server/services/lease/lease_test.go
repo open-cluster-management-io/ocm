@@ -214,7 +214,7 @@ func TestHandleStatusUpdate(t *testing.T) {
 func TestEventHandlerFuncs(t *testing.T) {
 	handler := &leaseHandler{}
 	service := &LeaseService{}
-	eventHandlerFuncs := service.EventHandlerFuncs(handler)
+	eventHandlerFuncs := service.EventHandlerFuncs(context.Background(), handler)
 
 	lease := &coordinationv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-lease", Namespace: "test-lease-namespace"},

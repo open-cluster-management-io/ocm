@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/pkg/errors"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -26,6 +25,7 @@ import (
 	workinformer "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
@@ -77,7 +77,7 @@ func NewManifestWorkController(
 	restMapper meta.RESTMapper,
 	validator auth.ExecutorValidator) factory.Controller {
 
-	syncCtx := factory.NewSyncContext("manifestwork-controller", recorder)
+	syncCtx := factory.NewSyncContext("manifestwork-controller")
 
 	controller := &ManifestWorkController{
 		manifestWorkPatcher: patcher.NewPatcher[
@@ -117,15 +117,14 @@ func NewManifestWorkController(
 			appliedManifestWorkInformer.Informer(),
 		).
 		WithSyncContext(syncCtx).
-		WithSync(controller.sync).ToController(controllerName, recorder)
+		WithSync(controller.sync).ToController(controllerName)
 }
 
 // sync is the main reconcile loop for manifest work. It is triggered in two scenarios
 // 1. ManifestWork API changes
 // 2. Resources defined in manifest changed on spoke
-func (m *ManifestWorkController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	manifestWorkName := controllerContext.QueueKey()
-	logger := klog.FromContext(ctx).WithName(controllerName).WithValues("manifestWorkName", manifestWorkName)
+func (m *ManifestWorkController) sync(ctx context.Context, controllerContext factory.SyncContext, manifestWorkName string) error {
+	logger := klog.FromContext(ctx).WithValues("manifestWorkName", manifestWorkName)
 	logger.V(5).Info("Reconciling ManifestWork")
 	ctx = klog.NewContext(ctx, logger)
 
@@ -229,7 +228,7 @@ func (m *ManifestWorkController) applyAppliedManifestWork(ctx context.Context, w
 	return appliedManifestWork, err
 }
 
-func onAddFunc(queue workqueue.RateLimitingInterface) func(obj interface{}) {
+func onAddFunc(queue workqueue.TypedRateLimitingInterface[string]) func(obj interface{}) {
 	return func(obj interface{}) {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
@@ -242,7 +241,7 @@ func onAddFunc(queue workqueue.RateLimitingInterface) func(obj interface{}) {
 	}
 }
 
-func onUpdateFunc(queue workqueue.RateLimitingInterface) func(oldObj, newObj interface{}) {
+func onUpdateFunc(queue workqueue.TypedRateLimitingInterface[string]) func(oldObj, newObj interface{}) {
 	return func(oldObj, newObj interface{}) {
 		newWork, ok := newObj.(*workapiv1.ManifestWork)
 		if !ok {

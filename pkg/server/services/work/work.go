@@ -87,6 +87,8 @@ func (w *WorkService) List(listOpts types.ListOptions) ([]*cloudevents.Event, er
 }
 
 func (w *WorkService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.Event) error {
+	logger := klog.FromContext(ctx)
+
 	eventType, err := types.ParseCloudEventsType(evt.Type())
 	if err != nil {
 		return fmt.Errorf("failed to parse cloud event type %s, %v", evt.Type(), err)
@@ -116,7 +118,9 @@ func (w *WorkService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.E
 		return err
 	}
 
-	klog.V(4).Infof("work %s/%s %s %s", last.Namespace, last.Name, eventType.SubResource, eventType.Action)
+	logger.V(4).Info("handle work event",
+		"manifestWorkNamespace", last.Namespace, "manifestWorkName", last.Name,
+		"subResource", eventType.SubResource, "actionType", eventType.Action)
 
 	workPatcher := patcher.NewPatcher[
 		*workv1.ManifestWork, workv1.ManifestWorkSpec, workv1.ManifestWorkStatus](
@@ -146,45 +150,50 @@ func (w *WorkService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.E
 	}
 }
 
-func (w *WorkService) RegisterHandler(handler server.EventHandler) {
-	if _, err := w.workInformer.Informer().AddEventHandler(w.EventHandlerFuncs(handler)); err != nil {
-		klog.Errorf("failed to register work informer event handler, %v", err)
+func (w *WorkService) RegisterHandler(ctx context.Context, handler server.EventHandler) {
+	logger := klog.FromContext(ctx)
+	if _, err := w.workInformer.Informer().AddEventHandler(w.EventHandlerFuncs(ctx, handler)); err != nil {
+		logger.Error(err, "failed to register work informer event handler")
 	}
 }
 
-func (w *WorkService) EventHandlerFuncs(handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
+func (w *WorkService) EventHandlerFuncs(ctx context.Context, handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
+	logger := klog.FromContext(ctx)
 	return &cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			accessor, err := meta.Accessor(obj)
 			if err != nil {
-				klog.Errorf("failed to get accessor for work %v", err)
+				logger.Error(err, "failed to get accessor for work")
 				return
 			}
 			id := accessor.GetNamespace() + "/" + accessor.GetName()
-			if err := handler.OnCreate(context.Background(), payload.ManifestBundleEventDataType, id); err != nil {
-				klog.Error(err)
+			if err := handler.OnCreate(ctx, payload.ManifestBundleEventDataType, id); err != nil {
+				logger.Error(err, "failed to create work",
+					"manifestWork", accessor.GetName(), "manifestWorkNamespace", accessor.GetNamespace())
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			accessor, err := meta.Accessor(newObj)
 			if err != nil {
-				klog.Errorf("failed to get accessor for work %v", err)
+				logger.Error(err, "failed to get accessor for work")
 				return
 			}
 			id := accessor.GetNamespace() + "/" + accessor.GetName()
-			if err := handler.OnUpdate(context.Background(), payload.ManifestBundleEventDataType, id); err != nil {
-				klog.Error(err)
+			if err := handler.OnUpdate(ctx, payload.ManifestBundleEventDataType, id); err != nil {
+				logger.Error(err, "failed to update work",
+					"manifestWork", accessor.GetName(), "manifestWorkNamespace", accessor.GetNamespace())
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			accessor, err := meta.Accessor(obj)
 			if err != nil {
-				klog.Errorf("failed to get accessor for work %v", err)
+				logger.Error(err, "failed to get accessor for work")
 				return
 			}
 			id := accessor.GetNamespace() + "/" + accessor.GetName()
-			if err := handler.OnDelete(context.Background(), payload.ManifestBundleEventDataType, id); err != nil {
-				klog.Error(err)
+			if err := handler.OnDelete(ctx, payload.ManifestBundleEventDataType, id); err != nil {
+				logger.Error(err, "failed to delete work",
+					"manifestWork", accessor.GetName(), "manifestWorkNamespace", accessor.GetNamespace())
 			}
 		},
 	}

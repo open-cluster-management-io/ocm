@@ -98,32 +98,34 @@ func (c *CSRService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.Ev
 	}
 }
 
-func (c *CSRService) RegisterHandler(handler server.EventHandler) {
-	if _, err := c.csrInformer.Informer().AddEventHandler(c.EventHandlerFuncs(handler)); err != nil {
-		klog.Errorf("failed to register csr informer event handler, %v", err)
+func (c *CSRService) RegisterHandler(ctx context.Context, handler server.EventHandler) {
+	logger := klog.FromContext(ctx)
+	if _, err := c.csrInformer.Informer().AddEventHandler(c.EventHandlerFuncs(ctx, handler)); err != nil {
+		logger.Error(err, "failed to register csr informer event handler")
 	}
 }
 
-func (c *CSRService) EventHandlerFuncs(handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
+func (c *CSRService) EventHandlerFuncs(ctx context.Context, handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
+	logger := klog.FromContext(ctx)
 	return &cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			accessor, err := meta.Accessor(obj)
 			if err != nil {
-				klog.Errorf("failed to get accessor for csr %v", err)
+				logger.Error(err, "failed to get accessor for csr")
 				return
 			}
-			if err := handler.OnCreate(context.Background(), csrce.CSREventDataType, accessor.GetName()); err != nil {
-				klog.Error(err)
+			if err := handler.OnCreate(ctx, csrce.CSREventDataType, accessor.GetName()); err != nil {
+				logger.Error(err, "failed to create csr", "csrName", accessor.GetName())
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			accessor, err := meta.Accessor(newObj)
 			if err != nil {
-				klog.Errorf("failed to get accessor for csr %v", err)
+				logger.Error(err, "failed to get accessor for csr")
 				return
 			}
-			if err := handler.OnUpdate(context.Background(), csrce.CSREventDataType, accessor.GetName()); err != nil {
-				klog.Error(err)
+			if err := handler.OnUpdate(ctx, csrce.CSREventDataType, accessor.GetName()); err != nil {
+				logger.Error(err, "failed to update csr", "csrName", accessor.GetName())
 			}
 		},
 	}
