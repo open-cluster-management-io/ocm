@@ -340,7 +340,7 @@ func TestHandleStatusUpdate(t *testing.T) {
 func TestEventHandlerFuncs(t *testing.T) {
 	handler := &workHandler{}
 	service := &WorkService{}
-	eventHandlerFuncs := service.EventHandlerFuncs(handler)
+	eventHandlerFuncs := service.EventHandlerFuncs(context.Background(), handler)
 
 	work := &workv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
@@ -408,10 +408,273 @@ func TestEventHandlerFuncs(t *testing.T) {
 	}
 }
 
+func TestHandleOnCreateFunc(t *testing.T) {
+	cases := []struct {
+		name              string
+		obj               interface{}
+		expectedCallCount int
+		expectError       bool
+	}{
+		{
+			name: "successful create",
+			obj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-work", Namespace: "test-namespace"},
+			},
+			expectedCallCount: 1,
+		},
+		{
+			name:              "invalid object type",
+			obj:               "invalid-object",
+			expectedCallCount: 0,
+			expectError:       true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			handler := &workHandler{}
+			createFunc := handleOnCreateFunc(context.Background(), handler)
+			createFunc(c.obj)
+			if handler.onCreateCallCount != c.expectedCallCount {
+				t.Errorf("expected %d onCreate calls, got %d", c.expectedCallCount, handler.onCreateCallCount)
+			}
+		})
+	}
+}
+
+func TestHandleOnUpdateFunc(t *testing.T) {
+	cases := []struct {
+		name              string
+		oldObj            interface{}
+		newObj            interface{}
+		expectedCallCount int
+		description       string
+	}{
+		{
+			name: "generation increased",
+			oldObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-work", Namespace: "test-namespace", Generation: 1},
+			},
+			newObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-work", Namespace: "test-namespace", Generation: 2},
+			},
+			expectedCallCount: 1,
+			description:       "should call OnUpdate when generation increases",
+		},
+		{
+			name: "generation same - no update",
+			oldObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-work", Namespace: "test-namespace", Generation: 1},
+			},
+			newObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-work", Namespace: "test-namespace", Generation: 1},
+			},
+			expectedCallCount: 0,
+			description:       "should not call OnUpdate when generation stays same and no label/annotation changes",
+		},
+		{
+			name: "generation decreased - no update",
+			oldObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-work", Namespace: "test-namespace", Generation: 2},
+			},
+			newObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-work", Namespace: "test-namespace", Generation: 1},
+			},
+			expectedCallCount: 0,
+			description:       "should not call OnUpdate when generation decreases and no label/annotation changes",
+		},
+		{
+			name: "deletion timestamp set",
+			oldObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-work", Namespace: "test-namespace", Generation: 1},
+			},
+			newObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-work",
+					Namespace:         "test-namespace",
+					Generation:        1,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+				},
+			},
+			expectedCallCount: 1,
+			description:       "should call OnUpdate when deletion timestamp is set",
+		},
+		{
+			name: "labels changed",
+			oldObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Namespace:  "test-namespace",
+					Generation: 1,
+					Labels:     map[string]string{"key1": "value1"},
+				},
+			},
+			newObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Namespace:  "test-namespace",
+					Generation: 1,
+					Labels:     map[string]string{"key1": "value2"},
+				},
+			},
+			expectedCallCount: 1,
+			description:       "should call OnUpdate when labels change",
+		},
+		{
+			name: "labels added",
+			oldObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Namespace:  "test-namespace",
+					Generation: 1,
+				},
+			},
+			newObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Namespace:  "test-namespace",
+					Generation: 1,
+					Labels:     map[string]string{"key1": "value1"},
+				},
+			},
+			expectedCallCount: 1,
+			description:       "should call OnUpdate when labels are added",
+		},
+		{
+			name: "annotations changed",
+			oldObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-work",
+					Namespace:   "test-namespace",
+					Generation:  1,
+					Annotations: map[string]string{"key1": "value1"},
+				},
+			},
+			newObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-work",
+					Namespace:   "test-namespace",
+					Generation:  1,
+					Annotations: map[string]string{"key1": "value2"},
+				},
+			},
+			expectedCallCount: 1,
+			description:       "should call OnUpdate when annotations change",
+		},
+		{
+			name: "annotations added",
+			oldObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Namespace:  "test-namespace",
+					Generation: 1,
+				},
+			},
+			newObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-work",
+					Namespace:   "test-namespace",
+					Generation:  1,
+					Annotations: map[string]string{"key1": "value1"},
+				},
+			},
+			expectedCallCount: 1,
+			description:       "should call OnUpdate when annotations are added",
+		},
+		{
+			name: "labels and generation changed",
+			oldObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Namespace:  "test-namespace",
+					Generation: 1,
+					Labels:     map[string]string{"key1": "value1"},
+				},
+			},
+			newObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Namespace:  "test-namespace",
+					Generation: 2,
+					Labels:     map[string]string{"key1": "value2"},
+				},
+			},
+			expectedCallCount: 1,
+			description:       "should call OnUpdate when both labels and generation change",
+		},
+		{
+			name:   "invalid old object type",
+			oldObj: "invalid-object",
+			newObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-work", Namespace: "test-namespace", Generation: 1},
+			},
+			expectedCallCount: 0,
+			description:       "should not call OnUpdate when old object is invalid",
+		},
+		{
+			name: "invalid new object type",
+			oldObj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-work", Namespace: "test-namespace", Generation: 1},
+			},
+			newObj:            "invalid-object",
+			expectedCallCount: 0,
+			description:       "should not call OnUpdate when new object is invalid",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			handler := &workHandler{}
+			updateFunc := handleOnUpdateFunc(context.Background(), handler)
+			updateFunc(c.oldObj, c.newObj)
+			if handler.onUpdateCallCount != c.expectedCallCount {
+				t.Errorf("%s: expected %d OnUpdate calls, got %d", c.description, c.expectedCallCount, handler.onUpdateCallCount)
+			}
+		})
+	}
+}
+
+func TestHandleOnDeleteFunc(t *testing.T) {
+	cases := []struct {
+		name              string
+		obj               interface{}
+		expectedCallCount int
+		expectError       bool
+	}{
+		{
+			name: "successful delete",
+			obj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-work", Namespace: "test-namespace"},
+			},
+			expectedCallCount: 1,
+		},
+		{
+			name:              "invalid object type",
+			obj:               "invalid-object",
+			expectedCallCount: 0,
+			expectError:       true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			handler := &workHandler{}
+			deleteFunc := handleOnDeleteFunc(context.Background(), handler)
+			deleteFunc(c.obj)
+			if handler.onDeleteCallCount != c.expectedCallCount {
+				t.Errorf("expected %d onDelete calls, got %d", c.expectedCallCount, handler.onDeleteCallCount)
+			}
+		})
+	}
+}
+
 type workHandler struct {
-	onCreateCalled bool
-	onUpdateCalled bool
-	onDeleteCalled bool
+	onCreateCalled    bool
+	onUpdateCalled    bool
+	onDeleteCalled    bool
+	onCreateCallCount int
+	onUpdateCallCount int
+	onDeleteCallCount int
 }
 
 func (m *workHandler) OnCreate(ctx context.Context, t types.CloudEventsDataType, resourceID string) error {
@@ -422,6 +685,7 @@ func (m *workHandler) OnCreate(ctx context.Context, t types.CloudEventsDataType,
 		return fmt.Errorf("expected %v, got %v", "test-namespace/test-work", resourceID)
 	}
 	m.onCreateCalled = true
+	m.onCreateCallCount++
 	return nil
 }
 
@@ -433,6 +697,7 @@ func (m *workHandler) OnUpdate(ctx context.Context, t types.CloudEventsDataType,
 		return fmt.Errorf("expected %v, got %v", "test-namespace/test-work", resourceID)
 	}
 	m.onUpdateCalled = true
+	m.onUpdateCallCount++
 	return nil
 }
 
@@ -444,5 +709,6 @@ func (m *workHandler) OnDelete(ctx context.Context, t types.CloudEventsDataType,
 		return fmt.Errorf("expected %v, got %v", "test-namespace/test-work", resourceID)
 	}
 	m.onDeleteCalled = true
+	m.onDeleteCallCount++
 	return nil
 }

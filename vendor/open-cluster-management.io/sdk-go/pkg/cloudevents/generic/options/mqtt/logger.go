@@ -2,6 +2,7 @@ package mqtt
 
 import (
 	"fmt"
+
 	"github.com/eclipse/paho.golang/paho/log"
 	"k8s.io/klog/v2"
 )
@@ -14,8 +15,13 @@ type PahoDebugLogger struct {
 	logger klog.Logger
 }
 
-var _ log.Logger = &PahoErrorLogger{}
-var _ log.Logger = &PahoDebugLogger{}
+func NewPahoErrorLogger(logger klog.Logger) log.Logger {
+	return &PahoErrorLogger{logger: logger}
+}
+
+func NewPahoDebugLogger(logger klog.Logger) log.Logger {
+	return &PahoDebugLogger{logger: logger}
+}
 
 func (l *PahoErrorLogger) Println(v ...interface{}) {
 	l.logger.Error(fmt.Errorf("get err %s", fmt.Sprint(v...)), "MQTT error message")

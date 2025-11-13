@@ -8,6 +8,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt"
 	grpcv2 "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/v2/grpc"
+	mqttv2 "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/v2/mqtt"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
@@ -56,7 +57,7 @@ func BuildCloudEventsSourceOptions(config any,
 	clientId, sourceId string, dataType types.CloudEventsDataType) (*options.CloudEventsSourceOptions, error) {
 	switch config := config.(type) {
 	case *mqtt.MQTTOptions:
-		return mqtt.NewSourceOptions(config, clientId, sourceId), nil
+		return mqttv2.NewSourceOptions(config, clientId, sourceId), nil
 	case *grpc.GRPCOptions:
 		return grpcv2.NewSourceOptions(config, sourceId, dataType), nil
 	default:
@@ -69,7 +70,7 @@ func BuildCloudEventsAgentOptions(config any,
 	clusterName, clientId string, dataType types.CloudEventsDataType) (*options.CloudEventsAgentOptions, error) {
 	switch config := config.(type) {
 	case *mqtt.MQTTOptions:
-		return mqtt.NewAgentOptions(config, clusterName, clientId), nil
+		return mqttv2.NewAgentOptions(config, clusterName, clientId), nil
 	case *grpc.GRPCOptions:
 		return grpcv2.NewAgentOptions(config, clusterName, clientId, dataType), nil
 	default:

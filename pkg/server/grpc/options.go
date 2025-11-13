@@ -51,9 +51,6 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 		return err
 	}
 
-	// start clients
-	go clients.Run(ctx)
-
 	// initlize grpc broker and register services
 	grpcEventServer := cloudeventsgrpc.NewGRPCBroker()
 	grpcEventServer.RegisterService(ctx, clusterce.ManagedClusterEventDataType,
@@ -68,6 +65,9 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 		lease.NewLeaseService(clients.KubeClient, clients.KubeInformers.Coordination().V1().Leases()))
 	grpcEventServer.RegisterService(ctx, payload.ManifestBundleEventDataType,
 		work.NewWorkService(clients.WorkClient, clients.WorkInformers.Work().V1().ManifestWorks()))
+
+	// start clients
+	go clients.Run(ctx)
 
 	// initlize and run grpc server
 	authorizer := grpcauthz.NewSARAuthorizer(clients.KubeClient)

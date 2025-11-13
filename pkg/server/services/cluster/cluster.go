@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
@@ -65,6 +66,8 @@ func (c *ClusterService) List(listOpts types.ListOptions) ([]*cloudevents.Event,
 }
 
 func (c *ClusterService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.Event) error {
+	logger := klog.FromContext(ctx)
+
 	eventType, err := types.ParseCloudEventsType(evt.Type())
 	if err != nil {
 		return fmt.Errorf("failed to parse cloud event type %s, %v", evt.Type(), err)
@@ -74,7 +77,8 @@ func (c *ClusterService) HandleStatusUpdate(ctx context.Context, evt *cloudevent
 		return err
 	}
 
-	klog.V(4).Infof("cluster %s %s %s", cluster.Name, eventType.SubResource, eventType.Action)
+	logger.V(4).Info("handle cluster event",
+		"clusterName", cluster.Name, "subResource", eventType.SubResource, "action", eventType.Action)
 
 	switch eventType.Action {
 	case types.CreateRequestAction:
@@ -94,31 +98,32 @@ func (c *ClusterService) HandleStatusUpdate(ctx context.Context, evt *cloudevent
 }
 
 func (c *ClusterService) RegisterHandler(ctx context.Context, handler server.EventHandler) {
-	if _, err := c.clusterInformer.Informer().AddEventHandler(c.EventHandlerFuncs(handler)); err != nil {
-		klog.Errorf("failed to register cluster informer event handler, %v", err)
+	logger := klog.FromContext(ctx)
+	if _, err := c.clusterInformer.Informer().AddEventHandler(c.EventHandlerFuncs(ctx, handler)); err != nil {
+		logger.Error(err, "failed to register cluster informer event handler")
 	}
 }
 
-func (c *ClusterService) EventHandlerFuncs(handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
+func (c *ClusterService) EventHandlerFuncs(ctx context.Context, handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
 	return &cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			accessor, err := meta.Accessor(obj)
 			if err != nil {
-				klog.Errorf("failed to get accessor for cluster %v", err)
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to get accessor for cluster")
 				return
 			}
-			if err := handler.OnCreate(context.Background(), clusterce.ManagedClusterEventDataType, accessor.GetName()); err != nil {
-				klog.Error(err)
+			if err := handler.OnCreate(ctx, clusterce.ManagedClusterEventDataType, accessor.GetName()); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to create cluster", "clusterName", accessor.GetName())
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			accessor, err := meta.Accessor(newObj)
 			if err != nil {
-				klog.Errorf("failed to get accessor for cluster %v", err)
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to get accessor for cluster")
 				return
 			}
-			if err := handler.OnUpdate(context.Background(), clusterce.ManagedClusterEventDataType, accessor.GetName()); err != nil {
-				klog.Error(err)
+			if err := handler.OnUpdate(ctx, clusterce.ManagedClusterEventDataType, accessor.GetName()); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to update cluster", "clusterName", accessor.GetName())
 			}
 		},
 	}

@@ -9,6 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	certificatesv1informers "k8s.io/client-go/informers/certificates/v1"
 	"k8s.io/client-go/kubernetes"
 	certificatesv1listers "k8s.io/client-go/listers/certificates/v1"
@@ -99,31 +100,32 @@ func (c *CSRService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.Ev
 }
 
 func (c *CSRService) RegisterHandler(ctx context.Context, handler server.EventHandler) {
-	if _, err := c.csrInformer.Informer().AddEventHandler(c.EventHandlerFuncs(handler)); err != nil {
-		klog.Errorf("failed to register csr informer event handler, %v", err)
+	logger := klog.FromContext(ctx)
+	if _, err := c.csrInformer.Informer().AddEventHandler(c.EventHandlerFuncs(ctx, handler)); err != nil {
+		logger.Error(err, "failed to register csr informer event handler")
 	}
 }
 
-func (c *CSRService) EventHandlerFuncs(handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
+func (c *CSRService) EventHandlerFuncs(ctx context.Context, handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
 	return &cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			accessor, err := meta.Accessor(obj)
 			if err != nil {
-				klog.Errorf("failed to get accessor for csr %v", err)
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to get accessor for csr")
 				return
 			}
-			if err := handler.OnCreate(context.Background(), csrce.CSREventDataType, accessor.GetName()); err != nil {
-				klog.Error(err)
+			if err := handler.OnCreate(ctx, csrce.CSREventDataType, accessor.GetName()); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to create csr", "csrName", accessor.GetName())
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			accessor, err := meta.Accessor(newObj)
 			if err != nil {
-				klog.Errorf("failed to get accessor for csr %v", err)
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to get accessor for csr")
 				return
 			}
-			if err := handler.OnUpdate(context.Background(), csrce.CSREventDataType, accessor.GetName()); err != nil {
-				klog.Error(err)
+			if err := handler.OnUpdate(ctx, csrce.CSREventDataType, accessor.GetName()); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to update csr", "csrName", accessor.GetName())
 			}
 		},
 	}

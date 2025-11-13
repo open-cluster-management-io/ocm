@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -101,6 +102,11 @@ func runAgentWithContext(ctx context.Context, name string, agentConfig *spoke.Sp
 			return
 		}
 	}()
+}
+
+func init() {
+	klog.InitFlags(nil)
+	klog.SetOutput(ginkgo.GinkgoWriter)
 }
 
 func TestIntegration(t *testing.T) {
