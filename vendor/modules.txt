@@ -59,10 +59,10 @@ github.com/aws/aws-sdk-go-v2/internal/shareddefaults
 github.com/aws/aws-sdk-go-v2/internal/strings
 github.com/aws/aws-sdk-go-v2/internal/sync/singleflight
 github.com/aws/aws-sdk-go-v2/internal/timeconv
-# github.com/aws/aws-sdk-go-v2/config v1.31.19
+# github.com/aws/aws-sdk-go-v2/config v1.31.20
 ## explicit; go 1.23
 github.com/aws/aws-sdk-go-v2/config
-# github.com/aws/aws-sdk-go-v2/credentials v1.18.23
+# github.com/aws/aws-sdk-go-v2/credentials v1.18.24
 ## explicit; go 1.23
 github.com/aws/aws-sdk-go-v2/credentials
 github.com/aws/aws-sdk-go-v2/credentials/ec2rolecreds
@@ -84,12 +84,12 @@ github.com/aws/aws-sdk-go-v2/internal/endpoints/v2
 # github.com/aws/aws-sdk-go-v2/internal/ini v1.8.4
 ## explicit; go 1.23
 github.com/aws/aws-sdk-go-v2/internal/ini
-# github.com/aws/aws-sdk-go-v2/service/eks v1.74.8
+# github.com/aws/aws-sdk-go-v2/service/eks v1.74.9
 ## explicit; go 1.23
 github.com/aws/aws-sdk-go-v2/service/eks
 github.com/aws/aws-sdk-go-v2/service/eks/internal/endpoints
 github.com/aws/aws-sdk-go-v2/service/eks/types
-# github.com/aws/aws-sdk-go-v2/service/iam v1.50.1
+# github.com/aws/aws-sdk-go-v2/service/iam v1.50.2
 ## explicit; go 1.23
 github.com/aws/aws-sdk-go-v2/service/iam
 github.com/aws/aws-sdk-go-v2/service/iam/internal/endpoints
@@ -100,17 +100,17 @@ github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding
 # github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.13
 ## explicit; go 1.23
 github.com/aws/aws-sdk-go-v2/service/internal/presigned-url
-# github.com/aws/aws-sdk-go-v2/service/sso v1.30.2
+# github.com/aws/aws-sdk-go-v2/service/sso v1.30.3
 ## explicit; go 1.23
 github.com/aws/aws-sdk-go-v2/service/sso
 github.com/aws/aws-sdk-go-v2/service/sso/internal/endpoints
 github.com/aws/aws-sdk-go-v2/service/sso/types
-# github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.6
+# github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.7
 ## explicit; go 1.23
 github.com/aws/aws-sdk-go-v2/service/ssooidc
 github.com/aws/aws-sdk-go-v2/service/ssooidc/internal/endpoints
 github.com/aws/aws-sdk-go-v2/service/ssooidc/types
-# github.com/aws/aws-sdk-go-v2/service/sts v1.40.1
+# github.com/aws/aws-sdk-go-v2/service/sts v1.40.2
 ## explicit; go 1.23
 github.com/aws/aws-sdk-go-v2/service/sts
 github.com/aws/aws-sdk-go-v2/service/sts/internal/endpoints
