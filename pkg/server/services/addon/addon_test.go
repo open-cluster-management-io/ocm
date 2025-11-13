@@ -208,7 +208,7 @@ func TestHandleStatusUpdate(t *testing.T) {
 func TestEventHandlerFuncs(t *testing.T) {
 	handler := &addOnHandler{}
 	service := &AddonService{}
-	eventHandlerFuncs := service.EventHandlerFuncs(handler)
+	eventHandlerFuncs := service.EventHandlerFuncs(context.Background(), handler)
 
 	addon := &addonv1alpha1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-namespace"},

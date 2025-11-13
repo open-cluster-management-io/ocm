@@ -67,6 +67,12 @@ func (c *CSRClient) Create(ctx context.Context, csr *certificatev1.CertificateSi
 		return nil, cloudeventserrors.ToStatusError(common.CSRGR, csr.Name, err)
 	}
 
+	// we need to add to the store here since grpc driver may call this when it cannot
+	// get from lister.
+	if err := c.watcherStore.Add(csr); err != nil {
+		return nil, errors.NewInternalError(err)
+	}
+
 	return csr.DeepCopy(), nil
 }
 

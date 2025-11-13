@@ -340,7 +340,7 @@ func TestHandleStatusUpdate(t *testing.T) {
 func TestEventHandlerFuncs(t *testing.T) {
 	handler := &workHandler{}
 	service := &WorkService{}
-	eventHandlerFuncs := service.EventHandlerFuncs(handler)
+	eventHandlerFuncs := service.EventHandlerFuncs(context.Background(), handler)
 
 	work := &workv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-work", Namespace: "test-namespace"},

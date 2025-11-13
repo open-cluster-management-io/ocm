@@ -89,32 +89,34 @@ func (l *LeaseService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.
 	}
 }
 
-func (l *LeaseService) RegisterHandler(handler server.EventHandler) {
-	if _, err := l.informer.Informer().AddEventHandler(l.EventHandlerFuncs(handler)); err != nil {
-		klog.Errorf("failed to register lease informer event handler, %v", err)
+func (l *LeaseService) RegisterHandler(ctx context.Context, handler server.EventHandler) {
+	logger := klog.FromContext(ctx)
+	if _, err := l.informer.Informer().AddEventHandler(l.EventHandlerFuncs(ctx, handler)); err != nil {
+		logger.Error(err, "failed to register lease informer event handler")
 	}
 }
 
-func (l *LeaseService) EventHandlerFuncs(handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
+func (l *LeaseService) EventHandlerFuncs(ctx context.Context, handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
+	logger := klog.FromContext(ctx)
 	return &cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
 			if err != nil {
-				klog.Errorf("failed to get key for lease %v", err)
+				logger.Error(err, "failed to get key for lease")
 				return
 			}
-			if err := handler.OnCreate(context.Background(), leasece.LeaseEventDataType, key); err != nil {
-				klog.Error(err)
+			if err := handler.OnCreate(ctx, leasece.LeaseEventDataType, key); err != nil {
+				logger.Error(err, "failed to create lease", "key", key)
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(newObj)
 			if err != nil {
-				klog.Errorf("failed to get key for lease %v", err)
+				logger.Error(err, "failed to get key for lease")
 				return
 			}
-			if err := handler.OnUpdate(context.Background(), leasece.LeaseEventDataType, key); err != nil {
-				klog.Error(err)
+			if err := handler.OnUpdate(ctx, leasece.LeaseEventDataType, key); err != nil {
+				logger.Error(err, "failed to update lease", "key", key)
 			}
 		},
 	}

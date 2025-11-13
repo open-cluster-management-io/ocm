@@ -28,7 +28,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server"
 )
 
-type resourceHandler func(res *cloudevents.Event) error
+type resourceHandler func(ctx context.Context, res *cloudevents.Event) error
 
 // subscriber defines a subscriber that can receive and handle resource spec.
 type subscriber struct {
@@ -60,9 +60,9 @@ func NewGRPCBroker() *GRPCBroker {
 	return broker
 }
 
-func (bkr *GRPCBroker) RegisterService(t types.CloudEventsDataType, service server.Service) {
+func (bkr *GRPCBroker) RegisterService(ctx context.Context, t types.CloudEventsDataType, service server.Service) {
 	bkr.services[t] = service
-	service.RegisterHandler(bkr)
+	service.RegisterHandler(ctx, bkr)
 }
 
 func (bkr *GRPCBroker) Subscribers() sets.Set[string] {
@@ -122,7 +122,9 @@ func (bkr *GRPCBroker) Publish(ctx context.Context, pubReq *pbv1.PublishRequest)
 
 // register registers a subscriber and return client id and error channel.
 func (bkr *GRPCBroker) register(
-	clusterName string, dataType types.CloudEventsDataType, handler resourceHandler) (string, <-chan error) {
+	ctx context.Context, clusterName string, dataType types.CloudEventsDataType, handler resourceHandler) (string, <-chan error) {
+	logger := klog.FromContext(ctx)
+
 	bkr.mu.Lock()
 	defer bkr.mu.Unlock()
 
@@ -135,18 +137,19 @@ func (bkr *GRPCBroker) register(
 		errChan:     errChan,
 	}
 
-	klog.V(4).Infof("register a subscriber %s (cluster name = %s)", id, clusterName)
+	logger.V(4).Info("register a subscriber", "id", id)
 	metrics.IncGRPCCESubscribersMetric(clusterName, dataType.String())
 
 	return id, errChan
 }
 
 // unregister a subscriber by id
-func (bkr *GRPCBroker) unregister(id string) {
+func (bkr *GRPCBroker) unregister(ctx context.Context, id string) {
 	bkr.mu.Lock()
 	defer bkr.mu.Unlock()
 
-	klog.V(10).Infof("unregister subscriber %s", id)
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("unregister subscriber", "id", id)
 	if sub, exists := bkr.subscribers[id]; exists {
 		close(sub.errChan)
 		delete(bkr.subscribers, id)
@@ -171,6 +174,9 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 	ctx, cancel := context.WithCancel(subServer.Context())
 	defer cancel()
 
+	logger := klog.FromContext(ctx).WithValues("clusterName", subReq.ClusterName)
+	ctx = klog.NewContext(ctx, logger)
+
 	// TODO make the channel size configurable
 	eventCh := make(chan *pbv1.CloudEvent, 100)
 
@@ -189,7 +195,7 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 				return
 			case evt := <-hearbeater.Heartbeat():
 				if err := subServer.Send(evt); err != nil {
-					klog.Errorf("failed to send heartbeat: %v", err)
+					logger.Error(err, "failed to send heartbeat")
 					// Unblock producers (handler select) and exit heartbeat ticker.
 					cancel()
 					select {
@@ -200,7 +206,7 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 				}
 			case evt := <-eventCh:
 				if err := subServer.Send(evt); err != nil {
-					klog.Errorf("failed to send event: %v", err)
+					logger.Error(err, "failed to send event")
 					// Unblock producers (handler select) and exit heartbeat ticker.
 					cancel()
 					select {
@@ -213,16 +219,16 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 		}
 	}()
 
-	subscriberID, errChan := bkr.register(subReq.ClusterName, *dataType, func(evt *cloudevents.Event) error {
+	subscriberID, errChan := bkr.register(ctx, subReq.ClusterName, *dataType, func(ctx context.Context, evt *cloudevents.Event) error {
 		// WARNING: don't use "pbEvt, err := pb.ToProto(evt)" to convert cloudevent to protobuf
 		pbEvt := &pbv1.CloudEvent{}
-		if err := grpcprotocol.WritePBMessage(context.TODO(), binding.ToMessage(evt), pbEvt); err != nil {
+		if err := grpcprotocol.WritePBMessage(ctx, binding.ToMessage(evt), pbEvt); err != nil {
 			// return the error to requeue the event if converting to protobuf fails (e.g., due to invalid cloudevent).
 			return fmt.Errorf("failed to convert cloudevent to protobuf for resource(%s): %v", evt.ID(), err)
 		}
 
 		// send the cloudevent to the subscriber
-		klog.V(4).Infof("sending the event to spec subscribers, %s", evt.Context)
+		logger.V(4).Info("sending the event to spec subscribers", "eventContext", evt.Context)
 		select {
 		case eventCh <- pbEvt:
 		case <-ctx.Done():
@@ -238,12 +244,12 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 	case err := <-errChan:
 		// When reaching this point, an unrecoverable error occurred while sending the event,
 		// such as the connection being closed. Unregister the subscriber to trigger agent reconnection.
-		klog.Errorf("unregister subscriber %s, error= %v", subscriberID, err)
-		bkr.unregister(subscriberID)
+		logger.Error(err, "unregister subscriber", "id", subscriberID)
+		bkr.unregister(ctx, subscriberID)
 		return err
 	case err := <-sendErrCh:
-		klog.Errorf("failed to send event, unregister subscriber %s, error=%v", subscriberID, err)
-		bkr.unregister(subscriberID)
+		logger.Error(err, "failed to send event, unregister subscriber", "id", subscriberID)
+		bkr.unregister(ctx, subscriberID)
 		return err
 	case <-ctx.Done():
 		// The context of the stream has been canceled or completed.
@@ -252,7 +258,7 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 		// - The server closed the stream, potentially due to a shutdown.
 		// Regardless of the reason, unregister the subscriber and stop processing.
 		// No error is returned here because the stream closure is expected.
-		bkr.unregister(subscriberID)
+		bkr.unregister(ctx, subscriberID)
 		return nil
 	}
 }
@@ -307,7 +313,7 @@ func (bkr *GRPCBroker) respondResyncSpecRequest(ctx context.Context, eventDataTy
 		lastResourceVersion := findResourceVersion(obj.ID(), resourceVersions.Versions)
 		currentResourceVersion, err := cloudeventstypes.ToInteger(obj.Extensions()[types.ExtensionResourceVersion])
 		if err != nil {
-			log.V(4).Info("ignore the obj %v since it has a invalid resourceVersion, %v", obj, err)
+			log.V(4).Info("ignore the obj since it has a invalid resourceVersion", "object", obj, "error", err)
 			continue
 		}
 
@@ -383,7 +389,7 @@ func (bkr *GRPCBroker) handleRes(
 
 	for _, subscriber := range bkr.subscribers {
 		if subscriber.clusterName == clusterName && subscriber.dataType == t {
-			if err := subscriber.handler(evt); err != nil {
+			if err := subscriber.handler(ctx, evt); err != nil {
 				// check if the error is recoverable. For unrecoverable errors,
 				// such as a connection closed by an intermediate proxy, push
 				// the error to subscriber's error channel to unregister the subscriber.

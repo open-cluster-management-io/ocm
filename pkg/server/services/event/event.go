@@ -37,6 +37,8 @@ func (e *EventService) List(listOpts types.ListOptions) ([]*cloudevents.Event, e
 }
 
 func (e *EventService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.Event) error {
+	logger := klog.FromContext(ctx)
+
 	eventType, err := types.ParseCloudEventsType(evt.Type())
 	if err != nil {
 		return fmt.Errorf("failed to parse cloud event type %s, %v", evt.Type(), err)
@@ -46,7 +48,9 @@ func (e *EventService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.
 		return err
 	}
 
-	klog.V(4).Infof("event %s/%s %s %s", event.Namespace, event.Name, eventType.SubResource, eventType.Action)
+	logger.V(4).Info("handle event",
+		"eventNamespace", event.Namespace, "eventName", event.Name,
+		"subResource", eventType.SubResource, "actionType", eventType.Action)
 
 	switch eventType.Action {
 	case types.CreateRequestAction:
@@ -73,6 +77,6 @@ func (e *EventService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.
 	}
 }
 
-func (e *EventService) RegisterHandler(handler server.EventHandler) {
+func (e *EventService) RegisterHandler(_ context.Context, _ server.EventHandler) {
 	// do nothing
 }

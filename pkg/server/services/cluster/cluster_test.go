@@ -253,7 +253,7 @@ func TestHandleStatusUpdate(t *testing.T) {
 func TestEventHandlerFuncs(t *testing.T) {
 	handler := &clusterHandler{}
 	service := &ClusterService{}
-	eventHandlerFuncs := service.EventHandlerFuncs(handler)
+	eventHandlerFuncs := service.EventHandlerFuncs(context.Background(), handler)
 
 	cluster := &clusterv1.ManagedCluster{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"},

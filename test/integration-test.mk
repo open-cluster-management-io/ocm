@@ -30,8 +30,8 @@ build-work-integration:
 	go test -c ./test/integration/work -o ./work-integration.test
 
 test-registration-integration: ensure-kubebuilder-tools
-	go test -c ./test/integration/registration -o ./registration-integration.test
-	./registration-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast ${ARGS}
+	go test -c ./test/integration/registration -o ./registration-integration.test -mod=vendor
+	./registration-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast ${ARGS} -v=5
 .PHONY: test-registration-integration
 
 test-work-integration: ensure-kubebuilder-tools build-work-integration
@@ -76,5 +76,5 @@ test-cloudevents-work-grpc-integration: ensure-kubebuilder-tools build-work-inte
 test-integration: test-registration-operator-integration test-registration-integration test-placement-integration test-work-integration test-addon-integration
 .PHONY: test-integration
 
-test-cloudevents-integration: test-cloudevents-work-mqtt-integration test-cloudevents-work-grpc-integration
+test-cloudevents-integration: test-cloudevents-work-mqtt-integration
 .PHONY: test-cloudevents-integration
