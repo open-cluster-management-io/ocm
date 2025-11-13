@@ -1,3 +1,11 @@
+# v1.40.1 (2025-11-11)
+
+* **Bug Fix**: Return validation error if input region is not a valid host label.
+
+# v1.40.0 (2025-11-10)
+
+* **Feature**: Added GetDelegatedAccessToken API, which is not available for general use at this time.
+
 # v1.39.1 (2025-11-04)
 
 * **Dependency Update**: Updated to the latest SDK module versions
