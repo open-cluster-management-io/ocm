@@ -89,7 +89,7 @@ func (l *LeaseService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.
 	}
 }
 
-func (l *LeaseService) RegisterHandler(handler server.EventHandler) {
+func (l *LeaseService) RegisterHandler(ctx context.Context, handler server.EventHandler) {
 	if _, err := l.informer.Informer().AddEventHandler(l.EventHandlerFuncs(handler)); err != nil {
 		klog.Errorf("failed to register lease informer event handler, %v", err)
 	}

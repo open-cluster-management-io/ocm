@@ -90,7 +90,7 @@ func (s *AddonService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.
 	}
 }
 
-func (s *AddonService) RegisterHandler(handler server.EventHandler) {
+func (s *AddonService) RegisterHandler(ctx context.Context, handler server.EventHandler) {
 	if _, err := s.addonInformer.Informer().AddEventHandler(s.EventHandlerFuncs(handler)); err != nil {
 		klog.Errorf("failed to register addon informer event handler, %v", err)
 	}

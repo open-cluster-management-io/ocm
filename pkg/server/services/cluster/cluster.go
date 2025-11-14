@@ -93,7 +93,7 @@ func (c *ClusterService) HandleStatusUpdate(ctx context.Context, evt *cloudevent
 	}
 }
 
-func (c *ClusterService) RegisterHandler(handler server.EventHandler) {
+func (c *ClusterService) RegisterHandler(ctx context.Context, handler server.EventHandler) {
 	if _, err := c.clusterInformer.Informer().AddEventHandler(c.EventHandlerFuncs(handler)); err != nil {
 		klog.Errorf("failed to register cluster informer event handler, %v", err)
 	}

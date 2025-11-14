@@ -34,7 +34,7 @@ type ClientWatcherStore[T generic.ResourceObject] interface {
 	GetWatcher(namespace string, opts metav1.ListOptions) (watch.Interface, error)
 
 	// HandleReceivedResource handles the client received resource events.
-	HandleReceivedResource(action types.ResourceAction, resource T) error
+	HandleReceivedResource(ctx context.Context, action types.ResourceAction, resource T) error
 
 	// Add will be called by resource client when adding resources. The implementation is based on the specific
 	// watcher store, in some case, it does not need to update a store, but just send a watch event.
@@ -63,6 +63,7 @@ type ClientWatcherStore[T generic.ResourceObject] interface {
 }
 
 func WaitForStoreInit(ctx context.Context, cacheSyncs ...StoreInitiated) bool {
+	logger := klog.FromContext(ctx)
 	err := wait.PollUntilContextCancel(
 		ctx,
 		syncedPollPeriod,
@@ -77,7 +78,7 @@ func WaitForStoreInit(ctx context.Context, cacheSyncs ...StoreInitiated) bool {
 		},
 	)
 	if err != nil {
-		klog.Errorf("stop WaitForStoreInit, %v", err)
+		logger.Error(err, "stop WaitForStoreInit")
 		return false
 	}
 

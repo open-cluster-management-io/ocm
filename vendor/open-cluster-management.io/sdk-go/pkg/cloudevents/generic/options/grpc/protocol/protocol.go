@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"k8s.io/klog/v2"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/heartbeat"
 	"sync"
 	"time"
@@ -11,7 +12,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/cloudevents/sdk-go/v2/binding"
-	cecontext "github.com/cloudevents/sdk-go/v2/context"
 	"github.com/cloudevents/sdk-go/v2/protocol"
 
 	pbv1 "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protobuf/v1"
@@ -89,8 +89,8 @@ func (p *Protocol) Send(ctx context.Context, m binding.Message, transformers ...
 		return err
 	}
 
-	logger := cecontext.LoggerFrom(ctx)
-	logger.Infof("publishing event with id: %v", msg.Id)
+	logger := klog.FromContext(ctx)
+	logger.Info("publishing event", "messageID", msg.Id)
 	_, err = p.client.Publish(ctx, &pbv1.PublishRequest{
 		Event: msg,
 	})
@@ -112,7 +112,7 @@ func (p *Protocol) OpenInbound(ctx context.Context) error {
 	p.openerMutex.Lock()
 	defer p.openerMutex.Unlock()
 
-	logger := cecontext.LoggerFrom(ctx)
+	logger := klog.FromContext(ctx)
 	subClient, err := p.client.Subscribe(ctx, &pbv1.SubscriptionRequest{
 		Source:      p.subscribeOption.Source,
 		ClusterName: p.subscribeOption.ClusterName,
@@ -123,9 +123,9 @@ func (p *Protocol) OpenInbound(ctx context.Context) error {
 	}
 
 	if p.subscribeOption.Source != "" {
-		logger.Infof("subscribing events for: %v with data types: %v", p.subscribeOption.Source, p.subscribeOption.DataType)
+		logger.Info("subscribing events for source", "source", p.subscribeOption.Source, "eventDataType", p.subscribeOption.DataType)
 	} else {
-		logger.Infof("subscribing events for cluster: %v with data types: %v", p.subscribeOption.ClusterName, p.subscribeOption.DataType)
+		logger.Info("subscribing events for cluster", "cluster", p.subscribeOption.ClusterName, "eventDataType", p.subscribeOption.DataType)
 	}
 
 	subCtx, cancel := context.WithCancel(ctx)
@@ -146,7 +146,7 @@ func (p *Protocol) OpenInbound(ctx context.Context) error {
 	// ensure the event receiver and heartbeat watcher are done
 	cancel()
 
-	logger.Infof("Close grpc client connection")
+	logger.Info("Close grpc client connection")
 	return p.clientConn.Close()
 }
 
