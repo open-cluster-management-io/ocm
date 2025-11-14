@@ -14,6 +14,14 @@ spec:
     app: {{ .ClusterManagerName }}-grpc-server
   ports:
     - protocol: TCP
-      port: 8090 
+  {{ if eq .GRPCEndpointType "loadBalancer" }}
+      port: 443
+  {{ else }}
+      port: 8090
+  {{ end }}
       targetPort: 8090
+  {{ if eq .GRPCEndpointType "loadBalancer" }}
+  type: LoadBalancer
+  {{ else }}
   type: ClusterIP
+  {{ end }}
