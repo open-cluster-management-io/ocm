@@ -90,7 +90,7 @@ Refer to the [Additional Resources](#additional-resources) for more details.
 helm repo add ocm https://open-cluster-management.io/helm-charts
 helm repo update
 helm search repo ocm
-helm install argocd-agent-addon ocm/argocd-agent-addon
+helm install argocd-agent-addon ocm/argocd-agent-addon --namespace argocd --create-namespace
 ```
 
 Validate that the Argo CD Agent AddOn is successfully deployed and available:
