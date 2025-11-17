@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -50,7 +51,9 @@ func (s *SimpleStore[T]) HasInitiated() bool {
 	return true
 }
 
-func (s *SimpleStore[T]) HandleReceivedResource(action types.ResourceAction, resource T) error {
+func (s *SimpleStore[T]) HandleReceivedResource(ctx context.Context, action types.ResourceAction, resource T) error {
+	logger := klog.FromContext(ctx)
+
 	switch action {
 	case types.Added:
 		newObj, err := utils.ToRuntimeObject(resource)
@@ -75,7 +78,8 @@ func (s *SimpleStore[T]) HandleReceivedResource(action types.ResourceAction, res
 
 		// prevent the resource from being updated if it is deleting
 		if !lastObj.GetDeletionTimestamp().IsZero() {
-			klog.Warningf("the resource %s/%s is deleting, ignore the update", newObj.GetNamespace(), newObj.GetName())
+			logger.Info("the resource is deleting, ignore the update",
+				"resourceNamespace", newObj.GetNamespace(), "resourceName", newObj.GetName())
 			return nil
 		}
 

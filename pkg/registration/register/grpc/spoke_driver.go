@@ -31,7 +31,8 @@ import (
 	cloudeventsoptions "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options"
 	cloudeventsstore "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/store"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/constants"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/builder"
+
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/cert"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc"
 
@@ -237,7 +238,7 @@ func (d *GRPCDriver) loadConfig(secretOption register.SecretOption, bootstrapped
 	var config any
 	var configFile string
 	if bootstrapped {
-		_, config, err = generic.NewConfigLoader(constants.ConfigTypeGRPC, d.opt.BootstrapConfigFile).LoadConfig()
+		_, config, err = builder.NewConfigLoader(constants.ConfigTypeGRPC, d.opt.BootstrapConfigFile).LoadConfig()
 		if err != nil {
 			return nil, nil, fmt.Errorf(
 				"failed to load hub bootstrap registration config from file %q: %w",
@@ -246,7 +247,7 @@ func (d *GRPCDriver) loadConfig(secretOption register.SecretOption, bootstrapped
 
 		configFile = d.opt.BootstrapConfigFile
 	} else {
-		_, config, err = generic.NewConfigLoader(constants.ConfigTypeGRPC, d.opt.ConfigFile).LoadConfig()
+		_, config, err = builder.NewConfigLoader(constants.ConfigTypeGRPC, d.opt.ConfigFile).LoadConfig()
 		if err != nil {
 			return nil, nil, fmt.Errorf(
 				"failed to load hub registration config from file %q: %w",

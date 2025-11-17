@@ -15,15 +15,17 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
-type mqttAgentOptions struct {
+type mqttAgentTransport struct {
 	MQTTOptions
-	errorChan   chan error
-	clusterName string
-	agentID     string
+	protocol          *cloudeventsmqtt.Protocol
+	cloudEventsClient cloudevents.Client
+	errorChan         chan error
+	clusterName       string
+	agentID           string
 }
 
 func NewAgentOptions(mqttOptions *MQTTOptions, clusterName, agentID string) *options.CloudEventsAgentOptions {
-	mqttAgentOptions := &mqttAgentOptions{
+	mqttAgentOptions := &mqttAgentTransport{
 		MQTTOptions: *mqttOptions,
 		errorChan:   make(chan error),
 		clusterName: clusterName,
@@ -31,13 +33,15 @@ func NewAgentOptions(mqttOptions *MQTTOptions, clusterName, agentID string) *opt
 	}
 
 	return &options.CloudEventsAgentOptions{
-		CloudEventsOptions: mqttAgentOptions,
-		AgentID:            mqttAgentOptions.agentID,
-		ClusterName:        mqttAgentOptions.clusterName,
+		CloudEventsTransport: mqttAgentOptions,
+		AgentID:              mqttAgentOptions.agentID,
+		ClusterName:          mqttAgentOptions.clusterName,
 	}
 }
 
-func (o *mqttAgentOptions) WithContext(ctx context.Context, evtCtx cloudevents.EventContext) (context.Context, error) {
+func (o *mqttAgentTransport) WithContext(ctx context.Context, evtCtx cloudevents.EventContext) (context.Context, error) {
+	logger := klog.FromContext(ctx)
+
 	topic, err := getAgentPubTopic(ctx)
 	if err != nil {
 		return nil, err
@@ -60,7 +64,7 @@ func (o *mqttAgentOptions) WithContext(ctx context.Context, evtCtx cloudevents.E
 	// agent request to sync resource spec from all sources
 	if eventType.Action == types.ResyncRequestAction && originalSource == types.SourceAll {
 		if len(o.Topics.AgentBroadcast) == 0 {
-			klog.Warningf("the agent broadcast topic not set, fall back to the agent events topic")
+			logger.Info("the agent broadcast topic not set, fall back to the agent events topic")
 
 			// TODO after supporting multiple sources, we should list each source
 			eventsTopic := replaceLast(o.Topics.AgentEvents, "+", o.clusterName)
@@ -82,7 +86,7 @@ func (o *mqttAgentOptions) WithContext(ctx context.Context, evtCtx cloudevents.E
 	return cloudeventscontext.WithTopic(ctx, eventsTopic), nil
 }
 
-func (o *mqttAgentOptions) Protocol(ctx context.Context, dataType types.CloudEventsDataType) (options.CloudEventsProtocol, error) {
+func (o *mqttAgentTransport) Connect(ctx context.Context) error {
 	subscribe := &paho.Subscribe{
 		Subscriptions: []paho.SubscribeOptions{
 			{
@@ -102,7 +106,7 @@ func (o *mqttAgentOptions) Protocol(ctx context.Context, dataType types.CloudEve
 		})
 	}
 
-	return o.GetCloudEventsProtocol(
+	protocol, err := o.GetCloudEventsProtocol(
 		ctx,
 		fmt.Sprintf("%s-client", o.agentID),
 		func(err error) {
@@ -111,8 +115,37 @@ func (o *mqttAgentOptions) Protocol(ctx context.Context, dataType types.CloudEve
 		cloudeventsmqtt.WithPublish(&paho.Publish{QoS: byte(o.PubQoS)}),
 		cloudeventsmqtt.WithSubscribe(subscribe),
 	)
+	if err != nil {
+		return err
+	}
+
+	o.protocol = protocol
+	o.cloudEventsClient, err = cloudevents.NewClient(o.protocol)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func (o *mqttAgentOptions) ErrorChan() <-chan error {
+func (o *mqttAgentTransport) Send(ctx context.Context, evt cloudevents.Event) error {
+	sendingCtx, err := o.WithContext(ctx, evt.Context)
+	if err != nil {
+		return err
+	}
+	if err := o.cloudEventsClient.Send(sendingCtx, evt); cloudevents.IsUndelivered(err) {
+		return err
+	}
+	return nil
+}
+
+func (o *mqttAgentTransport) Receive(ctx context.Context, fn options.ReceiveHandlerFn) error {
+	return o.cloudEventsClient.StartReceiver(ctx, fn)
+}
+
+func (o *mqttAgentTransport) Close(ctx context.Context) error {
+	return o.protocol.Close(ctx)
+}
+
+func (o *mqttAgentTransport) ErrorChan() <-chan error {
 	return o.errorChan
 }

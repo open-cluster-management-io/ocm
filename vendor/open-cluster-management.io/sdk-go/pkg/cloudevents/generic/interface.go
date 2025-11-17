@@ -12,7 +12,7 @@ import (
 )
 
 // ResourceHandler handles the received resource object.
-type ResourceHandler[T ResourceObject] func(action types.ResourceAction, obj T) error
+type ResourceHandler[T ResourceObject] func(ctx context.Context, action types.ResourceAction, obj T) error
 
 // StatusHashGetter gets the status hash of one resource object.
 type StatusHashGetter[T ResourceObject] func(obj T) (string, error)

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -27,7 +28,7 @@ type baseSourceStore struct {
 	receivedWorks workqueue.TypedRateLimitingInterface[*workv1.ManifestWork]
 }
 
-func (bs *baseSourceStore) HandleReceivedResource(action types.ResourceAction, work *workv1.ManifestWork) error {
+func (bs *baseSourceStore) HandleReceivedResource(_ context.Context, action types.ResourceAction, work *workv1.ManifestWork) error {
 	switch action {
 	case types.StatusModified:
 		bs.receivedWorks.Add(work)
@@ -50,26 +51,26 @@ func newWorkProcessor(works workqueue.TypedRateLimitingInterface[*workv1.Manifes
 	}
 }
 
-func (b *workProcessor) run(stopCh <-chan struct{}) {
+func (b *workProcessor) run(ctx context.Context) {
 	defer b.works.ShutDown()
 
 	// start a goroutine to handle the works from the queue
 	// the .Until will re-kick the runWorker one second after the runWorker completes
-	go wait.Until(b.runWorker, time.Second, stopCh)
+	go wait.UntilWithContext(ctx, b.runWorker, time.Second)
 
 	// wait until we're told to stop
-	<-stopCh
+	<-ctx.Done()
 }
 
-func (b *workProcessor) runWorker() {
+func (b *workProcessor) runWorker(ctx context.Context) {
 	// hot loop until we're told to stop. processNextEvent will automatically wait until there's work available, so
 	// we don't worry about secondary waits
-	for b.processNextWork() {
+	for b.processNextWork(ctx) {
 	}
 }
 
 // processNextWork deals with one key off the queue.
-func (b *workProcessor) processNextWork() bool {
+func (b *workProcessor) processNextWork(ctx context.Context) bool {
 	// pull the next event item from queue.
 	// events queue blocks until it can return an item to be processed
 	key, quit := b.works.Get()
@@ -79,7 +80,7 @@ func (b *workProcessor) processNextWork() bool {
 	}
 	defer b.works.Done(key)
 
-	if err := b.handleWork(key); err != nil {
+	if err := b.handleWork(ctx, key); err != nil {
 		// we failed to handle the work, we should requeue the item to work on later
 		// this method will add a backoff to avoid hotlooping on particular items
 		b.works.AddRateLimited(key)
@@ -91,8 +92,9 @@ func (b *workProcessor) processNextWork() bool {
 	return true
 }
 
-func (b *workProcessor) handleWork(work *workv1.ManifestWork) error {
-	lastWork := b.getWork(work.UID)
+func (b *workProcessor) handleWork(ctx context.Context, work *workv1.ManifestWork) error {
+	logger := klog.FromContext(ctx).WithValues("manifestWorkNamespace", work.Namespace, "manifestWorkName", work.Name)
+	lastWork := b.getWork(ctx, work.UID)
 	if lastWork == nil {
 		// the work is not found from the local cache and it has been deleted by the agent,
 		// ignore this work.
@@ -116,20 +118,20 @@ func (b *workProcessor) handleWork(work *workv1.ManifestWork) error {
 
 	lastResourceVersion, err := strconv.Atoi(lastWork.ResourceVersion)
 	if err != nil {
-		klog.Errorf("invalid resource version for work %s/%s, %v", lastWork.Namespace, lastWork.Name, err)
+		logger.Error(err, "invalid resource version for work")
 		return nil
 	}
 
 	resourceVersion, err := strconv.Atoi(work.ResourceVersion)
 	if err != nil {
-		klog.Errorf("invalid resource version for work %s/%s, %v", lastWork.Namespace, lastWork.Name, err)
+		logger.Error(err, "invalid resource version for work")
 		return nil
 	}
 
 	// the current work's version is maintained on source and the agent's work is newer than source, ignore
 	if lastResourceVersion != 0 && resourceVersion > lastResourceVersion {
-		klog.Warningf("the work %s/%s resource version %d is great than its generation %d, ignore",
-			lastWork.Namespace, lastWork.Name, resourceVersion, lastResourceVersion)
+		logger.Info("the work resource version is great than its generation, ignore",
+			"agentResourceVersion", resourceVersion, "sourceResourceVersion", lastResourceVersion)
 		return nil
 	}
 
@@ -140,13 +142,13 @@ func (b *workProcessor) handleWork(work *workv1.ManifestWork) error {
 	sequenceID := work.Annotations[common.CloudEventsSequenceIDAnnotationKey]
 	greater, err := utils.CompareSnowflakeSequenceIDs(lastSequenceID, sequenceID)
 	if err != nil {
-		klog.Errorf("invalid sequenceID for work %s/%s, %v", lastWork.Namespace, lastWork.Name, err)
+		logger.Error(err, "invalid sequenceID for work")
 		return nil
 	}
 
 	if !greater {
-		klog.Warningf("the work %s/%s current sequenceID %s is less than its last %s, ignore",
-			lastWork.Namespace, lastWork.Name, sequenceID, lastSequenceID)
+		logger.Info("the work current sequenceID is less than its last, ignore",
+			"currentSequenceID", sequenceID, "lastSequenceID", lastSequenceID)
 		return nil
 	}
 
@@ -163,10 +165,11 @@ func (b *workProcessor) handleWork(work *workv1.ManifestWork) error {
 	return b.store.Update(updatedWork)
 }
 
-func (b *workProcessor) getWork(uid kubetypes.UID) *workv1.ManifestWork {
+func (b *workProcessor) getWork(ctx context.Context, uid kubetypes.UID) *workv1.ManifestWork {
+	logger := klog.FromContext(ctx)
 	works, err := b.store.ListAll()
 	if err != nil {
-		klog.Errorf("failed to lists works, %v", err)
+		logger.Error(err, "failed to lists works")
 		return nil
 	}
 

@@ -43,7 +43,7 @@ func NewSourceInformerWatcherStore(ctx context.Context) *SourceInformerWatcherSt
 	}
 
 	// start a goroutine to process the received work events from the work queue with current store.
-	go newWorkProcessor(s.receivedWorks, s).run(ctx.Done())
+	go newWorkProcessor(s.receivedWorks, s).run(ctx)
 
 	return s
 }
@@ -101,7 +101,9 @@ func NewAgentInformerWatcherStore() *AgentInformerWatcherStore {
 	}
 }
 
-func (s *AgentInformerWatcherStore) HandleReceivedResource(action types.ResourceAction, work *workv1.ManifestWork) error {
+func (s *AgentInformerWatcherStore) HandleReceivedResource(ctx context.Context, action types.ResourceAction, work *workv1.ManifestWork) error {
+	logger := klog.FromContext(ctx)
+
 	switch action {
 	case types.Added:
 		return s.Add(work.DeepCopy())
@@ -115,7 +117,8 @@ func (s *AgentInformerWatcherStore) HandleReceivedResource(action types.Resource
 		}
 		// prevent the work from being updated if it is deleting
 		if !lastWork.GetDeletionTimestamp().IsZero() {
-			klog.Warningf("the work %s/%s is deleting, ignore the update", work.Namespace, work.Name)
+			logger.Info("the work is deleting, ignore the update",
+				"manifestWorkNamespace", work.Namespace, "manifestWorkName", work.Name)
 			return nil
 		}
 
