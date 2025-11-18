@@ -98,7 +98,7 @@ func (c *CSRService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.Ev
 	}
 }
 
-func (c *CSRService) RegisterHandler(handler server.EventHandler) {
+func (c *CSRService) RegisterHandler(ctx context.Context, handler server.EventHandler) {
 	if _, err := c.csrInformer.Informer().AddEventHandler(c.EventHandlerFuncs(handler)); err != nil {
 		klog.Errorf("failed to register csr informer event handler, %v", err)
 	}

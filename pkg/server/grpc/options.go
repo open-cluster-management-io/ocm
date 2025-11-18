@@ -56,17 +56,29 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 
 	// initlize grpc broker and register services
 	grpcEventServer := cloudeventsgrpc.NewGRPCBroker()
-	grpcEventServer.RegisterService(clusterce.ManagedClusterEventDataType,
+	grpcEventServer.RegisterService(
+		ctx,
+		clusterce.ManagedClusterEventDataType,
 		cluster.NewClusterService(clients.ClusterClient, clients.ClusterInformers.Cluster().V1().ManagedClusters()))
-	grpcEventServer.RegisterService(csrce.CSREventDataType,
+	grpcEventServer.RegisterService(
+		ctx,
+		csrce.CSREventDataType,
 		csr.NewCSRService(clients.KubeClient, clients.KubeInformers.Certificates().V1().CertificateSigningRequests()))
-	grpcEventServer.RegisterService(addonce.ManagedClusterAddOnEventDataType,
+	grpcEventServer.RegisterService(
+		ctx,
+		addonce.ManagedClusterAddOnEventDataType,
 		addon.NewAddonService(clients.AddOnClient, clients.AddOnInformers.Addon().V1alpha1().ManagedClusterAddOns()))
-	grpcEventServer.RegisterService(eventce.EventEventDataType,
+	grpcEventServer.RegisterService(
+		ctx,
+		eventce.EventEventDataType,
 		event.NewEventService(clients.KubeClient))
-	grpcEventServer.RegisterService(leasece.LeaseEventDataType,
+	grpcEventServer.RegisterService(
+		ctx,
+		leasece.LeaseEventDataType,
 		lease.NewLeaseService(clients.KubeClient, clients.KubeInformers.Coordination().V1().Leases()))
-	grpcEventServer.RegisterService(payload.ManifestBundleEventDataType,
+	grpcEventServer.RegisterService(
+		ctx,
+		payload.ManifestBundleEventDataType,
 		work.NewWorkService(clients.WorkClient, clients.WorkInformers.Work().V1().ManifestWorks()))
 
 	// initlize and run grpc server

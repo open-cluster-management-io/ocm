@@ -84,7 +84,6 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 	clusterClient := clusterClientHolder.ClusterInterface()
 	clusterInformers := clusterinformers.NewSharedInformerFactory(
 		clusterClient, 10*time.Minute).Cluster().V1().ManagedClusters()
-	clusterWatchStore.SetInformer(clusterInformers.Informer())
 
 	csrClientHolder, err := cloudeventscsr.NewAgentClientHolder(ctx,
 		cloudeventsoptions.NewGenericClientOptions(
@@ -152,7 +151,6 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 	addonInformer := addoninformers.NewSharedInformerFactoryWithOptions(
 		addonClient, 10*time.Minute, addoninformers.WithNamespace(secretOption.ClusterName)).
 		Addon().V1alpha1().ManagedClusterAddOns()
-	addonWatchStore.SetInformer(addonInformer.Informer())
 
 	clients := &register.Clients{
 		ClusterClient:   clusterClient,

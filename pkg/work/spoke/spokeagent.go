@@ -262,10 +262,5 @@ func (o *WorkAgentConfig) newWorkClientAndInformer(
 	)
 	informer := factory.Work().V1().ManifestWorks()
 
-	// For cloudevents work client, we use the informer store as the client store
-	if watcherStore != nil {
-		watcherStore.SetInformer(informer.Informer())
-	}
-
 	return hubHost, workClient.WorkV1().ManifestWorks(o.agentOptions.SpokeClusterName), informer, nil
 }

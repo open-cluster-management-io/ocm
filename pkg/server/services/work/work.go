@@ -146,7 +146,7 @@ func (w *WorkService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.E
 	}
 }
 
-func (w *WorkService) RegisterHandler(handler server.EventHandler) {
+func (w *WorkService) RegisterHandler(ctx context.Context, handler server.EventHandler) {
 	if _, err := w.workInformer.Informer().AddEventHandler(w.EventHandlerFuncs(handler)); err != nil {
 		klog.Errorf("failed to register work informer event handler, %v", err)
 	}
