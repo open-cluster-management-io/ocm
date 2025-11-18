@@ -78,6 +78,12 @@ func (o *gRPCSourceTransport) Send(ctx context.Context, evt cloudevents.Event) e
 	return nil
 }
 
+func (o *gRPCSourceTransport) Subscribe(ctx context.Context) error {
+	// Subscription is handled by the cloudevents client during receiver startup.
+	// No action needed here.
+	return nil
+}
+
 func (o *gRPCSourceTransport) Receive(ctx context.Context, fn options.ReceiveHandlerFn) error {
 	return o.cloudEventsClient.StartReceiver(ctx, fn)
 }

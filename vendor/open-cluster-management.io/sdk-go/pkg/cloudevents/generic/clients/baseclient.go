@@ -79,7 +79,7 @@ func (c *baseClient) connect(ctx context.Context) error {
 				// TODO enhance the cloudevents SKD to avoid wrapping the error type to distinguish the net connection
 				// errors
 				if err != nil {
-					// failed to reconnect, try agin
+					// failed to reconnect, try again
 					runtime.HandleErrorWithContext(ctx, err, "the cloudevents client reconnect failed")
 					<-wait.RealTimer(DelayFn()).C()
 					continue
@@ -89,14 +89,11 @@ func (c *baseClient) connect(ctx context.Context) error {
 				metrics.IncreaseClientReconnectedCounter(c.clientID)
 				c.setClientReady(true)
 				c.sendReceiverSignal(restartReceiverSignal)
-				c.sendReconnectedSignal()
 			}
 
 			select {
 			case <-ctx.Done():
-				if c.receiverChan != nil {
-					close(c.receiverChan)
-				}
+				c.closeChannels()
 				return
 			case err, ok := <-c.transport.ErrorChan():
 				if !ok {
@@ -164,22 +161,52 @@ func (c *baseClient) subscribe(ctx context.Context, receive receiveFn) {
 		return
 	}
 
+	// send subscription request before starting to receive events
+	if err := c.transport.Subscribe(ctx); err != nil {
+		runtime.HandleErrorWithContext(ctx, err, "failed to subscribe")
+		return
+	}
+
 	c.receiverChan = make(chan int)
 
 	// start a go routine to handle cloudevents subscription
 	go func() {
-		receiverCtx, receiverCancel := context.WithCancel(context.TODO())
+		receiverCtx, receiverCancel := context.WithCancel(ctx)
 		startReceiving := true
+		subscribed := true
 
 		for {
+			if !subscribed {
+				// resubscribe before restarting the receiver
+				if err := c.transport.Subscribe(ctx); err != nil {
+					if ctx.Err() != nil {
+						receiverCancel()
+						return
+					}
+
+					runtime.HandleError(fmt.Errorf("failed to resubscribe, %v", err))
+					select {
+					case <-ctx.Done():
+						receiverCancel()
+						return
+					case <-wait.RealTimer(DelayFn()).C():
+					}
+					continue
+				}
+				subscribed = true
+				// notify the client caller to resync the resources
+				c.sendReconnectedSignal(ctx)
+			}
+
 			if startReceiving {
 				go func() {
-					if err := c.transport.Receive(receiverCtx, func(evt cloudevents.Event) {
+					if err := c.transport.Receive(receiverCtx, func(ctx context.Context, evt cloudevents.Event) {
+						logger := klog.FromContext(ctx)
 						logger.V(2).Info("Received event", "event", evt.Context)
 						if logger.V(5).Enabled() {
 							logger.V(5).Info("Received event", "event", evt.String())
 						}
-						receive(receiverCtx, evt)
+						receive(ctx, evt)
 					}); err != nil {
 						runtime.HandleError(fmt.Errorf("failed to receive cloudevents, %v", err))
 					}
@@ -191,7 +218,7 @@ func (c *baseClient) subscribe(ctx context.Context, receive receiveFn) {
 			case <-ctx.Done():
 				receiverCancel()
 				return
-			case signal, ok := <-c.receiverChan:
+			case signal, ok := <-c.getReceiverChan():
 				if !ok {
 					// receiver channel is closed, stop the receiver
 					receiverCancel()
@@ -202,8 +229,9 @@ func (c *baseClient) subscribe(ctx context.Context, receive receiveFn) {
 				case restartReceiverSignal:
 					logger.V(2).Info("restart the cloudevents receiver")
 					// rebuild the receiver context and restart receiving
-					receiverCtx, receiverCancel = context.WithCancel(context.TODO())
+					receiverCtx, receiverCancel = context.WithCancel(ctx)
 					startReceiving = true
+					subscribed = false
 				case stopReceiverSignal:
 					logger.V(2).Info("stop the cloudevents receiver")
 					receiverCancel()
@@ -224,10 +252,32 @@ func (c *baseClient) sendReceiverSignal(signal int) {
 	}
 }
 
-func (c *baseClient) sendReconnectedSignal() {
+func (c *baseClient) closeChannels() {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.receiverChan != nil {
+		close(c.receiverChan)
+		c.receiverChan = nil
+	}
+	if c.reconnectedChan != nil {
+		close(c.reconnectedChan)
+		c.reconnectedChan = nil
+	}
+}
+
+func (c *baseClient) sendReconnectedSignal(ctx context.Context) {
 	c.RLock()
 	defer c.RUnlock()
-	c.reconnectedChan <- struct{}{}
+	if c.reconnectedChan != nil {
+		select {
+		case c.reconnectedChan <- struct{}{}:
+			// Signal sent successfully
+		default:
+			// No receiver listening on reconnectedChan, that's okay - don't block
+			klog.FromContext(ctx).Info("reconnected signal not sent, no receiver listening")
+		}
+	}
 }
 
 func (c *baseClient) isClientReady() bool {
@@ -240,4 +290,10 @@ func (c *baseClient) setClientReady(ready bool) {
 	c.Lock()
 	defer c.Unlock()
 	c.clientReady = ready
+}
+
+func (c *baseClient) getReceiverChan() chan int {
+	c.RLock()
+	defer c.RUnlock()
+	return c.receiverChan
 }

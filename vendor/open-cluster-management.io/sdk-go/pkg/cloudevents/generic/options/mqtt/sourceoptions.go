@@ -132,6 +132,14 @@ func (o *mqttSourceTransport) Send(ctx context.Context, evt cloudevents.Event) e
 	return nil
 }
 
+func (o *mqttSourceTransport) Subscribe(ctx context.Context) error {
+	// Subscription is handled by the cloudevents client during receiver startup.
+	// No action needed here.
+	// TODO: consider implementing native subscription logic in v2 to decouple from
+	// the CloudEvents SDK.
+	return nil
+}
+
 func (o *mqttSourceTransport) Receive(ctx context.Context, fn options.ReceiveHandlerFn) error {
 	return o.cloudEventsClient.StartReceiver(ctx, fn)
 }

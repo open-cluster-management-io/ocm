@@ -7,6 +7,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt"
+	grpcv2 "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/v2/grpc"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
@@ -57,7 +58,7 @@ func BuildCloudEventsSourceOptions(config any,
 	case *mqtt.MQTTOptions:
 		return mqtt.NewSourceOptions(config, clientId, sourceId), nil
 	case *grpc.GRPCOptions:
-		return grpc.NewSourceOptions(config, sourceId, dataType), nil
+		return grpcv2.NewSourceOptions(config, sourceId, dataType), nil
 	default:
 		return nil, fmt.Errorf("unsupported client configuration type %T", config)
 	}
@@ -70,7 +71,7 @@ func BuildCloudEventsAgentOptions(config any,
 	case *mqtt.MQTTOptions:
 		return mqtt.NewAgentOptions(config, clusterName, clientId), nil
 	case *grpc.GRPCOptions:
-		return grpc.NewAgentOptions(config, clusterName, clientId, dataType), nil
+		return grpcv2.NewAgentOptions(config, clusterName, clientId, dataType), nil
 	default:
 		return nil, fmt.Errorf("unsupported client configuration type %T", config)
 	}

@@ -20,6 +20,7 @@ type grpcAgentTransport struct {
 	dataType          types.CloudEventsDataType
 }
 
+// Deprecated: use v2.grpc.NewAgentOptions instead
 func NewAgentOptions(grpcOptions *GRPCOptions,
 	clusterName, agentID string, dataType types.CloudEventsDataType) *options.CloudEventsAgentOptions {
 	return &options.CloudEventsAgentOptions{
@@ -79,6 +80,12 @@ func (o *grpcAgentTransport) Send(ctx context.Context, evt cloudevents.Event) er
 	if err := o.cloudEventsClient.Send(ctx, evt); cloudevents.IsUndelivered(err) {
 		return err
 	}
+	return nil
+}
+
+func (o *grpcAgentTransport) Subscribe(ctx context.Context) error {
+	// Subscription is handled by the cloudevents client during receiver startup.
+	// No action needed here.
 	return nil
 }
 

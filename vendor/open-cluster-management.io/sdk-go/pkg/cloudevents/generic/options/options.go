@@ -10,7 +10,7 @@ import (
 // ReceiveHandlerFn is a callback function invoked for each received CloudEvent.
 // The handler is called synchronously within the Receive loop, so blocking operations
 // in the handler will block the reception of subsequent events.
-type ReceiveHandlerFn func(evt cloudevents.Event)
+type ReceiveHandlerFn func(cxt context.Context, evt cloudevents.Event)
 
 // CloudEventTransport sends/receives cloudevents based on different event protocol.
 //
@@ -21,12 +21,16 @@ type CloudEventTransport interface {
 	// Connect establishes a connection to the event transport.
 	// This method should be called before Send or Receive.
 	// Returns an error if the connection cannot be established.
-	// TODO remove the dataType
 	Connect(ctx context.Context) error
 
 	// Send transmits a CloudEvent through the transport.
 	// Returns an error if the event cannot be send.
 	Send(ctx context.Context, evt cloudevents.Event) error
+
+	// Subscribe sends a subscription request to the transport to subscribe topics/services.
+	// This is a non-blocking method that should be called after Connect and before Receive.
+	// Returns an error if the subscription request cannot be sent.
+	Subscribe(ctx context.Context) error
 
 	// Receive starts receiving events and invokes the provided handler for each event.
 	// This is a BLOCKING call that runs an event loop until the context is cancelled.
