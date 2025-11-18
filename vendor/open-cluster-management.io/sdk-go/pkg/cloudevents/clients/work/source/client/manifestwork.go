@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,27 +53,34 @@ func (c *ManifestWorkSourceClient) SetNamespace(namespace string) {
 }
 
 func (c *ManifestWorkSourceClient) Create(ctx context.Context, manifestWork *workv1.ManifestWork, opts metav1.CreateOptions) (*workv1.ManifestWork, error) {
+	var returnErr *errors.StatusError
+
+	defer func() {
+		if returnErr != nil {
+			metrics.IncreaseWorkProcessedCounter("create", string(returnErr.ErrStatus.Reason))
+		} else {
+			metrics.IncreaseWorkProcessedCounter("create", metav1.StatusSuccess)
+		}
+	}()
+
 	if manifestWork.Namespace != "" && manifestWork.Namespace != c.namespace {
-		returnErr := errors.NewInvalid(common.ManifestWorkGK, manifestWork.Name, field.ErrorList{
+		returnErr = errors.NewInvalid(common.ManifestWorkGK, manifestWork.Name, field.ErrorList{
 			field.Invalid(
 				field.NewPath("metadata").Child("namespace"),
 				manifestWork.Namespace,
 				fmt.Sprintf("does not match the namespace %s", c.namespace),
 			),
 		})
-		metrics.IncreaseWorkProcessedCounter("create", string(returnErr.ErrStatus.Reason))
 		return nil, returnErr
 	}
 
 	_, exists, err := c.watcherStore.Get(c.namespace, manifestWork.Name)
 	if err != nil {
-		returnErr := errors.NewInternalError(err)
-		metrics.IncreaseWorkProcessedCounter("create", string(returnErr.ErrStatus.Reason))
+		returnErr = errors.NewInternalError(err)
 		return nil, returnErr
 	}
 	if exists {
-		returnErr := errors.NewAlreadyExists(common.ManifestWorkGR, manifestWork.Name)
-		metrics.IncreaseWorkProcessedCounter("create", string(returnErr.ErrStatus.Reason))
+		returnErr = errors.NewAlreadyExists(common.ManifestWorkGR, manifestWork.Name)
 		return nil, returnErr
 	}
 
@@ -87,34 +95,36 @@ func (c *ManifestWorkSourceClient) Create(ctx context.Context, manifestWork *wor
 	newWork := manifestWork.DeepCopy()
 	newWork.UID = kubetypes.UID(utils.UID(c.sourceID, common.ManifestWorkGR.String(), c.namespace, newWork.Name))
 	newWork.Namespace = c.namespace
-	newWork.ResourceVersion = getWorkResourceVersion(manifestWork)
+
+	rv, generation, err := getWorkResourceVersion(manifestWork)
+	if err != nil {
+		returnErr = errors.NewInternalError(err)
+		return nil, returnErr
+	}
+	newWork.Generation = generation
+	newWork.ResourceVersion = rv
 
 	if err := utils.EncodeManifests(newWork); err != nil {
-		returnErr := errors.NewInternalError(err)
-		metrics.IncreaseWorkProcessedCounter("create", string(returnErr.ErrStatus.Reason))
+		returnErr = errors.NewInternalError(err)
 		return nil, returnErr
 	}
 
 	if errs := utils.ValidateWork(newWork); len(errs) != 0 {
-		returnErr := errors.NewInvalid(common.ManifestWorkGK, manifestWork.Name, errs)
-		metrics.IncreaseWorkProcessedCounter("create", string(returnErr.ErrStatus.Reason))
+		returnErr = errors.NewInvalid(common.ManifestWorkGK, manifestWork.Name, errs)
 		return nil, returnErr
 	}
 
 	if err := c.cloudEventsClient.Publish(ctx, eventType, newWork); err != nil {
-		returnErr := cloudeventserrors.ToStatusError(common.ManifestWorkGR, manifestWork.Name, err)
-		metrics.IncreaseWorkProcessedCounter("create", string(returnErr.ErrStatus.Reason))
+		returnErr = cloudeventserrors.ToStatusError(common.ManifestWorkGR, manifestWork.Name, err)
 		return nil, returnErr
 	}
 
 	// add the new work to the local cache.
 	if err := c.watcherStore.Add(newWork); err != nil {
-		returnErr := errors.NewInternalError(err)
-		metrics.IncreaseWorkProcessedCounter("create", string(returnErr.ErrStatus.Reason))
+		returnErr = errors.NewInternalError(err)
 		return nil, returnErr
 	}
 
-	metrics.IncreaseWorkProcessedCounter("create", metav1.StatusSuccess)
 	return newWork.DeepCopy(), nil
 }
 
@@ -238,29 +248,34 @@ func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt ku
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("patching manifestwork", "manifestWorkName", name)
 
+	var returnErr *errors.StatusError
+	defer func() {
+		if returnErr != nil {
+			metrics.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		} else {
+			metrics.IncreaseWorkProcessedCounter("patch", metav1.StatusSuccess)
+		}
+	}()
+
 	if len(subresources) != 0 {
 		msg := fmt.Sprintf("unsupported to update subresources %v", subresources)
-		returnErr := errors.NewGenericServerResponse(http.StatusMethodNotAllowed, "patch", common.ManifestWorkGR, name, msg, 0, false)
-		metrics.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		returnErr = errors.NewGenericServerResponse(http.StatusMethodNotAllowed, "patch", common.ManifestWorkGR, name, msg, 0, false)
 		return nil, returnErr
 	}
 
 	lastWork, exists, err := c.watcherStore.Get(c.namespace, name)
 	if err != nil {
-		returnErr := errors.NewInternalError(err)
-		metrics.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		returnErr = errors.NewInternalError(err)
 		return nil, returnErr
 	}
 	if !exists {
-		returnErr := errors.NewNotFound(common.ManifestWorkGR, name)
-		metrics.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		returnErr = errors.NewNotFound(common.ManifestWorkGR, name)
 		return nil, returnErr
 	}
 
 	patchedWork, err := utils.Patch(pt, lastWork, data)
 	if err != nil {
-		returnErr := errors.NewInternalError(err)
-		metrics.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		returnErr = errors.NewInternalError(err)
 		return nil, returnErr
 	}
 
@@ -273,28 +288,30 @@ func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt ku
 	}
 
 	newWork := patchedWork.DeepCopy()
-	newWork.ResourceVersion = getWorkResourceVersion(patchedWork)
+	rv, generation, err := getWorkResourceVersion(patchedWork)
+	if err != nil {
+		returnErr = errors.NewInternalError(err)
+		return nil, returnErr
+	}
+	newWork.Generation = generation
+	newWork.ResourceVersion = rv
 
 	if errs := utils.ValidateWork(newWork); len(errs) != 0 {
-		returnErr := errors.NewInvalid(common.ManifestWorkGK, name, errs)
-		metrics.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		returnErr = errors.NewInvalid(common.ManifestWorkGK, name, errs)
 		return nil, returnErr
 	}
 
 	if err := c.cloudEventsClient.Publish(ctx, eventType, newWork); err != nil {
-		returnErr := cloudeventserrors.ToStatusError(common.ManifestWorkGR, name, err)
-		metrics.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		returnErr = cloudeventserrors.ToStatusError(common.ManifestWorkGR, name, err)
 		return nil, returnErr
 	}
 
 	// modify the updated work in the local cache.
 	if err := c.watcherStore.Update(newWork); err != nil {
-		returnErr := errors.NewInternalError(err)
-		metrics.IncreaseWorkProcessedCounter("patch", string(returnErr.ErrStatus.Reason))
+		returnErr = errors.NewInternalError(err)
 		return nil, returnErr
 	}
 
-	metrics.IncreaseWorkProcessedCounter("patch", metav1.StatusSuccess)
 	return newWork.DeepCopy(), nil
 }
 
@@ -303,15 +320,29 @@ func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt ku
 // firstly, if no annotation is set, we will get the the resource version from work itself,
 // if the wok does not have it, "0" will be returned, which means the version of the work
 // will not be maintained on source, the message broker guarantees the work update order.
-func getWorkResourceVersion(work *workv1.ManifestWork) string {
+func getWorkResourceVersion(work *workv1.ManifestWork) (string, int64, error) {
+	var generation int64
+	var err error
+
 	resourceVersion, ok := work.Annotations[common.CloudEventsResourceVersionAnnotationKey]
 	if ok {
-		return resourceVersion
+		generation, err = strconv.ParseInt(resourceVersion, 10, 64)
+		if err != nil {
+			return "", 0, errors.NewInternalError(err)
+		}
 	}
 
-	if work.ResourceVersion != "" {
-		return work.ResourceVersion
+	if generation == 0 {
+		generation = work.Generation
 	}
 
-	return "0"
+	if len(resourceVersion) == 0 {
+		if len(work.ResourceVersion) != 0 {
+			resourceVersion = work.ResourceVersion
+		} else {
+			resourceVersion = "0"
+		}
+	}
+
+	return resourceVersion, generation, nil
 }

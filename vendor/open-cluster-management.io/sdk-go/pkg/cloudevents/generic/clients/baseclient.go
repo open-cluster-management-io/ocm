@@ -143,7 +143,9 @@ func (c *baseClient) publish(ctx context.Context, evt cloudevents.Event) error {
 	}
 
 	logger.V(2).Info("Sending event", "event", evt.Context)
-	logger.V(5).Info("Sending event", "event", func() any { return evt.String() })
+	if logger.V(5).Enabled() {
+		logger.V(5).Info("Sending event", "event", evt.String())
+	}
 	if err := c.transport.Send(ctx, evt); err != nil {
 		return err
 	}
@@ -174,8 +176,9 @@ func (c *baseClient) subscribe(ctx context.Context, receive receiveFn) {
 				go func() {
 					if err := c.transport.Receive(receiverCtx, func(evt cloudevents.Event) {
 						logger.V(2).Info("Received event", "event", evt.Context)
-						logger.V(5).Info("Received event", "event", func() any { return evt.String() })
-
+						if logger.V(5).Enabled() {
+							logger.V(5).Info("Received event", "event", evt.String())
+						}
 						receive(receiverCtx, evt)
 					}); err != nil {
 						runtime.HandleError(fmt.Errorf("failed to receive cloudevents, %v", err))

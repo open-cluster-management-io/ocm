@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -116,22 +115,10 @@ func (b *workProcessor) handleWork(ctx context.Context, work *workv1.ManifestWor
 		return b.store.Delete(updatedWork)
 	}
 
-	lastResourceVersion, err := strconv.Atoi(lastWork.ResourceVersion)
-	if err != nil {
-		logger.Error(err, "invalid resource version for work")
-		return nil
-	}
-
-	resourceVersion, err := strconv.Atoi(work.ResourceVersion)
-	if err != nil {
-		logger.Error(err, "invalid resource version for work")
-		return nil
-	}
-
 	// the current work's version is maintained on source and the agent's work is newer than source, ignore
-	if lastResourceVersion != 0 && resourceVersion > lastResourceVersion {
-		logger.Info("the work resource version is great than its generation, ignore",
-			"agentResourceVersion", resourceVersion, "sourceResourceVersion", lastResourceVersion)
+	if lastWork.Generation != 0 && work.Generation > lastWork.Generation {
+		logger.Info("the work generation is greater than its local generation, ignore",
+			"localGeneration", lastWork.Generation, "remoteGeneration", work.Generation)
 		return nil
 	}
 

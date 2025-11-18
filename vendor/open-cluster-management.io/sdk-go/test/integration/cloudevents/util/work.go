@@ -178,8 +178,9 @@ func UpdateWorkStatus(ctx context.Context, workClient workv1client.ManifestWorkI
 func NewManifestWork(namespace, name string, withVersion bool) *workv1.ManifestWork {
 	work := &workv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:       name,
+			Namespace:  namespace,
+			Generation: 1,
 		},
 		Spec: workv1.ManifestWorkSpec{
 			Workload: workv1.ManifestsTemplate{
