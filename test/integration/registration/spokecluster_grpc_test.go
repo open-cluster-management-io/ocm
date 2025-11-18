@@ -86,15 +86,25 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 		go hook.Run(grpcServerCtx)
 
 		grpcEventServer := cloudeventsgrpc.NewGRPCBroker()
-		grpcEventServer.RegisterService(clusterce.ManagedClusterEventDataType,
+		grpcEventServer.RegisterService(
+			grpcServerCtx,
+			clusterce.ManagedClusterEventDataType,
 			cluster.NewClusterService(hook.ClusterClient, hook.ClusterInformers.Cluster().V1().ManagedClusters()))
-		grpcEventServer.RegisterService(csrce.CSREventDataType,
+		grpcEventServer.RegisterService(
+			grpcServerCtx,
+			csrce.CSREventDataType,
 			csr.NewCSRService(hook.KubeClient, hook.KubeInformers.Certificates().V1().CertificateSigningRequests()))
-		grpcEventServer.RegisterService(addonce.ManagedClusterAddOnEventDataType,
+		grpcEventServer.RegisterService(
+			grpcServerCtx,
+			addonce.ManagedClusterAddOnEventDataType,
 			addon.NewAddonService(hook.AddOnClient, hook.AddOnInformers.Addon().V1alpha1().ManagedClusterAddOns()))
-		grpcEventServer.RegisterService(eventce.EventEventDataType,
+		grpcEventServer.RegisterService(
+			grpcServerCtx,
+			eventce.EventEventDataType,
 			event.NewEventService(hook.KubeClient))
-		grpcEventServer.RegisterService(leasece.LeaseEventDataType,
+		grpcEventServer.RegisterService(
+			grpcServerCtx,
+			leasece.LeaseEventDataType,
 			lease.NewLeaseService(hook.KubeClient, hook.KubeInformers.Coordination().V1().Leases()))
 
 		authorizer := util.NewMockAuthorizer()
