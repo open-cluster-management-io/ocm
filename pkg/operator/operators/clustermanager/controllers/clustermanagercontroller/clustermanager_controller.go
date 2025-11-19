@@ -230,8 +230,13 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	config.Labels = helpers.GetClusterManagerHubLabels(clusterManager, n.enableSyncLabels)
 	config.LabelsString = helpers.GetRegistrationLabelString(config.Labels)
 
-	// Determine if the gGRPC auth is enabled
+	// Determine if the gRPC auth is enabled
 	config.GRPCAuthEnabled = helpers.GRPCAuthEnabled(clusterManager)
+
+	// Get gRPC endpoint type
+	if config.GRPCAuthEnabled {
+		config.GRPCEndpointType = helpers.GRPCServerEndpointType(clusterManager)
+	}
 
 	// Update finalizer at first
 	if clusterManager.DeletionTimestamp.IsZero() {

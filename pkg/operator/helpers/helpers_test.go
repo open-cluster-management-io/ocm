@@ -1879,91 +1879,95 @@ func TestGRPCAuthEnabled(t *testing.T) {
 
 func TestGRPCServerHostNames(t *testing.T) {
 	cases := []struct {
-		name          string
-		cm            *operatorapiv1.ClusterManager
-		namespace     string
-		desiredResult []string
+		name            string
+		cm              *operatorapiv1.ClusterManager
+		namespace       string
+		existingObjects []runtime.Object
+		expectedResult  []string
+		expectError     bool
 	}{
 		{
-			name: "nil registration config",
+			name: "nil server configuration",
 			cm: &operatorapiv1.ClusterManager{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-manager",
 				},
 				Spec: operatorapiv1.ClusterManagerSpec{
-					RegistrationConfiguration: nil,
+					ServerConfiguration: nil,
 				},
 			},
-			namespace:     "test",
-			desiredResult: []string{"cluster-manager-grpc-server.test.svc"},
+			namespace:      "test",
+			expectedResult: []string{"cluster-manager-grpc-server.test.svc"},
+			expectError:    false,
 		},
 		{
-			name: "no registration drivers",
+			name: "no endpoints exposure",
 			cm: &operatorapiv1.ClusterManager{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-manager",
 				},
 				Spec: operatorapiv1.ClusterManagerSpec{
-					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
-						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{},
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{},
 					},
 				},
 			},
-			namespace:     "test",
-			desiredResult: []string{"cluster-manager-grpc-server.test.svc"},
+			namespace:      "test",
+			expectedResult: []string{"cluster-manager-grpc-server.test.svc"},
+			expectError:    false,
 		},
 		{
-			name: "one non-grpc registration driver",
+			name: "non-grpc endpoint",
 			cm: &operatorapiv1.ClusterManager{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-manager",
 				},
 				Spec: operatorapiv1.ClusterManagerSpec{
-					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
-						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
-							{AuthType: operatorapiv1.CSRAuthType},
-						},
-					},
-				},
-			},
-			namespace:     "test",
-			desiredResult: []string{"cluster-manager-grpc-server.test.svc"},
-		},
-		{
-			name: "one grpc registration driver, no hostname",
-			cm: &operatorapiv1.ClusterManager{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "cluster-manager",
-				},
-				Spec: operatorapiv1.ClusterManagerSpec{
-					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
-						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
-							{AuthType: operatorapiv1.GRPCAuthType},
-						},
-					},
-				},
-			},
-			namespace:     "test",
-			desiredResult: []string{"cluster-manager-grpc-server.test.svc"},
-		},
-		{
-			name: "one grpc registration driver, with hostname",
-			cm: &operatorapiv1.ClusterManager{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "cluster-manager",
-				},
-				Spec: operatorapiv1.ClusterManagerSpec{
-					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
-						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
-							{
-								AuthType: operatorapiv1.GRPCAuthType,
-							},
-						},
-					},
 					ServerConfiguration: &operatorapiv1.ServerConfiguration{
 						EndpointsExposure: []operatorapiv1.EndpointExposure{
 							{
-								Protocol: "grpc",
+								Protocol: "http",
+							},
+						},
+					},
+				},
+			},
+			namespace:      "test",
+			expectedResult: []string{"cluster-manager-grpc-server.test.svc"},
+			expectError:    false,
+		},
+		{
+			name: "grpc endpoint with nil GRPC config",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: operatorapiv1.GRPCAuthType,
+								GRPC:     nil,
+							},
+						},
+					},
+				},
+			},
+			namespace:      "test",
+			expectedResult: []string{"cluster-manager-grpc-server.test.svc"},
+			expectError:    false,
+		},
+		{
+			name: "hostname endpoint with valid host",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: operatorapiv1.GRPCAuthType,
 								GRPC: &operatorapiv1.Endpoint{
 									Type: operatorapiv1.EndpointTypeHostname,
 									Hostname: &operatorapiv1.HostnameConfig{
@@ -1975,16 +1979,448 @@ func TestGRPCServerHostNames(t *testing.T) {
 					},
 				},
 			},
-			namespace:     "test",
-			desiredResult: []string{"cluster-manager-grpc-server.test.svc", "test.example.com"},
+			namespace:      "test",
+			expectedResult: []string{"cluster-manager-grpc-server.test.svc", "test.example.com"},
+			expectError:    false,
+		},
+		{
+			name: "hostname endpoint with empty host",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: operatorapiv1.GRPCAuthType,
+								GRPC: &operatorapiv1.Endpoint{
+									Type: operatorapiv1.EndpointTypeHostname,
+									Hostname: &operatorapiv1.HostnameConfig{
+										Host: "   ",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			namespace:      "test",
+			expectedResult: []string{"cluster-manager-grpc-server.test.svc"},
+			expectError:    false,
+		},
+		{
+			name: "loadbalancer endpoint with IP",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: operatorapiv1.GRPCAuthType,
+								GRPC: &operatorapiv1.Endpoint{
+									Type: operatorapiv1.EndpointTypeLoadBalancer,
+									LoadBalancer: &operatorapiv1.LoadBalancerConfig{
+										Host: "myhost.com",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			namespace: "test",
+			existingObjects: []runtime.Object{
+				&corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cluster-manager-grpc-server",
+						Namespace: "test",
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP: "192.168.1.100",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedResult: []string{"cluster-manager-grpc-server.test.svc", "myhost.com", "192.168.1.100"},
+			expectError:    false,
+		},
+		{
+			name: "loadbalancer endpoint with hostname",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: operatorapiv1.GRPCAuthType,
+								GRPC: &operatorapiv1.Endpoint{
+									Type: operatorapiv1.EndpointTypeLoadBalancer,
+								},
+							},
+						},
+					},
+				},
+			},
+			namespace: "test",
+			existingObjects: []runtime.Object{
+				&corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cluster-manager-grpc-server",
+						Namespace: "test",
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									Hostname: "lb.example.com",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedResult: []string{"cluster-manager-grpc-server.test.svc", "lb.example.com"},
+			expectError:    false,
+		},
+		{
+			name: "duplicated hostname",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: operatorapiv1.GRPCAuthType,
+								GRPC: &operatorapiv1.Endpoint{
+									Type: operatorapiv1.EndpointTypeLoadBalancer,
+									LoadBalancer: &operatorapiv1.LoadBalancerConfig{
+										Host: "lb.example.com",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			namespace: "test",
+			existingObjects: []runtime.Object{
+				&corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cluster-manager-grpc-server",
+						Namespace: "test",
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									Hostname: "lb.example.com",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedResult: []string{"cluster-manager-grpc-server.test.svc", "lb.example.com"},
+			expectError:    false,
+		},
+		{
+			name: "loadbalancer endpoint with both IP and hostname",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: operatorapiv1.GRPCAuthType,
+								GRPC: &operatorapiv1.Endpoint{
+									Type: operatorapiv1.EndpointTypeLoadBalancer,
+								},
+							},
+						},
+					},
+				},
+			},
+			namespace: "test",
+			existingObjects: []runtime.Object{
+				&corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cluster-manager-grpc-server",
+						Namespace: "test",
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP:       "192.168.1.100",
+									Hostname: "lb.example.com",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedResult: []string{"cluster-manager-grpc-server.test.svc", "192.168.1.100", "lb.example.com"},
+			expectError:    false,
+		},
+		{
+			name: "loadbalancer endpoint - service not found",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: operatorapiv1.GRPCAuthType,
+								GRPC: &operatorapiv1.Endpoint{
+									Type: operatorapiv1.EndpointTypeLoadBalancer,
+								},
+							},
+						},
+					},
+				},
+			},
+			namespace:       "test",
+			existingObjects: []runtime.Object{},
+			expectedResult:  []string{"cluster-manager-grpc-server.test.svc"},
+			expectError:     true,
+		},
+		{
+			name: "loadbalancer endpoint - no ingress in status",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: operatorapiv1.GRPCAuthType,
+								GRPC: &operatorapiv1.Endpoint{
+									Type: operatorapiv1.EndpointTypeLoadBalancer,
+								},
+							},
+						},
+					},
+				},
+			},
+			namespace: "test",
+			existingObjects: []runtime.Object{
+				&corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cluster-manager-grpc-server",
+						Namespace: "test",
+					},
+					Status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{},
+						},
+					},
+				},
+			},
+			expectedResult: []string{"cluster-manager-grpc-server.test.svc"},
+			expectError:    true,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			hostnames := GRPCServerHostNames(tc.namespace, tc.cm)
-			if !reflect.DeepEqual(hostnames, tc.desiredResult) {
-				t.Errorf("Name: %s, expect hostnames %v, but got %v", tc.name, tc.desiredResult, hostnames)
+			fakeKubeClient := fakekube.NewSimpleClientset(tc.existingObjects...)
+			hostnames, err := GRPCServerHostNames(fakeKubeClient, tc.namespace, tc.cm)
+
+			if tc.expectError && err == nil {
+				t.Errorf("expected error but got none")
+			}
+			if !tc.expectError && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			if !reflect.DeepEqual(hostnames, tc.expectedResult) {
+				t.Errorf("expected hostnames %v, but got %v", tc.expectedResult, hostnames)
+			}
+		})
+	}
+}
+
+func TestGRPCServerEndpointType(t *testing.T) {
+	cases := []struct {
+		name         string
+		cm           *operatorapiv1.ClusterManager
+		expectedType string
+	}{
+		{
+			name: "nil server configuration",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: nil,
+				},
+			},
+			expectedType: string(operatorapiv1.EndpointTypeHostname),
+		},
+		{
+			name: "empty endpoints exposure",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{},
+					},
+				},
+			},
+			expectedType: string(operatorapiv1.EndpointTypeHostname),
+		},
+		{
+			name: "non-grpc endpoint",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: "http",
+							},
+						},
+					},
+				},
+			},
+			expectedType: string(operatorapiv1.EndpointTypeHostname),
+		},
+		{
+			name: "grpc endpoint with nil GRPC config",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: operatorapiv1.GRPCAuthType,
+								GRPC:     nil,
+							},
+						},
+					},
+				},
+			},
+			expectedType: string(operatorapiv1.EndpointTypeHostname),
+		},
+		{
+			name: "grpc endpoint with hostname type",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: operatorapiv1.GRPCAuthType,
+								GRPC: &operatorapiv1.Endpoint{
+									Type: operatorapiv1.EndpointTypeHostname,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedType: string(operatorapiv1.EndpointTypeHostname),
+		},
+		{
+			name: "grpc endpoint with loadBalancer type",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: operatorapiv1.GRPCAuthType,
+								GRPC: &operatorapiv1.Endpoint{
+									Type: operatorapiv1.EndpointTypeLoadBalancer,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedType: string(operatorapiv1.EndpointTypeLoadBalancer),
+		},
+		{
+			name: "multiple endpoints with grpc as second",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: "http",
+							},
+							{
+								Protocol: operatorapiv1.GRPCAuthType,
+								GRPC: &operatorapiv1.Endpoint{
+									Type: operatorapiv1.EndpointTypeLoadBalancer,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedType: string(operatorapiv1.EndpointTypeLoadBalancer),
+		},
+		{
+			name: "grpc endpoint with nil hostname config",
+			cm: &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-manager",
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					ServerConfiguration: &operatorapiv1.ServerConfiguration{
+						EndpointsExposure: []operatorapiv1.EndpointExposure{
+							{
+								Protocol: operatorapiv1.GRPCAuthType,
+								GRPC: &operatorapiv1.Endpoint{
+									Type:     operatorapiv1.EndpointTypeHostname,
+									Hostname: nil,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedType: string(operatorapiv1.EndpointTypeHostname),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			endpointType := GRPCServerEndpointType(tc.cm)
+			if endpointType != tc.expectedType {
+				t.Errorf("expected endpoint type %s, but got %s", tc.expectedType, endpointType)
 			}
 		})
 	}
