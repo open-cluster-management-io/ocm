@@ -4,53 +4,64 @@ import (
 	"context"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
-	"github.com/cloudevents/sdk-go/v2/protocol"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/utils"
 )
 
-// CloudEventsOptions provides cloudevents clients to send/receive cloudevents based on different event protocol.
+// ReceiveHandlerFn is a callback function invoked for each received CloudEvent.
+// The handler is called synchronously within the Receive loop, so blocking operations
+// in the handler will block the reception of subsequent events.
+type ReceiveHandlerFn func(cxt context.Context, evt cloudevents.Event)
+
+// CloudEventTransport sends/receives cloudevents based on different event protocol.
 //
 // Available implementations:
 //   - MQTT
-//   - KAFKA
 //   - gRPC
-type CloudEventsOptions interface {
-	// WithContext returns back a new context with the given cloudevent context. The new context will be used when
-	// sending a cloudevent.The new context is protocol-dependent, for example, for MQTT, the new context should contain
-	// the MQTT topic, for Kafka, the context should contain the message key, etc.
-	WithContext(ctx context.Context, evtContext cloudevents.EventContext) (context.Context, error)
+type CloudEventTransport interface {
+	// Connect establishes a connection to the event transport.
+	// This method should be called before Send or Receive.
+	// Returns an error if the connection cannot be established.
+	Connect(ctx context.Context) error
 
-	// Protocol returns a specific protocol to initialize the cloudevents client.
-	Protocol(ctx context.Context, dataType types.CloudEventsDataType) (CloudEventsProtocol, error)
+	// Send transmits a CloudEvent through the transport.
+	// Returns an error if the event cannot be send.
+	Send(ctx context.Context, evt cloudevents.Event) error
 
-	// ErrorChan returns a chan which will receive the cloudevents connection error. The source/agent client will try to
-	// reconnect the when this error occurs.
+	// Subscribe sends a subscription request to the transport to subscribe topics/services.
+	// This is a non-blocking method that should be called after Connect and before Receive.
+	// Returns an error if the subscription request cannot be sent.
+	Subscribe(ctx context.Context) error
+
+	// Receive starts receiving events and invokes the provided handler for each event.
+	// This is a BLOCKING call that runs an event loop until the context is cancelled.
+	// The handler function is called synchronously for each received event.
+	// This method should typically be run in a separate goroutine.
+	//
+	// The method returns when:
+	//   - The context is cancelled (returns ctx.Err())
+	//   - A fatal transport error occurs (returns the error)
+	//
+	// Note: The handler should avoid blocking operations to prevent blocking the
+	// reception of subsequent events. For blocking operations, dispatch to a separate
+	// goroutine within the handler.
+	Receive(ctx context.Context, fn ReceiveHandlerFn) error
+
+	// Close gracefully shuts down the transport, closing all connections and channels.
+	// After Close is called, Send and Receive operations will fail.
+	// This method waits for in-flight operations to complete or for the context to expire.
+	Close(ctx context.Context) error
+
+	// ErrorChan returns a read-only channel that receives asynchronous transport errors.
+	// These errors may include connection failures, protocol errors, or other transport-level issues.
+	// The channel is closed when Close() is called on the transport.
+	// The source/agent client will attempt to reconnect when errors are received on this channel.
 	ErrorChan() <-chan error
-}
-
-// CloudEventsProtocol is a set of interfaces for a specific binding need to implemented
-// Reference: https://cloudevents.github.io/sdk-go/protocol_implementations.html#protocol-interfaces
-type CloudEventsProtocol interface {
-	protocol.Sender
-	protocol.Receiver
-	protocol.Closer
-}
-
-// EventRateLimit for limiting the event sending rate.
-type EventRateLimit struct {
-	// QPS indicates the maximum QPS to send the event.
-	// If it's less than or equal to zero, the DefaultQPS (50) will be used.
-	QPS float32
-
-	// Maximum burst for throttle.
-	// If it's less than or equal to zero, the DefaultBurst (100) will be used.
-	Burst int
 }
 
 // CloudEventsSourceOptions provides the required options to build a source CloudEventsClient
 type CloudEventsSourceOptions struct {
-	// CloudEventsOptions provides cloudevents clients to send/receive cloudevents based on different event protocol.
-	CloudEventsOptions CloudEventsOptions
+	// CloudEventsTransport sends/receives cloudevents based on different event protocol.
+	CloudEventsTransport CloudEventTransport
 
 	// SourceID is a unique identifier for a source, for example, it can generate a source ID by hashing the hub cluster
 	// URL and appending the controller name. Similarly, a RESTful service can select a unique name or generate a unique
@@ -58,13 +69,13 @@ type CloudEventsSourceOptions struct {
 	SourceID string
 
 	// EventRateLimit limits the event sending rate.
-	EventRateLimit EventRateLimit
+	EventRateLimit utils.EventRateLimit
 }
 
 // CloudEventsAgentOptions provides the required options to build an agent CloudEventsClient
 type CloudEventsAgentOptions struct {
-	// CloudEventsOptions provides cloudevents clients to send/receive cloudevents based on different event protocol.
-	CloudEventsOptions CloudEventsOptions
+	// CloudEventsTransport sends/receives cloudevents based on different event protocol.
+	CloudEventsTransport CloudEventTransport
 
 	// AgentID is a unique identifier for an agent, for example, it can consist of a managed cluster name and an agent
 	// name.
@@ -74,5 +85,5 @@ type CloudEventsAgentOptions struct {
 	ClusterName string
 
 	// EventRateLimit limits the event sending rate.
-	EventRateLimit EventRateLimit
+	EventRateLimit utils.EventRateLimit
 }

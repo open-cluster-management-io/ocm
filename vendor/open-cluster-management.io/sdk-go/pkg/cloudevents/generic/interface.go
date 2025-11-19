@@ -12,7 +12,7 @@ import (
 )
 
 // ResourceHandler handles the received resource object.
-type ResourceHandler[T ResourceObject] func(action types.ResourceAction, obj T) error
+type ResourceHandler[T ResourceObject] func(ctx context.Context, action types.ResourceAction, obj T) error
 
 // StatusHashGetter gets the status hash of one resource object.
 type StatusHashGetter[T ResourceObject] func(obj T) (string, error)
@@ -25,7 +25,11 @@ type ResourceObject interface {
 	// GetResourceVersion returns the resource version of this object. The resource version is a required int64 sequence
 	// number property that must be incremented by the source whenever this resource changes.
 	// The source should guarantee its incremental nature.
+	// Deprecated: use GetGeneration() instead.
 	GetResourceVersion() string
+
+	// GetGeneration returns the generation number of this object to reflect the spec change of the resource.
+	GetGeneration() int64
 
 	// GetDeletionTimestamp returns the deletion timestamp of this object. The deletiontimestamp is an optional
 	// timestamp property representing the resource is deleting from the source, the agent needs to clean up the

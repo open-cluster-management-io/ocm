@@ -11,30 +11,32 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
-type grpcAgentOptions struct {
+type grpcAgentTransport struct {
 	GRPCOptions
-	errorChan   chan error // grpc client connection doesn't have error channel, it will handle reconnecting automatically
-	clusterName string
+	errorChan         chan error
+	clusterName       string
+	protocol          *protocol.Protocol
+	cloudEventsClient cloudevents.Client
+	dataType          types.CloudEventsDataType
 }
 
-func NewAgentOptions(grpcOptions *GRPCOptions, clusterName, agentID string) *options.CloudEventsAgentOptions {
+// Deprecated: use v2.grpc.NewAgentOptions instead
+func NewAgentOptions(grpcOptions *GRPCOptions,
+	clusterName, agentID string, dataType types.CloudEventsDataType) *options.CloudEventsAgentOptions {
 	return &options.CloudEventsAgentOptions{
-		CloudEventsOptions: &grpcAgentOptions{
+		CloudEventsTransport: &grpcAgentTransport{
 			GRPCOptions: *grpcOptions,
 			errorChan:   make(chan error),
 			clusterName: clusterName,
+			dataType:    dataType,
 		},
 		AgentID:     agentID,
 		ClusterName: clusterName,
 	}
 }
 
-func (o *grpcAgentOptions) WithContext(ctx context.Context, evtCtx cloudevents.EventContext) (context.Context, error) {
-	// grpc agent client doesn't need to update topic in the context
-	return ctx, nil
-}
-
-func (o *grpcAgentOptions) Protocol(ctx context.Context, dataType types.CloudEventsDataType) (options.CloudEventsProtocol, error) {
+func (o *grpcAgentTransport) Connect(ctx context.Context) error {
+	logger := klog.FromContext(ctx)
 	opts := []protocol.Option{
 		protocol.WithSubscribeOption(&protocol.SubscribeOption{
 			// TODO: Update this code to determine the subscription source for the agent client.
@@ -42,7 +44,7 @@ func (o *grpcAgentOptions) Protocol(ctx context.Context, dataType types.CloudEve
 			// as a placeholder with all the sources.
 			Source:      types.SourceAll,
 			ClusterName: o.clusterName,
-			DataType:    dataType.String(),
+			DataType:    o.dataType.String(),
 		}),
 		protocol.WithReconnectErrorChan(o.errorChan),
 	}
@@ -57,17 +59,44 @@ func (o *grpcAgentOptions) Protocol(ctx context.Context, dataType types.CloudEve
 			select {
 			case o.errorChan <- err:
 			default:
-				klog.Errorf("no error channel available to report error: %v", err)
+				logger.Error(err, "no error channel available to report error")
 			}
 		},
 		opts...,
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return receiver, nil
+
+	o.protocol = receiver
+	o.cloudEventsClient, err = cloudevents.NewClient(o.protocol)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func (o *grpcAgentOptions) ErrorChan() <-chan error {
+func (o *grpcAgentTransport) Send(ctx context.Context, evt cloudevents.Event) error {
+	if err := o.cloudEventsClient.Send(ctx, evt); cloudevents.IsUndelivered(err) {
+		return err
+	}
+	return nil
+}
+
+func (o *grpcAgentTransport) Subscribe(ctx context.Context) error {
+	// Subscription is handled by the cloudevents client during receiver startup.
+	// No action needed here.
+	return nil
+}
+
+func (o *grpcAgentTransport) Receive(ctx context.Context, fn options.ReceiveHandlerFn) error {
+	return o.cloudEventsClient.StartReceiver(ctx, fn)
+}
+
+func (o *grpcAgentTransport) Close(ctx context.Context) error {
+	return o.protocol.Close(ctx)
+}
+
+func (o *grpcAgentTransport) ErrorChan() <-chan error {
 	return o.errorChan
 }

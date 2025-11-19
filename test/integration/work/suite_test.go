@@ -280,7 +280,7 @@ func startGRPCServer(ctx context.Context, temp string, cfg *rest.Config) (string
 	}()
 
 	grpcEventServer := cloudeventsgrpc.NewGRPCBroker()
-	grpcEventServer.RegisterService(payload.ManifestBundleEventDataType,
+	grpcEventServer.RegisterService(ctx, payload.ManifestBundleEventDataType,
 		serviceswork.NewWorkService(hook.WorkClient, hook.WorkInformers.Work().V1().ManifestWorks()))
 
 	authorizer := util.NewMockAuthorizer()

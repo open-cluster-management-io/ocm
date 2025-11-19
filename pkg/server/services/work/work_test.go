@@ -343,14 +343,61 @@ func TestEventHandlerFuncs(t *testing.T) {
 	eventHandlerFuncs := service.EventHandlerFuncs(handler)
 
 	work := &workv1.ManifestWork{
-		ObjectMeta: metav1.ObjectMeta{Name: "test-work", Namespace: "test-namespace"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-work",
+			Namespace:  "test-namespace",
+			Generation: 1,
+		},
 	}
 	eventHandlerFuncs.AddFunc(work)
 	if !handler.onCreateCalled {
 		t.Errorf("onCreate not called")
 	}
 
-	eventHandlerFuncs.UpdateFunc(nil, work)
+	eventHandlerFuncs.UpdateFunc(work, &workv1.ManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-work",
+			Namespace:  "test-namespace",
+			Generation: 2,
+		},
+	})
+	if !handler.onUpdateCalled {
+		t.Errorf("onUpdate not called")
+	}
+
+	eventHandlerFuncs.UpdateFunc(work, &workv1.ManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-work",
+			Namespace:  "test-namespace",
+			Generation: 1,
+			Labels:     map[string]string{"test": "test"},
+		},
+	})
+	if !handler.onUpdateCalled {
+		t.Errorf("onUpdate not called")
+	}
+
+	eventHandlerFuncs.UpdateFunc(work, &workv1.ManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test-work",
+			Namespace:   "test-namespace",
+			Generation:  1,
+			Annotations: map[string]string{"test": "test"},
+		},
+	})
+	if !handler.onUpdateCalled {
+		t.Errorf("onUpdate not called")
+	}
+
+	time := metav1.Now()
+	eventHandlerFuncs.UpdateFunc(work, &workv1.ManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "test-work",
+			Namespace:         "test-namespace",
+			DeletionTimestamp: &time,
+			Generation:        1,
+		},
+	})
 	if !handler.onUpdateCalled {
 		t.Errorf("onUpdate not called")
 	}

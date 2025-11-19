@@ -6,6 +6,7 @@ import (
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	cloudeventstypes "github.com/cloudevents/sdk-go/v2/types"
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
@@ -59,8 +60,6 @@ func (w *WorkService) Get(ctx context.Context, resourceID string) (*cloudevents.
 	}
 
 	work = work.DeepCopy()
-	// use the work generation as the work cloudevent resource version
-	work.ResourceVersion = fmt.Sprintf("%d", work.Generation)
 	return w.codec.Encode(services.CloudEventsSourceKube, types.CloudEventsType{CloudEventsDataType: payload.ManifestBundleEventDataType}, work)
 }
 
@@ -146,7 +145,7 @@ func (w *WorkService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.E
 	}
 }
 
-func (w *WorkService) RegisterHandler(handler server.EventHandler) {
+func (w *WorkService) RegisterHandler(ctx context.Context, handler server.EventHandler) {
 	if _, err := w.workInformer.Informer().AddEventHandler(w.EventHandlerFuncs(handler)); err != nil {
 		klog.Errorf("failed to register work informer event handler, %v", err)
 	}
@@ -166,12 +165,27 @@ func (w *WorkService) EventHandlerFuncs(handler server.EventHandler) *cache.Reso
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			accessor, err := meta.Accessor(newObj)
+			oldAccessor, err := meta.Accessor(oldObj)
 			if err != nil {
 				klog.Errorf("failed to get accessor for work %v", err)
 				return
 			}
-			id := accessor.GetNamespace() + "/" + accessor.GetName()
+
+			newAccessor, err := meta.Accessor(newObj)
+			if err != nil {
+				klog.Errorf("failed to get accessor for work %v", err)
+				return
+			}
+
+			// the manifestwork is not changed and is not deleting
+			if cmp.Equal(oldAccessor.GetLabels(), newAccessor.GetLabels()) &&
+				cmp.Equal(oldAccessor.GetAnnotations(), newAccessor.GetAnnotations()) &&
+				oldAccessor.GetGeneration() == newAccessor.GetGeneration() &&
+				newAccessor.GetDeletionTimestamp().IsZero() {
+				return
+			}
+
+			id := newAccessor.GetNamespace() + "/" + newAccessor.GetName()
 			if err := handler.OnUpdate(context.Background(), payload.ManifestBundleEventDataType, id); err != nil {
 				klog.Error(err)
 			}
