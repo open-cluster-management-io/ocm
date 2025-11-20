@@ -245,8 +245,8 @@ func TestManifestWorkReplicaSetControllerPatchStatus(t *testing.T) {
 				clusterInformers.Cluster().V1beta1().PlacementDecisions(),
 			)
 
-			controllerContext := testingcommon.NewFakeSyncContext(t, c.mwrSet.Namespace+"/"+c.mwrSet.Name)
-			err = ctrl.sync(context.TODO(), controllerContext)
+			controllerContext := testingcommon.NewFakeSDKSyncContext(t, c.mwrSet.Namespace+"/"+c.mwrSet.Name)
+			err = ctrl.sync(context.TODO(), controllerContext, c.mwrSet.Namespace+"/"+c.mwrSet.Name)
 			if err != nil {
 				t.Error(err)
 			}

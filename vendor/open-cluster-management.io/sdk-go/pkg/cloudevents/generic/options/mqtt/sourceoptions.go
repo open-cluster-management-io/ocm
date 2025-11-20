@@ -23,6 +23,7 @@ type mqttSourceTransport struct {
 	clientID          string
 }
 
+// Deprecated: use v2.mqtt.NewSourceOptions instead
 func NewSourceOptions(mqttOptions *MQTTOptions, clientID, sourceID string) *options.CloudEventsSourceOptions {
 	mqttSourceOptions := &mqttSourceTransport{
 		MQTTOptions: *mqttOptions,
@@ -47,56 +48,18 @@ func (o *mqttSourceTransport) WithContext(ctx context.Context, evtCtx cloudevent
 		return cloudeventscontext.WithTopic(ctx, string(*topic)), nil
 	}
 
-	eventType, err := types.ParseCloudEventsType(evtCtx.GetType())
-	if err != nil {
-		return nil, fmt.Errorf("unsupported event type %s, %v", eventType, err)
-	}
-
-	clusterName, err := evtCtx.GetExtension(types.ExtensionClusterName)
+	pubTopic, err := SourcePubTopic(ctx, &o.MQTTOptions, o.sourceID, evtCtx)
 	if err != nil {
 		return nil, err
 	}
 
-	if eventType.Action == types.ResyncRequestAction && clusterName == types.ClusterAll {
-		// source request to get resources status from all agents
-		if len(o.Topics.SourceBroadcast) == 0 {
-			return nil, fmt.Errorf("the source broadcast topic not set")
-		}
-
-		resyncTopic := strings.Replace(o.Topics.SourceBroadcast, "+", o.sourceID, 1)
-		return cloudeventscontext.WithTopic(ctx, resyncTopic), nil
-	}
-
-	// source publishes spec events or status resync events
-	eventsTopic := strings.Replace(o.Topics.SourceEvents, "+", fmt.Sprintf("%s", clusterName), 1)
-	return cloudeventscontext.WithTopic(ctx, eventsTopic), nil
+	return cloudeventscontext.WithTopic(ctx, pubTopic), nil
 }
 
 func (o *mqttSourceTransport) Connect(ctx context.Context) error {
-	topicSource, err := getSourceFromEventsTopic(o.Topics.AgentEvents)
+	subscribe, err := SourceSubscribe(&o.MQTTOptions, o.sourceID)
 	if err != nil {
 		return err
-	}
-
-	if topicSource != o.sourceID {
-		return fmt.Errorf("the topic source %q does not match with the client sourceID %q",
-			o.Topics.AgentEvents, o.sourceID)
-	}
-
-	subscribe := &paho.Subscribe{
-		Subscriptions: []paho.SubscribeOptions{
-			{
-				Topic: o.Topics.AgentEvents, QoS: byte(o.SubQoS),
-			},
-		},
-	}
-
-	if len(o.Topics.AgentBroadcast) != 0 {
-		// receiving spec resync events from all agents
-		subscribe.Subscriptions = append(subscribe.Subscriptions, paho.SubscribeOptions{
-			Topic: o.Topics.AgentBroadcast,
-			QoS:   byte(o.SubQoS),
-		})
 	}
 
 	protocol, err := o.GetCloudEventsProtocol(
@@ -150,4 +113,66 @@ func (o *mqttSourceTransport) Close(ctx context.Context) error {
 
 func (o *mqttSourceTransport) ErrorChan() <-chan error {
 	return o.errorChan
+}
+
+func SourcePubTopic(ctx context.Context, o *MQTTOptions, sourceID string, evtCtx cloudevents.EventContext) (string, error) {
+	ceType := evtCtx.GetType()
+	eventType, err := types.ParseCloudEventsType(ceType)
+	if err != nil {
+		return "", fmt.Errorf("unsupported event type %q, %v", ceType, err)
+	}
+
+	clusterNameVal, err := evtCtx.GetExtension(types.ExtensionClusterName)
+	if err != nil {
+		return "", err
+	}
+
+	clusterName, ok := clusterNameVal.(string)
+	if !ok {
+		return "", fmt.Errorf("clustername extension must be a string, got %T", clusterNameVal)
+	}
+
+	if eventType.Action == types.ResyncRequestAction && clusterName == types.ClusterAll {
+		// source request to get resources status from all agents
+		if len(o.Topics.SourceBroadcast) == 0 {
+			return "", fmt.Errorf("the source broadcast topic not set")
+		}
+
+		resyncTopic := strings.Replace(o.Topics.SourceBroadcast, "+", sourceID, 1)
+		return resyncTopic, nil
+	}
+
+	// source publishes spec events or status resync events
+	eventsTopic := strings.Replace(o.Topics.SourceEvents, "+", clusterName, 1)
+	return eventsTopic, nil
+}
+
+func SourceSubscribe(o *MQTTOptions, sourceID string) (*paho.Subscribe, error) {
+	topicSource, err := getSourceFromEventsTopic(o.Topics.AgentEvents)
+	if err != nil {
+		return nil, err
+	}
+
+	if topicSource != sourceID {
+		return nil, fmt.Errorf("the topic source %q does not match the client sourceID %q",
+			topicSource, sourceID)
+	}
+
+	subscribe := &paho.Subscribe{
+		Subscriptions: []paho.SubscribeOptions{
+			{
+				Topic: o.Topics.AgentEvents, QoS: byte(o.SubQoS),
+			},
+		},
+	}
+
+	if len(o.Topics.AgentBroadcast) != 0 {
+		// receiving spec resync events from all agents
+		subscribe.Subscriptions = append(subscribe.Subscriptions, paho.SubscribeOptions{
+			Topic: o.Topics.AgentBroadcast,
+			QoS:   byte(o.SubQoS),
+		})
+	}
+
+	return subscribe, nil
 }

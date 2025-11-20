@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,6 +16,7 @@ import (
 	"k8s.io/klog/v2"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/work/helper"
@@ -29,7 +29,7 @@ type appliedManifestWorkReconciler struct {
 
 func (m *appliedManifestWorkReconciler) reconcile(
 	ctx context.Context,
-	controllerContext factory.SyncContext,
+	_ factory.SyncContext,
 	manifestWork *workapiv1.ManifestWork,
 	appliedManifestWork *workapiv1.AppliedManifestWork,
 	results []applyResult) (*workapiv1.ManifestWork, *workapiv1.AppliedManifestWork, []applyResult, error) {

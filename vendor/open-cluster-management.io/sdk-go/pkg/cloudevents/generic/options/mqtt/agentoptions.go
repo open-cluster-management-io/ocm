@@ -24,6 +24,7 @@ type mqttAgentTransport struct {
 	agentID           string
 }
 
+// Deprecated: use v2.mqtt.NewAgentOptions instead
 func NewAgentOptions(mqttOptions *MQTTOptions, clusterName, agentID string) *options.CloudEventsAgentOptions {
 	mqttAgentOptions := &mqttAgentTransport{
 		MQTTOptions: *mqttOptions,
@@ -40,8 +41,6 @@ func NewAgentOptions(mqttOptions *MQTTOptions, clusterName, agentID string) *opt
 }
 
 func (o *mqttAgentTransport) WithContext(ctx context.Context, evtCtx cloudevents.EventContext) (context.Context, error) {
-	logger := klog.FromContext(ctx)
-
 	topic, err := getAgentPubTopic(ctx)
 	if err != nil {
 		return nil, err
@@ -51,59 +50,18 @@ func (o *mqttAgentTransport) WithContext(ctx context.Context, evtCtx cloudevents
 		return cloudeventscontext.WithTopic(ctx, string(*topic)), nil
 	}
 
-	eventType, err := types.ParseCloudEventsType(evtCtx.GetType())
-	if err != nil {
-		return nil, fmt.Errorf("unsupported event type %s, %v", eventType, err)
-	}
-
-	originalSource, err := evtCtx.GetExtension(types.ExtensionOriginalSource)
+	pubTopic, err := AgentPubTopic(ctx, &o.MQTTOptions, o.clusterName, evtCtx)
 	if err != nil {
 		return nil, err
 	}
 
-	// agent request to sync resource spec from all sources
-	if eventType.Action == types.ResyncRequestAction && originalSource == types.SourceAll {
-		if len(o.Topics.AgentBroadcast) == 0 {
-			logger.Info("the agent broadcast topic not set, fall back to the agent events topic")
-
-			// TODO after supporting multiple sources, we should list each source
-			eventsTopic := replaceLast(o.Topics.AgentEvents, "+", o.clusterName)
-			return cloudeventscontext.WithTopic(ctx, eventsTopic), nil
-		}
-
-		resyncTopic := strings.Replace(o.Topics.AgentBroadcast, "+", o.clusterName, 1)
-		return cloudeventscontext.WithTopic(ctx, resyncTopic), nil
-	}
-
-	topicSource, err := getSourceFromEventsTopic(o.Topics.AgentEvents)
-	if err != nil {
-		return nil, err
-	}
-
-	// agent publishes status events or spec resync events
-	eventsTopic := replaceLast(o.Topics.AgentEvents, "+", o.clusterName)
-	eventsTopic = replaceLast(eventsTopic, "+", topicSource)
-	return cloudeventscontext.WithTopic(ctx, eventsTopic), nil
+	return cloudeventscontext.WithTopic(ctx, pubTopic), nil
 }
 
 func (o *mqttAgentTransport) Connect(ctx context.Context) error {
-	subscribe := &paho.Subscribe{
-		Subscriptions: []paho.SubscribeOptions{
-			{
-				// TODO support multiple sources, currently the client require the source events topic has a sourceID, in
-				// the future, client may need a source list, it will subscribe to each source
-				// receiving the sources events
-				Topic: replaceLast(o.Topics.SourceEvents, "+", o.clusterName), QoS: byte(o.SubQoS),
-			},
-		},
-	}
-
-	// receiving status resync events from all sources
-	if len(o.Topics.SourceBroadcast) != 0 {
-		subscribe.Subscriptions = append(subscribe.Subscriptions, paho.SubscribeOptions{
-			Topic: o.Topics.SourceBroadcast,
-			QoS:   byte(o.SubQoS),
-		})
+	subscribe, err := AgentSubscribe(&o.MQTTOptions, o.clusterName)
+	if err != nil {
+		return err
 	}
 
 	protocol, err := o.GetCloudEventsProtocol(
@@ -156,4 +114,68 @@ func (o *mqttAgentTransport) Close(ctx context.Context) error {
 
 func (o *mqttAgentTransport) ErrorChan() <-chan error {
 	return o.errorChan
+}
+
+func AgentPubTopic(ctx context.Context, o *MQTTOptions, clusterName string, evtCtx cloudevents.EventContext) (string, error) {
+	logger := klog.FromContext(ctx)
+
+	ceType := evtCtx.GetType()
+	eventType, err := types.ParseCloudEventsType(ceType)
+	if err != nil {
+		return "", fmt.Errorf("unsupported event type %q, %v", ceType, err)
+	}
+
+	originalSourceVal, err := evtCtx.GetExtension(types.ExtensionOriginalSource)
+	if err != nil {
+		return "", err
+	}
+
+	originalSource, ok := originalSourceVal.(string)
+	if !ok {
+		return "", fmt.Errorf("originalsource extension must be a string, got %T", originalSourceVal)
+	}
+
+	// agent request to sync resource spec from all sources
+	if eventType.Action == types.ResyncRequestAction && originalSource == types.SourceAll {
+		if len(o.Topics.AgentBroadcast) == 0 {
+			logger.Info("the agent broadcast topic not set, fall back to the agent events topic")
+
+			// TODO after supporting multiple sources, we should list each source
+			return replaceLast(o.Topics.AgentEvents, "+", clusterName), nil
+		}
+
+		return strings.Replace(o.Topics.AgentBroadcast, "+", clusterName, 1), nil
+	}
+
+	topicSource, err := getSourceFromEventsTopic(o.Topics.AgentEvents)
+	if err != nil {
+		return "", err
+	}
+
+	// agent publishes status events or spec resync events
+	eventsTopic := replaceLast(o.Topics.AgentEvents, "+", clusterName)
+	return replaceLast(eventsTopic, "+", topicSource), nil
+}
+
+func AgentSubscribe(o *MQTTOptions, clusterName string) (*paho.Subscribe, error) {
+	subscribe := &paho.Subscribe{
+		Subscriptions: []paho.SubscribeOptions{
+			{
+				// TODO support multiple sources, currently the client require the source events topic has a sourceID, in
+				// the future, client may need a source list, it will subscribe to each source
+				// receiving the sources events
+				Topic: replaceLast(o.Topics.SourceEvents, "+", clusterName), QoS: byte(o.SubQoS),
+			},
+		},
+	}
+
+	// receiving status resync events from all sources
+	if len(o.Topics.SourceBroadcast) != 0 {
+		subscribe.Subscriptions = append(subscribe.Subscriptions, paho.SubscribeOptions{
+			Topic: o.Topics.SourceBroadcast,
+			QoS:   byte(o.SubQoS),
+		})
+	}
+
+	return subscribe, nil
 }

@@ -83,8 +83,6 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 		hook, err := util.NewGRPCServerRegistrationHook(hubCfg)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		go hook.Run(grpcServerCtx)
-
 		grpcEventServer := cloudeventsgrpc.NewGRPCBroker()
 		grpcEventServer.RegisterService(grpcServerCtx, clusterce.ManagedClusterEventDataType,
 			cluster.NewClusterService(hook.ClusterClient, hook.ClusterInformers.Cluster().V1().ManagedClusters()))
@@ -96,6 +94,11 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 			event.NewEventService(hook.KubeClient))
 		grpcEventServer.RegisterService(grpcServerCtx, leasece.LeaseEventDataType,
 			lease.NewLeaseService(hook.KubeClient, hook.KubeInformers.Coordination().V1().Leases()))
+
+		go func() {
+			defer ginkgo.GinkgoRecover()
+			hook.Run(grpcServerCtx)
+		}()
 
 		authorizer := util.NewMockAuthorizer()
 		server := sdkgrpc.NewGRPCServer(gRPCServerOptions).

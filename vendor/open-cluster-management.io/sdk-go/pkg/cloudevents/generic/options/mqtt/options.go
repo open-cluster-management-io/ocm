@@ -4,12 +4,13 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"k8s.io/klog/v2"
 	"net"
 	"os"
 	"regexp"
 	"strings"
 	"time"
+
+	"k8s.io/klog/v2"
 
 	cloudeventsmqtt "github.com/cloudevents/sdk-go/protocol/mqtt_paho/v2"
 	"github.com/eclipse/paho.golang/packets"
@@ -235,8 +236,8 @@ func (o *MQTTOptions) GetCloudEventsProtocol(
 
 	opts := []cloudeventsmqtt.Option{
 		cloudeventsmqtt.WithConnect(o.GetMQTTConnectOption(clientID)),
-		cloudeventsmqtt.WithDebugLogger(&PahoDebugLogger{logger: logger}),
-		cloudeventsmqtt.WithErrorLogger(&PahoErrorLogger{logger: logger}),
+		cloudeventsmqtt.WithDebugLogger(NewPahoDebugLogger(logger)),
+		cloudeventsmqtt.WithErrorLogger(NewPahoErrorLogger(logger)),
 	}
 	opts = append(opts, clientOpts...)
 	return cloudeventsmqtt.New(ctx, config, opts...)

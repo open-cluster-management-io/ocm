@@ -89,8 +89,8 @@ func TestManifestWorkGarbageCollectionController(t *testing.T) {
 			workInformerFactory.Start(ctx.Done())
 			workInformerFactory.WaitForCacheSync(ctx.Done())
 
-			syncContext := testingcommon.NewFakeSyncContext(t, "default/test")
-			err := controller.sync(ctx, syncContext)
+			syncContext := testingcommon.NewFakeSDKSyncContext(t, "default/test")
+			err := controller.sync(ctx, syncContext, "default/test")
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}

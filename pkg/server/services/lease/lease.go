@@ -7,6 +7,7 @@ import (
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	leasev1 "k8s.io/client-go/informers/coordination/v1"
 	"k8s.io/client-go/kubernetes"
 	leaselister "k8s.io/client-go/listers/coordination/v1"
@@ -90,31 +91,32 @@ func (l *LeaseService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.
 }
 
 func (l *LeaseService) RegisterHandler(ctx context.Context, handler server.EventHandler) {
-	if _, err := l.informer.Informer().AddEventHandler(l.EventHandlerFuncs(handler)); err != nil {
-		klog.Errorf("failed to register lease informer event handler, %v", err)
+	logger := klog.FromContext(ctx)
+	if _, err := l.informer.Informer().AddEventHandler(l.EventHandlerFuncs(ctx, handler)); err != nil {
+		logger.Error(err, "failed to register lease informer event handler")
 	}
 }
 
-func (l *LeaseService) EventHandlerFuncs(handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
+func (l *LeaseService) EventHandlerFuncs(ctx context.Context, handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
 	return &cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
 			if err != nil {
-				klog.Errorf("failed to get key for lease %v", err)
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to get key for lease")
 				return
 			}
-			if err := handler.OnCreate(context.Background(), leasece.LeaseEventDataType, key); err != nil {
-				klog.Error(err)
+			if err := handler.OnCreate(ctx, leasece.LeaseEventDataType, key); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to create lease", "key", key)
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(newObj)
 			if err != nil {
-				klog.Errorf("failed to get key for lease %v", err)
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to get key for lease")
 				return
 			}
-			if err := handler.OnUpdate(context.Background(), leasece.LeaseEventDataType, key); err != nil {
-				klog.Error(err)
+			if err := handler.OnUpdate(ctx, leasece.LeaseEventDataType, key); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to update lease", "key", key)
 			}
 		},
 	}

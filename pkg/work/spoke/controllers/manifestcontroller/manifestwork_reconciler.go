@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -18,8 +17,10 @@ import (
 	"k8s.io/klog/v2"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
+	"open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
@@ -46,6 +47,7 @@ func (m *manifestworkReconciler) reconcile(
 	appliedManifestWork *workapiv1.AppliedManifestWork,
 	_ []applyResult) (*workapiv1.ManifestWork, *workapiv1.AppliedManifestWork, []applyResult, error) {
 	logger := klog.FromContext(ctx)
+	eventRecorder := recorder.NewContextualLoggingEventRecorder(controllerName).WithContext(ctx)
 	// We creat a ownerref instead of controller ref since multiple controller can declare the ownership of a manifests
 	owner := helper.NewAppliedManifestWorkOwner(appliedManifestWork)
 
@@ -54,7 +56,7 @@ func (m *manifestworkReconciler) reconcile(
 	resourceResults := make([]applyResult, len(manifestWork.Spec.Workload.Manifests))
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		resourceResults = m.applyManifests(
-			ctx, manifestWork.Spec.Workload.Manifests, manifestWork.Spec, manifestWork.Status, controllerContext.Recorder(), *owner, resourceResults)
+			ctx, manifestWork.Spec.Workload.Manifests, manifestWork.Spec, manifestWork.Status, eventRecorder, *owner, resourceResults)
 
 		for _, result := range resourceResults {
 			if apierrors.IsConflict(result.Error) {

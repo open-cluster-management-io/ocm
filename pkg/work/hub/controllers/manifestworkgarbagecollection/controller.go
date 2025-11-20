@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -18,6 +17,7 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	worklisters "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
@@ -45,12 +45,11 @@ func NewManifestWorkGarbageCollectionController(
 			manifestWorkInformer.Informer(),
 		).
 		WithSync(controller.sync).
-		ToController("ManifestWorkGarbageCollectionController", recorder)
+		ToController("ManifestWorkGarbageCollectionController")
 }
 
 // sync is the main reconcile loop for completed ManifestWork TTL
-func (c *ManifestWorkGarbageCollectionController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	key := controllerContext.QueueKey()
+func (c *ManifestWorkGarbageCollectionController) sync(ctx context.Context, controllerContext factory.SyncContext, key string) error {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Reconciling ManifestWork for TTL processing", "key", key)
 

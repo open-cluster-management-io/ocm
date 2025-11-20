@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -28,6 +27,7 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 	workapplier "open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
@@ -101,23 +101,23 @@ func NewManifestWorkReplicaSetController(
 
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaNamespaceName, manifestWorkReplicaSetInformer.Informer()).
-		WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
+		WithFilteredEventsInformersQueueKeysFunc(func(obj runtime.Object) []string {
 			accessor, _ := meta.Accessor(obj)
 			labelValue, ok := accessor.GetLabels()[ManifestWorkReplicaSetControllerNameLabelKey]
 			if !ok {
-				return ""
+				return []string{}
 			}
 			keys := strings.Split(labelValue, ".")
 			if len(keys) != 2 {
-				return ""
+				return []string{}
 			}
-			return fmt.Sprintf("%s/%s", keys[0], keys[1])
+			return []string{fmt.Sprintf("%s/%s", keys[0], keys[1])}
 		},
 			queue.FileterByLabel(ManifestWorkReplicaSetControllerNameLabelKey),
 			manifestWorkInformer.Informer()).
 		WithInformersQueueKeysFunc(controller.placementDecisionQueueKeysFunc, placeDecisionInformer.Informer()).
 		WithInformersQueueKeysFunc(controller.placementQueueKeysFunc, placementInformer.Informer()).
-		WithSync(controller.sync).ToController("ManifestWorkReplicaSetController", recorder)
+		WithSync(controller.sync).ToController("ManifestWorkReplicaSetController")
 }
 
 func newController(
@@ -154,9 +154,10 @@ func newController(
 }
 
 // sync is the main reconcile loop for ManifestWorkReplicaSet. It is triggered every 15sec
-func (m *ManifestWorkReplicaSetController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	key := controllerContext.QueueKey()
-	klog.V(4).Infof("Reconciling ManifestWorkReplicaSet %q", key)
+func (m *ManifestWorkReplicaSetController) sync(ctx context.Context, controllerContext factory.SyncContext, key string) error {
+	logger := klog.FromContext(ctx).WithValues("manifestWorkReplicaSet", key)
+
+	logger.V(5).Info("Reconciling ManifestWorkReplicaSet")
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {

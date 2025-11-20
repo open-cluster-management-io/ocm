@@ -1,4 +1,4 @@
-package helpers
+package recorder
 
 import (
 	"context"
@@ -14,7 +14,7 @@ func NewEventRecorder(ctx context.Context, scheme *runtime.Scheme,
 	broadcaster := kevents.NewBroadcaster(&kevents.EventSinkImpl{Interface: eventsClient})
 	err := broadcaster.StartRecordingToSinkWithContext(ctx)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 	broadcaster.StartStructuredLogging(0)
 	recorder := broadcaster.NewRecorder(scheme, controllerName)

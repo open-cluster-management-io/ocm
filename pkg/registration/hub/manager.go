@@ -29,7 +29,7 @@ import (
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 
-	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/hub/addon"
 	"open-cluster-management.io/ocm/pkg/registration/hub/clusterprofile"
