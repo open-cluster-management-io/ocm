@@ -101,11 +101,13 @@ const (
 )
 
 const (
-	EventsTopicPattern          = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/(sourceevents|agentevents)$`
-	SourceEventsTopicPattern    = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/sourceevents$`
-	AgentEventsTopicPattern     = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/agentevents$`
-	SourceBroadcastTopicPattern = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/sourcebroadcast$`
-	AgentBroadcastTopicPattern  = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/agentbroadcast$`
+	MQTTEventsTopicPattern          = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/(sourceevents|agentevents)$`
+	MQTTSourceEventsTopicPattern    = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/sourceevents$`
+	MQTTAgentEventsTopicPattern     = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/agentevents$`
+	MQTTSourceBroadcastTopicPattern = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/sourcebroadcast$`
+	MQTTAgentBroadcastTopicPattern  = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/agentbroadcast$`
+	PubSubTopicPattern              = `^projects/PROJECT_ID/topics/(sourceevents|agentevents|sourcebroadcast|agentbroadcast)$`
+	PubSubSubscriptionPattern       = `^projects/PROJECT_ID/subscriptions/(sourceevents-[a-z0-9-]+|agentevents-[a-z0-9-]+|sourcebroadcast-[a-z0-9-]+|agentbroadcast-[a-z0-9-]+)$`
 )
 
 // Topics represents required messaging system topics for a source or agent.
@@ -115,9 +117,11 @@ type Topics struct {
 	//     its sourceID to a specified agent
 	//   - An agent subscribes to this topic with its cluster name to response sources resource create/update/delete
 	//     request or status resync request
-	// The topic format is `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/sourceevents$`, e.g.
+	// For MQTT: The topic format is `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/sourceevents$`, e.g.
 	// sources/+/clusters/+/sourceevents, sources/source1/clusters/+/sourceevents, sources/source1/clusters/cluster1/sourceevents
 	// or $share/source-group/sources/+/clusters/+/sourceevents
+	// For Pub/Sub: The topic should be pre-created with the format `projects/{projectID}/topics/sourceevents`,
+	// e.g., `projects/my-project/topics/sourceevents`.
 	SourceEvents string `json:"sourceEvents" yaml:"sourceEvents"`
 
 	// AgentEvents topic is a topic for agents to publish their resource status update events or spec resync events
@@ -125,26 +129,67 @@ type Topics struct {
 	//     cluster name to a specified source.
 	//   - A source subscribe to this topic with its sourceID to response agents resource status update request or spec
 	//     resync request
-	// The topic format is `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/agentevents$`, e.g.
+	// For MQTT: The topic format is `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/agentevents$`, e.g.
 	// sources/+/clusters/+/agentevents, sources/source1/clusters/+/agentevents, sources/source1/clusters/cluster1/agentevents
 	// or $share/agent-group/+/clusters/+/agentevents
+	// For Pub/Sub: The topic should be pre-created with the format `projects/{projectID}/topics/agentevents`,
+	// e.g. projects/my-project/topics/agentevents.
 	AgentEvents string `json:"agentEvents" yaml:"agentEvents"`
 
-	// SourceBroadcast is an optional topic, it is for a source to publish its events to all agents, currently, we use
+	// SourceBroadcast is a topic for a source to publish its events to all agents, currently, we use
 	// this topic to resync resource status from all agents for a source that does not known the exact agents, e.g.
 	//   - A source uses this topic to publish its resource status resync request with its sourceID to all the agents
 	//   - Each agent subscribes to this topic to response sources resource status resync request
-	// The topic format is `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/sourcebroadcast$`, e.g.
+	// For MQTT: The topic is optional and the format is `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/sourcebroadcast$`, e.g.
 	// sources/+/sourcebroadcast, sources/source1/sourcebroadcast or $share/source-group/sources/+/sourcebroadcast
+	// For Pub/Sub: The topic should be pre-created with the format `projects/{projectID}/topics/sourcebroadcast`,
+	// e.g. projects/my-project/topics/sourcebroadcast.
 	SourceBroadcast string `json:"sourceBroadcast,omitempty" yaml:"sourceBroadcast,omitempty"`
 
-	// AgentBroadcast is an optional topic, it is for a agent to publish its events to all sources, currently, we use
+	// AgentBroadcast is a topic for a agent to publish its events to all sources, currently, we use
 	// this topic to resync resources from all sources for an agent that does not known the exact sources, e.g.
 	//   - An agent using this topic to publish the spec resync request with its cluster name to all the sources.
 	//   - Each source subscribe to this topic to response agents spec resync request
-	// The topic format is `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/agentbroadcast$`, e.g.
+	// For MQTT: The topic is optional and the format is `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/agentbroadcast$`, e.g.
 	// clusters/+/agentbroadcast, clusters/cluster1/agentbroadcast or $share/agent-group/clusters/+/agentbroadcast
+	// For Pub/Sub: The topic should be pre-created with the format `projects/{projectID}/topics/agentbroadcast`,
+	// e.g. projects/my-project/topics/agentbroadcast.
 	AgentBroadcast string `json:"agentBroadcast,omitempty" yaml:"agentBroadcast,omitempty"`
+}
+
+// Subscriptions represents required messaging system subscriptions for a source or agent.
+// Not all messaging systems use explicit subscriptions, e.g., MQTT uses topic subscriptions directly.
+// But for systems like Google Pub/Sub, subscriptions are necessary to receive messages from topics.
+type Subscriptions struct {
+	// SourceEvents subscription is a subscription for a agent to receive resource create/update/delete events or status resync events
+	//   - A source publishes to the topic attched by this subscription to send its resource create/update/delete request or status resync request
+	//     to a specified agent with cluster name
+	//   - An agent uses this subscription to receive resource create/update/delete request or status resync request from sources
+	//     with by filtering its cluster name
+	// For Pub/Sub: The subscription should be pre-created with the format `projects/{projectID}/subscriptions/sourceevents-{clusterName}` and filter `attr."ce-clustername"="{clusterName}"`,
+	// e.g. projects/my-project/subscriptions/sourceevents-cluster1 with filter `attr."ce-clustername"="cluster1"`.
+	SourceEvents string `json:"sourceEvents" yaml:"sourceEvents"`
+
+	// AgentEvents subscription is a subscription for a source to receive resource status update events or spec resync events
+	//   - An agent publishes to the topic attched by this subscription to send its resource status update request or spec resync request
+	//     to a specified source with sourceID
+	//   - A source uses this subscription to receive resource status update request or spec resync request from agents
+	//     by filtering its sourceID
+	// For Pub/Sub: The subscription should be pre-created with the format `projects/{projectID}/subscriptions/agentevents-{sourceID}` and filter `attr."ce-originalsource"="{sourceID}"`,
+	// e.g. projects/my-project/subscriptions/agentevents-source1 with filter `attr."ce-originalsource"="source1"`.
+	AgentEvents string `json:"agentEvents" yaml:"agentEvents"`
+	// SourceBroadcast subscription is a subscription for an agent to receive status resync events from all sources.
+	//   - A source publishes to the topic attached by this subscription to send its status resync request to all agents
+	//   - Each agent uses this subscription to receive status resync request from sources
+	// For Pub/Sub: The subscription should be pre-created with the format `projects/{projectID}/subscriptions/sourcebroadcast-{clusterName}`,
+	// e.g. projects/my-project/subscriptions/sourcebroadcast-cluster1.
+	SourceBroadcast string `json:"sourceBroadcast" yaml:"sourceBroadcast"`
+	// AgentBroadcast subscription is a subscription for a source to receive spec resync events from all agents.
+	//   - An agent publishes to the topic attached by this subscription to send its spec resync request to all sources
+	//   - Each source uses this subscription to receive spec resync request from agents
+	// For Pub/Sub: The subscription should be pre-created with the format `projects/{projectID}/subscriptions/agentbroadcast-{sourceID}`,
+	// e.g. projects/my-project/subscriptions/agentbroadcast-source1.
+	AgentBroadcast string `json:"agentBroadcast" yaml:"agentBroadcast"`
 }
 
 // ListOptions is the query options for listing the resource objects from the source/agent.

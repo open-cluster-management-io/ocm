@@ -120,10 +120,37 @@ func TestSyncManifestWork(t *testing.T) {
 					t.Fatal(spew.Sdump(actions))
 				}
 			},
-			expectedDeleteActions: []clienttesting.DeleteActionImpl{
-				clienttesting.NewDeleteAction(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}, "ns3", "n3"),
-				clienttesting.NewDeleteAction(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}, "ns4", "n4"),
-			},
+			expectedDeleteActions: func() []clienttesting.DeleteActionImpl {
+				deletePolicy := metav1.DeletePropagationBackground
+				uid3 := types.UID("ns3-n3")
+				uid4 := types.UID("ns4-n4")
+				return []clienttesting.DeleteActionImpl{
+					{
+						ActionImpl: clienttesting.ActionImpl{
+							Namespace: "ns3",
+							Verb:      "delete",
+							Resource:  schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"},
+						},
+						Name: "n3",
+						DeleteOptions: metav1.DeleteOptions{
+							Preconditions:     &metav1.Preconditions{UID: &uid3},
+							PropagationPolicy: &deletePolicy,
+						},
+					},
+					{
+						ActionImpl: clienttesting.ActionImpl{
+							Namespace: "ns4",
+							Verb:      "delete",
+							Resource:  schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"},
+						},
+						Name: "n4",
+						DeleteOptions: metav1.DeleteOptions{
+							Preconditions:     &metav1.Preconditions{UID: &uid4},
+							PropagationPolicy: &deletePolicy,
+						},
+					},
+				}
+			}(),
 			expectedQueueLen: 1,
 		},
 		{
