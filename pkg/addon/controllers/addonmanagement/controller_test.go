@@ -463,7 +463,7 @@ func TestAddonManagementControllerSync(t *testing.T) {
 			}
 
 			// Create sync context
-			syncCtx := testingcommon.NewFakeSDKSyncContext(t, c.queueKey)
+			syncCtx := testingcommon.NewFakeSyncContext(t, c.queueKey)
 
 			// Test sync method
 			ctx := context.TODO()

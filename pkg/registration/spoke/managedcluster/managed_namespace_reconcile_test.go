@@ -2,11 +2,9 @@ package managedcluster
 
 import (
 	"context"
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -17,6 +15,7 @@ import (
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
@@ -248,12 +247,11 @@ func TestManagedNamespaceReconcile_reconcile(t *testing.T) {
 				hubClusterSetLabel:   GetHubClusterSetLabel(testHubHash),
 				spokeKubeClient:      spokeKubeClient,
 				spokeNamespaceLister: spokeKubeInformerFactory.Core().V1().Namespaces().Lister(),
-				eventRecorder:        eventstesting.NewTestingEventRecorder(t),
 			}
 
 			// Run reconcile
 			ctx := context.TODO()
-			syncCtx := testingcommon.NewFakeSDKSyncContext(t, "")
+			syncCtx := testingcommon.NewFakeSyncContext(t, "")
 			updatedCluster, state, err := reconciler.reconcile(ctx, syncCtx, c.cluster)
 
 			// Validate error
@@ -354,12 +352,12 @@ func TestManagedNamespaceReconcile_createOrUpdateNamespace(t *testing.T) {
 			reconciler := &managedNamespaceReconcile{
 				hubClusterSetLabel: testClusterSetLabel,
 				spokeKubeClient:    spokeKubeClient,
-				eventRecorder:      eventstesting.NewTestingEventRecorder(t),
 			}
 
 			// Run createOrUpdateNamespace
 			ctx := context.TODO()
-			err := reconciler.createOrUpdateNamespace(ctx, c.nsName, c.clusterSetName)
+			syncCtx := testingcommon.NewFakeSyncContext(t, "")
+			err := reconciler.createOrUpdateNamespace(ctx, syncCtx, c.nsName, c.clusterSetName)
 
 			// Validate error
 			if c.expectedErr == "" && err != nil {
@@ -493,12 +491,12 @@ func TestManagedNamespaceReconcile_cleanupPreviouslyManagedNamespaces(t *testing
 				hubClusterSetLabel:   testClusterSetLabel,
 				spokeKubeClient:      spokeKubeClient,
 				spokeNamespaceLister: spokeKubeInformerFactory.Core().V1().Namespaces().Lister(),
-				eventRecorder:        eventstesting.NewTestingEventRecorder(t),
 			}
 
 			// Run cleanupPreviouslyManagedNamespaces
 			ctx := context.TODO()
-			err := reconciler.cleanupPreviouslyManagedNamespaces(ctx, c.currentManagedNS)
+			syncCtx := testingcommon.NewFakeSyncContext(t, "")
+			err := reconciler.cleanupPreviouslyManagedNamespaces(ctx, syncCtx, c.currentManagedNS)
 
 			// Validate error
 			if c.expectedErr == "" && err != nil {

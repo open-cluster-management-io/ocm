@@ -3,7 +3,6 @@ package managedcluster
 import (
 	"context"
 	"fmt"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"sort"
 	"strings"
 
@@ -17,6 +16,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	ocmfeature "open-cluster-management.io/api/feature"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"open-cluster-management.io/ocm/pkg/features"
 )

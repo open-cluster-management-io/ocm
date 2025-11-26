@@ -297,7 +297,7 @@ func TestSyncManifestWork(t *testing.T) {
 				hubHash: "test",
 			}
 
-			controllerContext := testingcommon.NewFakeSDKSyncContext(t, testingWork.Name)
+			controllerContext := testingcommon.NewFakeSyncContext(t, testingWork.Name)
 			err := controller.sync(context.TODO(), controllerContext, testingWork.Name)
 			if err != nil {
 				t.Fatal(err)

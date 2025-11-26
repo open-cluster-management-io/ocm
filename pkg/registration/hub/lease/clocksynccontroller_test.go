@@ -104,7 +104,7 @@ func TestClockSyncController(t *testing.T) {
 				}
 			}
 
-			syncCtx := testingcommon.NewFakeSDKSyncContext(t, testinghelpers.TestManagedClusterName)
+			syncCtx := testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName)
 
 			controller := &clockSyncController{
 				patcher: patcher.NewPatcher[

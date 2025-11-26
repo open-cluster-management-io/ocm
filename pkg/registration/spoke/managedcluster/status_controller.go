@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +35,6 @@ type managedClusterStatusController struct {
 	patcher          patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus]
 	hubClusterLister clusterv1listers.ManagedClusterLister
 	hubEventRecorder kevents.EventRecorder
-	recorder         events.Recorder
 }
 
 type statusReconcile interface {
@@ -158,7 +156,7 @@ func (c *managedClusterStatusController) sync(ctx context.Context, syncCtx facto
 	// check if managedcluster's clock is out of sync, if so, the agent will not be able to update the status of managed cluster.
 	outOfSynced := meta.IsStatusConditionFalse(newCluster.Status.Conditions, clusterv1.ManagedClusterConditionClockSynced)
 	if outOfSynced {
-		c.recorder.Eventf("ClockOutOfSync", "The managed cluster's clock is out of sync, the agent will not be able to update the status of managed cluster.")
+		syncCtx.Recorder().Eventf(ctx, "ClockOutOfSync", "The managed cluster's clock is out of sync, the agent will not be able to update the status of managed cluster.")
 		return fmt.Errorf("the managed cluster's clock is out of sync, the agent will not be able to update the status of managed cluster")
 	}
 

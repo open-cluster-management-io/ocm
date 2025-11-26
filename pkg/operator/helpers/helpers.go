@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"os"
 	"reflect"
 	"slices"
@@ -43,6 +42,8 @@ import (
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 )
 
 const (

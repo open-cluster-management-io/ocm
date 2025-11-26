@@ -126,7 +126,7 @@ func TestSyncDefaultClusterSet(t *testing.T) {
 				clusterSetLister: informerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
 			}
 
-			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSDKSyncContext(t, testinghelpers.TestManagedClusterName), "")
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName), "")
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

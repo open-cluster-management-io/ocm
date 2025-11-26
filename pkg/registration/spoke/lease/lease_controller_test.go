@@ -107,7 +107,7 @@ func TestSync(t *testing.T) {
 				lastLeaseDurationSeconds: c.controllerlastLeaseDurationSeconds,
 			}
 
-			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSDKSyncContext(t, ""), "")
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), "")
 			testingcommon.AssertError(t, syncErr, c.expectSyncErr)
 
 			if c.validateActions != nil {
@@ -141,7 +141,7 @@ func TestLeaseUpdater(t *testing.T) {
 
 	// start the updater
 	ctx := context.Background()
-	syncCtx := testingcommon.NewFakeSDKSyncContext(t, "")
+	syncCtx := testingcommon.NewFakeSyncContext(t, "")
 	leaseUpdater.start(ctx, syncCtx, time.Second*1)
 
 	// wait for 3 second, the all actions should be in get,update pairs

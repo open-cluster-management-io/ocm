@@ -3,7 +3,6 @@ package managedcluster
 import (
 	"context"
 	"encoding/json"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"reflect"
 	"testing"
 	"time"
@@ -24,6 +23,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	ocmfeature "open-cluster-management.io/api/feature"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/features"
@@ -219,7 +219,7 @@ func TestSync(t *testing.T) {
 				hubEventRecorder,
 			)
 
-			syncErr := ctrl.sync(ctx, testingcommon.NewFakeSDKSyncContext(t, ""), "")
+			syncErr := ctrl.sync(ctx, testingcommon.NewFakeSyncContext(t, ""), "")
 			testingcommon.AssertError(t, syncErr, c.expectedErr)
 
 			c.validateActions(t, clusterClient.Actions())
@@ -597,7 +597,7 @@ func TestExposeClaims(t *testing.T) {
 				hubEventRecorder,
 			)
 
-			syncErr := ctrl.sync(ctx, testingcommon.NewFakeSDKSyncContext(t, c.cluster.Name), c.cluster.Name)
+			syncErr := ctrl.sync(ctx, testingcommon.NewFakeSyncContext(t, c.cluster.Name), c.cluster.Name)
 			testingcommon.AssertError(t, syncErr, c.expectedErr)
 
 			c.validateActions(t, clusterClient.Actions())

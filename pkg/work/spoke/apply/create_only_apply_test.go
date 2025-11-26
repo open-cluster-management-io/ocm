@@ -71,7 +71,7 @@ func TestCreateOnlyApply(t *testing.T) {
 			dynamicClient := fakedynamic.NewSimpleDynamicClient(scheme, objects...)
 			applier := NewCreateOnlyApply(dynamicClient)
 
-			syncContext := testingcommon.NewFakeSDKSyncContext(t, "test")
+			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			obj, err := applier.Apply(
 				context.TODO(), c.gvr, c.required, c.owner, nil, syncContext.Recorder())
 

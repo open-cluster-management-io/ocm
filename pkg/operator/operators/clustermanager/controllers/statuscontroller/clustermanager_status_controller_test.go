@@ -230,7 +230,7 @@ func TestSyncStatus(t *testing.T) {
 					fakeOperatorClient.OperatorV1().ClusterManagers()),
 			}
 
-			syncContext := testingcommon.NewFakeSDKSyncContext(t, c.queueKey)
+			syncContext := testingcommon.NewFakeSyncContext(t, c.queueKey)
 			err := controller.sync(context.TODO(), syncContext, c.queueKey)
 			if err != nil {
 				t.Errorf("Expected no error when update status: %v", err)

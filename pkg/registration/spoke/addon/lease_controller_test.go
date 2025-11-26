@@ -106,7 +106,7 @@ func TestSync(t *testing.T) {
 		hubLeases        []runtime.Object
 		managementLeases []runtime.Object
 		spokeLeases      []runtime.Object
-		validateActions  func(t *testing.T, ctx *testingcommon.FakeSDKSyncContext, actions []clienttesting.Action)
+		validateActions  func(t *testing.T, ctx *testingcommon.FakeSyncContext, actions []clienttesting.Action)
 	}{
 		{
 			name:        "bad queue key",
@@ -114,7 +114,7 @@ func TestSync(t *testing.T) {
 			addOns:      []runtime.Object{},
 			hubLeases:   []runtime.Object{},
 			spokeLeases: []runtime.Object{},
-			validateActions: func(t *testing.T, ctx *testingcommon.FakeSDKSyncContext, actions []clienttesting.Action) {
+			validateActions: func(t *testing.T, ctx *testingcommon.FakeSyncContext, actions []clienttesting.Action) {
 				testingcommon.AssertNoActions(t, actions)
 			},
 		},
@@ -124,7 +124,7 @@ func TestSync(t *testing.T) {
 			addOns:      []runtime.Object{},
 			spokeLeases: []runtime.Object{},
 			hubLeases:   []runtime.Object{},
-			validateActions: func(t *testing.T, ctx *testingcommon.FakeSDKSyncContext, actions []clienttesting.Action) {
+			validateActions: func(t *testing.T, ctx *testingcommon.FakeSyncContext, actions []clienttesting.Action) {
 				testingcommon.AssertNoActions(t, actions)
 			},
 		},
@@ -142,7 +142,7 @@ func TestSync(t *testing.T) {
 			}},
 			hubLeases:   []runtime.Object{},
 			spokeLeases: []runtime.Object{},
-			validateActions: func(t *testing.T, ctx *testingcommon.FakeSDKSyncContext, actions []clienttesting.Action) {
+			validateActions: func(t *testing.T, ctx *testingcommon.FakeSyncContext, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				addOn := &addonv1alpha1.ManagedClusterAddOn{}
@@ -176,7 +176,7 @@ func TestSync(t *testing.T) {
 			spokeLeases: []runtime.Object{
 				testinghelpers.NewAddOnLease("test", "test", now.Add(-5*time.Minute)),
 			},
-			validateActions: func(t *testing.T, ctx *testingcommon.FakeSDKSyncContext, actions []clienttesting.Action) {
+			validateActions: func(t *testing.T, ctx *testingcommon.FakeSyncContext, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				addOn := &addonv1alpha1.ManagedClusterAddOn{}
@@ -210,7 +210,7 @@ func TestSync(t *testing.T) {
 			spokeLeases: []runtime.Object{
 				testinghelpers.NewAddOnLease("test", "test", now),
 			},
-			validateActions: func(t *testing.T, ctx *testingcommon.FakeSDKSyncContext, actions []clienttesting.Action) {
+			validateActions: func(t *testing.T, ctx *testingcommon.FakeSyncContext, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				addOn := &addonv1alpha1.ManagedClusterAddOn{}
@@ -254,7 +254,7 @@ func TestSync(t *testing.T) {
 			spokeLeases: []runtime.Object{
 				testinghelpers.NewAddOnLease("test", "test", now),
 			},
-			validateActions: func(t *testing.T, ctx *testingcommon.FakeSDKSyncContext, actions []clienttesting.Action) {
+			validateActions: func(t *testing.T, ctx *testingcommon.FakeSyncContext, actions []clienttesting.Action) {
 				testingcommon.AssertNoActions(t, actions)
 			},
 		},
@@ -282,7 +282,7 @@ func TestSync(t *testing.T) {
 			spokeLeases: []runtime.Object{
 				testinghelpers.NewAddOnLease("test1", "test1", now.Add(-5*time.Minute)),
 			},
-			validateActions: func(t *testing.T, ctx *testingcommon.FakeSDKSyncContext, actions []clienttesting.Action) {
+			validateActions: func(t *testing.T, ctx *testingcommon.FakeSyncContext, actions []clienttesting.Action) {
 				if ctx.Queue().Len() != 2 {
 					t.Errorf("expected two addons in queue, but failed")
 				}
@@ -307,7 +307,7 @@ func TestSync(t *testing.T) {
 			managementLeases: []runtime.Object{
 				testinghelpers.NewAddOnLease("test", "test", now),
 			},
-			validateActions: func(t *testing.T, ctx *testingcommon.FakeSDKSyncContext, actions []clienttesting.Action) {
+			validateActions: func(t *testing.T, ctx *testingcommon.FakeSyncContext, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				addOn := &addonv1alpha1.ManagedClusterAddOn{}
@@ -341,7 +341,7 @@ func TestSync(t *testing.T) {
 			}},
 			hubLeases:   []runtime.Object{},
 			spokeLeases: []runtime.Object{},
-			validateActions: func(t *testing.T, ctx *testingcommon.FakeSDKSyncContext, actions []clienttesting.Action) {
+			validateActions: func(t *testing.T, ctx *testingcommon.FakeSyncContext, actions []clienttesting.Action) {
 				testingcommon.AssertNoActions(t, actions)
 			},
 		},
@@ -371,7 +371,7 @@ func TestSync(t *testing.T) {
 				managementLeaseClient: managementLeaseClient.CoordinationV1(),
 				spokeLeaseClient:      spokeLeaseClient.CoordinationV1(),
 			}
-			syncCtx := testingcommon.NewFakeSDKSyncContext(t, c.queueKey)
+			syncCtx := testingcommon.NewFakeSyncContext(t, c.queueKey)
 			syncErr := ctrl.sync(context.TODO(), syncCtx, c.queueKey)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)

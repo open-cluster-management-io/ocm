@@ -7,6 +7,7 @@ package klusterletcontroller
 import (
 	"context"
 	"fmt"
+
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	rbacv1 "k8s.io/api/rbac/v1"

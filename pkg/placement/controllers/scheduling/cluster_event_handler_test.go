@@ -101,7 +101,7 @@ func TestOnClusterChange(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
 			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
-			syncCtx := testingcommon.NewFakeSDKSyncContext(t, "fake")
+			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 			q := newEnqueuer(
 				ctx,
 				syncCtx.Queue(),
@@ -265,7 +265,7 @@ func TestOnClusterUpdate(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
 			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
-			syncCtx := testingcommon.NewFakeSDKSyncContext(t, "fake")
+			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 			q := newEnqueuer(
 				ctx,
 				syncCtx.Queue(),
@@ -369,7 +369,7 @@ func TestOnClusterDelete(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
 			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
-			syncCtx := testingcommon.NewFakeSDKSyncContext(t, "fake")
+			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 			q := newEnqueuer(
 				ctx,
 				syncCtx.Queue(),

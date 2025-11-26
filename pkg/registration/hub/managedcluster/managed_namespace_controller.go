@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,8 +39,7 @@ type managedNamespaceController struct {
 func NewManagedNamespaceController(
 	clusterClient clientset.Interface,
 	clusterInformer clusterinformerv1.ManagedClusterInformer,
-	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer,
-	recorder events.Recorder) factory.Controller {
+	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer) factory.Controller {
 
 	controllerName := "managed-namespace-controller"
 	syncCtx := factory.NewSyncContext(controllerName)

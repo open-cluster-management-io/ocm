@@ -182,7 +182,6 @@ func RunControllerManagerWithInformers(
 		// these addons only support addontemplate and addondeploymentconfig
 		dynamicInformers,
 		workinformers,
-		controllerContext.EventRecorder,
 	)
 
 	go addonManagementController.Run(ctx, 2)

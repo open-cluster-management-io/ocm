@@ -323,7 +323,7 @@ func TestApplyUnstructred(t *testing.T) {
 			applier := NewUpdateApply(dynamicClient, nil, nil)
 
 			c.required.SetOwnerReferences([]metav1.OwnerReference{c.owner})
-			syncContext := testingcommon.NewFakeSDKSyncContext(t, "test")
+			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			cache := NewResourceCache()
 			cache.UpdateCachedResourceMetadata(c.required, c.existing)
 			_, _, err := applier.applyUnstructured(
@@ -392,7 +392,7 @@ func TestUpdateApplyKube(t *testing.T) {
 
 			applier := NewUpdateApply(nil, kubeclient, nil)
 
-			syncContext := testingcommon.NewFakeSDKSyncContext(t, "test")
+			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			obj, err := applier.Apply(
 				context.TODO(), c.gvr, c.required, c.owner, nil, syncContext.Recorder())
 
@@ -461,7 +461,7 @@ func TestUpdateApplyDynamic(t *testing.T) {
 
 			applier := NewUpdateApply(dynamicclient, nil, nil)
 
-			syncContext := testingcommon.NewFakeSDKSyncContext(t, "test")
+			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			obj, err := applier.Apply(
 				context.TODO(), c.gvr, c.required, c.owner, nil, syncContext.Recorder())
 
@@ -541,7 +541,7 @@ func TestUpdateApplyApiExtension(t *testing.T) {
 
 			applier := NewUpdateApply(nil, nil, apiextensionClient)
 
-			syncContext := testingcommon.NewFakeSDKSyncContext(t, "test")
+			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			obj, err := applier.Apply(
 				context.TODO(), c.gvr, c.required, c.owner, nil, syncContext.Recorder())
 

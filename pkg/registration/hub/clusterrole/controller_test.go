@@ -121,7 +121,7 @@ func TestSyncManagedClusterClusterRole(t *testing.T) {
 			}
 
 			syncErr := ctrl.sync(context.TODO(),
-				testingcommon.NewFakeSDKSyncContext(t, "testmangedclsuterclusterrole"),
+				testingcommon.NewFakeSyncContext(t, "testmangedclsuterclusterrole"),
 				"testmangedclsuterclusterrole")
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)

@@ -463,7 +463,7 @@ func TestSync(t *testing.T) {
 	clusterManager := newClusterManager("testhub")
 	tc, client := newTestController(t, clusterManager)
 
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, "testhub")
+	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
 	// Do not support migration
 	err := tc.sync(context.Background(), syncContext, "testhub")
 	if err != nil {

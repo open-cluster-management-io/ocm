@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"time"
 
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -35,6 +34,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/apply"
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/manifests"

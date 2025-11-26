@@ -3,12 +3,10 @@ package registration_test
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/openshift/api"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -23,12 +21,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
-	clocktesting "k8s.io/utils/clock/testing"
 
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
 	"open-cluster-management.io/ocm/pkg/registration/hub/importer"
@@ -63,7 +62,8 @@ var _ = ginkgo.Describe("Cluster Auto Importer", func() {
 		crdObjs, rawObjs, err := chart.RenderClusterManagerChart(clusterManagerConfig, "open-cluster-management")
 		manifests := append(crdObjs, rawObjs...)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		recorder := events.NewInMemoryRecorder("importer-testing", clocktesting.NewFakePassiveClock(time.Now()))
+		recorder := commonrecorder.NewEventsRecorderWrapper(context.TODO(),
+			events.NewContextualLoggingEventRecorder("importer-test"))
 		for _, manifest := range manifests {
 			requiredObj, _, err := genericCodec.Decode(manifest, nil, nil)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())

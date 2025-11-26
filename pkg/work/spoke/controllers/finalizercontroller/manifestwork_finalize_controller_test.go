@@ -204,7 +204,7 @@ func TestSyncManifestWorkController(t *testing.T) {
 				rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(0, 1*time.Second),
 			}
 
-			controllerContext := testingcommon.NewFakeSDKSyncContext(t, c.workName)
+			controllerContext := testingcommon.NewFakeSyncContext(t, c.workName)
 			err := controller.sync(context.TODO(), controllerContext, c.workName)
 			if err != nil {
 				t.Errorf("Expect no sync error, but got %v", err)

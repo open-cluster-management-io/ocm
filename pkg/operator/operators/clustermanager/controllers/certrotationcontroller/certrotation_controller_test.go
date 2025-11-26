@@ -193,7 +193,7 @@ func TestCertRotation(t *testing.T) {
 				}
 			}
 
-			syncContext := testingcommon.NewFakeSDKSyncContext(t, c.queueKey)
+			syncContext := testingcommon.NewFakeSyncContext(t, c.queueKey)
 
 			controller := NewCertRotationController(kubeClient, secretInformers, configmapInformer, operatorInformers.Operator().V1().ClusterManagers())
 
@@ -330,7 +330,7 @@ func TestCertRotationGRPCAuth(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			syncContext := testingcommon.NewFakeSDKSyncContext(t, testClusterManagerNameDefault)
+			syncContext := testingcommon.NewFakeSyncContext(t, testClusterManagerNameDefault)
 
 			// Create the controller to check the rotation map
 			controller := &certRotationController{
@@ -685,7 +685,7 @@ func TestCertRotationGRPCServerHostNames(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			syncContext := testingcommon.NewFakeSDKSyncContext(t, testClusterManagerNameDefault)
+			syncContext := testingcommon.NewFakeSyncContext(t, testClusterManagerNameDefault)
 
 			controller := &certRotationController{
 				rotationMap:          make(map[string]rotations),

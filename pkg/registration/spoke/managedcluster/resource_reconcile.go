@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -14,6 +13,7 @@ import (
 	corev1lister "k8s.io/client-go/listers/core/v1"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 type resoureReconcile struct {

@@ -109,7 +109,7 @@ func TestSyncTaintCluster(t *testing.T) {
 					clusterClient.ClusterV1().ManagedClusters()),
 				clusterInformerFactory.Cluster().V1().ManagedClusters().Lister()}
 			syncErr := ctrl.sync(context.TODO(),
-				testingcommon.NewFakeSDKSyncContext(t, testinghelpers.TestManagedClusterName),
+				testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName),
 				testinghelpers.TestManagedClusterName,
 			)
 			if syncErr != nil {

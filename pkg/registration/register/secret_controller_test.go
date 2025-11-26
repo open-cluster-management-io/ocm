@@ -147,7 +147,7 @@ func TestSync(t *testing.T) {
 
 	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
-			syncCtx := testingcommon.NewFakeSDKSyncContext(t, "test")
+			syncCtx := testingcommon.NewFakeSyncContext(t, "test")
 			kubeClient := kubefake.NewClientset(c.secrets...)
 			informerFactory := informers.NewSharedInformerFactory(kubeClient, 10*time.Minute)
 			updater := &fakeStatusUpdater{}

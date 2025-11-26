@@ -2,7 +2,10 @@ package recorder
 
 import (
 	"context"
+	"fmt"
+
 	librarygoevents "github.com/openshift/library-go/pkg/operator/events"
+
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 )
 
@@ -38,19 +41,19 @@ func (e *EventsRecorderWrapper) Warningf(reason, messageFmt string, args ...inte
 }
 
 func (e *EventsRecorderWrapper) ForComponent(componentName string) librarygoevents.Recorder {
-	e.recorder.ForComponent(componentName)
-	return e
+	newRecorder := *e
+	newRecorder.recorder = e.recorder.ForComponent(componentName)
+	return &newRecorder
 }
 
 func (e *EventsRecorderWrapper) WithComponentSuffix(suffix string) librarygoevents.Recorder {
-	e.recorder.WithComponentSuffix(suffix)
-	return e
+	return e.ForComponent(fmt.Sprintf("%s-%s", e.ComponentName(), suffix))
 }
 
 func (e *EventsRecorderWrapper) WithContext(ctx context.Context) librarygoevents.Recorder {
 	eCopy := *e
 	eCopy.ctx = ctx
-	return e
+	return &eCopy
 }
 
 func (e *EventsRecorderWrapper) ComponentName() string {

@@ -339,7 +339,7 @@ func TestReconcile(t *testing.T) {
 				}
 			}
 
-			syncContext := testingcommon.NewFakeSDKSyncContext(t, c.syncKey)
+			syncContext := testingcommon.NewFakeSyncContext(t, c.syncKey)
 
 			controller := NewCMAInstallProgressionController(
 				fakeAddonClient,

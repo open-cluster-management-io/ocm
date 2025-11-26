@@ -116,7 +116,8 @@ func (c certRotationController) sync(ctx context.Context, syncCtx factory.SyncCo
 		clustermanager, err := c.clusterManagerLister.Get(clustermanagerName)
 		// ClusterManager not found, could have been deleted, do nothing.
 		if errors.IsNotFound(err) {
-			klog.V(4).Infof("ClusterManager %q not found; it may have been deleted", clustermanagerName)
+			logger.V(4).Info("ClusterManager not found; it may have been deleted",
+				"clustermanager", clustermanagerName)
 			return nil
 		}
 		err = c.syncOne(ctx, clustermanager)
@@ -131,9 +132,11 @@ func (c certRotationController) syncOne(ctx context.Context, clustermanager *ope
 	clustermanagerName := clustermanager.Name
 	clustermanagerNamespace := helpers.ClusterManagerNamespace(clustermanager.Name, clustermanager.Spec.DeployOption.Mode)
 
+	logger := klog.FromContext(ctx).WithValues("clustermanager", clustermanagerName)
+
 	var err error
 
-	klog.Infof("Reconciling ClusterManager %q", clustermanagerName)
+	logger.Info("Reconciling ClusterManager")
 	// if the cluster manager is deleting, delete the rotation in map as well.
 	if !clustermanager.DeletionTimestamp.IsZero() {
 		// clean up all resources related with this clustermanager
@@ -249,7 +252,7 @@ func (c certRotationController) syncOne(ctx context.Context, clustermanager *ope
 			if !slices.Equal(targetRotation.HostNames, hostNames) {
 				targetRotation.HostNames = hostNames
 				cmRotations.targetRotations[helpers.GRPCServerSecret] = targetRotation
-				klog.Warningf("the hosts of grpc server are changed, will update the grpc serving cert")
+				logger.Info("the hosts of grpc server are changed, will update the grpc serving cert")
 			}
 
 		} else {

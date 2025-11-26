@@ -334,7 +334,7 @@ func TestRegistrationSync(t *testing.T) {
 				addOnRegistrationConfigs: c.addOnRegistrationConfigs,
 			}
 
-			err := controller.sync(context.Background(), testingcommon.NewFakeSDKSyncContext(t, c.queueKey), c.queueKey)
+			err := controller.sync(context.Background(), testingcommon.NewFakeSyncContext(t, c.queueKey), c.queueKey)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

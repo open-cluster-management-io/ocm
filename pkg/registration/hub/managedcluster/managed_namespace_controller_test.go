@@ -154,7 +154,7 @@ func TestSyncManagedNamespacesForCluster(t *testing.T) {
 				clusterSetLister: clusterSetInformer.Lister(),
 			}
 
-			syncCtx := testingcommon.NewFakeSDKSyncContext(t, c.name)
+			syncCtx := testingcommon.NewFakeSyncContext(t, c.name)
 
 			err := controller.syncManagedNamespacesForCluster(context.TODO(), syncCtx, c.cluster)
 			if err != nil {
@@ -460,7 +460,7 @@ func TestSync(t *testing.T) {
 			}
 
 			// Create a fake sync context
-			syncCtx := testingcommon.NewFakeSDKSyncContext(t, c.queueKey)
+			syncCtx := testingcommon.NewFakeSyncContext(t, c.queueKey)
 			err := controller.sync(context.TODO(), syncCtx, c.queueKey)
 
 			if c.expectError && err == nil {

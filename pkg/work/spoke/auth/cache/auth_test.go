@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	v1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,7 +29,7 @@ const (
 	clusterName = "cluster1"
 )
 
-func newExecutorCacheValidator(t *testing.T, ctx context.Context, clusterName string,
+func newExecutorCacheValidator(ctx context.Context, clusterName string,
 	kubeClient kubernetes.Interface, manifestWorkObjects ...runtime.Object) *sarCacheValidator {
 
 	workClient := fakeworkclient.NewSimpleClientset(manifestWorkObjects...)
@@ -38,7 +37,7 @@ func newExecutorCacheValidator(t *testing.T, ctx context.Context, clusterName st
 		workClient, 5*time.Minute, workinformers.WithNamespace(clusterName))
 
 	basicValidater := basic.NewSARValidator(nil, kubeClient)
-	validator := NewExecutorCacheValidator(ctx, eventstesting.NewTestingEventRecorder(t), kubeClient,
+	validator := NewExecutorCacheValidator(kubeClient,
 		workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks(clusterName),
 		spoketesting.NewFakeRestMapper(),
 		basicValidater,
@@ -137,7 +136,7 @@ func TestValidate(t *testing.T) {
 	)
 
 	ctx := context.TODO()
-	cacheValidator := newExecutorCacheValidator(t, ctx, clusterName, kubeClient)
+	cacheValidator := newExecutorCacheValidator(ctx, clusterName, kubeClient)
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
 			err := cacheValidator.Validate(context.TODO(), test.executor, gvr, test.namespace, test.name, true, nil)
@@ -216,7 +215,7 @@ func TestCacheWorks(t *testing.T) {
 	)
 	work.Spec.Executor = executor
 
-	cacheValidator := newExecutorCacheValidator(t, ctx, clusterName, kubeClient, work)
+	cacheValidator := newExecutorCacheValidator(ctx, clusterName, kubeClient, work)
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
 			// call validate 10 times

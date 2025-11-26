@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	v1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,7 +47,7 @@ func newExecutorCacheController(t *testing.T, ctx context.Context, clusterName s
 		sarCheckerFn:                     basic.NewSARValidator(nil, kubeClient).CheckSubjectAccessReviews,
 		bindingExecutorsMapper:           newSafeMap(),
 	}
-	controllerFactory := newControllerInner(cacheController, eventstesting.NewTestingEventRecorder(t),
+	controllerFactory := newControllerInner(cacheController,
 		spokeInformer.Rbac().V1().ClusterRoleBindings(),
 		spokeInformer.Rbac().V1().RoleBindings(),
 		spokeInformer.Rbac().V1().ClusterRoles(),

@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -51,7 +50,6 @@ type addonTemplateController struct {
 	dynamicInformers           dynamicinformer.DynamicSharedInformerFactory
 	workInformers              workv1informers.SharedInformerFactory
 	runControllerFunc          runController
-	eventRecorder              events.Recorder
 }
 
 type runController func(ctx context.Context, addonName string) error
@@ -66,7 +64,6 @@ func NewAddonTemplateController(
 	clusterInformers clusterv1informers.SharedInformerFactory,
 	dynamicInformers dynamicinformer.DynamicSharedInformerFactory,
 	workInformers workv1informers.SharedInformerFactory,
-	recorder events.Recorder,
 	runController ...runController,
 ) factory.Controller {
 	c := &addonTemplateController{
@@ -81,7 +78,6 @@ func NewAddonTemplateController(
 		clusterInformers:           clusterInformers,
 		dynamicInformers:           dynamicInformers,
 		workInformers:              workInformers,
-		eventRecorder:              recorder,
 	}
 
 	if len(runController) > 0 {
@@ -235,7 +231,6 @@ func (c *addonTemplateController) runController(ctx context.Context, addonName s
 		c.addonClient,
 		c.addonInformers, // use the shared informers, whose cache is synced already
 		kubeInformers.Rbac().V1().RoleBindings().Lister(),
-		c.eventRecorder,
 		// image overrides from cluster annotation has lower priority than from the addonDeploymentConfig
 		getValuesClosure,
 		addonfactory.GetAddOnDeploymentConfigValues(

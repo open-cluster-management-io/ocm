@@ -129,7 +129,6 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		spokeKubeClient,
 		hubWorkInformer,
 		o.agentOptions.SpokeClusterName,
-		controllerContext.EventRecorder,
 		restMapper,
 	).NewExecutorValidator(ctx, features.SpokeMutableFeatureGate.Enabled(ocmfeature.ExecutorValidatingCaches))
 

@@ -597,7 +597,6 @@ github.com/openshift/library-go/pkg/controller/fileobserver
 github.com/openshift/library-go/pkg/crypto
 github.com/openshift/library-go/pkg/network
 github.com/openshift/library-go/pkg/operator/events
-github.com/openshift/library-go/pkg/operator/events/eventstesting
 github.com/openshift/library-go/pkg/operator/resource/resourceapply
 github.com/openshift/library-go/pkg/operator/resource/resourcehelper
 github.com/openshift/library-go/pkg/operator/resource/resourcemerge

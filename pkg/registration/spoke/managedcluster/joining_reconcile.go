@@ -2,12 +2,12 @@ package managedcluster
 
 import (
 	"context"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 type joiningReconcile struct{}

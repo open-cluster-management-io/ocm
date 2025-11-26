@@ -3,7 +3,6 @@ package clusterrole
 import (
 	"context"
 	"fmt"
-	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
@@ -17,6 +16,7 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/common/apply"
 	"open-cluster-management.io/ocm/pkg/common/queue"
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/manifests"
 )

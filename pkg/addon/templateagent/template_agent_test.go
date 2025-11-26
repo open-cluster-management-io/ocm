@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -683,7 +682,6 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 				addonClient,
 				addonInformerFactory,
 				kubeInformers.Rbac().V1().RoleBindings().Lister(),
-				eventstesting.NewTestingEventRecorder(t),
 				addonfactory.GetAddOnDeploymentConfigValues(
 					utils.NewAddOnDeploymentConfigGetter(addonClient),
 					addonfactory.ToAddOnCustomizedVariableValues,
@@ -952,7 +950,6 @@ func TestAgentInstallNamespace(t *testing.T) {
 				addonClient,
 				addonInformerFactory,
 				kubeInformers.Rbac().V1().RoleBindings().Lister(),
-				eventstesting.NewTestingEventRecorder(t),
 				addonfactory.GetAddOnDeploymentConfigValues(
 					utils.NewAddOnDeploymentConfigGetter(addonClient),
 					addonfactory.ToAddOnCustomizedVariableValues,
@@ -1122,7 +1119,6 @@ func TestAgentManifestConfigs(t *testing.T) {
 			addonClient,
 			addonInformerFactory,
 			kubeInformers.Rbac().V1().RoleBindings().Lister(),
-			eventstesting.NewTestingEventRecorder(t),
 			addonfactory.GetAddOnDeploymentConfigValues(
 				utils.NewAddOnDeploymentConfigGetter(addonClient),
 				addonfactory.ToAddOnCustomizedVariableValues,

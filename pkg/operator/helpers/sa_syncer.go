@@ -3,7 +3,6 @@ package helpers
 import (
 	"bytes"
 	"context"
-	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"os"
 	"path/filepath"
 	"time"
@@ -22,6 +21,8 @@ import (
 	"k8s.io/utils/pointer"
 
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 )
 
 type TokenGetterFunc func() (token []byte, expiration []byte, additionalData map[string][]byte, err error)

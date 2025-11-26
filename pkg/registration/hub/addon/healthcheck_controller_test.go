@@ -106,7 +106,7 @@ func TestSync(t *testing.T) {
 			}
 
 			syncErr := ctrl.sync(context.TODO(),
-				testingcommon.NewFakeSDKSyncContext(t, testinghelpers.TestManagedClusterName),
+				testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName),
 				testinghelpers.TestManagedClusterName)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)

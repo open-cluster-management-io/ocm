@@ -250,7 +250,7 @@ func TestSyncClusterProfile(t *testing.T) {
 					*cpv1alpha1.ClusterProfile, cpv1alpha1.ClusterProfileSpec, cpv1alpha1.ClusterProfileStatus](
 					clusterProfileClient.ApisV1alpha1().ClusterProfiles(ClusterProfileNamespace)),
 			}
-			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSDKSyncContext(t, testinghelpers.TestManagedClusterName), testinghelpers.TestManagedClusterName)
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName), testinghelpers.TestManagedClusterName)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

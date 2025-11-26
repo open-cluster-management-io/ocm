@@ -380,7 +380,7 @@ func TestEnqueueUpdateClusterClusterSet(t *testing.T) {
 					t.Errorf("Failed to add clusterset: %v, error: %v", clusterset, err)
 				}
 			}
-			syncCtx := testingcommon.NewFakeSDKSyncContext(t, "fake")
+			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 
 			ctrl := managedClusterSetController{
 				clusterSetLister: informerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),

@@ -6,8 +6,6 @@ package klusterletcontroller
 
 import (
 	"context"
-	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	corev1 "k8s.io/api/core/v1"
@@ -19,6 +17,9 @@ import (
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
+
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 

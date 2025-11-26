@@ -126,7 +126,7 @@ func TestSync(t *testing.T) {
 					*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
 					clusterClient.ClusterV1().ManagedClusters()),
 			}
-			err := importer.sync(context.TODO(), testingcommon.NewFakeSDKSyncContext(t, c.key), c.key)
+			err := importer.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, c.key), c.key)
 			if err != nil {
 				t.Fatal(err)
 			}

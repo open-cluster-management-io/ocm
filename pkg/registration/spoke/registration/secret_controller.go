@@ -16,9 +16,10 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/klog/v2"
 
-	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
+
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 // hubKubeconfigSecretController watches the HubKubeconfig secret, if the secret is changed, this controller creates/updates the

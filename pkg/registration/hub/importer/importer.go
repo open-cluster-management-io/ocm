@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	"github.com/openshift/api"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -30,11 +28,13 @@ import (
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	v1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
 	cloudproviders "open-cluster-management.io/ocm/pkg/registration/hub/importer/providers"
 )

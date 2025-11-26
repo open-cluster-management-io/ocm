@@ -221,7 +221,7 @@ func TestSync(t *testing.T) {
 					),
 				},
 			}
-			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSDKSyncContext(t, validCSR.Name), validCSR.Name)
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, validCSR.Name), validCSR.Name)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"testing"
 	"time"
 
@@ -25,6 +24,7 @@ import (
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
@@ -339,7 +339,7 @@ func TestHealthCheck(t *testing.T) {
 				[]string{},
 				hubEventRecorder,
 			)
-			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSDKSyncContext(t, ""), "")
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), "")
 			testingcommon.AssertError(t, syncErr, c.expectedErr)
 
 			// wait for the event to be sent

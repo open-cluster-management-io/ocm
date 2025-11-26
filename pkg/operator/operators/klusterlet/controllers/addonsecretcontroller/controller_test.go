@@ -97,7 +97,7 @@ func TestSync(t *testing.T) {
 			namespaceInformer: kubeInformer.Core().V1().Namespaces(),
 		}
 
-		err := controller.sync(context.TODO(), testingcommon.NewFakeSDKSyncContext(t, tc.queueKey), tc.queueKey)
+		err := controller.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, tc.queueKey), tc.queueKey)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 		}

@@ -2,14 +2,16 @@ package addonsecretcontroller
 
 import (
 	"context"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	coreinformer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
+
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 const (

@@ -192,7 +192,7 @@ func TestProcess(t *testing.T) {
 				driver.keyData = c.approvedCSRCert.Key
 			}
 
-			syncCtx := testingcommon.NewFakeSDKSyncContext(t, "test")
+			syncCtx := testingcommon.NewFakeSyncContext(t, "test")
 
 			secret, cond, err := driver.Process(
 				context.TODO(), "test", c.secret, additionalSecretData, syncCtx.Recorder())

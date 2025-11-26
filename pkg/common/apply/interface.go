@@ -3,14 +3,16 @@ package apply
 import (
 	"context"
 	"fmt"
-	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 )
 
 // Getter is a wrapper interface of lister

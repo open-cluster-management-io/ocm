@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clocktesting "k8s.io/utils/clock/testing"
+
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/register"
@@ -90,7 +91,7 @@ func TestComplete(t *testing.T) {
 
 			err = registration.DumpSecret(
 				kubeClient.CoreV1(), componentNamespace, "hub-kubeconfig-secret",
-				options.HubKubeconfigDir, context.TODO(), eventstesting.NewTestingEventRecorder(t))
+				options.HubKubeconfigDir, context.TODO(), events.NewContextualLoggingEventRecorder(t.Name()))
 			if err != nil {
 				t.Error(err)
 			}

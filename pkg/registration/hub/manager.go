@@ -2,7 +2,6 @@ package hub
 
 import (
 	"context"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -28,6 +27,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"open-cluster-management.io/ocm/pkg/features"
@@ -197,7 +197,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 			if len(m.AutoApprovedCSRUsers) > 0 {
 				autoApprovedCSRUsers = m.AutoApprovedCSRUsers
 			}
-			csrDriver, err := csr.NewCSRHubDriver(kubeClient, kubeInformers, autoApprovedCSRUsers, controllerContext.EventRecorder)
+			csrDriver, err := csr.NewCSRHubDriver(kubeClient, kubeInformers, autoApprovedCSRUsers)
 			if err != nil {
 				return err
 			}
@@ -212,8 +212,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 			grpcHubDriver, err := grpc.NewGRPCHubDriver(
 				kubeClient, kubeInformers,
 				m.GRPCCAKeyFile, m.GRPCCAFile, m.GRPCSigningDuration,
-				m.AutoApprovedGRPCUsers,
-				controllerContext.EventRecorder)
+				m.AutoApprovedGRPCUsers)
 			if err != nil {
 				return err
 			}
@@ -275,7 +274,6 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		clusterClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
-		controllerContext.EventRecorder,
 	)
 
 	managedClusterSetBindingController := managedclustersetbinding.NewManagedClusterSetBindingController(

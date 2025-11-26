@@ -2,7 +2,6 @@ package apply
 
 import (
 	"context"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"testing"
 	"time"
 
@@ -11,6 +10,8 @@ import (
 	"k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )

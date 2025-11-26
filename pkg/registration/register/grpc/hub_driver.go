@@ -20,7 +20,6 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	sdkhelpers "open-cluster-management.io/sdk-go/pkg/helpers"
 
@@ -49,8 +48,7 @@ func NewGRPCHubDriver(
 	kubeInformers informers.SharedInformerFactory,
 	caKeyFile, caFile string,
 	duration time.Duration,
-	autoApprovedCSRUsers []string,
-	recorder events.Recorder) (register.HubDriver, error) {
+	autoApprovedCSRUsers []string) (register.HubDriver, error) {
 	csrReconciles := []csr.Reconciler{csr.NewCSRRenewalReconciler(kubeClient, operatorv1.GRPCAuthSigner)}
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
 		csrReconciles = append(csrReconciles, csr.NewCSRBootstrapReconciler(

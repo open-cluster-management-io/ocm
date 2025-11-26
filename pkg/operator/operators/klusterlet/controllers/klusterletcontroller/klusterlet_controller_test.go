@@ -40,6 +40,7 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/manifests"
@@ -63,7 +64,6 @@ type testController struct {
 	operatorClient     *fakeoperatorclient.Clientset
 	workClient         *fakeworkclient.Clientset
 	operatorStore      cache.Store
-	recorder           events.Recorder
 
 	managedKubeClient         *fakekube.Clientset
 	managedApiExtensionClient *fakeapiextensions.Clientset
@@ -196,7 +196,7 @@ func newTestController(t *testing.T, klusterlet *operatorapiv1.Klusterlet, recor
 		operatorNamespace: "open-cluster-management",
 		cache:             resourceapply.NewResourceCache(),
 		managedClusterClientsBuilder: newManagedClusterClientsBuilder(fakeKubeClient, fakeAPIExtensionClient,
-			fakeWorkClient.WorkV1().AppliedManifestWorks(), recorder),
+			fakeWorkClient.WorkV1().AppliedManifestWorks()),
 		enableSyncLabels: enableSyncLabels,
 	}
 
@@ -208,7 +208,7 @@ func newTestController(t *testing.T, klusterlet *operatorapiv1.Klusterlet, recor
 		kubeVersion:       kubeVersion,
 		operatorNamespace: "open-cluster-management",
 		managedClusterClientsBuilder: newManagedClusterClientsBuilder(fakeKubeClient, fakeAPIExtensionClient,
-			fakeWorkClient.WorkV1().AppliedManifestWorks(), recorder),
+			fakeWorkClient.WorkV1().AppliedManifestWorks()),
 	}
 
 	store := operatorInformers.Operator().V1().Klusterlets().Informer().GetStore()
@@ -224,13 +224,11 @@ func newTestController(t *testing.T, klusterlet *operatorapiv1.Klusterlet, recor
 		operatorClient:     fakeOperatorClient,
 		workClient:         fakeWorkClient,
 		operatorStore:      store,
-		recorder:           recorder,
 	}
 }
 
 func newTestControllerHosted(
 	t *testing.T, klusterlet *operatorapiv1.Klusterlet,
-	recorder events.Recorder,
 	appliedManifestWorks []runtime.Object,
 	objects ...runtime.Object) *testController {
 	fakeKubeClient := fakekube.NewSimpleClientset(objects...)
@@ -327,7 +325,6 @@ func newTestControllerHosted(
 		operatorClient:     fakeOperatorClient,
 		workClient:         fakeWorkClient,
 		operatorStore:      store,
-		recorder:           recorder,
 
 		managedKubeClient:         fakeManagedKubeClient,
 		managedApiExtensionClient: fakeManagedAPIExtensionClient,
@@ -340,13 +337,11 @@ func (c *testController) setDefaultManagedClusterClientsBuilder() *testControlle
 		c.kubeClient,
 		c.apiExtensionClient,
 		c.workClient.WorkV1().AppliedManifestWorks(),
-		c.recorder,
 	)
 	c.cleanupController.managedClusterClientsBuilder = newManagedClusterClientsBuilder(
 		c.kubeClient,
 		c.apiExtensionClient,
 		c.workClient.WorkV1().AppliedManifestWorks(),
-		c.recorder,
 	)
 	return c
 }
@@ -613,7 +608,7 @@ func TestSyncDeploy(t *testing.T) {
 		hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
 		hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 		namespace := newNamespace("testns")
-		syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
+		syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
 		t.Run(c.name, func(t *testing.T) {
 			controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, c.enableSyncLabels,
@@ -694,7 +689,7 @@ func TestSyncDeploySingleton(t *testing.T) {
 		hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
 		hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 		namespace := newNamespace("testns")
-		syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
+		syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
 		t.Run(c.name, func(t *testing.T) {
 			controller := newTestController(t, klusterlet, syncContext.Recorder(), nil,
@@ -770,8 +765,8 @@ func TestSyncDeployHosted(t *testing.T) {
 	namespace := newNamespace(agentNamespace)
 	pullSecret := newSecret(helpers.ImagePullSecret, "open-cluster-management")
 
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
-	controller := newTestControllerHosted(t, klusterlet, syncContext.Recorder(), nil, bootStrapSecret,
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestControllerHosted(t, klusterlet, nil, bootStrapSecret,
 		hubKubeConfigSecret, namespace, pullSecret /*externalManagedSecret*/)
 
 	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
@@ -866,8 +861,8 @@ func TestSyncDeployHostedCreateAgentNamespace(t *testing.T) {
 		Type: operatorapiv1.ConditionReadyToApply, Status: metav1.ConditionFalse, Reason: "KlusterletPrepareFailed",
 		Message: "Failed to build managed cluster clients: secrets \"external-managed-kubeconfig\" not found",
 	})
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
-	controller := newTestControllerHosted(t, klusterlet, syncContext.Recorder(), nil).setDefaultManagedClusterClientsBuilder()
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestControllerHosted(t, klusterlet, nil).setDefaultManagedClusterClientsBuilder()
 
 	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if !errors.IsNotFound(err) {
@@ -892,7 +887,7 @@ func TestRemoveOldNamespace(t *testing.T) {
 	oldNamespace.Labels = map[string]string{
 		klusterletNamespaceLabelKey: "klusterlet",
 	}
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		bootStrapSecret, hubKubeConfigSecret, namespace, oldNamespace)
 
@@ -948,7 +943,7 @@ func TestSyncDisableAddonNamespace(t *testing.T) {
 	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
 	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	namespace := newNamespace("testns")
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		bootStrapSecret, hubKubeConfigSecret, namespace)
 	controller.controller.disableAddonNamespace = true
@@ -1053,7 +1048,7 @@ func TestAWSIrsaAuthInSingletonModeWithInvalidClusterArns(t *testing.T) {
 		hubSecret,
 	}
 
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		objects...)
 
@@ -1084,7 +1079,7 @@ func TestAWSIrsaAuthInSingletonMode(t *testing.T) {
 		hubSecret,
 	}
 
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		objects...)
 
@@ -1115,7 +1110,7 @@ func TestAWSIrsaAuthInNonSingletonMode(t *testing.T) {
 		hubSecret,
 	}
 
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		objects...)
 
@@ -1138,7 +1133,7 @@ func TestReplica(t *testing.T) {
 		hubSecret,
 	}
 
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		objects...)
 
@@ -1228,7 +1223,7 @@ func TestWorkConfig(t *testing.T) {
 		hubSecret,
 	}
 
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		objects...)
 
@@ -1250,7 +1245,7 @@ func TestClusterNameChange(t *testing.T) {
 	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
 	hubSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	hubSecret.Data["cluster-name"] = []byte("cluster1")
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		bootStrapSecret, hubSecret, namespace)
 
@@ -1339,7 +1334,7 @@ func TestSyncWithPullSecret(t *testing.T) {
 	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	namespace := newNamespace("testns")
 	pullSecret := newSecret(helpers.ImagePullSecret, "open-cluster-management")
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		bootStrapSecret, hubKubeConfigSecret, namespace, pullSecret)
 
@@ -1452,7 +1447,7 @@ func TestClusterClaimConfigInSingletonMode(t *testing.T) {
 		hubSecret,
 	}
 
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		objects...)
 
@@ -1478,7 +1473,7 @@ func TestSyncEnableClusterProperty(t *testing.T) {
 	}
 
 	objects := []runtime.Object{}
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		objects...)
 
@@ -1602,7 +1597,7 @@ func (f *fakeManagedClusterBuilder) withKubeConfigSecret(_, _ string) managedClu
 	return f
 }
 
-func (f *fakeManagedClusterBuilder) build(_ context.Context) (*managedClusterClients, error) {
+func (f *fakeManagedClusterBuilder) build(_ context.Context, _ factory.SyncContext) (*managedClusterClients, error) {
 	t, err := time.Parse(time.RFC3339, hostedKubeconfigCreationTime)
 	if err != nil {
 		return nil, err
@@ -1834,7 +1829,7 @@ func TestCleanWithMultipleKlusterletAgentNamespaces(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
-			syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
+			syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
 			// Mark klusterlet for deletion
 			now := metav1.Now()

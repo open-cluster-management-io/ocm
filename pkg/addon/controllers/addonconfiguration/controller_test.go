@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 	"time"
-	
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -234,7 +234,7 @@ func TestAddonConfigurationControllerSync(t *testing.T) {
 			}
 
 			// Create sync context
-			syncCtx := testingcommon.NewFakeSDKSyncContext(t, c.queueKey)
+			syncCtx := testingcommon.NewFakeSyncContext(t, c.queueKey)
 
 			// Test sync method
 			ctx := context.TODO()

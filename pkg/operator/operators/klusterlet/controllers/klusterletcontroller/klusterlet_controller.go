@@ -3,7 +3,6 @@ package klusterletcontroller
 import (
 	"context"
 	"fmt"
-	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"strings"
 	"time"
 
@@ -33,6 +32,7 @@ import (
 
 	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 

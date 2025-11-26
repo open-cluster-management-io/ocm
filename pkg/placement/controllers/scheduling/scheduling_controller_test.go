@@ -571,7 +571,7 @@ func TestSchedulingController_sync(t *testing.T) {
 			}
 
 			key := c.placement.Namespace + "/" + c.placement.Name
-			sysCtx := testingcommon.NewFakeSDKSyncContext(t, key)
+			sysCtx := testingcommon.NewFakeSyncContext(t, key)
 			syncErr := ctrl.sync(context.TODO(), sysCtx, key)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)

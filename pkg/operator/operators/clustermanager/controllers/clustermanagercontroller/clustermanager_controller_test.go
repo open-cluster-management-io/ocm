@@ -337,7 +337,7 @@ func assertDeployments(t *testing.T, clusterManager *operatorapiv1.ClusterManage
 	cd := setDeployment(clusterManager.Name, clusterManagerNamespace)
 	setup(t, tc, cd)
 
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, "testhub")
+	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
 
 	err := tc.clusterManagerController.sync(ctx, syncContext, "testhub")
 	if err != nil {
@@ -376,7 +376,7 @@ func assertDeletion(t *testing.T, clusterManager *operatorapiv1.ClusterManager, 
 	tc := newTestController(t, clusterManager)
 	setup(t, tc, nil)
 
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, "testhub")
+	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
 	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
 
 	err := tc.clusterManagerController.sync(ctx, syncContext, "testhub")
@@ -478,7 +478,7 @@ func TestSyncSecret(t *testing.T) {
 		clusterManagerNamespace := helpers.ClusterManagerNamespace(cm.Name, cm.Spec.DeployOption.Mode)
 		setup(t, tc, nil)
 
-		syncContext := testingcommon.NewFakeSDKSyncContext(t, "testhub")
+		syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
 
 		if c.imagePullSecret != nil {
 			if _, err := tc.managementKubeClient.CoreV1().Secrets(operatorNamespace).Create(ctx, c.imagePullSecret, metav1.CreateOptions{}); err != nil {
@@ -571,7 +571,7 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 	tc := newTestController(t, clusterManager)
 	setup(t, tc, nil)
 
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, "testhub")
+	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
 
 	err := tc.clusterManagerController.sync(ctx, syncContext, "testhub")
 	if err != nil {
@@ -657,7 +657,7 @@ func TestDeleteCRD(t *testing.T) {
 			apiextensionsv1.Resource("customresourcedefinitions"), "clustermanagementaddons.addon.open-cluster-management.io")
 
 	})
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, "testhub")
+	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
 	err := tc.clusterManagerController.sync(ctx, syncContext, "testhub")
 	if err == nil {
 		t.Fatalf("Expected error when sync at first time")
@@ -912,7 +912,7 @@ func TestGRPCServiceLoadBalancerType(t *testing.T) {
 			cd := setDeployment(test.clusterManager.Name, clusterManagerNamespace)
 			setup(t, tc, cd)
 
-			syncContext := testingcommon.NewFakeSDKSyncContext(t, test.clusterManager.Name)
+			syncContext := testingcommon.NewFakeSyncContext(t, test.clusterManager.Name)
 
 			// Call sync to create resources
 			err := tc.clusterManagerController.sync(ctx, syncContext, "testhub")
@@ -1071,10 +1071,10 @@ func TestWorkControllerEnabledByFeatureGates(t *testing.T) {
 			tc := newTestController(t, clusterManager)
 			setup(t, tc, nil)
 
-			syncContext := testingcommon.NewFakeSDKSyncContext(t, "test-cluster-manager")
+			syncContext := testingcommon.NewFakeSyncContext(t, "test-cluster-manager")
 
 			// Call sync to trigger the feature gate processing
-			err := tc.clusterManagerController.sync(ctx, syncContext, "testhub")
+			err := tc.clusterManagerController.sync(ctx, syncContext, "test-cluster-manager")
 			if err != nil {
 				t.Fatalf("Expected no error when sync, %v", err)
 			}

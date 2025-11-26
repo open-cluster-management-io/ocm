@@ -7,70 +7,12 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 )
-
-const (
-	testNamespace  = "testns"
-	testAgentName  = "testagent"
-	testSecretName = "testsecret"
-	testIrsaName   = "testirsa"
-)
-
-// var commonName = fmt.Sprintf("%s%s:%s", user.SubjectPrefix, testinghelpers.TestManagedClusterName, testAgentName)
-
-func TestProcess(t *testing.T) {
-	cases := []struct {
-		name                string
-		queueKey            string
-		secret              *corev1.Secret
-		approvedIrsaRequest *testinghelpers.TestIrsaRequest
-		keyDataExpected     bool
-		irsaNameExpected    bool
-		expectedCondition   *metav1.Condition
-		validateActions     func(t *testing.T, hubActions []clienttesting.Action, secret *corev1.Secret)
-	}{
-		{},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			ctrl := &mockAWSIRSAControl{}
-			var irsas []runtime.Object
-
-			hubKubeClient := kubefake.NewSimpleClientset(irsas...)
-
-			additionalSecretData := map[string][]byte{
-				register.ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
-				register.AgentNameFile:   []byte(testAgentName),
-			}
-
-			awsOption := &AWSOption{}
-
-			driver := &AWSIRSADriver{
-				awsIRSAControl: ctrl,
-			}
-
-			if c.approvedIrsaRequest != nil {
-				driver.name = testIrsaName
-			}
-
-			syncCtx := testingcommon.NewFakeSyncContext(t, "test")
-
-			klog.Info(hubKubeClient, additionalSecretData, awsOption, syncCtx)
-
-		})
-	}
-}
 
 var _ AWSIRSAControl = &mockAWSIRSAControl{}
 

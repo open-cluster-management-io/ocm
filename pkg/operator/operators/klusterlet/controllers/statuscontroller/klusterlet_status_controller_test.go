@@ -192,7 +192,7 @@ func TestSync(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			controller := newTestController(t, c.klusterlet, c.object...)
-			syncContext := testingcommon.NewFakeSDKSyncContext(t, c.klusterlet.Name)
+			syncContext := testingcommon.NewFakeSyncContext(t, c.klusterlet.Name)
 
 			err := controller.controller.sync(context.TODO(), syncContext, c.klusterlet.Name)
 			if err != nil {

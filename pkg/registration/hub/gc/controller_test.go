@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	fakemetadataclient "k8s.io/client-go/metadata/fake"
 	clienttesting "k8s.io/client-go/testing"
+
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeclusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
@@ -157,7 +158,7 @@ func TestGController(t *testing.T) {
 				gcResourcesController: newGCResourcesController(metadataClient, []schema.GroupVersionResource{addonGvr, workGvr}),
 			}
 
-			controllerContext := testingcommon.NewFakeSDKSyncContext(t, c.key)
+			controllerContext := testingcommon.NewFakeSyncContext(t, c.key)
 			err := ctrl.sync(context.TODO(), controllerContext, c.key)
 			if err != nil && !errors.Is(err, requeueError) {
 				t.Error(err)
