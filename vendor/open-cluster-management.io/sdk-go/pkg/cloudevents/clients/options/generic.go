@@ -33,6 +33,8 @@ type GenericClientOptions[T generic.ResourceObject] struct {
 //
 //     GRPCOptions (*grpc.GRPCOptions): builds a generic cloudevents client with GRPC
 //
+//     PubSubOptions (*pubsub.PubSubOptions): builds a generic cloudevents client with PubSub
+//
 //   - codec, the codec for resource
 //
 //   - clientID, the client ID for generic cloudevents client.

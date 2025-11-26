@@ -310,8 +310,16 @@ func TestSyncManifestWork(t *testing.T) {
 					deleteActions = append(deleteActions, action.(clienttesting.DeleteActionImpl))
 				}
 			}
-			if !reflect.DeepEqual(c.expectedDeleteActions, deleteActions) {
-				t.Fatal(spew.Sdump(deleteActions))
+			if len(deleteActions) != len(c.expectedDeleteActions) {
+				t.Fatalf("expected %d deleteActions, got %d", len(c.expectedDeleteActions), len(deleteActions))
+			}
+			for idx, action := range deleteActions {
+				if action.GetVerb() != c.expectedDeleteActions[idx].GetVerb() ||
+					!reflect.DeepEqual(action.GetResource(), c.expectedDeleteActions[idx].GetResource()) ||
+					action.GetName() != c.expectedDeleteActions[idx].GetName() ||
+					action.GetNamespace() != c.expectedDeleteActions[idx].GetNamespace() {
+					t.Fatalf("expected delete action '%v', got '%v'", c.expectedDeleteActions[idx], action)
+				}
 			}
 
 			queueLen := controllerContext.Queue().Len()

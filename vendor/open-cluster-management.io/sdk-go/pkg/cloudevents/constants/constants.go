@@ -1,8 +1,9 @@
 package constants
 
 const (
-	ConfigTypeMQTT = "mqtt"
-	ConfigTypeGRPC = "grpc"
+	ConfigTypeMQTT   = "mqtt"
+	ConfigTypeGRPC   = "grpc"
+	ConfigTypePubSub = "pubsub"
 )
 
 // GRPCSubscriptionIDKey is the key for the gRPC subscription ID.

@@ -9,6 +9,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt"
 	grpcv2 "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/v2/grpc"
 	mqttv2 "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/v2/mqtt"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/v2/pubsub"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
@@ -23,6 +24,7 @@ type ConfigLoader struct {
 // Available configuration types:
 //   - mqtt
 //   - grpc
+//   - pubsub
 func NewConfigLoader(configType, configPath string) *ConfigLoader {
 	return &ConfigLoader{
 		configType: configType,
@@ -47,6 +49,13 @@ func (l *ConfigLoader) LoadConfig() (string, any, error) {
 		}
 
 		return grpcOptions.Dialer.URL, grpcOptions, nil
+	case constants.ConfigTypePubSub:
+		pubsubOptions, err := pubsub.BuildPubSubOptionsFromFlags(l.configPath)
+		if err != nil {
+			return "", nil, err
+		}
+
+		return "", pubsubOptions, nil
 	}
 
 	return "", nil, fmt.Errorf("unsupported config type %s", l.configType)
@@ -60,6 +69,8 @@ func BuildCloudEventsSourceOptions(config any,
 		return mqttv2.NewSourceOptions(config, clientId, sourceId), nil
 	case *grpc.GRPCOptions:
 		return grpcv2.NewSourceOptions(config, sourceId, dataType), nil
+	case *pubsub.PubSubOptions:
+		return pubsub.NewSourceOptions(config, sourceId), nil
 	default:
 		return nil, fmt.Errorf("unsupported client configuration type %T", config)
 	}
@@ -73,6 +84,8 @@ func BuildCloudEventsAgentOptions(config any,
 		return mqttv2.NewAgentOptions(config, clusterName, clientId), nil
 	case *grpc.GRPCOptions:
 		return grpcv2.NewAgentOptions(config, clusterName, clientId, dataType), nil
+	case *pubsub.PubSubOptions:
+		return pubsub.NewAgentOptions(config, clusterName, clientId), nil
 	default:
 		return nil, fmt.Errorf("unsupported client configuration type %T", config)
 	}

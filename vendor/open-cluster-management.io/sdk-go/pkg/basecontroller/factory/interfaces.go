@@ -2,6 +2,7 @@ package factory
 
 import (
 	"context"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	"k8s.io/client-go/util/workqueue"
 )
@@ -34,6 +35,9 @@ type SyncContext interface {
 	// Queue gives access to controller queue. This can be used for manual requeue, although if a Sync() function return
 	// an error, the object is automatically re-queued. Use with caution.
 	Queue() workqueue.TypedRateLimitingInterface[string]
+
+	// Recorder returns a recorder to record events.
+	Recorder() events.Recorder
 }
 
 // SyncFunc is a function that contain main controller logic.
