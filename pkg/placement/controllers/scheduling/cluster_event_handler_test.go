@@ -101,7 +101,7 @@ func TestOnClusterChange(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
 			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
-			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
+			syncCtx := testingcommon.NewFakeSDKSyncContext(t, "fake")
 			q := newEnqueuer(
 				ctx,
 				syncCtx.Queue(),
@@ -111,7 +111,7 @@ func TestOnClusterChange(t *testing.T) {
 				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings(),
 			)
 			queuedKeys := sets.NewString()
-			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.RateLimitingInterface) {
+			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.TypedRateLimitingInterface[string]) {
 				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 				queuedKeys.Insert(key)
 			}
@@ -265,7 +265,7 @@ func TestOnClusterUpdate(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
 			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
-			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
+			syncCtx := testingcommon.NewFakeSDKSyncContext(t, "fake")
 			q := newEnqueuer(
 				ctx,
 				syncCtx.Queue(),
@@ -275,7 +275,7 @@ func TestOnClusterUpdate(t *testing.T) {
 				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings(),
 			)
 			queuedKeys := sets.NewString()
-			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.RateLimitingInterface) {
+			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.TypedRateLimitingInterface[string]) {
 				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 				queuedKeys.Insert(key)
 			}
@@ -369,7 +369,7 @@ func TestOnClusterDelete(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
 			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
-			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
+			syncCtx := testingcommon.NewFakeSDKSyncContext(t, "fake")
 			q := newEnqueuer(
 				ctx,
 				syncCtx.Queue(),
@@ -379,7 +379,7 @@ func TestOnClusterDelete(t *testing.T) {
 				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings(),
 			)
 			queuedKeys := sets.NewString()
-			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.RateLimitingInterface) {
+			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.TypedRateLimitingInterface[string]) {
 				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 				queuedKeys.Insert(key)
 			}

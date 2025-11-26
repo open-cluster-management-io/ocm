@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
@@ -36,7 +35,6 @@ type AppliedManifestWorkFinalizeController struct {
 }
 
 func NewAppliedManifestWorkFinalizeController(
-	recorder events.Recorder,
 	spokeDynamicClient dynamic.Interface,
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
 	appliedManifestWorkInformer workinformer.AppliedManifestWorkInformer,

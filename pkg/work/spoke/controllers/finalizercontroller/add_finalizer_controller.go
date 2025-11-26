@@ -3,7 +3,6 @@ package finalizercontroller
 import (
 	"context"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
 
@@ -27,7 +26,6 @@ type AddFinalizerController struct {
 
 // NewAddFinalizerController returns a ManifestWorkController
 func NewAddFinalizerController(
-	recorder events.Recorder,
 	manifestWorkClient workv1client.ManifestWorkInterface,
 	manifestWorkInformer workinformer.ManifestWorkInformer,
 	manifestWorkLister worklister.ManifestWorkNamespaceLister,

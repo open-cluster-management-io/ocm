@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeinformers "k8s.io/client-go/informers"
@@ -20,9 +18,9 @@ import (
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
-	"open-cluster-management.io/ocm/pkg/common/recorder"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
@@ -173,8 +171,8 @@ func TestSync(t *testing.T) {
 			}
 
 			ctx := context.TODO()
-			syncCtx := testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName)
-			mcEventRecorder, err := recorder.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient.EventsV1(), "test")
+			syncCtx := testingcommon.NewFakeSDKSyncContext(t, testinghelpers.TestManagedClusterName)
+			mcEventRecorder, err := events.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient.EventsV1(), "test")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -187,7 +185,7 @@ func TestSync(t *testing.T) {
 				leaseLister:     leaseInformerFactory.Coordination().V1().Leases().Lister(),
 				mcEventRecorder: mcEventRecorder,
 			}
-			syncErr := ctrl.sync(context.TODO(), syncCtx)
+			syncErr := ctrl.sync(context.TODO(), syncCtx, testinghelpers.TestManagedClusterName)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}
@@ -208,15 +206,15 @@ func newDeletingManagedCluster() *clusterv1.ManagedCluster {
 
 // spyQueue wraps a real queue and captures AddAfter calls
 type spyQueue struct {
-	workqueue.RateLimitingInterface
+	workqueue.TypedRateLimitingInterface[string]
 	addAfterDelay time.Duration
 	addAfterKey   interface{}
 }
 
-func (s *spyQueue) AddAfter(item interface{}, duration time.Duration) {
+func (s *spyQueue) AddAfter(item string, duration time.Duration) {
 	s.addAfterDelay = duration
 	s.addAfterKey = item
-	s.RateLimitingInterface.AddAfter(item, duration)
+	s.TypedRateLimitingInterface.AddAfter(item, duration)
 }
 
 // testSyncContext is a custom sync context for testing requeue timing
@@ -226,9 +224,9 @@ type testSyncContext struct {
 	queue    *spyQueue
 }
 
-func (t *testSyncContext) Queue() workqueue.RateLimitingInterface { return t.queue }
-func (t *testSyncContext) QueueKey() string                       { return t.queueKey }
-func (t *testSyncContext) Recorder() events.Recorder              { return t.recorder }
+func (t *testSyncContext) Queue() workqueue.TypedRateLimitingInterface[string] { return t.queue }
+func (t *testSyncContext) QueueKey() string                                    { return t.queueKey }
+func (t *testSyncContext) Recorder() events.Recorder                           { return t.recorder }
 
 func newManagedClusterWithLeaseDuration(seconds int32) *clusterv1.ManagedCluster {
 	cluster := testinghelpers.NewAvailableManagedCluster()
@@ -288,18 +286,18 @@ func TestRequeueTime(t *testing.T) {
 			}
 
 			ctx := context.TODO()
-			mcEventRecorder, err := recorder.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient.EventsV1(), "test")
+			mcEventRecorder, err := events.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient.EventsV1(), "test")
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			// Create a custom sync context with spy queue to capture AddAfter calls
 			spyQ := &spyQueue{
-				RateLimitingInterface: workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+				TypedRateLimitingInterface: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
 			}
 			syncCtx := &testSyncContext{
 				queueKey: testinghelpers.TestManagedClusterName,
-				recorder: eventstesting.NewTestingEventRecorder(t),
+				recorder: events.NewContextualLoggingEventRecorder(t.Name()),
 				queue:    spyQ,
 			}
 
@@ -313,7 +311,7 @@ func TestRequeueTime(t *testing.T) {
 				mcEventRecorder: mcEventRecorder,
 			}
 
-			syncErr := ctrl.sync(context.TODO(), syncCtx)
+			syncErr := ctrl.sync(context.TODO(), syncCtx, testinghelpers.TestManagedClusterName)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

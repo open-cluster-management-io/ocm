@@ -7,8 +7,6 @@ import (
 	"path"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"gopkg.in/yaml.v2"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	coordv1 "k8s.io/api/coordination/v1"
@@ -23,6 +21,8 @@ import (
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	cloudeventsaddon "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon"
 	cloudeventscluster "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
 	cloudeventscsr "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
@@ -323,7 +323,7 @@ func (c *ceCSRControl) Create(ctx context.Context, recorder events.Recorder, obj
 	if err != nil {
 		return "", err
 	}
-	recorder.Eventf("CSRCreated", "A csr %q is created", req.Name)
+	recorder.Eventf(ctx, "CSRCreated", "A csr %q is created", req.Name)
 	return req.Name, nil
 }
 

@@ -3,8 +3,6 @@ package addon
 import (
 	"context"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -18,6 +16,7 @@ import (
 	clusterinformerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -34,8 +33,7 @@ type managedClusterAddOnHealthCheckController struct {
 // NewManagedClusterAddOnHealthCheckController returns an instance of managedClusterAddOnHealthCheckController
 func NewManagedClusterAddOnHealthCheckController(addOnClient addonclient.Interface,
 	addOnInformer addoninformerv1alpha1.ManagedClusterAddOnInformer,
-	clusterInformer clusterinformerv1.ManagedClusterInformer,
-	recorder events.Recorder) factory.Controller {
+	clusterInformer clusterinformerv1.ManagedClusterInformer) factory.Controller {
 	c := &managedClusterAddOnHealthCheckController{
 		addOnClient:   addOnClient,
 		addOnLister:   addOnInformer.Lister(),
@@ -45,11 +43,10 @@ func NewManagedClusterAddOnHealthCheckController(addOnClient addonclient.Interfa
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterInformer.Informer()).
 		WithSync(c.sync).
-		ToController("ManagedClusterAddonHealthCheckController", recorder)
+		ToController("ManagedClusterAddonHealthCheckController")
 }
 
-func (c *managedClusterAddOnHealthCheckController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	managedClusterName := syncCtx.QueueKey()
+func (c *managedClusterAddOnHealthCheckController) sync(ctx context.Context, syncCtx factory.SyncContext, managedClusterName string) error {
 	managedCluster, err := c.clusterLister.Get(managedClusterName)
 	if errors.IsNotFound(err) {
 		// Managed cluster is not found, could have been deleted, do nothing.
@@ -102,7 +99,7 @@ func (c *managedClusterAddOnHealthCheckController) sync(ctx context.Context, syn
 			errs = append(errs, err)
 		}
 		if updated {
-			syncCtx.Recorder().Eventf("ManagedClusterAddOnStatusUpdated", "update addon %q status to unknown on managed cluster %q",
+			syncCtx.Recorder().Eventf(ctx, "ManagedClusterAddOnStatusUpdated", "update addon %q status to unknown on managed cluster %q",
 				addOn.Name, managedClusterName)
 		}
 	}

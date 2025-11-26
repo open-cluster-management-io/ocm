@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	"github.com/openshift/library-go/pkg/assets"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -18,6 +17,7 @@ import (
 	migrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/typed/migration/v1alpha1"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	"open-cluster-management.io/ocm/manifests"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
@@ -124,7 +124,7 @@ func (c *crdReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterManag
 		if err := crdManager.CleanOne(ctx, name, c.skipRemoveCRDs); err != nil {
 			return cm, reconcileStop, err
 		}
-		c.recorder.Eventf("CRDDeleted", "crd %s is deleted", name)
+		c.recorder.Eventf(ctx, "CRDDeleted", "crd %s is deleted", name)
 	}
 	if c.skipRemoveCRDs {
 		return cm, reconcileContinue, nil

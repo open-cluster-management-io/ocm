@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -23,6 +22,7 @@ import (
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/features"
@@ -40,7 +40,7 @@ type managedClusterStatusController struct {
 }
 
 type statusReconcile interface {
-	reconcile(ctx context.Context, cm *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error)
+	reconcile(ctx context.Context, syncCtx factory.SyncContext, cm *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error)
 }
 
 type reconcileState int64
@@ -65,7 +65,6 @@ func NewManagedClusterStatusController(
 	maxCustomClusterClaims int,
 	reservedClusterClaimSuffixes []string,
 	resyncInterval time.Duration,
-	recorder events.Recorder,
 	hubEventRecorder kevents.EventRecorder) factory.Controller {
 	c := newManagedClusterStatusController(
 		clusterName,
@@ -80,7 +79,6 @@ func NewManagedClusterStatusController(
 		nodeInformer,
 		maxCustomClusterClaims,
 		reservedClusterClaimSuffixes,
-		recorder,
 		hubEventRecorder,
 	)
 
@@ -95,7 +93,7 @@ func NewManagedClusterStatusController(
 		controllerFactory = controllerFactory.WithInformers(propertyInformer.Informer())
 	}
 
-	return controllerFactory.ToController("ManagedClusterStatusController", recorder)
+	return controllerFactory.ToController("ManagedClusterStatusController")
 }
 
 func newManagedClusterStatusController(
@@ -111,7 +109,6 @@ func newManagedClusterStatusController(
 	nodeInformer corev1informers.NodeInformer,
 	maxCustomClusterClaims int,
 	reservedClusterClaimSuffixes []string,
-	recorder events.Recorder,
 	hubEventRecorder kevents.EventRecorder) *managedClusterStatusController {
 	return &managedClusterStatusController{
 		clusterName: clusterName,
@@ -119,9 +116,9 @@ func newManagedClusterStatusController(
 			*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
 			hubClusterClient.ClusterV1().ManagedClusters()),
 		reconcilers: []statusReconcile{
-			&joiningReconcile{recorder: recorder},
+			&joiningReconcile{},
 			&resoureReconcile{managedClusterDiscoveryClient: managedClusterDiscoveryClient, nodeLister: nodeInformer.Lister()},
-			&claimReconcile{claimLister: claimInformer.Lister(), recorder: recorder,
+			&claimReconcile{claimLister: claimInformer.Lister(),
 				maxCustomClusterClaims:       maxCustomClusterClaims,
 				reservedClusterClaimSuffixes: reservedClusterClaimSuffixes,
 				aboutLister:                  propertyInformer.Lister(),
@@ -130,18 +127,16 @@ func newManagedClusterStatusController(
 				hubClusterSetLabel:   GetHubClusterSetLabel(hubHash),
 				spokeKubeClient:      spokeKubeClient,
 				spokeNamespaceLister: spokeNamespaceInformer.Lister(),
-				eventRecorder:        recorder,
 			},
 		},
 		hubClusterLister: hubClusterInformer.Lister(),
 		hubEventRecorder: hubEventRecorder,
-		recorder:         recorder,
 	}
 }
 
 // sync updates managed cluster available condition by checking kube-apiserver health on managed cluster.
 // if the kube-apiserver is health, it will ensure that managed cluster resources and version are up to date.
-func (c *managedClusterStatusController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+func (c *managedClusterStatusController) sync(ctx context.Context, syncCtx factory.SyncContext, _ string) error {
 	cluster, err := c.hubClusterLister.Get(c.clusterName)
 	if err != nil {
 		return fmt.Errorf("unable to get managed cluster %q from hub: %w", c.clusterName, err)
@@ -151,7 +146,7 @@ func (c *managedClusterStatusController) sync(ctx context.Context, syncCtx facto
 	var errs []error
 	for _, reconciler := range c.reconcilers {
 		var state reconcileState
-		newCluster, state, err = reconciler.reconcile(ctx, newCluster)
+		newCluster, state, err = reconciler.reconcile(ctx, syncCtx, newCluster)
 		if err != nil {
 			errs = append(errs, err)
 		}

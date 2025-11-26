@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,6 +18,7 @@ import (
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -38,8 +37,7 @@ func NewKlusterletStatusController(
 	kubeClient kubernetes.Interface,
 	klusterletClient operatorv1client.KlusterletInterface,
 	klusterletInformer operatorinformer.KlusterletInformer,
-	deploymentInformer appsinformer.DeploymentInformer,
-	recorder events.Recorder) factory.Controller {
+	deploymentInformer appsinformer.DeploymentInformer) factory.Controller {
 	controller := &klusterletStatusController{
 		kubeClient: kubeClient,
 		patcher: patcher.NewPatcher[
@@ -50,15 +48,15 @@ func NewKlusterletStatusController(
 	return factory.New().WithSync(controller.sync).
 		WithInformersQueueKeysFunc(helpers.KlusterletDeploymentQueueKeyFunc(controller.klusterletLister), deploymentInformer.Informer()).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, klusterletInformer.Informer()).
-		ToController("KlusterletStatusController", recorder)
+		ToController("KlusterletStatusController")
 }
 
-func (k *klusterletStatusController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	klusterletName := controllerContext.QueueKey()
+func (k *klusterletStatusController) sync(ctx context.Context, controllerContext factory.SyncContext, klusterletName string) error {
+	logger := klog.FromContext(ctx).WithValues("klusterlet", klusterletName)
 	if klusterletName == "" {
 		return nil
 	}
-	klog.V(4).Infof("Reconciling Klusterlet %q", klusterletName)
+	logger.V(4).Info("Reconciling Klusterlet")
 
 	klusterlet, err := k.klusterletLister.Get(klusterletName)
 	switch {

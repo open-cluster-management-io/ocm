@@ -2,6 +2,7 @@ package managedcluster
 
 import (
 	"context"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"testing"
 	"time"
 
@@ -252,7 +253,8 @@ func TestManagedNamespaceReconcile_reconcile(t *testing.T) {
 
 			// Run reconcile
 			ctx := context.TODO()
-			updatedCluster, state, err := reconciler.reconcile(ctx, c.cluster)
+			syncCtx := testingcommon.NewFakeSDKSyncContext(t, "")
+			updatedCluster, state, err := reconciler.reconcile(ctx, syncCtx, c.cluster)
 
 			// Validate error
 			if c.expectedErr == "" && err != nil {

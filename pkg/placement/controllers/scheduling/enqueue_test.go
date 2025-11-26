@@ -189,7 +189,7 @@ func TestEnqueuePlacementsByClusterSet(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
 			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
-			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
+			syncCtx := testingcommon.NewFakeSDKSyncContext(t, "fake")
 			q := newEnqueuer(
 				ctx,
 				syncCtx.Queue(),
@@ -199,7 +199,7 @@ func TestEnqueuePlacementsByClusterSet(t *testing.T) {
 				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings(),
 			)
 			queuedKeys := sets.NewString()
-			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.RateLimitingInterface) {
+			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.TypedRateLimitingInterface[string]) {
 				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 				queuedKeys.Insert(key)
 			}
@@ -298,7 +298,7 @@ func TestEnqueuePlacementsByClusterSetBinding(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
 			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
-			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
+			syncCtx := testingcommon.NewFakeSDKSyncContext(t, "fake")
 			q := newEnqueuer(
 				ctx,
 				syncCtx.Queue(),
@@ -308,7 +308,7 @@ func TestEnqueuePlacementsByClusterSetBinding(t *testing.T) {
 				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings(),
 			)
 			queuedKeys := sets.NewString()
-			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.RateLimitingInterface) {
+			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.TypedRateLimitingInterface[string]) {
 				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 				queuedKeys.Insert(key)
 			}
@@ -388,7 +388,7 @@ func TestEnqueuePlacementsByScore(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
 			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
-			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
+			syncCtx := testingcommon.NewFakeSDKSyncContext(t, "fake")
 			q := newEnqueuer(
 				ctx,
 				syncCtx.Queue(),
@@ -398,7 +398,7 @@ func TestEnqueuePlacementsByScore(t *testing.T) {
 				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings(),
 			)
 			queuedKeys := sets.NewString()
-			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.RateLimitingInterface) {
+			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.TypedRateLimitingInterface[string]) {
 				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 				queuedKeys.Insert(key)
 			}

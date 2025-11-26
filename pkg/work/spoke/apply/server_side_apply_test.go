@@ -77,7 +77,7 @@ func TestServerSideApply(t *testing.T) {
 
 			applier := NewServerSideApply(dynamicClient)
 
-			syncContext := testingcommon.NewFakeSyncContext(t, "test")
+			syncContext := testingcommon.NewFakeSDKSyncContext(t, "test")
 			option := &workapiv1.ManifestConfigOption{
 				UpdateStrategy: &workapiv1.UpdateStrategy{
 					Type: workapiv1.UpdateStrategyTypeServerSideApply,
@@ -550,7 +550,7 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 			reactors := []clienttesting.Reactor{reactor}
 			dynamicClient.Fake.ReactionChain = append(reactors, dynamicClient.Fake.ReactionChain...)
 
-			syncContext := testingcommon.NewFakeSyncContext(t, "test")
+			syncContext := testingcommon.NewFakeSDKSyncContext(t, "test")
 			option := &workapiv1.ManifestConfigOption{
 				UpdateStrategy: &workapiv1.UpdateStrategy{
 					Type: workapiv1.UpdateStrategyTypeServerSideApply,

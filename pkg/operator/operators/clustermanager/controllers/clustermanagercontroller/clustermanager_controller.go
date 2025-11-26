@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/assets"
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -30,6 +28,8 @@ import (
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/manifests"
@@ -51,7 +51,6 @@ type clusterManagerController struct {
 	operatorKubeClient   kubernetes.Interface
 	operatorKubeconfig   *rest.Config
 	configMapLister      corev1listers.ConfigMapLister
-	recorder             events.Recorder
 	cache                resourceapply.ResourceCache
 	// For testcases which don't need these functions, we could set fake funcs
 	ensureSAKubeconfigs func(ctx context.Context, clusterManagerName, clusterManagerNamespace string,
@@ -86,7 +85,6 @@ func NewClusterManagerController(
 	clusterManagerInformer operatorinformer.ClusterManagerInformer,
 	deploymentInformer appsinformer.DeploymentInformer,
 	configMapInformer corev1informers.ConfigMapInformer,
-	recorder events.Recorder,
 	skipRemoveCRDs bool,
 	controlPlaneNodeLabelSelector string,
 	deploymentReplicas int32,
@@ -101,7 +99,6 @@ func NewClusterManagerController(
 			clusterManagerClient),
 		clusterManagerLister:          clusterManagerInformer.Lister(),
 		configMapLister:               configMapInformer.Lister(),
-		recorder:                      recorder,
 		generateHubClusterClients:     generateHubClients,
 		ensureSAKubeconfigs:           ensureSAKubeconfigs,
 		cache:                         resourceapply.NewResourceCache(),
@@ -120,12 +117,12 @@ func NewClusterManagerController(
 			queue.FilterByNames(helpers.CaBundleConfigmap),
 			configMapInformer.Informer()).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterManagerInformer.Informer()).
-		ToController("ClusterManagerController", recorder)
+		ToController("ClusterManagerController")
 }
 
-func (n *clusterManagerController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	clusterManagerName := controllerContext.QueueKey()
-	klog.V(4).Infof("Reconciling ClusterManager %q", clusterManagerName)
+func (n *clusterManagerController) sync(ctx context.Context, controllerContext factory.SyncContext, clusterManagerName string) error {
+	logger := klog.FromContext(ctx).WithValues("clusterManagmer", clusterManagerName)
+	logger.V(4).Info("Reconciling ClusterManager")
 
 	originalClusterManager, err := n.clusterManagerLister.Get(clusterManagerName)
 	if errors.IsNotFound(err) {
@@ -141,7 +138,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 
 	resourceRequirements, err := helpers.ResourceRequirements(clusterManager)
 	if err != nil {
-		klog.Errorf("failed to parse resource requirements for cluster manager %s: %v", clusterManager.Name, err)
+		logger.Error(err, "failed to parse resource requirements for cluster manager")
 		return err
 	}
 
@@ -259,14 +256,14 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 
 	var errs []error
 	reconcilers := []clusterManagerReconcile{
-		&crdReconcile{cache: n.cache, recorder: n.recorder, hubAPIExtensionClient: hubApiExtensionClient,
+		&crdReconcile{cache: n.cache, recorder: controllerContext.Recorder(), hubAPIExtensionClient: hubApiExtensionClient,
 			hubMigrationClient: hubMigrationClient, skipRemoveCRDs: n.skipRemoveCRDs},
-		&secretReconcile{cache: n.cache, recorder: n.recorder, operatorKubeClient: n.operatorKubeClient,
+		&secretReconcile{cache: n.cache, recorder: controllerContext.Recorder(), operatorKubeClient: n.operatorKubeClient,
 			hubKubeClient: hubClient, operatorNamespace: n.operatorNamespace, enableSyncLabels: n.enableSyncLabels},
-		&hubReconcile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient},
-		&runtimeReconcile{cache: n.cache, recorder: n.recorder, hubKubeConfig: hubKubeConfig, hubKubeClient: hubClient,
+		&hubReconcile{cache: n.cache, recorder: controllerContext.Recorder(), hubKubeClient: hubClient},
+		&runtimeReconcile{cache: n.cache, recorder: controllerContext.Recorder(), hubKubeConfig: hubKubeConfig, hubKubeClient: hubClient,
 			kubeClient: managementClient, ensureSAKubeconfigs: n.ensureSAKubeconfigs},
-		&webhookReconcile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient, kubeClient: managementClient},
+		&webhookReconcile{cache: n.cache, recorder: controllerContext.Recorder(), hubKubeClient: hubClient, kubeClient: managementClient},
 	}
 
 	// If the ClusterManager is deleting, we remove its related resources on hub

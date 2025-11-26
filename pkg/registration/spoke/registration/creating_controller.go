@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -14,6 +12,7 @@ import (
 
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 )
@@ -36,8 +35,7 @@ type managedClusterCreatingController struct {
 func NewManagedClusterCreatingController(
 	clusterName string,
 	decorators []ManagedClusterDecorator,
-	hubClusterClient clientset.Interface,
-	recorder events.Recorder) factory.Controller {
+	hubClusterClient clientset.Interface) factory.Controller {
 
 	c := &managedClusterCreatingController{
 		clusterName:       clusterName,
@@ -48,10 +46,10 @@ func NewManagedClusterCreatingController(
 	return factory.New().
 		WithSync(c.sync).
 		ResyncEvery(wait.Jitter(CreatingControllerSyncInterval, 1.0)).
-		ToController("ManagedClusterCreatingController", recorder)
+		ToController("ManagedClusterCreatingController")
 }
 
-func (c *managedClusterCreatingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+func (c *managedClusterCreatingController) sync(ctx context.Context, syncCtx factory.SyncContext, _ string) error {
 	logger := klog.FromContext(ctx)
 	existingCluster, err := c.hubClusterClient.ClusterV1().ManagedClusters().Get(ctx, c.clusterName, metav1.GetOptions{})
 	// ManagedCluster is only allowed created during bootstrap. After bootstrap secret expired, an unauthorized error will be got, output log at the debug level
@@ -89,7 +87,7 @@ func (c *managedClusterCreatingController) sync(ctx context.Context, syncCtx fac
 			}
 			return fmt.Errorf("unable to create managed cluster with name %q on hub: %w", c.clusterName, err)
 		}
-		syncCtx.Recorder().Eventf("ManagedClusterCreated", "Managed cluster %q created on hub", c.clusterName)
+		syncCtx.Recorder().Eventf(ctx, "ManagedClusterCreated", "Managed cluster %q created on hub", c.clusterName)
 		return nil
 	}
 

@@ -3,7 +3,7 @@ package testing
 import (
 	"testing"
 
-	openshiftevents "github.com/openshift/library-go/pkg/operator/events"
+	ocpevents "github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"k8s.io/client-go/util/workqueue"
 
@@ -12,13 +12,13 @@ import (
 
 type FakeSyncContext struct {
 	spokeName string
-	recorder  openshiftevents.Recorder
+	recorder  ocpevents.Recorder
 	queue     workqueue.RateLimitingInterface
 }
 
 func (f FakeSyncContext) Queue() workqueue.RateLimitingInterface { return f.queue }
 func (f FakeSyncContext) QueueKey() string                       { return f.spokeName }
-func (f FakeSyncContext) Recorder() openshiftevents.Recorder     { return f.recorder }
+func (f FakeSyncContext) Recorder() ocpevents.Recorder           { return f.recorder }
 
 func NewFakeSyncContext(t *testing.T, clusterName string) *FakeSyncContext {
 	return &FakeSyncContext{

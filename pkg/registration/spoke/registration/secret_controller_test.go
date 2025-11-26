@@ -8,10 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	kubefake "k8s.io/client-go/kubernetes/fake"
+
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/register"
@@ -116,7 +117,9 @@ func TestDumpSecret(t *testing.T) {
 				testinghelpers.WriteFile(path.Join(hubKubeconfigDir, k), v)
 			}
 
-			err = DumpSecret(kubeClient.CoreV1(), testNamespace, testSecretName, hubKubeconfigDir, context.TODO(), eventstesting.NewTestingEventRecorder(t))
+			err = DumpSecret(
+				kubeClient.CoreV1(), testNamespace, testSecretName, hubKubeconfigDir, context.TODO(),
+				events.NewContextualLoggingEventRecorder(t.Name()))
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}

@@ -111,8 +111,7 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		o.ControlPlaneNodeLabelSelector,
 		o.DeploymentReplicas,
 		o.DisableAddonNamespace,
-		o.EnableSyncLabels,
-		controllerContext.EventRecorder)
+		o.EnableSyncLabels)
 
 	klusterletCleanupController := klusterletcontroller.NewKlusterletCleanupController(
 		kubeClient,
@@ -126,15 +125,13 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		helpers.GetOperatorNamespace(),
 		o.ControlPlaneNodeLabelSelector,
 		o.DeploymentReplicas,
-		o.DisableAddonNamespace,
-		controllerContext.EventRecorder)
+		o.DisableAddonNamespace)
 
 	ssarController := ssarcontroller.NewKlusterletSSARController(
 		kubeClient,
 		operatorClient.OperatorV1().Klusterlets(),
 		operatorInformer.Operator().V1().Klusterlets(),
 		secretInformers,
-		controllerContext.EventRecorder,
 	)
 
 	statusController := statuscontroller.NewKlusterletStatusController(
@@ -142,14 +139,12 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		operatorClient.OperatorV1().Klusterlets(),
 		operatorInformer.Operator().V1().Klusterlets(),
 		deploymentInformer.Apps().V1().Deployments(),
-		controllerContext.EventRecorder,
 	)
 
 	addonController := addonsecretcontroller.NewAddonPullImageSecretController(
 		kubeClient,
 		helpers.GetOperatorNamespace(),
 		kubeInformer.Core().V1().Namespaces(),
-		controllerContext.EventRecorder,
 	)
 
 	go operatorInformer.Start(ctx.Done())

@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	"github.com/openshift/library-go/pkg/assets"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -18,6 +17,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	"open-cluster-management.io/ocm/manifests"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
@@ -113,7 +113,7 @@ func (r *managementReconcile) clean(ctx context.Context, klusterlet *operatorapi
 		if err != nil && !errors.IsNotFound(err) {
 			return klusterlet, reconcileStop, err
 		}
-		r.recorder.Eventf("SecretDeleted", "secret %s is deleted", secret)
+		r.recorder.Eventf(ctx, "SecretDeleted", "secret %s is deleted", secret)
 	}
 
 	// remove static file on the management cluster

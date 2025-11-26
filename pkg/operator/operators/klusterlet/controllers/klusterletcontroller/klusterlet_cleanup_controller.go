@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/assets"
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -24,6 +22,7 @@ import (
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/manifests"
@@ -57,8 +56,7 @@ func NewKlusterletCleanupController(
 	operatorNamespace string,
 	controlPlaneNodeLabelSelector string,
 	deploymentReplicas int32,
-	disableAddonNamespace bool,
-	recorder events.Recorder) factory.Controller {
+	disableAddonNamespace bool) factory.Controller {
 	controller := &klusterletCleanupController{
 		kubeClient: kubeClient,
 		patcher: patcher.NewPatcher[
@@ -67,7 +65,7 @@ func NewKlusterletCleanupController(
 		klusterletLister:              klusterletInformer.Lister(),
 		kubeVersion:                   kubeVersion,
 		operatorNamespace:             operatorNamespace,
-		managedClusterClientsBuilder:  newManagedClusterClientsBuilder(kubeClient, apiExtensionClient, appliedManifestWorkClient, recorder),
+		managedClusterClientsBuilder:  newManagedClusterClientsBuilder(kubeClient, apiExtensionClient, appliedManifestWorkClient),
 		controlPlaneNodeLabelSelector: controlPlaneNodeLabelSelector,
 		deploymentReplicas:            deploymentReplicas,
 		disableAddonNamespace:         disableAddonNamespace,
@@ -80,12 +78,12 @@ func NewKlusterletCleanupController(
 			secretInformers[helpers.ExternalManagedKubeConfig].Informer()).
 		WithInformersQueueKeysFunc(helpers.KlusterletDeploymentQueueKeyFunc(controller.klusterletLister), deploymentInformer.Informer()).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, klusterletInformer.Informer()).
-		ToController("KlusterletCleanupController", recorder)
+		ToController("KlusterletCleanupController")
 }
 
-func (n *klusterletCleanupController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	klusterletName := controllerContext.QueueKey()
-	klog.V(4).Infof("Reconciling Klusterlet %q", klusterletName)
+func (n *klusterletCleanupController) sync(ctx context.Context, controllerContext factory.SyncContext, klusterletName string) error {
+	logger := klog.FromContext(ctx).WithValues("klusterlet", klusterletName)
+	logger.V(4).Info("Reconciling Klusterlet")
 	originalKlusterlet, err := n.klusterletLister.Get(klusterletName)
 	if errors.IsNotFound(err) {
 		// Klusterlet not found, could have been deleted, do nothing.
@@ -148,7 +146,7 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 		managedClusterClients, err := n.managedClusterClientsBuilder.
 			withMode(config.InstallMode).
 			withKubeConfigSecret(config.AgentNamespace, config.ExternalManagedKubeConfigSecret).
-			build(ctx)
+			build(ctx, controllerContext)
 		// stop when hosted kubeconfig is not found. the klustelet controller will monitor the secret and retrigger
 		// reconciliation of cleanup controller when secret is created again.
 		if errors.IsNotFound(err) {

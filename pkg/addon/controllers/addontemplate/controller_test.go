@@ -198,8 +198,8 @@ func TestReconcile(t *testing.T) {
 		)
 		ctx := context.TODO()
 		for _, syncKey := range c.syncKeys {
-			syncContext := testingcommon.NewFakeSyncContext(t, syncKey)
-			err := controller.Sync(ctx, syncContext)
+			syncContext := testingcommon.NewFakeSDKSyncContext(t, syncKey)
+			err := controller.Sync(ctx, syncContext, syncKey)
 			if err != nil {
 				t.Errorf("expected no error when sync: %v", err)
 			}
@@ -391,7 +391,7 @@ func TestStopUnusedManagers(t *testing.T) {
 			addonInformers.Start(ctx.Done())
 			addonInformers.WaitForCacheSync(ctx.Done())
 
-			syncContext := testingcommon.NewFakeSyncContext(t, c.addonName)
+			syncContext := testingcommon.NewFakeSDKSyncContext(t, c.addonName)
 
 			err = controller.stopUnusedManagers(ctx, syncContext, c.addonName)
 			assert.NoError(t, err)

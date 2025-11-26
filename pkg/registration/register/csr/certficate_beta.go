@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	certificates "k8s.io/api/certificates/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	certificateslisters "k8s.io/client-go/listers/certificates/v1beta1"
 	"k8s.io/client-go/tools/cache"
+
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 )
 
 var _ CSRControl = &v1beta1CSRControl{}
@@ -71,7 +72,7 @@ func (v *v1beta1CSRControl) Create(ctx context.Context, recorder events.Recorder
 	if err != nil {
 		return "", err
 	}
-	recorder.Eventf("CSRCreated", "A csr %q is created", req.Name)
+	recorder.Eventf(ctx, "CSRCreated", "A csr %q is created", req.Name)
 	return req.Name, nil
 }
 

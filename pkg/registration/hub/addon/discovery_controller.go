@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -20,6 +18,7 @@ import (
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -38,7 +37,6 @@ type addOnFeatureDiscoveryController struct {
 	patcher       patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus]
 	clusterLister clusterv1listers.ManagedClusterLister
 	addOnLister   addonlisterv1alpha1.ManagedClusterAddOnLister
-	recorder      events.Recorder
 }
 
 // NewAddOnFeatureDiscoveryController returns an instance of addOnFeatureDiscoveryController
@@ -46,7 +44,6 @@ func NewAddOnFeatureDiscoveryController(
 	clusterClient clientset.Interface,
 	clusterInformer clusterv1informer.ManagedClusterInformer,
 	addOnInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
-	recorder events.Recorder,
 ) factory.Controller {
 	c := &addOnFeatureDiscoveryController{
 		patcher: patcher.NewPatcher[
@@ -54,7 +51,6 @@ func NewAddOnFeatureDiscoveryController(
 			clusterClient.ClusterV1().ManagedClusters()),
 		clusterLister: clusterInformer.Lister(),
 		addOnLister:   addOnInformers.Lister(),
-		recorder:      recorder,
 	}
 
 	return factory.New().
@@ -65,12 +61,10 @@ func NewAddOnFeatureDiscoveryController(
 			queue.QueueKeyByMetaNamespace,
 			addOnInformers.Informer()).
 		WithSync(c.sync).
-		ToController("AddOnFeatureDiscoveryController", recorder)
+		ToController("AddOnFeatureDiscoveryController")
 }
 
-func (c *addOnFeatureDiscoveryController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	queueKey := syncCtx.QueueKey()
-
+func (c *addOnFeatureDiscoveryController) sync(ctx context.Context, syncCtx factory.SyncContext, queueKey string) error {
 	switch {
 	case queueKey == factory.DefaultQueueKey:
 		// no need to resync

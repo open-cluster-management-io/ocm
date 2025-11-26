@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -26,9 +24,10 @@ import (
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	ocmfeature "open-cluster-management.io/api/feature"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
-	eventrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/addon"
@@ -148,7 +147,7 @@ func (o *SpokeAgentConfig) RunSpokeAgent(ctx context.Context, controllerContext 
 		informers.NewSharedInformerFactory(spokeKubeClient, 10*time.Minute),
 		clusterv1informers.NewSharedInformerFactory(spokeClusterClient, 10*time.Minute),
 		aboutinformers.NewSharedInformerFactory(aboutClusterClient, 10*time.Minute),
-		controllerContext.EventRecorder,
+		events.NewContextualLoggingEventRecorder("registration-agent"),
 	)
 }
 
@@ -211,7 +210,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		if err != nil {
 			return fmt.Errorf("failed to select a bootstrap kubeconfig: %w", err)
 		}
-		recorder.Eventf("BootstrapSelected", "Select bootstrap kubeconfig with index %d and file %s",
+		recorder.Eventf(ctx, "BootstrapSelected", "Select bootstrap kubeconfig with index %d and file %s",
 			index, o.registrationOption.BootstrapKubeconfigs[index])
 		o.currentBootstrapKubeConfig = o.registrationOption.BootstrapKubeconfigs[index]
 	} else {
@@ -255,7 +254,6 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		// the hub kubeconfig secret stored in the cluster where the agent pod runs
 		managementKubeClient.CoreV1(),
 		secretInformer,
-		recorder,
 	)
 	go hubKubeconfigSecretController.Run(ctx, 1)
 	go namespacedManagementKubeInformerFactory.Start(ctx.Done())
@@ -291,7 +289,6 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 				o.driver.ManagedClusterDecorator,
 			},
 			bootstrapClients.ClusterClient,
-			recorder,
 		)
 
 		controllerName := fmt.Sprintf("BootstrapController@cluster:%s", o.agentOptions.SpokeClusterName)
@@ -299,7 +296,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 			secretOption, o.driver, register.GenerateBootstrapStatusUpdater(),
 			managementKubeClient.CoreV1(),
 			namespacedManagementKubeInformerFactory.Core().V1().Secrets().Informer(),
-			recorder, controllerName)
+			controllerName)
 
 		go bootstrapClients.ClusterInformer.Informer().Run(bootstrapCtx.Done())
 		if driverInformer != nil {
@@ -338,7 +335,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	}
 	hubDriverInformer, _ := o.driver.InformerHandler()
 
-	recorder.Event("HubClientConfigReady", "Client config for hub is ready.")
+	recorder.Event(ctx, "HubClientConfigReady", "Client config for hub is ready.")
 	// create another RegisterController for registration credential rotation
 	controllerName := fmt.Sprintf("RegisterController@cluster:%s", o.agentOptions.SpokeClusterName)
 	secretController := register.NewSecretController(
@@ -348,17 +345,15 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 			o.agentOptions.SpokeClusterName),
 		managementKubeClient.CoreV1(),
 		namespacedManagementKubeInformerFactory.Core().V1().Secrets().Informer(),
-		recorder, controllerName)
+		controllerName)
 
 	// create ManagedClusterLeaseController to keep the spoke cluster heartbeat
 	managedClusterLeaseController := lease.NewManagedClusterLeaseController(
 		o.agentOptions.SpokeClusterName,
 		hubClient.LeaseClient,
-		hubClient.ClusterInformer,
-		recorder,
-	)
+		hubClient.ClusterInformer)
 
-	hubEventRecorder, err := eventrecorder.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient.EventsClient, "klusterlet-agent")
+	hubEventRecorder, err := events.NewEventRecorder(ctx, clusterscheme.Scheme, hubClient.EventsClient, "klusterlet-agent")
 	if err != nil {
 		return fmt.Errorf("failed to create event recorder: %w", err)
 	}
@@ -396,7 +391,6 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		o.registrationOption.MaxCustomClusterClaims,
 		o.registrationOption.ReservedClusterClaimSuffixes,
 		o.registrationOption.ClusterHealthCheckPeriod,
-		recorder,
 		hubEventRecorder,
 	)
 
@@ -410,7 +404,6 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 			managementKubeClient.CoordinationV1(),
 			spokeKubeClient.CoordinationV1(),
 			AddOnLeaseControllerSyncInterval, //TODO: this interval time should be allowed to change from outside
-			recorder,
 		)
 
 		// addon registration only enabled when the registration driver is csr.
@@ -424,7 +417,6 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 				spokeKubeClient,
 				addonDriver,
 				hubClient.AddonInformer,
-				recorder,
 			)
 		}
 	}
@@ -439,7 +431,6 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 				o.agentStopFunc()
 				return nil
 			},
-			recorder,
 		)
 
 		hubTimeoutController = registration.NewHubTimeoutController(
@@ -451,7 +442,6 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 				o.agentStopFunc()
 				return nil
 			},
-			recorder,
 		)
 	}
 

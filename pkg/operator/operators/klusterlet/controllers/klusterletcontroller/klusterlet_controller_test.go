@@ -11,7 +11,6 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/openshift/library-go/pkg/assets"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
@@ -40,6 +39,7 @@ import (
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/manifests"
@@ -613,13 +613,13 @@ func TestSyncDeploy(t *testing.T) {
 		hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
 		hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 		namespace := newNamespace("testns")
-		syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+		syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 
 		t.Run(c.name, func(t *testing.T) {
 			controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, c.enableSyncLabels,
 				bootStrapSecret, hubKubeConfigSecret, namespace)
 
-			err := controller.controller.sync(context.TODO(), syncContext)
+			err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 			if err != nil {
 				t.Errorf("Expected non error when sync, %v", err)
 			}
@@ -694,13 +694,13 @@ func TestSyncDeploySingleton(t *testing.T) {
 		hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
 		hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 		namespace := newNamespace("testns")
-		syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+		syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 
 		t.Run(c.name, func(t *testing.T) {
 			controller := newTestController(t, klusterlet, syncContext.Recorder(), nil,
 				c.enableSyncLabels, bootStrapSecret, hubKubeConfigSecret, namespace)
 
-			err := controller.controller.sync(context.TODO(), syncContext)
+			err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 			if err != nil {
 				t.Errorf("Expected non error when sync, %v", err)
 			}
@@ -770,11 +770,11 @@ func TestSyncDeployHosted(t *testing.T) {
 	namespace := newNamespace(agentNamespace)
 	pullSecret := newSecret(helpers.ImagePullSecret, "open-cluster-management")
 
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 	controller := newTestControllerHosted(t, klusterlet, syncContext.Recorder(), nil, bootStrapSecret,
 		hubKubeConfigSecret, namespace, pullSecret /*externalManagedSecret*/)
 
-	err := controller.controller.sync(context.TODO(), syncContext)
+	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -866,10 +866,10 @@ func TestSyncDeployHostedCreateAgentNamespace(t *testing.T) {
 		Type: operatorapiv1.ConditionReadyToApply, Status: metav1.ConditionFalse, Reason: "KlusterletPrepareFailed",
 		Message: "Failed to build managed cluster clients: secrets \"external-managed-kubeconfig\" not found",
 	})
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 	controller := newTestControllerHosted(t, klusterlet, syncContext.Recorder(), nil).setDefaultManagedClusterClientsBuilder()
 
-	err := controller.controller.sync(context.TODO(), syncContext)
+	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if !errors.IsNotFound(err) {
 		t.Errorf("Expected not found error when sync, but got %v", err)
 	}
@@ -892,11 +892,11 @@ func TestRemoveOldNamespace(t *testing.T) {
 	oldNamespace.Labels = map[string]string{
 		klusterletNamespaceLabelKey: "klusterlet",
 	}
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		bootStrapSecret, hubKubeConfigSecret, namespace, oldNamespace)
 
-	err := controller.controller.sync(context.TODO(), syncContext)
+	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -921,7 +921,7 @@ func TestRemoveOldNamespace(t *testing.T) {
 	if err := controller.operatorStore.Update(klusterlet); err != nil {
 		t.Fatal(err)
 	}
-	err = controller.controller.sync(context.TODO(), syncContext)
+	err = controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -948,12 +948,12 @@ func TestSyncDisableAddonNamespace(t *testing.T) {
 	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
 	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	namespace := newNamespace("testns")
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		bootStrapSecret, hubKubeConfigSecret, namespace)
 	controller.controller.disableAddonNamespace = true
 
-	err := controller.controller.sync(context.TODO(), syncContext)
+	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -1053,11 +1053,11 @@ func TestAWSIrsaAuthInSingletonModeWithInvalidClusterArns(t *testing.T) {
 		hubSecret,
 	}
 
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		objects...)
 
-	err := controller.controller.sync(context.TODO(), syncContext)
+	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		assert.Equal(t, err.Error(), "HubClusterArn arn:aws:bks:us-west-2:123456789012:cluster/hub-cluster1 is not well formed")
 	}
@@ -1084,11 +1084,11 @@ func TestAWSIrsaAuthInSingletonMode(t *testing.T) {
 		hubSecret,
 	}
 
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		objects...)
 
-	err := controller.controller.sync(context.TODO(), syncContext)
+	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -1115,11 +1115,11 @@ func TestAWSIrsaAuthInNonSingletonMode(t *testing.T) {
 		hubSecret,
 	}
 
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		objects...)
 
-	err := controller.controller.sync(context.TODO(), syncContext)
+	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -1138,11 +1138,11 @@ func TestReplica(t *testing.T) {
 		hubSecret,
 	}
 
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		objects...)
 
-	err := controller.controller.sync(context.TODO(), syncContext)
+	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -1167,7 +1167,7 @@ func TestReplica(t *testing.T) {
 	controller.kubeClient.ClearActions()
 	controller.operatorClient.ClearActions()
 
-	err = controller.controller.sync(context.TODO(), syncContext)
+	err = controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -1189,7 +1189,7 @@ func TestReplica(t *testing.T) {
 	controller.kubeClient.ClearActions()
 	controller.operatorClient.ClearActions()
 
-	err = controller.controller.sync(context.TODO(), syncContext)
+	err = controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -1228,11 +1228,11 @@ func TestWorkConfig(t *testing.T) {
 		hubSecret,
 	}
 
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		objects...)
 
-	err := controller.controller.sync(context.TODO(), syncContext)
+	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -1250,11 +1250,11 @@ func TestClusterNameChange(t *testing.T) {
 	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
 	hubSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	hubSecret.Data["cluster-name"] = []byte("cluster1")
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		bootStrapSecret, hubSecret, namespace)
 
-	err := controller.controller.sync(context.TODO(), syncContext)
+	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -1286,7 +1286,7 @@ func TestClusterNameChange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = controller.controller.sync(context.TODO(), syncContext)
+	err = controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -1308,7 +1308,7 @@ func TestClusterNameChange(t *testing.T) {
 	})
 	controller.kubeClient.ClearActions()
 
-	err = controller.controller.sync(context.TODO(), syncContext)
+	err = controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -1324,7 +1324,7 @@ func TestClusterNameChange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = controller.controller.sync(context.TODO(), syncContext)
+	err = controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -1339,11 +1339,11 @@ func TestSyncWithPullSecret(t *testing.T) {
 	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	namespace := newNamespace("testns")
 	pullSecret := newSecret(helpers.ImagePullSecret, "open-cluster-management")
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		bootStrapSecret, hubKubeConfigSecret, namespace, pullSecret)
 
-	err := controller.controller.sync(context.TODO(), syncContext)
+	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -1452,11 +1452,11 @@ func TestClusterClaimConfigInSingletonMode(t *testing.T) {
 		hubSecret,
 	}
 
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		objects...)
 
-	err := controller.controller.sync(context.TODO(), syncContext)
+	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -1478,11 +1478,11 @@ func TestSyncEnableClusterProperty(t *testing.T) {
 	}
 
 	objects := []runtime.Object{}
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		objects...)
 
-	err := controller.controller.sync(context.TODO(), syncContext)
+	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -1834,7 +1834,7 @@ func TestCleanWithMultipleKlusterletAgentNamespaces(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
-			syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+			syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 
 			// Mark klusterlet for deletion
 			now := metav1.Now()
@@ -1843,7 +1843,7 @@ func TestCleanWithMultipleKlusterletAgentNamespaces(t *testing.T) {
 			controller := newTestController(t, tt.klusterlet, syncContext.Recorder(), nil, false, tt.existingNamespaces...)
 
 			// Call the clean function through the cleanup controller
-			err := controller.cleanupController.sync(ctx, syncContext)
+			err := controller.cleanupController.sync(ctx, syncContext, "klusterlet")
 			if err != nil {
 				t.Errorf("Expected no error from cleanup sync, but got: %v", err)
 			}

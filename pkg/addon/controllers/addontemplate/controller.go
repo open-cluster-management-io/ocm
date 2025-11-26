@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +26,7 @@ import (
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 	"open-cluster-management.io/ocm/pkg/addon/templateagent"
@@ -118,7 +118,7 @@ func NewAddonTemplateController(
 			// addonTemplate lister to get the template object
 			addonInformers.Addon().V1alpha1().AddOnTemplates().Informer()).
 		WithSync(c.sync).
-		ToController("addon-template-controller", recorder)
+		ToController("addon-template-controller")
 }
 
 func (c *addonTemplateController) stopUnusedManagers(
@@ -150,9 +150,9 @@ func (c *addonTemplateController) stopUnusedManagers(
 	return nil
 }
 
-func (c *addonTemplateController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	logger := klog.FromContext(ctx)
-	addonName := syncCtx.QueueKey()
+func (c *addonTemplateController) sync(ctx context.Context, syncCtx factory.SyncContext, addonName string) error {
+	logger := klog.FromContext(ctx).WithValues("addonName", addonName)
+	ctx = klog.NewContext(ctx, logger)
 
 	cma, err := c.cmaLister.Get(addonName)
 	if err != nil {
@@ -168,11 +168,11 @@ func (c *addonTemplateController) sync(ctx context.Context, syncCtx factory.Sync
 
 	_, exist := c.addonManagers[addonName]
 	if exist {
-		logger.V(4).Info("There already is a manager started for addon, skipping", "addonName", addonName)
+		logger.V(4).Info("There already is a manager started for addon, skipping")
 		return nil
 	}
 
-	logger.Info("Starting an addon manager for addon", "addonName", addonName)
+	logger.Info("Starting an addon manager for addon")
 
 	stopFunc := c.startManager(ctx, addonName)
 	c.addonManagers[addonName] = stopFunc
@@ -187,7 +187,7 @@ func (c *addonTemplateController) startManager(
 	go func() {
 		err := c.runControllerFunc(ctx, addonName)
 		if err != nil {
-			logger.Error(err, "Error running controller for addon", "addonName", addonName)
+			logger.Error(err, "Error running controller for addon")
 			utilruntime.HandleError(err)
 		}
 
@@ -199,7 +199,7 @@ func (c *addonTemplateController) startManager(
 		c.dynamicInformers.Start(pctx.Done())
 
 		<-ctx.Done()
-		logger.Info("Addon Manager stopped", "addonName", addonName)
+		logger.Info("Addon Manager stopped")
 	}()
 	return stopFunc
 }

@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	certificates "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,6 +25,7 @@ import (
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/features"
@@ -192,7 +192,7 @@ func TestProcess(t *testing.T) {
 				driver.keyData = c.approvedCSRCert.Key
 			}
 
-			syncCtx := testingcommon.NewFakeSyncContext(t, "test")
+			syncCtx := testingcommon.NewFakeSDKSyncContext(t, "test")
 
 			secret, cond, err := driver.Process(
 				context.TODO(), "test", c.secret, additionalSecretData, syncCtx.Recorder())

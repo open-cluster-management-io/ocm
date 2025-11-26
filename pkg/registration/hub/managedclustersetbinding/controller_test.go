@@ -115,7 +115,7 @@ func TestSync(t *testing.T) {
 
 			key, _ := cache.MetaNamespaceKeyFunc(c.clusterSetBinding)
 
-			syncErr := ctrl.sync(context.Background(), testingcommon.NewFakeSyncContext(t, key))
+			syncErr := ctrl.sync(context.Background(), testingcommon.NewFakeSDKSyncContext(t, key), key)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}
@@ -174,7 +174,7 @@ func TestEnqueue(t *testing.T) {
 				}
 			}
 
-			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
+			syncCtx := testingcommon.NewFakeSDKSyncContext(t, "fake")
 
 			ctrl := managedClusterSetBindingController{
 				clusterSetBindingIndexers: informerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Informer().GetIndexer(),

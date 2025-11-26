@@ -279,13 +279,13 @@ func TestSync(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			controller := newTestController(t, c.klusterlet, c.object...)
-			syncContext := testingcommon.NewFakeSyncContext(t, c.klusterlet.Name)
+			syncContext := testingcommon.NewFakeSDKSyncContext(t, c.klusterlet.Name)
 
 			response.allowToOperateManagedClusters = c.allowToOperateManagedClusters
 			response.allowToOperateManagedClusterStatus = c.allowToOperateManagedClusterStatus
 			response.allowToOperateManifestWorks = c.allowToOperateManifestWorks
 
-			err := controller.controller.sync(context.TODO(), syncContext)
+			err := controller.controller.sync(context.TODO(), syncContext, c.klusterlet.Name)
 			if err != nil {
 				t.Errorf("Expected no error when update status: %v", err)
 			}

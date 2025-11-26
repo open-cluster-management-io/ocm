@@ -3,10 +3,10 @@ package managedcluster
 import (
 	"context"
 	"encoding/json"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeinformers "k8s.io/client-go/informers"
@@ -20,7 +20,6 @@ import (
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
-	"open-cluster-management.io/ocm/pkg/common/recorder"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
@@ -86,7 +85,7 @@ func TestSyncManagedCluster(t *testing.T) {
 
 			fakeHubClient := kubefake.NewSimpleClientset()
 			ctx := context.TODO()
-			hubEventRecorder, err := recorder.NewEventRecorder(ctx,
+			hubEventRecorder, err := events.NewEventRecorder(ctx,
 				clusterscheme.Scheme, fakeHubClient.EventsV1(), "test")
 			if err != nil {
 				t.Fatal(err)
@@ -104,11 +103,10 @@ func TestSyncManagedCluster(t *testing.T) {
 				kubeInformerFactory.Core().V1().Nodes(),
 				20,
 				[]string{},
-				eventstesting.NewTestingEventRecorder(t),
 				hubEventRecorder,
 			)
 
-			syncErr := ctrl.sync(ctx, testingcommon.NewFakeSyncContext(t, ""))
+			syncErr := ctrl.sync(ctx, testingcommon.NewFakeSDKSyncContext(t, ""), "")
 			testingcommon.AssertError(t, syncErr, c.expectedErr)
 
 			c.validateActions(t, clusterClient.Actions())

@@ -6,8 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -17,6 +15,7 @@ import (
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 const leaseUpdateJitterFactor = 0.25
@@ -33,8 +32,7 @@ type managedClusterLeaseController struct {
 func NewManagedClusterLeaseController(
 	clusterName string,
 	leaseClient leasev1client.LeaseInterface,
-	hubClusterInformer clusterv1informer.ManagedClusterInformer,
-	recorder events.Recorder) factory.Controller {
+	hubClusterInformer clusterv1informer.ManagedClusterInformer) factory.Controller {
 	c := &managedClusterLeaseController{
 		clusterName:      clusterName,
 		hubClusterLister: hubClusterInformer.Lister(),
@@ -42,28 +40,27 @@ func NewManagedClusterLeaseController(
 			leaseClient: leaseClient,
 			clusterName: clusterName,
 			leaseName:   "managed-cluster-lease",
-			recorder:    recorder,
 		},
 	}
 
 	return factory.New().
 		WithInformers(hubClusterInformer.Informer()).
 		WithSync(c.sync).
-		ToController("ManagedClusterLeaseController", recorder)
+		ToController("ManagedClusterLeaseController")
 }
 
 // sync starts a lease update routine with the managed cluster lease duration.
-func (c *managedClusterLeaseController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+func (c *managedClusterLeaseController) sync(ctx context.Context, syncCtx factory.SyncContext, _ string) error {
 	cluster, err := c.hubClusterLister.Get(c.clusterName)
 	// unable to get managed cluster, make sure there is no lease update routine.
 	if err != nil {
-		c.leaseUpdater.stop()
+		c.leaseUpdater.stop(ctx, syncCtx)
 		return fmt.Errorf("unable to get managed cluster %q from hub: %w", c.clusterName, err)
 	}
 
 	// the managed cluster is not accepted, make sure there is no lease update routine.
 	if !meta.IsStatusConditionTrue(cluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted) {
-		c.leaseUpdater.stop()
+		c.leaseUpdater.stop(ctx, syncCtx)
 		return nil
 	}
 
@@ -77,17 +74,17 @@ func (c *managedClusterLeaseController) sync(ctx context.Context, syncCtx factor
 	// if lease duration is changed, stop the old lease update routine.
 	if c.lastLeaseDurationSeconds != observedLeaseDurationSeconds {
 		c.lastLeaseDurationSeconds = observedLeaseDurationSeconds
-		c.leaseUpdater.stop()
+		c.leaseUpdater.stop(ctx, syncCtx)
 	}
 
 	// ensure there is a starting lease update routine.
-	c.leaseUpdater.start(ctx, time.Duration(c.lastLeaseDurationSeconds)*time.Second)
+	c.leaseUpdater.start(ctx, syncCtx, time.Duration(c.lastLeaseDurationSeconds)*time.Second)
 	return nil
 }
 
 type leaseUpdaterInterface interface {
-	start(ctx context.Context, leaseDuration time.Duration)
-	stop()
+	start(ctx context.Context, syncCtx factory.SyncContext, leaseDuration time.Duration)
+	stop(ctx context.Context, syncCtx factory.SyncContext)
 }
 
 // leaseUpdater periodically updates the lease of a managed cluster
@@ -97,11 +94,10 @@ type leaseUpdater struct {
 	leaseName   string
 	lock        sync.Mutex
 	cancel      context.CancelFunc
-	recorder    events.Recorder
 }
 
 // start a lease update routine to update the lease of a managed cluster periodically.
-func (u *leaseUpdater) start(ctx context.Context, leaseDuration time.Duration) {
+func (u *leaseUpdater) start(ctx context.Context, syncCtx factory.SyncContext, leaseDuration time.Duration) {
 	u.lock.Lock()
 	defer u.lock.Unlock()
 
@@ -112,11 +108,11 @@ func (u *leaseUpdater) start(ctx context.Context, leaseDuration time.Duration) {
 	var updateCtx context.Context
 	updateCtx, u.cancel = context.WithCancel(ctx)
 	go wait.JitterUntilWithContext(updateCtx, u.update, leaseDuration, leaseUpdateJitterFactor, true)
-	u.recorder.Eventf("ManagedClusterLeaseUpdateStarted", "Start to update lease %q on cluster %q", u.leaseName, u.clusterName)
+	syncCtx.Recorder().Eventf(ctx, "ManagedClusterLeaseUpdateStarted", "Start to update lease %q on cluster %q", u.leaseName, u.clusterName)
 }
 
 // stop the lease update routine.
-func (u *leaseUpdater) stop() {
+func (u *leaseUpdater) stop(ctx context.Context, syncCtx factory.SyncContext) {
 	u.lock.Lock()
 	defer u.lock.Unlock()
 
@@ -125,19 +121,19 @@ func (u *leaseUpdater) stop() {
 	}
 	u.cancel()
 	u.cancel = nil
-	u.recorder.Eventf("ManagedClusterLeaseUpdateStoped", "Stop to update lease %q on cluster %q", u.leaseName, u.clusterName)
+	syncCtx.Recorder().Eventf(ctx, "ManagedClusterLeaseUpdateStoped", "Stop to update lease %q on cluster %q", u.leaseName, u.clusterName)
 }
 
 // update the lease of a given managed cluster.
 func (u *leaseUpdater) update(ctx context.Context) {
 	lease, err := u.leaseClient.Get(ctx, u.leaseName, metav1.GetOptions{})
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to get cluster lease %q on hub cluster: %w", u.leaseName, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "unable to get cluster lease on hub cluster", "lease", u.leaseName)
 		return
 	}
 
 	lease.Spec.RenewTime = &metav1.MicroTime{Time: time.Now()}
 	if _, err = u.leaseClient.Update(ctx, lease, metav1.UpdateOptions{}); err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to update cluster lease %q on hub cluster: %w", u.leaseName, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "unable to update cluster lease on hub cluster", "lease", u.leaseName)
 	}
 }

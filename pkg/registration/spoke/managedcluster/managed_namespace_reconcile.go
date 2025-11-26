@@ -3,6 +3,7 @@ package managedcluster
 import (
 	"context"
 	"fmt"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -60,7 +61,7 @@ type managedNamespaceReconcile struct {
 }
 
 // reconcile implements the statusReconcile interface for managed namespace management
-func (r *managedNamespaceReconcile) reconcile(ctx context.Context, cluster *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error) {
+func (r *managedNamespaceReconcile) reconcile(ctx context.Context, _ factory.SyncContext, cluster *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Reconciling managed namespaces", "clusterName", cluster.Name)
 

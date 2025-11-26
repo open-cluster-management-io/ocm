@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -20,7 +21,7 @@ type resoureReconcile struct {
 	nodeLister                    corev1lister.NodeLister
 }
 
-func (r *resoureReconcile) reconcile(ctx context.Context, cluster *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error) {
+func (r *resoureReconcile) reconcile(ctx context.Context, _ factory.SyncContext, cluster *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error) {
 	// check the kube-apiserver health on managed cluster.
 	condition := r.checkKubeAPIServerStatus(ctx)
 

@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -21,6 +20,9 @@ import (
 	"k8s.io/utils/pointer"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 )
 
 type UpdateApply struct {
@@ -53,8 +55,10 @@ func (c *UpdateApply) Apply(
 		WithKubernetes(c.kubeclient).
 		WithDynamicClient(c.dynamicClient)
 
+	recorderWrapper := commonrecorder.NewEventsRecorderWrapper(ctx, recorder)
+
 	required.SetOwnerReferences([]metav1.OwnerReference{owner})
-	results := resourceapply.ApplyDirectly(ctx, clientHolder, recorder, c.staticResourceCache, func(name string) ([]byte, error) {
+	results := resourceapply.ApplyDirectly(ctx, clientHolder, recorderWrapper, c.staticResourceCache, func(name string) ([]byte, error) {
 		return required.MarshalJSON()
 	}, "manifest")
 

@@ -13,8 +13,8 @@ import (
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
-	"open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/scheduling"
 	"open-cluster-management.io/ocm/pkg/placement/debugger"
@@ -44,7 +44,7 @@ func RunControllerManagerWithInformers(
 	clusterClient clusterclient.Interface,
 	clusterInformers clusterinformers.SharedInformerFactory,
 ) error {
-	recorder, err := recorder.NewEventRecorder(ctx, clusterscheme.Scheme, kubeClient.EventsV1(), "placement-controller")
+	recorder, err := events.NewEventRecorder(ctx, clusterscheme.Scheme, kubeClient.EventsV1(), "placement-controller")
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func RunControllerManagerWithInformers(
 		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
 		clusterInformers.Cluster().V1alpha1().AddOnPlacementScores(),
 		scheduler,
-		controllerContext.EventRecorder, recorder, metrics,
+		recorder, metrics,
 	)
 
 	go clusterInformers.Start(ctx.Done())

@@ -33,11 +33,11 @@ func TestSyncDelete(t *testing.T) {
 		newAppliedManifestWorks("testhost", []string{workv1.AppliedManifestWorkFinalizer}, true),
 		newAppliedManifestWorks("testhost-2", []string{workv1.AppliedManifestWorkFinalizer}, false),
 	}
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), appliedManifestWorks, false,
 		namespace, bootstrapKubeConfigSecret)
 
-	err := controller.cleanupController.sync(context.TODO(), syncContext)
+	err := controller.cleanupController.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -92,11 +92,11 @@ func TestSyncDeleteHosted(t *testing.T) {
 		newAppliedManifestWorks("testhost", []string{workv1.AppliedManifestWorkFinalizer}, true),
 		newAppliedManifestWorks("testhost-2", []string{workv1.AppliedManifestWorkFinalizer}, false),
 	}
-	syncContext := testingcommon.NewFakeSyncContext(t, klusterlet.Name)
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, klusterlet.Name)
 	controller := newTestControllerHosted(t, klusterlet, syncContext.Recorder(), appliedManifestWorks,
 		bootstrapKubeConfigSecret, namespace /*externalManagedSecret*/)
 
-	err := controller.cleanupController.sync(context.TODO(), syncContext)
+	err := controller.cleanupController.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -157,10 +157,10 @@ func TestSyncDeleteHostedDeleteAgentNamespace(t *testing.T) {
 	})
 	now := metav1.Now()
 	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 	controller := newTestControllerHosted(t, klusterlet, syncContext.Recorder(), nil).setDefaultManagedClusterClientsBuilder()
 
-	err := controller.cleanupController.sync(context.TODO(), syncContext)
+	err := controller.cleanupController.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -174,10 +174,10 @@ func TestSyncDeleteHostedDeleteWaitKubeconfig(t *testing.T) {
 	klusterlet := newKlusterletHosted("klusterlet", "testns", "cluster1")
 	now := metav1.Now()
 	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 	controller := newTestControllerHosted(t, klusterlet, syncContext.Recorder(), nil).setDefaultManagedClusterClientsBuilder()
 
-	err := controller.cleanupController.sync(context.TODO(), syncContext)
+	err := controller.cleanupController.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -195,10 +195,10 @@ func TestSyncAddHostedFinalizerWhenKubeconfigReady(t *testing.T) {
 		newKlusterletHosted("klusterlet", "testns", "cluster1"),
 		klusterletHostedFinalizer)
 
-	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, "klusterlet")
 	c := newTestControllerHosted(t, klusterlet, syncContext.Recorder(), nil)
 
-	err := c.cleanupController.sync(context.TODO(), syncContext)
+	err := c.cleanupController.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
@@ -218,7 +218,7 @@ func TestSyncAddHostedFinalizerWhenKubeconfigReady(t *testing.T) {
 	if err := c.operatorStore.Update(klusterlet); err != nil {
 		t.Fatal(err)
 	}
-	err = c.cleanupController.sync(context.TODO(), syncContext)
+	err = c.cleanupController.sync(context.TODO(), syncContext, "klusterlet")
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}

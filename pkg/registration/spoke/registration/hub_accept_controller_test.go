@@ -36,7 +36,7 @@ func TestHubAcceptController_sync(t *testing.T) {
 	}
 
 	// Call the sync method
-	err = hacontroller.sync(context.TODO(), nil)
+	err = hacontroller.sync(context.TODO(), nil, "")
 	assert.NoError(t, err, "Expected no error")
 
 	// Expect handled to be false
@@ -53,7 +53,7 @@ func TestHubAcceptController_sync(t *testing.T) {
 	}
 
 	// Call the sync method again
-	err = hacontroller.sync(context.TODO(), nil)
+	err = hacontroller.sync(context.TODO(), nil, "")
 	assert.NoError(t, err, "Expected no error")
 
 	// Expect handled to be true

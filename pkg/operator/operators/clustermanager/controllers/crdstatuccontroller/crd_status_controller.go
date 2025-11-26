@@ -8,8 +8,6 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -21,6 +19,7 @@ import (
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
@@ -46,8 +45,7 @@ type crdStatusController struct {
 func NewCRDStatusController(
 	kubeconfig *rest.Config,
 	kubeClient kubernetes.Interface,
-	clusterManagerInformer operatorinformer.ClusterManagerInformer,
-	recorder events.Recorder) factory.Controller {
+	clusterManagerInformer operatorinformer.ClusterManagerInformer) factory.Controller {
 	controller := &crdStatusController{
 		kubeconfig:                kubeconfig,
 		kubeClient:                kubeClient,
@@ -57,12 +55,12 @@ func NewCRDStatusController(
 
 	return factory.New().WithSync(controller.sync).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterManagerInformer.Informer()).
-		ToController("CRDStatusController", recorder)
+		ToController("CRDStatusController")
 }
 
-func (c *crdStatusController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	clusterManagerName := controllerContext.QueueKey()
-	klog.V(4).Infof("Reconciling ClusterManager %q", clusterManagerName)
+func (c *crdStatusController) sync(ctx context.Context, controllerContext factory.SyncContext, clusterManagerName string) error {
+	logger := klog.FromContext(ctx).WithValues("clusterManager", clusterManagerName)
+	logger.V(4).Info("Reconciling ClusterManager")
 
 	clusterManager, err := c.clusterManagerLister.Get(clusterManagerName)
 	if errors.IsNotFound(err) {
@@ -80,7 +78,7 @@ func (c *crdStatusController) sync(ctx context.Context, controllerContext factor
 	// need to wait storage version migrations succeed.
 	if succeeded := meta.IsStatusConditionTrue(clusterManager.Status.Conditions, operatorapiv1.ConditionMigrationSucceeded); !succeeded {
 		controllerContext.Queue().AddRateLimited(clusterManagerName)
-		klog.V(4).Info("Wait storage version migration succeed.")
+		logger.V(4).Info("Wait storage version migration succeed.")
 		return nil
 	}
 

@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -18,6 +16,7 @@ import (
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/features"
@@ -55,8 +54,7 @@ func NewCSRApprovingController[T CSR](
 	eventFilter factory.EventFilterFunc,
 	approver csrApprover[T],
 	csrInfoGetter CSRInfoGetter[T],
-	reconcilers []Reconciler,
-	recorder events.Recorder) factory.Controller {
+	reconcilers []Reconciler) factory.Controller {
 	c := &csrApprovingController[T]{
 		lister:        lister,
 		approver:      approver,
@@ -67,13 +65,13 @@ func NewCSRApprovingController[T CSR](
 	return factory.New().
 		WithFilteredEventsInformersQueueKeysFunc(queue.QueueKeyByMetaName, eventFilter, csrInformer).
 		WithSync(c.sync).
-		ToController("CSRApprovingController", recorder)
+		ToController("CSRApprovingController")
 }
 
-func (c *csrApprovingController[T]) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	logger := klog.FromContext(ctx)
-	csrName := syncCtx.QueueKey()
-	logger.V(4).Info("Reconciling CertificateSigningRequests", "csrName", csrName)
+func (c *csrApprovingController[T]) sync(ctx context.Context, syncCtx factory.SyncContext, csrName string) error {
+	logger := klog.FromContext(ctx).WithValues("csrName", csrName)
+	logger.V(4).Info("Reconciling CertificateSigningRequests")
+	ctx = klog.NewContext(ctx, logger)
 
 	csr, err := c.lister.Get(csrName)
 	if errors.IsNotFound(err) {
@@ -89,7 +87,7 @@ func (c *csrApprovingController[T]) sync(ctx context.Context, syncCtx factory.Sy
 
 	csrInfo := c.csrInfoGetter(csr)
 	for _, r := range c.reconcilers {
-		state, err := r.Reconcile(ctx, csrInfo, c.approver.approve(ctx, csr))
+		state, err := r.Reconcile(ctx, syncCtx, csrInfo, c.approver.approve(ctx, csr))
 		if err != nil {
 			return err
 		}
@@ -177,17 +175,15 @@ func (c *CSRHubDriver) Cleanup(_ context.Context, _ *clusterv1.ManagedCluster) e
 func NewCSRHubDriver(
 	kubeClient kubernetes.Interface,
 	kubeInformers informers.SharedInformerFactory,
-	autoApprovedCSRUsers []string,
-	recorder events.Recorder) (register.HubDriver, error) {
+	autoApprovedCSRUsers []string) (register.HubDriver, error) {
 	csrDriverForHub := &CSRHubDriver{}
 
-	csrReconciles := []Reconciler{NewCSRRenewalReconciler(kubeClient, certificatesv1.KubeAPIServerClientSignerName, recorder)}
+	csrReconciles := []Reconciler{NewCSRRenewalReconciler(kubeClient, certificatesv1.KubeAPIServerClientSignerName)}
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
 		csrReconciles = append(csrReconciles, NewCSRBootstrapReconciler(
 			kubeClient,
 			certificatesv1.KubeAPIServerClientSignerName,
 			autoApprovedCSRUsers,
-			recorder,
 		))
 	}
 
@@ -205,9 +201,7 @@ func NewCSRHubDriver(
 				newCSRV1beta1Approver(kubeClient),
 				getCSRv1beta1Info,
 				csrReconciles,
-				recorder,
 			)
-			recorder.Eventf("CSRV1beta1Approver", "Using v1beta1 CSR api to manage managed cluster client certificate")
 			return csrDriverForHub, nil
 		}
 	}
@@ -219,7 +213,6 @@ func NewCSRHubDriver(
 		NewCSRV1Approver(kubeClient),
 		getCSRInfo,
 		csrReconciles,
-		recorder,
 	)
 
 	return csrDriverForHub, nil
@@ -230,6 +223,6 @@ func (a *CSRHubDriver) CreatePermissions(_ context.Context, _ *clusterv1.Managed
 	return nil
 }
 
-func (c *CSRHubDriver) Accept(cluster *clusterv1.ManagedCluster) bool {
+func (c *CSRHubDriver) Accept(_ *clusterv1.ManagedCluster) bool {
 	return true
 }

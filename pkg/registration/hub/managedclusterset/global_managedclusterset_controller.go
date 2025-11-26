@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,6 +14,7 @@ import (
 	clusterinformerv1beta2 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta2"
 	clusterlisterv1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
@@ -39,18 +38,15 @@ var GlobalManagedClusterSet = &clusterv1beta2.ManagedClusterSet{
 type globalManagedClusterSetController struct {
 	clusterSetClient clustersetv1beta2.ClusterV1beta2Interface
 	clusterSetLister clusterlisterv1beta2.ManagedClusterSetLister
-	eventRecorder    events.Recorder
 }
 
 func NewGlobalManagedClusterSetController(
 	clusterSetClient clustersetv1beta2.ClusterV1beta2Interface,
-	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer,
-	recorder events.Recorder) factory.Controller {
+	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer) factory.Controller {
 
 	c := &globalManagedClusterSetController{
 		clusterSetClient: clusterSetClient,
 		clusterSetLister: clusterSetInformer.Lister(),
-		eventRecorder:    recorder.WithComponentSuffix("global-managed-cluster-set-controller"),
 	}
 
 	return factory.New().
@@ -63,11 +59,11 @@ func NewGlobalManagedClusterSetController(
 		// use ResyncEvery to make sure:
 		// 1. create the global clusterset once controller is launched
 		// 2. the global clusterset be recreated once it is deleted for some reason
-		ResyncEvery(10*time.Second).
-		ToController("GlobalManagedClusterSetController", recorder)
+		ResyncEvery(10 * time.Second).
+		ToController("GlobalManagedClusterSetController")
 }
 
-func (c *globalManagedClusterSetController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+func (c *globalManagedClusterSetController) sync(ctx context.Context, syncCtx factory.SyncContext, _ string) error {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Reconciling GlobalManagedClusterSet")
 	globalClusterSet, err := c.clusterSetLister.Get(GlobalManagedClusterSetName)
@@ -76,7 +72,7 @@ func (c *globalManagedClusterSetController) sync(ctx context.Context, syncCtx fa
 		if errors.IsNotFound(err) {
 			_, err := c.clusterSetClient.ManagedClusterSets().Create(ctx, GlobalManagedClusterSet, metav1.CreateOptions{})
 			if err == nil {
-				c.eventRecorder.Eventf("GlobalManagedClusterSetCreated",
+				syncCtx.Recorder().Eventf(ctx, "GlobalManagedClusterSetCreated",
 					"Set the GlobalManagedClusterSet name to %+v. spec to %+v", GlobalManagedClusterSetName, GlobalManagedClusterSet.Spec)
 			}
 			return err
@@ -84,7 +80,7 @@ func (c *globalManagedClusterSetController) sync(ctx context.Context, syncCtx fa
 		return err
 	}
 
-	if err := c.applyGlobalClusterSet(ctx, globalClusterSet); err != nil {
+	if err := c.applyGlobalClusterSet(ctx, syncCtx, globalClusterSet); err != nil {
 		return fmt.Errorf("failed to sync GlobalManagedClusterSet %q: %w", GlobalManagedClusterSetName, err)
 	}
 
@@ -92,7 +88,7 @@ func (c *globalManagedClusterSetController) sync(ctx context.Context, syncCtx fa
 }
 
 // applyGlobalClusterSet syncs global cluster set.
-func (c *globalManagedClusterSetController) applyGlobalClusterSet(ctx context.Context, originalGlobalClusterSet *clusterv1beta2.ManagedClusterSet) error {
+func (c *globalManagedClusterSetController) applyGlobalClusterSet(ctx context.Context, syncCtx factory.SyncContext, originalGlobalClusterSet *clusterv1beta2.ManagedClusterSet) error {
 	logger := klog.FromContext(ctx)
 	globalClusterSet := originalGlobalClusterSet.DeepCopy()
 
@@ -112,7 +108,7 @@ func (c *globalManagedClusterSetController) applyGlobalClusterSet(ctx context.Co
 			return fmt.Errorf("failed to update status of ManagedClusterSet %q: %w", globalClusterSet.Name, err)
 		}
 
-		c.eventRecorder.Eventf("GlobalManagedClusterSetSpecRollbacked", "Rollback the GlobalManagedClusterSetSpec to %+v", globalClusterSet.Spec)
+		syncCtx.Recorder().Eventf(ctx, "GlobalManagedClusterSetSpecRollbacked", "Rollback the GlobalManagedClusterSetSpec to %+v", globalClusterSet.Spec)
 	}
 
 	return nil

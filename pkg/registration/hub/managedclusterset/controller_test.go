@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -236,7 +235,6 @@ func TestSyncClusterSet(t *testing.T) {
 					clusterClient.ClusterV1beta2().ManagedClusterSets()),
 				clusterLister:    informerFactory.Cluster().V1().ManagedClusters().Lister(),
 				clusterSetLister: informerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
-				eventRecorder:    eventstesting.NewTestingEventRecorder(t),
 			}
 
 			syncErr := ctrl.syncClusterSet(context.Background(), c.existingClusterSet)
@@ -382,11 +380,10 @@ func TestEnqueueUpdateClusterClusterSet(t *testing.T) {
 					t.Errorf("Failed to add clusterset: %v, error: %v", clusterset, err)
 				}
 			}
-			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
+			syncCtx := testingcommon.NewFakeSDKSyncContext(t, "fake")
 
 			ctrl := managedClusterSetController{
 				clusterSetLister: informerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
-				eventRecorder:    eventstesting.NewTestingEventRecorder(t),
 				queue:            syncCtx.Queue(),
 			}
 

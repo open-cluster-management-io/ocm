@@ -134,7 +134,6 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 	).NewExecutorValidator(ctx, features.SpokeMutableFeatureGate.Enabled(ocmfeature.ExecutorValidatingCaches))
 
 	manifestWorkController := manifestcontroller.NewManifestWorkController(
-		controllerContext.EventRecorder,
 		spokeDynamicClient,
 		spokeKubeClient,
 		spokeAPIExtensionClient,
@@ -148,20 +147,17 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		validator,
 	)
 	addFinalizerController := finalizercontroller.NewAddFinalizerController(
-		controllerContext.EventRecorder,
 		hubWorkClient,
 		hubWorkInformer,
 		hubWorkInformer.Lister().ManifestWorks(o.agentOptions.SpokeClusterName),
 	)
 	appliedManifestWorkFinalizeController := finalizercontroller.NewAppliedManifestWorkFinalizeController(
-		controllerContext.EventRecorder,
 		spokeDynamicClient,
 		spokeWorkClient.WorkV1().AppliedManifestWorks(),
 		spokeWorkInformerFactory.Work().V1().AppliedManifestWorks(),
 		agentID,
 	)
 	manifestWorkFinalizeController := finalizercontroller.NewManifestWorkFinalizeController(
-		controllerContext.EventRecorder,
 		hubWorkClient,
 		hubWorkInformer,
 		hubWorkInformer.Lister().ManifestWorks(o.agentOptions.SpokeClusterName),
@@ -170,7 +166,6 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		hubHash,
 	)
 	unmanagedAppliedManifestWorkController := finalizercontroller.NewUnManagedAppliedWorkController(
-		controllerContext.EventRecorder,
 		hubWorkInformer,
 		hubWorkInformer.Lister().ManifestWorks(o.agentOptions.SpokeClusterName),
 		spokeWorkClient.WorkV1().AppliedManifestWorks(),
@@ -179,7 +174,6 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		hubHash, agentID,
 	)
 	availableStatusController, err := statuscontroller.NewAvailableStatusController(
-		controllerContext.EventRecorder,
 		spokeDynamicClient,
 		hubWorkClient,
 		hubWorkInformer,

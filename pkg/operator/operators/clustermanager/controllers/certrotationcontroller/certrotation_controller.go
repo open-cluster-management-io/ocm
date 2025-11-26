@@ -6,8 +6,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	errorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -20,6 +18,7 @@ import (
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/certrotation"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -51,7 +50,6 @@ type certRotationController struct {
 	kubeClient           kubernetes.Interface
 	secretInformers      map[string]corev1informers.SecretInformer
 	configMapInformer    corev1informers.ConfigMapInformer
-	recorder             events.Recorder
 	clusterManagerLister operatorlister.ClusterManagerLister
 }
 
@@ -66,14 +64,12 @@ func NewCertRotationController(
 	secretInformers map[string]corev1informers.SecretInformer,
 	configMapInformer corev1informers.ConfigMapInformer,
 	clusterManagerInformer operatorinformer.ClusterManagerInformer,
-	recorder events.Recorder,
 ) factory.Controller {
 	c := &certRotationController{
 		rotationMap:          make(map[string]rotations),
 		kubeClient:           kubeClient,
 		secretInformers:      secretInformers,
 		configMapInformer:    configMapInformer,
-		recorder:             recorder,
 		clusterManagerLister: clusterManagerInformer.Lister(),
 	}
 	return factory.New().
@@ -86,11 +82,11 @@ func NewCertRotationController(
 			secretInformers[helpers.RegistrationWebhookSecret].Informer(),
 			secretInformers[helpers.WorkWebhookSecret].Informer(),
 			secretInformers[helpers.GRPCServerSecret].Informer()).
-		ToController("CertRotationController", recorder)
+		ToController("CertRotationController")
 }
 
-func (c certRotationController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	key := syncCtx.QueueKey()
+func (c certRotationController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
+	logger := klog.FromContext(ctx).WithValues("key", key)
 	switch {
 	case key == "":
 		return nil
@@ -103,7 +99,7 @@ func (c certRotationController) sync(ctx context.Context, syncCtx factory.SyncCo
 
 		// do nothing if there is no cluster manager
 		if len(clustermanagers) == 0 {
-			klog.V(4).Infof("No ClusterManager found")
+			logger.V(4).Info("No ClusterManager found")
 			return nil
 		}
 

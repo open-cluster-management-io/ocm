@@ -3,10 +3,10 @@ package managedcluster
 import (
 	"context"
 	"fmt"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"sort"
 	"strings"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -24,28 +24,27 @@ import (
 const labelCustomizedOnly = "open-cluster-management.io/spoke-only"
 
 type claimReconcile struct {
-	recorder                     events.Recorder
 	claimLister                  clusterv1alpha1listers.ClusterClaimLister
 	aboutLister                  aboutv1alpha1listers.ClusterPropertyLister
 	maxCustomClusterClaims       int
 	reservedClusterClaimSuffixes []string
 }
 
-func (r *claimReconcile) reconcile(ctx context.Context, cluster *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error) {
+func (r *claimReconcile) reconcile(ctx context.Context, syncCtx factory.SyncContext, cluster *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error) {
 	// current managed cluster has not joined the hub yet, do nothing.
 	if !meta.IsStatusConditionTrue(cluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined) {
-		r.recorder.Eventf("ManagedClusterIsNotAccepted", "Managed cluster %q does not join the hub yet", cluster.Name)
+		syncCtx.Recorder().Eventf(ctx, "ManagedClusterIsNotAccepted", "Managed cluster %q does not join the hub yet", cluster.Name)
 		return cluster, reconcileContinue, nil
 	}
 
-	err := r.exposeClaims(ctx, cluster)
+	err := r.exposeClaims(ctx, syncCtx, cluster)
 	return cluster, reconcileContinue, err
 }
 
 // exposeClaims saves cluster claims fetched on managed cluster into status of the
 // managed cluster on hub. Some of the customized claims might not be exposed once
 // the total number of the claims exceeds the value of `cluster-claims-max`.
-func (r *claimReconcile) exposeClaims(_ context.Context, cluster *clusterv1.ManagedCluster) error {
+func (r *claimReconcile) exposeClaims(ctx context.Context, syncCtx factory.SyncContext, cluster *clusterv1.ManagedCluster) error {
 	var reservedClaims, customClaims []clusterv1.ManagedClusterClaim
 	var clusterClaims []*clusterv1alpha1.ClusterClaim
 	claimsMap := map[string]clusterv1.ManagedClusterClaim{}
@@ -115,7 +114,7 @@ func (r *claimReconcile) exposeClaims(_ context.Context, cluster *clusterv1.Mana
 	// truncate custom claims if the number exceeds `max-custom-cluster-claims`
 	if n := len(customClaims); n > r.maxCustomClusterClaims {
 		customClaims = customClaims[:r.maxCustomClusterClaims]
-		r.recorder.Eventf("CustomClusterClaimsTruncated",
+		syncCtx.Recorder().Eventf(ctx, "CustomClusterClaimsTruncated",
 			"%d cluster claims are found. It exceeds the max number of custom cluster claims (%d). %d custom cluster claims are not exposed.",
 			n, r.maxCustomClusterClaims, n-r.maxCustomClusterClaims)
 	}

@@ -31,7 +31,7 @@ func TestReadOnlyApply(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			applier := NewReadOnlyApply()
-			syncContext := testingcommon.NewFakeSyncContext(t, "test")
+			syncContext := testingcommon.NewFakeSDKSyncContext(t, "test")
 			obj, err := applier.Apply(
 				context.TODO(), c.gvr, c.required, c.owner, nil, syncContext.Recorder())
 

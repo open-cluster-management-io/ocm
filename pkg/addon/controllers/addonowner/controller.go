@@ -3,8 +3,6 @@ package addonowner
 import (
 	"context"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
@@ -15,6 +13,7 @@ import (
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -37,7 +36,6 @@ func NewAddonOwnerController(
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	addonFilterFunc factory.EventFilterFunc,
-	recorder events.Recorder,
 ) factory.Controller {
 	c := &addonOwnerController{
 		addonClient:                  addonClient,
@@ -59,13 +57,12 @@ func NewAddonOwnerController(
 			queue.QueueKeyByMetaNamespaceName,
 			addonInformers.Informer()).
 		WithSync(c.sync).
-		ToController("addon-owner-controller", recorder)
+		ToController("addon-owner-controller")
 }
 
-func (c *addonOwnerController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	logger := klog.FromContext(ctx)
-	key := syncCtx.QueueKey()
-	logger.V(4).Info("Reconciling addon", "addon", key)
+func (c *addonOwnerController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
+	logger := klog.FromContext(ctx).WithValues("addon", key)
+	logger.V(4).Info("Reconciling addon")
 
 	namespace, addonName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {

@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
+
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 // CSROption includes options that is used to create and monitor csrs

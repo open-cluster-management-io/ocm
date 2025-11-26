@@ -3,11 +3,11 @@ package managedcluster
 import (
 	"context"
 	"encoding/json"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -25,7 +25,6 @@ import (
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	ocmfeature "open-cluster-management.io/api/feature"
 
-	"open-cluster-management.io/ocm/pkg/common/recorder"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/features"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
@@ -199,7 +198,7 @@ func TestSync(t *testing.T) {
 
 			fakeHubClient := kubefake.NewClientset()
 			ctx := context.TODO()
-			hubEventRecorder, err := recorder.NewEventRecorder(ctx,
+			hubEventRecorder, err := events.NewEventRecorder(ctx,
 				clusterscheme.Scheme, fakeHubClient.EventsV1(), "test")
 			if err != nil {
 				t.Fatal(err)
@@ -217,11 +216,10 @@ func TestSync(t *testing.T) {
 				kubeInformerFactory.Core().V1().Nodes(),
 				20,
 				[]string{},
-				eventstesting.NewTestingEventRecorder(t),
 				hubEventRecorder,
 			)
 
-			syncErr := ctrl.sync(ctx, testingcommon.NewFakeSyncContext(t, ""))
+			syncErr := ctrl.sync(ctx, testingcommon.NewFakeSDKSyncContext(t, ""), "")
 			testingcommon.AssertError(t, syncErr, c.expectedErr)
 
 			c.validateActions(t, clusterClient.Actions())
@@ -578,7 +576,7 @@ func TestExposeClaims(t *testing.T) {
 
 			fakeHubClient := kubefake.NewClientset()
 			ctx := context.TODO()
-			hubEventRecorder, err := recorder.NewEventRecorder(ctx,
+			hubEventRecorder, err := events.NewEventRecorder(ctx,
 				clusterscheme.Scheme, fakeHubClient.EventsV1(), "test")
 			if err != nil {
 				t.Fatal(err)
@@ -596,11 +594,10 @@ func TestExposeClaims(t *testing.T) {
 				kubeInformerFactory.Core().V1().Nodes(),
 				c.maxCustomClusterClaims,
 				c.reservedClusterClaimSuffixes,
-				eventstesting.NewTestingEventRecorder(t),
 				hubEventRecorder,
 			)
 
-			syncErr := ctrl.sync(ctx, testingcommon.NewFakeSyncContext(t, c.cluster.Name))
+			syncErr := ctrl.sync(ctx, testingcommon.NewFakeSDKSyncContext(t, c.cluster.Name), c.cluster.Name)
 			testingcommon.AssertError(t, syncErr, c.expectedErr)
 
 			c.validateActions(t, clusterClient.Actions())

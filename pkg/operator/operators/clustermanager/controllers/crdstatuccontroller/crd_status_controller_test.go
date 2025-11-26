@@ -27,9 +27,9 @@ func TestSync(t *testing.T) {
 	clusterManager := newClusterManager("testhub")
 	tc := newTestController(t, clusterManager)
 
-	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
+	syncContext := testingcommon.NewFakeSDKSyncContext(t, "testhub")
 	// Do not support migration
-	err := tc.sync(context.Background(), syncContext)
+	err := tc.sync(context.Background(), syncContext, "testhub")
 	if err != nil {
 		t.Fatalf("Expected no error when sync, %v", err)
 	}
@@ -43,7 +43,7 @@ func TestSync(t *testing.T) {
 	}
 	crds := newCrds()
 	tc = newTestController(t, clusterManager, crds...)
-	err = tc.sync(context.Background(), syncContext)
+	err = tc.sync(context.Background(), syncContext, "testhub")
 	if err != nil {
 		t.Fatalf("Expected no error when sync, %v", err)
 	}

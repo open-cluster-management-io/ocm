@@ -2,9 +2,6 @@ package addonsecretcontroller
 
 import (
 	"context"
-
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	coreinformer "k8s.io/client-go/informers/core/v1"
@@ -12,6 +9,7 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 const (
@@ -27,28 +25,25 @@ type addonPullImageSecretController struct {
 	operatorNamespace string
 	namespaceInformer coreinformer.NamespaceInformer
 	kubeClient        kubernetes.Interface
-	recorder          events.Recorder
 }
 
 func NewAddonPullImageSecretController(kubeClient kubernetes.Interface, operatorNamespace string,
-	namespaceInformer coreinformer.NamespaceInformer, recorder events.Recorder) factory.Controller {
+	namespaceInformer coreinformer.NamespaceInformer) factory.Controller {
 	ac := &addonPullImageSecretController{
 		operatorNamespace: operatorNamespace,
 		namespaceInformer: namespaceInformer,
 		kubeClient:        kubeClient,
-		recorder:          recorder,
 	}
 	return factory.New().WithFilteredEventsInformersQueueKeysFunc(
 		queue.QueueKeyByMetaName,
 		queue.FileterByLabelKeyValue(addonInstallNamespaceLabelKey, "true"),
-		namespaceInformer.Informer()).WithSync(ac.sync).ToController("AddonPullImageSecretController", recorder)
+		namespaceInformer.Informer()).WithSync(ac.sync).ToController("AddonPullImageSecretController")
 }
 
-func (c *addonPullImageSecretController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
+func (c *addonPullImageSecretController) sync(ctx context.Context, syncCtx factory.SyncContext, namespace string) error {
 	var err error
 
 	// Sync secret if namespace is created
-	namespace := controllerContext.QueueKey()
 	if namespace == "" {
 		return nil
 	}
@@ -73,7 +68,7 @@ func (c *addonPullImageSecretController) sync(ctx context.Context, controllerCon
 		ctx,
 		c.kubeClient.CoreV1(),
 		c.kubeClient.CoreV1(),
-		c.recorder,
+		syncCtx.Recorder(),
 		c.operatorNamespace,
 		helpers.ImagePullSecret,
 		namespace,

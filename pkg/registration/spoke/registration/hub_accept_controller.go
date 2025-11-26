@@ -3,11 +3,9 @@ package registration
 import (
 	"context"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
-
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 // hubAcceptController watch ManagedCluster CR on hub after spoke bootstrap done
@@ -20,24 +18,22 @@ type hubAcceptController struct {
 	clusterName       string
 	hubClusterLister  clusterv1listers.ManagedClusterLister
 	handleAcceptFalse func(ctx context.Context) error
-	recorder          events.Recorder
 }
 
 func NewHubAcceptController(clusterName string, hubClusterInformer clusterv1informer.ManagedClusterInformer,
-	handleAcceptFalse func(ctx context.Context) error, recorder events.Recorder) factory.Controller {
+	handleAcceptFalse func(ctx context.Context) error) factory.Controller {
 	c := &hubAcceptController{
 		clusterName:       clusterName,
 		hubClusterLister:  hubClusterInformer.Lister(),
 		handleAcceptFalse: handleAcceptFalse,
-		recorder:          recorder,
 	}
 	return factory.New().
 		WithInformers(hubClusterInformer.Informer()).
 		WithSync(c.sync).
-		ToController("HubAcceptController", recorder)
+		ToController("HubAcceptController")
 }
 
-func (c *hubAcceptController) sync(ctx context.Context, _ factory.SyncContext) error {
+func (c *hubAcceptController) sync(ctx context.Context, _ factory.SyncContext, _ string) error {
 	cluster, err := c.hubClusterLister.Get(c.clusterName)
 	if err != nil {
 		return err

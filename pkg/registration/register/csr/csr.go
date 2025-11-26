@@ -12,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	certificates "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -30,6 +28,8 @@ import (
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"open-cluster-management.io/ocm/pkg/registration/hub/user"
 	"open-cluster-management.io/ocm/pkg/registration/register"
@@ -159,7 +159,7 @@ func (c *CSRDriver) Process(
 				Message: fmt.Sprintf("Failed to rotated client certificate %v", err),
 			}
 		} else {
-			recorder.Eventf("ClientCertificateCreated", "A new client certificate for %s is available", controllerName)
+			recorder.Eventf(ctx, "ClientCertificateCreated", "A new client certificate for %s is available", controllerName)
 		}
 		c.reset()
 		return secret, cond, err
@@ -170,6 +170,7 @@ func (c *CSRDriver) Process(
 	// b. client certificate is sensitive to the additional secret data and the data changes;
 	// c. client certificate exists and has less than a random percentage range from 20% to 25% of its life remaining;
 	shouldCreate, err := shouldCreateCSR(
+		ctx,
 		logger,
 		controllerName,
 		secret,
@@ -185,7 +186,7 @@ func (c *CSRDriver) Process(
 
 	shouldHalt := c.haltCSRCreation()
 	if shouldHalt {
-		recorder.Eventf("ClientCertificateCreationHalted",
+		recorder.Eventf(ctx, "ClientCertificateCreationHalted",
 			"Stop creating csr since there are too many csr created already on hub", controllerName)
 		return nil, &metav1.Condition{
 			Type:    "ClusterCertificateRotated",
@@ -428,6 +429,7 @@ func NewCSRDriver(opt *Option, secretOpts register.SecretOption) (*CSRDriver, er
 }
 
 func shouldCreateCSR(
+	ctx context.Context,
 	logger klog.Logger,
 	controllerName string,
 	secret *corev1.Secret,
@@ -438,17 +440,17 @@ func shouldCreateCSR(
 	// a.there is no valid client certificate issued for the current cluster/agent
 	valid, err := IsCertificateValid(logger, secret.Data[TLSCertFile], subject)
 	if err != nil {
-		recorder.Eventf("CertificateValidationFailed", "Failed to validate client certificate for %s: %v", controllerName, err)
+		recorder.Eventf(ctx, "CertificateValidationFailed", "Failed to validate client certificate for %s: %v", controllerName, err)
 		return true, nil
 	}
 	if !valid {
-		recorder.Eventf("NoValidCertificateFound", "No valid client certificate for %s is found. Bootstrap is required", controllerName)
+		recorder.Eventf(ctx, "NoValidCertificateFound", "No valid client certificate for %s is found. Bootstrap is required", controllerName)
 		return true, nil
 	}
 
 	// b.client certificate is sensitive to the additional secret data and the data changes
 	if err := hasAdditionalSecretData(additionalSecretData, secret); err != nil {
-		recorder.Eventf("AdditonalSecretDataChanged", "The additional secret data is changed for %v. Re-create the client certificate for %s", err, controllerName)
+		recorder.Eventf(ctx, "AdditonalSecretDataChanged", "The additional secret data is changed for %v. Re-create the client certificate for %s", err, controllerName)
 		return true, nil
 	}
 
@@ -468,7 +470,7 @@ func shouldCreateCSR(
 			"remaining", remaining, "remaining/total", remaining.Seconds()/total.Seconds())
 		return false, nil
 	}
-	recorder.Eventf("CertificateRotationStarted",
+	recorder.Eventf(ctx, "CertificateRotationStarted",
 		"The current client certificate for %s expires in %v. Start certificate rotation",
 		controllerName, remaining.Round(time.Second))
 	return true, nil
