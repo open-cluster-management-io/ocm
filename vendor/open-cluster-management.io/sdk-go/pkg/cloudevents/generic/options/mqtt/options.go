@@ -249,27 +249,27 @@ func validateTopics(topics *types.Topics) error {
 	}
 
 	var errs []error
-	if !regexp.MustCompile(types.SourceEventsTopicPattern).MatchString(topics.SourceEvents) {
+	if !regexp.MustCompile(types.MQTTSourceEventsTopicPattern).MatchString(topics.SourceEvents) {
 		errs = append(errs, fmt.Errorf("invalid source events topic %q, it should match `%s`",
-			topics.SourceEvents, types.SourceEventsTopicPattern))
+			topics.SourceEvents, types.MQTTSourceEventsTopicPattern))
 	}
 
-	if !regexp.MustCompile(types.AgentEventsTopicPattern).MatchString(topics.AgentEvents) {
+	if !regexp.MustCompile(types.MQTTAgentEventsTopicPattern).MatchString(topics.AgentEvents) {
 		errs = append(errs, fmt.Errorf("invalid agent events topic %q, it should match `%s`",
-			topics.AgentEvents, types.AgentEventsTopicPattern))
+			topics.AgentEvents, types.MQTTAgentEventsTopicPattern))
 	}
 
 	if len(topics.SourceBroadcast) != 0 {
-		if !regexp.MustCompile(types.SourceBroadcastTopicPattern).MatchString(topics.SourceBroadcast) {
+		if !regexp.MustCompile(types.MQTTSourceBroadcastTopicPattern).MatchString(topics.SourceBroadcast) {
 			errs = append(errs, fmt.Errorf("invalid source broadcast topic %q, it should match `%s`",
-				topics.SourceBroadcast, types.SourceBroadcastTopicPattern))
+				topics.SourceBroadcast, types.MQTTSourceBroadcastTopicPattern))
 		}
 	}
 
 	if len(topics.AgentBroadcast) != 0 {
-		if !regexp.MustCompile(types.AgentBroadcastTopicPattern).MatchString(topics.AgentBroadcast) {
+		if !regexp.MustCompile(types.MQTTAgentBroadcastTopicPattern).MatchString(topics.AgentBroadcast) {
 			errs = append(errs, fmt.Errorf("invalid agent broadcast topic %q, it should match `%s`",
-				topics.AgentBroadcast, types.AgentBroadcastTopicPattern))
+				topics.AgentBroadcast, types.MQTTAgentBroadcastTopicPattern))
 		}
 	}
 
@@ -277,7 +277,7 @@ func validateTopics(topics *types.Topics) error {
 }
 
 func getSourceFromEventsTopic(topic string) (string, error) {
-	if !regexp.MustCompile(types.EventsTopicPattern).MatchString(topic) {
+	if !regexp.MustCompile(types.MQTTEventsTopicPattern).MatchString(topic) {
 		return "", fmt.Errorf("failed to get source from topic: %q", topic)
 	}
 
@@ -310,11 +310,11 @@ func getSourcePubTopic(ctx context.Context) (*PubTopic, error) {
 		return nil, fmt.Errorf("source pub topic should be a string")
 	}
 
-	if regexp.MustCompile(types.SourceEventsTopicPattern).MatchString(string(topic)) {
+	if regexp.MustCompile(types.MQTTSourceEventsTopicPattern).MatchString(string(topic)) {
 		return &topic, nil
 	}
 
-	if regexp.MustCompile(types.SourceBroadcastTopicPattern).MatchString(string(topic)) {
+	if regexp.MustCompile(types.MQTTSourceBroadcastTopicPattern).MatchString(string(topic)) {
 		return &topic, nil
 	}
 
@@ -332,11 +332,11 @@ func getAgentPubTopic(ctx context.Context) (*PubTopic, error) {
 		return nil, fmt.Errorf("agent pub topic should be a string")
 	}
 
-	if regexp.MustCompile(types.AgentEventsTopicPattern).MatchString(string(topic)) {
+	if regexp.MustCompile(types.MQTTAgentEventsTopicPattern).MatchString(string(topic)) {
 		return &topic, nil
 	}
 
-	if regexp.MustCompile(types.AgentBroadcastTopicPattern).MatchString(string(topic)) {
+	if regexp.MustCompile(types.MQTTAgentBroadcastTopicPattern).MatchString(string(topic)) {
 		return &topic, nil
 	}
 

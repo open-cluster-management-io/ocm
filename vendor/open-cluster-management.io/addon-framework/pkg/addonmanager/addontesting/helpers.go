@@ -333,18 +333,18 @@ func (r *TestingEventRecorder) WithComponentSuffix(suffix string) events.Recorde
 	return r.ForComponent(fmt.Sprintf("%s-%s", r.ComponentName(), suffix))
 }
 
-func (r *TestingEventRecorder) Event(reason, message string) {
+func (r *TestingEventRecorder) Event(ctx context.Context, reason, message string) {
 	r.t.Logf("Event: %v: %v", reason, message)
 }
 
-func (r *TestingEventRecorder) Eventf(reason, messageFmt string, args ...interface{}) {
-	r.Event(reason, fmt.Sprintf(messageFmt, args...))
+func (r *TestingEventRecorder) Eventf(ctx context.Context, reason, messageFmt string, args ...interface{}) {
+	r.Event(ctx, reason, fmt.Sprintf(messageFmt, args...))
 }
 
-func (r *TestingEventRecorder) Warning(reason, message string) {
+func (r *TestingEventRecorder) Warning(ctx context.Context, reason, message string) {
 	r.t.Logf("Warning: %v: %v", reason, message)
 }
 
-func (r *TestingEventRecorder) Warningf(reason, messageFmt string, args ...interface{}) {
-	r.Warning(reason, fmt.Sprintf(messageFmt, args...))
+func (r *TestingEventRecorder) Warningf(ctx context.Context, reason, messageFmt string, args ...interface{}) {
+	r.Warning(ctx, reason, fmt.Sprintf(messageFmt, args...))
 }

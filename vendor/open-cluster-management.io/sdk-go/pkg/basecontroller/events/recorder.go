@@ -13,10 +13,10 @@ import (
 
 // Recorder is a simple event recording interface.
 type Recorder interface {
-	Event(reason, message string)
-	Eventf(reason, messageFmt string, args ...interface{})
-	Warning(reason, message string)
-	Warningf(reason, messageFmt string, args ...interface{})
+	Event(ctx context.Context, reason, message string)
+	Eventf(ctx context.Context, reason, messageFmt string, args ...interface{})
+	Warning(ctx context.Context, reason, message string)
+	Warningf(ctx context.Context, reason, messageFmt string, args ...interface{})
 
 	// ForComponent allows to fiddle the component name before sending the event to sink.
 	// Making more unique components will prevent the spam filter in upstream event sink from dropping
@@ -25,9 +25,6 @@ type Recorder interface {
 
 	// WithComponentSuffix is similar to ForComponent except it just suffix the current component name instead of overriding.
 	WithComponentSuffix(componentNameSuffix string) Recorder
-
-	// WithContext allows to set a context for event create API calls.
-	WithContext(ctx context.Context) Recorder
 
 	// ComponentName returns the current source component name for the event.
 	// This allows to suffix the original component name with 'sub-component'.
@@ -50,9 +47,6 @@ type recorder struct {
 	eventClient       corev1client.EventInterface
 	involvedObjectRef *corev1.ObjectReference
 	sourceComponent   string
-
-	// TODO: This is not the right way to pass the context, but there is no other way without breaking event interface
-	ctx context.Context
 }
 
 func (r *recorder) ComponentName() string {
@@ -67,44 +61,31 @@ func (r *recorder) ForComponent(componentName string) Recorder {
 	return &newRecorderForComponent
 }
 
-func (r *recorder) WithContext(ctx context.Context) Recorder {
-	r.ctx = ctx
-	return r
-}
-
 func (r *recorder) WithComponentSuffix(suffix string) Recorder {
 	return r.ForComponent(fmt.Sprintf("%s-%s", r.ComponentName(), suffix))
 }
 
 // Eventf emits the normal type event and allow formatting of message.
-func (r *recorder) Eventf(reason, messageFmt string, args ...interface{}) {
-	r.Event(reason, fmt.Sprintf(messageFmt, args...))
+func (r *recorder) Eventf(ctx context.Context, reason, messageFmt string, args ...interface{}) {
+	r.Event(ctx, reason, fmt.Sprintf(messageFmt, args...))
 }
 
 // Warningf emits the warning type event and allow formatting of message.
-func (r *recorder) Warningf(reason, messageFmt string, args ...interface{}) {
-	r.Warning(reason, fmt.Sprintf(messageFmt, args...))
+func (r *recorder) Warningf(ctx context.Context, reason, messageFmt string, args ...interface{}) {
+	r.Warning(ctx, reason, fmt.Sprintf(messageFmt, args...))
 }
 
 // Event emits the normal type event.
-func (r *recorder) Event(reason, message string) {
+func (r *recorder) Event(ctx context.Context, reason, message string) {
 	event := makeEvent(r.involvedObjectRef, r.sourceComponent, corev1.EventTypeNormal, reason, message)
-	ctx := context.Background()
-	if r.ctx != nil {
-		ctx = r.ctx
-	}
 	if _, err := r.eventClient.Create(ctx, event, metav1.CreateOptions{}); err != nil {
 		klog.Warningf("Error creating event %+v: %v", event, err)
 	}
 }
 
 // Warning emits the warning type event.
-func (r *recorder) Warning(reason, message string) {
+func (r *recorder) Warning(ctx context.Context, reason, message string) {
 	event := makeEvent(r.involvedObjectRef, r.sourceComponent, corev1.EventTypeWarning, reason, message)
-	ctx := context.Background()
-	if r.ctx != nil {
-		ctx = r.ctx
-	}
 	if _, err := r.eventClient.Create(ctx, event, metav1.CreateOptions{}); err != nil {
 		klog.Warningf("Error creating event %+v: %v", event, err)
 	}

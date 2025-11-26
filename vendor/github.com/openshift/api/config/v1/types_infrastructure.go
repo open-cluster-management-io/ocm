@@ -183,6 +183,17 @@ const (
 	LoadBalancerTypeOpenShiftManagedDefault PlatformLoadBalancerType = "OpenShiftManagedDefault"
 )
 
+// DNSRecordsType defines whether api, api-int, and ingress records are provided by
+// the internal DNS infrastructure or must be configured external to the cluster.
+// +kubebuilder:validation:Enum=Internal;External
+// +enum
+type DNSRecordsType string
+
+const (
+	DNSRecordsTypeExternal DNSRecordsType = "External"
+	DNSRecordsTypeInternal DNSRecordsType = "Internal"
+)
+
 // PlatformType is a specific supported infrastructure provider.
 // +kubebuilder:validation:Enum="";AWS;Azure;BareMetal;GCP;Libvirt;OpenStack;None;VSphere;oVirt;IBMCloud;KubeVirt;EquinixMetal;PowerVS;AlibabaCloud;Nutanix;External
 type PlatformType string
@@ -491,6 +502,21 @@ type AWSServiceEndpoint struct {
 	URL string `json:"url"`
 }
 
+// IPFamilyType represents the IP protocol family that cloud platform resources should use.
+// +kubebuilder:validation:Enum=IPv4;DualStackIPv6Primary;DualStackIPv4Primary
+type IPFamilyType string
+
+const (
+	// IPv4 indicates that cloud platform resources should use IPv4 addressing only.
+	IPv4 IPFamilyType = "IPv4"
+
+	// DualStackIPv6Primary indicates that cloud platform resources should use dual-stack networking with IPv6 as primary.
+	DualStackIPv6Primary IPFamilyType = "DualStackIPv6Primary"
+
+	// DualStackIPv4Primary indicates that cloud platform resources should use dual-stack networking with IPv4 as primary.
+	DualStackIPv4Primary IPFamilyType = "DualStackIPv4Primary"
+)
+
 // AWSPlatformSpec holds the desired state of the Amazon Web Services infrastructure provider.
 // This only includes fields that can be modified in the cluster.
 type AWSPlatformSpec struct {
@@ -532,10 +558,22 @@ type AWSPlatformStatus struct {
 	//
 	// +default={"dnsType": "PlatformDefault"}
 	// +kubebuilder:default={"dnsType": "PlatformDefault"}
-	// +openshift:enable:FeatureGate=AWSClusterHostedDNS
+	// +openshift:enable:FeatureGate=AWSClusterHostedDNSInstall
 	// +optional
 	// +nullable
 	CloudLoadBalancerConfig *CloudLoadBalancerConfig `json:"cloudLoadBalancerConfig,omitempty"`
+
+	// ipFamily specifies the IP protocol family that should be used for AWS
+	// network resources. This controls whether AWS resources are created with
+	// IPv4-only, or dual-stack networking with IPv4 or IPv6 as the primary
+	// protocol family.
+	//
+	// +default="IPv4"
+	// +kubebuilder:default="IPv4"
+	// +kubebuilder:validation:XValidation:rule="oldSelf == '' || self == oldSelf",message="ipFamily is immutable once set"
+	// +openshift:enable:FeatureGate=AWSDualStackInstall
+	// +optional
+	IPFamily IPFamilyType `json:"ipFamily,omitempty"`
 }
 
 // AWSResourceTag is a tag to apply to AWS resources created for the cluster.
@@ -594,6 +632,31 @@ type AzurePlatformStatus struct {
 	// +listType=atomic
 	// +optional
 	ResourceTags []AzureResourceTag `json:"resourceTags,omitempty"`
+
+	// cloudLoadBalancerConfig holds configuration related to DNS and cloud
+	// load balancers. It allows configuration of in-cluster DNS as an alternative
+	// to the platform default DNS implementation.
+	// When using the ClusterHosted DNS type, Load Balancer IP addresses
+	// must be provided for the API and internal API load balancers as well as the
+	// ingress load balancer.
+	//
+	// +default={"dnsType": "PlatformDefault"}
+	// +kubebuilder:default={"dnsType": "PlatformDefault"}
+	// +openshift:enable:FeatureGate=AzureClusterHostedDNSInstall
+	// +optional
+	CloudLoadBalancerConfig *CloudLoadBalancerConfig `json:"cloudLoadBalancerConfig,omitempty"`
+
+	// ipFamily specifies the IP protocol family that should be used for Azure
+	// network resources. This controls whether Azure resources are created with
+	// IPv4-only, or dual-stack networking with IPv4 or IPv6 as the primary
+	// protocol family.
+	//
+	// +default="IPv4"
+	// +kubebuilder:default="IPv4"
+	// +kubebuilder:validation:XValidation:rule="oldSelf == '' || self == oldSelf",message="ipFamily is immutable once set"
+	// +openshift:enable:FeatureGate=AzureDualStackInstall
+	// +optional
+	IPFamily IPFamilyType `json:"ipFamily,omitempty"`
 }
 
 // AzureResourceTag is a tag to apply to Azure resources created for the cluster.
@@ -637,7 +700,7 @@ const (
 )
 
 // GCPServiceEndpointName is the name of the GCP Service Endpoint.
-// +kubebuilder:validation:Enum=Compute;Container;CloudResourceManager;DNS;File;IAM;ServiceUsage;Storage
+// +kubebuilder:validation:Enum=Compute;Container;CloudResourceManager;DNS;File;IAM;IAMCredentials;OAuth;ServiceUsage;Storage;STS
 type GCPServiceEndpointName string
 
 const (
@@ -659,11 +722,20 @@ const (
 	// GCPServiceEndpointNameIAM is the name used for the GCP IAM Service endpoint.
 	GCPServiceEndpointNameIAM GCPServiceEndpointName = "IAM"
 
+	// GCPServiceEndpointNameIAMCredentials is the name used for the GCP IAM Credentials Service endpoint.
+	GCPServiceEndpointNameIAMCredentials GCPServiceEndpointName = "IAMCredentials"
+
+	// GCPServiceEndpointNameOAuth is the name used for the GCP OAuth2 Service endpoint.
+	GCPServiceEndpointNameOAuth GCPServiceEndpointName = "OAuth"
+
 	// GCPServiceEndpointNameServiceUsage is the name used for the GCP Service Usage Service endpoint.
 	GCPServiceEndpointNameServiceUsage GCPServiceEndpointName = "ServiceUsage"
 
 	// GCPServiceEndpointNameStorage is the name used for the GCP Storage Service endpoint.
 	GCPServiceEndpointNameStorage GCPServiceEndpointName = "Storage"
+
+	// GCPServiceEndpointNameSTS is the name used for the GCP STS Service endpoint.
+	GCPServiceEndpointNameSTS GCPServiceEndpointName = "STS"
 )
 
 // GCPServiceEndpoint store the configuration of a custom url to
@@ -701,8 +773,8 @@ type GCPServiceEndpoint struct {
 type GCPPlatformSpec struct{}
 
 // GCPPlatformStatus holds the current status of the Google Cloud Platform infrastructure provider.
-// +openshift:validation:FeatureGateAwareXValidation:featureGate=GCPLabelsTags,rule="!has(oldSelf.resourceLabels) && !has(self.resourceLabels) || has(oldSelf.resourceLabels) && has(self.resourceLabels)",message="resourceLabels may only be configured during installation"
-// +openshift:validation:FeatureGateAwareXValidation:featureGate=GCPLabelsTags,rule="!has(oldSelf.resourceTags) && !has(self.resourceTags) || has(oldSelf.resourceTags) && has(self.resourceTags)",message="resourceTags may only be configured during installation"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.resourceLabels) && !has(self.resourceLabels) || has(oldSelf.resourceLabels) && has(self.resourceLabels)",message="resourceLabels may only be configured during installation"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.resourceTags) && !has(self.resourceTags) || has(oldSelf.resourceTags) && has(self.resourceTags)",message="resourceTags may only be configured during installation"
 type GCPPlatformStatus struct {
 	// resourceGroupName is the Project ID for new GCP resources created for the cluster.
 	ProjectID string `json:"projectID"`
@@ -719,7 +791,6 @@ type GCPPlatformStatus struct {
 	// +listType=map
 	// +listMapKey=key
 	// +optional
-	// +openshift:enable:FeatureGate=GCPLabelsTags
 	ResourceLabels []GCPResourceLabel `json:"resourceLabels,omitempty"`
 
 	// resourceTags is a list of additional tags to apply to GCP resources created for the cluster.
@@ -730,7 +801,6 @@ type GCPPlatformStatus struct {
 	// +listType=map
 	// +listMapKey=key
 	// +optional
-	// +openshift:enable:FeatureGate=GCPLabelsTags
 	ResourceTags []GCPResourceTag `json:"resourceTags,omitempty"`
 
 	// This field was introduced and removed under tech preview.
@@ -747,7 +817,7 @@ type GCPPlatformStatus struct {
 	//
 	// +default={"dnsType": "PlatformDefault"}
 	// +kubebuilder:default={"dnsType": "PlatformDefault"}
-	// +openshift:enable:FeatureGate=GCPClusterHostedDNS
+	// +openshift:enable:FeatureGate=GCPClusterHostedDNSInstall
 	// +optional
 	// +nullable
 	CloudLoadBalancerConfig *CloudLoadBalancerConfig `json:"cloudLoadBalancerConfig,omitempty"`
@@ -756,13 +826,13 @@ type GCPPlatformStatus struct {
 	// used when creating clients to interact with GCP services.
 	// When not specified, the default endpoint for the GCP region will be used.
 	// Only 1 endpoint override is permitted for each GCP service.
-	// The maximum number of endpoint overrides allowed is 9.
+	// The maximum number of endpoint overrides allowed is 11.
 	// +listType=map
 	// +listMapKey=name
-	// +kubebuilder:validation:MaxItems=8
+	// +kubebuilder:validation:MaxItems=11
 	// +kubebuilder:validation:XValidation:rule="self.all(x, self.exists_one(y, x.name == y.name))",message="only 1 endpoint override is permitted per GCP service name"
 	// +optional
-	// +openshift:enable:FeatureGate=GCPCustomAPIEndpoints
+	// +openshift:enable:FeatureGate=GCPCustomAPIEndpointsInstall
 	ServiceEndpoints []GCPServiceEndpoint `json:"serviceEndpoints,omitempty"`
 }
 
@@ -963,6 +1033,7 @@ type BareMetalPlatformSpec struct {
 // BareMetalPlatformStatus holds the current status of the BareMetal infrastructure provider.
 // For more information about the network architecture used with the BareMetal platform type, see:
 // https://github.com/openshift/installer/blob/master/docs/design/baremetal/networking-infrastructure.md
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=OnPremDNSRecords,rule="!has(self.dnsRecordsType) || self.dnsRecordsType == 'Internal' || (has(self.loadBalancer) && self.loadBalancer.type == 'UserManaged')",message="dnsRecordsType may only be set to External when loadBalancer.type is UserManaged"
 type BareMetalPlatformStatus struct {
 	// apiServerInternalIP is an IP address to contact the Kubernetes API server that can be used
 	// by components inside the cluster, like kubelets using the infrastructure rather
@@ -1014,6 +1085,22 @@ type BareMetalPlatformStatus struct {
 	// +kubebuilder:default={"type": "OpenShiftManagedDefault"}
 	// +optional
 	LoadBalancer *BareMetalPlatformLoadBalancer `json:"loadBalancer,omitempty"`
+
+	// dnsRecordsType determines whether records for api, api-int, and ingress
+	// are provided by the internal DNS service or externally.
+	// Allowed values are `Internal`, `External`, and omitted.
+	// When set to `Internal`, records are provided by the internal infrastructure and
+	// no additional user configuration is required for the cluster to function.
+	// When set to `External`, records are not provided by the internal infrastructure
+	// and must be configured by the user on a DNS server outside the cluster.
+	// Cluster nodes must use this external server for their upstream DNS requests.
+	// This value may only be set when loadBalancer.type is set to UserManaged.
+	// When omitted, this means the user has no opinion and the platform is left
+	// to choose reasonable defaults. These defaults are subject to change over time.
+	// The current default is `Internal`.
+	// +openshift:enable:FeatureGate=OnPremDNSRecords
+	// +optional
+	DNSRecordsType DNSRecordsType `json:"dnsRecordsType,omitempty"`
 
 	// machineNetworks are IP networks used to connect all the OpenShift cluster nodes.
 	// +listType=atomic
@@ -1091,6 +1178,7 @@ type OpenStackPlatformSpec struct {
 }
 
 // OpenStackPlatformStatus holds the current status of the OpenStack infrastructure provider.
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=OnPremDNSRecords,rule="!has(self.dnsRecordsType) || self.dnsRecordsType == 'Internal' || (has(self.loadBalancer) && self.loadBalancer.type == 'UserManaged')",message="dnsRecordsType may only be set to External when loadBalancer.type is UserManaged"
 type OpenStackPlatformStatus struct {
 	// apiServerInternalIP is an IP address to contact the Kubernetes API server that can be used
 	// by components inside the cluster, like kubelets using the infrastructure rather
@@ -1147,6 +1235,22 @@ type OpenStackPlatformStatus struct {
 	// +optional
 	LoadBalancer *OpenStackPlatformLoadBalancer `json:"loadBalancer,omitempty"`
 
+	// dnsRecordsType determines whether records for api, api-int, and ingress
+	// are provided by the internal DNS service or externally.
+	// Allowed values are `Internal`, `External`, and omitted.
+	// When set to `Internal`, records are provided by the internal infrastructure and
+	// no additional user configuration is required for the cluster to function.
+	// When set to `External`, records are not provided by the internal infrastructure
+	// and must be configured by the user on a DNS server outside the cluster.
+	// Cluster nodes must use this external server for their upstream DNS requests.
+	// This value may only be set when loadBalancer.type is set to UserManaged.
+	// When omitted, this means the user has no opinion and the platform is left
+	// to choose reasonable defaults. These defaults are subject to change over time.
+	// The current default is `Internal`.
+	// +openshift:enable:FeatureGate=OnPremDNSRecords
+	// +optional
+	DNSRecordsType DNSRecordsType `json:"dnsRecordsType,omitempty"`
+
 	// machineNetworks are IP networks used to connect all the OpenShift cluster nodes.
 	// +listType=atomic
 	// +kubebuilder:validation:MaxItems=32
@@ -1181,6 +1285,7 @@ type OvirtPlatformLoadBalancer struct {
 type OvirtPlatformSpec struct{}
 
 // OvirtPlatformStatus holds the current status of the  oVirt infrastructure provider.
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=OnPremDNSRecords,rule="!has(self.dnsRecordsType) || self.dnsRecordsType == 'Internal' || (has(self.loadBalancer) && self.loadBalancer.type == 'UserManaged')",message="dnsRecordsType may only be set to External when loadBalancer.type is UserManaged"
 type OvirtPlatformStatus struct {
 	// apiServerInternalIP is an IP address to contact the Kubernetes API server that can be used
 	// by components inside the cluster, like kubelets using the infrastructure rather
@@ -1227,6 +1332,22 @@ type OvirtPlatformStatus struct {
 	// +kubebuilder:default={"type": "OpenShiftManagedDefault"}
 	// +optional
 	LoadBalancer *OvirtPlatformLoadBalancer `json:"loadBalancer,omitempty"`
+
+	// dnsRecordsType determines whether records for api, api-int, and ingress
+	// are provided by the internal DNS service or externally.
+	// Allowed values are `Internal`, `External`, and omitted.
+	// When set to `Internal`, records are provided by the internal infrastructure and
+	// no additional user configuration is required for the cluster to function.
+	// When set to `External`, records are not provided by the internal infrastructure
+	// and must be configured by the user on a DNS server outside the cluster.
+	// Cluster nodes must use this external server for their upstream DNS requests.
+	// This value may only be set when loadBalancer.type is set to UserManaged.
+	// When omitted, this means the user has no opinion and the platform is left
+	// to choose reasonable defaults. These defaults are subject to change over time.
+	// The current default is `Internal`.
+	// +openshift:enable:FeatureGate=OnPremDNSRecords
+	// +optional
+	DNSRecordsType DNSRecordsType `json:"dnsRecordsType,omitempty"`
 }
 
 // VSpherePlatformLoadBalancer defines the load balancer used by the cluster on VSphere platform.
@@ -1624,6 +1745,7 @@ type VSpherePlatformSpec struct {
 }
 
 // VSpherePlatformStatus holds the current status of the vSphere infrastructure provider.
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=OnPremDNSRecords,rule="!has(self.dnsRecordsType) || self.dnsRecordsType == 'Internal' || (has(self.loadBalancer) && self.loadBalancer.type == 'UserManaged')",message="dnsRecordsType may only be set to External when loadBalancer.type is UserManaged"
 type VSpherePlatformStatus struct {
 	// apiServerInternalIP is an IP address to contact the Kubernetes API server that can be used
 	// by components inside the cluster, like kubelets using the infrastructure rather
@@ -1676,6 +1798,22 @@ type VSpherePlatformStatus struct {
 	// +optional
 	LoadBalancer *VSpherePlatformLoadBalancer `json:"loadBalancer,omitempty"`
 
+	// dnsRecordsType determines whether records for api, api-int, and ingress
+	// are provided by the internal DNS service or externally.
+	// Allowed values are `Internal`, `External`, and omitted.
+	// When set to `Internal`, records are provided by the internal infrastructure and
+	// no additional user configuration is required for the cluster to function.
+	// When set to `External`, records are not provided by the internal infrastructure
+	// and must be configured by the user on a DNS server outside the cluster.
+	// Cluster nodes must use this external server for their upstream DNS requests.
+	// This value may only be set when loadBalancer.type is set to UserManaged.
+	// When omitted, this means the user has no opinion and the platform is left
+	// to choose reasonable defaults. These defaults are subject to change over time.
+	// The current default is `Internal`.
+	// +openshift:enable:FeatureGate=OnPremDNSRecords
+	// +optional
+	DNSRecordsType DNSRecordsType `json:"dnsRecordsType,omitempty"`
+
 	// machineNetworks are IP networks used to connect all the OpenShift cluster nodes.
 	// +listType=atomic
 	// +kubebuilder:validation:MaxItems=32
@@ -1717,7 +1855,7 @@ type IBMCloudPlatformSpec struct {
 	// serviceEndpoints is a list of custom endpoints which will override the default
 	// service endpoints of an IBM service. These endpoints are used by components
 	// within the cluster when trying to reach the IBM Cloud Services that have been
-	// overriden. The CCCMO reads in the IBMCloudPlatformSpec and validates each
+	// overridden. The CCCMO reads in the IBMCloudPlatformSpec and validates each
 	// endpoint is resolvable. Once validated, the cloud config and IBMCloudPlatformStatus
 	// are updated to reflect the same custom endpoints.
 	// A maximum of 13 service endpoints overrides are supported.
@@ -1751,7 +1889,7 @@ type IBMCloudPlatformStatus struct {
 	// serviceEndpoints is a list of custom endpoints which will override the default
 	// service endpoints of an IBM service. These endpoints are used by components
 	// within the cluster when trying to reach the IBM Cloud Services that have been
-	// overriden. The CCCMO reads in the IBMCloudPlatformSpec and validates each
+	// overridden. The CCCMO reads in the IBMCloudPlatformSpec and validates each
 	// endpoint is resolvable. Once validated, the cloud config and IBMCloudPlatformStatus
 	// are updated to reflect the same custom endpoints.
 	// +openshift:validation:FeatureGateAwareMaxItems:featureGate=DyanmicServiceEndpointIBMCloud,maxItems=13
@@ -2049,6 +2187,7 @@ type NutanixPrismElementEndpoint struct {
 }
 
 // NutanixPlatformStatus holds the current status of the Nutanix infrastructure provider.
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=OnPremDNSRecords,rule="!has(self.dnsRecordsType) || self.dnsRecordsType == 'Internal' || (has(self.loadBalancer) && self.loadBalancer.type == 'UserManaged')",message="dnsRecordsType may only be set to External when loadBalancer.type is UserManaged"
 type NutanixPlatformStatus struct {
 	// apiServerInternalIP is an IP address to contact the Kubernetes API server that can be used
 	// by components inside the cluster, like kubelets using the infrastructure rather
@@ -2092,6 +2231,22 @@ type NutanixPlatformStatus struct {
 	// +kubebuilder:default={"type": "OpenShiftManagedDefault"}
 	// +optional
 	LoadBalancer *NutanixPlatformLoadBalancer `json:"loadBalancer,omitempty"`
+
+	// dnsRecordsType determines whether records for api, api-int, and ingress
+	// are provided by the internal DNS service or externally.
+	// Allowed values are `Internal`, `External`, and omitted.
+	// When set to `Internal`, records are provided by the internal infrastructure and
+	// no additional user configuration is required for the cluster to function.
+	// When set to `External`, records are not provided by the internal infrastructure
+	// and must be configured by the user on a DNS server outside the cluster.
+	// Cluster nodes must use this external server for their upstream DNS requests.
+	// This value may only be set when loadBalancer.type is set to UserManaged.
+	// When omitted, this means the user has no opinion and the platform is left
+	// to choose reasonable defaults. These defaults are subject to change over time.
+	// The current default is `Internal`.
+	// +openshift:enable:FeatureGate=OnPremDNSRecords
+	// +optional
+	DNSRecordsType DNSRecordsType `json:"dnsRecordsType,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
