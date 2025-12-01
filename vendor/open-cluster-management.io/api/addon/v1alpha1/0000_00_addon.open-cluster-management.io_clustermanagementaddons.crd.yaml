@@ -376,6 +376,7 @@ spec:
                 type: object
               supportedConfigs:
                 description: |-
+                  Deprecated: Will be removed and replaced with DefaultConfigs in v1beta1.
                   supportedConfigs is a list of configuration types supported by add-on.
                   An empty list means the add-on does not require configurations.
                   The default is an empty list
@@ -422,7 +423,7 @@ spec:
               add-on.
             properties:
               defaultconfigReferences:
-                description: defaultconfigReferences is a list of current add-on default
+                description: DefaultConfigReferences is a list of current add-on default
                   configuration references.
                 items:
                   description: |-

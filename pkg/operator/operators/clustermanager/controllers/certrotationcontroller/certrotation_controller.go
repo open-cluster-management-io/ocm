@@ -81,6 +81,7 @@ func NewCertRotationController(
 			secretInformers[helpers.SignerSecret].Informer(),
 			secretInformers[helpers.RegistrationWebhookSecret].Informer(),
 			secretInformers[helpers.WorkWebhookSecret].Informer(),
+			secretInformers[helpers.AddonWebhookSecret].Informer(),
 			secretInformers[helpers.GRPCServerSecret].Informer()).
 		ToController("CertRotationController")
 }
@@ -165,6 +166,12 @@ func (c certRotationController) syncOne(ctx context.Context, clustermanager *ope
 				return fmt.Errorf("clean up deleted cluster-manager, deleting work webhook secret failed, err:%s", err.Error())
 			}
 
+			// delete addon webhook secret
+			err = c.kubeClient.CoreV1().Secrets(clustermanagerNamespace).Delete(ctx, helpers.AddonWebhookSecret, metav1.DeleteOptions{})
+			if err != nil && !errors.IsNotFound(err) {
+				return fmt.Errorf("clean up deleted cluster-manager, deleting addon webhook secret failed, err:%s", err.Error())
+			}
+
 			// delete grpc server secret
 			err = c.kubeClient.CoreV1().Secrets(clustermanagerNamespace).Delete(ctx, helpers.GRPCServerSecret, metav1.DeleteOptions{})
 			if err != nil && !errors.IsNotFound(err) {
@@ -227,6 +234,14 @@ func (c certRotationController) syncOne(ctx context.Context, clustermanager *ope
 				Validity:  TargetCertValidity,
 				HostNames: []string{fmt.Sprintf("%s.%s.svc", helpers.WorkWebhookService, clustermanagerNamespace)},
 				Lister:    c.secretInformers[helpers.WorkWebhookSecret].Lister(),
+				Client:    c.kubeClient.CoreV1(),
+			},
+			helpers.AddonWebhookSecret: {
+				Namespace: clustermanagerNamespace,
+				Name:      helpers.AddonWebhookSecret,
+				Validity:  TargetCertValidity,
+				HostNames: []string{fmt.Sprintf("%s.%s.svc", helpers.AddonWebhookService, clustermanagerNamespace)},
+				Lister:    c.secretInformers[helpers.AddonWebhookSecret].Lister(),
 				Client:    c.kubeClient.CoreV1(),
 			},
 		}

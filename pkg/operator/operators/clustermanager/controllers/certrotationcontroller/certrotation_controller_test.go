@@ -175,6 +175,7 @@ func TestCertRotation(t *testing.T) {
 				helpers.SignerSecret:              newOnTermInformer(helpers.SignerSecret).Core().V1().Secrets(),
 				helpers.RegistrationWebhookSecret: newOnTermInformer(helpers.RegistrationWebhookSecret).Core().V1().Secrets(),
 				helpers.WorkWebhookSecret:         newOnTermInformer(helpers.WorkWebhookSecret).Core().V1().Secrets(),
+				helpers.AddonWebhookSecret:        newOnTermInformer(helpers.AddonWebhookSecret).Core().V1().Secrets(),
 				helpers.GRPCServerSecret:          newOnTermInformer(helpers.GRPCServerSecret).Core().V1().Secrets(),
 			}
 
@@ -318,6 +319,7 @@ func TestCertRotationGRPCAuth(t *testing.T) {
 				helpers.SignerSecret:              newOnTermInformer(helpers.SignerSecret).Core().V1().Secrets(),
 				helpers.RegistrationWebhookSecret: newOnTermInformer(helpers.RegistrationWebhookSecret).Core().V1().Secrets(),
 				helpers.WorkWebhookSecret:         newOnTermInformer(helpers.WorkWebhookSecret).Core().V1().Secrets(),
+				helpers.AddonWebhookSecret:        newOnTermInformer(helpers.AddonWebhookSecret).Core().V1().Secrets(),
 				helpers.GRPCServerSecret:          newOnTermInformer(helpers.GRPCServerSecret).Core().V1().Secrets(),
 			}
 
@@ -673,6 +675,7 @@ func TestCertRotationGRPCServerHostNames(t *testing.T) {
 				helpers.SignerSecret:              newOnTermInformer(helpers.SignerSecret).Core().V1().Secrets(),
 				helpers.RegistrationWebhookSecret: newOnTermInformer(helpers.RegistrationWebhookSecret).Core().V1().Secrets(),
 				helpers.WorkWebhookSecret:         newOnTermInformer(helpers.WorkWebhookSecret).Core().V1().Secrets(),
+				helpers.AddonWebhookSecret:        newOnTermInformer(helpers.AddonWebhookSecret).Core().V1().Secrets(),
 				helpers.GRPCServerSecret:          newOnTermInformer(helpers.GRPCServerSecret).Core().V1().Secrets(),
 			}
 

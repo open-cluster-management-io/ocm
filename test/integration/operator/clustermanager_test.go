@@ -64,7 +64,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 	var hubWorkWebhookDeployment = fmt.Sprintf("%s-work-webhook", clusterManagerName)
 	var hubAddOnManagerDeployment = fmt.Sprintf("%s-addon-manager-controller", clusterManagerName)
 	var hubWorkControllerDeployment = fmt.Sprintf("%s-work-controller", clusterManagerName)
-	var hubAddonManagerDeployment = fmt.Sprintf("%s-addon-manager-controller", clusterManagerName)
+	var hubAddOnWebhookDeployment = fmt.Sprintf("%s-addon-webhook", clusterManagerName)
 	var hubRegistrationClusterRole = fmt.Sprintf("open-cluster-management:%s-registration:controller", clusterManagerName)
 	var hubRegistrationWebhookClusterRole = fmt.Sprintf("open-cluster-management:%s-registration:webhook", clusterManagerName)
 	var hubWorkWebhookClusterRole = fmt.Sprintf("open-cluster-management:%s-work:webhook", clusterManagerName)
@@ -213,7 +213,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
 			gomega.Eventually(func() error {
-				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubAddonManagerDeployment, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubAddOnManagerDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -271,7 +271,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 			ginkgo.By("Update the deployment status to fail to prevent other cases from interfering")
 			updateDeploymentsStatusFail(kubeClient, hubNamespace,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
-				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddonManagerDeployment)
+				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 
 			// Check validating webhook
 			registrationValidatingWebhook := "managedclustervalidators.admission.cluster.open-cluster-management.io"
@@ -289,7 +289,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 			// Update ready replica of deployment
 			updateDeploymentsStatusSuccess(kubeClient, hubNamespace,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
-				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddonManagerDeployment)
+				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 
 			gomega.Eventually(func() error {
 				_, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
@@ -384,8 +384,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 41 {
-					return fmt.Errorf("should get 41 relatedResources, actual got %v, %v",
+				if len(actual.Status.RelatedResources) != 44 {
+					return fmt.Errorf("should get 44 relatedResources, actual got %v, %v",
 						len(actual.Status.RelatedResources), actual.Status.RelatedResources)
 				}
 				return nil
@@ -455,7 +455,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 
 			updateDeploymentsStatusSuccess(kubeClient, hubNamespace,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
-				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddonManagerDeployment)
+				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 			// Check if relatedResources are correct
 			gomega.Eventually(func() error {
 				actual, err := operatorClient.OperatorV1().ClusterManagers().Get(
@@ -463,8 +463,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 45 {
-					return fmt.Errorf("should get 45 relatedResources, actual got %v, %v",
+				if len(actual.Status.RelatedResources) != 48 {
+					return fmt.Errorf("should get 48 relatedResources, actual got %v, %v",
 						len(actual.Status.RelatedResources), actual.Status.RelatedResources)
 				}
 				return nil
@@ -675,8 +675,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 40 {
-					return fmt.Errorf("should get 40 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 43 {
+					return fmt.Errorf("should get 43 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -724,15 +724,15 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 
 			updateDeploymentsStatusSuccess(kubeClient, hubNamespace,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
-				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddonManagerDeployment)
+				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 			// Check if relatedResources are correct
 			gomega.Eventually(func() error {
 				actual, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 45 {
-					return fmt.Errorf("should get 45 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 48 {
+					return fmt.Errorf("should get 48 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -989,7 +989,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 
 			updateDeploymentsStatusSuccess(kubeClient, hubNamespace,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
-				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddonManagerDeployment)
+				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 
 			// Check if generations are correct
 			gomega.Eventually(func() error {
@@ -1011,8 +1011,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 46 {
-					return fmt.Errorf("should get 46 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 49 {
+					return fmt.Errorf("should get 49 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -1063,7 +1063,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 			updateDeploymentsStatusSuccess(kubeClient, hubNamespace,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
-				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddonManagerDeployment)
+				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 		})
 
 		ginkgo.It("Deployment should be reconciled when manually updated", func() {
@@ -1313,7 +1313,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 			// Update replica of deployment
 			updateDeploymentsStatusSuccess(kubeClient, hubNamespace,
 				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
-				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddonManagerDeployment)
+				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
 			// The cluster manager should be functional at last
 			util.AssertClusterManagerCondition(clusterManagerName, operatorClient,
 				"HubRegistrationDegraded", "RegistrationFunctional", metav1.ConditionFalse)

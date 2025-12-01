@@ -31,6 +31,7 @@ var (
 		"cluster-manager/management/registration/webhook-deployment.yaml",
 		"cluster-manager/management/work/webhook-deployment.yaml",
 		"cluster-manager/management/placement/deployment.yaml",
+		"cluster-manager/management/addon-manager/webhook-deployment.yaml",
 	}
 
 	addOnManagerDeploymentFiles = []string{
