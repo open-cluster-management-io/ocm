@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/ghodss/yaml"
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -19,6 +17,7 @@ import (
 	fakecluster "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
@@ -71,15 +70,15 @@ func TestEnqueu(t *testing.T) {
 			provider := &CAPIProvider{
 				managedClusterIndexer: clusterInformer.Informer().GetIndexer(),
 			}
-			syncCtx := factory.NewSyncContext("test", eventstesting.NewTestingEventRecorder(t))
+			syncCtx := factory.NewSyncContext("test")
 			provider.enqueueManagedClusterByCAPI(&metav1.PartialObjectMetadata{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      c.capiName,
 					Namespace: c.capiNamespace,
 				},
 			}, syncCtx)
-			if i, _ := syncCtx.Queue().Get(); i.(string) != c.expectedKey {
-				t.Errorf("expected key %s but got %s", c.expectedKey, syncCtx.QueueKey())
+			if i, _ := syncCtx.Queue().Get(); i != c.expectedKey {
+				t.Errorf("expected key %s but got %s", c.expectedKey, i)
 			}
 		})
 	}

@@ -6,8 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -21,6 +19,7 @@ import (
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
@@ -49,7 +48,6 @@ func NewKlusterletSSARController(
 	klusterletClient operatorv1client.KlusterletInterface,
 	klusterletInformer operatorinformer.KlusterletInformer,
 	secretInformers map[string]coreinformer.SecretInformer,
-	recorder events.Recorder,
 ) factory.Controller {
 	controller := &ssarController{
 		kubeClient: kubeClient,
@@ -68,7 +66,7 @@ func NewKlusterletSSARController(
 			secretInformers[helpers.BootstrapHubKubeConfig].Informer(),
 			secretInformers[helpers.ExternalManagedKubeConfig].Informer()).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, klusterletInformer.Informer()).
-		ToController("KlusterletSSARController", recorder)
+		ToController("KlusterletSSARController")
 }
 
 func (l *klusterletLocker) inSSARChecking(klusterletName string) bool {
@@ -90,10 +88,9 @@ func (l *klusterletLocker) deleteSSARChecking(klusterletName string) {
 	delete(l.klusterletInChecking, klusterletName)
 }
 
-func (c *ssarController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
+func (c *ssarController) sync(ctx context.Context, controllerContext factory.SyncContext, klusterletName string) error {
 	logger := klog.FromContext(ctx)
 
-	klusterletName := controllerContext.QueueKey()
 	if klusterletName == "" {
 		return nil
 	}

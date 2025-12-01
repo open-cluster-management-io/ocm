@@ -5,8 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
@@ -18,6 +16,7 @@ import (
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	clusterinformersv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
@@ -64,7 +63,6 @@ func NewAddonConfigurationController(
 	placementInformer clusterinformersv1beta1.PlacementInformer,
 	placementDecisionInformer clusterinformersv1beta1.PlacementDecisionInformer,
 	addonFilterFunc factory.EventFilterFunc,
-	recorder events.Recorder,
 ) factory.Controller {
 	c := &addonConfigurationController{
 		addonClient:                  addonClient,
@@ -96,13 +94,12 @@ func NewAddonConfigurationController(
 		WithInformersQueueKeysFunc(
 			addonindex.ClusterManagementAddonByPlacementQueueKey(clusterManagementAddonInformers), placementInformer.Informer())
 
-	return controllerFactory.WithSync(c.sync).ToController("addon-configuration-controller", recorder)
+	return controllerFactory.WithSync(c.sync).ToController("addon-configuration-controller")
 }
 
-func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	logger := klog.FromContext(ctx)
-	addonName := syncCtx.QueueKey()
-	logger.V(4).Info("Reconciling addon", "addonName", addonName)
+func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory.SyncContext, addonName string) error {
+	logger := klog.FromContext(ctx).WithValues("addonName", addonName)
+	logger.V(4).Info("Reconciling addon")
 
 	cma, err := c.clusterManagementAddonLister.Get(addonName)
 	switch {

@@ -32,8 +32,8 @@ const (
 
 type enqueuer struct {
 	logger               klog.Logger
-	queue                workqueue.RateLimitingInterface
-	enqueuePlacementFunc func(obj interface{}, queue workqueue.RateLimitingInterface)
+	queue                workqueue.TypedRateLimitingInterface[string]
+	enqueuePlacementFunc func(obj interface{}, queue workqueue.TypedRateLimitingInterface[string])
 
 	clusterLister            clusterlisterv1.ManagedClusterLister
 	clusterSetLister         clusterlisterv1beta2.ManagedClusterSetLister
@@ -43,7 +43,7 @@ type enqueuer struct {
 
 func newEnqueuer(
 	ctx context.Context,
-	queue workqueue.RateLimitingInterface,
+	queue workqueue.TypedRateLimitingInterface[string],
 	clusterInformer clusterinformerv1.ManagedClusterInformer,
 	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer,
 	placementInformer clusterinformerv1beta1.PlacementInformer,
@@ -74,7 +74,7 @@ func newEnqueuer(
 	}
 }
 
-func enqueuePlacement(obj interface{}, queue workqueue.RateLimitingInterface) {
+func enqueuePlacement(obj interface{}, queue workqueue.TypedRateLimitingInterface[string]) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		runtime.HandleError(err)

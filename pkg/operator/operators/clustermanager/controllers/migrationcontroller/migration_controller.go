@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"github.com/openshift/library-go/pkg/assets"
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
@@ -29,6 +27,8 @@ import (
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/manifests"
@@ -60,7 +60,6 @@ type crdMigrationController struct {
 	kubeClient                kubernetes.Interface
 	patcher                   patcher.Patcher[*operatorapiv1.ClusterManager, operatorapiv1.ClusterManagerSpec, operatorapiv1.ClusterManagerStatus]
 	clusterManagerLister      operatorlister.ClusterManagerLister
-	recorder                  events.Recorder
 	generateHubClusterClients func(hubConfig *rest.Config) (apiextensionsclient.Interface, migrationv1alpha1client.StorageVersionMigrationsGetter, error)
 	parseMigrations           func() ([]*migrationv1alpha1.StorageVersionMigration, error)
 }
@@ -70,8 +69,7 @@ func NewCRDMigrationController(
 	kubeconfig *rest.Config,
 	kubeClient kubernetes.Interface,
 	clusterManagerClient operatorv1client.ClusterManagerInterface,
-	clusterManagerInformer operatorinformer.ClusterManagerInformer,
-	recorder events.Recorder) factory.Controller {
+	clusterManagerInformer operatorinformer.ClusterManagerInformer) factory.Controller {
 	controller := &crdMigrationController{
 		kubeconfig: kubeconfig,
 		kubeClient: kubeClient,
@@ -80,18 +78,18 @@ func NewCRDMigrationController(
 			clusterManagerClient),
 		clusterManagerLister:      clusterManagerInformer.Lister(),
 		parseMigrations:           parseStorageVersionMigrationFiles,
-		recorder:                  recorder,
 		generateHubClusterClients: generateHubClients,
 	}
 
 	return factory.New().WithSync(controller.sync).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterManagerInformer.Informer()).
-		ToController("CRDMigrationController", recorder)
+		ToController("CRDMigrationController")
 }
 
-func (c *crdMigrationController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	clusterManagerName := controllerContext.QueueKey()
-	klog.V(4).Infof("Reconciling ClusterManager %q", clusterManagerName)
+func (c *crdMigrationController) sync(ctx context.Context, controllerContext factory.SyncContext, clusterManagerName string) error {
+	logger := klog.FromContext(ctx).WithValues("clusterManager", clusterManagerName)
+	logger.V(4).Info("Reconciling ClusterManager")
+	ctx = klog.NewContext(ctx, logger)
 
 	// if no migration files exist, do nothing and exit the reconcile
 	migrations, err := c.parseMigrations()
@@ -152,23 +150,23 @@ func (c *crdMigrationController) sync(ctx context.Context, controllerContext fac
 
 		_, err = c.patcher.PatchStatus(ctx, newClusterManager, newClusterManager.Status, clusterManager.Status)
 		if err != nil {
-			klog.Errorf("Failed to update ClusterManager status. %v", err)
+			logger.Error(err, "Failed to update ClusterManager status")
 			controllerContext.Queue().AddRateLimited(clusterManagerName)
 			return
 		}
 
 		// If migration not succeed, wait for all StorageVersionMigrations succeed.
 		if migrationCond.Status != metav1.ConditionTrue {
-			klog.V(4).Infof("Wait all StorageVersionMigrations succeed. migrationCond: %v. error: %v", migrationCond, err)
+			logger.V(4).Info("Wait all StorageVersionMigrations succeed", "migrationCond", migrationCond, "error", err)
 			controllerContext.Queue().AddRateLimited(clusterManagerName)
 		}
 	}()
 
 	err = checkCRDStorageVersion(ctx, migrations, apiExtensionClient)
 	if err != nil {
-		klog.Errorf("Failed to check CRD current storage version. %v", err)
+		logger.Error(err, "Failed to check CRD current storage version")
 		controllerContext.Queue().AddRateLimited(clusterManagerName)
-		c.recorder.Warningf("StorageVersionMigrationFailed", "Failed to check CRD current storage version. %v", err)
+		controllerContext.Recorder().Warningf(ctx, "StorageVersionMigrationFailed", "Failed to check CRD current storage version. %v", err)
 
 		migrationCond = metav1.Condition{
 			Type:    operatorapiv1.ConditionMigrationSucceeded,
@@ -179,9 +177,9 @@ func (c *crdMigrationController) sync(ctx context.Context, controllerContext fac
 		return nil
 	}
 
-	err = createStorageVersionMigrations(ctx, migrations, newClusterManagerOwner(clusterManager), migrationClient, c.recorder)
+	err = createStorageVersionMigrations(ctx, migrations, newClusterManagerOwner(clusterManager), migrationClient, controllerContext.Recorder())
 	if err != nil {
-		klog.Errorf("Failed to apply StorageVersionMigrations. %v", err)
+		logger.Error(err, "Failed to apply StorageVersionMigrations")
 
 		migrationCond = metav1.Condition{
 			Type:    operatorapiv1.ConditionMigrationSucceeded,
@@ -194,7 +192,7 @@ func (c *crdMigrationController) sync(ctx context.Context, controllerContext fac
 
 	migrationCond, err = syncStorageVersionMigrationsCondition(ctx, migrations, migrationClient)
 	if err != nil {
-		klog.Errorf("Failed to sync StorageVersionMigrations condition. %v", err)
+		logger.Error(err, "Failed to sync StorageVersionMigrations condition")
 		return err
 	}
 
@@ -397,11 +395,11 @@ func createStorageVersionMigration(
 		migration.ObjectMeta.OwnerReferences = append(migration.ObjectMeta.OwnerReferences, ownerRefs)
 		actual, err := client.StorageVersionMigrations().Create(context.TODO(), migration, metav1.CreateOptions{})
 		if err != nil {
-			recorder.Warningf("StorageVersionMigrationCreateFailed", "Failed to create %s: %v", resourcehelper.FormatResourceForCLIWithNamespace(migration), err)
+			recorder.Warningf(ctx, "StorageVersionMigrationCreateFailed", "Failed to create %s: %v", resourcehelper.FormatResourceForCLIWithNamespace(migration), err)
 			return err
 		}
 
-		recorder.Eventf("StorageVersionMigrationCreated", "Created %s because it was missing", resourcehelper.FormatResourceForCLIWithNamespace(actual))
+		recorder.Eventf(ctx, "StorageVersionMigrationCreated", "Created %s because it was missing", resourcehelper.FormatResourceForCLIWithNamespace(actual))
 		return err
 	}
 	if err != nil {

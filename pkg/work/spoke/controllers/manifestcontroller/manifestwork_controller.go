@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/pkg/errors"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -64,7 +63,6 @@ type ManifestWorkController struct {
 
 // NewManifestWorkController returns a ManifestWorkController
 func NewManifestWorkController(
-	recorder events.Recorder,
 	spokeDynamicClient dynamic.Interface,
 	spokeKubeClient kubernetes.Interface,
 	spokeAPIExtensionClient apiextensionsclient.Interface,

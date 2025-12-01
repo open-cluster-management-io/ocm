@@ -111,7 +111,7 @@ func TestOnClusterChange(t *testing.T) {
 				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings(),
 			)
 			queuedKeys := sets.NewString()
-			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.RateLimitingInterface) {
+			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.TypedRateLimitingInterface[string]) {
 				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 				queuedKeys.Insert(key)
 			}
@@ -275,7 +275,7 @@ func TestOnClusterUpdate(t *testing.T) {
 				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings(),
 			)
 			queuedKeys := sets.NewString()
-			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.RateLimitingInterface) {
+			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.TypedRateLimitingInterface[string]) {
 				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 				queuedKeys.Insert(key)
 			}
@@ -379,7 +379,7 @@ func TestOnClusterDelete(t *testing.T) {
 				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings(),
 			)
 			queuedKeys := sets.NewString()
-			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.RateLimitingInterface) {
+			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.TypedRateLimitingInterface[string]) {
 				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 				queuedKeys.Insert(key)
 			}

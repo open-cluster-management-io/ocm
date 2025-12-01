@@ -6,8 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -28,10 +26,13 @@ import (
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
@@ -84,8 +85,7 @@ func NewKlusterletController(
 	controlPlaneNodeLabelSelector string,
 	deploymentReplicas int32,
 	disableAddonNamespace bool,
-	enableSyncLabels bool,
-	recorder events.Recorder) factory.Controller {
+	enableSyncLabels bool) factory.Controller {
 	controller := &klusterletController{
 		kubeClient: kubeClient,
 		patcher: patcher.NewPatcher[
@@ -94,7 +94,7 @@ func NewKlusterletController(
 		kubeVersion:                   kubeVersion,
 		operatorNamespace:             operatorNamespace,
 		cache:                         resourceapply.NewResourceCache(),
-		managedClusterClientsBuilder:  newManagedClusterClientsBuilder(kubeClient, apiExtensionClient, appliedManifestWorkClient, recorder),
+		managedClusterClientsBuilder:  newManagedClusterClientsBuilder(kubeClient, apiExtensionClient, appliedManifestWorkClient),
 		controlPlaneNodeLabelSelector: controlPlaneNodeLabelSelector,
 		deploymentReplicas:            deploymentReplicas,
 		disableAddonNamespace:         disableAddonNamespace,
@@ -109,7 +109,7 @@ func NewKlusterletController(
 		WithInformersQueueKeysFunc(helpers.KlusterletDeploymentQueueKeyFunc(
 			controller.klusterletLister), deploymentInformer.Informer()).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, klusterletInformer.Informer()).
-		ToController("KlusterletController", recorder)
+		ToController("KlusterletController")
 }
 
 type AwsIrsa struct {
@@ -235,9 +235,9 @@ func (config *klusterletConfig) populateBootstrap(klusterlet *operatorapiv1.Klus
 	}
 }
 
-func (n *klusterletController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	klusterletName := controllerContext.QueueKey()
-	klog.V(4).Infof("Reconciling Klusterlet %q", klusterletName)
+func (n *klusterletController) sync(ctx context.Context, controllerContext factory.SyncContext, klusterletName string) error {
+	logger := klog.FromContext(ctx).WithValues("klusterlet", klusterletName)
+	logger.V(4).Info("Reconciling Klusterlet")
 	originalKlusterlet, err := n.klusterletLister.Get(klusterletName)
 	if errors.IsNotFound(err) {
 		// Klusterlet not found, could have been deleted, do nothing.
@@ -250,7 +250,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 	resourceRequirements, err := helpers.ResourceRequirements(klusterlet)
 	if err != nil {
-		klog.Errorf("Failed to parse resource requirements for klusterlet %s: %v", klusterlet.Name, err)
+		logger.Error(err, "Failed to parse resource requirements for klusterlet")
 		return err
 	}
 
@@ -295,7 +295,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	managedClusterClients, err := n.managedClusterClientsBuilder.
 		withMode(config.InstallMode).
 		withKubeConfigSecret(config.AgentNamespace, config.ExternalManagedKubeConfigSecret).
-		build(ctx)
+		build(ctx, controllerContext)
 
 	// update klusterletReadyToApply condition at first in hosted mode
 	// this conditions should be updated even when klusterlet is in deleting state.
@@ -543,7 +543,8 @@ func ensureNamespace(
 	kubeClient kubernetes.Interface,
 	klusterlet *operatorapiv1.Klusterlet,
 	namespace string, labels map[string]string, recorder events.Recorder) error {
-	_, _, err := resourceapply.ApplyNamespace(ctx, kubeClient.CoreV1(), recorder, &corev1.Namespace{
+	recorderWrapper := commonrecorder.NewEventsRecorderWrapper(ctx, recorder)
+	_, _, err := resourceapply.ApplyNamespace(ctx, kubeClient.CoreV1(), recorderWrapper, &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: namespace,
 			Annotations: map[string]string{

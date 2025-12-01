@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	authv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -20,6 +19,10 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
+
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 )
 
 type TokenGetterFunc func() (token []byte, expiration []byte, additionalData map[string][]byte, err error)
@@ -233,7 +236,8 @@ func applyKubeconfigSecret(ctx context.Context, templateKubeconfig *rest.Config,
 		secret.Data[k] = v
 	}
 
-	_, _, err = resourceapply.ApplySecret(ctx, secretClient, recorder, secret)
+	recorderWrapper := commonrecorder.NewEventsRecorderWrapper(ctx, recorder)
+	_, _, err = resourceapply.ApplySecret(ctx, secretClient, recorderWrapper, secret)
 	return err
 }
 

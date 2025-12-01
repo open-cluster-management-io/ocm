@@ -112,9 +112,8 @@ func TestClockSyncController(t *testing.T) {
 					clusterClient.ClusterV1().ManagedClusters()),
 				clusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				leaseLister:   leaseInformerFactory.Coordination().V1().Leases().Lister(),
-				eventRecorder: syncCtx.Recorder(),
 			}
-			syncErr := controller.sync(context.TODO(), syncCtx)
+			syncErr := controller.sync(context.TODO(), syncCtx, testinghelpers.TestManagedClusterName)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

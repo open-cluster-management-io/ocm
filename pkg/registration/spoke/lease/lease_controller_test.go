@@ -5,12 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
@@ -107,7 +107,7 @@ func TestSync(t *testing.T) {
 				lastLeaseDurationSeconds: c.controllerlastLeaseDurationSeconds,
 			}
 
-			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""))
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), "")
 			testingcommon.AssertError(t, syncErr, c.expectSyncErr)
 
 			if c.validateActions != nil {
@@ -122,11 +122,11 @@ type fakeLeaseUpdater struct {
 	stopCalled  bool
 }
 
-func (f *fakeLeaseUpdater) start(ctx context.Context, leaseDuration time.Duration) {
+func (f *fakeLeaseUpdater) start(_ context.Context, _ factory.SyncContext, _ time.Duration) {
 	f.startCalled = true
 }
 
-func (f *fakeLeaseUpdater) stop() {
+func (f *fakeLeaseUpdater) stop(_ context.Context, _ factory.SyncContext) {
 	f.stopCalled = true
 }
 
@@ -137,12 +137,12 @@ func TestLeaseUpdater(t *testing.T) {
 		leaseClient: hubClient.CoordinationV1().Leases(testinghelpers.TestManagedClusterName),
 		clusterName: testinghelpers.TestManagedClusterName,
 		leaseName:   "managed-cluster-lease",
-		recorder:    eventstesting.NewTestingEventRecorder(t),
 	}
 
 	// start the updater
 	ctx := context.Background()
-	leaseUpdater.start(ctx, time.Second*1)
+	syncCtx := testingcommon.NewFakeSyncContext(t, "")
+	leaseUpdater.start(ctx, syncCtx, time.Second*1)
 
 	// wait for 3 second, the all actions should be in get,update pairs
 	time.Sleep(time.Second * 3)
@@ -161,7 +161,7 @@ func TestLeaseUpdater(t *testing.T) {
 	}
 
 	// stop the updater
-	leaseUpdater.stop()
+	leaseUpdater.stop(ctx, syncCtx)
 	actionLen := len(actions)
 
 	// wait for 3 second, no new actions should be added

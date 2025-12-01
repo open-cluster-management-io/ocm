@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	corev1 "k8s.io/api/core/v1"
@@ -30,11 +28,13 @@ import (
 	v1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 	workv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/apply"
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/manifests"
@@ -62,7 +62,6 @@ type managedClusterController struct {
 	applier            *apply.PermissionApplier
 	patcher            patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
 	hubDriver          register.HubDriver
-	eventRecorder      events.Recorder
 	labels             map[string]string
 }
 
@@ -77,7 +76,7 @@ func NewManagedClusterController(
 	clusterRoleBindingInformer rbacv1informers.ClusterRoleBindingInformer,
 	manifestWorkInformer workinformers.ManifestWorkInformer,
 	hubDriver register.HubDriver,
-	recorder events.Recorder, labels map[string]string) factory.Controller {
+	labels map[string]string) factory.Controller {
 
 	// Creating a deep copy of the labels to avoid controllers from reading the same map concurrently.
 	deepCopyLabels := make(map[string]string, len(labels))
@@ -101,8 +100,7 @@ func NewManagedClusterController(
 		patcher: patcher.NewPatcher[
 			*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus](
 			clusterClient.ClusterV1().ManagedClusters()),
-		eventRecorder: recorder.WithComponentSuffix("managed-cluster-controller"),
-		labels:        deepCopyLabels,
+		labels: deepCopyLabels,
 	}
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterInformer.Informer()).
@@ -114,16 +112,16 @@ func NewManagedClusterController(
 			clusterRoleInformer.Informer(),
 			clusterRoleBindingInformer.Informer()).
 		WithSync(c.sync).
-		ToController("ManagedClusterController", recorder)
+		ToController("ManagedClusterController")
 }
 
-func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	managedClusterName := syncCtx.QueueKey()
-	logger := klog.FromContext(ctx)
-	logger.V(4).Info("Reconciling ManagedCluster", "managedClusterName", managedClusterName)
+func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.SyncContext, managedClusterName string) error {
+	logger := klog.FromContext(ctx).WithValues("managedClusterName", managedClusterName)
+	logger.V(4).Info("Reconciling ManagedCluster")
+	ctx = klog.NewContext(ctx, logger)
 	managedCluster, err := c.clusterLister.Get(managedClusterName)
 	if apierrors.IsNotFound(err) {
-		err = c.removeClusterRbac(ctx, managedClusterName, true)
+		err = c.removeClusterRbac(ctx, syncCtx, managedClusterName, true)
 		if errors.Is(err, requeueError) {
 			syncCtx.Queue().AddAfter(managedClusterName, requeueError.RequeueTime)
 			return nil
@@ -141,7 +139,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 			return err
 		}
 
-		err = c.removeClusterRbac(ctx, managedClusterName, true)
+		err = c.removeClusterRbac(ctx, syncCtx, managedClusterName, true)
 		if err != nil {
 			if errors.Is(err, requeueError) {
 				syncCtx.Queue().AddAfter(managedClusterName, requeueError.RequeueTime)
@@ -170,7 +168,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		}
 
 		// Hub cluster-admin denies the current spoke cluster, we remove its related resources and update its condition.
-		c.eventRecorder.Eventf("ManagedClusterDenied", "managed cluster %s is denied by hub cluster admin", managedClusterName)
+		syncCtx.Recorder().Eventf(ctx, "ManagedClusterDenied", "managed cluster %s is denied by hub cluster admin", managedClusterName)
 
 		// Apply(Update) the cluster specific rbac resources for this spoke cluster with hubAcceptsClient=false.
 		var errs []error
@@ -203,7 +201,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		}
 
 		// Remove the cluster role binding files for registration-agent and work-agent.
-		err = c.removeClusterRbac(ctx, managedClusterName, managedCluster.Spec.HubAcceptsClient)
+		err = c.removeClusterRbac(ctx, syncCtx, managedClusterName, managedCluster.Spec.HubAcceptsClient)
 		if errors.Is(err, requeueError) {
 			syncCtx.Queue().AddAfter(managedClusterName, requeueError.RequeueTime)
 			return nil
@@ -231,8 +229,9 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	// 1. namespace for this spoke cluster.
 	// 2. cluster specific rbac resources for this spoke cluster.(hubAcceptsClient=true)
 	// 3. cluster specific rolebinding(registration-agent and work-agent) for this spoke cluster.
+	recorderWrapper := commonrecorder.NewEventsRecorderWrapper(ctx, syncCtx.Recorder())
 	var errs []error
-	_, _, err = resourceapply.ApplyNamespace(ctx, c.kubeClient.CoreV1(), syncCtx.Recorder(), namespace)
+	_, _, err = resourceapply.ApplyNamespace(ctx, c.kubeClient.CoreV1(), recorderWrapper, namespace)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -278,7 +277,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		errs = append(errs, updatedErr)
 	}
 	if updated {
-		c.eventRecorder.Eventf("ManagedClusterAccepted", "managed cluster %s is accepted by hub cluster admin", managedClusterName)
+		syncCtx.Recorder().Eventf(ctx, "ManagedClusterAccepted", "managed cluster %s is accepted by hub cluster admin", managedClusterName)
 	}
 	return operatorhelpers.NewMultiLineAggregate(errs)
 }
@@ -304,7 +303,7 @@ func (c *managedClusterController) acceptCluster(ctx context.Context, managedClu
 // remove the cluster rbac resources firstly.
 // the work roleBinding with a finalizer remains because it is used by work agent to operator the works.
 // the finalizer on work roleBinding will be removed after there is no works in the ns.
-func (c *managedClusterController) removeClusterRbac(ctx context.Context, clusterName string, accepted bool) error {
+func (c *managedClusterController) removeClusterRbac(ctx context.Context, syncCtx factory.SyncContext, clusterName string, accepted bool) error {
 	var errs []error
 	assetFn := helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, clusterName, accepted, c.labels)
 	files := manifests.ClusterSpecificRoleBindings
@@ -312,8 +311,9 @@ func (c *managedClusterController) removeClusterRbac(ctx context.Context, cluste
 		files = append(files, manifests.ClusterSpecificRBACFiles...)
 	}
 
+	recorderWrapper := commonrecorder.NewEventsRecorderWrapper(ctx, syncCtx.Recorder())
 	resourceResults := resourceapply.DeleteAll(ctx, resourceapply.NewKubeClientHolder(c.kubeClient),
-		c.eventRecorder, assetFn, files...)
+		recorderWrapper, assetFn, files...)
 	for _, result := range resourceResults {
 		if result.Error != nil {
 			errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))

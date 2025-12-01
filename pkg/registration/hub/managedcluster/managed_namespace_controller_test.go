@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -153,10 +152,11 @@ func TestSyncManagedNamespacesForCluster(t *testing.T) {
 					clusterClient.ClusterV1().ManagedClusters()),
 				clusterLister:    clusterInformer.Lister(),
 				clusterSetLister: clusterSetInformer.Lister(),
-				eventRecorder:    eventstesting.NewTestingEventRecorder(t),
 			}
 
-			err := controller.syncManagedNamespacesForCluster(context.TODO(), c.cluster)
+			syncCtx := testingcommon.NewFakeSyncContext(t, c.name)
+
+			err := controller.syncManagedNamespacesForCluster(context.TODO(), syncCtx, c.cluster)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -245,7 +245,6 @@ func TestClusterSetToClusterQueueKeysFunc(t *testing.T) {
 					clusterClient.ClusterV1().ManagedClusters()),
 				clusterLister:    clusterInformer.Lister(),
 				clusterSetLister: clusterSetInformer.Lister(),
-				eventRecorder:    eventstesting.NewTestingEventRecorder(t),
 			}
 
 			clusterNames := controller.clusterSetToClusterQueueKeysFunc(c.clusterSet)
@@ -341,7 +340,6 @@ func TestGetClustersPreviouslyInSet(t *testing.T) {
 					*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
 					clusterClient.ClusterV1().ManagedClusters()),
 				clusterLister: clusterInformer.Lister(),
-				eventRecorder: eventstesting.NewTestingEventRecorder(t),
 			}
 
 			clusters, err := controller.getClustersPreviouslyInSet(c.clusterSetName)
@@ -459,12 +457,11 @@ func TestSync(t *testing.T) {
 					clusterClient.ClusterV1().ManagedClusters()),
 				clusterLister:    clusterInformer.Lister(),
 				clusterSetLister: clusterSetInformer.Lister(),
-				eventRecorder:    eventstesting.NewTestingEventRecorder(t),
 			}
 
 			// Create a fake sync context
 			syncCtx := testingcommon.NewFakeSyncContext(t, c.queueKey)
-			err := controller.sync(context.TODO(), syncCtx)
+			err := controller.sync(context.TODO(), syncCtx, c.queueKey)
 
 			if c.expectError && err == nil {
 				t.Errorf("expected error but got none")

@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -16,6 +14,8 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 // ControllerResyncInterval is exposed so that integration tests can crank up the constroller sync speed.
@@ -40,7 +40,6 @@ func NewSecretController(
 	statusUpdater StatusUpdateFunc,
 	managementCoreClient corev1client.CoreV1Interface,
 	managementSecretInformer cache.SharedIndexInformer,
-	recorder events.Recorder,
 	controllerName string,
 ) factory.Controller {
 	additionalSecretData := map[string][]byte{}
@@ -81,8 +80,8 @@ func NewSecretController(
 	}
 
 	f := factory.New().
-		WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
-			return factory.DefaultQueueKey
+		WithFilteredEventsInformersQueueKeysFunc(func(obj runtime.Object) []string {
+			return []string{factory.DefaultQueueKey}
 		}, func(obj interface{}) bool {
 			accessor, err := meta.Accessor(obj)
 			if err != nil {
@@ -97,8 +96,8 @@ func NewSecretController(
 
 	driverInformer, driverFilter := driver.InformerHandler()
 	if driverInformer != nil && driverFilter != nil {
-		f = f.WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
-			return factory.DefaultQueueKey
+		f = f.WithFilteredEventsInformersQueueKeysFunc(func(obj runtime.Object) []string {
+			return []string{factory.DefaultQueueKey}
 		}, driverFilter, driverInformer)
 	} else if driverInformer != nil {
 		f = f.WithInformers(driverInformer)
@@ -106,10 +105,10 @@ func NewSecretController(
 
 	return f.WithSync(c.sync).
 		ResyncEvery(ControllerResyncInterval).
-		ToController(controllerName, recorder)
+		ToController(controllerName)
 }
 
-func (c *secretController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+func (c *secretController) sync(ctx context.Context, syncCtx factory.SyncContext, _ string) error {
 	// get secret containing client certificate
 	secret, err := c.managementCoreClient.Secrets(c.SecretNamespace).Get(ctx, c.SecretName, metav1.GetOptions{})
 	switch {
@@ -155,7 +154,7 @@ func (c *secretController) sync(ctx context.Context, syncCtx factory.SyncContext
 	if err := saveSecret(c.managementCoreClient, c.SecretNamespace, c.secretToSave); err != nil {
 		return err
 	}
-	syncCtx.Recorder().Eventf("SecretSave", "Secret %s/%s for %s is updated",
+	syncCtx.Recorder().Eventf(ctx, "SecretSave", "Secret %s/%s for %s is updated",
 		c.SecretNamespace, c.SecretName, c.controllerName)
 	// clean the cached secret.
 	c.secretToSave = nil

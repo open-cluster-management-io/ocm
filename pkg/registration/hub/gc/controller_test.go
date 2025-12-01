@@ -6,21 +6,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	fakemetadataclient "k8s.io/client-go/metadata/fake"
 	clienttesting "k8s.io/client-go/testing"
-	clocktesting "k8s.io/utils/clock/testing"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeclusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
@@ -146,7 +144,6 @@ func TestGController(t *testing.T) {
 				clusterInformerFactory.Cluster().V1().ManagedClusters(),
 				clusterClient,
 				metadataClient,
-				events.NewInMemoryRecorder("", clocktesting.NewFakePassiveClock(time.Now())),
 				[]string{"addon.open-cluster-management.io/v1alpha1/managedclusteraddons",
 					"work.open-cluster-management.io/v1/manifestworks"},
 			)
@@ -159,11 +156,10 @@ func TestGController(t *testing.T) {
 				clusterLister:         clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				clusterPatcher:        clusterPatcher,
 				gcResourcesController: newGCResourcesController(metadataClient, []schema.GroupVersionResource{addonGvr, workGvr}),
-				eventRecorder:         events.NewInMemoryRecorder("", clocktesting.NewFakePassiveClock(time.Now())),
 			}
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, c.key)
-			err := ctrl.sync(context.TODO(), controllerContext)
+			err := ctrl.sync(context.TODO(), controllerContext, c.key)
 			if err != nil && !errors.Is(err, requeueError) {
 				t.Error(err)
 			}

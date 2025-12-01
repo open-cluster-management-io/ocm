@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,6 +14,7 @@ import (
 	clusterinformerv1beta2 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta2"
 	clusterlisterv1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
@@ -39,18 +38,15 @@ var DefaultManagedClusterSet = &clusterv1beta2.ManagedClusterSet{
 type defaultManagedClusterSetController struct {
 	clusterSetClient clustersetv1beta2.ClusterV1beta2Interface
 	clusterSetLister clusterlisterv1beta2.ManagedClusterSetLister
-	eventRecorder    events.Recorder
 }
 
 func NewDefaultManagedClusterSetController(
 	clusterSetClient clustersetv1beta2.ClusterV1beta2Interface,
-	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer,
-	recorder events.Recorder) factory.Controller {
+	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer) factory.Controller {
 
 	c := &defaultManagedClusterSetController{
 		clusterSetClient: clusterSetClient,
 		clusterSetLister: clusterSetInformer.Lister(),
-		eventRecorder:    recorder.WithComponentSuffix("default-managed-cluster-set-controller"),
 	}
 
 	return factory.New().
@@ -63,11 +59,11 @@ func NewDefaultManagedClusterSetController(
 		// use ResyncEvery to make sure:
 		// 1. create the default clusterset once controller is launched
 		// 2. the default clusterset be recreated once it is deleted for some reason
-		ResyncEvery(10*time.Second).
-		ToController("DefaultManagedClusterSetController", recorder)
+		ResyncEvery(10 * time.Second).
+		ToController("DefaultManagedClusterSetController")
 }
 
-func (c *defaultManagedClusterSetController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+func (c *defaultManagedClusterSetController) sync(ctx context.Context, syncCtx factory.SyncContext, _ string) error {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Reconciling DefaultManagedClusterSet")
 	defaultClusterSet, err := c.clusterSetLister.Get(DefaultManagedClusterSetName)
@@ -76,7 +72,7 @@ func (c *defaultManagedClusterSetController) sync(ctx context.Context, syncCtx f
 		if errors.IsNotFound(err) {
 			_, err := c.clusterSetClient.ManagedClusterSets().Create(ctx, DefaultManagedClusterSet, metav1.CreateOptions{})
 			if err == nil {
-				c.eventRecorder.Eventf("DefaultManagedClusterSetCreated",
+				syncCtx.Recorder().Eventf(ctx, "DefaultManagedClusterSetCreated",
 					"Set the DefaultManagedClusterSet name to %+v. spec to %+v", DefaultManagedClusterSetName, DefaultManagedClusterSet.Spec)
 			}
 			return err
@@ -84,7 +80,7 @@ func (c *defaultManagedClusterSetController) sync(ctx context.Context, syncCtx f
 		return err
 	}
 
-	if err := c.syncDefaultClusterSet(ctx, defaultClusterSet); err != nil {
+	if err := c.syncDefaultClusterSet(ctx, syncCtx, defaultClusterSet); err != nil {
 		return fmt.Errorf("failed to sync DefaultManagedClusterSet %q: %w", DefaultManagedClusterSetName, err)
 	}
 
@@ -92,7 +88,7 @@ func (c *defaultManagedClusterSetController) sync(ctx context.Context, syncCtx f
 }
 
 // syncDefaultClusterSet syncs default cluster set.
-func (c *defaultManagedClusterSetController) syncDefaultClusterSet(ctx context.Context, originalDefaultClusterSet *clusterv1beta2.ManagedClusterSet) error {
+func (c *defaultManagedClusterSetController) syncDefaultClusterSet(ctx context.Context, syncCtx factory.SyncContext, originalDefaultClusterSet *clusterv1beta2.ManagedClusterSet) error {
 	logger := klog.FromContext(ctx)
 	defaultClusterSet := originalDefaultClusterSet.DeepCopy()
 
@@ -112,7 +108,7 @@ func (c *defaultManagedClusterSetController) syncDefaultClusterSet(ctx context.C
 			return fmt.Errorf("failed to update status of ManagedClusterSet %q: %w", defaultClusterSet.Name, err)
 		}
 
-		c.eventRecorder.Eventf("DefaultManagedClusterSetSpecRollbacked", "Rollback the DefaultManagedClusterSetSpec to %+v", defaultClusterSet.Spec)
+		syncCtx.Recorder().Eventf(ctx, "DefaultManagedClusterSetSpecRollbacked", "Rollback the DefaultManagedClusterSetSpec to %+v", defaultClusterSet.Spec)
 	}
 
 	return nil

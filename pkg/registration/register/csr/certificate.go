@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	certificates "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -24,6 +23,7 @@ import (
 	"k8s.io/klog/v2"
 
 	ocmfeature "open-cluster-management.io/api/feature"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
@@ -212,7 +212,7 @@ func (v *v1CSRControl) Create(ctx context.Context, recorder events.Recorder, obj
 	if err != nil {
 		return "", err
 	}
-	recorder.Eventf("CSRCreated", "A csr %q is created", req.Name)
+	recorder.Eventf(ctx, "CSRCreated", "A csr %q is created", req.Name)
 	return req.Name, nil
 }
 

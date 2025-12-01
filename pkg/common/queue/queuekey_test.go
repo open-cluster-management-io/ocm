@@ -4,10 +4,11 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 func TestFileter(t *testing.T) {

@@ -13,6 +13,7 @@ import (
 	corev1lister "k8s.io/client-go/listers/core/v1"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 type resoureReconcile struct {
@@ -20,7 +21,7 @@ type resoureReconcile struct {
 	nodeLister                    corev1lister.NodeLister
 }
 
-func (r *resoureReconcile) reconcile(ctx context.Context, cluster *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error) {
+func (r *resoureReconcile) reconcile(ctx context.Context, _ factory.SyncContext, cluster *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error) {
 	// check the kube-apiserver health on managed cluster.
 	condition := r.checkKubeAPIServerStatus(ctx)
 

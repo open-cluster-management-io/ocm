@@ -5,11 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/utils/clock"
 
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
@@ -89,7 +87,7 @@ func TestManifestWorkGarbageCollectionController(t *testing.T) {
 			workInformerFactory.Start(ctx.Done())
 			workInformerFactory.WaitForCacheSync(ctx.Done())
 
-			syncContext := testingcommon.NewFakeSDKSyncContext(t, "default/test")
+			syncContext := testingcommon.NewFakeSyncContext(t, "default/test")
 			err := controller.sync(ctx, syncContext, "default/test")
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
@@ -130,10 +128,8 @@ func TestManifestWorkGarbageCollectionController(t *testing.T) {
 func TestNewManifestWorkGarbageCollectionController(t *testing.T) {
 	fakeWorkClient := fakeworkclient.NewSimpleClientset()
 	workInformerFactory := workinformers.NewSharedInformerFactory(fakeWorkClient, time.Minute*10)
-	recorder := events.NewInMemoryRecorder("test", clock.RealClock{})
 
 	ctrl := NewManifestWorkGarbageCollectionController(
-		recorder,
 		fakeWorkClient,
 		workInformerFactory.Work().V1().ManifestWorks(),
 	)

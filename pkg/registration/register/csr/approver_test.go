@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
@@ -204,7 +203,6 @@ func TestSync(t *testing.T) {
 				}
 			}
 
-			recorder := eventstesting.NewTestingEventRecorder(t)
 			ctrl := &csrApprovingController[*certificatesv1.CertificateSigningRequest]{
 				lister:        informerFactory.Certificates().V1().CertificateSigningRequests().Lister(),
 				approver:      NewCSRV1Approver(kubeClient),
@@ -213,19 +211,17 @@ func TestSync(t *testing.T) {
 					&csrBootstrapReconciler{
 						signer:        certificatesv1.KubeAPIServerClientSignerName,
 						kubeClient:    kubeClient,
-						eventRecorder: recorder,
 						approvalUsers: sets.Set[string]{},
 					},
-					NewCSRRenewalReconciler(kubeClient, certificatesv1.KubeAPIServerClientSignerName, recorder),
+					NewCSRRenewalReconciler(kubeClient, certificatesv1.KubeAPIServerClientSignerName),
 					NewCSRBootstrapReconciler(
 						kubeClient,
 						certificatesv1.KubeAPIServerClientSignerName,
 						c.approvalUsers,
-						recorder,
 					),
 				},
 			}
-			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, validCSR.Name))
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, validCSR.Name), validCSR.Name)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}
@@ -338,15 +334,14 @@ func TestIsSpokeClusterClientCertRenewal(t *testing.T) {
 func TestNewApprover(t *testing.T) {
 	kubeClient := kubefake.NewClientset()
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, 3*time.Minute)
-	recorder := eventstesting.NewTestingEventRecorder(t)
 	utilruntime.Must(features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates))
-	_, err := NewCSRHubDriver(kubeClient, informerFactory, []string{}, recorder)
+	_, err := NewCSRHubDriver(kubeClient, informerFactory, []string{})
 	if err != nil {
 		t.Error(err)
 	}
 
 	features.HubMutableFeatureGate.Set(fmt.Sprintf("%s=true", ocmfeature.ManagedClusterAutoApproval))
-	_, err = NewCSRHubDriver(kubeClient, informerFactory, []string{}, recorder)
+	_, err = NewCSRHubDriver(kubeClient, informerFactory, []string{})
 	if err != nil {
 		t.Error(err)
 	}

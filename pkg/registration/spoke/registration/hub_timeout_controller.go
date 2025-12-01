@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	leasev1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	"k8s.io/klog/v2"
+
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 const leaseName = "managed-cluster-lease"
@@ -30,7 +30,6 @@ func NewHubTimeoutController(
 	leaseClient leasev1client.LeaseInterface,
 	timeoutSeconds int32,
 	handleTimeout func(ctx context.Context) error,
-	recorder events.Recorder,
 ) factory.Controller {
 	c := &hubTimeoutController{
 		clusterName:    clusterName,
@@ -40,10 +39,10 @@ func NewHubTimeoutController(
 		startTime:      time.Now(),
 	}
 	return factory.New().WithSync(c.sync).ResyncEvery(time.Minute).
-		ToController("HubTimeoutController", recorder)
+		ToController("HubTimeoutController")
 }
 
-func (c *hubTimeoutController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+func (c *hubTimeoutController) sync(ctx context.Context, _ factory.SyncContext, _ string) error {
 	logger := klog.FromContext(ctx)
 	if c.handleTimeout == nil {
 		return nil

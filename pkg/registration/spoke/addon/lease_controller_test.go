@@ -372,7 +372,7 @@ func TestSync(t *testing.T) {
 				spokeLeaseClient:      spokeLeaseClient.CoordinationV1(),
 			}
 			syncCtx := testingcommon.NewFakeSyncContext(t, c.queueKey)
-			syncErr := ctrl.sync(context.TODO(), syncCtx)
+			syncErr := ctrl.sync(context.TODO(), syncCtx, c.queueKey)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

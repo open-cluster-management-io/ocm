@@ -3,8 +3,6 @@ package clusterprofile
 import (
 	"context"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -19,6 +17,7 @@ import (
 	listerv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	v1 "open-cluster-management.io/api/cluster/v1"
 	v1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -35,15 +34,13 @@ type clusterProfileController struct {
 	clusterProfileClient cpclientset.Interface
 	clusterProfileLister cplisterv1alpha1.ClusterProfileLister
 	patcher              patcher.Patcher[*cpv1alpha1.ClusterProfile, cpv1alpha1.ClusterProfileSpec, cpv1alpha1.ClusterProfileStatus]
-	eventRecorder        events.Recorder
 }
 
 // NewClusterProfileController creates a new managed cluster controller
 func NewClusterProfileController(
 	clusterInformer informerv1.ManagedClusterInformer,
 	clusterProfileClient cpclientset.Interface,
-	clusterProfileInformer cpinformerv1alpha1.ClusterProfileInformer,
-	recorder events.Recorder) factory.Controller {
+	clusterProfileInformer cpinformerv1alpha1.ClusterProfileInformer) factory.Controller {
 	c := &clusterProfileController{
 		clusterLister:        clusterInformer.Lister(),
 		clusterProfileClient: clusterProfileClient,
@@ -51,19 +48,17 @@ func NewClusterProfileController(
 		patcher: patcher.NewPatcher[
 			*cpv1alpha1.ClusterProfile, cpv1alpha1.ClusterProfileSpec, cpv1alpha1.ClusterProfileStatus](
 			clusterProfileClient.ApisV1alpha1().ClusterProfiles(ClusterProfileNamespace)),
-		eventRecorder: recorder.WithComponentSuffix("cluster-profile-controller"),
 	}
 
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterInformer.Informer(), clusterProfileInformer.Informer()).
 		WithSync(c.sync).
-		ToController("ClusterProfileController", recorder)
+		ToController("ClusterProfileController")
 }
 
-func (c *clusterProfileController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	managedClusterName := syncCtx.QueueKey()
-	logger := klog.FromContext(ctx)
-	logger.V(4).Info("Reconciling Cluster", "ClusterName", managedClusterName)
+func (c *clusterProfileController) sync(ctx context.Context, syncCtx factory.SyncContext, managedClusterName string) error {
+	logger := klog.FromContext(ctx).WithValues("managedClusterName", managedClusterName)
+	logger.V(4).Info("Reconciling Cluster")
 
 	managedCluster, err := c.clusterLister.Get(managedClusterName)
 	if errors.IsNotFound(err) {
@@ -169,7 +164,7 @@ func (c *clusterProfileController) sync(ctx context.Context, syncCtx factory.Syn
 		return err
 	}
 	if updated {
-		c.eventRecorder.Eventf("ClusterProfileSynced", "cluster profile %s is synced from open cluster management", managedClusterName)
+		syncCtx.Recorder().Eventf(ctx, "ClusterProfileSynced", "cluster profile %s is synced from open cluster management", managedClusterName)
 	}
 	return nil
 }

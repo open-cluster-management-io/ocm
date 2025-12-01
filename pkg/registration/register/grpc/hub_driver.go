@@ -6,8 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -22,6 +20,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	sdkhelpers "open-cluster-management.io/sdk-go/pkg/helpers"
 
 	"open-cluster-management.io/ocm/pkg/features"
@@ -49,15 +48,13 @@ func NewGRPCHubDriver(
 	kubeInformers informers.SharedInformerFactory,
 	caKeyFile, caFile string,
 	duration time.Duration,
-	autoApprovedCSRUsers []string,
-	recorder events.Recorder) (register.HubDriver, error) {
-	csrReconciles := []csr.Reconciler{csr.NewCSRRenewalReconciler(kubeClient, operatorv1.GRPCAuthSigner, recorder)}
+	autoApprovedCSRUsers []string) (register.HubDriver, error) {
+	csrReconciles := []csr.Reconciler{csr.NewCSRRenewalReconciler(kubeClient, operatorv1.GRPCAuthSigner)}
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
 		csrReconciles = append(csrReconciles, csr.NewCSRBootstrapReconciler(
 			kubeClient,
 			operatorv1.GRPCAuthSigner,
 			autoApprovedCSRUsers,
-			recorder,
 		))
 	}
 
@@ -77,12 +74,11 @@ func NewGRPCHubDriver(
 			csr.NewCSRV1Approver(kubeClient),
 			getCSRInfo,
 			csrReconciles,
-			recorder,
 		),
 		csrSignController: newCSRSignController(
 			kubeClient,
 			kubeInformers.Certificates().V1().CertificateSigningRequests(),
-			caKey, caData, duration, recorder,
+			caKey, caData, duration,
 		),
 	}, nil
 }
@@ -110,7 +106,6 @@ func newCSRSignController(
 	csrInformer certificatesv1informers.CertificateSigningRequestInformer,
 	caKey, caData []byte,
 	duration time.Duration,
-	recorder events.Recorder,
 ) factory.Controller {
 	c := &csrSignController{
 		kubeClient: kubeClient,
@@ -138,11 +133,10 @@ func newCSRSignController(
 			},
 			csrInformer.Informer()).
 		WithSync(c.sync).
-		ToController("CSRSignController", recorder)
+		ToController("CSRSignController")
 }
 
-func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	csrName := syncCtx.QueueKey()
+func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContext, csrName string) error {
 	csr, err := c.csrLister.Get(csrName)
 	if errors.IsNotFound(err) {
 		return nil

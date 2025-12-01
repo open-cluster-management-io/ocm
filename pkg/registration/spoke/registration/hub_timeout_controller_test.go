@@ -49,7 +49,7 @@ func TestHubTimeoutController_Sync(t *testing.T) {
 				timeoutSeconds: 3,
 			}
 
-			err := controller.sync(context.Background(), testingcommon.NewFakeSyncContext(t, ""))
+			err := controller.sync(context.Background(), testingcommon.NewFakeSyncContext(t, ""), "")
 			if err != nil {
 				t.Fatal(err)
 			}

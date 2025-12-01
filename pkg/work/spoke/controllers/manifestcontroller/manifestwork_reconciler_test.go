@@ -375,7 +375,7 @@ func TestSync(t *testing.T) {
 			controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
 				withKubeObject(c.spokeObject...).
 				withUnstructuredObject(c.spokeDynamicObject...)
-			syncContext := testingcommon.NewFakeSDKSyncContext(t, workKey)
+			syncContext := testingcommon.NewFakeSyncContext(t, workKey)
 			err := controller.toController().sync(context.TODO(), syncContext, work.Name)
 			if err != nil {
 				t.Errorf("Should be success with no err: %v", err)
@@ -418,7 +418,7 @@ func TestFailedToApplyResource(t *testing.T) {
 
 		return true, &corev1.Secret{}, fmt.Errorf("fake error")
 	})
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, workKey)
+	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
 	err := controller.toController().sync(context.TODO(), syncContext, work.Name)
 	if err == nil {
 		t.Errorf("Should return an err")
@@ -553,7 +553,7 @@ func TestUpdateStrategy(t *testing.T) {
 						"v1", "NewObject", "ns1", "n1",
 						map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}}), nil
 				})
-			syncContext := testingcommon.NewFakeSDKSyncContext(t, workKey)
+			syncContext := testingcommon.NewFakeSyncContext(t, workKey)
 			err := controller.toController().sync(context.TODO(), syncContext, work.Name)
 			if err != nil {
 				t.Errorf("Should be success with no err: %v", err)
@@ -590,7 +590,7 @@ func TestServerSideApplyConflict(t *testing.T) {
 	controller.dynamicClient.PrependReactor("patch", "newobjects", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 		return true, nil, errors.NewConflict(schema.GroupResource{Resource: "newobjects"}, "n1", fmt.Errorf("conflict error"))
 	})
-	syncContext := testingcommon.NewFakeSDKSyncContext(t, workKey)
+	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
 	err := controller.toController().sync(context.TODO(), syncContext, work.Name)
 	if err != nil {
 		t.Errorf("Should be success with no err: %v", err)

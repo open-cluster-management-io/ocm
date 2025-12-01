@@ -736,7 +736,6 @@ func TestReconcile(t *testing.T) {
 			}
 
 			syncContext := testingcommon.NewFakeSyncContext(t, c.syncKey)
-			recorder := syncContext.Recorder()
 
 			controller := NewAddonProgressingController(
 				fakeAddonClient,
@@ -744,10 +743,9 @@ func TestReconcile(t *testing.T) {
 				addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 				workInformers.Work().V1().ManifestWorks(),
 				utils.ManagedByAddonManager,
-				recorder,
 			)
 
-			err := controller.Sync(context.TODO(), syncContext)
+			err := controller.Sync(context.TODO(), syncContext, c.syncKey)
 			if err != nil {
 				t.Errorf("expected no error when sync: %v", err)
 			}
@@ -1464,7 +1462,6 @@ func TestReconcileHostedAddons(t *testing.T) {
 			}
 
 			syncContext := testingcommon.NewFakeSyncContext(t, c.syncKey)
-			recorder := syncContext.Recorder()
 
 			controller := NewAddonProgressingController(
 				fakeAddonClient,
@@ -1472,10 +1469,9 @@ func TestReconcileHostedAddons(t *testing.T) {
 				addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 				workInformers.Work().V1().ManifestWorks(),
 				utils.ManagedByAddonManager,
-				recorder,
 			)
 
-			err := controller.Sync(context.TODO(), syncContext)
+			err := controller.Sync(context.TODO(), syncContext, c.syncKey)
 			if err != nil {
 				t.Errorf("expected no error when sync: %v", err)
 			}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -17,6 +16,9 @@ import (
 	"k8s.io/klog/v2"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
+
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 )
 
 const (
@@ -56,18 +58,17 @@ type managedNamespaceReconcile struct {
 	hubClusterSetLabel   string
 	spokeKubeClient      kubernetes.Interface
 	spokeNamespaceLister corev1listers.NamespaceLister
-	eventRecorder        events.Recorder
 }
 
 // reconcile implements the statusReconcile interface for managed namespace management
-func (r *managedNamespaceReconcile) reconcile(ctx context.Context, cluster *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error) {
+func (r *managedNamespaceReconcile) reconcile(ctx context.Context, syncCtx factory.SyncContext, cluster *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Reconciling managed namespaces", "clusterName", cluster.Name)
 
 	// Skip if cluster is being deleted
 	if !cluster.DeletionTimestamp.IsZero() {
 		logger.V(4).Info("ManagedCluster is being deleted, cleanup all managed namespaces")
-		if err := r.cleanupPreviouslyManagedNamespaces(ctx, sets.Set[string]{}); err != nil {
+		if err := r.cleanupPreviouslyManagedNamespaces(ctx, syncCtx, sets.Set[string]{}); err != nil {
 			logger.Error(err, "Failed to cleanup previously managed namespaces")
 			return cluster, reconcileContinue, err
 		}
@@ -78,7 +79,7 @@ func (r *managedNamespaceReconcile) reconcile(ctx context.Context, cluster *clus
 	if len(cluster.Status.ManagedNamespaces) == 0 {
 		logger.V(4).Info("No managed namespaces configured")
 		// Still need to cleanup previously managed namespaces
-		if err := r.cleanupPreviouslyManagedNamespaces(ctx, sets.Set[string]{}); err != nil {
+		if err := r.cleanupPreviouslyManagedNamespaces(ctx, syncCtx, sets.Set[string]{}); err != nil {
 			logger.Error(err, "Failed to cleanup previously managed namespaces")
 			return cluster, reconcileContinue, err
 		}
@@ -102,7 +103,7 @@ func (r *managedNamespaceReconcile) reconcile(ctx context.Context, cluster *clus
 		logger.V(4).Info("Processing managed namespace", "namespace", nsName, "clusterSet", clusterSetName)
 
 		// Create or update the namespace
-		if err := r.createOrUpdateNamespace(ctx, nsName, clusterSetName); err != nil {
+		if err := r.createOrUpdateNamespace(ctx, syncCtx, nsName, clusterSetName); err != nil {
 			// Update condition: Failed
 			condition := metav1.Condition{
 				Type:               ConditionNamespaceAvailable,
@@ -133,7 +134,7 @@ func (r *managedNamespaceReconcile) reconcile(ctx context.Context, cluster *clus
 
 	// Clean up previously managed namespaces by setting label to 'false'
 	// Keeps a record of which namespaces were previously managed by this hub
-	if err := r.cleanupPreviouslyManagedNamespaces(ctx, currentManagedNS); err != nil {
+	if err := r.cleanupPreviouslyManagedNamespaces(ctx, syncCtx, currentManagedNS); err != nil {
 		logger.Error(err, "Failed to cleanup previously managed namespaces")
 		allErrors = append(allErrors, fmt.Errorf("failed to cleanup previously managed namespaces: %w", err))
 	}
@@ -144,7 +145,7 @@ func (r *managedNamespaceReconcile) reconcile(ctx context.Context, cluster *clus
 }
 
 // createOrUpdateNamespace creates or updates a namespace
-func (r *managedNamespaceReconcile) createOrUpdateNamespace(ctx context.Context, nsName, clusterSetName string) error {
+func (r *managedNamespaceReconcile) createOrUpdateNamespace(ctx context.Context, syncCtx factory.SyncContext, nsName, clusterSetName string) error {
 	logger := klog.FromContext(ctx)
 
 	// Add hub-specific clusterset label using hub hash
@@ -160,13 +161,14 @@ func (r *managedNamespaceReconcile) createOrUpdateNamespace(ctx context.Context,
 		},
 	}
 
-	_, changed, err := resourceapply.ApplyNamespace(ctx, r.spokeKubeClient.CoreV1(), r.eventRecorder, namespace)
+	recorderWrapper := commonrecorder.NewEventsRecorderWrapper(ctx, syncCtx.Recorder())
+	_, changed, err := resourceapply.ApplyNamespace(ctx, r.spokeKubeClient.CoreV1(), recorderWrapper, namespace)
 	if err != nil {
 		return fmt.Errorf("failed to apply namespace %q: %w", nsName, err)
 	}
 
 	if changed {
-		r.eventRecorder.Eventf("NamespaceApplied", "Applied managed namespace %q for cluster set %q", nsName, clusterSetName)
+		syncCtx.Recorder().Eventf(ctx, "NamespaceApplied", "Applied managed namespace %q for cluster set %q", nsName, clusterSetName)
 		logger.V(4).Info("Applied namespace", "namespace", nsName, "clusterSet", clusterSetName)
 	}
 
@@ -175,7 +177,7 @@ func (r *managedNamespaceReconcile) createOrUpdateNamespace(ctx context.Context,
 
 // cleanupPreviouslyManagedNamespaces sets the hub-specific label to 'false' for namespaces
 // that are no longer in the current managed namespace list
-func (r *managedNamespaceReconcile) cleanupPreviouslyManagedNamespaces(ctx context.Context, currentManagedNS sets.Set[string]) error {
+func (r *managedNamespaceReconcile) cleanupPreviouslyManagedNamespaces(ctx context.Context, syncCtx factory.SyncContext, currentManagedNS sets.Set[string]) error {
 	logger := klog.FromContext(ctx)
 
 	// Get all namespaces with our hub-specific label
@@ -204,7 +206,8 @@ func (r *managedNamespaceReconcile) cleanupPreviouslyManagedNamespaces(ctx conte
 			},
 		}
 
-		_, changed, err := resourceapply.ApplyNamespace(ctx, r.spokeKubeClient.CoreV1(), r.eventRecorder, namespace)
+		recorderWrapper := commonrecorder.NewEventsRecorderWrapper(ctx, syncCtx.Recorder())
+		_, changed, err := resourceapply.ApplyNamespace(ctx, r.spokeKubeClient.CoreV1(), recorderWrapper, namespace)
 		if err != nil {
 			logger.Error(err, "Failed to update previously managed namespace", "namespace", ns.Name)
 			allErrors = append(allErrors, fmt.Errorf("failed to update namespace %q: %w", ns.Name, err))
@@ -212,7 +215,7 @@ func (r *managedNamespaceReconcile) cleanupPreviouslyManagedNamespaces(ctx conte
 		}
 
 		if changed {
-			r.eventRecorder.Eventf("NamespaceUnmanaged", "Set namespace %q as no longer managed", ns.Name)
+			syncCtx.Recorder().Eventf(ctx, "NamespaceUnmanaged", "Set namespace %q as no longer managed", ns.Name)
 			logger.V(4).Info("Updated previously managed namespace", "namespace", ns.Name)
 		}
 	}

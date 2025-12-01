@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -110,12 +109,11 @@ func TestSync(t *testing.T) {
 				clusterClient:           clusterClient,
 				clusterSetBindingLister: informerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
 				clusterSetLister:        informerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
-				eventRecorder:           eventstesting.NewTestingEventRecorder(t),
 			}
 
 			key, _ := cache.MetaNamespaceKeyFunc(c.clusterSetBinding)
 
-			syncErr := ctrl.sync(context.Background(), testingcommon.NewFakeSyncContext(t, key))
+			syncErr := ctrl.sync(context.Background(), testingcommon.NewFakeSyncContext(t, key), key)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

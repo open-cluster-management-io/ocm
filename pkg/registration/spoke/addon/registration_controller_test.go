@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
@@ -15,6 +13,7 @@ import (
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
@@ -328,7 +327,6 @@ func TestRegistrationSync(t *testing.T) {
 				managementKubeClient: managementClient,
 				spokeKubeClient:      kubeClient,
 				hubAddOnLister:       addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				recorder:             eventstesting.NewTestingEventRecorder(t),
 				startRegistrationFunc: func(ctx context.Context, config registrationConfig) context.CancelFunc {
 					_, cancel := context.WithCancel(context.Background())
 					return cancel
@@ -336,7 +334,7 @@ func TestRegistrationSync(t *testing.T) {
 				addOnRegistrationConfigs: c.addOnRegistrationConfigs,
 			}
 
-			err := controller.sync(context.Background(), testingcommon.NewFakeSyncContext(t, c.queueKey))
+			err := controller.sync(context.Background(), testingcommon.NewFakeSyncContext(t, c.queueKey), c.queueKey)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

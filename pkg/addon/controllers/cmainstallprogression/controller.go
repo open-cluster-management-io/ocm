@@ -4,8 +4,6 @@ import (
 	"context"
 	"sort"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -14,6 +12,7 @@ import (
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -33,7 +32,6 @@ func NewCMAInstallProgressionController(
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	addonFilterFunc factory.EventFilterFunc,
-	recorder events.Recorder,
 ) factory.Controller {
 	c := &cmaInstallProgressionController{
 		patcher: patcher.NewPatcher[
@@ -46,14 +44,13 @@ func NewCMAInstallProgressionController(
 	return factory.New().WithInformersQueueKeysFunc(
 		queue.QueueKeyByMetaName,
 		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
-		WithSync(c.sync).ToController("cma-install-progression-controller", recorder)
+		WithSync(c.sync).ToController("cma-install-progression-controller")
 
 }
 
-func (c *cmaInstallProgressionController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	addonName := syncCtx.QueueKey()
-	logger := klog.FromContext(ctx)
-	logger.V(4).Info("Reconciling addon", "addonName", addonName)
+func (c *cmaInstallProgressionController) sync(ctx context.Context, syncCtx factory.SyncContext, addonName string) error {
+	logger := klog.FromContext(ctx).WithValues("addonName", addonName)
+	logger.V(4).Info("Reconciling addon")
 	mgmtAddon, err := c.clusterManagementAddonLister.Get(addonName)
 	switch {
 	case errors.IsNotFound(err):

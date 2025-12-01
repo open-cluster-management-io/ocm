@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	fakeapiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,6 +18,7 @@ import (
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	fakeoperatorclient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
@@ -126,7 +126,7 @@ func TestSync(t *testing.T) {
 					*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
 					clusterClient.ClusterV1().ManagedClusters()),
 			}
-			err := importer.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, c.key))
+			err := importer.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, c.key), c.key)
 			if err != nil {
 				t.Fatal(err)
 			}

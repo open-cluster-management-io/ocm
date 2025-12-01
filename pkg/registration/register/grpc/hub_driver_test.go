@@ -144,7 +144,7 @@ func TestSignCSR(t *testing.T) {
 				duration:   1 * time.Hour,
 			}
 
-			if err := ctrl.sync(context.Background(), testingcommon.NewFakeSyncContext(t, "test_csr")); err != nil {
+			if err := ctrl.sync(context.Background(), testingcommon.NewFakeSyncContext(t, "test_csr"), "test_csr"); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 

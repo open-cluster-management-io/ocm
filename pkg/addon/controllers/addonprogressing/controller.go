@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -27,6 +25,7 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
@@ -49,7 +48,6 @@ func NewAddonProgressingController(
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	workInformers workinformers.ManifestWorkInformer,
 	addonFilterFunc factory.EventFilterFunc,
-	recorder events.Recorder,
 ) factory.Controller {
 	c := &addonProgressingController{
 		addonClient:                  addonClient,
@@ -79,13 +77,12 @@ func NewAddonProgressingController(
 				return len(accessor.GetLabels()) > 0 && len(accessor.GetLabels()[addonapiv1alpha1.AddonLabelKey]) > 0
 			},
 			workInformers.Informer()).
-		WithSync(c.sync).ToController("addon-progressing-controller", recorder)
+		WithSync(c.sync).ToController("addon-progressing-controller")
 }
 
-func (c *addonProgressingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	logger := klog.FromContext(ctx)
-	key := syncCtx.QueueKey()
-	logger.V(4).Info("Reconciling addon", "addon", key)
+func (c *addonProgressingController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
+	logger := klog.FromContext(ctx).WithValues("addonName", key)
+	logger.V(4).Info("Reconciling addon")
 
 	namespace, addonName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {

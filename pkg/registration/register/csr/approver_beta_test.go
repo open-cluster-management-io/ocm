@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -154,13 +153,12 @@ func Test_v1beta1CSRApprovingController_sync(t *testing.T) {
 						signer: certificatesv1beta1.KubeAPIServerClientSignerName,
 					},
 					&csrRenewalReconciler{
-						signer:        certificatesv1beta1.KubeAPIServerClientSignerName,
-						kubeClient:    kubeClient,
-						eventRecorder: eventstesting.NewTestingEventRecorder(t),
+						signer:     certificatesv1beta1.KubeAPIServerClientSignerName,
+						kubeClient: kubeClient,
 					},
 				},
 			}
-			if err := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, validV1beta1CSR.Name)); (err != nil) != tt.wantErr {
+			if err := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, validV1beta1CSR.Name), validV1beta1CSR.Name); (err != nil) != tt.wantErr {
 				t.Errorf("v1beta1CSRApprovingController.sync() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			tt.validateActions(t, kubeClient.Actions())

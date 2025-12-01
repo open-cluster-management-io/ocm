@@ -123,7 +123,6 @@ func RunControllerManagerWithInformers(
 	replicaSetInformerFactory := workinformers.NewSharedInformerFactory(replicaSetClient, 30*time.Minute)
 
 	manifestWorkReplicaSetController := manifestworkreplicasetcontroller.NewManifestWorkReplicaSetController(
-		controllerContext.EventRecorder,
 		replicaSetClient,
 		workapplier.NewWorkApplierWithTypedClient(workClient, workInformer.Lister()),
 		replicaSetInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets(),
@@ -133,7 +132,6 @@ func RunControllerManagerWithInformers(
 	)
 
 	manifestWorkGarbageCollectionController := manifestworkgarbagecollection.NewManifestWorkGarbageCollectionController(
-		controllerContext.EventRecorder,
 		workClient,
 		workInformer,
 	)

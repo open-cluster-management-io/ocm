@@ -3,8 +3,6 @@ package taint
 import (
 	"context"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,6 +12,7 @@ import (
 	informerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	listerv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	v1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -36,31 +35,27 @@ var (
 type taintController struct {
 	patcher       patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
 	clusterLister listerv1.ManagedClusterLister
-	eventRecorder events.Recorder
 }
 
 // NewTaintController creates a new taint controller
 func NewTaintController(
 	clusterClient clientset.Interface,
-	clusterInformer informerv1.ManagedClusterInformer,
-	recorder events.Recorder) factory.Controller {
+	clusterInformer informerv1.ManagedClusterInformer) factory.Controller {
 	c := &taintController{
 		patcher: patcher.NewPatcher[
 			*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus](
 			clusterClient.ClusterV1().ManagedClusters()),
 		clusterLister: clusterInformer.Lister(),
-		eventRecorder: recorder.WithComponentSuffix("taint-controller"),
 	}
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterInformer.Informer()).
 		WithSync(c.sync).
-		ToController("taintController", recorder)
+		ToController("taintController")
 }
 
-func (c *taintController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	logger := klog.FromContext(ctx)
-	managedClusterName := syncCtx.QueueKey()
-	logger.V(4).Info("Reconciling ManagedCluster", "managedClusterName", managedClusterName)
+func (c *taintController) sync(ctx context.Context, syncCtx factory.SyncContext, managedClusterName string) error {
+	logger := klog.FromContext(ctx).WithValues("managedClusterName", managedClusterName)
+	logger.V(4).Info("Reconciling ManagedCluster")
 	managedCluster, err := c.clusterLister.Get(managedClusterName)
 	if errors.IsNotFound(err) {
 		// Spoke cluster not found, could have been deleted, do nothing.
@@ -94,7 +89,7 @@ func (c *taintController) sync(ctx context.Context, syncCtx factory.SyncContext)
 		if _, err = c.patcher.PatchSpec(ctx, newManagedCluster, newManagedCluster.Spec, managedCluster.Spec); err != nil {
 			return err
 		}
-		c.eventRecorder.Eventf("ManagedClusterConditionAvailableUpdated", "Update the original taints to the %+v", newTaints)
+		syncCtx.Recorder().Eventf(ctx, "ManagedClusterConditionAvailableUpdated", "Update the original taints to the %+v", newTaints)
 	}
 	return nil
 }

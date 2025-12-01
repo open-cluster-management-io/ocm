@@ -23,6 +23,9 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 )
 
 const (
@@ -471,8 +474,14 @@ func (a *CRDTemplateAgentAddon) createPermissionBinding(clusterName, addonName, 
 		binding.OwnerReferences = []metav1.OwnerReference{*owner}
 	}
 
+	// TODO(qiujian16) this should have ctx passed to build the wrapper
+	recorderWrapper := commonrecorder.NewEventsRecorderWrapper(
+		context.Background(),
+		events.NewContextualLoggingEventRecorder(fmt.Sprintf("addontemplate-%s-%s", clusterName, addonName)),
+	)
+
 	_, modified, err := resourceapply.ApplyRoleBinding(context.TODO(),
-		a.hubKubeClient.RbacV1(), a.eventRecorder, binding)
+		a.hubKubeClient.RbacV1(), recorderWrapper, binding)
 	if err == nil && modified {
 		a.logger.Info("Rolebinding for addon updated", "namespace", binding.Namespace, "name", binding.Name,
 			"clusterName", clusterName, "addonName", addonName)

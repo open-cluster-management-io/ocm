@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
 
@@ -108,8 +107,11 @@ func TestSyncTaintCluster(t *testing.T) {
 				patcher.NewPatcher[
 					*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus](
 					clusterClient.ClusterV1().ManagedClusters()),
-				clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(), eventstesting.NewTestingEventRecorder(t)}
-			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
+				clusterInformerFactory.Cluster().V1().ManagedClusters().Lister()}
+			syncErr := ctrl.sync(context.TODO(),
+				testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName),
+				testinghelpers.TestManagedClusterName,
+			)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

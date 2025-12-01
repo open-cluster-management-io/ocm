@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -20,6 +18,7 @@ import (
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 	"open-cluster-management.io/ocm/pkg/common/helpers"
@@ -46,8 +45,6 @@ func TestNewAddonConfigurationController(t *testing.T) {
 		return true
 	}
 
-	recorder := eventstesting.NewTestingEventRecorder(t)
-
 	controller := NewAddonConfigurationController(
 		fakeAddonClient,
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
@@ -55,7 +52,6 @@ func TestNewAddonConfigurationController(t *testing.T) {
 		clusterInformers.Cluster().V1beta1().Placements(),
 		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
 		addonFilterFunc,
-		recorder,
 	)
 
 	if controller == nil {
@@ -242,7 +238,7 @@ func TestAddonConfigurationControllerSync(t *testing.T) {
 
 			// Test sync method
 			ctx := context.TODO()
-			err = controller.sync(ctx, syncCtx)
+			err = controller.sync(ctx, syncCtx, c.queueKey)
 
 			if c.expectError && err == nil {
 				t.Errorf("Expected error but got none")

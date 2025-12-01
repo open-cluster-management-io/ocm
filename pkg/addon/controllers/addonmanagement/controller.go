@@ -3,8 +3,6 @@ package addonmanagement
 import (
 	"context"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
@@ -15,6 +13,7 @@ import (
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	clusterinformersv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -47,7 +46,6 @@ func NewAddonManagementController(
 	placementInformer clusterinformersv1beta1.PlacementInformer,
 	placementDecisionInformer clusterinformersv1beta1.PlacementDecisionInformer,
 	addonFilterFunc factory.EventFilterFunc,
-	recorder events.Recorder,
 ) factory.Controller {
 	c := &addonManagementController{
 		addonClient:                   addonClient,
@@ -76,13 +74,12 @@ func NewAddonManagementController(
 			addonindex.ClusterManagementAddonByPlacementQueueKey(
 				clusterManagementAddonInformers),
 			placementInformer.Informer()).
-		WithSync(c.sync).ToController("addon-management-controller", recorder)
+		WithSync(c.sync).ToController("addon-management-controller")
 }
 
-func (c *addonManagementController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	logger := klog.FromContext(ctx)
-	addonName := syncCtx.QueueKey()
-	logger.V(4).Info("Reconciling addon", "addonName", addonName)
+func (c *addonManagementController) sync(ctx context.Context, syncCtx factory.SyncContext, addonName string) error {
+	logger := klog.FromContext(ctx).WithValues("addonName", addonName)
+	logger.V(4).Info("Reconciling addon")
 
 	cma, err := c.clusterManagementAddonLister.Get(addonName)
 	switch {

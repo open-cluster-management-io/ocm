@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
@@ -13,6 +11,8 @@ import (
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/register"
@@ -50,7 +50,7 @@ func (c *AWSIRSADriver) Process(
 		return nil, nil, nil
 	}
 
-	recorder.Eventf("EKSRegistrationRequestApproved", "An EKS registration request is approved for %s", controllerName)
+	recorder.Eventf(ctx, "EKSRegistrationRequestApproved", "An EKS registration request is approved for %s", controllerName)
 	return secret, nil, nil
 }
 

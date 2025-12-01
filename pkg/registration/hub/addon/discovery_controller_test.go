@@ -280,7 +280,7 @@ func TestDiscoveryController_Sync(t *testing.T) {
 				addOnLister:   addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 			}
 
-			err := controller.sync(context.Background(), testingcommon.NewFakeSyncContext(t, c.queueKey))
+			err := controller.sync(context.Background(), testingcommon.NewFakeSyncContext(t, c.queueKey), c.queueKey)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}

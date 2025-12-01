@@ -5,12 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
@@ -406,7 +407,7 @@ subjects:
 				informerFactory.Rbac().V1().ClusterRoles().Lister(),
 				informerFactory.Rbac().V1().ClusterRoleBindings().Lister(),
 			)
-			results := applier.Apply(context.TODO(), eventstesting.NewTestingEventRecorder(t),
+			results := applier.Apply(context.TODO(), events.NewContextualLoggingEventRecorder(t.Name()),
 				func(name string) ([]byte, error) {
 					return []byte(c.manifest), nil
 				}, "test")

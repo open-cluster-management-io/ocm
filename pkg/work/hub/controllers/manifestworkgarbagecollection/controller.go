@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +29,6 @@ type ManifestWorkGarbageCollectionController struct {
 
 // NewManifestWorkGarbageCollectionController creates a new ManifestWorkGarbageCollectionController
 func NewManifestWorkGarbageCollectionController(
-	recorder events.Recorder,
 	workClient workclientset.Interface,
 	manifestWorkInformer workinformers.ManifestWorkInformer,
 ) factory.Controller {

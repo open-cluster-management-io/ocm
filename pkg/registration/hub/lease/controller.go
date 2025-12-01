@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -21,6 +19,7 @@ import (
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -49,7 +48,6 @@ func NewClusterLeaseController(
 	clusterClient clientset.Interface,
 	clusterInformer clusterv1informer.ManagedClusterInformer,
 	leaseInformer coordinformers.LeaseInformer,
-	recorder events.Recorder,
 	mcEventRecorder kevents.EventRecorder) factory.Controller {
 	c := &leaseController{
 		kubeClient: kubeClient,
@@ -68,14 +66,12 @@ func NewClusterLeaseController(
 		).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterInformer.Informer()).
 		WithSync(c.sync).
-		ToController("ManagedClusterLeaseController", recorder)
+		ToController("ManagedClusterLeaseController")
 }
 
 // sync checks the lease of each cluster on hub, which is accepted or previously accepted, to determine whether
 // the managed cluster is available.
-func (c *leaseController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	clusterName := syncCtx.QueueKey()
-
+func (c *leaseController) sync(ctx context.Context, syncCtx factory.SyncContext, clusterName string) error {
 	cluster, err := c.clusterLister.Get(clusterName)
 	if errors.IsNotFound(err) {
 		// the cluster is not found, do nothing

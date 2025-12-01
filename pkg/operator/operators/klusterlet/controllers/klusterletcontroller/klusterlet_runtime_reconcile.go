@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/openshift/library-go/pkg/assets"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -18,6 +17,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	"open-cluster-management.io/ocm/manifests"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
@@ -248,7 +248,7 @@ func (r *runtimeReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.
 		if err != nil && !errors.IsNotFound(err) {
 			return klusterlet, reconcileStop, err
 		}
-		r.recorder.Eventf("DeploymentDeleted", "deployment %s is deleted", deployment)
+		r.recorder.Eventf(ctx, "DeploymentDeleted", "deployment %s is deleted", deployment)
 	}
 
 	return klusterlet, reconcileContinue, nil

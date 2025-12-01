@@ -138,7 +138,6 @@ func RunControllerManagerWithInformers(
 		clusterInformers.Cluster().V1beta1().Placements(),
 		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
 		utils.ManagedByAddonManager,
-		controllerContext.EventRecorder,
 	)
 
 	addonConfigurationController := addonconfiguration.NewAddonConfigurationController(
@@ -148,7 +147,6 @@ func RunControllerManagerWithInformers(
 		clusterInformers.Cluster().V1beta1().Placements(),
 		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
 		utils.ManagedByAddonManager,
-		controllerContext.EventRecorder,
 	)
 
 	addonOwnerController := addonowner.NewAddonOwnerController(
@@ -156,7 +154,6 @@ func RunControllerManagerWithInformers(
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 		utils.ManagedByAddonManager,
-		controllerContext.EventRecorder,
 	)
 
 	addonProgressingController := addonprogressing.NewAddonProgressingController(
@@ -165,7 +162,6 @@ func RunControllerManagerWithInformers(
 		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 		workinformers.Work().V1().ManifestWorks(),
 		utils.ManagedByAddonManager,
-		controllerContext.EventRecorder,
 	)
 
 	mgmtAddonInstallProgressionController := cmainstallprogression.NewCMAInstallProgressionController(
@@ -173,7 +169,6 @@ func RunControllerManagerWithInformers(
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 		utils.ManagedByAddonManager,
-		controllerContext.EventRecorder,
 	)
 
 	addonTemplateController := addontemplate.NewAddonTemplateController(
@@ -187,7 +182,6 @@ func RunControllerManagerWithInformers(
 		// these addons only support addontemplate and addondeploymentconfig
 		dynamicInformers,
 		workinformers,
-		controllerContext.EventRecorder,
 	)
 
 	go addonManagementController.Run(ctx, 2)

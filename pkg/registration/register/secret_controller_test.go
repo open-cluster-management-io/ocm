@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,6 +19,8 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
@@ -155,8 +155,8 @@ func TestSync(t *testing.T) {
 				c.option, c.driver, updater.update,
 				kubeClient.CoreV1(),
 				informerFactory.Core().V1().Secrets().Informer(),
-				syncCtx.Recorder(), "test")
-			err := ctrl.Sync(context.Background(), syncCtx)
+				"test")
+			err := ctrl.Sync(context.Background(), syncCtx, "test")
 			if err != nil {
 				t.Fatal(err)
 			}

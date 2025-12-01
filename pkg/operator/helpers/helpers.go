@@ -12,7 +12,6 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/openshift/api"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
@@ -42,6 +41,9 @@ import (
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 )
 
 const (
@@ -233,10 +235,11 @@ func ApplyDeployment(
 	deployment.(*appsv1.Deployment).Spec.Template.Spec.NodeSelector = nodePlacement.NodeSelector
 	deployment.(*appsv1.Deployment).Spec.Template.Spec.Tolerations = nodePlacement.Tolerations
 
+	recorderWrapper := commonrecorder.NewEventsRecorderWrapper(ctx, recorder)
 	updatedDeployment, updated, err := resourceapply.ApplyDeployment(
 		ctx,
 		client.AppsV1(),
-		recorder,
+		recorderWrapper,
 		deployment.(*appsv1.Deployment), generationStatus.LastGeneration)
 	if err != nil {
 		return updatedDeployment, generationStatus, fmt.Errorf("%q (%T): %v", file, deployment, err)
@@ -282,6 +285,7 @@ func ApplyDirectly(
 	manifests resourceapply.AssetFunc,
 	files ...string) []resourceapply.ApplyResult {
 	var ret []resourceapply.ApplyResult
+	recorderWrapper := commonrecorder.NewEventsRecorderWrapper(ctx, recorder)
 
 	var genericApplyFiles []string
 	for _, file := range files {
@@ -321,7 +325,7 @@ func ApplyDirectly(
 	applyResults := resourceapply.ApplyDirectly(
 		ctx,
 		clientHolder,
-		recorder,
+		recorderWrapper,
 		cache,
 		manifests,
 		genericApplyFiles...,
@@ -676,7 +680,7 @@ func SyncSecret(ctx context.Context, client, targetClient coreclientv1.SecretsGe
 			return nil, false, nil
 		}
 		if deleteErr == nil {
-			recorder.Eventf("TargetSecretDeleted", "Deleted target secret %s/%s because source config does not exist", targetNamespace, targetName)
+			recorder.Eventf(ctx, "TargetSecretDeleted", "Deleted target secret %s/%s because source config does not exist", targetNamespace, targetName)
 			return nil, true, nil
 		}
 		return nil, false, deleteErr
@@ -706,7 +710,8 @@ func SyncSecret(ctx context.Context, client, targetClient coreclientv1.SecretsGe
 		source.ResourceVersion = ""
 		source.OwnerReferences = ownerRefs
 		source.Labels = labels
-		return resourceapply.ApplySecret(ctx, targetClient, recorder, source)
+		recorderWrapper := commonrecorder.NewEventsRecorderWrapper(ctx, recorder)
+		return resourceapply.ApplySecret(ctx, targetClient, recorderWrapper, source)
 	}
 }
 

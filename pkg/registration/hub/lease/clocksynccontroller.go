@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	coordv1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -20,6 +18,7 @@ import (
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -29,7 +28,6 @@ type clockSyncController struct {
 	patcher       patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus]
 	clusterLister clusterv1listers.ManagedClusterLister
 	leaseLister   coordlisters.LeaseLister
-	eventRecorder events.Recorder
 }
 
 const (
@@ -40,7 +38,6 @@ func NewClockSyncController(
 	clusterClient clientset.Interface,
 	clusterInformer clusterv1informer.ManagedClusterInformer,
 	leaseInformer coordinformers.LeaseInformer,
-	recorder events.Recorder,
 ) factory.Controller {
 	c := &clockSyncController{
 		patcher: patcher.NewPatcher[
@@ -48,19 +45,18 @@ func NewClockSyncController(
 			clusterClient.ClusterV1().ManagedClusters()),
 		clusterLister: clusterInformer.Lister(),
 		leaseLister:   leaseInformer.Lister(),
-		eventRecorder: recorder.WithComponentSuffix("managed-cluster-clock-sync-controller"),
 	}
 
-	syncCtx := factory.NewSyncContext(clockSyncControllerName, recorder)
+	syncCtx := factory.NewSyncContext(clockSyncControllerName)
 	leaseRenewTimeUpdateInformer := renewUpdateInfomer(syncCtx.Queue(), leaseInformer)
 
 	return factory.New().WithSyncContext(syncCtx).
 		WithBareInformers(leaseRenewTimeUpdateInformer).
 		WithSync(c.sync).
-		ToController(clockSyncControllerName, recorder)
+		ToController(clockSyncControllerName)
 }
 
-func renewUpdateInfomer(q workqueue.RateLimitingInterface, leaseInformer coordinformers.LeaseInformer) factory.Informer {
+func renewUpdateInfomer(q workqueue.TypedRateLimitingInterface[string], leaseInformer coordinformers.LeaseInformer) factory.Informer {
 	leaseRenewTimeUpdateInformer := leaseInformer.Informer()
 	queueKeyByLabel := queue.QueueKeyByLabel(clusterv1.ClusterNameLabelKey)
 	_, err := leaseRenewTimeUpdateInformer.AddEventHandler(&cache.FilteringResourceEventHandler{
@@ -84,9 +80,7 @@ func renewUpdateInfomer(q workqueue.RateLimitingInterface, leaseInformer coordin
 	return leaseRenewTimeUpdateInformer
 }
 
-func (c *clockSyncController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	clusterName := syncCtx.QueueKey()
-
+func (c *clockSyncController) sync(ctx context.Context, syncCtx factory.SyncContext, clusterName string) error {
 	// the event caused by resync will be filtered because the cluster is not found
 	cluster, err := c.clusterLister.Get(clusterName)
 	if errors.IsNotFound(err) {
@@ -110,14 +104,14 @@ func (c *clockSyncController) sync(ctx context.Context, syncCtx factory.SyncCont
 		leaseDuration = time.Duration(LeaseDurationSeconds*leaseDurationTimes) * time.Second
 	}
 
-	if err := c.updateClusterStatusClockSynced(ctx, cluster,
+	if err := c.updateClusterStatusClockSynced(ctx, syncCtx, cluster,
 		now.Sub(observedLease.Spec.RenewTime.Time) < leaseDuration && observedLease.Spec.RenewTime.Time.Sub(now) < leaseDuration); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *clockSyncController) updateClusterStatusClockSynced(ctx context.Context, cluster *clusterv1.ManagedCluster, synced bool) error {
+func (c *clockSyncController) updateClusterStatusClockSynced(ctx context.Context, syncCtx factory.SyncContext, cluster *clusterv1.ManagedCluster, synced bool) error {
 	var desiredStatus metav1.ConditionStatus
 	var condition metav1.Condition
 	if synced {
@@ -148,7 +142,7 @@ func (c *clockSyncController) updateClusterStatusClockSynced(ctx context.Context
 
 	updated, err := c.patcher.PatchStatus(ctx, newCluster, newCluster.Status, cluster.Status)
 	if updated {
-		c.eventRecorder.Eventf("ManagedClusterClockSyncedConditionUpdated",
+		syncCtx.Recorder().Eventf(ctx, "ManagedClusterClockSyncedConditionUpdated",
 			"update managed cluster %q clock synced condition to %v.", cluster.Name, desiredStatus)
 	}
 	return err

@@ -7,7 +7,6 @@ package klusterletcontroller
 import (
 	"context"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -18,14 +17,16 @@ import (
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
 type managedClusterClientsBuilderInterface interface {
 	withMode(mode operatorapiv1.InstallMode) managedClusterClientsBuilderInterface
 	withKubeConfigSecret(namespace, name string) managedClusterClientsBuilderInterface
-	build(ctx context.Context) (*managedClusterClients, error)
+	build(ctx context.Context, syncCtx factory.SyncContext) (*managedClusterClients, error)
 }
 
 // managedClusterClients holds variety of kube client for managed cluster
@@ -43,7 +44,6 @@ type managedClusterClientsBuilder struct {
 	kubeClient                kubernetes.Interface
 	apiExtensionClient        apiextensionsclient.Interface
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
-	recorder                  events.Recorder
 
 	mode            operatorapiv1.InstallMode
 	secretNamespace string
@@ -54,13 +54,11 @@ func newManagedClusterClientsBuilder(
 	kubeClient kubernetes.Interface,
 	apiExtensionClient apiextensionsclient.Interface,
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
-	recorder events.Recorder,
 ) *managedClusterClientsBuilder {
 	return &managedClusterClientsBuilder{
 		kubeClient:                kubeClient,
 		apiExtensionClient:        apiExtensionClient,
 		appliedManifestWorkClient: appliedManifestWorkClient,
-		recorder:                  recorder,
 	}
 }
 
@@ -75,7 +73,7 @@ func (m *managedClusterClientsBuilder) withKubeConfigSecret(namespace, name stri
 	return m
 }
 
-func (m *managedClusterClientsBuilder) build(ctx context.Context) (*managedClusterClients, error) {
+func (m *managedClusterClientsBuilder) build(ctx context.Context, syncCtx factory.SyncContext) (*managedClusterClients, error) {
 	if !helpers.IsHosted(m.mode) {
 		return &managedClusterClients{
 			kubeClient:                m.kubeClient,
@@ -87,7 +85,8 @@ func (m *managedClusterClientsBuilder) build(ctx context.Context) (*managedClust
 	// Ensure the agent namespace for users to create the external-managed-kubeconfig secret in this
 	// namespace, so that in the next reconcile loop the controller can get the secret successfully after
 	// the secret was created.
-	_, _, err := resourceapply.ApplyNamespace(ctx, m.kubeClient.CoreV1(), m.recorder, &corev1.Namespace{
+	recorderWrapper := commonrecorder.NewEventsRecorderWrapper(ctx, syncCtx.Recorder())
+	_, _, err := resourceapply.ApplyNamespace(ctx, m.kubeClient.CoreV1(), recorderWrapper, &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: m.secretNamespace,
 			Annotations: map[string]string{

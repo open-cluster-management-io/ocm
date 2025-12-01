@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers"
@@ -35,9 +34,8 @@ func TestAccept(t *testing.T) {
 
 	kubeClient := kubefake.NewClientset()
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, 3*time.Minute)
-	recorder := eventstesting.NewTestingEventRecorder(t)
 	utilruntime.Must(features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates))
-	csrHubDriver, err := NewCSRHubDriver(kubeClient, informerFactory, []string{}, recorder)
+	csrHubDriver, err := NewCSRHubDriver(kubeClient, informerFactory, []string{})
 
 	if err != nil {
 		t.Error(err)

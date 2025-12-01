@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,6 +15,7 @@ import (
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -33,8 +32,7 @@ type clusterManagerStatusController struct {
 func NewClusterManagerStatusController(
 	clusterManagerClient operatorv1client.ClusterManagerInterface,
 	clusterManagerInformer operatorinformer.ClusterManagerInformer,
-	deploymentInformer appsinformer.DeploymentInformer,
-	recorder events.Recorder) factory.Controller {
+	deploymentInformer appsinformer.DeploymentInformer) factory.Controller {
 	controller := &clusterManagerStatusController{
 		deploymentLister:     deploymentInformer.Lister(),
 		clusterManagerLister: clusterManagerInformer.Lister(),
@@ -47,16 +45,16 @@ func NewClusterManagerStatusController(
 		WithInformersQueueKeysFunc(
 			helpers.ClusterManagerDeploymentQueueKeyFunc(controller.clusterManagerLister), deploymentInformer.Informer()).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterManagerInformer.Informer()).
-		ToController("ClusterManagerStatusController", recorder)
+		ToController("ClusterManagerStatusController")
 }
 
-func (s *clusterManagerStatusController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	clusterManagerName := controllerContext.QueueKey()
+func (s *clusterManagerStatusController) sync(ctx context.Context, controllerContext factory.SyncContext, clusterManagerName string) error {
+	logger := klog.FromContext(ctx).WithValues("clusterManager", clusterManagerName)
 	if clusterManagerName == "" {
 		return nil
 	}
 
-	klog.Infof("Reconciling ClusterManager %q", clusterManagerName)
+	logger.V(4).Info("Reconciling ClusterManager")
 
 	clusterManager, err := s.clusterManagerLister.Get(clusterManagerName)
 	// ClusterManager not found, could have been deleted, do nothing.

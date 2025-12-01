@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 )
 
 // Getter is a wrapper interface of lister
@@ -43,6 +46,8 @@ func Apply[T runtime.Object](
 	}
 	gvk := resourcehelper.GuessObjectGroupVersionKind(required)
 	existing, err := getter.Get(requiredAccessor.GetName())
+	recorderWrapper := commonrecorder.NewEventsRecorderWrapper(ctx, recorder)
+
 	if errors.IsNotFound(err) {
 		actual, createErr := client.Create(ctx, required, metav1.CreateOptions{})
 		switch {
@@ -56,12 +61,12 @@ func Apply[T runtime.Object](
 			}
 			existing = actual
 		case createErr == nil:
-			recorder.Eventf(
+			recorderWrapper.Eventf(
 				fmt.Sprintf("%sCreated", gvk.Kind),
 				"Created %s because it was missing", resourcehelper.FormatResourceForCLIWithNamespace(actual))
 			return actual, true, nil
 		default:
-			recorder.Warningf(
+			recorderWrapper.Warningf(
 				fmt.Sprintf("%sCreateFailed", gvk.Kind),
 				"Failed to create %s: %v", resourcehelper.FormatResourceForCLIWithNamespace(required), createErr)
 			return actual, true, createErr
@@ -76,11 +81,11 @@ func Apply[T runtime.Object](
 	updated, err = client.Update(ctx, updated, metav1.UpdateOptions{})
 	switch {
 	case err != nil:
-		recorder.Warningf(
+		recorderWrapper.Warningf(
 			fmt.Sprintf("%sUpdateFailed", gvk.Kind),
 			"Failed to update %s: %v", resourcehelper.FormatResourceForCLIWithNamespace(required), err)
 	default:
-		recorder.Eventf(
+		recorderWrapper.Eventf(
 			fmt.Sprintf("%sUpdated", gvk.Kind),
 			"Updated %s", resourcehelper.FormatResourceForCLIWithNamespace(updated))
 	}

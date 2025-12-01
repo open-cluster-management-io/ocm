@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
@@ -17,6 +16,7 @@ import (
 	"k8s.io/klog/v2"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"open-cluster-management.io/ocm/pkg/registration/hub/user"
 )
@@ -42,24 +42,22 @@ type CSRInfo struct {
 type approveCSRFunc func(kubernetes.Interface) error
 
 type Reconciler interface {
-	Reconcile(context.Context, CSRInfo, approveCSRFunc) (reconcileState, error)
+	Reconcile(context.Context, factory.SyncContext, CSRInfo, approveCSRFunc) (reconcileState, error)
 }
 
 type csrRenewalReconciler struct {
-	signer        string
-	kubeClient    kubernetes.Interface
-	eventRecorder events.Recorder
+	signer     string
+	kubeClient kubernetes.Interface
 }
 
-func NewCSRRenewalReconciler(kubeClient kubernetes.Interface, signer string, recorder events.Recorder) Reconciler {
+func NewCSRRenewalReconciler(kubeClient kubernetes.Interface, signer string) Reconciler {
 	return &csrRenewalReconciler{
-		signer:        signer,
-		kubeClient:    kubeClient,
-		eventRecorder: recorder.WithComponentSuffix("csr-approving-controller"),
+		signer:     signer,
+		kubeClient: kubeClient,
 	}
 }
 
-func (r *csrRenewalReconciler) Reconcile(ctx context.Context, csr CSRInfo, approveCSR approveCSRFunc) (reconcileState, error) {
+func (r *csrRenewalReconciler) Reconcile(ctx context.Context, syncCtx factory.SyncContext, csr CSRInfo, approveCSR approveCSRFunc) (reconcileState, error) {
 	logger := klog.FromContext(ctx)
 	// Check whether current csr is a valid spoker cluster csr.
 	valid, _, commonName := validateCSR(logger, r.signer, csr)
@@ -87,7 +85,7 @@ func (r *csrRenewalReconciler) Reconcile(ctx context.Context, csr CSRInfo, appro
 		return reconcileContinue, err
 	}
 
-	r.eventRecorder.Eventf("ManagedClusterCSRAutoApproved", "managed cluster csr %q is auto approved by hub csr controller", csr.Name)
+	syncCtx.Recorder().Eventf(ctx, "ManagedClusterCSRAutoApproved", "managed cluster csr %q is auto approved by hub csr controller", csr.Name)
 	return reconcileStop, nil
 }
 
@@ -95,22 +93,19 @@ type csrBootstrapReconciler struct {
 	signer        string
 	kubeClient    kubernetes.Interface
 	approvalUsers sets.Set[string]
-	eventRecorder events.Recorder
 }
 
 func NewCSRBootstrapReconciler(kubeClient kubernetes.Interface,
 	signer string,
-	approvalUsers []string,
-	recorder events.Recorder) Reconciler {
+	approvalUsers []string) Reconciler {
 	return &csrBootstrapReconciler{
 		signer:        signer,
 		kubeClient:    kubeClient,
 		approvalUsers: sets.New(approvalUsers...),
-		eventRecorder: recorder.WithComponentSuffix("csr-approving-controller"),
 	}
 }
 
-func (b *csrBootstrapReconciler) Reconcile(ctx context.Context, csr CSRInfo, approveCSR approveCSRFunc) (reconcileState, error) {
+func (b *csrBootstrapReconciler) Reconcile(ctx context.Context, syncCtx factory.SyncContext, csr CSRInfo, approveCSR approveCSRFunc) (reconcileState, error) {
 	logger := klog.FromContext(ctx)
 	// Check whether current csr is a valid spoker cluster csr.
 	valid, clusterName, _ := validateCSR(logger, b.signer, csr)
@@ -128,7 +123,7 @@ func (b *csrBootstrapReconciler) Reconcile(ctx context.Context, csr CSRInfo, app
 		return reconcileContinue, err
 	}
 
-	b.eventRecorder.Eventf("ManagedClusterAutoApproved", "managed cluster %q is auto approved.", clusterName)
+	syncCtx.Recorder().Eventf(ctx, "ManagedClusterAutoApproved", "managed cluster %q is auto approved.", clusterName)
 	return reconcileStop, nil
 }
 

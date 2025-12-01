@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -84,7 +83,6 @@ func TestSync(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		recorder := eventstesting.NewTestingEventRecorder(t)
 		objs := append(tc.objects, tc.namespaces...) //nolint:gocritic
 		kubeClient := kubefake.NewSimpleClientset(objs...)
 		kubeInformer := informers.NewSharedInformerFactory(kubeClient, 5*time.Minute)
@@ -96,11 +94,10 @@ func TestSync(t *testing.T) {
 		controller := &addonPullImageSecretController{
 			operatorNamespace: "open-cluster-management",
 			kubeClient:        kubeClient,
-			recorder:          recorder,
 			namespaceInformer: kubeInformer.Core().V1().Namespaces(),
 		}
 
-		err := controller.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, tc.queueKey))
+		err := controller.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, tc.queueKey), tc.queueKey)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 		}

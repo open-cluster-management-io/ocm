@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,6 +22,7 @@ import (
 	v1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	clustersdkv1beta2 "open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta2"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -40,19 +39,17 @@ type managedClusterSetController struct {
 	patcher          patcher.Patcher[*clusterv1beta2.ManagedClusterSet, clusterv1beta2.ManagedClusterSetSpec, clusterv1beta2.ManagedClusterSetStatus]
 	clusterLister    clusterlisterv1.ManagedClusterLister
 	clusterSetLister clusterlisterv1beta2.ManagedClusterSetLister
-	eventRecorder    events.Recorder
-	queue            workqueue.RateLimitingInterface
+	queue            workqueue.TypedRateLimitingInterface[string]
 }
 
 // NewManagedClusterSetController creates a new managed cluster set controller
 func NewManagedClusterSetController(
 	clusterClient clientset.Interface,
 	clusterInformer clusterinformerv1.ManagedClusterInformer,
-	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer,
-	recorder events.Recorder) factory.Controller {
+	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer) factory.Controller {
 
 	controllerName := "managed-clusterset-controller"
-	syncCtx := factory.NewSyncContext(controllerName, recorder)
+	syncCtx := factory.NewSyncContext(controllerName)
 
 	c := &managedClusterSetController{
 		patcher: patcher.NewPatcher[
@@ -60,7 +57,6 @@ func NewManagedClusterSetController(
 			clusterClient.ClusterV1beta2().ManagedClusterSets()),
 		clusterLister:    clusterInformer.Lister(),
 		clusterSetLister: clusterSetInformer.Lister(),
-		eventRecorder:    recorder.WithComponentSuffix("managed-cluster-set-controller"),
 		queue:            syncCtx.Queue(),
 	}
 
@@ -120,16 +116,16 @@ func NewManagedClusterSetController(
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterSetInformer.Informer()).
 		WithBareInformers(clusterInformer.Informer()).
 		WithSync(c.sync).
-		ToController("ManagedClusterSetController", recorder)
+		ToController("ManagedClusterSetController")
 }
 
-func (c *managedClusterSetController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+func (c *managedClusterSetController) sync(ctx context.Context, syncCtx factory.SyncContext, clusterSetName string) error {
 	logger := klog.FromContext(ctx)
-	clusterSetName := syncCtx.QueueKey()
 	if len(clusterSetName) == 0 {
 		return nil
 	}
-	logger.V(4).Info("Reconciling ManagedClusterSet", "clusterSetName", clusterSetName)
+	logger.WithValues("clusterSetName", clusterSetName)
+	ctx = klog.NewContext(ctx, logger)
 	clusterSet, err := c.clusterSetLister.Get(clusterSetName)
 	if errors.IsNotFound(err) {
 		// cluster set not found, could have been deleted, do nothing.

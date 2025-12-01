@@ -6,8 +6,6 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -24,6 +22,7 @@ import (
 	v1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	clustersdkv1beta2 "open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta2"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 )
 
@@ -34,18 +33,16 @@ type managedNamespaceController struct {
 	clusterPatcher   patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
 	clusterLister    clusterlisterv1.ManagedClusterLister
 	clusterSetLister clusterlisterv1beta2.ManagedClusterSetLister
-	eventRecorder    events.Recorder
 }
 
 // NewManagedNamespaceController creates a new managed namespace controller
 func NewManagedNamespaceController(
 	clusterClient clientset.Interface,
 	clusterInformer clusterinformerv1.ManagedClusterInformer,
-	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer,
-	recorder events.Recorder) factory.Controller {
+	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer) factory.Controller {
 
 	controllerName := "managed-namespace-controller"
-	syncCtx := factory.NewSyncContext(controllerName, recorder)
+	syncCtx := factory.NewSyncContext(controllerName)
 
 	c := &managedNamespaceController{
 		clusterPatcher: patcher.NewPatcher[
@@ -53,7 +50,6 @@ func NewManagedNamespaceController(
 			clusterClient.ClusterV1().ManagedClusters()),
 		clusterLister:    clusterInformer.Lister(),
 		clusterSetLister: clusterSetInformer.Lister(),
-		eventRecorder:    recorder.WithComponentSuffix("managed-namespace-controller"),
 	}
 
 	// Add explicit event handlers for ManagedCluster
@@ -92,17 +88,17 @@ func NewManagedNamespaceController(
 		WithBareInformers(clusterInformer.Informer()).
 		WithInformersQueueKeysFunc(c.clusterSetToClusterQueueKeysFunc, clusterSetInformer.Informer()).
 		WithSync(c.sync).
-		ToController("ManagedNamespaceController", recorder)
+		ToController("ManagedNamespaceController")
 }
 
-func (c *managedNamespaceController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	logger := klog.FromContext(ctx)
-	clusterName := syncCtx.QueueKey()
+func (c *managedNamespaceController) sync(ctx context.Context, syncCtx factory.SyncContext, clusterName string) error {
+	logger := klog.FromContext(ctx).WithValues("clusterName", clusterName)
+	ctx = klog.NewContext(ctx, logger)
 	if len(clusterName) == 0 {
 		return nil
 	}
 
-	logger.V(4).Info("Reconciling managed namespaces for ManagedCluster", "clusterName", clusterName)
+	logger.V(4).Info("Reconciling managed namespaces for ManagedCluster")
 
 	cluster, err := c.clusterLister.Get(clusterName)
 	if errors.IsNotFound(err) {
@@ -120,7 +116,7 @@ func (c *managedNamespaceController) sync(ctx context.Context, syncCtx factory.S
 		return nil
 	}
 
-	if err := c.syncManagedNamespacesForCluster(ctx, cluster); err != nil {
+	if err := c.syncManagedNamespacesForCluster(ctx, syncCtx, cluster); err != nil {
 		return fmt.Errorf("failed to sync managed namespaces for ManagedCluster %q: %w", cluster.Name, err)
 	}
 
@@ -129,7 +125,7 @@ func (c *managedNamespaceController) sync(ctx context.Context, syncCtx factory.S
 
 // syncManagedNamespacesForCluster updates the managed namespace configuration for a specific cluster
 // based on all cluster sets it belongs to
-func (c *managedNamespaceController) syncManagedNamespacesForCluster(ctx context.Context, cluster *v1.ManagedCluster) error {
+func (c *managedNamespaceController) syncManagedNamespacesForCluster(ctx context.Context, syncCtx factory.SyncContext, cluster *v1.ManagedCluster) error {
 	logger := klog.FromContext(ctx)
 
 	// Get all cluster sets this cluster belongs to
@@ -178,7 +174,7 @@ func (c *managedNamespaceController) syncManagedNamespacesForCluster(ctx context
 	// Only record event if there was an actual update
 	if updated {
 		logger.V(4).Info("Updated managed namespaces for cluster", "clusterName", cluster.Name, "namespacesCount", len(allManagedNamespaces))
-		c.eventRecorder.Eventf("ManagedNamespacesUpdated", "Updated managed namespaces for cluster %q (total: %d)", cluster.Name, len(allManagedNamespaces))
+		syncCtx.Recorder().Eventf(ctx, "ManagedNamespacesUpdated", "Updated managed namespaces for cluster %q (total: %d)", cluster.Name, len(allManagedNamespaces))
 	}
 
 	return nil

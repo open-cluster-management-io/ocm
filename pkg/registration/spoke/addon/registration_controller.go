@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -20,6 +18,7 @@ import (
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -40,7 +39,6 @@ type addOnRegistrationController struct {
 	patcher              patcher.Patcher[
 		*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus]
 	addonDriver register.AddonDriver
-	recorder    events.Recorder
 
 	startRegistrationFunc func(ctx context.Context, config registrationConfig) context.CancelFunc
 
@@ -59,7 +57,6 @@ func NewAddOnRegistrationController(
 	managedKubeClient kubernetes.Interface,
 	addonDriver register.AddonDriver,
 	hubAddOnInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
-	recorder events.Recorder,
 ) factory.Controller {
 	c := &addOnRegistrationController{
 		clusterName:          clusterName,
@@ -72,7 +69,6 @@ func NewAddOnRegistrationController(
 		patcher: patcher.NewPatcher[
 			*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus](
 			addOnClient.AddonV1alpha1().ManagedClusterAddOns(clusterName)),
-		recorder:                 recorder,
 		addOnRegistrationConfigs: map[string]map[string]registrationConfig{},
 	}
 
@@ -83,12 +79,11 @@ func NewAddOnRegistrationController(
 			queue.QueueKeyByMetaName,
 			hubAddOnInformers.Informer()).
 		WithSync(c.sync).
-		ResyncEvery(10*time.Minute).
-		ToController("AddOnRegistrationController", recorder)
+		ResyncEvery(10 * time.Minute).
+		ToController("AddOnRegistrationController")
 }
 
-func (c *addOnRegistrationController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	queueKey := syncCtx.QueueKey()
+func (c *addOnRegistrationController) sync(ctx context.Context, syncCtx factory.SyncContext, queueKey string) error {
 	if queueKey != factory.DefaultQueueKey {
 		// sync a particular addOn
 		return c.syncAddOn(ctx, syncCtx, queueKey)
@@ -115,8 +110,8 @@ func (c *addOnRegistrationController) sync(ctx context.Context, syncCtx factory.
 }
 
 func (c *addOnRegistrationController) syncAddOn(ctx context.Context, syncCtx factory.SyncContext, addOnName string) error {
-	logger := klog.FromContext(ctx)
-	logger.V(4).Info("Reconciling addOn", "addOnName", addOnName)
+	logger := klog.FromContext(ctx).WithValues("addOnName", addOnName)
+	logger.V(4).Info("Reconciling addOn")
 	addOn, err := c.hubAddOnLister.ManagedClusterAddOns(c.clusterName).Get(addOnName)
 	if errors.IsNotFound(err) {
 		// addon is deleted
@@ -209,7 +204,7 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 		secretOption, driver, statusUpdater,
 		kubeClient.CoreV1(),
 		kubeInformerFactory.Core().V1().Secrets().Informer(),
-		c.recorder, controllerName)
+		controllerName)
 
 	go kubeInformerFactory.Start(ctx.Done())
 	go secretController.Run(ctx, 1)

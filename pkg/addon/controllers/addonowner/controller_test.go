@@ -75,16 +75,14 @@ func TestReconcile(t *testing.T) {
 			}
 
 			syncContext := testingcommon.NewFakeSyncContext(t, c.syncKey)
-			recorder := syncContext.Recorder()
 
 			controller := NewAddonOwnerController(
 				fakeAddonClient,
 				addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 				addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
-				utils.ManagedByAddonManager,
-				recorder)
+				utils.ManagedByAddonManager)
 
-			err := controller.Sync(context.TODO(), syncContext)
+			err := controller.Sync(context.TODO(), syncContext, c.syncKey)
 			if err != nil {
 				t.Errorf("expected no error when sync: %v", err)
 			}

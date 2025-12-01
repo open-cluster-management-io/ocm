@@ -7,13 +7,10 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/ghodss/yaml"
 	"github.com/google/go-cmp/cmp"
 	"github.com/openshift/library-go/pkg/assets"
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
@@ -32,10 +29,10 @@ import (
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 	"k8s.io/component-base/featuregate"
 	fakeapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
-	clocktesting "k8s.io/utils/clock/testing"
 
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	"open-cluster-management.io/ocm/manifests"
 )
@@ -260,7 +257,7 @@ func TestApplyDirectly(t *testing.T) {
 				results = ApplyDirectly(
 					context.TODO(),
 					fakeKubeClient, nil,
-					eventstesting.NewTestingEventRecorder(t),
+					events.NewContextualLoggingEventRecorder(t.Name()),
 					cache,
 					fakeApplyFunc,
 					c.applyFileNames...,
@@ -269,7 +266,7 @@ func TestApplyDirectly(t *testing.T) {
 				results = ApplyDirectly(
 					context.TODO(),
 					fakeKubeClient, fakeExtensionClient,
-					eventstesting.NewTestingEventRecorder(t),
+					events.NewContextualLoggingEventRecorder(t.Name()),
 					cache,
 					fakeApplyFunc,
 					c.applyFileNames...,
@@ -683,7 +680,7 @@ func TestApplyDeployment(t *testing.T) {
 				func(name string) ([]byte, error) {
 					return json.Marshal(newDeploymentUnstructured(c.deploymentName, c.deploymentNamespace))
 				},
-				eventstesting.NewTestingEventRecorder(t),
+				events.NewContextualLoggingEventRecorder(t.Name()),
 				c.deploymentName,
 			)
 			if err != nil && !c.expectErr {
@@ -1480,7 +1477,7 @@ func TestSyncSecret(t *testing.T) {
 			clientTarget := fakekube.NewSimpleClientset()
 			secret, changed, err := SyncSecret(
 				context.TODO(), client.CoreV1(), clientTarget.CoreV1(),
-				events.NewInMemoryRecorder("test", clocktesting.NewFakePassiveClock(time.Now())), tc.sourceNamespace, tc.sourceName,
+				events.NewContextualLoggingEventRecorder(t.Name()), tc.sourceNamespace, tc.sourceName,
 				tc.targetNamespace, tc.targetName, tc.ownerRefs, nil)
 
 			if (err == nil && len(tc.expectedErr) != 0) || (err != nil && err.Error() != tc.expectedErr) {

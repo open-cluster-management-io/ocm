@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -118,10 +117,9 @@ func TestSyncGlobalClusterSet(t *testing.T) {
 			ctrl := globalManagedClusterSetController{
 				clusterSetClient: clusterSetClient.ClusterV1beta2(),
 				clusterSetLister: informerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
-				eventRecorder:    eventstesting.NewTestingEventRecorder(t),
 			}
 
-			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName), "")
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,6 +16,7 @@ import (
 	clusterinformerv1beta2 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta2"
 	clusterlisterv1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -33,18 +32,16 @@ type managedClusterSetBindingController struct {
 	clusterSetBindingLister   clusterlisterv1beta2.ManagedClusterSetBindingLister
 	clusterSetLister          clusterlisterv1beta2.ManagedClusterSetLister
 	clusterSetBindingIndexers cache.Indexer
-	queue                     workqueue.RateLimitingInterface
-	eventRecorder             events.Recorder
+	queue                     workqueue.TypedRateLimitingInterface[string]
 }
 
 func NewManagedClusterSetBindingController(
 	clusterClient clientset.Interface,
 	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer,
-	clusterSetBindingInformer clusterinformerv1beta2.ManagedClusterSetBindingInformer,
-	recorder events.Recorder) factory.Controller {
+	clusterSetBindingInformer clusterinformerv1beta2.ManagedClusterSetBindingInformer) factory.Controller {
 
 	controllerName := "managed-clusterset-binding-controller"
-	syncCtx := factory.NewSyncContext(controllerName, recorder)
+	syncCtx := factory.NewSyncContext(controllerName)
 
 	err := clusterSetBindingInformer.Informer().AddIndexers(cache.Indexers{
 		byClusterSet: indexByClusterset,
@@ -58,7 +55,6 @@ func NewManagedClusterSetBindingController(
 		clusterClient:             clusterClient,
 		clusterSetLister:          clusterSetInformer.Lister(),
 		clusterSetBindingLister:   clusterSetBindingInformer.Lister(),
-		eventRecorder:             recorder.WithComponentSuffix(controllerName),
 		clusterSetBindingIndexers: clusterSetBindingInformer.Informer().GetIndexer(),
 		queue:                     syncCtx.Queue(),
 	}
@@ -81,7 +77,7 @@ func NewManagedClusterSetBindingController(
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaNamespaceName, clusterSetBindingInformer.Informer()).
 		WithBareInformers(clusterSetInformer.Informer()).
 		WithSync(c.sync).
-		ToController("ManagedClusterSetController", recorder)
+		ToController("ManagedClusterSetController")
 }
 
 func indexByClusterset(obj interface{}) ([]string, error) {
@@ -131,14 +127,13 @@ func (c *managedClusterSetBindingController) enqueueBindingsByClusterSet(obj int
 	}
 }
 
-func (c *managedClusterSetBindingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	logger := klog.FromContext(ctx)
-	key := syncCtx.QueueKey()
+func (c *managedClusterSetBindingController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
+	logger := klog.FromContext(ctx).WithValues("key", key)
 	if len(key) == 0 {
 		return nil
 	}
 
-	logger.V(4).Info("Reconciling ManagedClusterSetBinding", "key", key)
+	logger.V(4).Info("Reconciling ManagedClusterSetBinding")
 
 	bindingNamespace, bindingName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {

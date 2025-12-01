@@ -3,7 +3,6 @@ package providers
 import (
 	"context"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -11,6 +10,7 @@ import (
 
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 // Interface is the interface that a cluster provider should implement

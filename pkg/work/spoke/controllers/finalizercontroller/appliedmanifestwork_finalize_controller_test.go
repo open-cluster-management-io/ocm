@@ -194,7 +194,7 @@ func TestFinalize(t *testing.T) {
 				rateLimiter:        workqueue.NewTypedItemExponentialFailureRateLimiter[string](0, 1*time.Second),
 			}
 
-			controllerContext := testingcommon.NewFakeSDKSyncContext(t, testingWork.Name)
+			controllerContext := testingcommon.NewFakeSyncContext(t, testingWork.Name)
 			err := controller.syncAppliedManifestWork(context.TODO(), controllerContext, testingWork)
 			if err != nil {
 				t.Fatal(err)

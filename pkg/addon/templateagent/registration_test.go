@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"github.com/stretchr/testify/assert"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificates "k8s.io/api/certificates/v1beta1"
@@ -739,7 +738,7 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 		}
 
 		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, hubKubeClient, addonClient, addonInformerFactory,
-			kubeInformers.Rbac().V1().RoleBindings().Lister(), eventstesting.NewTestingEventRecorder(t))
+			kubeInformers.Rbac().V1().RoleBindings().Lister())
 		f := agent.TemplatePermissionConfigFunc()
 		err := f(c.cluster, c.addon)
 		if err != c.expectedErr {

@@ -570,8 +570,9 @@ func TestSchedulingController_sync(t *testing.T) {
 				metricsRecorder:         metrics.NewScheduleMetrics(clock.RealClock{}),
 			}
 
-			sysCtx := testingcommon.NewFakeSyncContext(t, c.placement.Namespace+"/"+c.placement.Name)
-			syncErr := ctrl.sync(context.TODO(), sysCtx)
+			key := c.placement.Namespace + "/" + c.placement.Name
+			sysCtx := testingcommon.NewFakeSyncContext(t, key)
+			syncErr := ctrl.sync(context.TODO(), sysCtx, key)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

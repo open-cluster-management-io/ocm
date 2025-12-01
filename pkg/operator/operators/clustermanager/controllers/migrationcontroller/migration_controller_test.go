@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	v1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -23,6 +22,7 @@ import (
 	fakeoperatorlient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
@@ -230,7 +230,7 @@ func TestCreateStorageVersionMigrations(t *testing.T) {
 						UID:  "testhub-uid",
 					},
 				}), fakeMigrationClient.MigrationV1alpha1(),
-				eventstesting.NewTestingEventRecorder(t))
+				events.NewContextualLoggingEventRecorder(t.Name()))
 			if c.expectErr && err != nil {
 				return
 			}
@@ -465,7 +465,7 @@ func TestSync(t *testing.T) {
 
 	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
 	// Do not support migration
-	err := tc.sync(context.Background(), syncContext)
+	err := tc.sync(context.Background(), syncContext, "testhub")
 	if err != nil {
 		t.Fatalf("Expected no error when sync, %v", err)
 	}
@@ -490,7 +490,7 @@ func TestSync(t *testing.T) {
 		newFakeCRD(migrationRequestCRDName, "v1", "v1"),
 		newFakeCRD("foos.cluster.open-cluster-management.io", "v1beta2", "v1beta1", "v1beta2"),
 		newFakeCRD("bars.cluster.open-cluster-management.io", "v1beta2", "v1beta1", "v1beta2"))
-	err = tc.sync(context.Background(), syncContext)
+	err = tc.sync(context.Background(), syncContext, "testhub")
 	if err != nil {
 		t.Fatalf("Expected no error when sync, %v", err)
 	}
@@ -514,7 +514,6 @@ func newTestController(
 
 	crdMigrationController := &crdMigrationController{
 		clusterManagerLister: operatorInformers.Operator().V1().ClusterManagers().Lister(),
-		recorder:             eventstesting.NewTestingEventRecorder(t),
 		patcher: patcher.NewPatcher[
 			*operatorapiv1.ClusterManager, operatorapiv1.ClusterManagerSpec, operatorapiv1.ClusterManagerStatus](
 			fakeOperatorClient.OperatorV1().ClusterManagers()),

@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	errorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,6 +36,7 @@ import (
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	clustersdkv1beta2 "open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta2"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -84,10 +83,10 @@ func NewSchedulingController(
 	placementDecisionInformer clusterinformerv1beta1.PlacementDecisionInformer,
 	placementScoreInformer clusterinformerv1alpha1.AddOnPlacementScoreInformer,
 	scheduler Scheduler,
-	recorder events.Recorder, krecorder kevents.EventRecorder,
+	krecorder kevents.EventRecorder,
 	metricsRecorder *metrics.ScheduleMetrics,
 ) factory.Controller {
-	syncCtx := factory.NewSyncContext(schedulingControllerName, recorder)
+	syncCtx := factory.NewSyncContext(schedulingControllerName)
 
 	enQueuer := newEnqueuer(ctx, syncCtx.Queue(), clusterInformer, clusterSetInformer, placementInformer, clusterSetBindingInformer)
 
@@ -168,22 +167,22 @@ func NewSchedulingController(
 		WithInformersQueueKeysFunc(
 			queue.QueueKeyByMetaNamespaceName,
 			placementInformer.Informer()).
-		WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
+		WithFilteredEventsInformersQueueKeysFunc(func(obj runtime.Object) []string {
 			accessor, _ := meta.Accessor(obj)
 			placementName := accessor.GetLabels()[clusterapiv1beta1.PlacementLabel]
-			return fmt.Sprintf("%s/%s", accessor.GetNamespace(), placementName)
+			return []string{fmt.Sprintf("%s/%s", accessor.GetNamespace(), placementName)}
 		},
 			queue.FileterByLabel(clusterapiv1beta1.PlacementLabel),
 			placementDecisionInformer.Informer()).
 		WithBareInformers(clusterInformer.Informer(), clusterSetInformer.Informer(), clusterSetBindingInformer.Informer(), placementScoreInformer.Informer()).
 		WithSync(c.sync).
-		ToController(schedulingControllerName, recorder)
+		ToController(schedulingControllerName)
 }
 
-func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	logger := klog.FromContext(ctx)
-	queueKey := syncCtx.QueueKey()
-	logger.V(4).Info("Reconciling placement", "queueKey", queueKey)
+func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncContext, queueKey string) error {
+	logger := klog.FromContext(ctx).WithValues("queueKey", queueKey)
+	logger.V(4).Info("Reconciling placement")
+	ctx = klog.NewContext(ctx, logger)
 
 	placement, err := c.getPlacement(queueKey)
 	if errors.IsNotFound(err) {

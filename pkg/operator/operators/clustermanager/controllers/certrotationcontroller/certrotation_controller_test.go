@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,6 +21,7 @@ import (
 	fakeoperatorclient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/certrotation"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
@@ -194,11 +194,10 @@ func TestCertRotation(t *testing.T) {
 			}
 
 			syncContext := testingcommon.NewFakeSyncContext(t, c.queueKey)
-			recorder := syncContext.Recorder()
 
-			controller := NewCertRotationController(kubeClient, secretInformers, configmapInformer, operatorInformers.Operator().V1().ClusterManagers(), recorder)
+			controller := NewCertRotationController(kubeClient, secretInformers, configmapInformer, operatorInformers.Operator().V1().ClusterManagers())
 
-			err := controller.Sync(context.TODO(), syncContext)
+			err := controller.Sync(context.TODO(), syncContext, c.queueKey)
 			c.validate(t, kubeClient, err)
 		})
 	}
@@ -332,7 +331,6 @@ func TestCertRotationGRPCAuth(t *testing.T) {
 			}
 
 			syncContext := testingcommon.NewFakeSyncContext(t, testClusterManagerNameDefault)
-			recorder := syncContext.Recorder()
 
 			// Create the controller to check the rotation map
 			controller := &certRotationController{
@@ -340,12 +338,11 @@ func TestCertRotationGRPCAuth(t *testing.T) {
 				kubeClient:           kubeClient,
 				secretInformers:      secretInformers,
 				configMapInformer:    configmapInformer,
-				recorder:             recorder,
 				clusterManagerLister: operatorInformers.Operator().V1().ClusterManagers().Lister(),
 			}
 
 			// First sync with initial configuration
-			if err := controller.sync(context.TODO(), syncContext); err != nil {
+			if err := controller.sync(context.TODO(), syncContext, testClusterManagerNameDefault); err != nil {
 				t.Fatal(err)
 			}
 
@@ -353,7 +350,7 @@ func TestCertRotationGRPCAuth(t *testing.T) {
 			if err := clusterManagerStore.Update(c.updatedClusterManager); err != nil {
 				t.Fatal(err)
 			}
-			if err := controller.sync(context.TODO(), syncContext); err != nil {
+			if err := controller.sync(context.TODO(), syncContext, testClusterManagerNameDefault); err != nil {
 				t.Fatal(err)
 			}
 
@@ -689,19 +686,17 @@ func TestCertRotationGRPCServerHostNames(t *testing.T) {
 			}
 
 			syncContext := testingcommon.NewFakeSyncContext(t, testClusterManagerNameDefault)
-			recorder := syncContext.Recorder()
 
 			controller := &certRotationController{
 				rotationMap:          make(map[string]rotations),
 				kubeClient:           kubeClient,
 				secretInformers:      secretInformers,
 				configMapInformer:    configmapInformer,
-				recorder:             recorder,
 				clusterManagerLister: operatorInformers.Operator().V1().ClusterManagers().Lister(),
 			}
 
 			// Sync the controller
-			err := controller.sync(context.TODO(), syncContext)
+			err := controller.sync(context.TODO(), syncContext, testClusterManagerNameDefault)
 
 			// Check if we expect an error
 			if c.expectedErrorSubstr != "" {

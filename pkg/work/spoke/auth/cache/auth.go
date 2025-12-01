@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -42,8 +41,6 @@ type sarCacheValidator struct {
 
 // NewExecutorCacheValidator creates a sarCacheValidator
 func NewExecutorCacheValidator(
-	ctx context.Context,
-	recorder events.Recorder,
 	spokeKubeClient kubernetes.Interface,
 	manifestWorkLister worklister.ManifestWorkNamespaceLister,
 	restMapper meta.RESTMapper,
@@ -69,7 +66,7 @@ func NewExecutorCacheValidator(
 		spokeInformer:                    spokeKubeInformerFactory,
 	}
 
-	v.cacheController = NewExecutorCacheController(ctx, recorder,
+	v.cacheController = NewExecutorCacheController(
 		v.spokeInformer.Rbac().V1().ClusterRoleBindings(),
 		v.spokeInformer.Rbac().V1().RoleBindings(),
 		v.spokeInformer.Rbac().V1().ClusterRoles(),

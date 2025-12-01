@@ -5,8 +5,6 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,6 +16,7 @@ import (
 	informerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
@@ -35,7 +34,6 @@ type GCController struct {
 	clusterLister         clusterv1listers.ManagedClusterLister
 	clusterPatcher        patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus]
 	gcResourcesController *gcResourcesController
-	eventRecorder         events.Recorder
 }
 
 // NewGCController ensures the related resources are cleaned up after cluster is deleted
@@ -43,7 +41,6 @@ func NewGCController(
 	clusterInformer informerv1.ManagedClusterInformer,
 	clusterClient clientset.Interface,
 	metadataClient metadata.Interface,
-	eventRecorder events.Recorder,
 	gcResourceList []string,
 ) factory.Controller {
 	clusterPatcher := patcher.NewPatcher[
@@ -53,7 +50,6 @@ func NewGCController(
 	controller := &GCController{
 		clusterLister:  clusterInformer.Lister(),
 		clusterPatcher: clusterPatcher,
-		eventRecorder:  eventRecorder.WithComponentSuffix("gc-resources"),
 	}
 	if len(gcResourceList) != 0 {
 		gcResources := []schema.GroupVersionResource{}
@@ -71,14 +67,13 @@ func NewGCController(
 
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterInformer.Informer()).
-		WithSync(controller.sync).ToController("GCController", eventRecorder)
+		WithSync(controller.sync).ToController("GCController")
 }
 
 // gc controller is watching cluster and to do these jobs:
 //  1. add a cleanup finalizer to managedCluster if the cluster is not deleting.
 //  2. clean up the resources in the cluster ns after the cluster is deleted.
-func (r *GCController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	clusterName := controllerContext.QueueKey()
+func (r *GCController) sync(ctx context.Context, syncCtx factory.SyncContext, clusterName string) error {
 	if clusterName == "" || clusterName == factory.DefaultQueueKey {
 		return nil
 	}
@@ -99,14 +94,14 @@ func (r *GCController) sync(ctx context.Context, controllerContext factory.SyncC
 	gcErr := r.gcResourcesController.reconcile(ctx, copyCluster, clusterName)
 	if cluster == nil {
 		if errors.Is(gcErr, requeueError) {
-			controllerContext.Queue().AddAfter(clusterName, requeueError.RequeueTime)
+			syncCtx.Queue().AddAfter(clusterName, requeueError.RequeueTime)
 			return nil
 		}
 		return gcErr
 	}
 
 	if gcErr != nil && !errors.Is(gcErr, requeueError) {
-		r.eventRecorder.Eventf("ResourceCleanupFail",
+		syncCtx.Recorder().Eventf(ctx, "ResourceCleanupFail",
 			"failed to cleanup resources in cluster %s:%v", cluster.Name, gcErr)
 
 		meta.SetStatusCondition(&copyCluster.Status.Conditions, metav1.Condition{
@@ -122,14 +117,14 @@ func (r *GCController) sync(ctx context.Context, controllerContext factory.SyncC
 	}
 
 	if errors.Is(gcErr, requeueError) {
-		controllerContext.Queue().AddAfter(clusterName, requeueError.RequeueTime)
+		syncCtx.Queue().AddAfter(clusterName, requeueError.RequeueTime)
 		return nil
 	}
 	if gcErr != nil {
 		return gcErr
 	}
 
-	r.eventRecorder.Eventf("ResourceCleanupCompleted",
+	syncCtx.Recorder().Eventf(ctx, "ResourceCleanupCompleted",
 		"resources in cluster %s are cleaned up", cluster.Name)
 
 	return r.clusterPatcher.RemoveFinalizer(ctx, cluster, commonhelper.GcFinalizer)

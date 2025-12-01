@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	rbacapiv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -51,8 +50,6 @@ type CacheController struct {
 // rolebinding, clusterrole, clusterrolebinding) related to the executors used by the manifestworks, and update the
 // caches of the corresponding executor when the RBAC resources change
 func NewExecutorCacheController(
-	ctx context.Context,
-	recorder events.Recorder,
 	crbInformer rbacv1.ClusterRoleBindingInformer,
 	rbInformer rbacv1.RoleBindingInformer,
 	crInformer rbacv1.ClusterRoleInformer,
@@ -69,7 +66,7 @@ func NewExecutorCacheController(
 		bindingExecutorsMapper:           newSafeMap(),
 	}
 
-	return newControllerInner(controller, recorder, crbInformer, rbInformer, crInformer, rInformer)
+	return newControllerInner(controller, crbInformer, rbInformer, crInformer, rInformer)
 }
 
 func newSafeMap() *safeMap {
@@ -82,7 +79,6 @@ func newSafeMap() *safeMap {
 // newControllerInner is an inner function to create a cache controller,
 // this is useful for unit test to fake the value of CacheController
 func newControllerInner(controller *CacheController,
-	recorder events.Recorder,
 	crbInformer rbacv1.ClusterRoleBindingInformer,
 	rbInformer rbacv1.RoleBindingInformer,
 	crInformer rbacv1.ClusterRoleInformer,

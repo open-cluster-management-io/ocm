@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,6 +18,7 @@ import (
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 )
 
@@ -47,8 +46,7 @@ func NewManagedClusterAddOnLeaseController(clusterName string,
 	addOnInformer addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	managementLeaseClient coordv1client.CoordinationV1Interface,
 	spokeLeaseClient coordv1client.CoordinationV1Interface,
-	resyncInterval time.Duration,
-	recorder events.Recorder) factory.Controller {
+	resyncInterval time.Duration) factory.Controller {
 	c := &managedClusterAddOnLeaseController{
 		clusterName: clusterName,
 		clock:       clock.RealClock{},
@@ -67,11 +65,10 @@ func NewManagedClusterAddOnLeaseController(clusterName string,
 	return factory.New().
 		WithSync(c.sync).
 		ResyncEvery(resyncInterval).
-		ToController("ManagedClusterAddOnLeaseController", recorder)
+		ToController("ManagedClusterAddOnLeaseController")
 }
 
-func (c *managedClusterAddOnLeaseController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	queueKey := syncCtx.QueueKey()
+func (c *managedClusterAddOnLeaseController) sync(ctx context.Context, syncCtx factory.SyncContext, queueKey string) error {
 	if queueKey == factory.DefaultQueueKey {
 		addOns, err := c.addOnLister.ManagedClusterAddOns(c.clusterName).List(labels.Everything())
 		if err != nil {
@@ -105,13 +102,13 @@ func (c *managedClusterAddOnLeaseController) sync(ctx context.Context, syncCtx f
 		return nil
 	}
 
-	return c.syncSingle(ctx, addOnNamespace, addOn, syncCtx.Recorder())
+	return c.syncSingle(ctx, syncCtx, addOnNamespace, addOn)
 }
 
 func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
+	syncCtx factory.SyncContext,
 	leaseNamespace string,
-	addOn *addonv1alpha1.ManagedClusterAddOn,
-	recorder events.Recorder) error {
+	addOn *addonv1alpha1.ManagedClusterAddOn) error {
 	now := c.clock.Now()
 	gracePeriod := time.Duration(leaseDurationTimes*AddOnLeaseControllerLeaseDurationSeconds) * time.Second
 
@@ -164,7 +161,7 @@ func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
 		return err
 	}
 	if updated {
-		recorder.Eventf("ManagedClusterAddOnStatusUpdated",
+		syncCtx.Recorder().Eventf(ctx, "ManagedClusterAddOnStatusUpdated",
 			"update managed cluster addon %q available condition to %q with its lease %q/%q status",
 			addOn.Name, condition.Status, leaseNamespace, addOn.Name)
 	}

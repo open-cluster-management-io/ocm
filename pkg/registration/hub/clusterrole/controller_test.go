@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -118,11 +117,12 @@ func TestSyncManagedClusterClusterRole(t *testing.T) {
 				),
 				clusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				cache:         resourceapply.NewResourceCache(),
-				eventRecorder: eventstesting.NewTestingEventRecorder(t),
 				labels:        c.labels,
 			}
 
-			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, "testmangedclsuterclusterrole"))
+			syncErr := ctrl.sync(context.TODO(),
+				testingcommon.NewFakeSyncContext(t, "testmangedclsuterclusterrole"),
+				"testmangedclsuterclusterrole")
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

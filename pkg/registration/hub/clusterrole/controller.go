@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	"k8s.io/apimachinery/pkg/labels"
@@ -14,9 +12,11 @@ import (
 
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"open-cluster-management.io/ocm/pkg/common/apply"
 	"open-cluster-management.io/ocm/pkg/common/queue"
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/manifests"
 )
@@ -32,7 +32,6 @@ type clusterroleController struct {
 	clusterLister clusterv1listers.ManagedClusterLister
 	applier       *apply.PermissionApplier
 	cache         resourceapply.ResourceCache
-	eventRecorder events.Recorder
 	labels        map[string]string
 }
 
@@ -41,7 +40,6 @@ func NewManagedClusterClusterroleController(
 	kubeClient kubernetes.Interface,
 	clusterInformer clusterv1informer.ManagedClusterInformer,
 	clusterRoleInformer rbacv1informers.ClusterRoleInformer,
-	recorder events.Recorder,
 	labels map[string]string) factory.Controller {
 
 	// Creating a deep copy of the labels to avoid controllers from reading the same map concurrently.
@@ -60,8 +58,7 @@ func NewManagedClusterClusterroleController(
 			clusterRoleInformer.Lister(),
 			nil,
 		),
-		eventRecorder: recorder.WithComponentSuffix("managed-cluster-clusterrole-controller"),
-		labels:        deepCopyLabels,
+		labels: deepCopyLabels,
 	}
 	return factory.New().
 		WithFilteredEventsInformers(
@@ -69,10 +66,10 @@ func NewManagedClusterClusterroleController(
 			clusterRoleInformer.Informer()).
 		WithInformers(clusterInformer.Informer()).
 		WithSync(c.sync).
-		ToController("ManagedClusterClusterRoleController", recorder)
+		ToController("ManagedClusterClusterRoleController")
 }
 
-func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncContext, _ string) error {
 	managedClusters, err := c.clusterLister.List(labels.Everything())
 	if err != nil {
 		return err
@@ -80,12 +77,13 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 	var errs []error
 	assetFn := helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, "", false, c.labels)
 
+	recorderWrapper := commonrecorder.NewEventsRecorderWrapper(ctx, syncCtx.Recorder())
 	// Clean up managedcluser cluserroles if there are no managed clusters
 	if len(managedClusters) == 0 {
 		results := resourceapply.DeleteAll(
 			ctx,
 			resourceapply.NewKubeClientHolder(c.kubeClient),
-			c.eventRecorder,
+			recorderWrapper,
 			assetFn,
 			manifests.CommonClusterRoleFiles...,
 		)

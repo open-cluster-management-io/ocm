@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -193,13 +192,12 @@ func TestReconcile(t *testing.T) {
 			clusterInformers,
 			dynamicInformerFactory,
 			workInformers,
-			eventstesting.NewTestingEventRecorder(t),
 			runController,
 		)
 		ctx := context.TODO()
 		for _, syncKey := range c.syncKeys {
 			syncContext := testingcommon.NewFakeSyncContext(t, syncKey)
-			err := controller.Sync(ctx, syncContext)
+			err := controller.Sync(ctx, syncContext, syncKey)
 			if err != nil {
 				t.Errorf("expected no error when sync: %v", err)
 			}
@@ -383,7 +381,6 @@ func TestStopUnusedManagers(t *testing.T) {
 				clusterInformers:           clusterInformers,
 				dynamicInformers:           dynamicInformerFactory,
 				workInformers:              workInformers,
-				eventRecorder:              eventstesting.NewTestingEventRecorder(t),
 			}
 
 			// Start informers and wait for cache sync

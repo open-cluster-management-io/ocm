@@ -69,7 +69,7 @@ func TestCreateSpokeCluster(t *testing.T) {
 				hubClusterClient: clusterClient,
 			}
 
-			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""))
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""), "")
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

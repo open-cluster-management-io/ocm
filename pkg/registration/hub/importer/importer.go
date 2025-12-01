@@ -6,8 +6,6 @@ import (
 	"fmt"
 
 	"github.com/openshift/api"
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
@@ -30,10 +28,13 @@ import (
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	v1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
 	cloudproviders "open-cluster-management.io/ocm/pkg/registration/hub/importer/providers"
 )
@@ -81,10 +82,9 @@ func NewImporter(
 	renders []KlusterletConfigRenderer,
 	clusterClient clusterclientset.Interface,
 	clusterInformer clusterinformerv1.ManagedClusterInformer,
-	providers []cloudproviders.Interface,
-	recorder events.Recorder) factory.Controller {
+	providers []cloudproviders.Interface) factory.Controller {
 	controllerName := "managed-cluster-importer"
-	syncCtx := factory.NewSyncContext(controllerName, recorder)
+	syncCtx := factory.NewSyncContext(controllerName)
 
 	i := &Importer{
 		providers:     providers,
@@ -101,13 +101,12 @@ func NewImporter(
 	}
 
 	return factory.New().WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterInformer.Informer()).
-		WithSyncContext(syncCtx).WithSync(i.sync).ToController(controllerName, recorder)
+		WithSyncContext(syncCtx).WithSync(i.sync).ToController(controllerName)
 }
 
-func (i *Importer) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	clusterName := syncCtx.QueueKey()
-	logger := klog.FromContext(ctx)
-	logger.V(4).Info("Reconciling key", "clusterName", clusterName)
+func (i *Importer) sync(ctx context.Context, syncCtx factory.SyncContext, clusterName string) error {
+	logger := klog.FromContext(ctx).WithValues("managedClusterName", clusterName)
+	logger.V(4).Info("Reconciling key")
 
 	cluster, err := i.clusterLister.Get(clusterName)
 	switch {
@@ -142,7 +141,7 @@ func (i *Importer) sync(ctx context.Context, syncCtx factory.SyncContext) error 
 		return updatedErr
 	}
 	if updated {
-		syncCtx.Recorder().Eventf(
+		syncCtx.Recorder().Eventf(ctx,
 			"ManagedClusterImported", "managed cluster %s is imported", clusterName)
 	}
 	var rqe helpers.RequeueError
@@ -160,6 +159,7 @@ func (i *Importer) reconcile(
 	recorder events.Recorder,
 	provider cloudproviders.Interface,
 	cluster *v1.ManagedCluster) (*v1.ManagedCluster, error) {
+	recorderWrapper := commonrecorder.NewEventsRecorderWrapper(ctx, recorder)
 	clients, err := provider.Clients(ctx, cluster)
 	if err != nil {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
@@ -227,14 +227,14 @@ func (i *Importer) reconcile(
 		switch t := requiredObj.(type) {
 		case *appsv1.Deployment:
 			result.Result, result.Changed, result.Error = resourceapply.ApplyDeployment(
-				ctx, clients.KubeClient.AppsV1(), recorder, t, 0)
+				ctx, clients.KubeClient.AppsV1(), recorderWrapper, t, 0)
 			results = append(results, result)
 		case *operatorv1.Klusterlet:
 			result.Result, result.Changed, result.Error = ApplyKlusterlet(
 				ctx, clients.OperatorClient, recorder, t)
 			results = append(results, result)
 		default:
-			tempResults := resourceapply.ApplyDirectly(ctx, clientHolder, recorder, cache,
+			tempResults := resourceapply.ApplyDirectly(ctx, clientHolder, recorderWrapper, cache,
 				func(name string) ([]byte, error) {
 					return manifest, nil
 				},
@@ -273,11 +273,12 @@ func ApplyKlusterlet(
 	client operatorclient.Interface,
 	recorder events.Recorder,
 	required *operatorv1.Klusterlet) (*operatorv1.Klusterlet, bool, error) {
+	recorderWrapper := commonrecorder.NewEventsRecorderWrapper(ctx, recorder)
 	existing, err := client.OperatorV1().Klusterlets().Get(ctx, required.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		requiredCopy := required.DeepCopy()
 		actual, err := client.OperatorV1().Klusterlets().Create(ctx, requiredCopy, metav1.CreateOptions{})
-		resourcehelper.ReportCreateEvent(recorder, required, err)
+		resourcehelper.ReportCreateEvent(recorderWrapper, required, err)
 		return actual, true, err
 	}
 	if err != nil {
@@ -294,6 +295,6 @@ func ApplyKlusterlet(
 
 	existingCopy.Spec = required.Spec
 	actual, err := client.OperatorV1().Klusterlets().Update(ctx, existingCopy, metav1.UpdateOptions{})
-	resourcehelper.ReportUpdateEvent(recorder, required, err)
+	resourcehelper.ReportUpdateEvent(recorderWrapper, required, err)
 	return actual, true, err
 }

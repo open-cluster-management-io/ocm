@@ -199,7 +199,7 @@ func TestEnqueuePlacementsByClusterSet(t *testing.T) {
 				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings(),
 			)
 			queuedKeys := sets.NewString()
-			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.RateLimitingInterface) {
+			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.TypedRateLimitingInterface[string]) {
 				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 				queuedKeys.Insert(key)
 			}
@@ -308,7 +308,7 @@ func TestEnqueuePlacementsByClusterSetBinding(t *testing.T) {
 				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings(),
 			)
 			queuedKeys := sets.NewString()
-			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.RateLimitingInterface) {
+			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.TypedRateLimitingInterface[string]) {
 				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 				queuedKeys.Insert(key)
 			}
@@ -398,7 +398,7 @@ func TestEnqueuePlacementsByScore(t *testing.T) {
 				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings(),
 			)
 			queuedKeys := sets.NewString()
-			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.RateLimitingInterface) {
+			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.TypedRateLimitingInterface[string]) {
 				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 				queuedKeys.Insert(key)
 			}

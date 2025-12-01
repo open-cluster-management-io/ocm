@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
@@ -74,7 +73,6 @@ const (
 )
 
 func NewManifestWorkReplicaSetController(
-	recorder events.Recorder,
 	workClient workclientset.Interface,
 	workApplier *workapplier.WorkApplier,
 	manifestWorkReplicaSetInformer workinformerv1alpha1.ManifestWorkReplicaSetInformer,
