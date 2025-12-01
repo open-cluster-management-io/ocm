@@ -45,6 +45,8 @@ var (
 		"cluster-manager/hub/placement/clusterrole.yaml",
 		"cluster-manager/hub/placement/clusterrolebinding.yaml",
 		"cluster-manager/hub/placement/serviceaccount.yaml",
+		// addon-webhook
+		"cluster-manager/hub/addon-manager/webhook-serviceaccount.yaml",
 	}
 
 	workControllerResourceFiles = []string{
@@ -66,13 +68,16 @@ var (
 	hubDefaultWebhookServiceFiles = []string{
 		"cluster-manager/hub/registration/webhook-service.yaml",
 		"cluster-manager/hub/work/webhook-service.yaml",
+		"cluster-manager/hub/addon-manager/webhook-service.yaml",
 	}
+	// Note: addon conversion webhook is not supported in hosted mode
 	hubHostedWebhookServiceFiles = []string{
 		"cluster-manager/hub/registration/webhook-service-hosted.yaml",
 		"cluster-manager/hub/work/webhook-service-hosted.yaml",
 	}
 
 	// hubHostedWebhookEndpointFiles only apply when the deploy mode is hosted and address is IPFormat.
+	// Note: addon conversion webhook is not supported in hosted mode
 	hubHostedWebhookEndpointRegistration = "cluster-manager/hub/registration/webhook-endpoint-hosted.yaml"
 	hubHostedWebhookEndpointWork         = "cluster-manager/hub/work/webhook-endpoint-hosted.yaml"
 
@@ -177,6 +182,7 @@ func getHubResources(mode operatorapiv1.InstallMode, config manifests.HubConfig)
 	}
 
 	// the hubHostedWebhookServiceFiles are only used in hosted mode
+	// Note: addon conversion webhook is not supported in hosted mode
 	if helpers.IsHosted(mode) {
 		hubResources = append(hubResources, hubHostedWebhookServiceFiles...)
 		if config.RegistrationWebhook.IsIPFormat {

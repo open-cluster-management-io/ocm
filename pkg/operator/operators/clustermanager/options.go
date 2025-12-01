@@ -57,6 +57,7 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 	signerSecretInformer := newOneTermInformer(helpers.SignerSecret)
 	registrationSecretInformer := newOneTermInformer(helpers.RegistrationWebhookSecret)
 	workSecretInformer := newOneTermInformer(helpers.WorkWebhookSecret)
+	addonSecretInformer := newOneTermInformer(helpers.AddonWebhookSecret)
 	grpcServerSecretInformer := newOneTermInformer(helpers.GRPCServerSecret)
 	configmapInformer := newOneTermInformer(helpers.CaBundleConfigmap)
 
@@ -77,6 +78,7 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		helpers.SignerSecret:              signerSecretInformer.Core().V1().Secrets(),
 		helpers.RegistrationWebhookSecret: registrationSecretInformer.Core().V1().Secrets(),
 		helpers.WorkWebhookSecret:         workSecretInformer.Core().V1().Secrets(),
+		helpers.AddonWebhookSecret:        addonSecretInformer.Core().V1().Secrets(),
 		helpers.GRPCServerSecret:          grpcServerSecretInformer.Core().V1().Secrets(),
 	}
 
@@ -128,6 +130,7 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 	go signerSecretInformer.Start(ctx.Done())
 	go registrationSecretInformer.Start(ctx.Done())
 	go workSecretInformer.Start(ctx.Done())
+	go addonSecretInformer.Start(ctx.Done())
 	go grpcServerSecretInformer.Start(ctx.Done())
 	go configmapInformer.Start(ctx.Done())
 	go clusterManagerController.Run(ctx, 1)

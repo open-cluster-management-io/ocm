@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cluster-manager-addon-webhook
+  namespace: {{ .ClusterManagerNamespace }}
+  labels:
+    {{ if gt (len .Labels) 0 }}
+    {{ range $key, $value := .Labels }}
+    "{{ $key }}": "{{ $value }}"
+    {{ end }}
+    {{ end }}
+spec:
+  selector:
+    app: {{ .ClusterManagerName }}-addon-webhook
+  ports:
+  - name: webhook
+    port: 9443
+    targetPort: 9443

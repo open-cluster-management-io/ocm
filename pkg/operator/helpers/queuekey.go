@@ -41,6 +41,8 @@ const (
 	RegistrationWebhookService = "cluster-manager-registration-webhook"
 	WorkWebhookSecret          = "work-webhook-serving-cert" // #nosec G101
 	WorkWebhookService         = "cluster-manager-work-webhook"
+	AddonWebhookSecret         = "addon-webhook-serving-cert" // #nosec G101
+	AddonWebhookService        = "cluster-manager-addon-webhook"
 
 	SignerSecret      = "signer-secret"
 	CaBundleConfigmap = "ca-bundle-configmap"
@@ -118,6 +120,7 @@ func ClusterManagerDeploymentQueueKeyFunc(clusterManagerLister operatorlister.Cl
 			strings.HasSuffix(name, "registration-webhook") ||
 			strings.HasSuffix(name, "work-webhook") ||
 			strings.HasSuffix(name, "addon-manager-controller") ||
+			strings.HasSuffix(name, "addon-webhook") ||
 			strings.HasSuffix(name, "work-controller") ||
 			strings.HasSuffix(name, "placement-controller") {
 			interestedObjectFound = true
