@@ -218,15 +218,10 @@ func (d *deployReconciler) clusterRolloutStatusFunc(clusterName string, manifest
 	// Get all relevant conditions
 	progressingCond := apimeta.FindStatusCondition(manifestWork.Status.Conditions, workv1.WorkProgressing)
 	degradedCond := apimeta.FindStatusCondition(manifestWork.Status.Conditions, workv1.WorkDegraded)
+	appliedCond := apimeta.FindStatusCondition(manifestWork.Status.Conditions, workv1.WorkApplied)
 
-	// Return ToApply if:
-	// - No Progressing condition exists yet (work hasn't been reconciled by agent)
-	// - Progressing condition hasn't observed the latest spec
-	// - Degraded condition exists but hasn't observed the latest spec
-	//   (Degraded is optional, but if it exists, we wait for it to catch up)
-	if progressingCond == nil ||
-		progressingCond.ObservedGeneration != manifestWork.Generation ||
-		(degradedCond != nil && degradedCond.ObservedGeneration != manifestWork.Generation) {
+	// Check if the work should be in ToApply status
+	if shouldReturnToApply(manifestWork.Generation, appliedCond, progressingCond, degradedCond) {
 		return clsRolloutStatus, nil
 	}
 
@@ -260,6 +255,60 @@ func (d *deployReconciler) clusterRolloutStatusFunc(clusterName string, manifest
 	}
 
 	return clsRolloutStatus, nil
+}
+
+// shouldReturnToApply determines if the ManifestWork should be in ToApply status
+// based on the state of its conditions.
+//
+// Returns true if:
+// - The Applied condition is not ready (missing, hasn't observed latest spec, or not True)
+// - The Progressing condition is not ready (missing or hasn't observed latest spec)
+// - The Degraded condition exists but hasn't observed the latest spec
+//
+// IMPORTANT: Applied condition is checked FIRST to ensure the work has been properly applied
+// by the spoke agent before checking other agent-side conditions (Progressing/Degraded).
+// This prevents using stale timestamps from previous generations when conditions update
+// their ObservedGeneration without changing Status.
+func shouldReturnToApply(generation int64, appliedCond, progressingCond, degradedCond *metav1.Condition) bool {
+	// Check Applied condition first - work must be applied by spoke agent
+	if !isConditionReady(appliedCond, generation, true) {
+		return true
+	}
+
+	// Check Progressing condition - work must be reconciled by spoke agent
+	if !isConditionReady(progressingCond, generation, false) {
+		return true
+	}
+
+	// Check Degraded condition if it exists - it must have observed the latest spec
+	// Degraded is optional, but if it exists, we wait for it to catch up to avoid
+	// using stale status information
+	if degradedCond != nil && degradedCond.ObservedGeneration != generation {
+		return true
+	}
+
+	return false
+}
+
+// isConditionReady checks if a condition is ready for rollout status evaluation.
+// A condition is ready if:
+// - It exists (not nil)
+// - It has observed the latest generation
+// - If requireTrue is set, it must also have Status=True
+func isConditionReady(cond *metav1.Condition, generation int64, requireTrue bool) bool {
+	if cond == nil {
+		return false
+	}
+
+	if cond.ObservedGeneration != generation {
+		return false
+	}
+
+	if requireTrue && cond.Status != metav1.ConditionTrue {
+		return false
+	}
+
+	return true
 }
 
 // GetManifestworkApplied return only True status if there all clusters have manifests applied as expected
