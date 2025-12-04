@@ -89,7 +89,7 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 				return nil, clusterNames, err
 			}
 
-			_, err = hubClusterClient.ClusterV1beta1().Placements(placement.Namespace).Create(context.TODO(), placement, metav1.CreateOptions{})
+			createdPlacement, err := hubClusterClient.ClusterV1beta1().Placements(placement.Namespace).Create(context.TODO(), placement, metav1.CreateOptions{})
 			if err != nil {
 				return nil, clusterNames, err
 			}
@@ -113,6 +113,13 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 			}
 
 			_, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).UpdateStatus(context.TODO(), decision, metav1.UpdateOptions{})
+			if err != nil {
+				return nil, clusterNames, err
+			}
+
+			// Update placement status with NumberOfSelectedClusters
+			createdPlacement.Status.NumberOfSelectedClusters = int32(numberOfClusters)
+			_, err = hubClusterClient.ClusterV1beta1().Placements(placement.Namespace).UpdateStatus(context.TODO(), createdPlacement, metav1.UpdateOptions{})
 			return manifestWorkReplicaSet, clusterNames, err
 		}
 	})
@@ -210,7 +217,7 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 					Namespace: namespaceName,
 				},
 			}
-			_, err := hubClusterClient.ClusterV1beta1().Placements(placement1.Namespace).Create(context.TODO(), placement1, metav1.CreateOptions{})
+			createdPlacement1, err := hubClusterClient.ClusterV1beta1().Placements(placement1.Namespace).Create(context.TODO(), placement1, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			placementDecision1 := &clusterv1beta1.PlacementDecision{
@@ -239,6 +246,11 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 				cluster1Names.Insert(clusterName)
 			}
 			_, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision1.Namespace).UpdateStatus(context.TODO(), decision1, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Update placement1 status with NumberOfSelectedClusters
+			createdPlacement1.Status.NumberOfSelectedClusters = 2
+			_, err = hubClusterClient.ClusterV1beta1().Placements(placement1.Namespace).UpdateStatus(context.TODO(), createdPlacement1, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// Create manifestWorkReplicaSet with first placement
@@ -290,7 +302,7 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 					Namespace: namespaceName,
 				},
 			}
-			_, err = hubClusterClient.ClusterV1beta1().Placements(placement2.Namespace).Create(context.TODO(), placement2, metav1.CreateOptions{})
+			createdPlacement2, err := hubClusterClient.ClusterV1beta1().Placements(placement2.Namespace).Create(context.TODO(), placement2, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			placementDecision2 := &clusterv1beta1.PlacementDecision{
@@ -319,6 +331,11 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 				cluster2Names.Insert(clusterName)
 			}
 			_, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision2.Namespace).UpdateStatus(context.TODO(), decision2, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Update placement2 status with NumberOfSelectedClusters
+			createdPlacement2.Status.NumberOfSelectedClusters = 2
+			_, err = hubClusterClient.ClusterV1beta1().Placements(placement2.Namespace).UpdateStatus(context.TODO(), createdPlacement2, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// Update manifestWorkReplicaSet to use second placement
