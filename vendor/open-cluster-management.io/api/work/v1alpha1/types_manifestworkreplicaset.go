@@ -125,6 +125,8 @@ type PlacementSummary struct {
 type ManifestWorkReplicaSetSummary struct {
 	// Total number of ManifestWorks managed by the ManifestWorkReplicaSet
 	Total int `json:"total"`
+	// DesiredTotal is the total number of clusters that should have ManifestWorks based on the rollout strategy
+	DesiredTotal int `json:"desiredTotal"`
 	// TODO: Progressing is the number of ManifestWorks with condition Progressing: true
 	Progressing int `json:"progressing"`
 	// Available is the number of ManifestWorks with condition Available: true
