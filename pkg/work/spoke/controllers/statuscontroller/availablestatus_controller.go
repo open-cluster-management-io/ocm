@@ -21,6 +21,7 @@ import (
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
+	"open-cluster-management.io/sdk-go/pkg/logging"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
@@ -82,7 +83,6 @@ func NewAvailableStatusController(
 func (c *AvailableStatusController) sync(ctx context.Context, controllerContext factory.SyncContext, manifestWorkName string) error {
 	logger := klog.FromContext(ctx).WithValues("manifestWorkName", manifestWorkName)
 	logger.V(4).Info("Reconciling ManifestWork")
-	ctx = klog.NewContext(ctx, logger)
 
 	// sync a particular manifestwork
 	manifestWork, err := c.manifestWorkLister.Get(manifestWorkName)
@@ -93,6 +93,10 @@ func (c *AvailableStatusController) sync(ctx context.Context, controllerContext 
 	if err != nil {
 		return fmt.Errorf("unable to fetch manifestwork %q: %w", manifestWorkName, err)
 	}
+
+	// set tracing key from work if there is any
+	logger = logging.SetLogTracingByObject(logger, manifestWork)
+	ctx = klog.NewContext(ctx, logger)
 
 	err = c.syncManifestWork(ctx, manifestWork)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"open-cluster-management.io/sdk-go/pkg/logging"
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -109,6 +110,9 @@ func (c *ManifestWorkSourceClient) Create(ctx context.Context, manifestWork *wor
 		return nil, returnErr
 	}
 
+	// Add logging tracing annotation
+	logging.SetLogTracingFromContext(ctx, newWork)
+
 	if errs := utils.ValidateWork(newWork); len(errs) != 0 {
 		returnErr = errors.NewInvalid(common.ManifestWorkGK, manifestWork.Name, errs)
 		return nil, returnErr
@@ -158,6 +162,9 @@ func (c *ManifestWorkSourceClient) Delete(ctx context.Context, name string, opts
 	deletingWork := work.DeepCopy()
 	now := metav1.Now()
 	deletingWork.DeletionTimestamp = &now
+
+	// Add logging tracing annotation
+	logging.SetLogTracingFromContext(ctx, deletingWork)
 
 	if err := c.cloudEventsClient.Publish(ctx, eventType, deletingWork); err != nil {
 		returnErr := cloudeventserrors.ToStatusError(common.ManifestWorkGR, name, err)
@@ -295,6 +302,9 @@ func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt ku
 	}
 	newWork.Generation = generation
 	newWork.ResourceVersion = rv
+
+	// Add logging tracing annotation
+	logging.SetLogTracingFromContext(ctx, newWork)
 
 	if errs := utils.ValidateWork(newWork); len(errs) != 0 {
 		returnErr = errors.NewInvalid(common.ManifestWorkGK, name, errs)

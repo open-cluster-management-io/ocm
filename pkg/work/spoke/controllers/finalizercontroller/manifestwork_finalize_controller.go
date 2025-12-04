@@ -16,6 +16,7 @@ import (
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
+	"open-cluster-management.io/sdk-go/pkg/logging"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -68,7 +69,6 @@ func (m *ManifestWorkFinalizeController) sync(ctx context.Context, controllerCon
 
 	logger := klog.FromContext(ctx).WithName(appliedManifestWorkFinalizer).
 		WithValues("appliedManifestWorkName", appliedManifestWorkName, "manifestWorkName", manifestWorkName)
-	ctx = klog.NewContext(ctx, logger)
 
 	logger.V(5).Info("Reconciling ManifestWork")
 
@@ -82,6 +82,9 @@ func (m *ManifestWorkFinalizeController) sync(ctx context.Context, controllerCon
 	case err != nil:
 		return err
 	case !manifestWork.DeletionTimestamp.IsZero():
+		// set tracing key from work if there is any
+		logger = logging.SetLogTracingByObject(logger, manifestWork)
+		ctx = klog.NewContext(ctx, logger)
 		err := m.deleteAppliedManifestWork(ctx, manifestWork, appliedManifestWorkName)
 		if err != nil {
 			return err

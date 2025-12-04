@@ -25,6 +25,7 @@ import (
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
+	"open-cluster-management.io/sdk-go/pkg/logging"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
@@ -124,7 +125,6 @@ func NewManifestWorkController(
 func (m *ManifestWorkController) sync(ctx context.Context, controllerContext factory.SyncContext, manifestWorkName string) error {
 	logger := klog.FromContext(ctx).WithValues("manifestWorkName", manifestWorkName)
 	logger.V(5).Info("Reconciling ManifestWork")
-	ctx = klog.NewContext(ctx, logger)
 
 	oldManifestWork, err := m.manifestWorkLister.Get(manifestWorkName)
 	if apierrors.IsNotFound(err) {
@@ -135,6 +135,10 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 		return err
 	}
 	manifestWork := oldManifestWork.DeepCopy()
+
+	// set tracing key from work if there is any
+	logger = logging.SetLogTracingByObject(logger, manifestWork)
+	ctx = klog.NewContext(ctx, logger)
 
 	// no work to do if we're deleted
 	if !manifestWork.DeletionTimestamp.IsZero() {

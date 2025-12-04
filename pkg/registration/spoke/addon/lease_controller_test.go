@@ -16,6 +16,7 @@ import (
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
@@ -260,7 +261,7 @@ func TestSync(t *testing.T) {
 		},
 		{
 			name:     "sync all addons",
-			queueKey: "key",
+			queueKey: factory.DefaultQueueKey,
 			addOns: []runtime.Object{
 				&addonv1alpha1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{
@@ -284,7 +285,7 @@ func TestSync(t *testing.T) {
 			},
 			validateActions: func(t *testing.T, ctx *testingcommon.FakeSyncContext, actions []clienttesting.Action) {
 				if ctx.Queue().Len() != 2 {
-					t.Errorf("expected two addons in queue, but failed")
+					t.Errorf("expected two addons in queue, but get %d", ctx.Queue().Len())
 				}
 			},
 		},

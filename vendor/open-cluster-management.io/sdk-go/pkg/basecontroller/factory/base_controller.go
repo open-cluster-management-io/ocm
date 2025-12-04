@@ -80,7 +80,7 @@ func (c *baseController) Run(ctx context.Context, workers int) {
 	queueContext, queueContextCancel := context.WithCancel(ctx)
 
 	for i := 1; i <= workers; i++ {
-		logger.Info("Starting worker of controller ...", "numberOfWorkers", i)
+		logger.Info("Starting worker of controller ...", "worker-ID", i)
 		workerWg.Add(1)
 		go func() {
 			defer func() {
@@ -157,10 +157,10 @@ func (c *baseController) processNextWorkItem(queueCtx context.Context) {
 	queueKey := key
 
 	if err := c.sync(queueCtx, syncCtx, queueKey); err != nil {
-		if logger.V(4).Enabled() || key != "key" {
-			utilruntime.HandleErrorWithContext(queueCtx, err, "controller failed to sync", "key", key, "error", err)
+		if logger.V(4).Enabled() || key != DefaultQueueKey {
+			utilruntime.HandleErrorWithContext(queueCtx, err, "controller failed to sync", "key", key)
 		} else {
-			utilruntime.HandleErrorWithContext(queueCtx, err, "reconciliation failed", "error", err)
+			utilruntime.HandleErrorWithContext(queueCtx, err, "reconciliation failed")
 		}
 		c.syncContext.Queue().AddRateLimited(key)
 		return

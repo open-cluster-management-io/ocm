@@ -10,7 +10,7 @@ import (
 )
 
 // DefaultQueueKey is the queue key used for string trigger based controllers.
-const DefaultQueueKey = "key"
+const DefaultQueueKey = "basecontroller-default-key"
 
 // DefaultQueueKeysFunc returns a slice with a single element - the DefaultQueueKey
 func DefaultQueueKeysFunc(_ runtime.Object) []string {
