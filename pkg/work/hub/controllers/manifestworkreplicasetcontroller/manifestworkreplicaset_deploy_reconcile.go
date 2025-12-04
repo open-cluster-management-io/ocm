@@ -35,7 +35,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 	var errs []error
 	var plcsSummary []workapiv1alpha1.PlacementSummary
 	minRequeue := maxRequeueTime
-	count, total := 0, 0
+	count, total, succeededCount := 0, 0, 0
 
 	// Clean up ManifestWorks from placements no longer in the spec
 	currentPlacementNames := sets.New[string]()
@@ -65,6 +65,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 	for _, placementRef := range mwrSet.Spec.PlacementRefs {
 		var existingRolloutClsStatus []clustersdkv1alpha1.ClusterRolloutStatus
 		existingClusterNames := sets.New[string]()
+		succeededClusterNames := sets.New[string]()
 		placement, err := d.placementLister.Placements(mwrSet.Namespace).Get(placementRef.Name)
 
 		if errors.IsNotFound(err) {
@@ -100,6 +101,11 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 				continue
 			}
 			existingRolloutClsStatus = append(existingRolloutClsStatus, rolloutClusterStatus)
+
+			// Only count clusters that are done progressing (Succeeded status)
+			if rolloutClusterStatus.Status == clustersdkv1alpha1.Succeeded {
+				succeededClusterNames.Insert(mw.Namespace)
+			}
 		}
 
 		placeTracker := helper.GetPlacementTracker(d.placeDecisionLister, placement, existingClusterNames)
@@ -171,6 +177,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 		plcsSummary = append(plcsSummary, plcSummary)
 
 		count += len(existingClusterNames)
+		succeededCount += len(succeededClusterNames)
 	}
 	// Set the placements summary
 	mwrSet.Status.PlacementsSummary = plcsSummary
@@ -191,7 +198,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetPlacementDecisionVerified(workapiv1alpha1.ReasonAsExpected, ""))
 	}
 
-	if total == count {
+	if total == succeededCount {
 		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetPlacementRollOut(workapiv1alpha1.ReasonComplete, ""))
 	} else {
 		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetPlacementRollOut(workapiv1alpha1.ReasonProgressing, ""))
@@ -330,7 +337,7 @@ func GetPlacementDecisionVerified(reason string, message string) metav1.Conditio
 	return getCondition(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified, reason, message, metav1.ConditionFalse)
 }
 
-// GetPlacementRollout return only True status if there are clusters selected
+// GetPlacementRollout return only True status if all the clusters selected by the placement have succeeded
 func GetPlacementRollOut(reason string, message string) metav1.Condition {
 	if reason == workapiv1alpha1.ReasonComplete {
 		return getCondition(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementRolledOut, reason, message, metav1.ConditionTrue)
