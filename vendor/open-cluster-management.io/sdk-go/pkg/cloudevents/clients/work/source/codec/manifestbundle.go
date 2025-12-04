@@ -5,6 +5,7 @@ import (
 	"fmt"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	cloudeventstypes "github.com/cloudevents/sdk-go/v2/types"
+	"open-cluster-management.io/sdk-go/pkg/logging"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
@@ -40,12 +41,17 @@ func (c *ManifestBundleCodec) Encode(source string, eventType types.CloudEventsT
 		WithResourceVersion(work.Generation).
 		NewEvent()
 
-	// set the work's meta data to its cloud event
+	// set the work's metadata to its cloud event
 	metaJson, err := json.Marshal(work.ObjectMeta)
 	if err != nil {
 		return nil, err
 	}
 	evt.SetExtension(types.ExtensionWorkMeta, string(metaJson))
+
+	// Add log tracing extension
+	if err := logging.LogTracingFromObjectToEvent(work, &evt); err != nil {
+		return nil, err
+	}
 
 	if !work.DeletionTimestamp.IsZero() {
 		evt.SetExtension(types.ExtensionDeletionTimestamp, work.DeletionTimestamp.Time)
@@ -118,6 +124,11 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 		metaObj.Annotations = map[string]string{}
 	}
 	metaObj.Annotations[common.CloudEventsSequenceIDAnnotationKey] = sequenceID
+
+	// Add log tracing annotation
+	if err := logging.LogTracingFromEventToObject(evt, &metaObj); err != nil {
+		return nil, err
+	}
 
 	work := &workv1.ManifestWork{
 		TypeMeta:   metav1.TypeMeta{},

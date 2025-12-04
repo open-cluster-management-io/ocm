@@ -254,7 +254,7 @@ func (c *CacheController) sync(ctx context.Context, _ factory.SyncContext, execu
 	logger := klog.FromContext(ctx).WithValues("executorKey", executorKey)
 	ctx = klog.NewContext(ctx, logger)
 	logger.V(4).Info("Executor cache sync")
-	if executorKey == "key" {
+	if executorKey == factory.DefaultQueueKey {
 		// cleanup unnecessary cache
 		logger.V(4).Info("Cache items before cleanup", "count", c.executorCaches.Count())
 		c.cleanupUnnecessaryCache()

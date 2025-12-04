@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"fmt"
+	"open-cluster-management.io/sdk-go/pkg/logging"
 	"sync"
 	"time"
 
@@ -119,7 +120,7 @@ func (c *baseClient) connect(ctx context.Context) error {
 }
 
 func (c *baseClient) publish(ctx context.Context, evt cloudevents.Event) error {
-	logger := klog.FromContext(ctx)
+	logger := logging.SetLogTracingByCloudEvent(klog.FromContext(ctx), &evt)
 	now := time.Now()
 
 	if err := c.cloudEventsRateLimiter.Wait(ctx); err != nil {
@@ -201,14 +202,15 @@ func (c *baseClient) subscribe(ctx context.Context, receive receiveFn) {
 			if startReceiving {
 				go func() {
 					if err := c.transport.Receive(receiverCtx, func(ctx context.Context, evt cloudevents.Event) {
-						logger := klog.FromContext(ctx)
-						logger.V(2).Info("Received event", "event", evt.Context)
-						if logger.V(5).Enabled() {
-							logger.V(5).Info("Received event", "event", evt.String())
+						receiveLogger := logging.SetLogTracingByCloudEvent(klog.FromContext(ctx), &evt)
+						ctx = klog.NewContext(ctx, receiveLogger)
+						receiveLogger.V(2).Info("Received event", "event", evt.Context)
+						if receiveLogger.V(5).Enabled() {
+							receiveLogger.V(5).Info("Received event", "event", evt.String())
 						}
 						receive(ctx, evt)
 					}); err != nil {
-						runtime.HandleError(fmt.Errorf("failed to receive cloudevents, %v", err))
+						runtime.HandleErrorWithContext(ctx, err, "failed to receive cloudevents")
 					}
 				}()
 				startReceiving = false

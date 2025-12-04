@@ -66,7 +66,7 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 	logger := klog.NewKlogr()
 	podName := os.Getenv("POD_NAME")
 	if podName != "" {
-		logger = logger.WithValues("podName", podName)
+		logger = logger.WithValues("podName", podName, "clusterName", o.agentOptions.SpokeClusterName)
 	}
 	ctx = klog.NewContext(ctx, logger)
 
