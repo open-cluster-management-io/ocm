@@ -35,7 +35,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 	var errs []error
 	var plcsSummary []workapiv1alpha1.PlacementSummary
 	minRequeue := maxRequeueTime
-	count, total := 0, 0
+	count, total, succeededCount := 0, 0, 0
 
 	// Clean up ManifestWorks from placements no longer in the spec
 	currentPlacementNames := sets.New[string]()
@@ -176,7 +176,8 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 		plcSummary.Summary = mwrSetSummary
 		plcsSummary = append(plcsSummary, plcSummary)
 
-		count += len(succeededClusterNames)
+		count += len(existingClusterNames)
+		succeededCount += len(succeededClusterNames)
 	}
 	// Set the placements summary
 	mwrSet.Status.PlacementsSummary = plcsSummary
@@ -197,7 +198,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetPlacementDecisionVerified(workapiv1alpha1.ReasonAsExpected, ""))
 	}
 
-	if total == count {
+	if total == succeededCount {
 		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetPlacementRollOut(workapiv1alpha1.ReasonComplete, ""))
 	} else {
 		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetPlacementRollOut(workapiv1alpha1.ReasonProgressing, ""))
