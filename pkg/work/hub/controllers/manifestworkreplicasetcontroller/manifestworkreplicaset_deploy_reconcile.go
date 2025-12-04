@@ -65,6 +65,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 	for _, placementRef := range mwrSet.Spec.PlacementRefs {
 		var existingRolloutClsStatus []clustersdkv1alpha1.ClusterRolloutStatus
 		existingClusterNames := sets.New[string]()
+		succeededClusterNames := sets.New[string]()
 		placement, err := d.placementLister.Placements(mwrSet.Namespace).Get(placementRef.Name)
 
 		if errors.IsNotFound(err) {
@@ -100,6 +101,11 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 				continue
 			}
 			existingRolloutClsStatus = append(existingRolloutClsStatus, rolloutClusterStatus)
+
+			// Only count clusters that are done progressing (Succeeded status)
+			if rolloutClusterStatus.Status == clustersdkv1alpha1.Succeeded {
+				succeededClusterNames.Insert(mw.Namespace)
+			}
 		}
 
 		placeTracker := helper.GetPlacementTracker(d.placeDecisionLister, placement, existingClusterNames)
@@ -170,7 +176,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 		plcSummary.Summary = mwrSetSummary
 		plcsSummary = append(plcsSummary, plcSummary)
 
-		count += len(existingClusterNames)
+		count += len(succeededClusterNames)
 	}
 	// Set the placements summary
 	mwrSet.Status.PlacementsSummary = plcsSummary
