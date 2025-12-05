@@ -129,8 +129,35 @@ func MergeStatusConditions(conditions []metav1.Condition, newConditions []metav1
 
 	merged = append(merged, conditions...)
 	for _, condition := range newConditions {
+		// Capture previous state (by value) for this condition type if it exists
+		var (
+			hadPrevious            bool
+			prevStatus             metav1.ConditionStatus
+			prevObservedGeneration int64
+		)
+		for i := range merged {
+			if merged[i].Type == condition.Type {
+				hadPrevious = true
+				prevStatus = merged[i].Status
+				prevObservedGeneration = merged[i].ObservedGeneration
+				break
+			}
+		}
 		// merge two conditions if necessary
 		meta.SetStatusCondition(&merged, condition)
+
+		// If status is unchanged but ObservedGeneration advanced, bump LastTransitionTime to reflect a new apply
+		if hadPrevious &&
+			prevStatus == condition.Status &&
+			condition.ObservedGeneration != 0 &&
+			prevObservedGeneration != condition.ObservedGeneration {
+			for i := range merged {
+				if merged[i].Type == condition.Type {
+					merged[i].LastTransitionTime = metav1.NewTime(time.Now())
+					break
+				}
+			}
+		}
 	}
 
 	return merged
