@@ -382,6 +382,30 @@ func TestSync(t *testing.T) {
 			}
 
 			c.validate(t, controller.dynamicClient, controller.workClient, controller.kubeClient)
+
+			// Verify ObservedGeneration is set in ManifestApplied conditions
+			if len(c.expectedWorkAction) > 0 {
+				var actualWorkActions []clienttesting.Action
+				for _, workAction := range controller.workClient.Actions() {
+					if workAction.GetResource().Resource == "manifestworks" {
+						actualWorkActions = append(actualWorkActions, workAction)
+					}
+				}
+				if len(actualWorkActions) > 0 {
+					if patchAction, ok := actualWorkActions[len(actualWorkActions)-1].(clienttesting.PatchActionImpl); ok {
+						actualWork := &workapiv1.ManifestWork{}
+						if err := json.Unmarshal(patchAction.Patch, actualWork); err == nil {
+							for _, manifest := range actualWork.Status.ResourceStatus.Manifests {
+								appliedCond := meta.FindStatusCondition(manifest.Conditions, workapiv1.ManifestApplied)
+								if appliedCond != nil && appliedCond.ObservedGeneration != actualWork.Generation {
+									t.Errorf("Expected ObservedGeneration %d in ManifestApplied condition, got %d",
+										actualWork.Generation, appliedCond.ObservedGeneration)
+								}
+							}
+						}
+					}
+				}
+			}
 		})
 	}
 }
