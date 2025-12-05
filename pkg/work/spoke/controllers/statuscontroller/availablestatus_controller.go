@@ -136,6 +136,10 @@ func (c *AvailableStatusController) syncManifestWork(ctx context.Context, origin
 
 		// Read status of the resource according to feedback rules.
 		values, statusFeedbackCondition := c.getFeedbackValues(obj, option)
+		valuesChanged := !equality.Semantic.DeepEqual(manifest.StatusFeedbacks.Values, values)
+		if valuesChanged {
+			meta.RemoveStatusCondition(manifestConditions, statusFeedbackCondition.Type)
+		}
 		meta.SetStatusCondition(manifestConditions, statusFeedbackCondition)
 		manifestWork.Status.ResourceStatus.Manifests[index].StatusFeedbacks.Values = values
 

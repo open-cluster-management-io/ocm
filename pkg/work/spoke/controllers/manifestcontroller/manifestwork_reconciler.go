@@ -77,7 +77,7 @@ func (m *manifestworkReconciler) reconcile(
 		}
 
 		// Add applied status condition
-		manifestCondition.Conditions = append(manifestCondition.Conditions, buildAppliedStatusCondition(result))
+		manifestCondition.Conditions = append(manifestCondition.Conditions, buildAppliedStatusCondition(result, manifestWork.Generation))
 
 		newManifestConditions = append(newManifestConditions, manifestCondition)
 
@@ -239,21 +239,23 @@ func allInCondition(conditionType string, manifests []workapiv1.ManifestConditio
 	return exists, exists
 }
 
-func buildAppliedStatusCondition(result applyResult) metav1.Condition {
+func buildAppliedStatusCondition(result applyResult, generation int64) metav1.Condition {
 	if result.Error != nil {
 		return metav1.Condition{
-			Type:    workapiv1.ManifestApplied,
-			Status:  metav1.ConditionFalse,
-			Reason:  "AppliedManifestFailed",
-			Message: fmt.Sprintf("Failed to apply manifest: %v", result.Error),
+			Type:               workapiv1.ManifestApplied,
+			Status:             metav1.ConditionFalse,
+			Reason:             "AppliedManifestFailed",
+			Message:            fmt.Sprintf("Failed to apply manifest: %v", result.Error),
+			ObservedGeneration: generation,
 		}
 	}
 
 	return metav1.Condition{
-		Type:    workapiv1.ManifestApplied,
-		Status:  metav1.ConditionTrue,
-		Reason:  "AppliedManifestComplete",
-		Message: "Apply manifest complete",
+		Type:               workapiv1.ManifestApplied,
+		Status:             metav1.ConditionTrue,
+		Reason:             "AppliedManifestComplete",
+		Message:            "Apply manifest complete",
+		ObservedGeneration: generation,
 	}
 }
 
