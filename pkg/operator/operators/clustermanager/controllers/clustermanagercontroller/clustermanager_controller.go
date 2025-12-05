@@ -121,7 +121,7 @@ func NewClusterManagerController(
 }
 
 func (n *clusterManagerController) sync(ctx context.Context, controllerContext factory.SyncContext, clusterManagerName string) error {
-	logger := klog.FromContext(ctx).WithValues("clusterManagmer", clusterManagerName)
+	logger := klog.FromContext(ctx).WithValues("clusterManager", clusterManagerName)
 	logger.V(4).Info("Reconciling ClusterManager")
 
 	originalClusterManager, err := n.clusterManagerLister.Get(clusterManagerName)
@@ -136,7 +136,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	clusterManagerMode := clusterManager.Spec.DeployOption.Mode
 	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManagerName, clusterManagerMode)
 
-	resourceRequirements, err := helpers.ResourceRequirements(clusterManager)
+	resourceRequirements, err := helpers.ResourceRequirements(ctx, clusterManager)
 	if err != nil {
 		logger.Error(err, "failed to parse resource requirements for cluster manager")
 		return err
@@ -150,7 +150,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 
 	replica := n.deploymentReplicas
 	if replica <= 0 {
-		replica = helpers.DetermineReplica(ctx, n.operatorKubeClient, clusterManager.Spec.DeployOption.Mode, nil, n.controlPlaneNodeLabelSelector)
+		replica = helpers.DetermineReplica(ctx, n.operatorKubeClient, clusterManager.Spec.DeployOption.Mode, n.controlPlaneNodeLabelSelector)
 	}
 
 	// This config is used to render template of manifests.
@@ -413,7 +413,7 @@ func cleanResources(ctx context.Context, kubeClient kubernetes.Interface, cm *op
 					return nil, err
 				}
 				objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
-				helpers.RemoveRelatedResourcesStatusesWithObj(&cm.Status.RelatedResources, objData)
+				helpers.RemoveRelatedResourcesStatusesWithObj(ctx, &cm.Status.RelatedResources, objData)
 				return objData, nil
 			},
 			file,

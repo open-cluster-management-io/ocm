@@ -75,7 +75,7 @@ func (r *managementReconcile) reconcile(ctx context.Context, klusterlet *operato
 				return nil, err
 			}
 			objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
-			helpers.SetRelatedResourcesStatusesWithObj(&klusterlet.Status.RelatedResources, objData)
+			helpers.SetRelatedResourcesStatusesWithObj(ctx, &klusterlet.Status.RelatedResources, objData)
 			return objData, nil
 		},
 		managementStaticResourceFiles...,

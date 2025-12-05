@@ -237,6 +237,7 @@ func (config *klusterletConfig) populateBootstrap(klusterlet *operatorapiv1.Klus
 
 func (n *klusterletController) sync(ctx context.Context, controllerContext factory.SyncContext, klusterletName string) error {
 	logger := klog.FromContext(ctx).WithValues("klusterlet", klusterletName)
+	ctx = klog.NewContext(ctx, logger)
 	logger.V(4).Info("Reconciling Klusterlet")
 	originalKlusterlet, err := n.klusterletLister.Get(klusterletName)
 	if errors.IsNotFound(err) {
@@ -248,7 +249,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 	klusterlet := originalKlusterlet.DeepCopy()
 
-	resourceRequirements, err := helpers.ResourceRequirements(klusterlet)
+	resourceRequirements, err := helpers.ResourceRequirements(ctx, klusterlet)
 	if err != nil {
 		logger.Error(err, "Failed to parse resource requirements for klusterlet")
 		return err
@@ -256,7 +257,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 	replica := n.deploymentReplicas
 	if replica <= 0 {
-		replica = helpers.DetermineReplica(ctx, n.kubeClient, klusterlet.Spec.DeployOption.Mode, n.kubeVersion, n.controlPlaneNodeLabelSelector)
+		replica = helpers.DetermineReplica(ctx, n.kubeClient, klusterlet.Spec.DeployOption.Mode, n.controlPlaneNodeLabelSelector)
 	}
 
 	config := klusterletConfig{
@@ -272,7 +273,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		ExternalServerURL:   getServersFromKlusterlet(klusterlet),
 		OperatorNamespace:   n.operatorNamespace,
 		Replica:             replica,
-		PriorityClassName:   helpers.AgentPriorityClassName(klusterlet, n.kubeVersion),
+		PriorityClassName:   helpers.AgentPriorityClassName(ctx, klusterlet, n.kubeVersion),
 
 		ExternalManagedKubeConfigSecret:             helpers.ExternalManagedKubeConfig,
 		ExternalManagedKubeConfigRegistrationSecret: helpers.ExternalManagedKubeConfigRegistration,

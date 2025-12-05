@@ -2,6 +2,7 @@ package hub
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -12,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 	generate "k8s.io/kubectl/pkg/generate"
 	cpclientset "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned"
 	cpinformerv1alpha1 "sigs.k8s.io/cluster-inventory-api/client/informers/externalversions"
@@ -111,6 +113,14 @@ func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 
 // RunControllerManager starts the controllers on hub to manage spoke cluster registration.
 func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+	// setting up contextual logger
+	logger := klog.NewKlogr()
+	podName := os.Getenv("POD_NAME")
+	if podName != "" {
+		logger = logger.WithValues("podName", podName)
+	}
+	ctx = klog.NewContext(ctx, logger)
+
 	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err

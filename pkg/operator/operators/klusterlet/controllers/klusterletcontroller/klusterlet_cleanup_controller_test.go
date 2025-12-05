@@ -10,7 +10,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/klog/v2"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
@@ -47,7 +46,6 @@ func TestSyncDelete(t *testing.T) {
 	for _, action := range kubeActions {
 		if action.GetVerb() == deleteVerb {
 			deleteAction := action.(clienttesting.DeleteActionImpl)
-			klog.Infof("kube delete name: %v\t resource:%v \t namespace:%v", deleteAction.Name, deleteAction.GetResource(), deleteAction.GetNamespace())
 			deleteActions = append(deleteActions, deleteAction)
 		}
 	}
@@ -106,7 +104,6 @@ func TestSyncDeleteHosted(t *testing.T) {
 	for _, action := range kubeActions {
 		if action.GetVerb() == deleteVerb {
 			deleteAction := action.(clienttesting.DeleteActionImpl)
-			klog.Infof("management kube delete name: %v\t resource:%v \t namespace:%v", deleteAction.Name, deleteAction.GetResource(), deleteAction.GetNamespace())
 			deleteActionsManagement = append(deleteActionsManagement, deleteAction)
 		}
 	}
@@ -121,7 +118,6 @@ func TestSyncDeleteHosted(t *testing.T) {
 	for _, action := range controller.managedKubeClient.Actions() {
 		if action.GetVerb() == deleteVerb {
 			deleteAction := action.(clienttesting.DeleteActionImpl)
-			klog.Infof("managed kube delete name: %v\t resource:%v \t namespace:%v", deleteAction.Name, deleteAction.GetResource(), deleteAction.GetNamespace())
 			deleteActionsManaged = append(deleteActionsManaged, deleteAction)
 		}
 	}

@@ -68,7 +68,7 @@ func (r *runtimeReconcile) installAgent(ctx context.Context, klusterlet *operato
 				return nil, err
 			}
 			objData := assets.MustCreateAssetFromTemplate(name, template, runtimeConfig).Data
-			helpers.SetRelatedResourcesStatusesWithObj(&klusterlet.Status.RelatedResources, objData)
+			helpers.SetRelatedResourcesStatusesWithObj(ctx, &klusterlet.Status.RelatedResources, objData)
 			return objData, nil
 		},
 		r.recorder,
@@ -117,7 +117,7 @@ func (r *runtimeReconcile) installAgent(ctx context.Context, klusterlet *operato
 				return nil, err
 			}
 			objData := assets.MustCreateAssetFromTemplate(name, template, workConfig).Data
-			helpers.SetRelatedResourcesStatusesWithObj(&klusterlet.Status.RelatedResources, objData)
+			helpers.SetRelatedResourcesStatusesWithObj(ctx, &klusterlet.Status.RelatedResources, objData)
 			return objData, nil
 		},
 		r.recorder,
@@ -167,7 +167,7 @@ func (r *runtimeReconcile) installSingletonAgent(ctx context.Context, klusterlet
 				return nil, err
 			}
 			objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
-			helpers.SetRelatedResourcesStatusesWithObj(&klusterlet.Status.RelatedResources, objData)
+			helpers.SetRelatedResourcesStatusesWithObj(ctx, &klusterlet.Status.RelatedResources, objData)
 			return objData, nil
 		},
 		r.recorder,

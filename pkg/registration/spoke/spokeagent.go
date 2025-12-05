@@ -115,6 +115,14 @@ func (o *SpokeAgentConfig) HealthCheckers() []healthz.HealthChecker {
 //   - the client certificate referenced by the hub kubeconfig become expired (Return failure when
 //     checking the health of the agent);
 func (o *SpokeAgentConfig) RunSpokeAgent(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+	// setting up contextual logger
+	logger := klog.NewKlogr()
+	podName := os.Getenv("POD_NAME")
+	if podName != "" {
+		logger = logger.WithValues("podName", podName, "clusterName", o.agentOptions.SpokeClusterName)
+	}
+	ctx = klog.NewContext(ctx, logger)
+
 	kubeConfig := controllerContext.KubeConfig
 
 	// load spoke client config and create spoke clients,

@@ -36,7 +36,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/component-base/featuregate"
-	"k8s.io/klog/v2"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
@@ -436,24 +435,12 @@ func LoadClientConfigFromSecret(secret *corev1.Secret) (*rest.Config, error) {
 // - kube version: if the kube version is less than v1.14 reutn 1
 // - node: list master nodes in the cluster and return 1 if the
 // number of master nodes is equal or less than 1. Return 3 otherwise.
-func DetermineReplica(ctx context.Context, kubeClient kubernetes.Interface, mode operatorapiv1.InstallMode, kubeVersion *version.Version,
+func DetermineReplica(ctx context.Context, kubeClient kubernetes.Interface, mode operatorapiv1.InstallMode,
 	controlPlaneNodeLabelSelector string) int32 {
 	// For hosted mode, there may be many cluster-manager/klusterlet running on the management cluster,
 	// set the replica to 1 to reduce the footprint of the management cluster.
 	if IsHosted(mode) {
 		return singleReplica
-	}
-
-	if kubeVersion != nil {
-		// If the cluster does not support lease.coordination.k8s.io/v1, set the replica to 1.
-		// And then the leader election of agent running on this cluster should be disabled, because
-		// it leverages the lease API. Kubernetes starts support lease/v1 from v1.14.
-		if cnt, err := kubeVersion.Compare("v1.14.0"); err != nil {
-			klog.Warningf("set replica to %d because it's failed to check whether the cluster supports lease/v1 or not: %v", singleReplica, err)
-			return singleReplica
-		} else if cnt == -1 {
-			return singleReplica
-		}
 	}
 
 	return DetermineReplicaByNodes(ctx, kubeClient, controlPlaneNodeLabelSelector)
@@ -585,20 +572,22 @@ func RemoveRelatedResourcesStatus(
 }
 
 func SetRelatedResourcesStatusesWithObj(
-	relatedResourcesStatuses *[]operatorapiv1.RelatedResourceMeta, objData []byte) {
+	ctx context.Context, relatedResourcesStatuses *[]operatorapiv1.RelatedResourceMeta, objData []byte) {
 	res, err := GenerateRelatedResource(objData)
 	if err != nil {
-		klog.Errorf("failed to generate relatedResource %v, and skip to set into status. %v", objData, err)
+		utilruntime.HandleErrorWithContext(ctx, err,
+			"failed to generate relatedResource and skip to set into status", "object", string(objData))
 		return
 	}
 	SetRelatedResourcesStatuses(relatedResourcesStatuses, res)
 }
 
 func RemoveRelatedResourcesStatusesWithObj(
-	relatedResourcesStatuses *[]operatorapiv1.RelatedResourceMeta, objData []byte) {
+	ctx context.Context, relatedResourcesStatuses *[]operatorapiv1.RelatedResourceMeta, objData []byte) {
 	res, err := GenerateRelatedResource(objData)
 	if err != nil {
-		klog.Errorf("failed to generate relatedResource %v, and skip to set into status. %v", objData, err)
+		utilruntime.HandleErrorWithContext(ctx, err,
+			"failed to generate relatedResource and skip to set into status", "object", string(objData))
 		return
 	}
 	RemoveRelatedResourcesStatuses(relatedResourcesStatuses, res)
@@ -634,28 +623,29 @@ func ResourceType(resourceRequirementAcquirer operatorapiv1.ResourceRequirementA
 }
 
 // ResourceRequirements get resource requirements overridden by user for ResourceQosClassResourceRequirement type
-func ResourceRequirements(resourceRequirementAcquirer operatorapiv1.ResourceRequirementAcquirer) ([]byte, error) {
+func ResourceRequirements(ctx context.Context, resourceRequirementAcquirer operatorapiv1.ResourceRequirementAcquirer) ([]byte, error) {
 	r := resourceRequirementAcquirer.GetResourceRequirement()
 	if r == nil || r.Type == operatorapiv1.ResourceQosClassBestEffort {
 		return nil, nil
 	}
 	marshal, err := yaml.Marshal(r.ResourceRequirements)
 	if err != nil {
-		klog.Errorf("failed to marshal resource requirement: %v", err)
+		utilruntime.HandleErrorWithContext(ctx, err, "failed to marshal resource requirement")
 		return nil, err
 	}
 	return marshal, nil
 }
 
 // AgentPriorityClassName return the name of the PriorityClass that should be used for the klusterlet agents
-func AgentPriorityClassName(klusterlet *operatorapiv1.Klusterlet, kubeVersion *version.Version) string {
+func AgentPriorityClassName(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, kubeVersion *version.Version) string {
 	if kubeVersion == nil || klusterlet == nil {
 		return ""
 	}
 
 	// priorityclass.scheduling.k8s.io/v1 is supported since v1.14.
 	if cnt, err := kubeVersion.Compare("v1.14.0"); err != nil {
-		klog.Warningf("Ignore PriorityClass because it's failed to check whether the cluster supports PriorityClass/v1 or not: %v", err)
+		utilruntime.HandleErrorWithContext(ctx, err,
+			"ignore PriorityClass because it's failed to check whether the cluster supports PriorityClass/v1")
 		return ""
 	} else if cnt == -1 {
 		return ""

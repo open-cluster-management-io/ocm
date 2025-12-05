@@ -773,7 +773,7 @@ func newFakeHubConfigWithResourceRequirement(t *testing.T, r *operatorapiv1.Reso
 		},
 	}
 
-	resourceRequirements, err := helpers.ResourceRequirements(clusterManager)
+	resourceRequirements, err := helpers.ResourceRequirements(context.Background(), clusterManager)
 	if err != nil {
 		t.Errorf("Failed to parse resource requirements: %v", err)
 	}
