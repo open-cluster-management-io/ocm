@@ -76,7 +76,6 @@ func TestTokenGetter(t *testing.T) {
 			})
 			tokenGetter := SATokenGetter(context.TODO(), saName, saNamespace, client)
 			token, _, additionalData, err := tokenGetter()
-			fmt.Printf("client action is %v\n", client.Actions())
 			if err != nil && !tt.wantErr {
 				t.Error(err)
 			}

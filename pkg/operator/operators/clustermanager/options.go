@@ -2,6 +2,7 @@ package clustermanager
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -10,6 +11,7 @@ import (
 	"k8s.io/client-go/informers"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
@@ -31,6 +33,14 @@ type Options struct {
 
 // RunClusterManagerOperator starts a new cluster manager operator
 func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+	// setting up contextual logger
+	logger := klog.NewKlogr()
+	podName := os.Getenv("POD_NAME")
+	if podName != "" {
+		logger = logger.WithValues("podName", podName)
+	}
+	ctx = klog.NewContext(ctx, logger)
+
 	// Build kubclient client and informer for managed cluster
 	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {

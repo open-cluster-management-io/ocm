@@ -96,7 +96,7 @@ func (c *crdReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 				return nil, fmt.Errorf("failed to add labels to template %s: %w", name, err)
 			}
 
-			helpers.SetRelatedResourcesStatusesWithObj(&cm.Status.RelatedResources, objData)
+			helpers.SetRelatedResourcesStatusesWithObj(ctx, &cm.Status.RelatedResources, objData)
 			return objData, nil
 		},
 		hubDeployCRDResources...); err != nil {
@@ -139,7 +139,7 @@ func (c *crdReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterManag
 				return nil, err
 			}
 			objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
-			helpers.SetRelatedResourcesStatusesWithObj(&cm.Status.RelatedResources, objData)
+			helpers.SetRelatedResourcesStatusesWithObj(ctx, &cm.Status.RelatedResources, objData)
 			return objData, nil
 		},
 		hubCRDResourceFiles...); err != nil {

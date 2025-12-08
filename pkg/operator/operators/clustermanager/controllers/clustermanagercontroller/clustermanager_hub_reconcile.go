@@ -131,7 +131,7 @@ func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 				return nil, err
 			}
 			objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
-			helpers.SetRelatedResourcesStatusesWithObj(&cm.Status.RelatedResources, objData)
+			helpers.SetRelatedResourcesStatusesWithObj(ctx, &cm.Status.RelatedResources, objData)
 			return objData, nil
 		},
 		hubResources...,

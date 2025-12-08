@@ -199,6 +199,8 @@ func (m *Manager[T]) Apply(ctx context.Context, manifests resourceapply.AssetFun
 }
 
 func (m *Manager[T]) applyOne(ctx context.Context, required T) error {
+	logger := klog.FromContext(ctx)
+
 	accessor, err := meta.Accessor(required)
 	if err != nil {
 		return err
@@ -206,7 +208,7 @@ func (m *Manager[T]) applyOne(ctx context.Context, required T) error {
 	existing, err := m.client.Get(ctx, accessor.GetName(), metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		_, err := m.client.Create(ctx, required, metav1.CreateOptions{})
-		klog.Infof("crd %s is created", accessor.GetName())
+		logger.Info("crd is created", "crdName", accessor.GetName())
 		return err
 	}
 	if err != nil {
@@ -240,7 +242,7 @@ func (m *Manager[T]) applyOne(ctx context.Context, required T) error {
 		return err
 	}
 
-	klog.Infof("crd %s is updated to version %s", accessor.GetName(), m.version.String())
+	logger.Info("crd is updated", "crdName", accessor.GetName(), "version", m.version.String())
 
 	return nil
 }

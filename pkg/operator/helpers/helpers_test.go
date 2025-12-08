@@ -479,15 +479,10 @@ func newKubeConfigSecret(namespace, name string, kubeConfigData, certData, keyDa
 }
 
 func TestDeterminReplica(t *testing.T) {
-	kubeVersionV113, _ := version.ParseGeneric("v1.13.0")
-	kubeVersionV114, _ := version.ParseGeneric("v1.14.0")
-	kubeVersionV122, _ := version.ParseGeneric("v1.22.5+5c84e52")
-
 	cases := []struct {
 		name            string
 		mode            operatorapiv1.InstallMode
 		existingNodes   []runtime.Object
-		kubeVersion     *version.Version
 		expectedReplica int32
 	}{
 		{
@@ -513,29 +508,16 @@ func TestDeterminReplica(t *testing.T) {
 			expectedReplica: singleReplica,
 		},
 		{
-			name:            "kube v1.13",
-			existingNodes:   []runtime.Object{newNode("node1"), newNode("node2"), newNode("node3")},
-			kubeVersion:     kubeVersionV113,
-			expectedReplica: singleReplica,
-		},
-		{
-			name:            "kube v1.14",
-			existingNodes:   []runtime.Object{newNode("node1"), newNode("node2"), newNode("node3")},
-			kubeVersion:     kubeVersionV114,
-			expectedReplica: defaultReplica,
-		},
-		{
 			name:            "kube v1.22.5+5c84e52",
 			existingNodes:   []runtime.Object{newNode("node1"), newNode("node2"), newNode("node3")},
-			kubeVersion:     kubeVersionV122,
 			expectedReplica: defaultReplica,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			fakeKubeClient := fakekube.NewSimpleClientset(c.existingNodes...)
-			replica := DetermineReplica(context.Background(), fakeKubeClient, c.mode, c.kubeVersion, "node-role.kubernetes.io/master=")
+			fakeKubeClient := fakekube.NewClientset(c.existingNodes...)
+			replica := DetermineReplica(context.Background(), fakeKubeClient, c.mode, "node-role.kubernetes.io/master=")
 			if replica != c.expectedReplica {
 				t.Errorf("Unexpected replica, actual: %d, expected: %d", replica, c.expectedReplica)
 			}
@@ -604,7 +586,7 @@ func TestAgentPriorityClassName(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			priorityClassName := AgentPriorityClassName(c.klusterlet, c.kubeVersion)
+			priorityClassName := AgentPriorityClassName(context.Background(), c.klusterlet, c.kubeVersion)
 			if priorityClassName != c.expectedPriorityClassName {
 				t.Errorf("Unexpected priorityClassName, actual: %s, expected: %s", priorityClassName, c.expectedPriorityClassName)
 			}
@@ -1076,7 +1058,7 @@ func TestSetRelatedResourcesStatusesWithObj(t *testing.T) {
 			objData := assets.MustCreateAssetFromTemplate(c.manifestFile, template, c.config).Data
 
 			relatedResources := c.relatedResources
-			SetRelatedResourcesStatusesWithObj(&relatedResources, objData)
+			SetRelatedResourcesStatusesWithObj(context.Background(), &relatedResources, objData)
 			c.relatedResources = relatedResources
 			if !reflect.DeepEqual(c.relatedResources, c.expectedRelatedResource) {
 				t.Errorf("Expect to get %v, but got %v", c.expectedRelatedResource, c.relatedResources)
@@ -1183,7 +1165,7 @@ func TestRemoveRelatedResourcesStatusesWithObj(t *testing.T) {
 			objData := assets.MustCreateAssetFromTemplate(c.manifestFile, template, c.config).Data
 
 			relatedResources := c.relatedResources
-			RemoveRelatedResourcesStatusesWithObj(&relatedResources, objData)
+			RemoveRelatedResourcesStatusesWithObj(context.Background(), &relatedResources, objData)
 			c.relatedResources = relatedResources
 			if !reflect.DeepEqual(c.relatedResources, c.expectedRelatedResource) {
 				t.Errorf("Expect to get %v, but got %v", c.expectedRelatedResource, c.relatedResources)

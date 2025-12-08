@@ -255,7 +255,6 @@ func newTestControllerHosted(
 			getRegistrationServiceAccountCount++
 			if getRegistrationServiceAccountCount > 1 {
 				sa := newServiceAccount(name, klusterletNamespace, saRegistrationSecret.Name)
-				klog.Infof("return service account %s/%s, secret: %v", klusterletNamespace, name, sa.Secrets)
 				return true, sa, nil
 			}
 		}
@@ -264,7 +263,6 @@ func newTestControllerHosted(
 			getWorkServiceAccountCount++
 			if getWorkServiceAccountCount > 1 {
 				sa := newServiceAccount(name, klusterletNamespace, saWorkSecret.Name)
-				klog.Infof("return service account %s/%s, secret: %v", klusterletNamespace, name, sa.Secrets)
 				return true, sa, nil
 			}
 		}
@@ -779,7 +777,6 @@ func TestSyncDeployHosted(t *testing.T) {
 	for _, action := range kubeActions {
 		if action.GetVerb() == createVerb {
 			object := action.(clienttesting.CreateActionImpl).Object
-			klog.Infof("management kube create: %v\t resource:%v \t namespace:%v", object.GetObjectKind(), action.GetResource(), action.GetNamespace())
 			createObjectsManagement = append(createObjectsManagement, object)
 		}
 	}
@@ -798,7 +795,6 @@ func TestSyncDeployHosted(t *testing.T) {
 		if action.GetVerb() == createVerb {
 
 			object := action.(clienttesting.CreateActionImpl).Object
-			klog.Infof("managed kube create: %v\t resource:%v \t namespace:%v", object.GetObjectKind().GroupVersionKind(), action.GetResource(), action.GetNamespace())
 			createObjectsManaged = append(createObjectsManaged, object)
 		}
 	}
@@ -1553,7 +1549,7 @@ func newFakeKlusterletConfigWithResourceRequirement(t *testing.T, r *operatorapi
 		},
 	}
 
-	requirements, err := helpers.ResourceRequirements(klusterlet)
+	requirements, err := helpers.ResourceRequirements(context.Background(), klusterlet)
 	if err != nil {
 		t.Errorf("Failed to parse resource requirements: %v", err)
 	}

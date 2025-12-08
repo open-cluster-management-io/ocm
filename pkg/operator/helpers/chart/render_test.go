@@ -1,6 +1,7 @@
 package chart
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -166,7 +167,7 @@ func TestClusterManagerConfig(t *testing.T) {
 				version = config.Images.Tag
 			}
 
-			crdObjs, rawObjs, err := RenderClusterManagerChart(config, c.namespace)
+			crdObjs, rawObjs, err := RenderClusterManagerChart(context.Background(), config, c.namespace)
 			if err != nil {
 				t.Errorf("error rendering chart: %v", err)
 			}
@@ -477,7 +478,7 @@ func TestKlusterletConfig(t *testing.T) {
 				version = config.Images.Tag
 			}
 
-			crdObjs, rawObjs, err := RenderKlusterletChart(config, c.namespace)
+			crdObjs, rawObjs, err := RenderKlusterletChart(context.Background(), config, c.namespace)
 			if err != nil {
 				t.Errorf("error rendering chart: %v", err)
 			}

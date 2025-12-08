@@ -59,7 +59,7 @@ var _ = ginkgo.Describe("Cluster Auto Importer", func() {
 		clusterManagerConfig := chart.NewDefaultClusterManagerChartConfig()
 		clusterManagerConfig.CreateBootstrapSA = true
 		clusterManagerConfig.CreateNamespace = true
-		crdObjs, rawObjs, err := chart.RenderClusterManagerChart(clusterManagerConfig, "open-cluster-management")
+		crdObjs, rawObjs, err := chart.RenderClusterManagerChart(context.Background(), clusterManagerConfig, "open-cluster-management")
 		manifests := append(crdObjs, rawObjs...)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		recorder := commonrecorder.NewEventsRecorderWrapper(context.TODO(),

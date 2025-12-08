@@ -3,11 +3,13 @@ package hub
 import (
 	"context"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
@@ -22,6 +24,14 @@ import (
 
 // RunControllerManager starts the controllers on hub to make placement decisions.
 func RunControllerManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+	// setting up contextual logger
+	logger := klog.NewKlogr()
+	podName := os.Getenv("POD_NAME")
+	if podName != "" {
+		logger = logger.WithValues("podName", podName)
+	}
+	ctx = klog.NewContext(ctx, logger)
+
 	clusterClient, err := clusterclient.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err

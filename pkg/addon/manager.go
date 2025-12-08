@@ -2,6 +2,7 @@ package addon
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -10,6 +11,7 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 
 	"open-cluster-management.io/addon-framework/pkg/index"
 	"open-cluster-management.io/addon-framework/pkg/utils"
@@ -31,6 +33,14 @@ import (
 )
 
 func RunManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+	// setting up contextual logger
+	logger := klog.NewKlogr()
+	podName := os.Getenv("POD_NAME")
+	if podName != "" {
+		logger = logger.WithValues("podName", podName)
+	}
+	ctx = klog.NewContext(ctx, logger)
+
 	kubeConfig := controllerContext.KubeConfig
 	hubKubeClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {

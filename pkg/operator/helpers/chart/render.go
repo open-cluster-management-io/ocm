@@ -1,6 +1,7 @@
 package chart
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"io/fs"
@@ -43,28 +44,29 @@ func NewDefaultKlusterletChartConfig() *KlusterletChartConfig {
 
 // RenderClusterManagerChart renders the ClusterManager objects to be created on the hub.
 // It returns three values: CRD objects(which usually should be created before other objects), other Kubernetes objects, error.
-func RenderClusterManagerChart(config *ClusterManagerChartConfig, namespace string) ([][]byte, [][]byte, error) {
+func RenderClusterManagerChart(ctx context.Context, config *ClusterManagerChartConfig, namespace string) ([][]byte, [][]byte, error) {
 	if namespace == "" {
 		return nil, nil, fmt.Errorf("cluster manager chart namespace is required")
 	}
-	return renderChart(config, namespace, config.CreateNamespace,
+	return renderChart(ctx, config, namespace, config.CreateNamespace,
 		clustermanagerchart.ChartName, clustermanagerchart.ChartFiles)
 }
 
 // RenderKlusterletChart renders the Klusterlet objects to be created on the managed cluster.
 // It returns three values: CRD objects(which usually should be created before other objects), other Kubernetes objects, error.
-func RenderKlusterletChart(config *KlusterletChartConfig, namespace string) ([][]byte, [][]byte, error) {
+func RenderKlusterletChart(ctx context.Context, config *KlusterletChartConfig, namespace string) ([][]byte, [][]byte, error) {
 	if namespace == "" {
 		return nil, nil, fmt.Errorf("klusterlet chart namespace is required")
 	}
-	return renderChart(config, namespace, config.CreateNamespace,
+	return renderChart(ctx, config, namespace, config.CreateNamespace,
 		klusterletchart.ChartName, klusterletchart.ChartFiles)
 }
 
-func renderChart[T *ClusterManagerChartConfig | *KlusterletChartConfig](config T,
+func renderChart[T *ClusterManagerChartConfig | *KlusterletChartConfig](ctx context.Context, config T,
 	namespace string, createNamespace bool, chartName string, fs embed.FS) ([][]byte, [][]byte, error) {
+	logger := klog.FromContext(ctx)
 	// chartName is the prefix of chart path here
-	operatorChart, err := LoadChart(fs, chartName)
+	operatorChart, err := LoadChart(fs, chartName, logger)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load %s chart: %w", chartName, err)
 	}
@@ -82,11 +84,11 @@ func renderChart[T *ClusterManagerChartConfig | *KlusterletChartConfig](config T
 	values, err := chartutil.ToRenderValues(operatorChart, configValues,
 		releaseOptions, &chartutil.Capabilities{})
 	if err != nil {
-		klog.Errorf("failed to render helm chart with values %v. err:%v", values, err)
+		logger.Error(err, "failed to render helm chart", "values", values)
 		return nil, nil, err
 	}
 
-	crdObjects, rawObjects, err := renderManifests(operatorChart, values)
+	crdObjects, rawObjects, err := renderManifests(operatorChart, values, logger)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error rendering cluster manager chart: %v", err)
 	}
@@ -127,7 +129,7 @@ func stripPrefix(chartPrefix, path string) string {
 	return strings.Join(pathValues[chartPrefixLen:], string(filepath.Separator))
 }
 
-func LoadChart(chartFS embed.FS, chartPrefix string) (*chart.Chart, error) {
+func LoadChart(chartFS embed.FS, chartPrefix string, logger klog.Logger) (*chart.Chart, error) {
 	files, err := getFiles(chartFS)
 	if err != nil {
 		return nil, err
@@ -137,7 +139,7 @@ func LoadChart(chartFS embed.FS, chartPrefix string) (*chart.Chart, error) {
 	for _, fileName := range files {
 		b, err := fs.ReadFile(chartFS, fileName)
 		if err != nil {
-			klog.Errorf("failed to read file %v. err:%v", fileName, err)
+			logger.Error(err, "failed to read file", "fileName", fileName)
 			return nil, err
 		}
 		if !strings.HasPrefix(fileName, chartPrefix) {
@@ -152,7 +154,7 @@ func LoadChart(chartFS embed.FS, chartPrefix string) (*chart.Chart, error) {
 
 	userChart, err := loader.LoadFiles(bfs)
 	if err != nil {
-		klog.Errorf("failed to load chart. err:%v", err)
+		logger.Error(err, "failed to load chart")
 		return nil, err
 	}
 	return userChart, nil
@@ -172,13 +174,13 @@ func JsonStructToValues(a interface{}) (chartutil.Values, error) {
 	return vals, nil
 }
 
-func renderManifests(chart *chart.Chart, values chartutil.Values) ([][]byte, [][]byte, error) {
+func renderManifests(chart *chart.Chart, values chartutil.Values, logger klog.Logger) ([][]byte, [][]byte, error) {
 	var rawCRDObjects, rawObjects [][]byte
 
 	// make sure the CRDs are at the top.
 	crds := chart.CRDObjects()
 	for _, crd := range crds {
-		klog.V(4).Infof("%v/n", crd.File.Data)
+		logger.V(4).Info("crd data", "crdName", crd.Name, "crdData", string(crd.File.Data))
 		rawCRDObjects = append(rawCRDObjects, crd.File.Data)
 	}
 

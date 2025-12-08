@@ -207,7 +207,7 @@ func (i *Importer) reconcile(
 			return cluster, err
 		}
 	}
-	crdObjs, rawObjs, err := chart.RenderKlusterletChart(klusterletChartConfig, klusterletNamespace)
+	crdObjs, rawObjs, err := chart.RenderKlusterletChart(ctx, klusterletChartConfig, klusterletNamespace)
 	if err != nil {
 		return cluster, err
 	}
