@@ -140,9 +140,12 @@ func (c *baseClient) publish(ctx context.Context, evt cloudevents.Event) error {
 		return fmt.Errorf("the cloudevents client is not ready")
 	}
 
-	logger.V(2).Info("Sending event", "event", evt.Context)
 	if logger.V(5).Enabled() {
-		logger.V(5).Info("Sending event", "event", evt.String())
+		evtData, _ := evt.MarshalJSON()
+		logger.V(5).Info("Sending event", "event", string(evtData))
+	} else {
+		logger.V(2).Info("Sending event",
+			"eventType", evt.Type(), "extensions", evt.Extensions())
 	}
 	if err := c.transport.Send(ctx, evt); err != nil {
 		return err
@@ -204,9 +207,12 @@ func (c *baseClient) subscribe(ctx context.Context, receive receiveFn) {
 					if err := c.transport.Receive(receiverCtx, func(ctx context.Context, evt cloudevents.Event) {
 						receiveLogger := logging.SetLogTracingByCloudEvent(klog.FromContext(ctx), &evt)
 						ctx = klog.NewContext(ctx, receiveLogger)
-						receiveLogger.V(2).Info("Received event", "event", evt.Context)
 						if receiveLogger.V(5).Enabled() {
-							receiveLogger.V(5).Info("Received event", "event", evt.String())
+							evtData, _ := evt.MarshalJSON()
+							receiveLogger.V(5).Info("Received event", "event", string(evtData))
+						} else {
+							receiveLogger.V(2).Info("Received event",
+								"eventType", evt.Type(), "extensions", evt.Extensions())
 						}
 						receive(ctx, evt)
 					}); err != nil {

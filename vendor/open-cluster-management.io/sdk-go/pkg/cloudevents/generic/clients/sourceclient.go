@@ -204,7 +204,12 @@ func (c *CloudEventSourceClient[T]) receive(ctx context.Context, evt cloudevents
 
 	for _, handler := range handlers {
 		if err := handler(ctx, types.StatusModified, obj); err != nil {
-			logger.Error(err, "failed to handle status event", "event", evt)
+			if logger.V(4).Enabled() {
+				evtData, _ := evt.MarshalJSON()
+				logger.Error(err, "failed to handle status event", "event", string(evtData))
+			} else {
+				logger.Error(err, "failed to handle status event")
+			}
 		}
 	}
 }

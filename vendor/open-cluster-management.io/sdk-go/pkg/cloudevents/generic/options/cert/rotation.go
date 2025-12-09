@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"os"
 	"reflect"
 	"sync"
 	"time"
@@ -26,8 +27,31 @@ type Connection interface {
 
 type reloadFunc func(*tls.CertificateRequestInfo) (*tls.Certificate, error)
 
-// CertCallbackRefreshDuration is exposed so that integration tests can crank up the reload speed.
+// CertCallbackRefreshDuration controls how frequently certificate callbacks reload.
+// Default is 5 minutes.
+//
+// NOTE: This can be overridden via the environment variable
+//
+//	CERT_CALLBACK_REFRESH_DURATION **for testing only**.
+//	Do NOT rely on this environment variable in production.
 var CertCallbackRefreshDuration = 5 * time.Minute
+
+func init() {
+	// TEST-ONLY OVERRIDE:
+	// Allow integration tests to reduce reload intervals by setting
+	// CERT_CALLBACK_REFRESH_DURATION to a valid Go duration string (e.g., "10s").
+	//
+	// If the variable is not set or is invalid, the default (5m) is preserved.
+	if v := os.Getenv("CERT_CALLBACK_REFRESH_DURATION"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			// Optional: log or print a warning
+			klog.Warningf("invalid CERT_CALLBACK_REFRESH_DURATION (%q): %v, using default\n", v, err)
+			return
+		}
+		CertCallbackRefreshDuration = d
+	}
+}
 
 type clientCertRotating struct {
 	sync.RWMutex
