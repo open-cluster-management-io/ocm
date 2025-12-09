@@ -188,7 +188,6 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 	}
 
 	mwrSet.Status.Summary.Total = count
-	mwrSet.Status.Summary.DesiredTotal = total
 	if count == 0 {
 		mwrSet.Status.Summary.Applied = 0
 		mwrSet.Status.Summary.Available = 0
