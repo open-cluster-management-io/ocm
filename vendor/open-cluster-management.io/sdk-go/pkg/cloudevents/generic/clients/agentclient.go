@@ -200,7 +200,12 @@ func (c *CloudEventAgentClient[T]) receive(ctx context.Context, evt cloudevents.
 
 	action, err := c.specAction(evt.Source(), eventType.CloudEventsDataType, obj)
 	if err != nil {
-		logger.Error(err, "failed to generate spec action", "event", evt)
+		if logger.V(4).Enabled() {
+			evtData, _ := evt.MarshalJSON()
+			logger.Error(err, "failed to generate spec action", "event", string(evtData))
+		} else {
+			logger.Error(err, "failed to generate spec action")
+		}
 		return
 	}
 
@@ -211,7 +216,12 @@ func (c *CloudEventAgentClient[T]) receive(ctx context.Context, evt cloudevents.
 
 	for _, handler := range handlers {
 		if err := handler(ctx, action, obj); err != nil {
-			logger.Error(err, "failed to handle spec event", "event", evt)
+			if logger.V(4).Enabled() {
+				evtData, _ := evt.MarshalJSON()
+				logger.Error(err, "failed to handle spec event", "event", string(evtData))
+			} else {
+				logger.Error(err, "failed to handle spec event")
+			}
 		}
 	}
 }

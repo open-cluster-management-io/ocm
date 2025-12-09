@@ -3,6 +3,7 @@ package codec
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/bwmarrin/snowflake"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	cloudeventstypes "github.com/cloudevents/sdk-go/v2/types"
@@ -142,9 +143,7 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 	metaObj.ResourceVersion = ""
 	// The resourceVersion in cloudevent actually sematically equals to generation, since it increments when
 	// spec changes
-	if metaObj.Generation == 0 {
-		metaObj.Generation = int64(resourceVersion)
-	}
+	metaObj.Generation = int64(resourceVersion)
 	if metaObj.Annotations == nil {
 		metaObj.Annotations = map[string]string{}
 	}

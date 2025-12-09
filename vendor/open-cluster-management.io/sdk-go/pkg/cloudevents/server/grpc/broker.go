@@ -92,7 +92,7 @@ func (bkr *GRPCBroker) Publish(ctx context.Context, pubReq *pbv1.PublishRequest)
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to parse cloud event type %s, %v", evt.Type(), err))
 	}
 
-	logger.V(4).Info("receive the event with grpc broker", "eventContext", evt.Context)
+	logger.V(4).Info("receive the event with grpc broker", "eventType", evt.Type(), "extensions", evt.Extensions())
 
 	// handler resync request
 	if eventType.Action == types.ResyncRequestAction {
@@ -234,7 +234,8 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 		}
 
 		// send the cloudevent to the subscriber
-		logger.V(4).Info("sending the event to spec subscribers", "subID", subID, "eventContext", evt.Context)
+		logger.V(4).Info("sending the event to spec subscribers",
+			"subID", subID, "eventType", evt.Type(), "extensions", evt.Extensions())
 		select {
 		case eventCh <- pbEvt:
 		case <-subCtx.Done():
@@ -280,7 +281,8 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 //   - If the requested resource version is older than the source's current maintained resource version, the source
 //     sends the resource.
 func (bkr *GRPCBroker) respondResyncSpecRequest(ctx context.Context, eventDataType types.CloudEventsDataType, evt *cloudevents.Event) error {
-	log := klog.FromContext(ctx)
+	log := klog.FromContext(ctx).WithValues(
+		"eventDataType", eventDataType, "eventType", evt.Type(), "extensions", evt.Extensions())
 
 	resourceVersions, err := payload.DecodeSpecResyncRequest(*evt)
 	if err != nil {
@@ -304,17 +306,18 @@ func (bkr *GRPCBroker) respondResyncSpecRequest(ctx context.Context, eventDataTy
 	}
 
 	if len(objs) == 0 {
-		log.V(4).Info("no objs from the lister, do nothing", "eventContext", evt.Context)
+		log.V(4).Info("no objs from the lister, do nothing")
 		return nil
 	}
 
 	for _, obj := range objs {
 		// respond with the deleting resource regardless of the resource version
+		objLogger := log.WithValues("eventType", obj.Type(), "extensions", obj.Extensions())
 		if _, ok := obj.Extensions()[types.ExtensionDeletionTimestamp]; ok {
-			log.V(4).Info("respond spec resync request", "eventContext", evt.Context)
+			objLogger.V(4).Info("respond spec resync request")
 			err = bkr.handleRes(ctx, obj, eventDataType, "delete_request")
 			if err != nil {
-				log.Error(err, "failed to handle resync spec request")
+				objLogger.Error(err, "failed to handle resync spec request")
 			}
 			continue
 		}
@@ -322,17 +325,17 @@ func (bkr *GRPCBroker) respondResyncSpecRequest(ctx context.Context, eventDataTy
 		lastResourceVersion := findResourceVersion(obj.ID(), resourceVersions.Versions)
 		currentResourceVersion, err := cloudeventstypes.ToInteger(obj.Extensions()[types.ExtensionResourceVersion])
 		if err != nil {
-			log.V(4).Info("ignore the event since it has a invalid resourceVersion", "eventContext", obj.Context, "error", err)
+			objLogger.V(4).Info("ignore the event since it has a invalid resourceVersion", "error", err)
 			continue
 		}
 
 		// the version of the work is not maintained on source or the source's work is newer than agent, send
 		// the newer work to agent
 		if currentResourceVersion == 0 || int64(currentResourceVersion) > lastResourceVersion {
-			log.V(4).Info("respond spec resync request", "eventContext", evt.Context)
+			objLogger.V(4).Info("respond spec resync request")
 			err := bkr.handleRes(ctx, obj, eventDataType, "update_request")
 			if err != nil {
-				log.Error(err, "failed to handle resync spec request")
+				objLogger.Error(err, "failed to handle resync spec request")
 			}
 		}
 	}
@@ -356,7 +359,7 @@ func (bkr *GRPCBroker) respondResyncSpecRequest(ctx context.Context, eventDataTy
 			NewEvent()
 
 		// send a delete event for the current resource
-		log.V(4).Info("respond spec resync request", "eventContext", evt.Context)
+		log.V(4).Info("respond spec resync request")
 		err := bkr.handleRes(ctx, &obj, eventDataType, "delete_request")
 		if err != nil {
 			log.Error(err, "failed to handle delete request")
