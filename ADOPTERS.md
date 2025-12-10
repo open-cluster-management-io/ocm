@@ -15,6 +15,7 @@ The list includes but is not limited to:
 | Vendor | Red Hat | 2021 | [Link](https://www.redhat.com) | Red Hat is a founding member of the OCM project and uses OCM as a foundational component in Red Hat Advanced Cluster Management for Kubernetes (RHACM). RHACM is used in multiple production installations for large scale Kubernetes deployments. |
 | Vendor | Spectro Cloud | 2025 | [Link](https://www.spectrocloud.com/) | Spectro Cloud uses OCM in their platform-building platform, Mural. Mural uses OCM for intelligent federation of resources across multiple Kubernetes clusters, simplifying application lifecycle management at scale. |
 | End user | Xiao Hong Shu | 2022 | [Link](xiaohongshu.com) | Xiao Hong Shu (also known as Xiaohongshu or Little Red Book) is a Chinese social media and e-commerce platform. They were very early adopters of OCM and have contributed to the growth of the multi-cluster space. |
+| End user | Guidewire Software Inc. | 2025 | [Link](https://www.guidewire.com/) | Guidewire Software Inc. uses OCM in their Cloud platform for their P&C Insurance customers. To utilize OCM on their platform, they have contributed to the OCM project with implementation of enabling AWS IAM-based registration mechanism on EKS clusters. 
 
 Additional non-public adopters exist as well.
 
