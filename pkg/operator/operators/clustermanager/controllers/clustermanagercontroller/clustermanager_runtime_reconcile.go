@@ -246,6 +246,7 @@ func getSAs(mwctrEnabled, addonManagerEnabled, grpcAuthEnabled bool) []string {
 		"registration-webhook-sa",
 		"work-webhook-sa",
 		"placement-controller-sa",
+		"addon-webhook-sa", // addon webhook is always deployed
 	}
 	if mwctrEnabled {
 		sas = append(sas, "work-controller-sa")

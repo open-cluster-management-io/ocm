@@ -225,6 +225,8 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	if clusterManager.Spec.DeployOption.Hosted != nil {
 		config.RegistrationWebhook = convertWebhookConfiguration(clusterManager.Spec.DeployOption.Hosted.RegistrationWebhookConfiguration)
 		config.WorkWebhook = convertWebhookConfiguration(clusterManager.Spec.DeployOption.Hosted.WorkWebhookConfiguration)
+		// Addon webhook shares the same address as registration webhook
+		config.AddonWebhook = convertWebhookConfiguration(clusterManager.Spec.DeployOption.Hosted.RegistrationWebhookConfiguration)
 	}
 
 	config.Labels = helpers.GetClusterManagerHubLabels(clusterManager, n.enableSyncLabels)

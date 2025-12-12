@@ -401,8 +401,8 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 43 {
-					return fmt.Errorf("should get 43 relatedResources, actual got %v, %v",
+				if len(actual.Status.RelatedResources) != 44 {
+					return fmt.Errorf("should get 44 relatedResources, actual got %v, %v",
 						len(actual.Status.RelatedResources), actual.Status.RelatedResources)
 				}
 				return nil
@@ -480,8 +480,8 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 47 {
-					return fmt.Errorf("should get 47 relatedResources, actual got %v, %v",
+				if len(actual.Status.RelatedResources) != 48 {
+					return fmt.Errorf("should get 48 relatedResources, actual got %v, %v",
 						len(actual.Status.RelatedResources), actual.Status.RelatedResources)
 				}
 				return nil
@@ -694,8 +694,8 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 42 {
-					return fmt.Errorf("should get 42 relatedResources, actual got %v, %v",
+				if len(actual.Status.RelatedResources) != 43 {
+					return fmt.Errorf("should get 43 relatedResources, actual got %v, %v",
 						len(actual.Status.RelatedResources), actual.Status.RelatedResources)
 				}
 				return nil
@@ -755,8 +755,8 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 47 {
-					return fmt.Errorf("should get 47 relatedResources, actual got %v, %v", len(actual.Status.RelatedResources), actual.Status.RelatedResources)
+				if len(actual.Status.RelatedResources) != 48 {
+					return fmt.Errorf("should get 48 relatedResources, actual got %v, %v", len(actual.Status.RelatedResources), actual.Status.RelatedResources)
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
