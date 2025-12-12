@@ -11,10 +11,12 @@ type HubConfig struct {
 	WorkImage                      string
 	WorkAPIServiceCABundle         string
 	PlacementImage                 string
+	AddonAPIServiceCABundle        string
 	Replica                        int32
 	HostedMode                     bool
 	RegistrationWebhook            Webhook
 	WorkWebhook                    Webhook
+	AddonWebhook                   Webhook
 	RegistrationFeatureGates       []string
 	WorkFeatureGates               []string
 	AddOnManagerImage              string

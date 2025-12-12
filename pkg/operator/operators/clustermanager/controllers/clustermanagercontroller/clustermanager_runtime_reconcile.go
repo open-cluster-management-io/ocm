@@ -31,6 +31,7 @@ var (
 		"cluster-manager/management/registration/webhook-deployment.yaml",
 		"cluster-manager/management/work/webhook-deployment.yaml",
 		"cluster-manager/management/placement/deployment.yaml",
+		"cluster-manager/management/addon-manager/webhook-deployment.yaml",
 	}
 
 	addOnManagerDeploymentFiles = []string{
@@ -245,6 +246,7 @@ func getSAs(mwctrEnabled, addonManagerEnabled, grpcAuthEnabled bool) []string {
 		"registration-webhook-sa",
 		"work-webhook-sa",
 		"placement-controller-sa",
+		"addon-webhook-sa", // addon webhook is always deployed
 	}
 	if mwctrEnabled {
 		sas = append(sas, "work-controller-sa")

@@ -170,6 +170,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		WorkWebhook: manifests.Webhook{
 			Port: defaultWebhookPort,
 		},
+		AddonWebhook: manifests.Webhook{
+			Port: defaultWebhookPort,
+		},
 		ResourceRequirementResourceType: helpers.ResourceType(clusterManager),
 		ResourceRequirements:            resourceRequirements,
 		WorkDriver:                      string(workDriver),
@@ -222,6 +225,8 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	if clusterManager.Spec.DeployOption.Hosted != nil {
 		config.RegistrationWebhook = convertWebhookConfiguration(clusterManager.Spec.DeployOption.Hosted.RegistrationWebhookConfiguration)
 		config.WorkWebhook = convertWebhookConfiguration(clusterManager.Spec.DeployOption.Hosted.WorkWebhookConfiguration)
+		// Addon webhook shares the same address as registration webhook
+		config.AddonWebhook = convertWebhookConfiguration(clusterManager.Spec.DeployOption.Hosted.RegistrationWebhookConfiguration)
 	}
 
 	config.Labels = helpers.GetClusterManagerHubLabels(clusterManager, n.enableSyncLabels)
@@ -294,6 +299,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	encodedCaBundle := base64.StdEncoding.EncodeToString([]byte(caBundle))
 	config.RegistrationAPIServiceCABundle = encodedCaBundle
 	config.WorkAPIServiceCABundle = encodedCaBundle
+	config.AddonAPIServiceCABundle = encodedCaBundle
 
 	// check imagePulSecret here because there will be a warning event FailedToRetrieveImagePullSecret
 	// if imagePullSecret does not exist.

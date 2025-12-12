@@ -11,6 +11,7 @@ import (
 	"k8s.io/component-base/logs"
 
 	"open-cluster-management.io/ocm/pkg/cmd/hub"
+	"open-cluster-management.io/ocm/pkg/cmd/webhook"
 	"open-cluster-management.io/ocm/pkg/version"
 )
 
@@ -46,5 +47,6 @@ func newAddonCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(hub.NewAddonManager())
+	cmd.AddCommand(webhook.NewAddonWebhook())
 	return cmd
 }

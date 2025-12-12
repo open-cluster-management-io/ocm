@@ -9,6 +9,7 @@ import (
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonclientset "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned/typed/addon/v1alpha1"
+	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned/typed/addon/v1beta1"
 
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options"
 )
@@ -26,6 +27,10 @@ func (a AddonClientSetWrapper) Discovery() discovery.DiscoveryInterface {
 
 func (a AddonClientSetWrapper) AddonV1alpha1() addonv1alpha1client.AddonV1alpha1Interface {
 	return a.AddonV1Alpha1ClientWrapper
+}
+
+func (a AddonClientSetWrapper) AddonV1beta1() addonv1beta1client.AddonV1beta1Interface {
+	panic("AddonV1beta1 is unsupported")
 }
 
 // AddonV1Alpha1ClientWrapper wraps ManagedClusterAddOnClient to AddonV1alpha1Interface

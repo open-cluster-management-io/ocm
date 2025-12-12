@@ -235,6 +235,10 @@ github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 h1:Ovs26xHkKqVztRpIrF/92Bcuy
 github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0/go.mod h1:8NvIoxWQoOIhqOTXgfV/d3M/q6VIi02HzZEHgUlZvzk=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3 h1:5ZPtiqj0JL5oKWmcsq4VMaAW5ukBEgSGXEN89zeH1Jo=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3/go.mod h1:ndYquD05frm2vACXE1nsccT4oJzjhw2arTS2cpUD1PI=
+github.com/haoqing0110/api v0.0.0-20251212032035-313cd1fc03dd h1:vu2J9Ctz4ziyIC2L6QnD6g4L8Q2wPEXyDu6YqhDA95Q=
+github.com/haoqing0110/api v0.0.0-20251212032035-313cd1fc03dd/go.mod h1:Hk/3c114t6Ba5qhpqw+RoA93yEbE2CosG+JzzBZ6aCo=
+github.com/haoqing0110/sdk-go v0.0.0-20251209073717-ea92d99dce36 h1:EBJAq3337D2t6Yrlek6L0/i47dL7J+ZTYjboA7KO+Rs=
+github.com/haoqing0110/sdk-go v0.0.0-20251209073717-ea92d99dce36/go.mod h1:0EZ9M7AtD0b+x9lUo5pYlyFF2aKOk1y88looeOVybwU=
 github.com/huandu/xstrings v1.5.0 h1:2ag3IFq9ZDANvthTwTiqSSZLjDc+BedvHPAp5tJy2TI=
 github.com/huandu/xstrings v1.5.0/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
 github.com/ianlancetaylor/demangle v0.0.0-20210905161508-09a460cdf81d/go.mod h1:aYm2/VgdVmcIU8iMfdMvDMsRAQjcfZSKFby6HOFvi/w=
@@ -590,10 +594,6 @@ k8s.io/utils v0.0.0-20250604170112-4c0f3b243397 h1:hwvWFiBzdWw1FhfY1FooPn3kzWuJ8
 k8s.io/utils v0.0.0-20250604170112-4c0f3b243397/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 open-cluster-management.io/addon-framework v1.1.1-0.20251126020917-1a0a9be61322 h1:ibdBTpWmpQ37f1jZgR3fFIDK5uDTOJRvOkDKnRjLOpg=
 open-cluster-management.io/addon-framework v1.1.1-0.20251126020917-1a0a9be61322/go.mod h1:YqG/M9aLM/jhUXZDb2lEi2gGFU8NHAPTsQEFGk/tiS8=
-open-cluster-management.io/api v1.1.1-0.20251124092621-2337d27c3b7f h1:aOEXqgXvWSykMvzw9drHsLGUNP3xhsk1PcdRzfOVXoM=
-open-cluster-management.io/api v1.1.1-0.20251124092621-2337d27c3b7f/go.mod h1:Hk/3c114t6Ba5qhpqw+RoA93yEbE2CosG+JzzBZ6aCo=
-open-cluster-management.io/sdk-go v1.1.1-0.20251209031938-62521c9935ac h1:Wt7rzenZqrtyYI58+lpe9tmf9e5Ft8Wwd0MyDwuJ4ck=
-open-cluster-management.io/sdk-go v1.1.1-0.20251209031938-62521c9935ac/go.mod h1:0EZ9M7AtD0b+x9lUo5pYlyFF2aKOk1y88looeOVybwU=
 sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03 h1:1ShFiMjGQOR/8jTBkmZrk1gORxnvMwm1nOy2/DbHg4U=
 sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03/go.mod h1:F1pT4mK53U6F16/zuaPSYpBaR7x5Kjym6aKJJC0/DHU=
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 h1:jpcvIRr3GLoUoEKRkHKSmGjxb6lWwrBlJsXc+eUYQHM=

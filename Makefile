@@ -76,7 +76,7 @@ $(call build-image,placement,$(PLACEMENT_IMAGE),./build/Dockerfile.placement,.)
 $(call build-image,registration-operator,$(OPERATOR_IMAGE_NAME),./build/Dockerfile.registration-operator,.)
 $(call build-image,addon-manager,$(ADDON_MANAGER_IMAGE),./build/Dockerfile.addon,.)
 
-copy-crd:
+copy-crd: ensure-yaml-patch
 	bash -x hack/copy-crds.sh $(YAML_PATCH)
 
 update: copy-crd update-csv
@@ -86,7 +86,7 @@ test-unit: ensure-kubebuilder-tools
 update-csv: ensure-operator-sdk ensure-helm
 	bash -x hack/update-csv.sh
 
-verify-crds:
+verify-crds: ensure-yaml-patch
 	bash -x hack/verify-crds.sh $(YAML_PATCH)
 
 verify-gocilint: ensure-golangci-lint

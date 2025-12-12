@@ -251,6 +251,29 @@ func setDeployment(clusterManagerName, clusterManagerNamespace string) []runtime
 		},
 		&appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
+				Name:       clusterManagerName + "-addon-webhook",
+				Namespace:  clusterManagerNamespace,
+				Generation: 1,
+			},
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: clusterManagerName + "-addon-webhook",
+							},
+						},
+					},
+				},
+				Replicas: &replicas,
+			},
+			Status: appsv1.DeploymentStatus{
+				ReadyReplicas:      replicas,
+				ObservedGeneration: 1,
+			},
+		},
+		&appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:       clusterManagerName + "-grpc-server",
 				Namespace:  clusterManagerNamespace,
 				Generation: 1,
@@ -545,7 +568,7 @@ func TestSyncDeploy(t *testing.T) {
 		"open-cluster-management.io/cluster-name": "test"}
 	clusterManager := newClusterManager("testhub")
 	clusterManager.SetLabels(labels)
-	assertDeployments(t, clusterManager, 28, 12)
+	assertDeployments(t, clusterManager, 30, 12)
 }
 
 func TestSyncDeployWithGRPCAuthEnabled(t *testing.T) {
@@ -563,7 +586,7 @@ func TestSyncDeployWithGRPCAuthEnabled(t *testing.T) {
 			},
 		},
 	}
-	assertDeployments(t, clusterManager, 32, 12)
+	assertDeployments(t, clusterManager, 34, 12)
 }
 
 func TestSyncDeployNoWebhook(t *testing.T) {
@@ -589,7 +612,7 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 
 	// Check if resources are created as expected
 	// We expect create the namespace twice respectively in the management cluster and the hub cluster.
-	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 30)
+	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 33)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager, false)
 	}
@@ -612,7 +635,7 @@ func TestSyncDelete(t *testing.T) {
 	now := metav1.Now()
 	clusterManager.ObjectMeta.SetDeletionTimestamp(&now)
 
-	assertDeletion(t, clusterManager, 30, 16)
+	assertDeletion(t, clusterManager, 32, 16)
 }
 
 func TestSyncDeleteWithGRPCAuthEnabled(t *testing.T) {
@@ -629,7 +652,7 @@ func TestSyncDeleteWithGRPCAuthEnabled(t *testing.T) {
 	}
 	now := metav1.Now()
 	clusterManager.ObjectMeta.SetDeletionTimestamp(&now)
-	assertDeletion(t, clusterManager, 34, 16)
+	assertDeletion(t, clusterManager, 36, 16)
 }
 
 // TestDeleteCRD test delete crds
@@ -802,6 +825,7 @@ func newFakeHubConfigWithResourceRequirement(t *testing.T, r *operatorapiv1.Reso
 func getManifestFiles() []string {
 	return []string{
 		"cluster-manager/management/addon-manager/deployment.yaml",
+		"cluster-manager/management/addon-manager/webhook-deployment.yaml",
 		"cluster-manager/management/work/deployment.yaml",
 		"cluster-manager/management/placement/deployment.yaml",
 		"cluster-manager/management/registration/deployment.yaml",

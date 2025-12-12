@@ -5,7 +5,9 @@ set -o nounset
 set -o pipefail
 
 HUB_CRD_FILES="./vendor/open-cluster-management.io/api/cluster/v1/*.crd.yaml
-./vendor/open-cluster-management.io/api/addon/v1alpha1/*.crd.yaml
+./vendor/open-cluster-management.io/api/addon/v1alpha1/0000_02_addon.open-cluster-management.io_addondeploymentconfigs.crd.yaml
+./vendor/open-cluster-management.io/api/addon/v1alpha1/0000_03_addon.open-cluster-management.io_addontemplates.crd.yaml
+./vendor/open-cluster-management.io/api/addon/v1beta1/*.crd.yaml
 ./vendor/open-cluster-management.io/api/cluster/v1beta2/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml
 ./vendor/open-cluster-management.io/api/cluster/v1beta2/0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml
 ./vendor/open-cluster-management.io/api/cluster/v1beta1/0000_02_clusters.open-cluster-management.io_placements.crd.yaml

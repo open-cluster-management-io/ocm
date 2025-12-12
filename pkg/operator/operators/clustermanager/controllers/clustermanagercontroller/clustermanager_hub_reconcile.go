@@ -45,6 +45,8 @@ var (
 		"cluster-manager/hub/placement/clusterrole.yaml",
 		"cluster-manager/hub/placement/clusterrolebinding.yaml",
 		"cluster-manager/hub/placement/serviceaccount.yaml",
+		// addon-webhook
+		"cluster-manager/hub/addon-manager/webhook-serviceaccount.yaml",
 	}
 
 	workControllerResourceFiles = []string{
@@ -66,15 +68,18 @@ var (
 	hubDefaultWebhookServiceFiles = []string{
 		"cluster-manager/hub/registration/webhook-service.yaml",
 		"cluster-manager/hub/work/webhook-service.yaml",
+		"cluster-manager/hub/addon-manager/webhook-service.yaml",
 	}
 	hubHostedWebhookServiceFiles = []string{
 		"cluster-manager/hub/registration/webhook-service-hosted.yaml",
 		"cluster-manager/hub/work/webhook-service-hosted.yaml",
+		"cluster-manager/hub/addon-manager/webhook-service-hosted.yaml",
 	}
 
 	// hubHostedWebhookEndpointFiles only apply when the deploy mode is hosted and address is IPFormat.
 	hubHostedWebhookEndpointRegistration = "cluster-manager/hub/registration/webhook-endpoint-hosted.yaml"
 	hubHostedWebhookEndpointWork         = "cluster-manager/hub/work/webhook-endpoint-hosted.yaml"
+	hubHostedWebhookEndpointAddon        = "cluster-manager/hub/addon-manager/webhook-endpoint-hosted.yaml"
 
 	grpcServerResourceFiles = []string{
 		"cluster-manager/hub/grpc-server/clusterrole.yaml",
@@ -184,6 +189,9 @@ func getHubResources(mode operatorapiv1.InstallMode, config manifests.HubConfig)
 		}
 		if config.WorkWebhook.IsIPFormat {
 			hubResources = append(hubResources, hubHostedWebhookEndpointWork)
+		}
+		if config.AddonWebhook.IsIPFormat {
+			hubResources = append(hubResources, hubHostedWebhookEndpointAddon)
 		}
 	} else {
 		hubResources = append(hubResources, hubDefaultWebhookServiceFiles...)

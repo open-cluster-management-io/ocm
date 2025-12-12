@@ -54,6 +54,7 @@ type ManagedClusterAddOnSpec struct {
 // RegistrationConfig defines the configuration of the addon agent to register to hub. The Klusterlet agent will
 // create a csr for the addon agent with the registrationConfig.
 type RegistrationConfig struct {
+	// Deprecated: Will be replaced with type: kubeClient and type: csr in v1beta1.
 	// signerName is the name of signer that addon agent will use to create csr.
 	// +required
 	// +kubebuilder:validation:MaxLength=571
@@ -61,6 +62,7 @@ type RegistrationConfig struct {
 	// +kubebuilder:validation:Pattern=^([a-z0-9][a-z0-9-]*[a-z0-9]\.)+[a-z]+\/[a-z0-9-\.]+$
 	SignerName string `json:"signerName"`
 
+	// Deprecated: Will be replaced with type: kubeClient and type: csr in v1beta1.
 	// subject is the user subject of the addon agent to be registered to the hub.
 	// If it is not set, the addon agent will have the default subject
 	// "subject": {
@@ -191,7 +193,6 @@ type ConfigReference struct {
 	// defaultConfigs.
 	ConfigReferent `json:",inline"`
 
-	// Deprecated: Use LastAppliedConfig instead
 	// lastObservedGeneration is the observed generation of the add-on configuration.
 	LastObservedGeneration int64 `json:"lastObservedGeneration"`
 
