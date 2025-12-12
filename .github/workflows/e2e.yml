@@ -15,7 +15,7 @@ on:
       - release-*
 
 env:
-  GO_VERSION: '1.24'
+  GO_VERSION: '1.25'
   GO_REQUIRED_MIN_VERSION: ''
   USE_EXISTING_CLUSTER: false # set to true to use an existing kind cluster for debugging with act
 

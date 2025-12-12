@@ -26,7 +26,7 @@ Open Cluster Management (OCM) is a CNCF sandbox project that provides multiclust
 
 ### Key Technologies
 
-- **Language**: Go 1.24.0
+- **Language**: Go 1.25.0
 - **Framework**: Kubernetes operators with controller-runtime
 - **Build System**: Make with OpenShift build machinery
 - **Testing**: Ginkgo/Gomega for BDD-style tests
@@ -36,7 +36,7 @@ Open Cluster Management (OCM) is a CNCF sandbox project that provides multiclust
 
 ### Prerequisites
 
-- Go 1.24.0 ([installation guide](https://go.dev/doc/install))
+- Go 1.25.0 ([installation guide](https://go.dev/doc/install))
 - Docker or Podman (container engine)
 - [Kind](https://kind.sigs.k8s.io/) (local Kubernetes clusters)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/) (Kubernetes CLI)
