@@ -12,6 +12,7 @@ import (
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
@@ -67,6 +68,27 @@ func TestManifestWorkGarbageCollectionController(t *testing.T) {
 			name: "TTL is zero - delete immediately",
 			works: []runtime.Object{
 				createCompletedManifestWorkWithTTL("test", "default", 0, time.Now().Add(-1*time.Second)),
+			},
+			expectedDeleteActions:  1,
+			expectedRequeueActions: 0,
+		},
+		{
+			name: "ManifestWork with ManifestWorkReplicaSet label - should skip GC",
+			works: []runtime.Object{
+				createCompletedManifestWorkWithLabel("test", "default", 300, time.Now().Add(-400*time.Second), map[string]string{
+					workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey: "test-replicaset",
+				}),
+			},
+			expectedDeleteActions:  0,
+			expectedRequeueActions: 0,
+		},
+		{
+			name: "ManifestWork with other labels but no ReplicaSet label - should continue with GC",
+			works: []runtime.Object{
+				createCompletedManifestWorkWithLabel("test", "default", 300, time.Now().Add(-400*time.Second), map[string]string{
+					"app": "test-app",
+					"env": "production",
+				}),
 			},
 			expectedDeleteActions:  1,
 			expectedRequeueActions: 0,
@@ -177,5 +199,11 @@ func createCompletedManifestWorkWithTTL(name, namespace string, ttlSeconds int64
 	}
 
 	mw.Status.Conditions = []metav1.Condition{completedCondition}
+	return mw
+}
+
+func createCompletedManifestWorkWithLabel(name, namespace string, ttlSeconds int64, completedTime time.Time, labels map[string]string) *workapiv1.ManifestWork {
+	mw := createCompletedManifestWorkWithTTL(name, namespace, ttlSeconds, completedTime)
+	mw.Labels = labels
 	return mw
 }

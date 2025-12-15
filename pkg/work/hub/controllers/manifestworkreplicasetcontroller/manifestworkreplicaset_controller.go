@@ -33,23 +33,8 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
-const (
-	// ManifestWorkReplicaSetControllerNameLabelKey is the label key on manifestwork to ref to the ManifestWorkReplicaSet
-	// that owns this manifestwork
-	// TODO move this to the api repo
-	ManifestWorkReplicaSetControllerNameLabelKey = "work.open-cluster-management.io/manifestworkreplicaset"
-
-	// ManifestWorkReplicaSetPlacementNameLabelKey is the label key on manifestwork to ref to the Placement that select
-	// the managedCluster on the manifestWorkReplicaSet's PlacementRef.
-	ManifestWorkReplicaSetPlacementNameLabelKey = "work.open-cluster-management.io/placementname"
-
-	// ManifestWorkReplicaSetFinalizer is the name of the finalizer added to ManifestWorkReplicaSet. It is used to ensure
-	// related manifestworks is deleted
-	ManifestWorkReplicaSetFinalizer = "work.open-cluster-management.io/manifest-work-cleanup"
-
-	// maxRequeueTime is the same as the informer resync period
-	maxRequeueTime = 30 * time.Minute
-)
+// maxRequeueTime is the same as the informer resync period
+const maxRequeueTime = 30 * time.Minute
 
 type ManifestWorkReplicaSetController struct {
 	workClient                    workclientset.Interface
@@ -101,7 +86,7 @@ func NewManifestWorkReplicaSetController(
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaNamespaceName, manifestWorkReplicaSetInformer.Informer()).
 		WithFilteredEventsInformersQueueKeysFunc(func(obj runtime.Object) []string {
 			accessor, _ := meta.Accessor(obj)
-			labelValue, ok := accessor.GetLabels()[ManifestWorkReplicaSetControllerNameLabelKey]
+			labelValue, ok := accessor.GetLabels()[workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey]
 			if !ok {
 				return []string{}
 			}
@@ -111,7 +96,7 @@ func NewManifestWorkReplicaSetController(
 			}
 			return []string{fmt.Sprintf("%s/%s", keys[0], keys[1])}
 		},
-			queue.FileterByLabel(ManifestWorkReplicaSetControllerNameLabelKey),
+			queue.FileterByLabel(workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey),
 			manifestWorkInformer.Informer()).
 		WithInformersQueueKeysFunc(controller.placementDecisionQueueKeysFunc, placeDecisionInformer.Informer()).
 		WithInformersQueueKeysFunc(controller.placementQueueKeysFunc, placementInformer.Informer()).
@@ -213,7 +198,9 @@ func (m *ManifestWorkReplicaSetController) sync(ctx context.Context, controllerC
 
 func listManifestWorksByManifestWorkReplicaSet(mwrs *workapiv1alpha1.ManifestWorkReplicaSet,
 	manifestWorkLister worklisterv1.ManifestWorkLister) ([]*workapiv1.ManifestWork, error) {
-	req, err := labels.NewRequirement(ManifestWorkReplicaSetControllerNameLabelKey, selection.Equals, []string{manifestWorkReplicaSetKey(mwrs)})
+	req, err := labels.NewRequirement(
+		workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey,
+		selection.Equals, []string{manifestWorkReplicaSetKey(mwrs)})
 	if err != nil {
 		return nil, err
 	}
@@ -224,12 +211,14 @@ func listManifestWorksByManifestWorkReplicaSet(mwrs *workapiv1alpha1.ManifestWor
 
 func listManifestWorksByMWRSetPlacementRef(mwrs *workapiv1alpha1.ManifestWorkReplicaSet, placementName string,
 	manifestWorkLister worklisterv1.ManifestWorkLister) ([]*workapiv1.ManifestWork, error) {
-	reqMWRSet, err := labels.NewRequirement(ManifestWorkReplicaSetControllerNameLabelKey, selection.Equals, []string{manifestWorkReplicaSetKey(mwrs)})
+	reqMWRSet, err := labels.NewRequirement(workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey,
+		selection.Equals, []string{manifestWorkReplicaSetKey(mwrs)})
 	if err != nil {
 		return nil, err
 	}
 
-	reqPlacementRef, err := labels.NewRequirement(ManifestWorkReplicaSetPlacementNameLabelKey, selection.Equals, []string{placementName})
+	reqPlacementRef, err := labels.NewRequirement(workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey,
+		selection.Equals, []string{placementName})
 	if err != nil {
 		return nil, err
 	}

@@ -240,5 +240,70 @@ var _ = ginkgo.Describe("ManifestWork TTL after completion", func() {
 				return errors.IsNotFound(err)
 			}, 15*time.Second, eventuallyInterval).Should(gomega.BeTrue())
 		})
+
+		ginkgo.It("should not delete the ManifestWork with ManifestWorkReplicaSet label even after TTL expires", func() {
+			// Create ManifestWork with TTL and ManifestWorkReplicaSet label
+			ttlSeconds := int64(5)
+			work = util.NewManifestWork(clusterName, workName, manifests)
+			work.Spec.DeleteOption = &workapiv1.DeleteOption{
+				PropagationPolicy:       workapiv1.DeletePropagationPolicyTypeForeground,
+				TTLSecondsAfterFinished: &ttlSeconds,
+			}
+
+			// Add ManifestWorkReplicaSet label
+			work.Labels = map[string]string{
+				"work.open-cluster-management.io/manifestworkreplicaset": "test-replicaset",
+			}
+
+			// Add condition rule to mark work as complete
+			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "",
+						Resource:  "configmaps",
+						Name:      "test-cm",
+						Namespace: clusterName,
+					},
+					ConditionRules: []workapiv1.ConditionRule{
+						{
+							Condition: workapiv1.WorkComplete,
+							Type:      workapiv1.CelConditionExpressionsType,
+							CelExpressions: []string{
+								"object.metadata.name == 'test-cm'",
+							},
+						},
+					},
+				},
+			}
+
+			// Create the ManifestWork
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Wait for work to be applied, available, and completed
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			// Wait for work to be marked as complete
+			gomega.Eventually(func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if meta.IsStatusConditionTrue(work.Status.Conditions, workapiv1.WorkComplete) {
+					return nil
+				}
+				return fmt.Errorf("ManifestWork %s is not complete", work.Name)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+			ginkgo.By("Verifying the ManifestWork is NOT deleted even after TTL expires due to ManifestWorkReplicaSet label")
+			// Wait past TTL expiry and verify the work still exists
+			gomega.Consistently(func() error {
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				return err
+			}, time.Duration(ttlSeconds+5)*time.Second, eventuallyInterval).Should(gomega.Succeed())
+		})
 	})
 })

@@ -243,9 +243,8 @@ spec:
                       - name
                       type: object
                     lastObservedGeneration:
-                      description: |-
-                        Deprecated: Use LastAppliedConfig instead
-                        lastObservedGeneration is the observed generation of the add-on configuration.
+                      description: lastObservedGeneration is the observed generation
+                        of the add-on configuration.
                       format: int64
                       type: integer
                     name:
@@ -302,14 +301,16 @@ spec:
                     create a csr for the addon agent with the registrationConfig.
                   properties:
                     signerName:
-                      description: signerName is the name of signer that addon agent
-                        will use to create csr.
+                      description: |-
+                        Deprecated: Will be replaced with type: kubeClient and type: csr in v1beta1.
+                        signerName is the name of signer that addon agent will use to create csr.
                       maxLength: 571
                       minLength: 5
                       pattern: ^([a-z0-9][a-z0-9-]*[a-z0-9]\.)+[a-z]+\/[a-z0-9-\.]+$
                       type: string
                     subject:
                       description: |-
+                        Deprecated: Will be replaced with type: kubeClient and type: csr in v1beta1.
                         subject is the user subject of the addon agent to be registered to the hub.
                         If it is not set, the addon agent will have the default subject
                         "subject": {

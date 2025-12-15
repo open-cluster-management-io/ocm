@@ -24,7 +24,7 @@ func (a *addFinalizerReconciler) reconcile(ctx context.Context, pw *workapiv1alp
 		*workapiv1alpha1.ManifestWorkReplicaSet, workapiv1alpha1.ManifestWorkReplicaSetSpec, workapiv1alpha1.ManifestWorkReplicaSetStatus](
 		a.workClient.WorkV1alpha1().ManifestWorkReplicaSets(pw.Namespace))
 
-	updated, err := workSetPatcher.AddFinalizer(ctx, pw, ManifestWorkReplicaSetFinalizer)
+	updated, err := workSetPatcher.AddFinalizer(ctx, pw, workapiv1alpha1.ManifestWorkReplicaSetFinalizer)
 	// if this conflicts, we'll simply try again later
 	if updated {
 		return pw, reconcileStop, err

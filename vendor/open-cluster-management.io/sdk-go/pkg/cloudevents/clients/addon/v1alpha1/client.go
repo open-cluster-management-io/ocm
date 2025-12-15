@@ -1,7 +1,8 @@
-package addon
+package v1alpha1
 
 import (
 	"context"
+	"k8s.io/client-go/rest"
 	"net/http"
 
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -41,8 +42,11 @@ func NewManagedClusterAddOnClient(
 }
 
 func (c *ManagedClusterAddOnClient) Namespace(namespace string) *ManagedClusterAddOnClient {
-	c.namespace = namespace
-	return c
+	return &ManagedClusterAddOnClient{
+		cloudEventsClient: c.cloudEventsClient,
+		watcherStore:      c.watcherStore,
+		namespace:         namespace,
+	}
 }
 
 func (c *ManagedClusterAddOnClient) Create(
@@ -67,7 +71,8 @@ func (c *ManagedClusterAddOnClient) DeleteCollection(ctx context.Context, opts m
 }
 
 func (c *ManagedClusterAddOnClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*addonapiv1alpha1.ManagedClusterAddOn, error) {
-	klog.V(4).Infof("getting ManagedClusterAddOn %s/%s", c.namespace, name)
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("getting ManagedClusterAddOn", "namespace", c.namespace, "name", name)
 	addon, exists, err := c.watcherStore.Get(c.namespace, name)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
@@ -80,7 +85,8 @@ func (c *ManagedClusterAddOnClient) Get(ctx context.Context, name string, opts m
 }
 
 func (c *ManagedClusterAddOnClient) List(ctx context.Context, opts metav1.ListOptions) (*addonapiv1alpha1.ManagedClusterAddOnList, error) {
-	klog.V(4).Info("list ManagedClusterAddon")
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("list ManagedClusterAddon")
 	addonList, err := c.watcherStore.List(c.namespace, opts)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
@@ -95,7 +101,8 @@ func (c *ManagedClusterAddOnClient) List(ctx context.Context, opts metav1.ListOp
 }
 
 func (c *ManagedClusterAddOnClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	klog.V(4).Info("watch ManagedClusterAddOn")
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("watch ManagedClusterAddOn")
 	watcher, err := c.watcherStore.GetWatcher(c.namespace, opts)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
@@ -106,7 +113,8 @@ func (c *ManagedClusterAddOnClient) Watch(ctx context.Context, opts metav1.ListO
 
 func (c *ManagedClusterAddOnClient) Patch(
 	ctx context.Context, name string, pt kubetypes.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*addonapiv1alpha1.ManagedClusterAddOn, error) {
-	klog.V(4).Infof("patching ManagedClusterAddon %s/%s", c.namespace, name)
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("patching ManagedClusterAddon", "namespace", c.namespace, "name", name)
 	last, exists, err := c.watcherStore.Get(c.namespace, name)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
@@ -140,4 +148,35 @@ func (c *ManagedClusterAddOnClient) Patch(
 	}
 
 	return newAddon, nil
+}
+
+// AddonClientWrapper wraps ManagedClusterAddOnClient to AddonV1alpha1Interface
+type AddonClientWrapper struct {
+	client *ManagedClusterAddOnClient
+}
+
+var _ addonv1alpha1client.AddonV1alpha1Interface = &AddonClientWrapper{}
+
+func NewAddonClientWrapper(client *ManagedClusterAddOnClient) *AddonClientWrapper {
+	return &AddonClientWrapper{client: client}
+}
+
+func (c *AddonClientWrapper) AddOnDeploymentConfigs(namespace string) addonv1alpha1client.AddOnDeploymentConfigInterface {
+	panic("AddOnDeploymentConfigs is unsupported")
+}
+
+func (c *AddonClientWrapper) AddOnTemplates() addonv1alpha1client.AddOnTemplateInterface {
+	panic("AddOnTemplates is unsupported")
+}
+
+func (c *AddonClientWrapper) ClusterManagementAddOns() addonv1alpha1client.ClusterManagementAddOnInterface {
+	panic("ClusterManagementAddOns is unsupported")
+}
+
+func (c *AddonClientWrapper) RESTClient() rest.Interface {
+	panic("RESTClient is unsupported")
+}
+
+func (c *AddonClientWrapper) ManagedClusterAddOns(namespace string) addonv1alpha1client.ManagedClusterAddOnInterface {
+	return c.client.Namespace(namespace)
 }

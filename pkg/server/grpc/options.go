@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 
-	addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon"
+	addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
 	clusterce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
 	csrce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
 	eventce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"

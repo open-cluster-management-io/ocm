@@ -16,7 +16,7 @@ import (
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
-	addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon"
+	addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
 	clusterce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
 	csrce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
 	eventce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"

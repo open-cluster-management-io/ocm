@@ -46,7 +46,7 @@ func (f *finalizeReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alp
 			return mwrSet, reconcileContinue, nil
 		}
 	}
-	if err := workSetPatcher.RemoveFinalizer(ctx, mwrSet, ManifestWorkReplicaSetFinalizer); err != nil {
+	if err := workSetPatcher.RemoveFinalizer(ctx, mwrSet, workapiv1alpha1.ManifestWorkReplicaSetFinalizer); err != nil {
 		return mwrSet, reconcileContinue, err
 	}
 
