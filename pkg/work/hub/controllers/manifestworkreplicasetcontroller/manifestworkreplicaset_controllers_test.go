@@ -52,7 +52,7 @@ func TestManifestWorkReplicaSetControllerPatchStatus(t *testing.T) {
 				if err := json.Unmarshal(p, workSet); err != nil {
 					t.Fatal(err)
 				}
-				if !reflect.DeepEqual(workSet.Finalizers, []string{ManifestWorkReplicaSetFinalizer}) {
+				if !reflect.DeepEqual(workSet.Finalizers, []string{workapiv1alpha1.ManifestWorkReplicaSetFinalizer}) {
 					t.Fatal(spew.Sdump(actions))
 				}
 			},
@@ -61,7 +61,7 @@ func TestManifestWorkReplicaSetControllerPatchStatus(t *testing.T) {
 			name: "placement not found",
 			mwrSet: func() *workapiv1alpha1.ManifestWorkReplicaSet {
 				w := helpertest.CreateTestManifestWorkReplicaSet("test", "default", "placement")
-				w.Finalizers = []string{ManifestWorkReplicaSetFinalizer}
+				w.Finalizers = []string{workapiv1alpha1.ManifestWorkReplicaSetFinalizer}
 				return w
 			}(),
 			works: []runtime.Object{},
@@ -89,7 +89,7 @@ func TestManifestWorkReplicaSetControllerPatchStatus(t *testing.T) {
 			name: "placement decision not found",
 			mwrSet: func() *workapiv1alpha1.ManifestWorkReplicaSet {
 				w := helpertest.CreateTestManifestWorkReplicaSet("test", "default", "placement")
-				w.Finalizers = []string{ManifestWorkReplicaSetFinalizer}
+				w.Finalizers = []string{workapiv1alpha1.ManifestWorkReplicaSetFinalizer}
 				return w
 			}(),
 			works: []runtime.Object{},
@@ -117,7 +117,7 @@ func TestManifestWorkReplicaSetControllerPatchStatus(t *testing.T) {
 			name: "apply correctly",
 			mwrSet: func() *workapiv1alpha1.ManifestWorkReplicaSet {
 				w := helpertest.CreateTestManifestWorkReplicaSet("test", "default", "placement")
-				w.Finalizers = []string{ManifestWorkReplicaSetFinalizer}
+				w.Finalizers = []string{workapiv1alpha1.ManifestWorkReplicaSetFinalizer}
 				return w
 			}(),
 			works: []runtime.Object{},
@@ -148,7 +148,7 @@ func TestManifestWorkReplicaSetControllerPatchStatus(t *testing.T) {
 			name: "no additional apply needed",
 			mwrSet: func() *workapiv1alpha1.ManifestWorkReplicaSet {
 				w := helpertest.CreateTestManifestWorkReplicaSet("test", "default", "placement")
-				w.Finalizers = []string{ManifestWorkReplicaSetFinalizer}
+				w.Finalizers = []string{workapiv1alpha1.ManifestWorkReplicaSetFinalizer}
 				return w
 			}(),
 			works: helpertest.CreateTestManifestWorks("test", "default", "placement", "cluster1", "cluster2"),
@@ -179,7 +179,7 @@ func TestManifestWorkReplicaSetControllerPatchStatus(t *testing.T) {
 			name: "add and delete",
 			mwrSet: func() *workapiv1alpha1.ManifestWorkReplicaSet {
 				w := helpertest.CreateTestManifestWorkReplicaSet("test", "default", "placement")
-				w.Finalizers = []string{ManifestWorkReplicaSetFinalizer}
+				w.Finalizers = []string{workapiv1alpha1.ManifestWorkReplicaSetFinalizer}
 				return w
 			}(),
 			works: helpertest.CreateTestManifestWorks("test", "default", "placement", "cluster1", "cluster2"),

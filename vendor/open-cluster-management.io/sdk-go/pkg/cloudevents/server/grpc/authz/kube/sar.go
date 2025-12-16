@@ -3,6 +3,7 @@ package sar
 import (
 	"context"
 	"fmt"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -15,7 +16,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	workv1 "open-cluster-management.io/api/work/v1"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
@@ -195,7 +195,7 @@ func toSubjectAccessReview(clusterName string, user string, groups []string, eve
 		sar.Spec.ResourceAttributes.Resource = eventsType.Resource
 		sar.Spec.ResourceAttributes.Name = clusterName
 		return sar, nil
-	case addon.ManagedClusterAddOnEventDataType,
+	case v1alpha1.ManagedClusterAddOnEventDataType,
 		csr.CSREventDataType,
 		event.EventEventDataType,
 		lease.LeaseEventDataType:

@@ -51,7 +51,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 
 	// Delete ManifestWorks that belong to placements no longer in the spec
 	for _, mw := range allManifestWorks {
-		placementName, ok := mw.Labels[ManifestWorkReplicaSetPlacementNameLabelKey]
+		placementName, ok := mw.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey]
 		if !ok || !currentPlacementNames.Has(placementName) {
 			// This ManifestWork belongs to a placement that's no longer in the spec, delete it
 			err := d.workApplier.Delete(ctx, mw.Namespace, mw.Name)
@@ -369,8 +369,8 @@ func CreateManifestWork(
 		mergedLabels[k] = v
 	}
 
-	mergedLabels[ManifestWorkReplicaSetControllerNameLabelKey] = manifestWorkReplicaSetKey(mwrSet)
-	mergedLabels[ManifestWorkReplicaSetPlacementNameLabelKey] = placementRefName
+	mergedLabels[workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey] = manifestWorkReplicaSetKey(mwrSet)
+	mergedLabels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey] = placementRefName
 
 	return &workv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{

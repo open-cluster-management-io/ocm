@@ -68,7 +68,7 @@ func (m *ManifestWorkReplicaSetController) placementDecisionQueueKeysFunc(obj ru
 // we will generate manifestwork with a label
 func (m *ManifestWorkReplicaSetController) manifestWorkQueueKeyFunc(obj runtime.Object) string {
 	accessor, _ := meta.Accessor(obj)
-	key, ok := accessor.GetLabels()[ManifestWorkReplicaSetControllerNameLabelKey]
+	key, ok := accessor.GetLabels()[workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey]
 	if !ok {
 		return ""
 	}

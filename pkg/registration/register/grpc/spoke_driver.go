@@ -24,6 +24,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	cloudeventsaddon "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon"
+	cloudeventsaddonv1alpha1 "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
 	cloudeventscluster "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
 	cloudeventscsr "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
 	cloudeventsevent "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
@@ -142,7 +143,7 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 		ctx,
 		cloudeventsoptions.NewGenericClientOptions(
 			config,
-			cloudeventsaddon.NewManagedClusterAddOnCodec(),
+			cloudeventsaddonv1alpha1.NewManagedClusterAddOnCodec(),
 			secretOption.ClusterName,
 		).WithClusterName(secretOption.ClusterName).WithClientWatcherStore(addonWatchStore))
 	if err != nil {

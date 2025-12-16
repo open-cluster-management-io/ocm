@@ -7,6 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	fakeclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
+	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	helpertest "open-cluster-management.io/ocm/pkg/work/hub/test"
@@ -31,7 +32,7 @@ func TestAddFinalizerReconcile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !commonhelper.HasFinalizer(updatetSet.Finalizers, ManifestWorkReplicaSetFinalizer) {
+	if !commonhelper.HasFinalizer(updatetSet.Finalizers, workapiv1alpha1.ManifestWorkReplicaSetFinalizer) {
 		t.Fatal("Finalizer did not added")
 	}
 
@@ -47,14 +48,14 @@ func TestAddFinalizerReconcile(t *testing.T) {
 	}
 
 	// Check finalizer not exist
-	if commonhelper.HasFinalizer(mwrSetTest.Finalizers, ManifestWorkReplicaSetFinalizer) {
+	if commonhelper.HasFinalizer(mwrSetTest.Finalizers, workapiv1alpha1.ManifestWorkReplicaSetFinalizer) {
 		t.Fatal("Finalizer added to deleted ManifestWorkReplicaSet")
 	}
 }
 
 func TestAddFinalizerTwiceReconcile(t *testing.T) {
 	mwrSetTest := helpertest.CreateTestManifestWorkReplicaSet("mwrset-test", "default", "place-test")
-	mwrSetTest.Finalizers = []string{ManifestWorkReplicaSetFinalizer}
+	mwrSetTest.Finalizers = []string{workapiv1alpha1.ManifestWorkReplicaSetFinalizer}
 	fakeClient := fakeclient.NewSimpleClientset(mwrSetTest)
 
 	addFinalizerController := &addFinalizerReconciler{

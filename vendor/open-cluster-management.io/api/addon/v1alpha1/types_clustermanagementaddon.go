@@ -45,6 +45,7 @@ type ClusterManagementAddOnSpec struct {
 	// +optional
 	AddOnConfiguration ConfigCoordinates `json:"addOnConfiguration,omitempty"`
 
+	// Deprecated: Will be removed and replaced with DefaultConfigs in v1beta1.
 	// supportedConfigs is a list of configuration types supported by add-on.
 	// An empty list means the add-on does not require configurations.
 	// The default is an empty list
@@ -110,7 +111,7 @@ type ConfigGroupResource struct {
 	// resource of the add-on configuration.
 	// +required
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinLength:=1
+	// +kubebuilder:validation:MinLength=1
 	Resource string `json:"resource"`
 }
 
@@ -124,7 +125,7 @@ type ConfigReferent struct {
 	// name of the add-on configuration.
 	// +required
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinLength:=1
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 }
 
@@ -170,12 +171,12 @@ type PlacementRef struct {
 	// Namespace is the namespace of the placement
 	// +required
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinLength:=1
+	// +kubebuilder:validation:MinLength=1
 	Namespace string `json:"namespace"`
 	// Name is the name of the placement
 	// +required
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinLength:=1
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 }
 
@@ -194,7 +195,7 @@ type PlacementStrategy struct {
 
 // ClusterManagementAddOnStatus represents the current status of cluster management add-on.
 type ClusterManagementAddOnStatus struct {
-	// defaultconfigReferences is a list of current add-on default configuration references.
+	// DefaultConfigReferences is a list of current add-on default configuration references.
 	// +optional
 	DefaultConfigReferences []DefaultConfigReference `json:"defaultconfigReferences,omitempty"`
 	// installProgression is a list of current add-on configuration references per placement.
@@ -267,7 +268,7 @@ const (
 	AddonLifecycleAnnotationKey = "addon.open-cluster-management.io/lifecycle"
 	// AddonLifecycleAddonManagerAnnotationValue is the value of annotation AddonLifecycleAnnotationKey indicating
 	// that the addon installation and upgrade is handled by the general addon manager. This should be set only
-	// when featugate AddonManager on hub is enabled
+	// when featuregate AddonManager on hub is enabled
 	AddonLifecycleAddonManagerAnnotationValue = "addon-manager"
 	// AddonLifecycleSelfManageAnnotationValue is the value of annotation AddonLifecycleAnnotationKey indicating
 	// that the addon installation and upgrade is handled the addon itself. The general addon manager will ignore

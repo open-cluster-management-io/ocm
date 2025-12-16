@@ -13,6 +13,8 @@ import (
 	clientset "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addonv1alpha1 "open-cluster-management.io/api/client/addon/clientset/versioned/typed/addon/v1alpha1"
 	fakeaddonv1alpha1 "open-cluster-management.io/api/client/addon/clientset/versioned/typed/addon/v1alpha1/fake"
+	addonv1beta1 "open-cluster-management.io/api/client/addon/clientset/versioned/typed/addon/v1beta1"
+	fakeaddonv1beta1 "open-cluster-management.io/api/client/addon/clientset/versioned/typed/addon/v1beta1/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -76,4 +78,9 @@ var (
 // AddonV1alpha1 retrieves the AddonV1alpha1Client
 func (c *Clientset) AddonV1alpha1() addonv1alpha1.AddonV1alpha1Interface {
 	return &fakeaddonv1alpha1.FakeAddonV1alpha1{Fake: &c.Fake}
+}
+
+// AddonV1beta1 retrieves the AddonV1beta1Client
+func (c *Clientset) AddonV1beta1() addonv1beta1.AddonV1beta1Interface {
+	return &fakeaddonv1beta1.FakeAddonV1beta1{Fake: &c.Fake}
 }

@@ -719,8 +719,9 @@ func TestDeployReconcileDeletesOrphanedManifestWorks(t *testing.T) {
 	}
 
 	// Verify the placement label is correct
-	if currentMW.Labels[ManifestWorkReplicaSetPlacementNameLabelKey] != "place-test2" {
-		t.Fatalf("Expected placement label to be 'place-test2', got '%s'", currentMW.Labels[ManifestWorkReplicaSetPlacementNameLabelKey])
+	if currentMW.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey] != "place-test2" {
+		t.Fatalf("Expected placement label to be 'place-test2', got '%s'",
+			currentMW.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey])
 	}
 }
 
@@ -798,13 +799,13 @@ func TestDeployReconcileWithMultiplePlacementChanges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected ManifestWork for placement2 to exist, but got error: %v", err)
 	}
-	assert.Equal(t, currentMW2.Labels[ManifestWorkReplicaSetPlacementNameLabelKey], "place-test2")
+	assert.Equal(t, currentMW2.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey], "place-test2")
 
 	currentMW3, err := fWorkClient.WorkV1().ManifestWorks("cls3").Get(context.TODO(), mwrSet.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Expected ManifestWork for placement3 to exist, but got error: %v", err)
 	}
-	assert.Equal(t, currentMW3.Labels[ManifestWorkReplicaSetPlacementNameLabelKey], "place-test3")
+	assert.Equal(t, currentMW3.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey], "place-test3")
 }
 func TestClusterRolloutStatusFunc(t *testing.T) {
 	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")

@@ -32,7 +32,7 @@ func TestFinalizeReconcile(t *testing.T) {
 				mwrSetTest := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
 				timeNow := metav1.Now()
 				mwrSetTest.DeletionTimestamp = &timeNow
-				mwrSetTest.Finalizers = append(mwrSetTest.Finalizers, ManifestWorkReplicaSetFinalizer)
+				mwrSetTest.Finalizers = append(mwrSetTest.Finalizers, workapiv1alpha1.ManifestWorkReplicaSetFinalizer)
 
 				mw, _ := CreateManifestWork(mwrSetTest, "cluster1", "place-test")
 				return mwrSetTest, []*workapiv1.ManifestWork{mw}
@@ -45,7 +45,7 @@ func TestFinalizeReconcile(t *testing.T) {
 				if state != reconcileStop {
 					t.Fatalf("manifestWorkReplicaSet should be stopped after finalizeReconcile")
 				}
-				if commonhelper.HasFinalizer(manifestWorkReplicaSet.Finalizers, ManifestWorkReplicaSetFinalizer) {
+				if commonhelper.HasFinalizer(manifestWorkReplicaSet.Finalizers, workapiv1alpha1.ManifestWorkReplicaSetFinalizer) {
 					t.Fatalf("Finalizer %v not deleted", manifestWorkReplicaSet.Finalizers)
 				}
 			},
@@ -56,7 +56,7 @@ func TestFinalizeReconcile(t *testing.T) {
 				mwrSetTest := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
 				timeNow := metav1.Now()
 				mwrSetTest.DeletionTimestamp = &timeNow
-				mwrSetTest.Finalizers = append(mwrSetTest.Finalizers, ManifestWorkReplicaSetFinalizer)
+				mwrSetTest.Finalizers = append(mwrSetTest.Finalizers, workapiv1alpha1.ManifestWorkReplicaSetFinalizer)
 				mwrSetTest.Spec.CascadeDeletionPolicy = workapiv1alpha1.Foreground
 
 				mw1, _ := CreateManifestWork(mwrSetTest, "cluster1", "place-test")
@@ -72,7 +72,7 @@ func TestFinalizeReconcile(t *testing.T) {
 				if state != reconcileContinue {
 					t.Fatalf("manifestWorkReplicaSet should be continue after finalizeReconcile")
 				}
-				if !commonhelper.HasFinalizer(manifestWorkReplicaSet.Finalizers, ManifestWorkReplicaSetFinalizer) {
+				if !commonhelper.HasFinalizer(manifestWorkReplicaSet.Finalizers, workapiv1alpha1.ManifestWorkReplicaSetFinalizer) {
 					t.Fatalf("Finalizer %v is deleted", manifestWorkReplicaSet.Finalizers)
 				}
 			},
