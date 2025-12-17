@@ -83,23 +83,6 @@ const (
 	ExtensionWorkMeta = "metadata"
 )
 
-// ResourceAction represents an action on a resource object on the source or agent.
-type ResourceAction string
-
-const (
-	// Added represents a resource is added on the source part.
-	Added ResourceAction = "ADDED"
-
-	// Modified represents a resource is modified on the source part.
-	Modified ResourceAction = "MODIFIED"
-
-	// StatusModified represents the status of a resource is modified on the agent part.
-	StatusModified ResourceAction = "STATUSMODIFIED"
-
-	// Deleted represents a resource is deleted from the source prat.
-	Deleted ResourceAction = "DELETED"
-)
-
 const (
 	MQTTEventsTopicPattern          = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/(sourceevents|agentevents)$`
 	MQTTSourceEventsTopicPattern    = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/sourceevents$`

@@ -17,6 +17,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/server/grpc/authn"
 	"open-cluster-management.io/sdk-go/pkg/server/grpc/authz"
 	"open-cluster-management.io/sdk-go/pkg/server/grpc/metrics"
+	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 
 	"k8s.io/klog/v2"
 )
@@ -79,15 +80,28 @@ func (b *GRPCServer) Run(ctx context.Context) error {
 		Timeout:          b.options.ServerPingTimeout,
 	}))
 
-	// Serve with TLS
-	serverCerts, err := tls.LoadX509KeyPair(b.options.TLSCertFile, b.options.TLSKeyFile)
+	// Serve with TLS - use certwatcher for dynamic certificate reloading
+	certWatcher, err := certwatcher.New(b.options.TLSCertFile, b.options.TLSKeyFile)
 	if err != nil {
-		return fmt.Errorf("failed to load server certificates: %v", err)
+		return fmt.Errorf("failed to create certificate watcher: %v", err)
 	}
+
+	// Configure watch interval from options (default is 1 minute, configurable via --grpc-cert-watch-interval flag or YAML config)
+	certWatcher.WithWatchInterval(b.options.CertWatchInterval)
+
+	// This uses fsnotify for immediate detection + polling fallback
+	go func() {
+		if err := certWatcher.Start(ctx); err != nil {
+			klog.FromContext(ctx).Error(err, "Certificate watcher stopped")
+		}
+	}()
+
 	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{serverCerts},
-		MinVersion:   b.options.TLSMinVersion,
-		MaxVersion:   b.options.TLSMaxVersion,
+		// Use GetCertificate callback from certwatcher
+		// This allows dynamic certificate reloading on each TLS handshake
+		GetCertificate: certWatcher.GetCertificate,
+		MinVersion:     b.options.TLSMinVersion,
+		MaxVersion:     b.options.TLSMaxVersion,
 	}
 
 	if b.options.ClientCAFile != "" {

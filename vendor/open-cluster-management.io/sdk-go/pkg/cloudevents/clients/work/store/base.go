@@ -17,7 +17,6 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/common"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/store"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/utils"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
 type baseSourceStore struct {
@@ -27,13 +26,8 @@ type baseSourceStore struct {
 	receivedWorks workqueue.TypedRateLimitingInterface[*workv1.ManifestWork]
 }
 
-func (bs *baseSourceStore) HandleReceivedResource(_ context.Context, action types.ResourceAction, work *workv1.ManifestWork) error {
-	switch action {
-	case types.StatusModified:
-		bs.receivedWorks.Add(work)
-	default:
-		return fmt.Errorf("unsupported resource action %s", action)
-	}
+func (bs *baseSourceStore) HandleReceivedResource(_ context.Context, work *workv1.ManifestWork) error {
+	bs.receivedWorks.Add(work)
 	return nil
 }
 
