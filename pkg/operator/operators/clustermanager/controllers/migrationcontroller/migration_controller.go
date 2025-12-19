@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -456,9 +457,14 @@ func generateHubClients(hubKubeConfig *rest.Config) (apiextensionsclient.Interfa
 }
 
 func newClusterManagerOwner(clusterManager *operatorapiv1.ClusterManager) metav1.OwnerReference {
+	gvk := schema.GroupVersionKind{
+		Group:   operatorapiv1.GroupName,
+		Version: operatorapiv1.GroupVersion.Version,
+		Kind:    "ClusterManager",
+	}
 	return metav1.OwnerReference{
-		APIVersion: operatorapiv1.GroupVersion.WithKind("ClusterManager").GroupVersion().String(),
-		Kind:       operatorapiv1.GroupVersion.WithKind("ClusterManager").Kind,
+		APIVersion: gvk.GroupVersion().String(),
+		Kind:       gvk.Kind,
 		Name:       clusterManager.Name,
 		UID:        clusterManager.UID,
 	}

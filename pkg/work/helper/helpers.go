@@ -345,9 +345,14 @@ func IsOwnedBy(myOwner metav1.OwnerReference, existingOwners []metav1.OwnerRefer
 }
 
 func NewAppliedManifestWorkOwner(appliedWork *workapiv1.AppliedManifestWork) *metav1.OwnerReference {
+	gvk := schema.GroupVersionKind{
+		Group:   workapiv1.GroupName,
+		Version: workapiv1.GroupVersion.Version,
+		Kind:    "AppliedManifestWork",
+	}
 	return &metav1.OwnerReference{
-		APIVersion: workapiv1.GroupVersion.WithKind("AppliedManifestWork").GroupVersion().String(),
-		Kind:       workapiv1.GroupVersion.WithKind("AppliedManifestWork").Kind,
+		APIVersion: gvk.GroupVersion().String(),
+		Kind:       gvk.Kind,
 		Name:       appliedWork.Name,
 		UID:        appliedWork.UID,
 	}

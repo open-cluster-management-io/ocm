@@ -99,6 +99,10 @@ func TestManagedClusterAddOnConvertTo(t *testing.T) {
 			},
 			expected: &internalv1alpha1.ManagedClusterAddOn{
 				ManagedClusterAddOn: addonv1alpha1.ManagedClusterAddOn{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "ManagedClusterAddOn",
+						APIVersion: "addon.open-cluster-management.io/v1alpha1",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-addon",
 						Namespace: "cluster1",
@@ -273,6 +277,10 @@ func TestManagedClusterAddOnConvertFrom(t *testing.T) {
 			},
 			expected: &ManagedClusterAddOn{
 				ManagedClusterAddOn: addonv1beta1.ManagedClusterAddOn{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "ManagedClusterAddOn",
+						APIVersion: "addon.open-cluster-management.io/v1beta1",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-addon",
 						Namespace: "cluster1",

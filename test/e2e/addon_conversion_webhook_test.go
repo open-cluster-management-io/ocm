@@ -62,6 +62,12 @@ var _ = ginkgo.Describe("Create v1alpha1 ManagedClusterAddOn", ginkgo.Label("add
 							Namespace: "test-ns",
 							Name:      "test-config",
 						},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{
+								Namespace: "test-ns",
+								Name:      "test-config",
+							},
+						},
 					},
 				}
 			}
@@ -118,6 +124,12 @@ var _ = ginkgo.Describe("Create v1alpha1 ManagedClusterAddOn", ginkgo.Label("add
 						ConfigReferent: addonv1alpha1.ConfigReferent{
 							Namespace: "test-ns",
 							Name:      "test-config",
+						},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{
+								Namespace: "test-ns",
+								Name:      "test-config",
+							},
 						},
 					},
 				}

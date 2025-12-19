@@ -60,9 +60,6 @@ spec:
         - /addon
         - "webhook-server"
         - "--port=9443"
-        {{ if .HostedMode }}
-        - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
-        {{ end }}
         {{- if or (eq .ResourceRequirementResourceType "Default") (eq .ResourceRequirementResourceType "") }}
         resources:
           requests:
@@ -104,17 +101,7 @@ spec:
         - mountPath: /tmp/k8s-webhook-server/serving-certs
           name: webhook-secret
           readOnly: true
-        {{ if .HostedMode }}
-        - mountPath: /var/run/secrets/hub
-          name: kubeconfig
-          readOnly: true
-        {{ end }}
       volumes:
       - name: webhook-secret
         secret:
           secretName: addon-webhook-serving-cert
-      {{ if .HostedMode }}
-      - name: kubeconfig
-        secret:
-          secretName: addon-webhook-sa-kubeconfig
-      {{ end }}

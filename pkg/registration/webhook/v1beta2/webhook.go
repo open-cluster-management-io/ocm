@@ -3,6 +3,7 @@ package v1beta2
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -17,11 +18,12 @@ var (
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(v1beta2.GroupVersion,
+	gv := schema.GroupVersion{Group: v1beta2.GroupName, Version: v1beta2.GroupVersion.Version}
+	scheme.AddKnownTypes(gv,
 		&ManagedClusterSet{},
 		&v1beta2.ManagedClusterSetBinding{},
 	)
-	metav1.AddToGroupVersion(scheme, v1beta2.GroupVersion)
+	metav1.AddToGroupVersion(scheme, gv)
 	return nil
 }
 

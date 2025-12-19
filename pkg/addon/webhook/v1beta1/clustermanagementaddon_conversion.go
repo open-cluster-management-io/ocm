@@ -5,13 +5,13 @@ package v1beta1
 import (
 	"fmt"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 
-	addonconversion "open-cluster-management.io/ocm/pkg/addon/webhook/conversion"
 	internalv1alpha1 "open-cluster-management.io/ocm/pkg/addon/webhook/v1alpha1"
 )
 
@@ -23,20 +23,22 @@ func (src *ClusterManagementAddOn) ConvertTo(dstRaw conversion.Hub) error {
 	}
 	klog.V(4).Infof("Converting ClusterManagementAddOn %s from v1beta1 to v1alpha1 (Hub)", src.Name)
 
-	dst.ObjectMeta = src.ObjectMeta
+	// Convert the embedded v1beta1 type to v1alpha1 using the native conversion
+	var v1alpha1Obj addonv1alpha1.ClusterManagementAddOn
+	if err := addonv1beta1.Convert_v1beta1_ClusterManagementAddOn_To_v1alpha1_ClusterManagementAddOn(
+		&src.ClusterManagementAddOn, &v1alpha1Obj, nil); err != nil {
+		return fmt.Errorf("failed to convert ClusterManagementAddOn: %w", err)
+	}
 
-	// AddOnMeta has identical structure, use type conversion
-	dst.Spec.AddOnMeta = addonv1alpha1.AddOnMeta(src.Spec.AddOnMeta)
+	// Set TypeMeta for the target version - the native conversion doesn't copy these fields
+	// We must set the hub version (v1alpha1) here, not preserve the source version
+	v1alpha1Obj.TypeMeta = metav1.TypeMeta{
+		Kind:       "ClusterManagementAddOn",
+		APIVersion: addonv1alpha1.GroupVersion.String(),
+	}
 
-	// Convert defaultConfigs to supportedConfigs
-	dst.Spec.SupportedConfigs = addonconversion.ConvertAddOnConfigToConfigMeta(src.Spec.DefaultConfigs)
-
-	// Convert install strategy
-	dst.Spec.InstallStrategy = addonconversion.ConvertInstallStrategyFromV1Beta1(src.Spec.InstallStrategy)
-
-	// Convert status
-	dst.Status.DefaultConfigReferences = addonconversion.ConvertDefaultConfigReferencesFromV1Beta1(src.Status.DefaultConfigReferences)
-	dst.Status.InstallProgressions = addonconversion.ConvertInstallProgressionsFromV1Beta1(src.Status.InstallProgressions)
+	// Copy to the internal wrapper type
+	dst.ClusterManagementAddOn = v1alpha1Obj
 
 	return nil
 }
@@ -49,20 +51,22 @@ func (dst *ClusterManagementAddOn) ConvertFrom(srcRaw conversion.Hub) error {
 	}
 	klog.V(4).Infof("Converting ClusterManagementAddOn %s from v1alpha1 (Hub) to v1beta1", src.Name)
 
-	dst.ObjectMeta = src.ObjectMeta
+	// Convert the embedded v1alpha1 type to v1beta1 using the native conversion
+	var v1beta1Obj addonv1beta1.ClusterManagementAddOn
+	if err := addonv1beta1.Convert_v1alpha1_ClusterManagementAddOn_To_v1beta1_ClusterManagementAddOn(
+		&src.ClusterManagementAddOn, &v1beta1Obj, nil); err != nil {
+		return fmt.Errorf("failed to convert ClusterManagementAddOn: %w", err)
+	}
 
-	// AddOnMeta has identical structure, use type conversion
-	dst.Spec.AddOnMeta = addonv1beta1.AddOnMeta(src.Spec.AddOnMeta)
+	// Set TypeMeta for the target version - the native conversion doesn't copy these fields
+	// We must set the target version (v1beta1) here, not preserve the source version
+	v1beta1Obj.TypeMeta = metav1.TypeMeta{
+		Kind:       "ClusterManagementAddOn",
+		APIVersion: addonv1beta1.GroupVersion.String(),
+	}
 
-	// Convert supportedConfigs to defaultConfigs
-	dst.Spec.DefaultConfigs = addonconversion.ConvertConfigMetaToAddOnConfig(src.Spec.SupportedConfigs)
-
-	// Convert install strategy
-	dst.Spec.InstallStrategy = addonconversion.ConvertInstallStrategyToV1Beta1(src.Spec.InstallStrategy)
-
-	// Convert status
-	dst.Status.DefaultConfigReferences = addonconversion.ConvertDefaultConfigReferencesToV1Beta1(src.Status.DefaultConfigReferences)
-	dst.Status.InstallProgressions = addonconversion.ConvertInstallProgressionsToV1Beta1(src.Status.InstallProgressions)
+	// Copy to the internal wrapper type
+	dst.ClusterManagementAddOn = v1beta1Obj
 
 	return nil
 }

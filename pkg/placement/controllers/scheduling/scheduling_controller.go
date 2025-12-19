@@ -16,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -577,7 +578,11 @@ func (c *schedulingController) generateDecision(
 	var placementDecisions []*clusterapiv1beta1.PlacementDecision
 	for index, decisionSlice := range decisionSlices {
 		placementDecisionName := fmt.Sprintf("%s-decision-%d", placement.Name, placementDecisionIndex+index)
-		owner := metav1.NewControllerRef(placement, clusterapiv1beta1.GroupVersion.WithKind("Placement"))
+		owner := metav1.NewControllerRef(placement, schema.GroupVersionKind{
+			Group:   clusterapiv1beta1.GroupName,
+			Version: clusterapiv1beta1.GroupVersion.Version,
+			Kind:    "Placement",
+		})
 		placementDecision := &clusterapiv1beta1.PlacementDecision{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      placementDecisionName,

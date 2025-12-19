@@ -5,6 +5,7 @@ package v1beta1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
@@ -18,11 +19,12 @@ var (
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(addonv1beta1.GroupVersion,
+	gv := schema.GroupVersion{Group: addonv1beta1.GroupName, Version: addonv1beta1.GroupVersion.Version}
+	scheme.AddKnownTypes(gv,
 		&ManagedClusterAddOn{},
 		&ClusterManagementAddOn{},
 	)
-	metav1.AddToGroupVersion(scheme, addonv1beta1.GroupVersion)
+	metav1.AddToGroupVersion(scheme, gv)
 	return nil
 }
 

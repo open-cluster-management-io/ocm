@@ -116,6 +116,10 @@ func TestClusterManagementAddOnConvertTo(t *testing.T) {
 			},
 			expected: &internalv1alpha1.ClusterManagementAddOn{
 				ClusterManagementAddOn: addonv1alpha1.ClusterManagementAddOn{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "ClusterManagementAddOn",
+						APIVersion: "addon.open-cluster-management.io/v1alpha1",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-addon",
 					},
@@ -323,6 +327,10 @@ func TestClusterManagementAddOnConvertFrom(t *testing.T) {
 			},
 			expected: &ClusterManagementAddOn{
 				ClusterManagementAddOn: addonv1beta1.ClusterManagementAddOn{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "ClusterManagementAddOn",
+						APIVersion: "addon.open-cluster-management.io/v1beta1",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-addon",
 					},

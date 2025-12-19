@@ -1872,7 +1872,7 @@ k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/ptr
 k8s.io/utils/trace
-# open-cluster-management.io/addon-framework v1.1.1-0.20251216020304-d6b232cac146
+# open-cluster-management.io/addon-framework v1.1.1-0.20251222073158-b5846d76add9
 ## explicit; go 1.25.0
 open-cluster-management.io/addon-framework/pkg/addonfactory
 open-cluster-management.io/addon-framework/pkg/addonmanager
@@ -1888,7 +1888,7 @@ open-cluster-management.io/addon-framework/pkg/agent
 open-cluster-management.io/addon-framework/pkg/assets
 open-cluster-management.io/addon-framework/pkg/index
 open-cluster-management.io/addon-framework/pkg/utils
-# open-cluster-management.io/api v1.1.1-0.20251216020302-b4274bb2f05a
+# open-cluster-management.io/api v1.1.1-0.20251222023835-510285203ee6
 ## explicit; go 1.25.0
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/addon/v1beta1

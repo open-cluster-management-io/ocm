@@ -7,6 +7,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clienttesting "k8s.io/client-go/testing"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
@@ -20,7 +21,11 @@ import (
 
 func newClusterManagementOwner(name string) metav1.OwnerReference {
 	clusterManagementAddon := addontesting.NewClusterManagementAddon(name, "testcrd", "testcr").Build()
-	return *metav1.NewControllerRef(clusterManagementAddon, addonapiv1alpha1.GroupVersion.WithKind("ClusterManagementAddOn"))
+	return *metav1.NewControllerRef(clusterManagementAddon, schema.GroupVersionKind{
+		Group:   addonapiv1alpha1.GroupName,
+		Version: addonapiv1alpha1.GroupVersion.Version,
+		Kind:    "ClusterManagementAddOn",
+	})
 }
 
 func TestReconcile(t *testing.T) {

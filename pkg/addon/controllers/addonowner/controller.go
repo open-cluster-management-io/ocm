@@ -5,6 +5,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
@@ -94,7 +95,11 @@ func (c *addonOwnerController) sync(ctx context.Context, syncCtx factory.SyncCon
 		return nil
 	}
 
-	owner := metav1.NewControllerRef(clusterManagementAddon, addonapiv1alpha1.GroupVersion.WithKind("ClusterManagementAddOn"))
+	owner := metav1.NewControllerRef(clusterManagementAddon, schema.GroupVersionKind{
+		Group:   addonapiv1alpha1.GroupName,
+		Version: addonapiv1alpha1.GroupVersion.Version,
+		Kind:    "ClusterManagementAddOn",
+	})
 	modified = utils.MergeOwnerRefs(&addonCopy.OwnerReferences, *owner, false)
 	if modified {
 		_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Update(ctx, addonCopy, metav1.UpdateOptions{})
