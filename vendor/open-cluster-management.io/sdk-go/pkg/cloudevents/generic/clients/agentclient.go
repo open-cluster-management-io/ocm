@@ -198,24 +198,8 @@ func (c *CloudEventAgentClient[T]) receive(ctx context.Context, evt cloudevents.
 		return
 	}
 
-	action, err := c.specAction(evt.Source(), eventType.CloudEventsDataType, obj)
-	if err != nil {
-		if logger.V(4).Enabled() {
-			evtData, _ := evt.MarshalJSON()
-			logger.Error(err, "failed to generate spec action", "event", string(evtData))
-		} else {
-			logger.Error(err, "failed to generate spec action")
-		}
-		return
-	}
-
-	if len(action) == 0 {
-		// no action is required, ignore
-		return
-	}
-
 	for _, handler := range handlers {
-		if err := handler(ctx, action, obj); err != nil {
+		if err := handler(ctx, obj); err != nil {
 			if logger.V(4).Enabled() {
 				evtData, _ := evt.MarshalJSON()
 				logger.Error(err, "failed to handle spec event", "event", string(evtData))
@@ -289,36 +273,6 @@ func (c *CloudEventAgentClient[T]) respondResyncStatusRequest(
 	}
 
 	return nil
-}
-
-func (c *CloudEventAgentClient[T]) specAction(
-	source string, eventDataType types.CloudEventsDataType, obj T) (evt types.ResourceAction, err error) {
-	options := types.ListOptions{ClusterName: c.clusterName, Source: source, CloudEventsDataType: eventDataType}
-	objs, err := c.lister.List(options)
-	if err != nil {
-		return evt, err
-	}
-
-	lastObj, exists := getObj(string(obj.GetUID()), objs)
-	if !exists {
-		return types.Added, nil
-	}
-
-	if !obj.GetDeletionTimestamp().IsZero() {
-		return types.Deleted, nil
-	}
-
-	// if both the current and the last object have the generation "0" or empty, then object
-	// is considered as modified, the message broker guarantees the order of the messages
-	if lastObj.GetGeneration() == 0 && obj.GetGeneration() == 0 {
-		return types.Modified, nil
-	}
-
-	if obj.GetGeneration() < lastObj.GetGeneration() {
-		return evt, nil
-	}
-
-	return types.Modified, nil
 }
 
 func getObj[T generic.ResourceObject](resourceID string, objs []T) (obj T, exists bool) {

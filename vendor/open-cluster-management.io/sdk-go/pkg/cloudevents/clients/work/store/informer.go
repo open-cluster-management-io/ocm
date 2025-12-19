@@ -3,19 +3,20 @@ package store
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"strconv"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	workv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/store"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
 // SourceInformerWatcherStore extends the baseStore.
@@ -164,48 +165,83 @@ func (s *AgentInformerWatcherStore) Delete(resource runtime.Object) error {
 	return s.AgentInformerWatcherStore.Delete(resource)
 }
 
-func (s *AgentInformerWatcherStore) HandleReceivedResource(ctx context.Context, action types.ResourceAction, work *workv1.ManifestWork) error {
-	switch action {
-	case types.Added:
+func (s *AgentInformerWatcherStore) HandleReceivedResource(ctx context.Context, work *workv1.ManifestWork) error {
+	// for compatibility, we get the work by its UID
+	// TODO get the work by its namespace/name
+	existingWorks, err := s.findWorksByUID(work.UID)
+	if err != nil {
+		return err
+	}
+
+	if len(existingWorks) == 0 {
 		return s.Add(work.DeepCopy())
-	case types.Modified:
-		lastWork, exists, err := s.Get(work.Namespace, work.Name)
-		if err != nil {
+	}
+
+	lastWork := s.getWork(existingWorks, work)
+	if lastWork == nil {
+		// For compatibility, if a work is found by UID but not by namespace/name,
+		// it means the work's name has changed — replace the existing work with the new one.
+		if err := s.Add(work.DeepCopy()); err != nil {
 			return err
 		}
-		if !exists {
-			return fmt.Errorf("the work %s/%s does not exist", work.Namespace, work.Name)
+
+		for _, obsoleted := range existingWorks {
+			if err := s.Store.Delete(obsoleted); err != nil {
+				return err
+			}
 		}
 
-		updatedWork := work.DeepCopy()
+		return nil
+	}
 
-		// prevent the work from being updated if it is deleting
-		if !lastWork.GetDeletionTimestamp().IsZero() {
-			updatedWork.SetDeletionTimestamp(lastWork.DeletionTimestamp)
-		}
-
-		// restore the fields that are maintained by local agent.
-		updatedWork.Finalizers = lastWork.Finalizers
-		updatedWork.Status = lastWork.Status
-		return s.Update(updatedWork)
-	case types.Deleted:
-		// the manifestwork is deleting on the source, we just update its deletion timestamp.
-		lastWork, exists, err := s.Get(work.Namespace, work.Name)
-		if err != nil {
-			return err
-		}
-		if !exists {
-			return nil
-		}
-
+	if !work.DeletionTimestamp.IsZero() {
+		deletingWork := lastWork.DeepCopy()
 		// update the deletionTimeStamp and generation of last work.
 		// generation needs to be updated because it is possible that generation still change after
 		// the object is in deleting state.
-		updatedWork := lastWork.DeepCopy()
-		updatedWork.DeletionTimestamp = work.DeletionTimestamp
-		updatedWork.Generation = work.Generation
-		return s.Update(updatedWork)
-	default:
-		return fmt.Errorf("unsupported resource action %s", action)
+		deletingWork.DeletionTimestamp = work.DeletionTimestamp
+		deletingWork.Generation = work.Generation
+		return s.Update(deletingWork)
 	}
+
+	// Skip processing if the incoming work has a valid but stale generation.
+	// We only consider generation for freshness when it is non-zero;
+	// if work generation is 0, it is treated as "unversioned" and not compared.
+	// This avoids incorrectly rejecting unversioned work when lastWork.generation is non-zero,
+	// and also handles the case where both are 0 (no meaningful order).
+	if work.Generation != 0 && work.Generation < lastWork.Generation {
+		return nil
+	}
+
+	updatedWork := work.DeepCopy()
+	// restore the fields that are maintained by local agent.
+	updatedWork.Finalizers = lastWork.Finalizers
+	updatedWork.Status = lastWork.Status
+	return s.Update(updatedWork)
+}
+
+func (s *AgentInformerWatcherStore) findWorksByUID(uid kubetypes.UID) ([]*workv1.ManifestWork, error) {
+	existingWorks := []*workv1.ManifestWork{}
+	works, err := s.ListAll()
+	if err != nil {
+		return existingWorks, err
+	}
+	for _, work := range works {
+		if work.GetUID() == uid {
+			existingWorks = append(existingWorks, work.DeepCopy())
+		}
+	}
+
+	return existingWorks, nil
+}
+
+func (s *AgentInformerWatcherStore) getWork(existingWorks []*workv1.ManifestWork, work *workv1.ManifestWork) *workv1.ManifestWork {
+	for _, existing := range existingWorks {
+		if existing.Namespace == work.Namespace &&
+			existing.Name == work.Name {
+			return existing
+		}
+	}
+
+	return nil
 }

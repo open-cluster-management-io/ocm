@@ -11,7 +11,6 @@ import (
 	"k8s.io/klog/v2"
 
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
 const syncedPollPeriod = 100 * time.Millisecond
@@ -34,7 +33,7 @@ type ClientWatcherStore[T generic.ResourceObject] interface {
 	GetWatcher(namespace string, opts metav1.ListOptions) (watch.Interface, error)
 
 	// HandleReceivedResource handles the client received resource events.
-	HandleReceivedResource(ctx context.Context, action types.ResourceAction, resource T) error
+	HandleReceivedResource(ctx context.Context, resource T) error
 
 	// Add will be called by resource client when adding resources. The implementation is based on the specific
 	// watcher store, in some case, it does not need to update a store, but just send a watch event.

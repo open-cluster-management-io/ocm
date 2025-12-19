@@ -2,18 +2,15 @@ package store
 
 import (
 	"context"
-	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/utils"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
 // SimpleStore extends the BaseClientWatchStore.
@@ -51,73 +48,31 @@ func (s *SimpleStore[T]) HasInitiated() bool {
 	return true
 }
 
-func (s *SimpleStore[T]) HandleReceivedResource(ctx context.Context, action types.ResourceAction, resource T) error {
-	logger := klog.FromContext(ctx)
-
-	switch action {
-	case types.Added:
-		newObj, err := utils.ToRuntimeObject(resource)
-		if err != nil {
-			return err
-		}
-
-		return s.Add(newObj)
-	case types.Modified:
-		newObj, err := meta.Accessor(resource)
-		if err != nil {
-			return err
-		}
-
-		lastObj, exists, err := s.Get(newObj.GetNamespace(), newObj.GetName())
-		if err != nil {
-			return err
-		}
-		if !exists {
-			return fmt.Errorf("the resource %s/%s does not exist", newObj.GetNamespace(), newObj.GetName())
-		}
-
-		// prevent the resource from being updated if it is deleting
-		if !lastObj.GetDeletionTimestamp().IsZero() {
-			logger.Info("the resource is deleting, ignore the update",
-				"resourceNamespace", newObj.GetNamespace(), "resourceName", newObj.GetName())
-			return nil
-		}
-
-		updated, err := utils.ToRuntimeObject(resource)
-		if err != nil {
-			return err
-		}
-
-		return s.Update(updated)
-	case types.Deleted:
-		newObj, err := meta.Accessor(resource)
-		if err != nil {
-			return err
-		}
-
-		if newObj.GetDeletionTimestamp().IsZero() {
-			return nil
-		}
-
-		if len(newObj.GetFinalizers()) != 0 {
-			return nil
-		}
-
-		last, exists, err := s.Get(newObj.GetNamespace(), newObj.GetName())
-		if err != nil {
-			return err
-		}
-		if !exists {
-			return nil
-		}
-
-		deletingObj, err := utils.ToRuntimeObject(last)
-		if err != nil {
-			return err
-		}
-
-		return s.Delete(deletingObj)
-	default:
-		return fmt.Errorf("unsupported resource action %s", action)
+func (s *SimpleStore[T]) HandleReceivedResource(ctx context.Context, resource T) error {
+	runtimeObj, err := utils.ToRuntimeObject(resource)
+	if err != nil {
+		return err
 	}
+
+	metaObj, err := meta.Accessor(runtimeObj)
+	if err != nil {
+		return err
+	}
+
+	_, exists, err := s.Get(metaObj.GetNamespace(), metaObj.GetName())
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return s.Add(runtimeObj)
+	}
+
+	if !metaObj.GetDeletionTimestamp().IsZero() {
+		if len(metaObj.GetFinalizers()) != 0 {
+			return nil
+		}
+		return s.Delete(runtimeObj)
+	}
+
+	return s.Update(runtimeObj)
 }

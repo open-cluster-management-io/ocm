@@ -7,6 +7,8 @@ on:
      - 'pkg/server/**'
      - 'pkg/work/spoke/*.go'
      - 'test/integration/work/**'
+     - 'vendor/open-cluster-management.io/sdk-go/pkg/cloudevents/**'
+     - 'vendor/open-cluster-management.io/sdk-go/pkg/server/grpc/**'
     branches:
       - main
       - release-*
