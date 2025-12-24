@@ -1,0 +1,15 @@
+- op: add
+  path: /spec/conversion
+  value:
+    strategy: Webhook
+    webhook:
+      clientConfig:
+        caBundle: {{ .AddonAPIServiceCABundle }}
+        service:
+          name: cluster-manager-addon-webhook
+          namespace: {{ .ClusterManagerNamespace }}
+          path: /convert
+          port: 9443
+      conversionReviewVersions:
+      - v1
+      - v1beta1

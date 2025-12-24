@@ -6,6 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
@@ -58,7 +59,11 @@ func (d *managedClusterAddonInstallReconciler) reconcile(
 		return cma, reconcileContinue, err
 	}
 
-	owner := metav1.NewControllerRef(cma, addonv1alpha1.GroupVersion.WithKind("ClusterManagementAddOn"))
+	owner := metav1.NewControllerRef(cma, schema.GroupVersionKind{
+		Group:   addonv1alpha1.GroupName,
+		Version: addonv1alpha1.GroupVersion.Version,
+		Kind:    "ClusterManagementAddOn",
+	})
 	toAdd := requiredDeployed.Difference(existingDeployed)
 	toRemove := existingDeployed.Difference(requiredDeployed)
 
