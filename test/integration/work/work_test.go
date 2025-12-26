@@ -893,17 +893,16 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		})
 
 		ginkgo.It("should update lastTransitionTime when status feedback values change", func() {
-			var ctx context.Context
-			ctx, cancel = context.WithCancel(context.Background())
-			go startWorkAgent(ctx, clusterName)
-			defer cancel()
-
-			ginkgo.By("create work with status feedback rules")
+			ginkgo.By("update work to add status feedback rules")
 			u, _, err := util.NewDeployment(clusterName, "deploy1", "sa")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			work = util.NewManifestWork(clusterName, workName, []workapiv1.Manifest{util.ToManifest(u)})
-			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			newWork := updatedWork.DeepCopy()
+			newWork.Spec.Workload.Manifests = []workapiv1.Manifest{util.ToManifest(u)}
+			newWork.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "apps",
@@ -918,7 +917,12 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 					},
 				},
 			}
-			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+
+			pathBytes, err := util.NewWorkPatch(updatedWork, newWork)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
+				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			ginkgo.By("wait for initial status feedback and capture lastTransitionTime")
