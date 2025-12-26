@@ -129,6 +129,14 @@ func MergeStatusConditions(conditions []metav1.Condition, newConditions []metav1
 
 	merged = append(merged, conditions...)
 	for _, condition := range newConditions {
+		for i := range merged {
+			if merged[i].Type == condition.Type {
+				if merged[i].ObservedGeneration != condition.ObservedGeneration {
+					meta.RemoveStatusCondition(&merged, condition.Type)
+				}
+				break
+			}
+		}
 		// merge two conditions if necessary
 		meta.SetStatusCondition(&merged, condition)
 	}

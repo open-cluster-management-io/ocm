@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -381,6 +382,79 @@ func TestStatusFeedback(t *testing.T) {
 				}
 				if !hasStatusCondition(work.Status.ResourceStatus.Manifests[0].Conditions, statusFeedbackConditionType, metav1.ConditionFalse) {
 					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests[0].Conditions))
+				}
+			},
+		},
+		{
+			name: "LastTransitionTime updates when feedback values change",
+			existingResources: []runtime.Object{
+				testingcommon.NewUnstructuredWithContent("apps/v1", "Deployment", "ns1", "deploy1",
+					map[string]interface{}{
+						"status": map[string]interface{}{"readyReplicas": int64(3), "replicas": int64(3), "availableReplicas": int64(3)},
+					}),
+			},
+			configOption: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "apps", Resource: "deployments", Name: "deploy1", Namespace: "ns1"},
+					FeedbackRules:      []workapiv1.FeedbackRule{{Type: workapiv1.WellKnownStatusType}},
+				},
+			},
+			manifests: []workapiv1.ManifestCondition{
+				{
+					ResourceMeta: workapiv1.ManifestResourceMeta{
+						Group:     "apps",
+						Version:   "v1",
+						Resource:  "deployments",
+						Namespace: "ns1",
+						Name:      "deploy1",
+					},
+					StatusFeedbacks: workapiv1.StatusFeedbackResult{
+						Values: []workapiv1.FeedbackValue{
+							{
+								Name: "ReadyReplicas",
+								Value: workapiv1.FieldValue{
+									Type:    workapiv1.Integer,
+									Integer: pointer.Int64(2), // Different from current state (3)
+								},
+							},
+						},
+					},
+					Conditions: []metav1.Condition{
+						{
+							Type:               statusFeedbackConditionType,
+							Status:             metav1.ConditionTrue,
+							Reason:             "StatusFeedbackSynced",
+							LastTransitionTime: metav1.NewTime(metav1.Now().Add(-1 * time.Hour)), // Old timestamp
+						},
+					},
+				},
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.ManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
+				}
+				if len(work.Status.ResourceStatus.Manifests) != 1 {
+					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests))
+				}
+
+				// Verify feedback values were updated
+				if len(work.Status.ResourceStatus.Manifests[0].StatusFeedbacks.Values) == 0 {
+					t.Fatal("Expected feedback values to be set")
+				}
+
+				// Verify LastTransitionTime was updated (should be recent, not 1 hour ago)
+				cond := meta.FindStatusCondition(work.Status.ResourceStatus.Manifests[0].Conditions, statusFeedbackConditionType)
+				if cond == nil {
+					t.Fatal("Expected StatusFeedbackSynced condition")
+				}
+
+				oldTime := metav1.Now().Add(-1 * time.Hour)
+				// LastTransitionTime should be updated (within last minute)
+				if cond.LastTransitionTime.Before(&metav1.Time{Time: oldTime.Add(59 * time.Minute)}) {
+					t.Errorf("Expected LastTransitionTime to be updated when values changed, but it's still old: %v", cond.LastTransitionTime)
 				}
 			},
 		},

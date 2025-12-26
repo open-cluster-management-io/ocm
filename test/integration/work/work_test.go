@@ -9,6 +9,7 @@ import (
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -688,6 +689,345 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			util.AssertNonexistenceOfResources(
 				[]schema.GroupVersionResource{gvrs[3]}, []string{oldServiceAccount.GetNamespace()}, []string{oldServiceAccount.GetName()},
 				spokeDynamicClient, eventuallyTimeout, eventuallyInterval)
+		})
+	})
+
+	ginkgo.Context("ObservedGeneration and LastTransitionTime", func() {
+		var spokeDynamicClient dynamic.Interface
+		var cmGVR schema.GroupVersionResource
+
+		ginkgo.BeforeEach(func() {
+			spokeDynamicClient, err = dynamic.NewForConfig(spokeRestConfig)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			cmGVR = schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
+			manifests = []workapiv1.Manifest{
+				util.ToManifest(util.NewConfigmap(clusterName, cm1, map[string]string{"key": "value1"}, nil)),
+			}
+		})
+
+		ginkgo.It("should update work and verify observedGeneration and lastTransitionTime are updated", func() {
+			ginkgo.By("check initial condition status")
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("verify initial observedGeneration matches generation")
+			util.AssertWorkGeneration(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkGeneration(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("capture initial lastTransitionTime")
+			var initialAppliedTime, initialAvailableTime metav1.Time
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			appliedCondition := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkApplied)
+			gomega.Expect(appliedCondition).ToNot(gomega.BeNil())
+			initialAppliedTime = appliedCondition.LastTransitionTime
+
+			availableCondition := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkAvailable)
+			gomega.Expect(availableCondition).ToNot(gomega.BeNil())
+			initialAvailableTime = availableCondition.LastTransitionTime
+
+			initialGeneration := work.Generation
+
+			ginkgo.By("update work manifests")
+			// Sleep to ensure time difference for lastTransitionTime
+			time.Sleep(1 * time.Second)
+
+			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			newWork := updatedWork.DeepCopy()
+			newWork.Spec.Workload.Manifests = []workapiv1.Manifest{
+				util.ToManifest(util.NewConfigmap(clusterName, cm1, map[string]string{"key": "value2"}, nil)),
+			}
+
+			pathBytes, err := util.NewWorkPatch(updatedWork, newWork)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
+				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			ginkgo.By("verify observedGeneration is updated")
+			gomega.Eventually(func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if work.Generation == initialGeneration {
+					return fmt.Errorf("generation not yet updated")
+				}
+
+				appliedCond := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkApplied)
+				if appliedCond == nil {
+					return fmt.Errorf("applied condition not found")
+				}
+				if appliedCond.ObservedGeneration != work.Generation {
+					return fmt.Errorf("applied observedGeneration %d does not match generation %d",
+						appliedCond.ObservedGeneration, work.Generation)
+				}
+
+				availableCond := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkAvailable)
+				if availableCond == nil {
+					return fmt.Errorf("available condition not found")
+				}
+				if availableCond.ObservedGeneration != work.Generation {
+					return fmt.Errorf("available observedGeneration %d does not match generation %d",
+						availableCond.ObservedGeneration, work.Generation)
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+			ginkgo.By("verify lastTransitionTime is updated for Applied condition")
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			updatedAppliedCondition := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkApplied)
+			gomega.Expect(updatedAppliedCondition).ToNot(gomega.BeNil())
+			// LastTransitionTime should be updated when condition transitions
+			gomega.Expect(updatedAppliedCondition.LastTransitionTime.After(initialAppliedTime.Time) ||
+				updatedAppliedCondition.LastTransitionTime.Equal(&initialAppliedTime)).To(gomega.BeTrue())
+
+			updatedAvailableCondition := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkAvailable)
+			gomega.Expect(updatedAvailableCondition).ToNot(gomega.BeNil())
+			gomega.Expect(updatedAvailableCondition.LastTransitionTime.After(initialAvailableTime.Time) ||
+				updatedAvailableCondition.LastTransitionTime.Equal(&initialAvailableTime)).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("should update applied resource directly and verify lastTransitionTime is updated", func() {
+			ginkgo.By("check initial condition status")
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("verify configmap exists")
+			gomega.Eventually(func() error {
+				_, err := util.GetResource(clusterName, cm1, cmGVR, spokeDynamicClient)
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+			ginkgo.By("capture initial manifest condition lastTransitionTime")
+			var initialManifestConditionTime metav1.Time
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(len(work.Status.ResourceStatus.Manifests)).To(gomega.Equal(1))
+			gomega.Expect(len(work.Status.ResourceStatus.Manifests[0].Conditions)).To(gomega.BeNumerically(">", 0))
+			initialManifestConditionTime = work.Status.ResourceStatus.Manifests[0].Conditions[0].LastTransitionTime
+
+			ginkgo.By("update the applied resource directly on the cluster")
+			// Sleep to ensure time difference
+			time.Sleep(1 * time.Second)
+
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				cm, err := spokeDynamicClient.Resource(cmGVR).Namespace(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				// Update the configmap data
+				data := map[string]interface{}{
+					"key": "manually-updated-value",
+				}
+				err = unstructured.SetNestedMap(cm.Object, data, "data")
+				if err != nil {
+					return err
+				}
+
+				_, err = spokeDynamicClient.Resource(cmGVR).Namespace(clusterName).Update(context.Background(), cm, metav1.UpdateOptions{})
+				return err
+			})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			ginkgo.By("verify the resource is reconciled back to desired state")
+			gomega.Eventually(func() error {
+				cm, err := util.GetResource(clusterName, cm1, cmGVR, spokeDynamicClient)
+				if err != nil {
+					return err
+				}
+
+				data, found, err := unstructured.NestedString(cm.Object, "data", "key")
+				if err != nil {
+					return err
+				}
+				if !found {
+					return fmt.Errorf("key not found in configmap data")
+				}
+				// The controller should reconcile it back to the desired state
+				if data != "value1" {
+					return fmt.Errorf("configmap not yet reconciled, current value: %s", data)
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+			ginkgo.By("verify lastTransitionTime is updated in manifest conditions")
+			gomega.Eventually(func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if len(work.Status.ResourceStatus.Manifests) != 1 {
+					return fmt.Errorf("expected 1 manifest, got %d", len(work.Status.ResourceStatus.Manifests))
+				}
+
+				if len(work.Status.ResourceStatus.Manifests[0].Conditions) == 0 {
+					return fmt.Errorf("no conditions in manifest status")
+				}
+
+				currentManifestConditionTime := work.Status.ResourceStatus.Manifests[0].Conditions[0].LastTransitionTime
+
+				// LastTransitionTime should be updated after the resource was reconciled
+				if currentManifestConditionTime.After(initialManifestConditionTime.Time) {
+					return nil
+				}
+
+				return fmt.Errorf("lastTransitionTime not yet updated: initial=%v, current=%v",
+					initialManifestConditionTime, currentManifestConditionTime)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		})
+
+		ginkgo.It("should update lastTransitionTime when status feedback values change", func() {
+			ginkgo.By("update work to add status feedback rules")
+			u, _, err := util.NewDeployment(clusterName, "deploy1", "sa")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			newWork := updatedWork.DeepCopy()
+			newWork.Spec.Workload.Manifests = []workapiv1.Manifest{util.ToManifest(u)}
+			newWork.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Namespace: clusterName,
+						Name:      "deploy1",
+					},
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.WellKnownStatusType,
+						},
+					},
+				},
+			}
+
+			pathBytes, err := util.NewWorkPatch(updatedWork, newWork)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
+				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			ginkgo.By("wait for initial status feedback and capture lastTransitionTime")
+			var initialFeedbackConditionTime metav1.Time
+			gomega.Eventually(func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if len(work.Status.ResourceStatus.Manifests) != 1 {
+					return fmt.Errorf("expected 1 manifest, got %d", len(work.Status.ResourceStatus.Manifests))
+				}
+
+				// Find the StatusFeedbackSynced condition
+				feedbackCond := meta.FindStatusCondition(work.Status.ResourceStatus.Manifests[0].Conditions, "StatusFeedbackSynced")
+				if feedbackCond == nil {
+					return fmt.Errorf("StatusFeedbackSynced condition not found")
+				}
+
+				if feedbackCond.Status != metav1.ConditionTrue {
+					return fmt.Errorf("StatusFeedbackSynced condition is not true")
+				}
+
+				// Verify we have some feedback values
+				if len(work.Status.ResourceStatus.Manifests[0].StatusFeedbacks.Values) == 0 {
+					return fmt.Errorf("no status feedback values yet")
+				}
+
+				initialFeedbackConditionTime = feedbackCond.LastTransitionTime
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+			ginkgo.By("update deployment status to change feedback values")
+			// Sleep to ensure time difference
+			time.Sleep(1 * time.Second)
+
+			gomega.Eventually(func() error {
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				// Change the replica counts
+				deploy.Status.AvailableReplicas = 5
+				deploy.Status.Replicas = 5
+				deploy.Status.ReadyReplicas = 5
+
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+			ginkgo.By("verify status feedback values are updated")
+			gomega.Eventually(func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if len(work.Status.ResourceStatus.Manifests) != 1 {
+					return fmt.Errorf("expected 1 manifest, got %d", len(work.Status.ResourceStatus.Manifests))
+				}
+
+				currentFeedbackValues := work.Status.ResourceStatus.Manifests[0].StatusFeedbacks.Values
+
+				// Check if values have changed
+				foundChangedValue := false
+				for _, val := range currentFeedbackValues {
+					if val.Name == "AvailableReplicas" && val.Value.Integer != nil && *val.Value.Integer == 5 {
+						foundChangedValue = true
+						break
+					}
+				}
+
+				if !foundChangedValue {
+					return fmt.Errorf("feedback values not yet updated")
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+			ginkgo.By("verify lastTransitionTime is updated for StatusFeedbackSynced condition")
+			gomega.Eventually(func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if len(work.Status.ResourceStatus.Manifests) != 1 {
+					return fmt.Errorf("expected 1 manifest, got %d", len(work.Status.ResourceStatus.Manifests))
+				}
+
+				feedbackCond := meta.FindStatusCondition(work.Status.ResourceStatus.Manifests[0].Conditions, "StatusFeedbackSynced")
+				if feedbackCond == nil {
+					return fmt.Errorf("StatusFeedbackSynced condition not found")
+				}
+
+				// LastTransitionTime should be updated after feedback values changed
+				if feedbackCond.LastTransitionTime.After(initialFeedbackConditionTime.Time) {
+					return nil
+				}
+
+				return fmt.Errorf("lastTransitionTime not yet updated: initial=%v, current=%v",
+					initialFeedbackConditionTime, feedbackCond.LastTransitionTime)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 		})
 	})
 
