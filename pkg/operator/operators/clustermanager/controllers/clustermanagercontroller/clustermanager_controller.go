@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	errorhelpers "errors"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -281,18 +282,24 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		return n.patcher.RemoveFinalizer(ctx, clusterManager, clusterManagerFinalizer)
 	}
 
-	// get caBundle
-	caBundle := "placeholder"
+	// get caBundle from the ConfigMap created by the cert rotation controller.
+	// The cert rotation controller must create this ConfigMap before we can proceed,
+	// otherwise the CRDs will be created with an invalid "placeholder" CA bundle,
+	// causing webhook conversion to fail and the CRDs to not become Established.
 	configmap, err := n.configMapLister.ConfigMaps(clusterManagerNamespace).Get(helpers.CaBundleConfigmap)
-	switch {
-	case errors.IsNotFound(err):
-		// do nothing
-	case err != nil:
-		return err
-	default:
-		if cb := configmap.Data["ca-bundle.crt"]; len(cb) > 0 {
-			caBundle = cb
+	if err != nil {
+		if errors.IsNotFound(err) {
+			klog.V(4).Infof("CA bundle configmap %s/%s not yet available, will retry",
+				clusterManagerNamespace, helpers.CaBundleConfigmap)
+			return fmt.Errorf("waiting for CA bundle configmap %s/%s to be created by cert rotation controller",
+				clusterManagerNamespace, helpers.CaBundleConfigmap)
 		}
+		return err
+	}
+	caBundle := configmap.Data["ca-bundle.crt"]
+	if len(caBundle) == 0 {
+		return fmt.Errorf("CA bundle configmap %s/%s exists but ca-bundle.crt is empty",
+			clusterManagerNamespace, helpers.CaBundleConfigmap)
 	}
 	encodedCaBundle := base64.StdEncoding.EncodeToString([]byte(caBundle))
 	config.RegistrationAPIServiceCABundle = encodedCaBundle
