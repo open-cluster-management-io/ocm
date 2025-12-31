@@ -33,11 +33,27 @@ func (m *Validator) ValidateManifests(manifests []workv1.Manifest) error {
 		return fmt.Errorf("the size of manifests is %v bytes which exceeds the %v limit", totalSize, m.limit)
 	}
 
-	for _, manifest := range manifests {
+	// Track seen manifests to detect duplicates
+	seen := make(map[string]int) // key -> first occurrence index
+
+	for i, manifest := range manifests {
 		err := validateManifest(manifest.Raw)
 		if err != nil {
 			return err
 		}
+
+		// Check for duplicate manifests
+		key, err := extractManifestKey(manifest.Raw)
+		if err != nil {
+			// If we cannot extract the key, skip duplicate check
+			// (validateManifest would have caught invalid manifests)
+			continue
+		}
+
+		if firstIndex, exists := seen[key]; exists {
+			return fmt.Errorf("duplicate manifest at index %d: %s (first occurrence at index %d)", i, key, firstIndex)
+		}
+		seen[key] = i
 	}
 
 	return nil
@@ -61,4 +77,20 @@ func validateManifest(manifest []byte) error {
 	}
 
 	return nil
+}
+
+// extractManifestKey extracts a unique identifier from a manifest.
+// The key format is: apiVersion/kind/namespace/name
+// For cluster-scoped resources, namespace will be empty.
+func extractManifestKey(manifest []byte) (string, error) {
+	unstructuredObj := &unstructured.Unstructured{}
+	if err := unstructuredObj.UnmarshalJSON(manifest); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s/%s/%s/%s",
+		unstructuredObj.GetAPIVersion(),
+		unstructuredObj.GetKind(),
+		unstructuredObj.GetNamespace(),
+		unstructuredObj.GetName()), nil
 }
