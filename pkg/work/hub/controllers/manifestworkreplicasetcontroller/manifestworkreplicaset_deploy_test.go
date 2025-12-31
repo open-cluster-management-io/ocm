@@ -325,7 +325,36 @@ func TestDeployWithRolloutStrategyReconcileAsExpected(t *testing.T) {
 	}
 	assert.Equal(t, mwrSet.Status.Summary, mwrSetSummary)
 
-	// Check the RollOut conditions
+	// Check the RollOut conditions - should be Complete when all clusters have succeeded
+	// At this point, all ManifestWorks are created but none have Succeeded status yet
+	rollOutCondition = apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementRolledOut)
+	assert.NotNil(t, rollOutCondition)
+	assert.Equal(t, rollOutCondition.Status, metav1.ConditionFalse)
+	assert.Equal(t, rollOutCondition.Reason, workapiv1alpha1.ReasonProgressing)
+
+	// Now mark all ManifestWorks as Succeeded to achieve ReasonComplete
+	for i := 0; i < len(clusters); i++ {
+		mw := helpertest.CreateTestManifestWork(mwrSet.Name, mwrSet.Namespace, "place-test", clusters[i])
+		apimeta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
+			Type:               workapiv1.WorkApplied,
+			Status:             metav1.ConditionTrue,
+			ObservedGeneration: mw.Generation,
+			Reason:             "Applied",
+		})
+		apimeta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
+			Type:               workapiv1.WorkProgressing,
+			Status:             metav1.ConditionFalse,
+			ObservedGeneration: mw.Generation,
+			Reason:             "Completed",
+		})
+		err = workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Update(mw)
+		assert.Nil(t, err)
+	}
+
+	mwrSet, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
+	assert.Nil(t, err)
+
+	// Now RollOut should be Complete since all clusters have Succeeded status
 	rollOutCondition = apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementRolledOut)
 	assert.NotNil(t, rollOutCondition)
 	assert.Equal(t, rollOutCondition.Status, metav1.ConditionTrue)
@@ -532,8 +561,36 @@ func TestDeployMWRSetSpecChangesReconcile(t *testing.T) {
 	assert.Equal(t, placeCondition.Status, metav1.ConditionTrue)
 	assert.Equal(t, placeCondition.Reason, workapiv1alpha1.ReasonAsExpected)
 
-	// Check the RollOut conditions
+	// Check the RollOut conditions - need to mark ManifestWorks as Succeeded first
 	rollOutCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementRolledOut)
+	assert.NotNil(t, rollOutCondition)
+	assert.Equal(t, rollOutCondition.Status, metav1.ConditionFalse)
+	assert.Equal(t, rollOutCondition.Reason, workapiv1alpha1.ReasonProgressing)
+
+	// Mark all ManifestWorks as Succeeded
+	for i := 0; i < int(placement.Status.NumberOfSelectedClusters); i++ {
+		mw := helpertest.CreateTestManifestWork(mwrSet.Name, mwrSet.Namespace, placement.Name, clusters[i])
+		apimeta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
+			Type:               workapiv1.WorkApplied,
+			Status:             metav1.ConditionTrue,
+			ObservedGeneration: mw.Generation,
+			Reason:             "Applied",
+		})
+		apimeta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
+			Type:               workapiv1.WorkProgressing,
+			Status:             metav1.ConditionFalse,
+			ObservedGeneration: mw.Generation,
+			Reason:             "Completed",
+		})
+		err = workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Update(mw)
+		assert.Nil(t, err)
+	}
+
+	mwrSet, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
+	assert.Nil(t, err)
+
+	// Now RollOut should be Complete
+	rollOutCondition = apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementRolledOut)
 	assert.NotNil(t, rollOutCondition)
 	assert.Equal(t, rollOutCondition.Status, metav1.ConditionTrue)
 	assert.Equal(t, rollOutCondition.Reason, workapiv1alpha1.ReasonComplete)
@@ -807,6 +864,112 @@ func TestDeployReconcileWithMultiplePlacementChanges(t *testing.T) {
 	}
 	assert.Equal(t, currentMW3.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey], "place-test3")
 }
+func TestDeployRolloutProgressingWhenNotAllSucceeded(t *testing.T) {
+	// Test case where all ManifestWorks are created (count = total) but not all have succeeded
+	// This should result in PlacementRolledOut = False with Reason = Progressing
+	clusters := []string{"cls1", "cls2", "cls3"}
+	placement, placementDecision := helpertest.CreateTestPlacement("place-test", "default", clusters...)
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placement, placementDecision)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Second)
+
+	err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement)
+	assert.Nil(t, err)
+	err = clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision)
+	assert.Nil(t, err)
+
+	placementLister := clusterInformerFactory.Cluster().V1beta1().Placements().Lister()
+	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
+
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+
+	// Create ManifestWorks for all clusters
+	mw1 := helpertest.CreateTestManifestWork(mwrSet.Name, mwrSet.Namespace, placement.Name, clusters[0])
+	mw2 := helpertest.CreateTestManifestWork(mwrSet.Name, mwrSet.Namespace, placement.Name, clusters[1])
+	mw3 := helpertest.CreateTestManifestWork(mwrSet.Name, mwrSet.Namespace, placement.Name, clusters[2])
+
+	// Set cluster 1 as Succeeded
+	apimeta.SetStatusCondition(&mw1.Status.Conditions, metav1.Condition{
+		Type:               workapiv1.WorkApplied,
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: mw1.Generation,
+		Reason:             "Applied",
+	})
+	apimeta.SetStatusCondition(&mw1.Status.Conditions, metav1.Condition{
+		Type:               workapiv1.WorkProgressing,
+		Status:             metav1.ConditionFalse,
+		ObservedGeneration: mw1.Generation,
+		Reason:             "Completed",
+	})
+
+	// Set cluster 2 as Progressing
+	apimeta.SetStatusCondition(&mw2.Status.Conditions, metav1.Condition{
+		Type:               workapiv1.WorkApplied,
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: mw2.Generation,
+		Reason:             "Applied",
+	})
+	apimeta.SetStatusCondition(&mw2.Status.Conditions, metav1.Condition{
+		Type:               workapiv1.WorkProgressing,
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: mw2.Generation,
+		Reason:             "Applying",
+	})
+
+	// Set cluster 3 as Failed (Progressing=True + Degraded=True)
+	apimeta.SetStatusCondition(&mw3.Status.Conditions, metav1.Condition{
+		Type:               workapiv1.WorkApplied,
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: mw3.Generation,
+		Reason:             "Applied",
+	})
+	apimeta.SetStatusCondition(&mw3.Status.Conditions, metav1.Condition{
+		Type:               workapiv1.WorkProgressing,
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: mw3.Generation,
+		Reason:             "Applying",
+	})
+	apimeta.SetStatusCondition(&mw3.Status.Conditions, metav1.Condition{
+		Type:               workapiv1.WorkDegraded,
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: mw3.Generation,
+		Reason:             "ApplyFailed",
+	})
+
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet, mw1, mw2, mw3)
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
+
+	err = workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw1)
+	assert.Nil(t, err)
+	err = workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw2)
+	assert.Nil(t, err)
+	err = workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw3)
+	assert.Nil(t, err)
+	err = workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetStore().Add(mwrSet)
+	assert.Nil(t, err)
+
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	pmwDeployController := deployReconciler{
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: placementDecisionLister,
+		placementLister:     placementLister,
+	}
+
+	mwrSet, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
+	assert.Nil(t, err)
+
+	// Verify that Summary.Total equals the number of clusters
+	assert.Equal(t, len(clusters), mwrSet.Status.Summary.Total, "Summary.Total should equal the number of clusters")
+
+	// Verify PlacementRolledOut is False because not all clusters have succeeded
+	// Only 1 out of 3 clusters has succeeded
+	rollOutCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementRolledOut)
+	assert.NotNil(t, rollOutCondition)
+	assert.Equal(t, metav1.ConditionFalse, rollOutCondition.Status, "PlacementRolledOut should be False when not all clusters have succeeded")
+	assert.Equal(t, workapiv1alpha1.ReasonProgressing, rollOutCondition.Reason, "Reason should be Progressing when not all clusters have succeeded")
+}
+
 func TestClusterRolloutStatusFunc(t *testing.T) {
 	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
 	now := metav1.Now()
