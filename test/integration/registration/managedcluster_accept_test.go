@@ -16,6 +16,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	v1 "open-cluster-management.io/api/cluster/v1"
 
+	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/hub"
 )
 
@@ -146,6 +147,9 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Order
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
+		manifestWork := testinghelpers.NewManifestWork(managedCluster.Name, "test-work-1", []string{}, nil, nil, nil)
+		_, err = workClient.WorkV1().ManifestWorks(managedCluster.Name).Create(context.Background(), manifestWork, metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
 	})
 	It("should set hubAcceptsClient to false", func() {
 		Eventually(func() error {
@@ -219,21 +223,15 @@ var _ = Describe("ManagedCluster set hubAcceptsClient from true to false", Order
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
-		Eventually(func() error {
+		// Work rolebinding should be deleted after manifestworks are removed
+		err := workClient.WorkV1().ManifestWorks(managedCluster.Name).Delete(context.Background(), "test-work-1", metav1.DeleteOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		Eventually(func() bool {
 			// Work rolebinding should be deleted
-			wrb, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).Get(context.Background(), workRoleBindingName(managedCluster.Name), metav1.GetOptions{})
-			if err == nil {
-				// Here we check DeletionTimestamp because there is finalizer "cluster.open-cluster-management.io/manifest-work-cleanup" on the rolebinding.
-				if wrb.DeletionTimestamp.IsZero() {
-					return fmt.Errorf("work rolebinding should be deleted")
-				}
-				return nil
-			}
-			if !errors.IsNotFound(err) {
-				return err
-			}
-			return nil
-		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+			_, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).Get(context.Background(), workRoleBindingName(managedCluster.Name), metav1.GetOptions{})
+			return errors.IsNotFound(err)
+		}, 3*eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 	})
 })
