@@ -188,6 +188,10 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 			return nil
 		}
 
+		if err != nil {
+			errs = append(errs, err)
+		}
+
 		if err = c.hubDriver.Cleanup(ctx, managedCluster); err != nil {
 			errs = append(errs, err)
 		}
