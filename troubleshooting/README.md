@@ -1,3 +1,4 @@
+
 # Troubleshooting
 
 This document describes common issues and troubleshooting guidance for
@@ -32,3 +33,4 @@ TLS handshake timeouts.
 
 Related issue:
 https://github.com/open-cluster-management-io/ocm/issues/1314
+
