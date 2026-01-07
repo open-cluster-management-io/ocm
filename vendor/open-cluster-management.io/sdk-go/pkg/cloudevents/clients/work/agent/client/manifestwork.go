@@ -3,10 +3,11 @@ package client
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"net/http"
 	"strconv"
 	"sync"
+
+	"k8s.io/apimachinery/pkg/api/meta"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -79,7 +80,7 @@ func (c *ManifestWorkAgentClient) Get(ctx context.Context, name string, opts met
 	logger := klog.FromContext(ctx)
 
 	logger.V(4).Info("getting manifestwork", "manifestWorkNamespace", c.namespace, "manifestWorkName", name)
-	work, exists, err := c.watcherStore.Get(c.namespace, name)
+	work, exists, err := c.watcherStore.Get(ctx, c.namespace, name)
 	if err != nil {
 		returnErr := errors.NewInternalError(err)
 		metrics.IncreaseWorkProcessedCounter("get", string(returnErr.ErrStatus.Reason))
@@ -98,7 +99,7 @@ func (c *ManifestWorkAgentClient) Get(ctx context.Context, name string, opts met
 func (c *ManifestWorkAgentClient) List(ctx context.Context, opts metav1.ListOptions) (*workv1.ManifestWorkList, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("list manifestworks from cluster", "cluster", c.namespace)
-	works, err := c.watcherStore.List(c.namespace, opts)
+	works, err := c.watcherStore.List(ctx, c.namespace, opts)
 	if err != nil {
 		returnErr := errors.NewInternalError(err)
 		metrics.IncreaseWorkProcessedCounter("list", string(returnErr.ErrStatus.Reason))
@@ -117,7 +118,7 @@ func (c *ManifestWorkAgentClient) List(ctx context.Context, opts metav1.ListOpti
 func (c *ManifestWorkAgentClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("watch manifestworks from cluster", "cluster", c.namespace)
-	watcher, err := c.watcherStore.GetWatcher(c.namespace, opts)
+	watcher, err := c.watcherStore.GetWatcher(ctx, c.namespace, opts)
 	if err != nil {
 		returnErr := errors.NewInternalError(err)
 		metrics.IncreaseWorkProcessedCounter("watch", string(returnErr.ErrStatus.Reason))
@@ -151,7 +152,7 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 		return nil, returnErr
 	}
 
-	lastWork, exists, err := c.watcherStore.Get(c.namespace, name)
+	lastWork, exists, err := c.watcherStore.Get(ctx, c.namespace, name)
 	if err != nil {
 		returnErr = errors.NewInternalError(err)
 		return nil, returnErr
@@ -227,7 +228,7 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 	// with outdated work. Return a conflict error if the resource version is outdated.
 	// Due to the lack of read-modify-write guarantees in the store, race conditions may occur between
 	// this update operation and one from the agent informer after receiving the event from the source.
-	latestWork, exists, err := c.watcherStore.Get(c.namespace, name)
+	latestWork, exists, err := c.watcherStore.Get(ctx, c.namespace, name)
 	if err != nil {
 		returnErr = errors.NewInternalError(err)
 		return nil, returnErr

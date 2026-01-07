@@ -438,6 +438,8 @@ type PlacementStatus struct {
 	DecisionGroups []DecisionGroupStatus `json:"decisionGroups"`
 
 	// Conditions contains the different condition status for this Placement.
+	// +listType=map
+	// +listMapKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions"`
 }

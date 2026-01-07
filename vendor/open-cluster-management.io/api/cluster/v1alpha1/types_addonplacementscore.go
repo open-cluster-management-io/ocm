@@ -24,8 +24,6 @@ type AddOnPlacementScore struct {
 // AddOnPlacementScoreStatus represents the current status of AddOnPlacementScore.
 type AddOnPlacementScoreStatus struct {
 	// Conditions contain the different condition statuses for this AddOnPlacementScore.
-	// +patchMergeKey=type
-	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
 	// +optional

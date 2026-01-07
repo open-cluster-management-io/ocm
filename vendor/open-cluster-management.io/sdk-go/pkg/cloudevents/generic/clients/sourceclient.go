@@ -17,7 +17,6 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/utils"
 )
 
 // CloudEventSourceClient is a client for a source to resync/send/receive its resources with cloud events.
@@ -46,13 +45,7 @@ func NewCloudEventSourceClient[T generic.ResourceObject](
 	statusHashGetter generic.StatusHashGetter[T],
 	codec generic.Codec[T],
 ) (*CloudEventSourceClient[T], error) {
-	baseClient := &baseClient{
-		clientID:               sourceOptions.SourceID,
-		transport:              sourceOptions.CloudEventsTransport,
-		cloudEventsRateLimiter: utils.NewRateLimiter(sourceOptions.EventRateLimit),
-		reconnectedChan:        make(chan struct{}),
-	}
-
+	baseClient := newBaseClient(sourceOptions.SourceID, sourceOptions.CloudEventsTransport, sourceOptions.EventRateLimit)
 	if err := baseClient.connect(ctx); err != nil {
 		return nil, err
 	}
@@ -67,14 +60,14 @@ func NewCloudEventSourceClient[T generic.ResourceObject](
 }
 
 func (c *CloudEventSourceClient[T]) ReconnectedChan() <-chan struct{} {
-	return c.reconnectedChan
+	return c.resyncChan
 }
 
 // Resync the resources status by sending a status resync request from the current source to a specified cluster.
 func (c *CloudEventSourceClient[T]) Resync(ctx context.Context, clusterName string) error {
 	// list the resource objects that are maintained by the current source with a specified cluster
 	options := types.ListOptions{Source: c.sourceID, ClusterName: clusterName, CloudEventsDataType: c.codec.EventDataType()}
-	objs, err := c.lister.List(options)
+	objs, err := c.lister.List(ctx, options)
 	if err != nil {
 		return err
 	}
@@ -248,7 +241,7 @@ func (c *CloudEventSourceClient[T]) respondResyncSpecRequest(
 		Source:              c.sourceID,
 		CloudEventsDataType: evtDataType,
 	}
-	objs, err := c.lister.List(options)
+	objs, err := c.lister.List(ctx, options)
 	if err != nil {
 		return err
 	}

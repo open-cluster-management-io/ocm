@@ -58,7 +58,7 @@ func (s *AgentInformerWatcherStore[T]) HandleReceivedResource(ctx context.Contex
 		return err
 	}
 
-	lastResource, exists, err := s.Get(metaObj.GetNamespace(), metaObj.GetName())
+	lastResource, exists, err := s.Get(ctx, metaObj.GetNamespace(), metaObj.GetName())
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func (s *AgentInformerWatcherStore[T]) HandleReceivedResource(ctx context.Contex
 	return s.Update(runtimeObj)
 }
 
-func (s *AgentInformerWatcherStore[T]) GetWatcher(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+func (s *AgentInformerWatcherStore[T]) GetWatcher(ctx context.Context, namespace string, opts metav1.ListOptions) (watch.Interface, error) {
 	return s.Watcher, nil
 }
 

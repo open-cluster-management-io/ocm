@@ -152,7 +152,7 @@ func (s *SourceLocalWatcherStore) HasInitiated() bool {
 	return s.Initiated
 }
 
-func (s *SourceLocalWatcherStore) GetWatcher(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+func (s *SourceLocalWatcherStore) GetWatcher(ctx context.Context, namespace string, opts metav1.ListOptions) (watch.Interface, error) {
 	// TODO may consider to support watch with namespace
 	if namespace != metav1.NamespaceAll {
 		return nil, fmt.Errorf("unsupported to watch from the namespace %s", namespace)

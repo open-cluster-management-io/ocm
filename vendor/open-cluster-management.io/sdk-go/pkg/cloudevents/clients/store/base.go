@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -20,7 +21,7 @@ type BaseClientWatchStore[T generic.ResourceObject] struct {
 }
 
 // List the resources from the store with the list options
-func (s *BaseClientWatchStore[T]) List(namespace string, opts metav1.ListOptions) (*ResourceList[T], error) {
+func (s *BaseClientWatchStore[T]) List(ctx context.Context, namespace string, opts metav1.ListOptions) (*ResourceList[T], error) {
 	s.RLock()
 	defer s.RUnlock()
 
@@ -33,7 +34,7 @@ func (s *BaseClientWatchStore[T]) List(namespace string, opts metav1.ListOptions
 }
 
 // Get a resource from the store
-func (s *BaseClientWatchStore[T]) Get(namespace, name string) (resource T, exists bool, err error) {
+func (s *BaseClientWatchStore[T]) Get(ctx context.Context, namespace, name string) (resource T, exists bool, err error) {
 	s.RLock()
 	defer s.RUnlock()
 
@@ -60,7 +61,7 @@ func (s *BaseClientWatchStore[T]) Get(namespace, name string) (resource T, exist
 }
 
 // List all of resources from the store
-func (s *BaseClientWatchStore[T]) ListAll() ([]T, error) {
+func (s *BaseClientWatchStore[T]) ListAll(ctx context.Context) ([]T, error) {
 	s.RLock()
 	defer s.RUnlock()
 

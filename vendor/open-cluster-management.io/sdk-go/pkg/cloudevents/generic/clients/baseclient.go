@@ -3,9 +3,10 @@ package clients
 import (
 	"context"
 	"fmt"
-	"open-cluster-management.io/sdk-go/pkg/logging"
-	"sync"
+	"sync/atomic"
 	"time"
+
+	"open-cluster-management.io/sdk-go/pkg/logging"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 
@@ -21,11 +22,15 @@ import (
 )
 
 const (
-	restartReceiverSignal = iota
+	// startReceiverSignal signals the receiver goroutine to start with a new context.
+	// This is sent after successful connection and subscription to start event processing.
+	startReceiverSignal = iota
+	// stopReceiverSignal signals the receiver goroutine to cancel its context and stop processing events.
+	// This is sent when the transport connection fails or encounters an error.
 	stopReceiverSignal
 )
 
-// the reconnect backoff will stop at [1,5) min interval. If we don't backoff for 10min, we reset the backoff.
+// the reconnect backoff will stop at [5s, 1min) interval. If we don't backoff for 10min, we reset the backoff.
 var DelayFn = wait.Backoff{
 	Duration: 5 * time.Second,
 	Cap:      1 * time.Minute,
@@ -46,18 +51,30 @@ type receiveFn func(ctx context.Context, evt cloudevents.Event)
 //
 // The client maintains connection state and automatically attempts to reconnect when
 // errors are detected from the transport layer. Upon successful reconnection, it restarts
-// the event receiver and notifies listeners via the reconnectedChan.
+// the event receiver and notifies listeners via the resyncChan.
 //
-// Thread-safety: All public methods are safe for concurrent use. The clientReady flag
-// and receiverChan are protected by an embedded RWMutex.
+// Thread-safety: All public methods are safe for concurrent use. The connected and subscribed flags
+// use atomic operations for thread-safe access.
 type baseClient struct {
-	sync.RWMutex
 	clientID               string // the client id is used to identify the client, either a source or an agent ID
 	transport              options.CloudEventTransport
 	cloudEventsRateLimiter flowcontrol.RateLimiter
 	receiverChan           chan int
-	reconnectedChan        chan struct{}
-	clientReady            bool
+	resyncChan             chan struct{}
+	subscribeChan          chan struct{}
+	connected              atomic.Bool
+	subscribed             atomic.Bool
+}
+
+func newBaseClient(clientID string, transport options.CloudEventTransport, limit utils.EventRateLimit) *baseClient {
+	return &baseClient{
+		clientID:               clientID,
+		transport:              transport,
+		cloudEventsRateLimiter: utils.NewRateLimiter(limit),
+		resyncChan:             make(chan struct{}, 1),
+		subscribeChan:          make(chan struct{}, 1),
+		receiverChan:           make(chan int, 2), // Allow both stop and start signals to be buffered
+	}
 }
 
 func (c *baseClient) connect(ctx context.Context) error {
@@ -68,12 +85,17 @@ func (c *baseClient) connect(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	c.setClientReady(true)
+	c.connected.Store(true)
 
-	// start a go routine to handle cloudevents client connection errors
+	// Start a goroutine to monitor transport health and handle reconnection.
+	// This goroutine runs a loop that:
+	// 1. Checks if disconnected and attempts to reconnect with exponential backoff
+	// 2. Listens for errors from the transport's error channel
+	// 3. On error: sends stopReceiverSignal, sets connected to false, closes the transport, and waits for backoff delay
+	// 4. On successful reconnection: sets connected to true and sends signal to subscribeChan to trigger subscription
 	go func() {
 		for {
-			if !c.isClientReady() {
+			if !c.connected.Load() {
 				logger.V(2).Info("reconnecting the cloudevents client")
 
 				err = c.transport.Connect(ctx)
@@ -85,16 +107,24 @@ func (c *baseClient) connect(ctx context.Context) error {
 					<-wait.RealTimer(DelayFn()).C()
 					continue
 				}
-				// the cloudevents network connection is back, mark the client ready and send the receiver restart signal
+				// the cloudevents network connection is back, set connected to true and notify the client to resubscribe
 				logger.V(2).Info("the cloudevents client is reconnected")
 				metrics.IncreaseClientReconnectedCounter(c.clientID)
-				c.setClientReady(true)
-				c.sendReceiverSignal(restartReceiverSignal)
+				c.connected.Store(true)
+				select {
+				case c.subscribeChan <- struct{}{}:
+					// Signal sent successfully
+				default:
+					// Subscribe channel is unavailable, that's okay - don't block
+					klog.FromContext(ctx).Info("subscribe signal not sent, subscribe channel is unavailable")
+				}
 			}
 
 			select {
 			case <-ctx.Done():
-				c.closeChannels()
+				// Don't need to close channels here. Closing channels here would race
+				// with current goroutines trying to send/receive on the same channels.
+				// The channels will be garbage collected once all goroutines exit.
 				return
 			case err, ok := <-c.transport.ErrorChan():
 				if !ok {
@@ -103,10 +133,16 @@ func (c *baseClient) connect(ctx context.Context) error {
 				}
 				runtime.HandleErrorWithContext(ctx, err, "the cloudevents client is disconnected")
 
-				// the cloudevents client network connection is closed, send the receiver stop signal, set the current client not ready
-				// and close the current client
-				c.sendReceiverSignal(stopReceiverSignal)
-				c.setClientReady(false)
+				// transport reported an error (connection failed), stop the receiver, set connected to false,
+				// close the transport, and wait for backoff delay before attempting reconnection
+				select {
+				case c.receiverChan <- stopReceiverSignal:
+					// Signal sent successfully
+				default:
+					// Receiver channel is unavailable, that's okay - don't block
+					klog.FromContext(ctx).V(2).Info("stopReceiverSignal not sent, receiver channel unavailable")
+				}
+				c.connected.Store(false)
 				if err := c.transport.Close(ctx); err != nil {
 					runtime.HandleErrorWithContext(ctx, err, "failed to close the cloudevents protocol")
 				}
@@ -136,7 +172,7 @@ func (c *baseClient) publish(ctx context.Context, evt cloudevents.Event) error {
 		)
 	}
 
-	if !c.isClientReady() {
+	if !c.connected.Load() {
 		return fmt.Errorf("the cloudevents client is not ready")
 	}
 
@@ -155,153 +191,132 @@ func (c *baseClient) publish(ctx context.Context, evt cloudevents.Event) error {
 }
 
 func (c *baseClient) subscribe(ctx context.Context, receive receiveFn) {
-	c.Lock()
-	defer c.Unlock()
-
 	logger := klog.FromContext(ctx)
 	// make sure there is only one subscription go routine starting for one client.
-	if c.receiverChan != nil {
+	// Swap returns the old value, so if it was already true, we've already subscribed
+	if c.subscribed.Swap(true) {
 		logger.V(2).Info("the subscription has already started")
 		return
 	}
 
-	// send subscription request before starting to receive events
-	if err := c.transport.Subscribe(ctx); err != nil {
-		runtime.HandleErrorWithContext(ctx, err, "failed to subscribe")
-		return
-	}
-
-	c.receiverChan = make(chan int)
-
-	// start a go routine to handle cloudevents subscription
+	// Start a goroutine to handle subscription.
+	// This goroutine listens for signals on subscribeChan (sent on initial subscribe,
+	// and after reconnection by the connection monitor goroutine), attempts to subscribe to the
+	// event stream, and if successful, sends startReceiverSignal to start the receiver and
+	// notifies any listeners via resyncChan that they should resync their resources.
 	go func() {
-		receiverCtx, receiverCancel := context.WithCancel(ctx)
-		startReceiving := true
-		subscribed := true
-
 		for {
-			if !subscribed {
-				// resubscribe before restarting the receiver
-				if err := c.transport.Subscribe(ctx); err != nil {
-					if ctx.Err() != nil {
-						receiverCancel()
-						return
-					}
-
-					runtime.HandleError(fmt.Errorf("failed to resubscribe, %v", err))
-					select {
-					case <-ctx.Done():
-						receiverCancel()
-						return
-					case <-wait.RealTimer(DelayFn()).C():
-					}
-					continue
-				}
-				subscribed = true
-				// notify the client caller to resync the resources
-				c.sendReconnectedSignal(ctx)
-			}
-
-			if startReceiving {
-				go func() {
-					if err := c.transport.Receive(receiverCtx, func(ctx context.Context, evt cloudevents.Event) {
-						receiveLogger := logging.SetLogTracingByCloudEvent(klog.FromContext(ctx), &evt)
-						ctx = klog.NewContext(ctx, receiveLogger)
-						if receiveLogger.V(5).Enabled() {
-							evtData, _ := evt.MarshalJSON()
-							receiveLogger.V(5).Info("Received event", "event", string(evtData))
-						} else {
-							receiveLogger.V(2).Info("Received event",
-								"eventType", evt.Type(), "extensions", evt.Extensions())
-						}
-						receive(ctx, evt)
-					}); err != nil {
-						runtime.HandleErrorWithContext(ctx, err, "failed to receive cloudevents")
-					}
-				}()
-				startReceiving = false
-			}
-
 			select {
 			case <-ctx.Done():
-				receiverCancel()
 				return
-			case signal, ok := <-c.getReceiverChan():
+			case <-c.subscribeChan:
+				if err := c.transport.Subscribe(ctx); err != nil {
+					// Failed to send subscribe request, it should be connection failed, will retry on next reconnection
+					runtime.HandleErrorWithContext(ctx, err, "failed to subscribe after connection")
+					continue
+				}
+
+				// Send startReceiverSignal to start/restart the receiver after successful subscription.
+				// The receiver lifecycle goroutine will create a new context and spawn a goroutine
+				// to call c.transport.Receive() if not already running.
+				select {
+				case c.receiverChan <- startReceiverSignal:
+					// Signal sent successfully
+				default:
+					// Receiver channel full or closed, that's okay - will retry on next reconnection
+					klog.FromContext(ctx).V(2).Info("startReceiverSignal not sent, receiver channel unavailable")
+				}
+
+				// Notify the client caller to resync the resources
+				select {
+				case c.resyncChan <- struct{}{}:
+					// Signal sent successfully
+				default:
+					// Resync channel is unavailable, that's okay - don't block
+					klog.FromContext(ctx).V(2).Info("resync signal not sent, resync channel unavailable")
+				}
+			}
+		}
+	}()
+
+	// Start a goroutine to manage the event receiver lifecycle.
+	// This goroutine responds to signals on receiverChan:
+	// - startReceiverSignal: Creates a new receiver context and spawns a c.transport.Receive() goroutine
+	//   if not already running (tracked by startReceiving flag)
+	// - stopReceiverSignal: Cancels the receiver context to stop the running c.transport.Receive()
+	//   goroutine and clears the startReceiving flag
+	go func() {
+		var startReceiving bool
+		var receiverCtx context.Context
+		var receiverCancel context.CancelFunc
+
+		for {
+			select {
+			case <-ctx.Done():
+				if receiverCancel != nil {
+					receiverCancel()
+				}
+				return
+			case signal, ok := <-c.receiverChan:
 				if !ok {
 					// receiver channel is closed, stop the receiver
-					receiverCancel()
+					if receiverCancel != nil {
+						receiverCancel()
+					}
 					return
 				}
 
 				switch signal {
-				case restartReceiverSignal:
-					logger.V(2).Info("restart the cloudevents receiver")
-					// rebuild the receiver context and restart receiving
-					receiverCtx, receiverCancel = context.WithCancel(ctx)
-					startReceiving = true
-					subscribed = false
+				case startReceiverSignal:
+					if !startReceiving {
+						logger.V(2).Info("start the cloudevents receiver")
+						// Cancel old context before creating a new one to prevent context leak
+						if receiverCancel != nil {
+							receiverCancel()
+						}
+
+						// create a new receiver context
+						receiverCtx, receiverCancel = context.WithCancel(ctx)
+						// Set flag before spawning goroutine to prevent race condition
+						startReceiving = true
+						go func() {
+							if err := c.transport.Receive(receiverCtx, func(handlerCtx context.Context, evt cloudevents.Event) {
+								receiveLogger := logging.SetLogTracingByCloudEvent(klog.FromContext(handlerCtx), &evt)
+								handlerCtx = klog.NewContext(handlerCtx, receiveLogger)
+								if receiveLogger.V(5).Enabled() {
+									evtData, _ := evt.MarshalJSON()
+									receiveLogger.V(5).Info("Received event", "event", string(evtData))
+								} else {
+									receiveLogger.V(2).Info("Received event",
+										"eventType", evt.Type(), "extensions", evt.Extensions())
+								}
+								receive(handlerCtx, evt)
+							}); err != nil {
+								runtime.HandleErrorWithContext(ctx, err, "failed to receive cloudevents")
+							}
+						}()
+					}
 				case stopReceiverSignal:
 					logger.V(2).Info("stop the cloudevents receiver")
-					receiverCancel()
+					if receiverCancel != nil {
+						receiverCancel()
+						receiverCancel = nil
+						receiverCtx = nil
+					}
+					startReceiving = false
 				default:
 					runtime.HandleErrorWithContext(ctx, fmt.Errorf("unknown receiver signal"), "", "signal", signal)
 				}
 			}
 		}
 	}()
-}
 
-func (c *baseClient) sendReceiverSignal(signal int) {
-	c.RLock()
-	defer c.RUnlock()
-
-	if c.receiverChan != nil {
-		c.receiverChan <- signal
+	// Send initial subscription signal to trigger the first subscription attempt
+	select {
+	case c.subscribeChan <- struct{}{}:
+		// Signal sent successfully
+	default:
+		// Channel full or closed - should not happen during normal initialization
+		logger.V(2).Info("initial subscribe signal not sent, channel unavailable")
 	}
-}
-
-func (c *baseClient) closeChannels() {
-	c.Lock()
-	defer c.Unlock()
-
-	if c.receiverChan != nil {
-		close(c.receiverChan)
-		c.receiverChan = nil
-	}
-	if c.reconnectedChan != nil {
-		close(c.reconnectedChan)
-		c.reconnectedChan = nil
-	}
-}
-
-func (c *baseClient) sendReconnectedSignal(ctx context.Context) {
-	c.RLock()
-	defer c.RUnlock()
-	if c.reconnectedChan != nil {
-		select {
-		case c.reconnectedChan <- struct{}{}:
-			// Signal sent successfully
-		default:
-			// No receiver listening on reconnectedChan, that's okay - don't block
-			klog.FromContext(ctx).Info("reconnected signal not sent, no receiver listening")
-		}
-	}
-}
-
-func (c *baseClient) isClientReady() bool {
-	c.RLock()
-	defer c.RUnlock()
-	return c.clientReady
-}
-
-func (c *baseClient) setClientReady(ready bool) {
-	c.Lock()
-	defer c.Unlock()
-	c.clientReady = ready
-}
-
-func (c *baseClient) getReceiverChan() chan int {
-	c.RLock()
-	defer c.RUnlock()
-	return c.receiverChan
 }

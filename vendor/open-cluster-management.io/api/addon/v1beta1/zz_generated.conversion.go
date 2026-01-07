@@ -9,6 +9,7 @@ package v1beta1
 import (
 	unsafe "unsafe"
 
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -29,6 +30,36 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha1.AddOnConfig)(nil), (*AddOnConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_AddOnConfig_To_v1beta1_AddOnConfig(a.(*v1alpha1.AddOnConfig), b.(*AddOnConfig), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*AddOnDeploymentConfig)(nil), (*v1alpha1.AddOnDeploymentConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_AddOnDeploymentConfig_To_v1alpha1_AddOnDeploymentConfig(a.(*AddOnDeploymentConfig), b.(*v1alpha1.AddOnDeploymentConfig), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.AddOnDeploymentConfig)(nil), (*AddOnDeploymentConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_AddOnDeploymentConfig_To_v1beta1_AddOnDeploymentConfig(a.(*v1alpha1.AddOnDeploymentConfig), b.(*AddOnDeploymentConfig), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*AddOnDeploymentConfigList)(nil), (*v1alpha1.AddOnDeploymentConfigList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_AddOnDeploymentConfigList_To_v1alpha1_AddOnDeploymentConfigList(a.(*AddOnDeploymentConfigList), b.(*v1alpha1.AddOnDeploymentConfigList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.AddOnDeploymentConfigList)(nil), (*AddOnDeploymentConfigList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_AddOnDeploymentConfigList_To_v1beta1_AddOnDeploymentConfigList(a.(*v1alpha1.AddOnDeploymentConfigList), b.(*AddOnDeploymentConfigList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*AddOnDeploymentConfigSpec)(nil), (*v1alpha1.AddOnDeploymentConfigSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_AddOnDeploymentConfigSpec_To_v1alpha1_AddOnDeploymentConfigSpec(a.(*AddOnDeploymentConfigSpec), b.(*v1alpha1.AddOnDeploymentConfigSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.AddOnDeploymentConfigSpec)(nil), (*AddOnDeploymentConfigSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_AddOnDeploymentConfigSpec_To_v1beta1_AddOnDeploymentConfigSpec(a.(*v1alpha1.AddOnDeploymentConfigSpec), b.(*AddOnDeploymentConfigSpec), scope)
 	}); err != nil {
 		return err
 	}
@@ -107,6 +138,26 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*ContainerResourceRequirements)(nil), (*v1alpha1.ContainerResourceRequirements)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ContainerResourceRequirements_To_v1alpha1_ContainerResourceRequirements(a.(*ContainerResourceRequirements), b.(*v1alpha1.ContainerResourceRequirements), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.ContainerResourceRequirements)(nil), (*ContainerResourceRequirements)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ContainerResourceRequirements_To_v1beta1_ContainerResourceRequirements(a.(*v1alpha1.ContainerResourceRequirements), b.(*ContainerResourceRequirements), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*CustomizedVariable)(nil), (*v1alpha1.CustomizedVariable)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CustomizedVariable_To_v1alpha1_CustomizedVariable(a.(*CustomizedVariable), b.(*v1alpha1.CustomizedVariable), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.CustomizedVariable)(nil), (*CustomizedVariable)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_CustomizedVariable_To_v1beta1_CustomizedVariable(a.(*v1alpha1.CustomizedVariable), b.(*CustomizedVariable), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*DefaultConfigReference)(nil), (*v1alpha1.DefaultConfigReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_DefaultConfigReference_To_v1alpha1_DefaultConfigReference(a.(*DefaultConfigReference), b.(*v1alpha1.DefaultConfigReference), scope)
 	}); err != nil {
@@ -124,6 +175,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha1.HealthCheck)(nil), (*HealthCheck)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_HealthCheck_To_v1beta1_HealthCheck(a.(*v1alpha1.HealthCheck), b.(*HealthCheck), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*ImageMirror)(nil), (*v1alpha1.ImageMirror)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ImageMirror_To_v1alpha1_ImageMirror(a.(*ImageMirror), b.(*v1alpha1.ImageMirror), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.ImageMirror)(nil), (*ImageMirror)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ImageMirror_To_v1beta1_ImageMirror(a.(*v1alpha1.ImageMirror), b.(*ImageMirror), scope)
 	}); err != nil {
 		return err
 	}
@@ -187,6 +248,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*NodePlacement)(nil), (*v1alpha1.NodePlacement)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NodePlacement_To_v1alpha1_NodePlacement(a.(*NodePlacement), b.(*v1alpha1.NodePlacement), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.NodePlacement)(nil), (*NodePlacement)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_NodePlacement_To_v1beta1_NodePlacement(a.(*v1alpha1.NodePlacement), b.(*NodePlacement), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*ObjectReference)(nil), (*v1alpha1.ObjectReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_ObjectReference_To_v1alpha1_ObjectReference(a.(*ObjectReference), b.(*v1alpha1.ObjectReference), scope)
 	}); err != nil {
@@ -214,6 +285,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha1.PlacementStrategy)(nil), (*PlacementStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_PlacementStrategy_To_v1beta1_PlacementStrategy(a.(*v1alpha1.PlacementStrategy), b.(*PlacementStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*ProxyConfig)(nil), (*v1alpha1.ProxyConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ProxyConfig_To_v1alpha1_ProxyConfig(a.(*ProxyConfig), b.(*v1alpha1.ProxyConfig), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.ProxyConfig)(nil), (*ProxyConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ProxyConfig_To_v1beta1_ProxyConfig(a.(*v1alpha1.ProxyConfig), b.(*ProxyConfig), scope)
 	}); err != nil {
 		return err
 	}
@@ -293,6 +374,88 @@ func autoConvert_v1alpha1_AddOnConfig_To_v1beta1_AddOnConfig(in *v1alpha1.AddOnC
 // Convert_v1alpha1_AddOnConfig_To_v1beta1_AddOnConfig is an autogenerated conversion function.
 func Convert_v1alpha1_AddOnConfig_To_v1beta1_AddOnConfig(in *v1alpha1.AddOnConfig, out *AddOnConfig, s conversion.Scope) error {
 	return autoConvert_v1alpha1_AddOnConfig_To_v1beta1_AddOnConfig(in, out, s)
+}
+
+func autoConvert_v1beta1_AddOnDeploymentConfig_To_v1alpha1_AddOnDeploymentConfig(in *AddOnDeploymentConfig, out *v1alpha1.AddOnDeploymentConfig, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1beta1_AddOnDeploymentConfigSpec_To_v1alpha1_AddOnDeploymentConfigSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1beta1_AddOnDeploymentConfig_To_v1alpha1_AddOnDeploymentConfig is an autogenerated conversion function.
+func Convert_v1beta1_AddOnDeploymentConfig_To_v1alpha1_AddOnDeploymentConfig(in *AddOnDeploymentConfig, out *v1alpha1.AddOnDeploymentConfig, s conversion.Scope) error {
+	return autoConvert_v1beta1_AddOnDeploymentConfig_To_v1alpha1_AddOnDeploymentConfig(in, out, s)
+}
+
+func autoConvert_v1alpha1_AddOnDeploymentConfig_To_v1beta1_AddOnDeploymentConfig(in *v1alpha1.AddOnDeploymentConfig, out *AddOnDeploymentConfig, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1alpha1_AddOnDeploymentConfigSpec_To_v1beta1_AddOnDeploymentConfigSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha1_AddOnDeploymentConfig_To_v1beta1_AddOnDeploymentConfig is an autogenerated conversion function.
+func Convert_v1alpha1_AddOnDeploymentConfig_To_v1beta1_AddOnDeploymentConfig(in *v1alpha1.AddOnDeploymentConfig, out *AddOnDeploymentConfig, s conversion.Scope) error {
+	return autoConvert_v1alpha1_AddOnDeploymentConfig_To_v1beta1_AddOnDeploymentConfig(in, out, s)
+}
+
+func autoConvert_v1beta1_AddOnDeploymentConfigList_To_v1alpha1_AddOnDeploymentConfigList(in *AddOnDeploymentConfigList, out *v1alpha1.AddOnDeploymentConfigList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]v1alpha1.AddOnDeploymentConfig)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1beta1_AddOnDeploymentConfigList_To_v1alpha1_AddOnDeploymentConfigList is an autogenerated conversion function.
+func Convert_v1beta1_AddOnDeploymentConfigList_To_v1alpha1_AddOnDeploymentConfigList(in *AddOnDeploymentConfigList, out *v1alpha1.AddOnDeploymentConfigList, s conversion.Scope) error {
+	return autoConvert_v1beta1_AddOnDeploymentConfigList_To_v1alpha1_AddOnDeploymentConfigList(in, out, s)
+}
+
+func autoConvert_v1alpha1_AddOnDeploymentConfigList_To_v1beta1_AddOnDeploymentConfigList(in *v1alpha1.AddOnDeploymentConfigList, out *AddOnDeploymentConfigList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]AddOnDeploymentConfig)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1alpha1_AddOnDeploymentConfigList_To_v1beta1_AddOnDeploymentConfigList is an autogenerated conversion function.
+func Convert_v1alpha1_AddOnDeploymentConfigList_To_v1beta1_AddOnDeploymentConfigList(in *v1alpha1.AddOnDeploymentConfigList, out *AddOnDeploymentConfigList, s conversion.Scope) error {
+	return autoConvert_v1alpha1_AddOnDeploymentConfigList_To_v1beta1_AddOnDeploymentConfigList(in, out, s)
+}
+
+func autoConvert_v1beta1_AddOnDeploymentConfigSpec_To_v1alpha1_AddOnDeploymentConfigSpec(in *AddOnDeploymentConfigSpec, out *v1alpha1.AddOnDeploymentConfigSpec, s conversion.Scope) error {
+	out.CustomizedVariables = *(*[]v1alpha1.CustomizedVariable)(unsafe.Pointer(&in.CustomizedVariables))
+	out.NodePlacement = (*v1alpha1.NodePlacement)(unsafe.Pointer(in.NodePlacement))
+	out.Registries = *(*[]v1alpha1.ImageMirror)(unsafe.Pointer(&in.Registries))
+	if err := Convert_v1beta1_ProxyConfig_To_v1alpha1_ProxyConfig(&in.ProxyConfig, &out.ProxyConfig, s); err != nil {
+		return err
+	}
+	out.AgentInstallNamespace = in.AgentInstallNamespace
+	out.ResourceRequirements = *(*[]v1alpha1.ContainerResourceRequirements)(unsafe.Pointer(&in.ResourceRequirements))
+	return nil
+}
+
+// Convert_v1beta1_AddOnDeploymentConfigSpec_To_v1alpha1_AddOnDeploymentConfigSpec is an autogenerated conversion function.
+func Convert_v1beta1_AddOnDeploymentConfigSpec_To_v1alpha1_AddOnDeploymentConfigSpec(in *AddOnDeploymentConfigSpec, out *v1alpha1.AddOnDeploymentConfigSpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_AddOnDeploymentConfigSpec_To_v1alpha1_AddOnDeploymentConfigSpec(in, out, s)
+}
+
+func autoConvert_v1alpha1_AddOnDeploymentConfigSpec_To_v1beta1_AddOnDeploymentConfigSpec(in *v1alpha1.AddOnDeploymentConfigSpec, out *AddOnDeploymentConfigSpec, s conversion.Scope) error {
+	out.CustomizedVariables = *(*[]CustomizedVariable)(unsafe.Pointer(&in.CustomizedVariables))
+	out.NodePlacement = (*NodePlacement)(unsafe.Pointer(in.NodePlacement))
+	out.Registries = *(*[]ImageMirror)(unsafe.Pointer(&in.Registries))
+	if err := Convert_v1alpha1_ProxyConfig_To_v1beta1_ProxyConfig(&in.ProxyConfig, &out.ProxyConfig, s); err != nil {
+		return err
+	}
+	out.AgentInstallNamespace = in.AgentInstallNamespace
+	out.ResourceRequirements = *(*[]ContainerResourceRequirements)(unsafe.Pointer(&in.ResourceRequirements))
+	return nil
+}
+
+// Convert_v1alpha1_AddOnDeploymentConfigSpec_To_v1beta1_AddOnDeploymentConfigSpec is an autogenerated conversion function.
+func Convert_v1alpha1_AddOnDeploymentConfigSpec_To_v1beta1_AddOnDeploymentConfigSpec(in *v1alpha1.AddOnDeploymentConfigSpec, out *AddOnDeploymentConfigSpec, s conversion.Scope) error {
+	return autoConvert_v1alpha1_AddOnDeploymentConfigSpec_To_v1beta1_AddOnDeploymentConfigSpec(in, out, s)
 }
 
 func autoConvert_v1beta1_AddOnMeta_To_v1alpha1_AddOnMeta(in *AddOnMeta, out *v1alpha1.AddOnMeta, s conversion.Scope) error {
@@ -532,6 +695,50 @@ func Convert_v1alpha1_ConfigSpecHash_To_v1beta1_ConfigSpecHash(in *v1alpha1.Conf
 	return autoConvert_v1alpha1_ConfigSpecHash_To_v1beta1_ConfigSpecHash(in, out, s)
 }
 
+func autoConvert_v1beta1_ContainerResourceRequirements_To_v1alpha1_ContainerResourceRequirements(in *ContainerResourceRequirements, out *v1alpha1.ContainerResourceRequirements, s conversion.Scope) error {
+	out.ContainerID = in.ContainerID
+	out.Resources = in.Resources
+	return nil
+}
+
+// Convert_v1beta1_ContainerResourceRequirements_To_v1alpha1_ContainerResourceRequirements is an autogenerated conversion function.
+func Convert_v1beta1_ContainerResourceRequirements_To_v1alpha1_ContainerResourceRequirements(in *ContainerResourceRequirements, out *v1alpha1.ContainerResourceRequirements, s conversion.Scope) error {
+	return autoConvert_v1beta1_ContainerResourceRequirements_To_v1alpha1_ContainerResourceRequirements(in, out, s)
+}
+
+func autoConvert_v1alpha1_ContainerResourceRequirements_To_v1beta1_ContainerResourceRequirements(in *v1alpha1.ContainerResourceRequirements, out *ContainerResourceRequirements, s conversion.Scope) error {
+	out.ContainerID = in.ContainerID
+	out.Resources = in.Resources
+	return nil
+}
+
+// Convert_v1alpha1_ContainerResourceRequirements_To_v1beta1_ContainerResourceRequirements is an autogenerated conversion function.
+func Convert_v1alpha1_ContainerResourceRequirements_To_v1beta1_ContainerResourceRequirements(in *v1alpha1.ContainerResourceRequirements, out *ContainerResourceRequirements, s conversion.Scope) error {
+	return autoConvert_v1alpha1_ContainerResourceRequirements_To_v1beta1_ContainerResourceRequirements(in, out, s)
+}
+
+func autoConvert_v1beta1_CustomizedVariable_To_v1alpha1_CustomizedVariable(in *CustomizedVariable, out *v1alpha1.CustomizedVariable, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Value = in.Value
+	return nil
+}
+
+// Convert_v1beta1_CustomizedVariable_To_v1alpha1_CustomizedVariable is an autogenerated conversion function.
+func Convert_v1beta1_CustomizedVariable_To_v1alpha1_CustomizedVariable(in *CustomizedVariable, out *v1alpha1.CustomizedVariable, s conversion.Scope) error {
+	return autoConvert_v1beta1_CustomizedVariable_To_v1alpha1_CustomizedVariable(in, out, s)
+}
+
+func autoConvert_v1alpha1_CustomizedVariable_To_v1beta1_CustomizedVariable(in *v1alpha1.CustomizedVariable, out *CustomizedVariable, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Value = in.Value
+	return nil
+}
+
+// Convert_v1alpha1_CustomizedVariable_To_v1beta1_CustomizedVariable is an autogenerated conversion function.
+func Convert_v1alpha1_CustomizedVariable_To_v1beta1_CustomizedVariable(in *v1alpha1.CustomizedVariable, out *CustomizedVariable, s conversion.Scope) error {
+	return autoConvert_v1alpha1_CustomizedVariable_To_v1beta1_CustomizedVariable(in, out, s)
+}
+
 func autoConvert_v1beta1_DefaultConfigReference_To_v1alpha1_DefaultConfigReference(in *DefaultConfigReference, out *v1alpha1.DefaultConfigReference, s conversion.Scope) error {
 	if err := Convert_v1beta1_ConfigGroupResource_To_v1alpha1_ConfigGroupResource(&in.ConfigGroupResource, &out.ConfigGroupResource, s); err != nil {
 		return err
@@ -576,6 +783,28 @@ func autoConvert_v1alpha1_HealthCheck_To_v1beta1_HealthCheck(in *v1alpha1.Health
 // Convert_v1alpha1_HealthCheck_To_v1beta1_HealthCheck is an autogenerated conversion function.
 func Convert_v1alpha1_HealthCheck_To_v1beta1_HealthCheck(in *v1alpha1.HealthCheck, out *HealthCheck, s conversion.Scope) error {
 	return autoConvert_v1alpha1_HealthCheck_To_v1beta1_HealthCheck(in, out, s)
+}
+
+func autoConvert_v1beta1_ImageMirror_To_v1alpha1_ImageMirror(in *ImageMirror, out *v1alpha1.ImageMirror, s conversion.Scope) error {
+	out.Mirror = in.Mirror
+	out.Source = in.Source
+	return nil
+}
+
+// Convert_v1beta1_ImageMirror_To_v1alpha1_ImageMirror is an autogenerated conversion function.
+func Convert_v1beta1_ImageMirror_To_v1alpha1_ImageMirror(in *ImageMirror, out *v1alpha1.ImageMirror, s conversion.Scope) error {
+	return autoConvert_v1beta1_ImageMirror_To_v1alpha1_ImageMirror(in, out, s)
+}
+
+func autoConvert_v1alpha1_ImageMirror_To_v1beta1_ImageMirror(in *v1alpha1.ImageMirror, out *ImageMirror, s conversion.Scope) error {
+	out.Mirror = in.Mirror
+	out.Source = in.Source
+	return nil
+}
+
+// Convert_v1alpha1_ImageMirror_To_v1beta1_ImageMirror is an autogenerated conversion function.
+func Convert_v1alpha1_ImageMirror_To_v1beta1_ImageMirror(in *v1alpha1.ImageMirror, out *ImageMirror, s conversion.Scope) error {
+	return autoConvert_v1alpha1_ImageMirror_To_v1beta1_ImageMirror(in, out, s)
 }
 
 func autoConvert_v1beta1_InstallConfigReference_To_v1alpha1_InstallConfigReference(in *InstallConfigReference, out *v1alpha1.InstallConfigReference, s conversion.Scope) error {
@@ -826,6 +1055,28 @@ func autoConvert_v1alpha1_ManagedClusterAddOnStatus_To_v1beta1_ManagedClusterAdd
 	return nil
 }
 
+func autoConvert_v1beta1_NodePlacement_To_v1alpha1_NodePlacement(in *NodePlacement, out *v1alpha1.NodePlacement, s conversion.Scope) error {
+	out.NodeSelector = *(*map[string]string)(unsafe.Pointer(&in.NodeSelector))
+	out.Tolerations = *(*[]corev1.Toleration)(unsafe.Pointer(&in.Tolerations))
+	return nil
+}
+
+// Convert_v1beta1_NodePlacement_To_v1alpha1_NodePlacement is an autogenerated conversion function.
+func Convert_v1beta1_NodePlacement_To_v1alpha1_NodePlacement(in *NodePlacement, out *v1alpha1.NodePlacement, s conversion.Scope) error {
+	return autoConvert_v1beta1_NodePlacement_To_v1alpha1_NodePlacement(in, out, s)
+}
+
+func autoConvert_v1alpha1_NodePlacement_To_v1beta1_NodePlacement(in *v1alpha1.NodePlacement, out *NodePlacement, s conversion.Scope) error {
+	out.NodeSelector = *(*map[string]string)(unsafe.Pointer(&in.NodeSelector))
+	out.Tolerations = *(*[]corev1.Toleration)(unsafe.Pointer(&in.Tolerations))
+	return nil
+}
+
+// Convert_v1alpha1_NodePlacement_To_v1beta1_NodePlacement is an autogenerated conversion function.
+func Convert_v1alpha1_NodePlacement_To_v1beta1_NodePlacement(in *v1alpha1.NodePlacement, out *NodePlacement, s conversion.Scope) error {
+	return autoConvert_v1alpha1_NodePlacement_To_v1beta1_NodePlacement(in, out, s)
+}
+
 func autoConvert_v1beta1_ObjectReference_To_v1alpha1_ObjectReference(in *ObjectReference, out *v1alpha1.ObjectReference, s conversion.Scope) error {
 	out.Group = in.Group
 	out.Resource = in.Resource
@@ -900,6 +1151,32 @@ func autoConvert_v1alpha1_PlacementStrategy_To_v1beta1_PlacementStrategy(in *v1a
 // Convert_v1alpha1_PlacementStrategy_To_v1beta1_PlacementStrategy is an autogenerated conversion function.
 func Convert_v1alpha1_PlacementStrategy_To_v1beta1_PlacementStrategy(in *v1alpha1.PlacementStrategy, out *PlacementStrategy, s conversion.Scope) error {
 	return autoConvert_v1alpha1_PlacementStrategy_To_v1beta1_PlacementStrategy(in, out, s)
+}
+
+func autoConvert_v1beta1_ProxyConfig_To_v1alpha1_ProxyConfig(in *ProxyConfig, out *v1alpha1.ProxyConfig, s conversion.Scope) error {
+	out.HTTPProxy = in.HTTPProxy
+	out.HTTPSProxy = in.HTTPSProxy
+	out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
+	out.NoProxy = in.NoProxy
+	return nil
+}
+
+// Convert_v1beta1_ProxyConfig_To_v1alpha1_ProxyConfig is an autogenerated conversion function.
+func Convert_v1beta1_ProxyConfig_To_v1alpha1_ProxyConfig(in *ProxyConfig, out *v1alpha1.ProxyConfig, s conversion.Scope) error {
+	return autoConvert_v1beta1_ProxyConfig_To_v1alpha1_ProxyConfig(in, out, s)
+}
+
+func autoConvert_v1alpha1_ProxyConfig_To_v1beta1_ProxyConfig(in *v1alpha1.ProxyConfig, out *ProxyConfig, s conversion.Scope) error {
+	out.HTTPProxy = in.HTTPProxy
+	out.HTTPSProxy = in.HTTPSProxy
+	out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
+	out.NoProxy = in.NoProxy
+	return nil
+}
+
+// Convert_v1alpha1_ProxyConfig_To_v1beta1_ProxyConfig is an autogenerated conversion function.
+func Convert_v1alpha1_ProxyConfig_To_v1beta1_ProxyConfig(in *v1alpha1.ProxyConfig, out *ProxyConfig, s conversion.Scope) error {
+	return autoConvert_v1alpha1_ProxyConfig_To_v1beta1_ProxyConfig(in, out, s)
 }
 
 func autoConvert_v1beta1_RegistrationConfig_To_v1alpha1_RegistrationConfig(in *RegistrationConfig, out *v1alpha1.RegistrationConfig, s conversion.Scope) error {

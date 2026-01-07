@@ -22,6 +22,10 @@ type PubSubOptions struct {
 	Subscriptions     types.Subscriptions
 	KeepaliveSettings *KeepaliveSettings
 	ReceiveSettings   *ReceiveSettings
+	// DisableTLS indicates whether to use an insecure connection (without TLS).
+	// Set to true for test environments (e.g., pubsub emulator or test server).
+	// Defaults to false (secure/TLS enabled) for production environments.
+	DisableTLS bool
 }
 
 // PubSubConfig holds the information needed to connect to Google Cloud Pub/Sub.
@@ -52,6 +56,11 @@ type PubSubConfig struct {
 
 	// (Optional) ReceiveSettings configures the pubsub subscriber's receive settings.
 	ReceiveSettings *ReceiveSettings `json:"receiveSettings,omitempty" yaml:"receiveSettings,omitempty"`
+
+	// (Optional) DisableTLS indicates whether to use an insecure connection (without TLS).
+	// Set to true for test environments like pubsub emulator or test server that don't support TLS.
+	// Defaults to false (secure/TLS enabled) for production environments.
+	DisableTLS bool `json:"disableTLS,omitempty" yaml:"disableTLS,omitempty"`
 }
 
 // KeepaliveSettings defines gRPC keepalive options for the Pub/Sub client.
@@ -115,6 +124,11 @@ func BuildPubSubOptionsFromFlags(configPath string) (*PubSubOptions, error) {
 		return nil, err
 	}
 
+	// validate insecure connection requires endpoint
+	if config.DisableTLS && config.Endpoint == "" {
+		return nil, fmt.Errorf("endpoint must be specified when tls is disabled")
+	}
+
 	// validate topics and subscriptions
 	if err := validateTopicsAndSubscriptions(config.Topics, config.Subscriptions, config.ProjectID); err != nil {
 		return nil, err
@@ -126,6 +140,7 @@ func BuildPubSubOptionsFromFlags(configPath string) (*PubSubOptions, error) {
 		CredentialsFile: config.CredentialsFile,
 		Topics:          *config.Topics,
 		Subscriptions:   *config.Subscriptions,
+		DisableTLS:      config.DisableTLS,
 		// enable keepalive by default
 		KeepaliveSettings: &KeepaliveSettings{
 			Time:                5 * time.Minute,

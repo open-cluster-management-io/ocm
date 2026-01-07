@@ -524,6 +524,9 @@ spec:
                         - type
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - type
+                      x-kubernetes-list-type: map
                     configReferences:
                       description: configReferences is a list of current add-on configuration
                         references.
@@ -1098,6 +1101,9 @@ spec:
                         - type
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - type
+                      x-kubernetes-list-type: map
                     configReferences:
                       description: configReferences is a list of current add-on configuration
                         references.

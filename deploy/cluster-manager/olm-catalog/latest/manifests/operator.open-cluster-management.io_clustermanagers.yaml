@@ -406,6 +406,18 @@ spec:
                       - feature
                       type: object
                     type: array
+                  importerConfiguration:
+                    description: ImporterConfiguration represents the configuration
+                      of the cluster importer
+                    properties:
+                      renderers:
+                        description: |-
+                          renderers specifies which import renderers to use.
+                          Valid values are: "render-auto", "render-from-config-secret"
+                        items:
+                          type: string
+                        type: array
+                    type: object
                   registrationDrivers:
                     description: |-
                       RegistrationDrivers represent the list of hub registration drivers that contain information used by hub to initialize the hub cluster
@@ -850,6 +862,9 @@ spec:
                   - type
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
               generations:
                 description: Generations are used to determine when an item needs
                   to be reconciled or has changed in a way that needs a reaction.

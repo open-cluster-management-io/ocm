@@ -7,31 +7,32 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
-func NewPubSubSourceOptions(endpoint, projectID, sourceID string) *pubsub.PubSubOptions {
+func NewPubSubSourceOptions(endpoint, projectID, sourceID string, disableTLS bool) *pubsub.PubSubOptions {
 	return newPubSubOptions(endpoint, projectID, types.Topics{
 		SourceEvents:    fmt.Sprintf("projects/%s/topics/sourceevents", projectID),
 		SourceBroadcast: fmt.Sprintf("projects/%s/topics/sourcebroadcast", projectID),
 	}, types.Subscriptions{
 		AgentEvents:    fmt.Sprintf("projects/%s/subscriptions/agentevents-%s", projectID, sourceID),
 		AgentBroadcast: fmt.Sprintf("projects/%s/subscriptions/agentbroadcast-%s", projectID, sourceID),
-	})
+	}, disableTLS)
 }
 
-func NewPubSubAgentOptions(endpoint, projectID, clusterName string) *pubsub.PubSubOptions {
+func NewPubSubAgentOptions(endpoint, projectID, clusterName string, disableTLS bool) *pubsub.PubSubOptions {
 	return newPubSubOptions(endpoint, projectID, types.Topics{
 		AgentEvents:    fmt.Sprintf("projects/%s/topics/agentevents", projectID),
 		AgentBroadcast: fmt.Sprintf("projects/%s/topics/agentbroadcast", projectID),
 	}, types.Subscriptions{
 		SourceEvents:    fmt.Sprintf("projects/%s/subscriptions/sourceevents-%s", projectID, clusterName),
 		SourceBroadcast: fmt.Sprintf("projects/%s/subscriptions/sourcebroadcast-%s", projectID, clusterName),
-	})
+	}, disableTLS)
 }
 
-func newPubSubOptions(endpoint, projectID string, topics types.Topics, subscriptions types.Subscriptions) *pubsub.PubSubOptions {
+func newPubSubOptions(endpoint, projectID string, topics types.Topics, subscriptions types.Subscriptions, disableTLS bool) *pubsub.PubSubOptions {
 	return &pubsub.PubSubOptions{
 		Endpoint:      endpoint,
 		ProjectID:     projectID,
 		Topics:        topics,
 		Subscriptions: subscriptions,
+		DisableTLS:    disableTLS,
 	}
 }

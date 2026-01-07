@@ -28,7 +28,7 @@ func NewSimpleStore[T generic.ResourceObject]() *SimpleStore[T] {
 	}
 }
 
-func (s *SimpleStore[T]) GetWatcher(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+func (s *SimpleStore[T]) GetWatcher(ctx context.Context, namespace string, opts metav1.ListOptions) (watch.Interface, error) {
 	panic("watcher is unsupported")
 }
 
@@ -59,7 +59,7 @@ func (s *SimpleStore[T]) HandleReceivedResource(ctx context.Context, resource T)
 		return err
 	}
 
-	_, exists, err := s.Get(metaObj.GetNamespace(), metaObj.GetName())
+	_, exists, err := s.Get(ctx, metaObj.GetNamespace(), metaObj.GetName())
 	if err != nil {
 		return err
 	}

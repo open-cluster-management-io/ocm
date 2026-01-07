@@ -69,7 +69,7 @@ func (s *SourceInformerWatcherStore) HasInitiated() bool {
 	return s.Initiated && s.informer.HasSynced()
 }
 
-func (s *SourceInformerWatcherStore) GetWatcher(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+func (s *SourceInformerWatcherStore) GetWatcher(ctx context.Context, namespace string, opts metav1.ListOptions) (watch.Interface, error) {
 	if namespace != metav1.NamespaceAll {
 		return nil, fmt.Errorf("unsupported to watch from the namespace %s", namespace)
 	}
@@ -168,7 +168,7 @@ func (s *AgentInformerWatcherStore) Delete(resource runtime.Object) error {
 func (s *AgentInformerWatcherStore) HandleReceivedResource(ctx context.Context, work *workv1.ManifestWork) error {
 	// for compatibility, we get the work by its UID
 	// TODO get the work by its namespace/name
-	existingWorks, err := s.findWorksByUID(work.UID)
+	existingWorks, err := s.findWorksByUID(ctx, work.UID)
 	if err != nil {
 		return err
 	}
@@ -220,9 +220,9 @@ func (s *AgentInformerWatcherStore) HandleReceivedResource(ctx context.Context, 
 	return s.Update(updatedWork)
 }
 
-func (s *AgentInformerWatcherStore) findWorksByUID(uid kubetypes.UID) ([]*workv1.ManifestWork, error) {
+func (s *AgentInformerWatcherStore) findWorksByUID(ctx context.Context, uid kubetypes.UID) ([]*workv1.ManifestWork, error) {
 	existingWorks := []*workv1.ManifestWork{}
-	works, err := s.ListAll()
+	works, err := s.ListAll(ctx)
 	if err != nil {
 		return existingWorks, err
 	}
