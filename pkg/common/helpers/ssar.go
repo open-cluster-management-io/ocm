@@ -1,3 +1,4 @@
+
 package helpers
 
 import (
@@ -164,6 +165,9 @@ func generateSelfSubjectAccessReviews(resource authorizationv1.ResourceAttribute
 					Verb:        verb,
 				},
 			},
+
+
+			
 		})
 	}
 	return reviews
