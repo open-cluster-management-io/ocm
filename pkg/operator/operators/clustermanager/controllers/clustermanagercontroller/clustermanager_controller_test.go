@@ -81,7 +81,23 @@ func newClusterManager(name string) *operatorapiv1.ClusterManager {
 	}
 }
 
-func newTestController(t *testing.T, clustermanager *operatorapiv1.ClusterManager) *testController {
+// newCaBundleConfigMap creates the CA bundle ConfigMap that the cert rotation controller creates.
+// This is required for the cluster manager controller to proceed with deploying CRDs.
+func newCaBundleConfigMap(namespace string) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      helpers.CaBundleConfigmap,
+			Namespace: namespace,
+		},
+		Data: map[string]string{
+			"ca-bundle.crt": "-----BEGIN CERTIFICATE-----\ntest-ca-bundle\n-----END CERTIFICATE-----",
+		},
+	}
+}
+
+// newTestControllerWithoutCaBundle creates a test controller without the CA bundle ConfigMap
+// to test the behavior when the cert rotation controller hasn't created it yet.
+func newTestControllerWithoutCaBundle(t *testing.T, clustermanager *operatorapiv1.ClusterManager) *testController {
 	kubeClient := fakekube.NewSimpleClientset()
 	kubeInfomers := kubeinformers.NewSharedInformerFactory(kubeClient, 5*time.Minute)
 	fakeOperatorClient := fakeoperatorlient.NewSimpleClientset(clustermanager)
@@ -98,6 +114,44 @@ func newTestController(t *testing.T, clustermanager *operatorapiv1.ClusterManage
 
 	store := operatorInformers.Operator().V1().ClusterManagers().Informer().GetStore()
 	if err := store.Add(clustermanager); err != nil {
+		t.Fatal(err)
+	}
+
+	return &testController{
+		clusterManagerController: clusterManagerController,
+		operatorClient:           fakeOperatorClient,
+	}
+}
+
+// newTestController creates a test controller with all required dependencies including
+// the CA bundle ConfigMap. This simulates the normal state where the cert rotation
+// controller has already created the CA bundle ConfigMap.
+func newTestController(t *testing.T, clustermanager *operatorapiv1.ClusterManager) *testController {
+	clusterManagerNamespace := helpers.ClusterManagerNamespace(clustermanager.Name, clustermanager.Spec.DeployOption.Mode)
+	caBundleConfigMap := newCaBundleConfigMap(clusterManagerNamespace)
+
+	kubeClient := fakekube.NewSimpleClientset(caBundleConfigMap)
+	kubeInfomers := kubeinformers.NewSharedInformerFactory(kubeClient, 5*time.Minute)
+	fakeOperatorClient := fakeoperatorlient.NewSimpleClientset(clustermanager)
+	operatorInformers := operatorinformers.NewSharedInformerFactory(fakeOperatorClient, 5*time.Minute)
+
+	clusterManagerController := &clusterManagerController{
+		patcher: patcher.NewPatcher[
+			*operatorapiv1.ClusterManager, operatorapiv1.ClusterManagerSpec, operatorapiv1.ClusterManagerStatus](
+			fakeOperatorClient.OperatorV1().ClusterManagers()),
+		clusterManagerLister: operatorInformers.Operator().V1().ClusterManagers().Lister(),
+		configMapLister:      kubeInfomers.Core().V1().ConfigMaps().Lister(),
+		cache:                resourceapply.NewResourceCache(),
+	}
+
+	store := operatorInformers.Operator().V1().ClusterManagers().Informer().GetStore()
+	if err := store.Add(clustermanager); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add the CA bundle ConfigMap to the informer store
+	configMapStore := kubeInfomers.Core().V1().ConfigMaps().Informer().GetStore()
+	if err := configMapStore.Add(caBundleConfigMap); err != nil {
 		t.Fatal(err)
 	}
 
@@ -627,6 +681,30 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 	}
 	// Check if resources are created as expected
 	testingcommon.AssertEqualNumber(t, len(createCRDObjects), 12)
+}
+
+// TestSyncDeployWithoutCaBundle tests that sync requeues when the CA bundle ConfigMap
+// doesn't exist. This ensures the controller waits for the cert rotation controller to create
+// the ConfigMap before proceeding, preventing CRDs from being created with invalid "placeholder"
+// CA bundles that would cause webhook conversion to fail.
+func TestSyncDeployWithoutCaBundle(t *testing.T) {
+	clusterManager := newClusterManager("testhub")
+	tc := newTestControllerWithoutCaBundle(t, clusterManager)
+	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
+	cd := setDeployment(clusterManager.Name, clusterManagerNamespace)
+	setup(t, tc, cd)
+
+	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
+
+	err := tc.clusterManagerController.sync(ctx, syncContext, "testhub")
+	// sync should return nil (requeue via AddAfter) instead of an error
+	if err != nil {
+		t.Fatalf("Expected no error when CA bundle ConfigMap is missing (should requeue via AddAfter), but got: %v", err)
+	}
+
+	// Note: We can't easily verify the requeue here because AddAfter adds items with a delay.
+	// The important thing is that sync returns nil (indicating graceful requeue) instead of
+	// proceeding with an invalid CA bundle or returning an error.
 }
 
 // TestSyncDelete test cleanup hub deploy

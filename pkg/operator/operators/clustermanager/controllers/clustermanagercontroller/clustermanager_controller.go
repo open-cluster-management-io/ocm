@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/base64"
 	errorhelpers "errors"
+	"fmt"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	corev1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -281,18 +283,32 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		return n.patcher.RemoveFinalizer(ctx, clusterManager, clusterManagerFinalizer)
 	}
 
-	// get caBundle
-	caBundle := "placeholder"
-	configmap, err := n.configMapLister.ConfigMaps(clusterManagerNamespace).Get(helpers.CaBundleConfigmap)
-	switch {
-	case errors.IsNotFound(err):
-		// do nothing
-	case err != nil:
+	// Create the hub namespace FIRST, before waiting for the CA bundle.
+	// This is required because the cert rotation controller needs the namespace to exist
+	// before it can create the ca-bundle-configmap. If we wait for the CA bundle before
+	// creating the namespace, we would have a deadlock.
+	if err := ensureNamespace(ctx, hubClient, clusterManagerNamespace); err != nil {
 		return err
-	default:
-		if cb := configmap.Data["ca-bundle.crt"]; len(cb) > 0 {
-			caBundle = cb
+	}
+
+	// get caBundle from the ConfigMap created by the cert rotation controller.
+	// The cert rotation controller must create this ConfigMap before we can proceed,
+	// otherwise the CRDs will be created with an invalid "placeholder" CA bundle,
+	// causing webhook conversion to fail and the CRDs to not become Established.
+	configmap, err := n.configMapLister.ConfigMaps(clusterManagerNamespace).Get(helpers.CaBundleConfigmap)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			logger.V(4).Info("CA bundle configmap not yet available, will retry",
+				"namespace", clusterManagerNamespace, "configmap", helpers.CaBundleConfigmap)
+			controllerContext.Queue().AddAfter(clusterManagerName, 3*time.Second)
+			return nil
 		}
+		return err
+	}
+	caBundle := configmap.Data["ca-bundle.crt"]
+	if len(caBundle) == 0 {
+		return fmt.Errorf("CA bundle configmap %s/%s exists but ca-bundle.crt is empty",
+			clusterManagerNamespace, helpers.CaBundleConfigmap)
 	}
 	encodedCaBundle := base64.StdEncoding.EncodeToString([]byte(caBundle))
 	config.RegistrationAPIServiceCABundle = encodedCaBundle
@@ -382,6 +398,33 @@ func ensureSAKubeconfigs(ctx context.Context, clusterManagerName, clusterManager
 			return err
 		}
 	}
+	return nil
+}
+
+// ensureNamespace creates the namespace if it doesn't exist.
+// This is used to create the hub namespace before waiting for the CA bundle,
+// so that the cert rotation controller can create the ca-bundle-configmap.
+func ensureNamespace(ctx context.Context, kubeClient kubernetes.Interface, namespace string) error {
+	_, err := kubeClient.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+	if err == nil {
+		// Namespace already exists
+		return nil
+	}
+	if !errors.IsNotFound(err) {
+		return err
+	}
+	// Create the namespace
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+		},
+	}
+	_, err = kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+	if err != nil && !errors.IsAlreadyExists(err) {
+		return err
+	}
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Created namespace for cert rotation controller", "namespace", namespace)
 	return nil
 }
 
