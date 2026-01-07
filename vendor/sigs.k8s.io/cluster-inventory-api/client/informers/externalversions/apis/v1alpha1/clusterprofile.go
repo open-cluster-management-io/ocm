@@ -18,24 +18,24 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	apisv1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
+	clusterinventoryapiapisv1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
 	versioned "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned"
 	internalinterfaces "sigs.k8s.io/cluster-inventory-api/client/informers/externalversions/internalinterfaces"
-	v1alpha1 "sigs.k8s.io/cluster-inventory-api/client/listers/apis/v1alpha1"
+	apisv1alpha1 "sigs.k8s.io/cluster-inventory-api/client/listers/apis/v1alpha1"
 )
 
 // ClusterProfileInformer provides access to a shared informer and lister for
 // ClusterProfiles.
 type ClusterProfileInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.ClusterProfileLister
+	Lister() apisv1alpha1.ClusterProfileLister
 }
 
 type clusterProfileInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredClusterProfileInformer(client versioned.Interface, namespace str
 				return client.ApisV1alpha1().ClusterProfiles(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&apisv1alpha1.ClusterProfile{},
+		&clusterinventoryapiapisv1alpha1.ClusterProfile{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *clusterProfileInformer) defaultInformer(client versioned.Interface, res
 }
 
 func (f *clusterProfileInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apisv1alpha1.ClusterProfile{}, f.defaultInformer)
+	return f.factory.InformerFor(&clusterinventoryapiapisv1alpha1.ClusterProfile{}, f.defaultInformer)
 }
 
-func (f *clusterProfileInformer) Lister() v1alpha1.ClusterProfileLister {
-	return v1alpha1.NewClusterProfileLister(f.Informer().GetIndexer())
+func (f *clusterProfileInformer) Lister() apisv1alpha1.ClusterProfileLister {
+	return apisv1alpha1.NewClusterProfileLister(f.Informer().GetIndexer())
 }

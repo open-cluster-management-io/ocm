@@ -26,9 +26,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
+const (
+	// Group is the API group.
+	Group = "multicluster.x-k8s.io"
+	// Version is the API version.
+	Version = "v1alpha1"
+	// Kind is the resource kind.
+	Kind     = "ClusterProfile"
+	resource = "clusterprofiles"
+)
+
 var (
 	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "multicluster.x-k8s.io", Version: "v1alpha1"}
+	GroupVersion = schema.GroupVersion{Group: Group, Version: Version}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
@@ -36,6 +46,20 @@ var (
 	// SchemeGroupVersion generated code relies on this name
 	// Deprecated
 	SchemeGroupVersion = GroupVersion
+
+	// SchemeGroupVersionKind is the group, version and kind for the ClusterProfile CR.
+	SchemeGroupVersionKind = schema.GroupVersionKind{
+		Group:   Group,
+		Version: Version,
+		Kind:    Kind,
+	}
+
+	// SchemeGroupVersionResource is the group, version and resource for the ClusterProfile CR.
+	SchemeGroupVersionResource = schema.GroupVersionResource{
+		Group:    Group,
+		Version:  Version,
+		Resource: resource,
+	}
 
 	// AddToScheme adds the types in this group-version to the given scheme.
 	AddToScheme = SchemeBuilder.AddToScheme
