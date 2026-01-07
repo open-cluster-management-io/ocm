@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
-	v1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
+	apisv1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
 )
 
 // ClusterProfileLister helps list ClusterProfiles.
@@ -29,7 +29,7 @@ import (
 type ClusterProfileLister interface {
 	// List lists all ClusterProfiles in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.ClusterProfile, err error)
+	List(selector labels.Selector) (ret []*apisv1alpha1.ClusterProfile, err error)
 	// ClusterProfiles returns an object that can list and get ClusterProfiles.
 	ClusterProfiles(namespace string) ClusterProfileNamespaceLister
 	ClusterProfileListerExpansion
@@ -37,25 +37,17 @@ type ClusterProfileLister interface {
 
 // clusterProfileLister implements the ClusterProfileLister interface.
 type clusterProfileLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*apisv1alpha1.ClusterProfile]
 }
 
 // NewClusterProfileLister returns a new ClusterProfileLister.
 func NewClusterProfileLister(indexer cache.Indexer) ClusterProfileLister {
-	return &clusterProfileLister{indexer: indexer}
-}
-
-// List lists all ClusterProfiles in the indexer.
-func (s *clusterProfileLister) List(selector labels.Selector) (ret []*v1alpha1.ClusterProfile, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.ClusterProfile))
-	})
-	return ret, err
+	return &clusterProfileLister{listers.New[*apisv1alpha1.ClusterProfile](indexer, apisv1alpha1.Resource("clusterprofile"))}
 }
 
 // ClusterProfiles returns an object that can list and get ClusterProfiles.
 func (s *clusterProfileLister) ClusterProfiles(namespace string) ClusterProfileNamespaceLister {
-	return clusterProfileNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return clusterProfileNamespaceLister{listers.NewNamespaced[*apisv1alpha1.ClusterProfile](s.ResourceIndexer, namespace)}
 }
 
 // ClusterProfileNamespaceLister helps list and get ClusterProfiles.
@@ -63,36 +55,15 @@ func (s *clusterProfileLister) ClusterProfiles(namespace string) ClusterProfileN
 type ClusterProfileNamespaceLister interface {
 	// List lists all ClusterProfiles in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.ClusterProfile, err error)
+	List(selector labels.Selector) (ret []*apisv1alpha1.ClusterProfile, err error)
 	// Get retrieves the ClusterProfile from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.ClusterProfile, error)
+	Get(name string) (*apisv1alpha1.ClusterProfile, error)
 	ClusterProfileNamespaceListerExpansion
 }
 
 // clusterProfileNamespaceLister implements the ClusterProfileNamespaceLister
 // interface.
 type clusterProfileNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all ClusterProfiles in the indexer for a given namespace.
-func (s clusterProfileNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.ClusterProfile, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.ClusterProfile))
-	})
-	return ret, err
-}
-
-// Get retrieves the ClusterProfile from the indexer for a given namespace and name.
-func (s clusterProfileNamespaceLister) Get(name string) (*v1alpha1.ClusterProfile, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("clusterprofile"), name)
-	}
-	return obj.(*v1alpha1.ClusterProfile), nil
+	listers.ResourceIndexer[*apisv1alpha1.ClusterProfile]
 }

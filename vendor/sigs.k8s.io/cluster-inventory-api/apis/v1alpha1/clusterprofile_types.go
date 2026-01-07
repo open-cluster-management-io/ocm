@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientcmdv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
 // ClusterProfileSpec defines the desired state of ClusterProfile.
@@ -60,14 +61,40 @@ type ClusterProfileStatus struct {
 	// +optional
 	Version ClusterVersion `json:"version,omitempty"`
 
-	// Properties defines name/value pairs to represent properties of a cluster.
-	// It could be a collection of ClusterProperty (KEP-2149) resources,
-	// but could also be info based on other implementations.
-	// The names of the properties can be predefined names from ClusterProperty resources
-	// and is allowed to be customized by different cluster managers.
+	// Properties defines cluster characteristics through a list of Property objects.
+	// Each Property can be one of:
+	// 1. A ClusterProperty resource (as defined in KEP-2149)
+	// 2. Custom information from cluster manager implementations
+	// Property names support both:
+	// - Standard names from ClusterProperty resources
+	// - Custom names defined by cluster managers
 	// +optional
 	Properties []Property `json:"properties,omitempty"`
+
+	// CredentialProviders is a list of cluster access providers that can provide access
+	// information for clusters.
+	// Deprecated: Use AccessProviders instead. If both AccessProviders and CredentialProviders are provided, both are used. In case they specify a provider with the same name, the one in AccessProviders is preferred.
+	// +optional
+	// +deprecated
+	CredentialProviders []CredentialProvider `json:"credentialProviders,omitempty"`
+
+	// AccessProviders is a list of cluster access providers that can provide access
+	// information for clusters.
+	// +optional
+	AccessProviders []AccessProvider `json:"accessProviders,omitempty"`
 }
+
+// AccessProvider defines how to access the cluster.
+// It contains the name of the provider name and the cluster connection details.
+// The name is used to identify different access info types, such as "kubeconfig" or "oidc".
+// The Cluster field contains the actual cluster connection details, such as server address,
+// certificate authority data, and authentication information.
+type AccessProvider struct {
+	Name    string              `json:"name"`
+	Cluster clientcmdv1.Cluster `json:"cluster,omitempty"`
+}
+
+type CredentialProvider = AccessProvider
 
 // ClusterVersion represents version information about the cluster.
 type ClusterVersion struct {
@@ -76,14 +103,10 @@ type ClusterVersion struct {
 	Kubernetes string `json:"kubernetes,omitempty"`
 }
 
-// Property defines a name/value pair to represent a property of a cluster.
-// It could be a ClusterProperty (KEP-2149) resource,
-// but could also be info based on other implementations.
-// The name of the property can be predefined name from a ClusterProperty resource
-// and is allowed to be customized by different cluster managers.
+// Property defines the data structure to represent a property of a cluster.
+// It contains a name/value pair and the last observed time of the property on the cluster.
 // This property can store various configurable details and metrics of a cluster,
-// which may include information such as the number of nodes, total and free CPU,
-// and total and free memory, among other potential attributes.
+// which may include information such as the entry point of the cluster, types of nodes, location, etc. according to KEP 4322.
 type Property struct {
 	// Name is the name of a property resource on cluster. It's a well-known
 	// or customized name to identify the property.
@@ -97,6 +120,13 @@ type Property struct {
 	// +kubebuilder:validation:MinLength=1
 	// +required
 	Value string `json:"value"`
+
+	// LastObservedTime is the last time the property was observed on the corresponding cluster.
+	// The value is the timestamp when the property was observed not the time when the property was updated in the cluster-profile.
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Format=date-time
+	// +optional
+	LastObservedTime metav1.Time `json:"lastObservedTime,omitempty"`
 }
 
 // Predefined healthy conditions indicate the cluster is in a good state or not.

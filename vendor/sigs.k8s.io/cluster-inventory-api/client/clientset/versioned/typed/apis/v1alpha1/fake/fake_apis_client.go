@@ -28,7 +28,7 @@ type FakeApisV1alpha1 struct {
 }
 
 func (c *FakeApisV1alpha1) ClusterProfiles(namespace string) v1alpha1.ClusterProfileInterface {
-	return &FakeClusterProfiles{c, namespace}
+	return newFakeClusterProfiles(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate
