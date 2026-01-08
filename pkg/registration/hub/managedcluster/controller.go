@@ -181,6 +181,17 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 			}
 		}
 
+		// Remove the cluster role binding files for registration-agent and work-agent.
+		err := c.removeClusterRbac(ctx, syncCtx, managedClusterName, managedCluster.Spec.HubAcceptsClient)
+		if errors.Is(err, requeueError) {
+			syncCtx.Queue().AddAfter(managedClusterName, requeueError.RequeueTime)
+			return nil
+		}
+
+		if err != nil {
+			errs = append(errs, err)
+		}
+
 		if err = c.hubDriver.Cleanup(ctx, managedCluster); err != nil {
 			errs = append(errs, err)
 		}
@@ -200,13 +211,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 			return err
 		}
 
-		// Remove the cluster role binding files for registration-agent and work-agent.
-		err = c.removeClusterRbac(ctx, syncCtx, managedClusterName, managedCluster.Spec.HubAcceptsClient)
-		if errors.Is(err, requeueError) {
-			syncCtx.Queue().AddAfter(managedClusterName, requeueError.RequeueTime)
-			return nil
-		}
-		return err
+		return nil
 	}
 
 	// TODO consider to add the managedcluster-namespace.yaml back to staticFiles,
