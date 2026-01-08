@@ -453,6 +453,9 @@ spec:
                   - type
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
               resourceStatus:
                 description: |-
                   ResourceStatus represents the status of each resource in manifestwork deployed on a
@@ -532,6 +535,9 @@ spec:
                             - type
                             type: object
                           type: array
+                          x-kubernetes-list-map-keys:
+                          - type
+                          x-kubernetes-list-type: map
                         resourceMeta:
                           description: ResourceMeta represents the group, version,
                             kind, name and namespace of a resoure.

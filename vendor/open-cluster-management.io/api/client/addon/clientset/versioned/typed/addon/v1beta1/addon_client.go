@@ -13,6 +13,7 @@ import (
 
 type AddonV1beta1Interface interface {
 	RESTClient() rest.Interface
+	AddOnDeploymentConfigsGetter
 	ClusterManagementAddOnsGetter
 	ManagedClusterAddOnsGetter
 }
@@ -20,6 +21,10 @@ type AddonV1beta1Interface interface {
 // AddonV1beta1Client is used to interact with features provided by the addon.open-cluster-management.io group.
 type AddonV1beta1Client struct {
 	restClient rest.Interface
+}
+
+func (c *AddonV1beta1Client) AddOnDeploymentConfigs(namespace string) AddOnDeploymentConfigInterface {
+	return newAddOnDeploymentConfigs(c, namespace)
 }
 
 func (c *AddonV1beta1Client) ClusterManagementAddOns() ClusterManagementAddOnInterface {

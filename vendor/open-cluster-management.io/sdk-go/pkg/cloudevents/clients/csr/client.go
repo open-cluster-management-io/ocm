@@ -28,6 +28,7 @@ type CSRClient struct {
 }
 
 var _ cache.ListerWatcher = &CSRClient{}
+var _ cache.ListerWatcherWithContext = &CSRClient{}
 
 func NewCSRClient(
 	cloudEventsClient generic.CloudEventsClient[*certificatev1.CertificateSigningRequest],
@@ -47,7 +48,7 @@ func (c *CSRClient) Create(ctx context.Context, csr *certificatev1.CertificateSi
 		csr.GenerateName = ""
 	}
 	klog.V(4).Infof("creating CSR %s", csr.Name)
-	_, exists, err := c.watcherStore.Get("", csr.Name)
+	_, exists, err := c.watcherStore.Get(ctx, "", csr.Name)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}
@@ -78,7 +79,7 @@ func (c *CSRClient) Create(ctx context.Context, csr *certificatev1.CertificateSi
 
 func (c *CSRClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*certificatev1.CertificateSigningRequest, error) {
 	klog.V(4).Infof("getting csr %s", name)
-	csr, exists, err := c.watcherStore.Get("", name)
+	csr, exists, err := c.watcherStore.Get(ctx, "", name)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}
@@ -90,8 +91,19 @@ func (c *CSRClient) Get(ctx context.Context, name string, opts metav1.GetOptions
 }
 
 func (c *CSRClient) List(opts metav1.ListOptions) (runtime.Object, error) {
-	klog.V(4).Info("list csr")
-	csrList, err := c.watcherStore.List("", opts)
+	// the ListWithContext is called in informer actually
+	return c.ListWithContext(context.TODO(), opts)
+}
+
+func (c *CSRClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	// the WatchWithContext is called in informer actually
+	return c.WatchWithContext(context.TODO(), opts)
+}
+
+func (c *CSRClient) ListWithContext(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("list csr")
+	csrList, err := c.watcherStore.List(ctx, "", opts)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}
@@ -103,9 +115,10 @@ func (c *CSRClient) List(opts metav1.ListOptions) (runtime.Object, error) {
 	return &certificatev1.CertificateSigningRequestList{ListMeta: csrList.ListMeta, Items: items}, nil
 }
 
-func (c *CSRClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	klog.V(4).Info("watch csr")
-	watcher, err := c.watcherStore.GetWatcher("", opts)
+func (c *CSRClient) WatchWithContext(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("watch csr")
+	watcher, err := c.watcherStore.GetWatcher(context.Background(), "", opts)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}

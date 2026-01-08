@@ -2,13 +2,14 @@ package v1beta1
 
 import (
 	"context"
+	"net/http"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-	"net/http"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 
 	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned/typed/addon/v1beta1"
@@ -71,7 +72,7 @@ func (c *ManagedClusterAddOnClient) DeleteCollection(_ context.Context, _ metav1
 func (c *ManagedClusterAddOnClient) Get(ctx context.Context, name string, _ metav1.GetOptions) (*addonapiv1beta1.ManagedClusterAddOn, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("getting ManagedClusterAddOn", "namespace", c.namespace, "name", name)
-	addon, exists, err := c.watcherStore.Get(c.namespace, name)
+	addon, exists, err := c.watcherStore.Get(ctx, c.namespace, name)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}
@@ -85,7 +86,7 @@ func (c *ManagedClusterAddOnClient) Get(ctx context.Context, name string, _ meta
 func (c *ManagedClusterAddOnClient) List(ctx context.Context, opts metav1.ListOptions) (*addonapiv1beta1.ManagedClusterAddOnList, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("list ManagedClusterAddon")
-	addonList, err := c.watcherStore.List(c.namespace, opts)
+	addonList, err := c.watcherStore.List(ctx, c.namespace, opts)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}
@@ -101,7 +102,7 @@ func (c *ManagedClusterAddOnClient) List(ctx context.Context, opts metav1.ListOp
 func (c *ManagedClusterAddOnClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("watch ManagedClusterAddOn")
-	watcher, err := c.watcherStore.GetWatcher(c.namespace, opts)
+	watcher, err := c.watcherStore.GetWatcher(ctx, c.namespace, opts)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}
@@ -113,7 +114,7 @@ func (c *ManagedClusterAddOnClient) Patch(
 	ctx context.Context, name string, pt kubetypes.PatchType, data []byte, _ metav1.PatchOptions, subresources ...string) (*addonapiv1beta1.ManagedClusterAddOn, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("patching ManagedClusterAddon", "namespace", c.namespace, "name", name)
-	last, exists, err := c.watcherStore.Get(c.namespace, name)
+	last, exists, err := c.watcherStore.Get(ctx, c.namespace, name)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}
@@ -169,4 +170,8 @@ func (c *AddonClientWrapper) RESTClient() rest.Interface {
 
 func (c *AddonClientWrapper) ManagedClusterAddOns(namespace string) addonv1beta1client.ManagedClusterAddOnInterface {
 	return c.client.Namespace(namespace)
+}
+
+func (c *AddonClientWrapper) AddOnDeploymentConfigs(namespace string) addonv1beta1client.AddOnDeploymentConfigInterface {
+	panic("AddOnDeploymentConfigs is unsupported")
 }

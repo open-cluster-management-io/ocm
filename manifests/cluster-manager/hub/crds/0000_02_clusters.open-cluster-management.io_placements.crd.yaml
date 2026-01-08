@@ -601,6 +601,9 @@ spec:
                   - type
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
               decisionGroups:
                 description: List of decision groups determined by the placement and
                   DecisionStrategy.

@@ -211,8 +211,8 @@ type InstallProgression struct {
 	ConfigReferences []InstallConfigReference `json:"configReferences,omitempty"`
 
 	// conditions describe the state of the managed and monitored components for the operator.
-	// +patchMergeKey=type
-	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"  patchStrategy:"merge" patchMergeKey:"type"`
 }

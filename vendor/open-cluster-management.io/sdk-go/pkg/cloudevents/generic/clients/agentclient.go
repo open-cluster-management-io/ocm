@@ -15,7 +15,6 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/utils"
 )
 
 // CloudEventAgentClient is a client for an agent to resync/send/receive its resources with cloud events.
@@ -45,13 +44,7 @@ func NewCloudEventAgentClient[T generic.ResourceObject](
 	statusHashGetter generic.StatusHashGetter[T],
 	codec generic.Codec[T],
 ) (generic.CloudEventsClient[T], error) {
-	baseClient := &baseClient{
-		clientID:               agentOptions.AgentID,
-		transport:              agentOptions.CloudEventsTransport,
-		cloudEventsRateLimiter: utils.NewRateLimiter(agentOptions.EventRateLimit),
-		reconnectedChan:        make(chan struct{}),
-	}
-
+	baseClient := newBaseClient(agentOptions.AgentID, agentOptions.CloudEventsTransport, agentOptions.EventRateLimit)
 	if err := baseClient.connect(ctx); err != nil {
 		return nil, err
 	}
@@ -69,14 +62,14 @@ func NewCloudEventAgentClient[T generic.ResourceObject](
 // ReconnectedChan returns a chan which indicates the source/agent client is reconnected.
 // The source/agent client callers should consider sending a resync request when receiving this signal.
 func (c *CloudEventAgentClient[T]) ReconnectedChan() <-chan struct{} {
-	return c.reconnectedChan
+	return c.resyncChan
 }
 
 // Resync the resources spec by sending a spec resync request from the current to the given source.
 func (c *CloudEventAgentClient[T]) Resync(ctx context.Context, source string) error {
 	// list the resource objects that are maintained by the current agent with the given source
 	options := types.ListOptions{Source: source, ClusterName: c.clusterName, CloudEventsDataType: c.codec.EventDataType()}
-	objs, err := c.lister.List(options)
+	objs, err := c.lister.List(ctx, options)
 	if err != nil {
 		return err
 	}
@@ -222,7 +215,7 @@ func (c *CloudEventAgentClient[T]) respondResyncStatusRequest(
 	logger := klog.FromContext(ctx).WithValues("eventDataType", eventDataType.String())
 
 	options := types.ListOptions{ClusterName: c.clusterName, Source: evt.Source(), CloudEventsDataType: eventDataType}
-	objs, err := c.lister.List(options)
+	objs, err := c.lister.List(ctx, options)
 	if err != nil {
 		return err
 	}

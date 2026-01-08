@@ -79,6 +79,8 @@ type ManifestWorkReplicaSetStatus struct {
 	// Valid condition types are:
 	// 1. AppliedManifestWorks represents ManifestWorks have been distributed as per placement All, Partial, None, Problem
 	// 2. PlacementRefValid
+	// +listType=map
+	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// Summary totals of resulting ManifestWorks for all placements

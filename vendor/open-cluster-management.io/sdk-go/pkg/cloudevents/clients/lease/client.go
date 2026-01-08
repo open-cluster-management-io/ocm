@@ -53,7 +53,7 @@ func (l LeaseClient) DeleteCollection(ctx context.Context, opts metav1.DeleteOpt
 
 func (l LeaseClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*coordinationv1.Lease, error) {
 	klog.V(4).Infof("getting lease %s", name)
-	lease, exists, err := l.watcherStore.Get(l.namespace, name)
+	lease, exists, err := l.watcherStore.Get(ctx, l.namespace, name)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}

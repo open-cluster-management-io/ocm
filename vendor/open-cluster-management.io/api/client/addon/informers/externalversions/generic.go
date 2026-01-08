@@ -49,6 +49,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Addon().V1alpha1().ManagedClusterAddOns().Informer()}, nil
 
 		// Group=addon.open-cluster-management.io, Version=v1beta1
+	case v1beta1.SchemeGroupVersion.WithResource("addondeploymentconfigs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Addon().V1beta1().AddOnDeploymentConfigs().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("clustermanagementaddons"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Addon().V1beta1().ClusterManagementAddOns().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("managedclusteraddons"):

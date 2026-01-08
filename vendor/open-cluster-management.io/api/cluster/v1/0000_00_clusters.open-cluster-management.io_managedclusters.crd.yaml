@@ -262,6 +262,9 @@ spec:
                   - type
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
               managedNamespaces:
                 description: |-
                   managedNamespaces are a list of namespaces managed by the clustersets the
@@ -330,6 +333,9 @@ spec:
                         - type
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - type
+                      x-kubernetes-list-type: map
                     name:
                       description: name is the name of the namespace.
                       maxLength: 63

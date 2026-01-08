@@ -3,7 +3,6 @@ package pubsub
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"cloud.google.com/go/pubsub/v2"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -47,15 +46,16 @@ func (o *pubsubTransport) Connect(ctx context.Context) error {
 	}
 	if o.Endpoint != "" {
 		clientOptions = append(clientOptions, option.WithEndpoint(o.Endpoint))
-		if strings.Contains(o.Endpoint, "localhost") || strings.Contains(o.Endpoint, "127.0.0.1") {
-			// use the insecure connection for local development/testing
-			pubsubConn, err := grpc.NewClient(o.Endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
-			if err != nil {
-				return err
-			}
-			o.grpcConn = pubsubConn
-			clientOptions = append(clientOptions, option.WithGRPCConn(pubsubConn))
+	}
+
+	// Use insecure connection for test environments (e.g., pubsub emulator or test server)
+	if o.DisableTLS {
+		pubsubConn, err := grpc.NewClient(o.Endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			return err
 		}
+		o.grpcConn = pubsubConn
+		clientOptions = append(clientOptions, option.WithGRPCConn(pubsubConn))
 	}
 
 	if o.KeepaliveSettings != nil {

@@ -148,7 +148,7 @@ func (b *workProcessor) handleWork(ctx context.Context, work *workv1.ManifestWor
 
 func (b *workProcessor) getWork(ctx context.Context, uid kubetypes.UID) *workv1.ManifestWork {
 	logger := klog.FromContext(ctx)
-	works, err := b.store.ListAll()
+	works, err := b.store.ListAll(ctx)
 	if err != nil {
 		logger.Error(err, "failed to lists works")
 		return nil

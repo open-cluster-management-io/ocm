@@ -13,6 +13,10 @@ type FakeAddonV1beta1 struct {
 	*testing.Fake
 }
 
+func (c *FakeAddonV1beta1) AddOnDeploymentConfigs(namespace string) v1beta1.AddOnDeploymentConfigInterface {
+	return newFakeAddOnDeploymentConfigs(c, namespace)
+}
+
 func (c *FakeAddonV1beta1) ClusterManagementAddOns() v1beta1.ClusterManagementAddOnInterface {
 	return newFakeClusterManagementAddOns(c)
 }

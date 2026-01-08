@@ -470,6 +470,8 @@ type ManifestWorkStatus struct {
 	// 3. Available represents workload in ManifestWork exists on the managed cluster.
 	// 4. Degraded represents the current state of workload does not match the desired
 	// state for a certain period.
+	// +listType=map
+	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// ResourceStatus represents the status of each resource in manifestwork deployed on a
@@ -538,6 +540,8 @@ type ManifestCondition struct {
 
 	// Conditions represents the conditions of this resource on a managed cluster.
 	// +required
+	// +listType=map
+	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions"`
 }
 

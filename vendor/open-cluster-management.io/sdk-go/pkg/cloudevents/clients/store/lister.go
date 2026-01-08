@@ -1,6 +1,8 @@
 package store
 
 import (
+	"context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
@@ -19,12 +21,12 @@ func NewAgentWatcherStoreLister[T generic.ResourceObject](store ClientWatcherSto
 }
 
 // List returns the resources from a ClientWatcherStore with list options
-func (l *AgentWatcherStoreLister[T]) List(options types.ListOptions) ([]T, error) {
+func (l *AgentWatcherStoreLister[T]) List(ctx context.Context, options types.ListOptions) ([]T, error) {
 	opts := metav1.ListOptions{}
 
 	// TODO we might want to specify source when list
 
-	list, err := l.store.List("", opts)
+	list, err := l.store.List(ctx, "", opts)
 	if err != nil {
 		return nil, err
 	}
@@ -44,8 +46,8 @@ func NewSourceWatcherStoreLister[T generic.ResourceObject](store ClientWatcherSt
 }
 
 // List returns the resources from a ClientWatcherStore with list options.
-func (l *SourceWatcherStoreLister[T]) List(options types.ListOptions) ([]T, error) {
-	list, err := l.store.List(options.ClusterName, metav1.ListOptions{})
+func (l *SourceWatcherStoreLister[T]) List(ctx context.Context, options types.ListOptions) ([]T, error) {
+	list, err := l.store.List(ctx, options.ClusterName, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

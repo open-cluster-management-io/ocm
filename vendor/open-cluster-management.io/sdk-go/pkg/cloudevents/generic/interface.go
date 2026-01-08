@@ -39,7 +39,7 @@ type ResourceObject interface {
 
 type Lister[T ResourceObject] interface {
 	// List returns the list of resource objects that are maintained by source/agent.
-	List(options types.ListOptions) ([]T, error)
+	List(ctx context.Context, options types.ListOptions) ([]T, error)
 }
 
 type Codec[T ResourceObject] interface {

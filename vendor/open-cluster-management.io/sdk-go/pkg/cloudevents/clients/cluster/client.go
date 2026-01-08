@@ -43,7 +43,7 @@ func NewManagedClusterClient(
 
 func (c *ManagedClusterClient) Create(ctx context.Context, cluster *clusterv1.ManagedCluster, opts metav1.CreateOptions) (*clusterv1.ManagedCluster, error) {
 	klog.V(4).Infof("creating ManagedCluster %s", cluster.Name)
-	_, exists, err := c.watcherStore.Get("", cluster.Name)
+	_, exists, err := c.watcherStore.Get(ctx, "", cluster.Name)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}
@@ -85,7 +85,7 @@ func (c *ManagedClusterClient) DeleteCollection(ctx context.Context, opts metav1
 
 func (c *ManagedClusterClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*clusterv1.ManagedCluster, error) {
 	klog.V(4).Infof("getting ManagedCluster %s", name)
-	cluster, exists, err := c.watcherStore.Get("", name)
+	cluster, exists, err := c.watcherStore.Get(ctx, "", name)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}
@@ -98,7 +98,7 @@ func (c *ManagedClusterClient) Get(ctx context.Context, name string, opts metav1
 
 func (c *ManagedClusterClient) List(ctx context.Context, opts metav1.ListOptions) (*clusterv1.ManagedClusterList, error) {
 	klog.V(4).Info("list ManagedCluster")
-	clusterList, err := c.watcherStore.List("", opts)
+	clusterList, err := c.watcherStore.List(ctx, "", opts)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}
@@ -113,7 +113,7 @@ func (c *ManagedClusterClient) List(ctx context.Context, opts metav1.ListOptions
 
 func (c *ManagedClusterClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	klog.V(4).Info("watch ManagedCluster")
-	watcher, err := c.watcherStore.GetWatcher("", opts)
+	watcher, err := c.watcherStore.GetWatcher(ctx, "", opts)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}
@@ -123,7 +123,7 @@ func (c *ManagedClusterClient) Watch(ctx context.Context, opts metav1.ListOption
 
 func (c *ManagedClusterClient) Patch(ctx context.Context, name string, pt kubetypes.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *clusterv1.ManagedCluster, err error) {
 	klog.V(4).Infof("patching ManagedCluster %s", name)
-	lastCluster, exists, err := c.watcherStore.Get("", name)
+	lastCluster, exists, err := c.watcherStore.Get(ctx, "", name)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}

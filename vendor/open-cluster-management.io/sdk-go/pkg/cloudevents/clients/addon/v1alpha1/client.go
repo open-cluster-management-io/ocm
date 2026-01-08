@@ -2,8 +2,9 @@ package v1alpha1
 
 import (
 	"context"
-	"k8s.io/client-go/rest"
 	"net/http"
+
+	"k8s.io/client-go/rest"
 
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 
@@ -73,7 +74,7 @@ func (c *ManagedClusterAddOnClient) DeleteCollection(ctx context.Context, opts m
 func (c *ManagedClusterAddOnClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*addonapiv1alpha1.ManagedClusterAddOn, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("getting ManagedClusterAddOn", "namespace", c.namespace, "name", name)
-	addon, exists, err := c.watcherStore.Get(c.namespace, name)
+	addon, exists, err := c.watcherStore.Get(ctx, c.namespace, name)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}
@@ -87,7 +88,7 @@ func (c *ManagedClusterAddOnClient) Get(ctx context.Context, name string, opts m
 func (c *ManagedClusterAddOnClient) List(ctx context.Context, opts metav1.ListOptions) (*addonapiv1alpha1.ManagedClusterAddOnList, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("list ManagedClusterAddon")
-	addonList, err := c.watcherStore.List(c.namespace, opts)
+	addonList, err := c.watcherStore.List(ctx, c.namespace, opts)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}
@@ -103,7 +104,7 @@ func (c *ManagedClusterAddOnClient) List(ctx context.Context, opts metav1.ListOp
 func (c *ManagedClusterAddOnClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("watch ManagedClusterAddOn")
-	watcher, err := c.watcherStore.GetWatcher(c.namespace, opts)
+	watcher, err := c.watcherStore.GetWatcher(ctx, c.namespace, opts)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}
@@ -115,7 +116,7 @@ func (c *ManagedClusterAddOnClient) Patch(
 	ctx context.Context, name string, pt kubetypes.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*addonapiv1alpha1.ManagedClusterAddOn, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("patching ManagedClusterAddon", "namespace", c.namespace, "name", name)
-	last, exists, err := c.watcherStore.Get(c.namespace, name)
+	last, exists, err := c.watcherStore.Get(ctx, c.namespace, name)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}
