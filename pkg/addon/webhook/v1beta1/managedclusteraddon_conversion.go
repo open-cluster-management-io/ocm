@@ -48,6 +48,9 @@ func (src *ManagedClusterAddOn) ConvertTo(dstRaw conversion.Hub) error {
 	// This field was removed in v1beta1, so we store it in annotation
 	if installNs, ok := src.Annotations[InstallNamespaceAnnotation]; ok {
 		v1alpha1Obj.Spec.InstallNamespace = installNs
+		// Remove the internal annotation from v1alpha1 object
+		// This annotation is only used for v1beta1 storage, not for v1alpha1 API
+		delete(v1alpha1Obj.Annotations, InstallNamespaceAnnotation)
 	}
 
 	// Manually populate deprecated ConfigReferent field in ConfigReferences

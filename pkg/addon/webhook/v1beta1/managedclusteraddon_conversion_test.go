@@ -106,9 +106,8 @@ func TestManagedClusterAddOnConvertTo(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-addon",
 						Namespace: "cluster1",
-						Annotations: map[string]string{
-							"addon.open-cluster-management.io/v1alpha1-install-namespace": "test-namespace",
-						},
+						// The internal annotation should be removed after conversion to v1alpha1
+						Annotations: map[string]string{},
 					},
 					Spec: addonv1alpha1.ManagedClusterAddOnSpec{
 						InstallNamespace: "test-namespace",
@@ -174,6 +173,43 @@ func TestManagedClusterAddOnConvertTo(t *testing.T) {
 						HealthCheck: addonv1alpha1.HealthCheck{
 							Mode: addonv1alpha1.HealthCheckModeCustomized,
 						},
+					},
+				},
+			},
+		},
+		{
+			name: "conversion removes internal annotation but preserves user annotations",
+			src: &ManagedClusterAddOn{
+				ManagedClusterAddOn: addonv1beta1.ManagedClusterAddOn{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-addon",
+						Namespace: "cluster1",
+						Annotations: map[string]string{
+							"addon.open-cluster-management.io/v1alpha1-install-namespace": "test-namespace",
+							"abc.def":         "hahaha",
+							"user.annotation": "should-be-preserved",
+						},
+					},
+					Spec: addonv1beta1.ManagedClusterAddOnSpec{},
+				},
+			},
+			expected: &internalv1alpha1.ManagedClusterAddOn{
+				ManagedClusterAddOn: addonv1alpha1.ManagedClusterAddOn{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "ManagedClusterAddOn",
+						APIVersion: "addon.open-cluster-management.io/v1alpha1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-addon",
+						Namespace: "cluster1",
+						// Internal annotation removed, user annotations preserved
+						Annotations: map[string]string{
+							"abc.def":         "hahaha",
+							"user.annotation": "should-be-preserved",
+						},
+					},
+					Spec: addonv1alpha1.ManagedClusterAddOnSpec{
+						InstallNamespace: "test-namespace",
 					},
 				},
 			},
