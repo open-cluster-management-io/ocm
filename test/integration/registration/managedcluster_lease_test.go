@@ -111,7 +111,7 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 
 		// remove the cluster
 		gomega.Eventually(func() error {
-			if err := clusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(), managedClusterName, metav1.DeleteOptions{}); err != nil {
+			if err := clusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(), managedClusterName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 				return err
 			}
 			managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
