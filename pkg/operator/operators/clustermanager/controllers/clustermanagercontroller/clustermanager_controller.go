@@ -196,6 +196,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	config.ClusterImporterEnabled = helpers.FeatureGateEnabled(registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates, ocmfeature.ClusterImporter)
 	if config.ClusterImporterEnabled {
 		config.AgentImage = os.Getenv("AGENT_IMAGE")
+		if clusterManager.Spec.RegistrationConfiguration != nil && clusterManager.Spec.RegistrationConfiguration.ImporterConfiguration != nil {
+			config.ImporterRenderers = strings.Join(clusterManager.Spec.RegistrationConfiguration.ImporterConfiguration.Renderers, ",")
+		}
 	}
 
 	var workFeatureGates []operatorapiv1.FeatureGate

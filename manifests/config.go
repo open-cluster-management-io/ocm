@@ -26,6 +26,7 @@ type HubConfig struct {
 	AgentImage                     string
 	CloudEventsDriverEnabled       bool
 	ClusterImporterEnabled         bool
+	ImporterRenderers              string
 	WorkDriver                     string
 	AutoApproveUsers               string
 	ImagePullSecret                string

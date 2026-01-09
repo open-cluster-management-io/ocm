@@ -1057,6 +1057,156 @@ func TestGRPCServiceLoadBalancerType(t *testing.T) {
 	}
 }
 
+// TestImporterRenderersConfiguration tests that importer renderers are correctly rendered in the registration deployment
+func TestImporterRenderersConfiguration(t *testing.T) {
+	tests := []struct {
+		name              string
+		clusterManager    *operatorapiv1.ClusterManager
+		expectedRenderers string
+		description       string
+	}{
+		{
+			name: "ImporterRenderers with single renderer",
+			clusterManager: func() *operatorapiv1.ClusterManager {
+				cm := newClusterManager("testhub")
+				cm.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{Feature: string(ocmfeature.ClusterImporter), Mode: operatorapiv1.FeatureGateModeTypeEnable},
+					},
+					ImporterConfiguration: &operatorapiv1.ImporterConfiguration{
+						Renderers: []string{"render-auto"},
+					},
+				}
+				return cm
+			}(),
+			expectedRenderers: "render-auto",
+			description:       "Single renderer should be passed correctly",
+		},
+		{
+			name: "ImporterRenderers with multiple renderers",
+			clusterManager: func() *operatorapiv1.ClusterManager {
+				cm := newClusterManager("testhub")
+				cm.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{Feature: string(ocmfeature.ClusterImporter), Mode: operatorapiv1.FeatureGateModeTypeEnable},
+					},
+					ImporterConfiguration: &operatorapiv1.ImporterConfiguration{
+						Renderers: []string{"render-auto", "render-from-config-secret"},
+					},
+				}
+				return cm
+			}(),
+			expectedRenderers: "render-auto,render-from-config-secret",
+			description:       "Multiple renderers should be comma-separated",
+		},
+		{
+			name: "ImporterRenderers with empty renderers",
+			clusterManager: func() *operatorapiv1.ClusterManager {
+				cm := newClusterManager("testhub")
+				cm.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{Feature: string(ocmfeature.ClusterImporter), Mode: operatorapiv1.FeatureGateModeTypeEnable},
+					},
+					ImporterConfiguration: &operatorapiv1.ImporterConfiguration{
+						Renderers: []string{},
+					},
+				}
+				return cm
+			}(),
+			expectedRenderers: "",
+			description:       "Empty renderers should result in no argument",
+		},
+		{
+			name: "ImporterRenderers with nil ImporterConfiguration",
+			clusterManager: func() *operatorapiv1.ClusterManager {
+				cm := newClusterManager("testhub")
+				cm.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{Feature: string(ocmfeature.ClusterImporter), Mode: operatorapiv1.FeatureGateModeTypeEnable},
+					},
+					// ImporterConfiguration is nil
+				}
+				return cm
+			}(),
+			expectedRenderers: "",
+			description:       "Nil ImporterConfiguration should result in no argument",
+		},
+		{
+			name: "ImporterRenderers with ClusterImporter feature gate disabled",
+			clusterManager: func() *operatorapiv1.ClusterManager {
+				cm := newClusterManager("testhub")
+				cm.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{Feature: string(ocmfeature.ClusterImporter), Mode: operatorapiv1.FeatureGateModeTypeDisable},
+					},
+					ImporterConfiguration: &operatorapiv1.ImporterConfiguration{
+						Renderers: []string{"render-auto"},
+					},
+				}
+				return cm
+			}(),
+			expectedRenderers: "",
+			description:       "Disabled ClusterImporter feature gate should result in no argument",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tc := newTestController(t, test.clusterManager)
+			clusterManagerNamespace := helpers.ClusterManagerNamespace(test.clusterManager.Name, test.clusterManager.Spec.DeployOption.Mode)
+			cd := setDeployment(test.clusterManager.Name, clusterManagerNamespace)
+			setup(t, tc, cd)
+
+			syncContext := testingcommon.NewFakeSyncContext(t, test.clusterManager.Name)
+
+			err := tc.clusterManagerController.sync(ctx, syncContext, test.clusterManager.Name)
+			if err != nil {
+				t.Fatalf("Expected no error when sync, %v", err)
+			}
+
+			// Find the registration deployment and check for --import-renderers argument
+			registrationDeploymentName := test.clusterManager.Name + "-registration-controller"
+			var registrationDeploymentFound bool
+			var importRenderersArg string
+
+			kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...)
+			for _, action := range kubeActions {
+				verb := action.GetVerb()
+				if verb == createVerb || verb == "update" {
+					var deployment *appsv1.Deployment
+					if verb == createVerb {
+						object := action.(clienttesting.CreateActionImpl).Object
+						deployment, _ = object.(*appsv1.Deployment)
+					} else {
+						object := action.(clienttesting.UpdateActionImpl).Object
+						deployment, _ = object.(*appsv1.Deployment)
+					}
+
+					if deployment != nil && deployment.Name == registrationDeploymentName && deployment.Namespace == clusterManagerNamespace {
+						registrationDeploymentFound = true
+						for _, arg := range deployment.Spec.Template.Spec.Containers[0].Args {
+							if after, ok := strings.CutPrefix(arg, "--import-renderers="); ok {
+								importRenderersArg = after
+								break
+							}
+						}
+						break
+					}
+				}
+			}
+
+			if !registrationDeploymentFound {
+				t.Fatalf("Registration deployment %s not found in namespace %s", registrationDeploymentName, clusterManagerNamespace)
+			}
+
+			if importRenderersArg != test.expectedRenderers {
+				t.Errorf("Test %q failed: %s. Expected import-renderers %q, but got %q",
+					test.name, test.description, test.expectedRenderers, importRenderersArg)
+			}
+		})
+	}
+}
+
 // TestWorkControllerEnabledByFeatureGates tests that work controller is enabled when specific feature gates are enabled
 func TestWorkControllerEnabledByFeatureGates(t *testing.T) {
 	tests := []struct {
