@@ -83,7 +83,7 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 		hook, err := util.NewGRPCServerRegistrationHook(hubCfg)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		grpcEventServer := cloudeventsgrpc.NewGRPCBroker()
+		grpcEventServer := cloudeventsgrpc.NewGRPCBroker(cloudeventsgrpc.NewBrokerOptions())
 		grpcEventServer.RegisterService(grpcServerCtx, clusterce.ManagedClusterEventDataType,
 			cluster.NewClusterService(hook.ClusterClient, hook.ClusterInformers.Cluster().V1().ManagedClusters()))
 		grpcEventServer.RegisterService(grpcServerCtx, csrce.CSREventDataType,

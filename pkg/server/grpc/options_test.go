@@ -80,9 +80,8 @@ func TestGRPCServerOptionsFlagTypes(t *testing.T) {
 }
 
 func TestGRPCServerOptionsRunWithInvalidConfig(t *testing.T) {
-	opts := &GRPCServerOptions{
-		GRPCServerConfig: "/nonexistent/path/to/config.yaml",
-	}
+	opts := NewGRPCServerOptions()
+	opts.GRPCServerConfig = "/nonexistent/path/to/config.yaml"
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -146,9 +145,8 @@ grpc_private_key_file: ` + keyFile + `
 		t.Fatalf("Failed to create test config file: %v", err)
 	}
 
-	opts := &GRPCServerOptions{
-		GRPCServerConfig: configFile,
-	}
+	opts := NewGRPCServerOptions()
+	opts.GRPCServerConfig = configFile
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()

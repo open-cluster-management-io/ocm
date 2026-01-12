@@ -48,15 +48,18 @@ type GRPCBroker struct {
 	services               map[types.CloudEventsDataType]server.Service
 	subscribers            map[string]*subscriber // registered subscribers
 	heartbeatCheckInterval time.Duration
+	heartbeatDisabled      bool
 	mu                     sync.RWMutex
 }
 
 // NewGRPCBroker creates a new gRPC broker with the given gRPC server.
-func NewGRPCBroker() *GRPCBroker {
+func NewGRPCBroker(opts *BrokerOptions) *GRPCBroker {
 	broker := &GRPCBroker{
 		subscribers:            make(map[string]*subscriber),
 		services:               make(map[types.CloudEventsDataType]server.Service),
-		heartbeatCheckInterval: 10 * time.Second,
+		heartbeatCheckInterval: opts.HeartbeatCheckInterval,
+		heartbeatDisabled:      opts.HeartbeatDisabled,
+		mu:                     sync.RWMutex{},
 	}
 	return broker
 }
@@ -186,7 +189,10 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 	// TODO make the channel size configurable
 	eventCh := make(chan *pbv1.CloudEvent, 100)
 
-	heartbeater := heartbeat.NewHeartbeater(bkr.heartbeatCheckInterval, 10)
+	var heartbeater *heartbeat.Heartbeater
+	if !bkr.heartbeatDisabled {
+		heartbeater = heartbeat.NewHeartbeater(bkr.heartbeatCheckInterval, 10)
+	}
 	sendErrCh := make(chan error, 1)
 
 	// send events
@@ -195,11 +201,18 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 	// For unrecoverable errors, such as a connection closed by an intermediate proxy, push the error to subscriber's
 	// error channel to unregister the subscriber.
 	go func() {
+		// Get heartbeat channel or nil if heartbeater is disabled
+		// Reading from a nil channel blocks forever, so it will never be selected
+		var heartbeatCh chan *pbv1.CloudEvent
+		if heartbeater != nil {
+			heartbeatCh = heartbeater.Heartbeat()
+		}
+
 		for {
 			select {
 			case <-subCtx.Done():
 				return
-			case evt := <-heartbeater.Heartbeat():
+			case evt := <-heartbeatCh:
 				if err := subServer.Send(evt); err != nil {
 					logger.Error(err, "failed to send heartbeat")
 					// Unblock producers (handler select) and exit heartbeat ticker.
@@ -253,7 +266,9 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 		return err
 	}
 
-	go heartbeater.Start(subCtx)
+	if heartbeater != nil {
+		go heartbeater.Start(subCtx)
+	}
 
 	select {
 	case err := <-sendErrCh:
