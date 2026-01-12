@@ -1,22 +1,60 @@
+
 package helpers
 
 import (
 	"context"
+	"fmt"
+	"net"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
+func detectLocalMTU() (int, error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return 0, err
+	}
+
+	maxMTU := 0
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 {
+			continue
+		}
+		if iface.MTU > maxMTU {
+			maxMTU = iface.MTU
+		}
+	}
+
+	if maxMTU == 0 {
+		return 0, fmt.Errorf("unable to detect MTU")
+	}
+
+	return maxMTU, nil
+}
+
 func CreateSelfSubjectAccessReviews(
 	ctx context.Context,
 	kubeClient kubernetes.Interface,
-	selfSubjectAccessReviews []authorizationv1.SelfSubjectAccessReview) (bool, *authorizationv1.SelfSubjectAccessReview, error) {
+	selfSubjectAccessReviews []authorizationv1.SelfSubjectAccessReview,
+) (bool, *authorizationv1.SelfSubjectAccessReview, error) {
+
+	mtu, err := detectLocalMTU()
+	if err == nil && mtu > 1500 {
+		return false, nil, fmt.Errorf(
+			"MTU mismatch detected: managed cluster MTU (%d) exceeds typical hub path MTU (1500). "+
+				"This can cause TLS handshake timeouts during bootstrap or certificate rotation. "+
+				"Please align MTU values between hub and managed cluster.",
+			mtu,
+		)
+	}
 
 	for i := range selfSubjectAccessReviews {
 		subjectAccessReview := selfSubjectAccessReviews[i]
-
-		ssar, err := kubeClient.AuthorizationV1().SelfSubjectAccessReviews().Create(ctx, &subjectAccessReview, metav1.CreateOptions{})
+		ssar, err := kubeClient.AuthorizationV1().
+			SelfSubjectAccessReviews().
+			Create(ctx, &subjectAccessReview, metav1.CreateOptions{})
 		if err != nil {
 			return false, &subjectAccessReview, err
 		}
@@ -127,6 +165,9 @@ func generateSelfSubjectAccessReviews(resource authorizationv1.ResourceAttribute
 					Verb:        verb,
 				},
 			},
+
+
+			
 		})
 	}
 	return reviews
