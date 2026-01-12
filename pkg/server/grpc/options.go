@@ -29,15 +29,19 @@ import (
 )
 
 type GRPCServerOptions struct {
-	GRPCServerConfig string
+	GRPCServerConfig  string
+	grpcBrokerOptions *cloudeventsgrpc.BrokerOptions
 }
 
 func NewGRPCServerOptions() *GRPCServerOptions {
-	return &GRPCServerOptions{}
+	return &GRPCServerOptions{
+		grpcBrokerOptions: cloudeventsgrpc.NewBrokerOptions(),
+	}
 }
 
 func (o *GRPCServerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.GRPCServerConfig, "server-config", o.GRPCServerConfig, "Location of the server configuration file.")
+	o.grpcBrokerOptions.AddFlags(fs)
 }
 
 func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
@@ -51,8 +55,8 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 		return err
 	}
 
-	// initlize grpc broker and register services
-	grpcEventServer := cloudeventsgrpc.NewGRPCBroker()
+	// initialize grpc broker and register services
+	grpcEventServer := cloudeventsgrpc.NewGRPCBroker(o.grpcBrokerOptions)
 	grpcEventServer.RegisterService(ctx, clusterce.ManagedClusterEventDataType,
 		cluster.NewClusterService(clients.ClusterClient, clients.ClusterInformers.Cluster().V1().ManagedClusters()))
 	grpcEventServer.RegisterService(ctx, csrce.CSREventDataType,
@@ -69,7 +73,7 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 	// start clients
 	go clients.Run(ctx)
 
-	// initlize and run grpc server
+	// initialize and run grpc server
 	authorizer := grpcauthz.NewSARAuthorizer(clients.KubeClient)
 	return sdkgrpc.NewGRPCServer(serverOptions).
 		WithAuthenticator(grpcauthn.NewTokenAuthenticator(clients.KubeClient)).

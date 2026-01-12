@@ -275,7 +275,7 @@ func startGRPCServer(ctx context.Context, temp string, cfg *rest.Config) (string
 	hook, err := util.NewGRPCServerWorkHook(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	grpcEventServer := cloudeventsgrpc.NewGRPCBroker()
+	grpcEventServer := cloudeventsgrpc.NewGRPCBroker(cloudeventsgrpc.NewBrokerOptions())
 	grpcEventServer.RegisterService(ctx, payload.ManifestBundleEventDataType,
 		serviceswork.NewWorkService(hook.WorkClient, hook.WorkInformers.Work().V1().ManifestWorks()))
 
