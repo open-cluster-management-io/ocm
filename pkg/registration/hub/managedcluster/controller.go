@@ -121,7 +121,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	ctx = klog.NewContext(ctx, logger)
 	managedCluster, err := c.clusterLister.Get(managedClusterName)
 	if apierrors.IsNotFound(err) {
-		err = c.removeClusterRbac(ctx, syncCtx, managedClusterName, true)
+		err = c.removeClusterRBACResources(ctx, syncCtx, managedClusterName)
 		if errors.Is(err, requeueError) {
 			syncCtx.Queue().AddAfter(managedClusterName, requeueError.RequeueTime)
 			return nil
@@ -139,7 +139,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 			return err
 		}
 
-		err = c.removeClusterRbac(ctx, syncCtx, managedClusterName, true)
+		err = c.removeClusterRBACResources(ctx, syncCtx, managedClusterName)
 		if err != nil {
 			if errors.Is(err, requeueError) {
 				syncCtx.Queue().AddAfter(managedClusterName, requeueError.RequeueTime)
@@ -182,7 +182,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		}
 
 		// Remove the cluster role binding files for registration-agent and work-agent.
-		err := c.removeClusterRbac(ctx, syncCtx, managedClusterName, managedCluster.Spec.HubAcceptsClient)
+		err := c.removeClusterSpecificRoleBindings(ctx, syncCtx, managedClusterName)
 		if errors.Is(err, requeueError) {
 			syncCtx.Queue().AddAfter(managedClusterName, requeueError.RequeueTime)
 			return nil
@@ -305,20 +305,47 @@ func (c *managedClusterController) acceptCluster(ctx context.Context, managedClu
 	return err
 }
 
-// remove the cluster rbac resources firstly.
-// the work roleBinding with a finalizer remains because it is used by work agent to operator the works.
-// the finalizer on work roleBinding will be removed after there is no works in the ns.
-func (c *managedClusterController) removeClusterRbac(ctx context.Context, syncCtx factory.SyncContext, clusterName string, accepted bool) error {
+// remove the managedCluster rbac resources.
+func (c *managedClusterController) removeClusterRBACResources(ctx context.Context, syncCtx factory.SyncContext, clusterName string) error {
 	var errs []error
-	assetFn := helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, clusterName, accepted, c.labels)
-	files := manifests.ClusterSpecificRoleBindings
-	if accepted {
-		files = append(files, manifests.ClusterSpecificRBACFiles...)
+	err := c.removeClusterSpecificRBAC(ctx, syncCtx, clusterName)
+	if err != nil {
+		errs = append(errs, err)
 	}
+	err = c.removeClusterSpecificRoleBindings(ctx, syncCtx, clusterName)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	return operatorhelpers.NewMultiLineAggregate(errs)
+}
 
+// remove clusterRole and clusterRoleBinding of managedCluster when cluster is deleted.
+func (c *managedClusterController) removeClusterSpecificRBAC(ctx context.Context, syncCtx factory.SyncContext, clusterName string) error {
+	var errs []error
+	// whether accepted is true or false will not affect the deletion of resources.
+	assetFn := helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, clusterName, true, c.labels)
 	recorderWrapper := commonrecorder.NewEventsRecorderWrapper(ctx, syncCtx.Recorder())
 	resourceResults := resourceapply.DeleteAll(ctx, resourceapply.NewKubeClientHolder(c.kubeClient),
-		recorderWrapper, assetFn, files...)
+		recorderWrapper, assetFn, manifests.ClusterSpecificRBACFiles...)
+	for _, result := range resourceResults {
+		if result.Error != nil {
+			errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
+		}
+	}
+
+	return operatorhelpers.NewMultiLineAggregate(errs)
+}
+
+// remove registration and work roleBindings of managedCluster when cluster is deleted or hubAcceptsClient is false.
+// the work roleBinding with a finalizer remains because it is used by work agent to operator the works.
+// the finalizer on work roleBinding will be removed after there is no works in the ns.
+func (c *managedClusterController) removeClusterSpecificRoleBindings(ctx context.Context, syncCtx factory.SyncContext, clusterName string) error {
+	var errs []error
+	// whether accepted is true or false will not affect the deletion of resources.
+	assetFn := helpers.ManagedClusterAssetFnWithAccepted(manifests.RBACManifests, clusterName, true, c.labels)
+	recorderWrapper := commonrecorder.NewEventsRecorderWrapper(ctx, syncCtx.Recorder())
+	resourceResults := resourceapply.DeleteAll(ctx, resourceapply.NewKubeClientHolder(c.kubeClient),
+		recorderWrapper, assetFn, manifests.ClusterSpecificRoleBindings...)
 	for _, result := range resourceResults {
 		if result.Error != nil {
 			errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))

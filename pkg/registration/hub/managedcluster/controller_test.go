@@ -144,6 +144,54 @@ func TestSyncManagedCluster(t *testing.T) {
 			},
 		},
 		{
+			name:            "deny a spoke cluster - verify only rolebindings deleted not clusterrole/clusterrolebinding",
+			startingObjects: []runtime.Object{testinghelpers.NewDeniedManagedCluster("True")},
+			validateClusterActions: func(t *testing.T, actions []clienttesting.Action) {
+				expectedCondition := metav1.Condition{
+					Type:    v1.ManagedClusterConditionHubAccepted,
+					Status:  metav1.ConditionFalse,
+					Reason:  "HubClusterAdminDenied",
+					Message: "Denied by hub cluster admin",
+				}
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &v1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
+			},
+			validateKubeActions: func(t *testing.T, actions []clienttesting.Action) {
+				// Verify the sequence of actions
+				testingcommon.AssertActions(t, actions,
+					"create", // clusterrole - created/updated, not deleted
+					"create", // clusterrolebinding - created/updated, not deleted
+					"delete", // registration rolebinding - deleted
+					"delete") // work rolebinding - deleted
+
+				// Verify that clusterrole and clusterrolebinding are created (not deleted)
+				clusterRoleAction := actions[0].(clienttesting.CreateAction)
+				if clusterRoleAction.GetVerb() != "create" {
+					t.Errorf("expected clusterrole to be created, got %s", clusterRoleAction.GetVerb())
+				}
+				clusterRoleBindingAction := actions[1].(clienttesting.CreateAction)
+				if clusterRoleBindingAction.GetVerb() != "create" {
+					t.Errorf("expected clusterrolebinding to be created, got %s", clusterRoleBindingAction.GetVerb())
+				}
+
+				// Verify that only rolebindings are deleted
+				regRoleBindingAction := actions[2].(clienttesting.DeleteAction)
+				if regRoleBindingAction.GetVerb() != "delete" {
+					t.Errorf("expected registration rolebinding to be deleted, got %s", regRoleBindingAction.GetVerb())
+				}
+				workRoleBindingAction := actions[3].(clienttesting.DeleteAction)
+				if workRoleBindingAction.GetVerb() != "delete" {
+					t.Errorf("expected work rolebinding to be deleted, got %s", workRoleBindingAction.GetVerb())
+				}
+			},
+		},
+		{
 			name: "delete a spoke cluster without manifestworks",
 			roleBindings: []runtime.Object{testinghelpers.NewRoleBinding(testinghelpers.TestManagedClusterName,
 				workRoleBindingName(testinghelpers.TestManagedClusterName), []string{workv1.ManifestWorkFinalizer},
