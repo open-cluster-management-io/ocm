@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
@@ -41,7 +40,6 @@ type unmanagedAppliedWorkController struct {
 	hubHash                   string
 	agentID                   string
 	evictionGracePeriod       time.Duration
-	rateLimiter               workqueue.RateLimiter
 }
 
 // NewUnManagedAppliedWorkController returns a controller to evict the unmanaged appliedmanifestworks.
@@ -71,7 +69,6 @@ func NewUnManagedAppliedWorkController(
 		hubHash:                   hubHash,
 		agentID:                   agentID,
 		evictionGracePeriod:       evictionGracePeriod,
-		rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(1*time.Minute, evictionGracePeriod),
 	}
 
 	return factory.New().
@@ -141,8 +138,13 @@ func (m *unmanagedAppliedWorkController) evictAppliedManifestWork(ctx context.Co
 		return m.patchEvictionStartTime(ctx, appliedManifestWork, &metav1.Time{Time: now})
 	}
 
-	if now.Before(evictionStartTime.Add(m.evictionGracePeriod)) {
-		controllerContext.Queue().AddAfter(appliedManifestWork.Name, m.rateLimiter.When(appliedManifestWork.Name))
+	evictionTime := evictionStartTime.Add(m.evictionGracePeriod)
+	if now.Before(evictionTime) {
+		// Calculate the exact remaining time until eviction
+		remainingTime := evictionTime.Sub(now)
+		controllerContext.Queue().AddAfter(appliedManifestWork.Name, remainingTime)
+		logger.V(4).Info("AppliedManifestWork scheduled for eviction",
+			"evictionTime", evictionTime, "remainingTime", remainingTime)
 		return nil
 	}
 
@@ -160,7 +162,6 @@ func (m *unmanagedAppliedWorkController) stopToEvictAppliedManifestWork(
 		return nil
 	}
 
-	m.rateLimiter.Forget(appliedManifestWork.Name)
 	return m.patchEvictionStartTime(ctx, appliedManifestWork, nil)
 }
 

@@ -8,7 +8,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/util/workqueue"
 
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
@@ -204,7 +203,7 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 					},
 				},
 			},
-			expectedQueueLen:                   1,
+			expectedQueueLen:                   0, // Item is added to delayed queue via AddAfter, not the main queue
 			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
 		},
 		{
@@ -283,7 +282,6 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 				hubHash:                   c.hubHash,
 				agentID:                   c.agentID,
 				evictionGracePeriod:       c.evictionGracePeriod,
-				rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(0, c.evictionGracePeriod),
 			}
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, c.appliedManifestWorkName)
