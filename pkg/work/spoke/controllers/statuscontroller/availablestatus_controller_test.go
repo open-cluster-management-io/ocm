@@ -751,6 +751,94 @@ func TestConditionRules(t *testing.T) {
 				{Type: workapiv1.WorkComplete, Status: util.ConditionNotFound},
 			},
 		},
+		{
+			name: "work Progressing is True when any manifest is progressing (True wins)",
+			existingResources: []runtime.Object{
+				testingcommon.NewUnstructuredWithContent(
+					"v1", "NewObject", "ns1", "n1",
+					map[string]any{"spec": map[string]any{"key1": "val1"}}),
+				testingcommon.NewUnstructuredWithContent(
+					"v1", "NewObject", "ns1", "n2",
+					map[string]any{"spec": map[string]any{"key1": "val2"}}),
+			},
+			configOption: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "newobjects", Namespace: "ns1", Name: "n1"},
+					ConditionRules: []workapiv1.ConditionRule{
+						{
+							Type:           workapiv1.CelConditionExpressionsType,
+							Condition:      workapiv1.ManifestProgressing,
+							CelExpressions: []string{"true"},
+						},
+					},
+				},
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "newobjects", Namespace: "ns1", Name: "n2"},
+					ConditionRules: []workapiv1.ConditionRule{
+						{
+							Type:           workapiv1.CelConditionExpressionsType,
+							Condition:      workapiv1.ManifestProgressing,
+							CelExpressions: []string{"false"},
+						},
+					},
+				},
+			},
+			manifests: []workapiv1.ManifestCondition{
+				newManifest("", "v1", "newobjects", "ns1", "n1"),
+				newManifest("", "v1", "newobjects", "ns1", "n2"),
+			},
+			expectedManifestConditions: [][]metav1.Condition{
+				{{Type: workapiv1.ManifestProgressing, Status: metav1.ConditionTrue, Reason: workapiv1.ConditionRuleEvaluated}},
+				{{Type: workapiv1.ManifestProgressing, Status: metav1.ConditionFalse, Reason: workapiv1.ConditionRuleEvaluated}},
+			},
+			expectedWorkConditions: []metav1.Condition{
+				{Type: workapiv1.WorkProgressing, Status: metav1.ConditionTrue, Reason: "ConditionRulesAggregated"},
+			},
+		},
+		{
+			name: "work Progressing is False when no manifest is progressing",
+			existingResources: []runtime.Object{
+				testingcommon.NewUnstructuredWithContent(
+					"v1", "NewObject", "ns1", "n1",
+					map[string]any{"spec": map[string]any{"key1": "val1"}}),
+				testingcommon.NewUnstructuredWithContent(
+					"v1", "NewObject", "ns1", "n2",
+					map[string]any{"spec": map[string]any{"key1": "val2"}}),
+			},
+			configOption: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "newobjects", Namespace: "ns1", Name: "n1"},
+					ConditionRules: []workapiv1.ConditionRule{
+						{
+							Type:           workapiv1.CelConditionExpressionsType,
+							Condition:      workapiv1.ManifestProgressing,
+							CelExpressions: []string{"false"},
+						},
+					},
+				},
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "newobjects", Namespace: "ns1", Name: "n2"},
+					ConditionRules: []workapiv1.ConditionRule{
+						{
+							Type:           workapiv1.CelConditionExpressionsType,
+							Condition:      workapiv1.ManifestProgressing,
+							CelExpressions: []string{"false"},
+						},
+					},
+				},
+			},
+			manifests: []workapiv1.ManifestCondition{
+				newManifest("", "v1", "newobjects", "ns1", "n1"),
+				newManifest("", "v1", "newobjects", "ns1", "n2"),
+			},
+			expectedManifestConditions: [][]metav1.Condition{
+				{{Type: workapiv1.ManifestProgressing, Status: metav1.ConditionFalse, Reason: workapiv1.ConditionRuleEvaluated}},
+				{{Type: workapiv1.ManifestProgressing, Status: metav1.ConditionFalse, Reason: workapiv1.ConditionRuleEvaluated}},
+			},
+			expectedWorkConditions: []metav1.Condition{
+				{Type: workapiv1.WorkProgressing, Status: metav1.ConditionFalse, Reason: "ConditionRulesAggregated"},
+			},
+		},
 	}
 
 	for _, c := range cases {
