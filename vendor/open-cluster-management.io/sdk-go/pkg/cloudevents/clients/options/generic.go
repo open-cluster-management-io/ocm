@@ -80,9 +80,8 @@ func (o *GenericClientOptions[T]) WithSubscription(enabled bool) *GenericClientO
 	return o
 }
 
-// WithResyncEnabled control the client resync (Default is true), if it's true, the resync happens when
-//  1. after the client's store is initiated
-//  2. the client reconnected
+// WithResyncEnabled control the client resync (Default is true), if it's true, the resync happens after
+// the client subscribed
 func (o *GenericClientOptions[T]) WithResyncEnabled(resync bool) *GenericClientOptions[T] {
 	o.resync = resync
 	return o
@@ -131,10 +130,12 @@ func (o *GenericClientOptions[T]) AgentClient(ctx context.Context) (generic.Clou
 		return nil, err
 	}
 
-	if o.subscription {
-		// start to subscribe
-		cloudEventsClient.Subscribe(ctx, o.watcherStore.HandleReceivedResource)
+	if !o.subscription {
+		return cloudEventsClient, nil
 	}
+
+	// start to subscribe
+	cloudEventsClient.Subscribe(ctx, o.watcherStore.HandleReceivedResource)
 
 	// start a go routine to receive client reconnect signal
 	go func() {
@@ -142,7 +143,7 @@ func (o *GenericClientOptions[T]) AgentClient(ctx context.Context) (generic.Clou
 			select {
 			case <-ctx.Done():
 				return
-			case <-cloudEventsClient.ReconnectedChan():
+			case <-cloudEventsClient.SubscribedChan():
 				if !o.resync {
 					logger.Info("resync is disabled, do nothing")
 					continue
@@ -150,22 +151,11 @@ func (o *GenericClientOptions[T]) AgentClient(ctx context.Context) (generic.Clou
 
 				// when receiving a client reconnected signal, we resync all sources for this agent
 				// TODO after supporting multiple sources, we should only resync agent known sources
-				if err := cloudEventsClient.Resync(ctx, types.SourceAll); err != nil {
-					logger.Error(err, "failed to send resync request")
+				if store.WaitForStoreInit(ctx, o.watcherStore.HasInitiated) {
+					if err := cloudEventsClient.Resync(ctx, types.SourceAll); err != nil {
+						logger.Error(err, "failed to send resync request")
+					}
 				}
-			}
-		}
-	}()
-
-	if !o.resync {
-		return cloudEventsClient, nil
-	}
-
-	// start a go routine to resync the works after this client's store is initiated
-	go func() {
-		if store.WaitForStoreInit(ctx, o.watcherStore.HasInitiated) {
-			if err := cloudEventsClient.Resync(ctx, types.SourceAll); err != nil {
-				logger.Error(err, "failed to send resync request")
 			}
 		}
 	}()
@@ -204,40 +194,31 @@ func (o *GenericClientOptions[T]) SourceClient(ctx context.Context) (generic.Clo
 		return nil, err
 	}
 
-	if o.subscription {
-		// start to subscribe
-		cloudEventsClient.Subscribe(ctx, o.watcherStore.HandleReceivedResource)
+	if !o.subscription {
+		return cloudEventsClient, nil
 	}
 
-	// start a go routine to receive client reconnect signal
+	// start to subscribe
+	cloudEventsClient.Subscribe(ctx, o.watcherStore.HandleReceivedResource)
+
+	// start a go routine to receive client subscribed signal
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-cloudEventsClient.ReconnectedChan():
+			case <-cloudEventsClient.SubscribedChan():
 				if !o.resync {
 					logger.Info("resync is disabled, do nothing")
 					continue
 				}
 
-				// when receiving a client reconnected signal, we resync all clusters for this source
-				if err := cloudEventsClient.Resync(ctx, types.ClusterAll); err != nil {
-					logger.Error(err, "failed to send resync request")
+				// when receiving a client subscribed signal, we resync all clusters for this source
+				if store.WaitForStoreInit(ctx, o.watcherStore.HasInitiated) {
+					if err := cloudEventsClient.Resync(ctx, types.ClusterAll); err != nil {
+						logger.Error(err, "failed to send resync request")
+					}
 				}
-			}
-		}
-	}()
-
-	if !o.resync {
-		return cloudEventsClient, nil
-	}
-
-	// start a go routine to resync the works after this client's store is initiated
-	go func() {
-		if store.WaitForStoreInit(ctx, o.watcherStore.HasInitiated) {
-			if err := cloudEventsClient.Resync(ctx, types.ClusterAll); err != nil {
-				logger.Error(err, "failed to send resync request")
 			}
 		}
 	}()

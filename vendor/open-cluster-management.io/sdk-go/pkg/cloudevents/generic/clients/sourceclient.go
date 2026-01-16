@@ -59,8 +59,10 @@ func NewCloudEventSourceClient[T generic.ResourceObject](
 	}, nil
 }
 
-func (c *CloudEventSourceClient[T]) ReconnectedChan() <-chan struct{} {
-	return c.resyncChan
+// SubscribedChan returns a chan which indicates the source client is subscribed.
+// The source client callers should consider sending a resync request when receiving this signal.
+func (c *CloudEventSourceClient[T]) SubscribedChan() <-chan struct{} {
+	return c.subscribedChan
 }
 
 // Resync the resources status by sending a status resync request from the current source to a specified cluster.

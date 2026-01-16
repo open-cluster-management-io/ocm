@@ -3,8 +3,10 @@ package sar
 import (
 	"context"
 	"fmt"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
 	"sync"
+
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/serviceaccount"
 
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
@@ -201,6 +203,13 @@ func toSubjectAccessReview(clusterName string, user string, groups []string, eve
 		lease.LeaseEventDataType:
 		sar.Spec.ResourceAttributes.Group = eventsType.Group
 		sar.Spec.ResourceAttributes.Resource = eventsType.Resource
+		return sar, nil
+	case serviceaccount.TokenRequestDataType:
+		sar.Spec.ResourceAttributes.Group = ""
+		sar.Spec.ResourceAttributes.Resource = "serviceaccounts"
+		sar.Spec.ResourceAttributes.Subresource = "token"
+		// the verb "create" is required for both token request pub and sub.
+		sar.Spec.ResourceAttributes.Verb = "create"
 		return sar, nil
 	case payload.ManifestBundleEventDataType:
 		sar.Spec.ResourceAttributes.Group = workv1.SchemeGroupVersion.Group
