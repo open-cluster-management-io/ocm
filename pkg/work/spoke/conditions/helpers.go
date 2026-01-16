@@ -127,13 +127,27 @@ func newAggregateAvailableCondition(aggCondition aggregateCondition, generation 
 
 func newAggregateConditionFromRules(conditionType string, generation int64, agg aggregateCondition) metav1.Condition {
 	var status metav1.ConditionStatus
-	switch {
-	case agg.numFalse > 0:
-		status = metav1.ConditionFalse
-	case agg.numUnknown > 0 || agg.numTrue == 0:
-		status = metav1.ConditionUnknown
-	default:
-		status = metav1.ConditionTrue
+
+	// Progressing uses opposite logic: True if ANY resource is progressing
+	if conditionType == workapiv1.WorkProgressing {
+		switch {
+		case agg.numTrue > 0:
+			status = metav1.ConditionTrue
+		case agg.numUnknown > 0:
+			status = metav1.ConditionUnknown
+		default:
+			status = metav1.ConditionFalse
+		}
+	} else {
+		// Default logic: False wins, then Unknown, then True
+		switch {
+		case agg.numFalse > 0:
+			status = metav1.ConditionFalse
+		case agg.numUnknown > 0 || agg.numTrue == 0:
+			status = metav1.ConditionUnknown
+		default:
+			status = metav1.ConditionTrue
+		}
 	}
 
 	// Use manifest condition message if there is only one, otherwise use generic message
