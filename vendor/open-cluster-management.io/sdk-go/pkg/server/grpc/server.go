@@ -14,12 +14,13 @@ import (
 	"google.golang.org/grpc/keepalive"
 	"k8s.io/apimachinery/pkg/util/errors"
 	k8smetrics "k8s.io/component-base/metrics"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/textlogger"
 	"open-cluster-management.io/sdk-go/pkg/server/grpc/authn"
 	"open-cluster-management.io/sdk-go/pkg/server/grpc/authz"
 	"open-cluster-management.io/sdk-go/pkg/server/grpc/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
-
-	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type GRPCServer struct {
@@ -80,6 +81,8 @@ func (b *GRPCServer) Run(ctx context.Context) error {
 		Timeout:          b.options.ServerPingTimeout,
 	}))
 
+	// Set textlogger with verbosity level 4 for controller-runtime logging
+	log.SetLogger(textlogger.NewLogger(textlogger.NewConfig(textlogger.Verbosity(4))))
 	// Serve with TLS - use certwatcher for dynamic certificate reloading
 	certWatcher, err := certwatcher.New(b.options.TLSCertFile, b.options.TLSKeyFile)
 	if err != nil {
