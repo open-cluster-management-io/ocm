@@ -1280,4 +1280,134 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 		})
 	})
+
+	ginkgo.Context("Status update timing for invalid manifests", func() {
+		ginkgo.BeforeEach(func() {
+			// Create two RoleBindings with valid roleRef
+			rb1, _ := util.NewRoleBinding(clusterName, "rb1", "default-sa", "default-role")
+			rb2, _ := util.NewRoleBinding(clusterName, "rb2", "default-sa", "default-role")
+			manifests = []workapiv1.Manifest{
+				util.ToManifest(rb1),
+				util.ToManifest(rb2),
+			}
+		})
+
+		ginkgo.It("should update conditions correctly when RoleRef changes", func() {
+			ginkgo.By("verify initial conditions are True")
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			// Verify observedGeneration matches generation
+			util.AssertWorkGeneration(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkGeneration(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("change RoleRef of the first rolebinding to a non-existent role")
+			updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Update first rolebinding to reference a non-existent role
+			rb1Invalid, _ := util.NewRoleBinding(clusterName, "rb1", "default-sa", "changed-role-1")
+
+			newWork := updatedWork.DeepCopy()
+			newWork.Spec.Workload.Manifests[0] = util.ToManifest(rb1Invalid)
+
+			pathBytes, err := util.NewWorkPatch(updatedWork, newWork)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
+				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			ginkgo.By("verify Applied condition is False, Available condition is True, and ObservedGeneration matches")
+			gomega.Eventually(func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				// Check Applied condition is False
+				appliedCond := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkApplied)
+				if appliedCond == nil {
+					return fmt.Errorf("applied condition not found")
+				}
+				if appliedCond.Status != metav1.ConditionFalse {
+					return fmt.Errorf("applied condition status is %s, expected False", appliedCond.Status)
+				}
+				if appliedCond.ObservedGeneration != work.Generation {
+					return fmt.Errorf("applied observedGeneration %d does not match generation %d",
+						appliedCond.ObservedGeneration, work.Generation)
+				}
+
+				// Check Available condition is True
+				availableCond := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkAvailable)
+				if availableCond == nil {
+					return fmt.Errorf("available condition not found")
+				}
+				if availableCond.Status != metav1.ConditionTrue {
+					return fmt.Errorf("available condition status is %s, expected True", availableCond.Status)
+				}
+				if availableCond.ObservedGeneration != work.Generation {
+					return fmt.Errorf("available observedGeneration %d does not match generation %d",
+						availableCond.ObservedGeneration, work.Generation)
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+			ginkgo.By("change RoleRef of the second rolebinding to a non-existent role")
+			updatedWork, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Update second rolebinding to reference a non-existent role
+			rb2Invalid, _ := util.NewRoleBinding(clusterName, "rb2", "default-sa", "changed-role-2")
+
+			newWork = updatedWork.DeepCopy()
+			newWork.Spec.Workload.Manifests[1] = util.ToManifest(rb2Invalid)
+
+			pathBytes, err = util.NewWorkPatch(updatedWork, newWork)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
+				context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			ginkgo.By("verify Applied condition is still False, Available condition is True, and ObservedGeneration matches")
+			gomega.Eventually(func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				// Check Applied condition is False
+				appliedCond := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkApplied)
+				if appliedCond == nil {
+					return fmt.Errorf("applied condition not found")
+				}
+				if appliedCond.Status != metav1.ConditionFalse {
+					return fmt.Errorf("applied condition status is %s, expected False", appliedCond.Status)
+				}
+				if appliedCond.ObservedGeneration != work.Generation {
+					return fmt.Errorf("applied observedGeneration %d does not match generation %d",
+						appliedCond.ObservedGeneration, work.Generation)
+				}
+
+				// Check Available condition is True
+				availableCond := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkAvailable)
+				if availableCond == nil {
+					return fmt.Errorf("available condition not found")
+				}
+				if availableCond.Status != metav1.ConditionTrue {
+					return fmt.Errorf("available condition status is %s, expected True", availableCond.Status)
+				}
+				if availableCond.ObservedGeneration != work.Generation {
+					return fmt.Errorf("available observedGeneration %d does not match generation %d",
+						availableCond.ObservedGeneration, work.Generation)
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		})
+	})
 })
