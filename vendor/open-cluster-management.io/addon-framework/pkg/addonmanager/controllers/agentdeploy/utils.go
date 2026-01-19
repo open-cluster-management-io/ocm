@@ -8,7 +8,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -270,11 +269,7 @@ func (b *addonWorksBuilder) BuildDeployWorks(installMode, addonWorkNamespace str
 	// This owner is only added to the manifestWork deployed in managed cluster ns.
 	// the manifestWork in managed cluster ns is cleaned up via the addon ownerRef, so need to add the owner.
 	// the manifestWork in hosting cluster ns is cleaned up by its controller since it and its addon cross ns.
-	owner := metav1.NewControllerRef(addon, schema.GroupVersionKind{
-		Group:   addonapiv1alpha1.GroupName,
-		Version: addonapiv1alpha1.GroupVersion.Version,
-		Kind:    "ManagedClusterAddOn",
-	})
+	owner := metav1.NewControllerRef(addon, addonapiv1alpha1.GroupVersion.WithKind("ManagedClusterAddOn"))
 
 	var deletionOrphaningRules []workapiv1.OrphaningRule
 	for _, object := range objects {
@@ -336,11 +331,7 @@ func (b *addonWorksBuilder) BuildHookWork(installMode, addonWorkNamespace string
 	var hookManifests []workapiv1.Manifest
 	var hookManifestConfigs []workapiv1.ManifestConfigOption
 
-	owner := metav1.NewControllerRef(addon, schema.GroupVersionKind{
-		Group:   addonapiv1alpha1.GroupName,
-		Version: addonapiv1alpha1.GroupVersion.Version,
-		Kind:    "ManagedClusterAddOn",
-	})
+	owner := metav1.NewControllerRef(addon, addonapiv1alpha1.GroupVersion.WithKind("ManagedClusterAddOn"))
 
 	for _, object := range objects {
 		deployable, err := b.processor.deployable(b.hostedModeEnabled, installMode, object)
