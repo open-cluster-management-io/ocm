@@ -273,5 +273,13 @@ func onUpdateFunc(queue workqueue.TypedRateLimitingInterface[string]) func(oldOb
 			queue.Forget(newWork.GetName())
 			queue.Add(newWork.GetName())
 		}
+
+		// Trigger reconciliation when resources are applied but not available.
+		// This handles cases where applied resources are deleted externally.
+		// Without this requeue, the resource may be re-created in the next reconciliation after 4-6 minutes.
+		if meta.IsStatusConditionTrue(newWork.Status.Conditions, workapiv1.WorkApplied) &&
+			!meta.IsStatusConditionTrue(newWork.Status.Conditions, workapiv1.WorkAvailable) {
+			queue.Add(newWork.GetName())
+		}
 	}
 }
