@@ -1351,6 +1351,93 @@ func TestOnUpdateFunc(t *testing.T) {
 			expectQueued: false,
 		},
 		{
+			name: "object transitioning to Available=False should be queued",
+			oldObj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Generation: 1,
+					Finalizers: []string{workapiv1.ManifestWorkFinalizer},
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{{
+						Type:   workapiv1.WorkAvailable,
+						Status: metav1.ConditionTrue,
+					}}}},
+			newObj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Generation: 1,
+					Finalizers: []string{workapiv1.ManifestWorkFinalizer},
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{{
+						Type:   workapiv1.WorkApplied,
+						Status: metav1.ConditionTrue,
+					}, {
+						Type:   workapiv1.WorkAvailable,
+						Status: metav1.ConditionFalse,
+					}}}},
+			expectQueued: true,
+		},
+		{
+			name: "object transitioning to Available=Unknown should not be queued",
+			oldObj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Generation: 1,
+					Finalizers: []string{workapiv1.ManifestWorkFinalizer},
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{{
+						Type:   workapiv1.WorkAvailable,
+						Status: metav1.ConditionTrue,
+					}}}},
+			newObj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Generation: 1,
+					Finalizers: []string{workapiv1.ManifestWorkFinalizer},
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{{
+						Type:   workapiv1.WorkApplied,
+						Status: metav1.ConditionTrue,
+					}, {
+						Type:   workapiv1.WorkAvailable,
+						Status: metav1.ConditionUnknown,
+					}}}},
+			expectQueued: false,
+		},
+		{
+			name: "object with Applied=False should not be queued",
+			oldObj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Generation: 1,
+					Finalizers: []string{workapiv1.ManifestWorkFinalizer},
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{{
+						Type:   workapiv1.WorkAvailable,
+						Status: metav1.ConditionTrue,
+					}}}},
+			newObj: &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-work",
+					Generation: 1,
+					Finalizers: []string{workapiv1.ManifestWorkFinalizer},
+				},
+				Status: workapiv1.ManifestWorkStatus{
+					Conditions: []metav1.Condition{{
+						Type:   workapiv1.WorkApplied,
+						Status: metav1.ConditionFalse,
+					}, {
+						Type:   workapiv1.WorkAvailable,
+						Status: metav1.ConditionFalse,
+					}}}},
+			expectQueued: false,
+		},
+		{
 			name: "invalid new object should not queue anything",
 			oldObj: &workapiv1.ManifestWork{
 				ObjectMeta: metav1.ObjectMeta{

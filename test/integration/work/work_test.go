@@ -1453,4 +1453,44 @@ var _ = Describe("ManifestWork", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 		})
 	})
+
+	Context("Resource deletion and recreation", func() {
+		BeforeEach(func() {
+			manifests = []workapiv1.Manifest{
+				util.ToManifest(util.NewConfigmap(clusterName, cm1, map[string]string{"a": "b"}, nil)),
+			}
+		})
+
+		It("should recreate resource after manual deletion", func(ctx SpecContext) {
+			verifyManifestWorkConditions := func() {
+				util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+					[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+				util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
+					[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+			}
+
+			By("verify initial conditions are True")
+			verifyManifestWorkConditions()
+
+			By("verify configmap exists")
+			cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm1, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			originalUID := cm.UID
+
+			By("manually delete the configmap")
+			err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Delete(ctx, cm1, metav1.DeleteOptions{})
+			Expect(err).ToNot(HaveOccurred())
+
+			By("verify a new ConfigMap is created within 30s")
+			Eventually(func(g Gomega) {
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(ctx, cm1, metav1.GetOptions{})
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(cm.UID).NotTo(Equal(originalUID))
+				g.Expect(cm.Data).To(HaveKeyWithValue("a", "b"))
+			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
+
+			By("verify conditions are True again after recreation")
+			verifyManifestWorkConditions()
+		})
+	})
 })
