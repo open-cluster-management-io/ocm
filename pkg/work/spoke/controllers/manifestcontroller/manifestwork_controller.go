@@ -263,6 +263,14 @@ func onUpdateFunc(queue workqueue.TypedRateLimitingInterface[string]) func(oldOb
 		}
 		if !apiequality.Semantic.DeepEqual(newWork.Spec, oldWork.Spec) ||
 			!apiequality.Semantic.DeepEqual(newWork.Labels, oldWork.Labels) {
+
+			// Reset the rate limiter to process the work immediately when the spec or labels change.
+			// Without this reset, if the work was previously failing and being rate-limited (exponential backoff),
+			// it would continue to wait for the backoff delay before processing the new spec change.
+			// By calling Forget(), we clear the rate limiter's failure count and backoff state,
+			// ensuring the updated work is reconciled immediately if meet failure rather than
+			// waiting for a long time rate-limited retry.
+			queue.Forget(newWork.GetName())
 			queue.Add(newWork.GetName())
 		}
 	}
