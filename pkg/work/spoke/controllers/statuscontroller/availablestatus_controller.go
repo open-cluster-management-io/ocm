@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -28,6 +27,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/conditions"
+	"open-cluster-management.io/ocm/pkg/work/spoke/objectreader"
 	"open-cluster-management.io/ocm/pkg/work/spoke/statusfeedback"
 )
 
@@ -44,7 +44,7 @@ const (
 type AvailableStatusController struct {
 	patcher            patcher.Patcher[*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus]
 	manifestWorkLister worklister.ManifestWorkNamespaceLister
-	spokeDynamicClient dynamic.Interface
+	objectReader       *objectreader.ObjectReader
 	statusReader       *statusfeedback.StatusReader
 	conditionReader    *conditions.ConditionReader
 	syncInterval       time.Duration
@@ -64,13 +64,18 @@ func NewAvailableStatusController(
 		return nil, err
 	}
 
+	objectReader, err := objectreader.NewObjectReader(spokeDynamicClient, manifestWorkInformer)
+	if err != nil {
+		return nil, err
+	}
+
 	controller := &AvailableStatusController{
 		patcher: patcher.NewPatcher[
 			*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
 			manifestWorkClient),
 		manifestWorkLister: manifestWorkLister,
-		spokeDynamicClient: spokeDynamicClient,
 		syncInterval:       syncInterval,
+		objectReader:       objectReader,
 		statusReader:       statusfeedback.NewStatusReader().WithMaxJsonRawLength(maxJSONRawLength),
 		conditionReader:    conditionReader,
 	}
@@ -124,7 +129,7 @@ func (c *AvailableStatusController) syncManifestWork(ctx context.Context, origin
 	// handle status condition of manifests
 	// TODO revist this controller since this might bring races when user change the manifests in spec.
 	for index, manifest := range manifestWork.Status.ResourceStatus.Manifests {
-		obj, availableStatusCondition, err := buildAvailableStatusCondition(manifest.ResourceMeta, c.spokeDynamicClient)
+		obj, availableStatusCondition, err := c.objectReader.Get(ctx, manifest.ResourceMeta)
 		manifestConditions := &manifestWork.Status.ResourceStatus.Manifests[index].Conditions
 		meta.SetStatusCondition(manifestConditions, availableStatusCondition)
 		if err != nil {
@@ -228,51 +233,4 @@ func (c *AvailableStatusController) evaluateConditionRules(ctx context.Context,
 	// (e.g. manifestwork_reconciler adds the "Applied" condition), so we must explicitly
 	// delete conditions that were created by rules which no longer exist.
 	conditions.PruneConditionsGeneratedByConditionRules(manifestConditions, generation)
-}
-
-// buildAvailableStatusCondition returns a StatusCondition with type Available for a given manifest resource
-func buildAvailableStatusCondition(resourceMeta workapiv1.ManifestResourceMeta,
-	dynamicClient dynamic.Interface) (*unstructured.Unstructured, metav1.Condition, error) {
-	conditionType := workapiv1.ManifestAvailable
-
-	if len(resourceMeta.Resource) == 0 || len(resourceMeta.Version) == 0 || len(resourceMeta.Name) == 0 {
-		return nil, metav1.Condition{
-			Type:    conditionType,
-			Status:  metav1.ConditionUnknown,
-			Reason:  "IncompletedResourceMeta",
-			Message: "Resource meta is incompleted",
-		}, fmt.Errorf("incomplete resource meta")
-	}
-
-	gvr := schema.GroupVersionResource{
-		Group:    resourceMeta.Group,
-		Version:  resourceMeta.Version,
-		Resource: resourceMeta.Resource,
-	}
-
-	obj, err := dynamicClient.Resource(gvr).Namespace(resourceMeta.Namespace).Get(context.TODO(), resourceMeta.Name, metav1.GetOptions{})
-
-	switch {
-	case errors.IsNotFound(err):
-		return nil, metav1.Condition{
-			Type:    conditionType,
-			Status:  metav1.ConditionFalse,
-			Reason:  "ResourceNotAvailable",
-			Message: "Resource is not available",
-		}, err
-	case err != nil:
-		return nil, metav1.Condition{
-			Type:    conditionType,
-			Status:  metav1.ConditionUnknown,
-			Reason:  "FetchingResourceFailed",
-			Message: fmt.Sprintf("Failed to fetch resource: %v", err),
-		}, err
-	}
-
-	return obj, metav1.Condition{
-		Type:    conditionType,
-		Status:  metav1.ConditionTrue,
-		Reason:  "ResourceAvailable",
-		Message: "Resource is available",
-	}, nil
 }

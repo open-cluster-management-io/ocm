@@ -17,6 +17,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
+	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
@@ -24,6 +25,7 @@ import (
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/spoke/conditions"
+	"open-cluster-management.io/ocm/pkg/work/spoke/objectreader"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 	"open-cluster-management.io/ocm/pkg/work/spoke/statusfeedback"
 	"open-cluster-management.io/ocm/test/integration/util"
@@ -207,14 +209,20 @@ func TestSyncManifestWork(t *testing.T) {
 
 			fakeClient := fakeworkclient.NewSimpleClientset(testingWork)
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), c.existingResources...)
+			informerFactory := workinformers.NewSharedInformerFactory(fakeClient, 0)
+			r, err := objectreader.NewObjectReader(fakeDynamicClient, informerFactory.Work().V1().ManifestWorks())
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			controller := AvailableStatusController{
-				spokeDynamicClient: fakeDynamicClient,
 				patcher: patcher.NewPatcher[
 					*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
 					fakeClient.WorkV1().ManifestWorks(testingWork.Namespace)),
+				objectReader: r,
 			}
 
-			err := controller.syncManifestWork(context.TODO(), testingWork)
+			err = controller.syncManifestWork(context.TODO(), testingWork)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -545,15 +553,21 @@ func TestStatusFeedback(t *testing.T) {
 
 			fakeClient := fakeworkclient.NewSimpleClientset(testingWork)
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), c.existingResources...)
+			informerFactory := workinformers.NewSharedInformerFactory(fakeClient, 0)
+			r, err := objectreader.NewObjectReader(fakeDynamicClient, informerFactory.Work().V1().ManifestWorks())
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			controller := AvailableStatusController{
-				spokeDynamicClient: fakeDynamicClient,
-				statusReader:       statusfeedback.NewStatusReader(),
+				statusReader: statusfeedback.NewStatusReader(),
 				patcher: patcher.NewPatcher[
 					*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
 					fakeClient.WorkV1().ManifestWorks(testingWork.Namespace)),
+				objectReader: r,
 			}
 
-			err := controller.syncManifestWork(context.TODO(), testingWork)
+			err = controller.syncManifestWork(context.TODO(), testingWork)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -862,17 +876,24 @@ func TestConditionRules(t *testing.T) {
 
 			fakeClient := fakeworkclient.NewSimpleClientset(testingWork)
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), c.existingResources...)
+			informerFactory := workinformers.NewSharedInformerFactory(fakeClient, 0)
 			conditionReader, err := conditions.NewConditionReader()
 			if err != nil {
 				t.Fatal(err)
 			}
+
+			r, err := objectreader.NewObjectReader(fakeDynamicClient, informerFactory.Work().V1().ManifestWorks())
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			controller := AvailableStatusController{
-				spokeDynamicClient: fakeDynamicClient,
-				statusReader:       statusfeedback.NewStatusReader(),
-				conditionReader:    conditionReader,
+				statusReader:    statusfeedback.NewStatusReader(),
+				conditionReader: conditionReader,
 				patcher: patcher.NewPatcher[
 					*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
 					fakeClient.WorkV1().ManifestWorks(testingWork.Namespace)),
+				objectReader: r,
 			}
 
 			err = controller.syncManifestWork(context.TODO(), testingWork)
