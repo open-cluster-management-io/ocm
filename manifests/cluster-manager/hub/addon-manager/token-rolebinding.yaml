@@ -1,0 +1,19 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: "{{ .AddonName }}-token-role"
+  namespace: "{{ .ClusterName }}"
+  labels:
+    addon.open-cluster-management.io/name: "{{ .AddonName }}"
+    addon.open-cluster-management.io/token-infrastructure: "true"
+subjects:
+- kind: Group
+  name: "system:open-cluster-management:{{ .ClusterName }}"
+  apiGroup: rbac.authorization.k8s.io
+- kind: Group
+  name: "open-cluster-management:{{ .ClusterName }}"
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: "{{ .AddonName }}-token-role"
+  apiGroup: rbac.authorization.k8s.io

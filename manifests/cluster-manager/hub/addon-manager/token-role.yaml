@@ -1,0 +1,17 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: "{{ .AddonName }}-token-role"
+  namespace: "{{ .ClusterName }}"
+  labels:
+    addon.open-cluster-management.io/name: "{{ .AddonName }}"
+    addon.open-cluster-management.io/token-infrastructure: "true"
+rules:
+- apiGroups: [""]
+  resources: ["serviceaccounts/token"]
+  resourceNames: ["{{ .AddonName }}-agent"]
+  verbs: ["create"]
+# Allow gRPC client to connect to the gRPC server on hub
+- apiGroups: [""]
+  resources: ["serviceaccounts/token"]
+  verbs: ["subscribe"]

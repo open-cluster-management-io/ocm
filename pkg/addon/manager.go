@@ -9,6 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -28,6 +29,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/addon/controllers/addonowner"
 	"open-cluster-management.io/ocm/pkg/addon/controllers/addonprogressing"
 	"open-cluster-management.io/ocm/pkg/addon/controllers/addontemplate"
+	"open-cluster-management.io/ocm/pkg/addon/controllers/addontokeninfra"
 	"open-cluster-management.io/ocm/pkg/addon/controllers/cmainstallprogression"
 	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 )
@@ -85,6 +87,18 @@ func RunManager(ctx context.Context, controllerContext *controllercmd.Controller
 
 	dynamicInformers := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, 10*time.Minute)
 
+	// Create filtered informers for token infrastructure resources
+	tokenInfraInformers := informers.NewSharedInformerFactoryWithOptions(hubKubeClient, 10*time.Minute,
+		informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
+			selector := &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"addon.open-cluster-management.io/token-infrastructure": "true",
+				},
+			}
+			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
+		}),
+	)
+
 	return RunControllerManagerWithInformers(
 		ctx, controllerContext,
 		hubKubeClient,
@@ -94,6 +108,7 @@ func RunManager(ctx context.Context, controllerContext *controllercmd.Controller
 		addonInformerFactory,
 		workInformers,
 		dynamicInformers,
+		tokenInfraInformers,
 	)
 }
 
@@ -107,6 +122,7 @@ func RunControllerManagerWithInformers(
 	addonInformers addoninformers.SharedInformerFactory,
 	workinformers workv1informers.SharedInformerFactory,
 	dynamicInformers dynamicinformer.DynamicSharedInformerFactory,
+	tokenInfraInformers informers.SharedInformerFactory,
 ) error {
 	// addonDeployController
 	err := workinformers.Work().V1().ManifestWorks().Informer().AddIndexers(
@@ -194,6 +210,15 @@ func RunControllerManagerWithInformers(
 		workinformers,
 	)
 
+	tokenInfrastructureController := addontokeninfra.NewTokenInfrastructureController(
+		hubKubeClient,
+		hubAddOnClient,
+		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		tokenInfraInformers.Core().V1().ServiceAccounts(),
+		tokenInfraInformers.Rbac().V1().Roles(),
+		tokenInfraInformers.Rbac().V1().RoleBindings(),
+	)
+
 	go addonManagementController.Run(ctx, 2)
 	go addonConfigurationController.Run(ctx, 2)
 	go addonOwnerController.Run(ctx, 2)
@@ -202,11 +227,13 @@ func RunControllerManagerWithInformers(
 	// There should be only one instance of addonTemplateController running, since the addonTemplateController will
 	// start a goroutine for each template-type addon it watches.
 	go addonTemplateController.Run(ctx, 1)
+	go tokenInfrastructureController.Run(ctx, 1)
 
 	clusterInformers.Start(ctx.Done())
 	addonInformers.Start(ctx.Done())
 	workinformers.Start(ctx.Done())
 	dynamicInformers.Start(ctx.Done())
+	tokenInfraInformers.Start(ctx.Done())
 
 	<-ctx.Done()
 	return nil
