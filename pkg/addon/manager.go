@@ -28,6 +28,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/addon/controllers/addonowner"
 	"open-cluster-management.io/ocm/pkg/addon/controllers/addonprogressing"
 	"open-cluster-management.io/ocm/pkg/addon/controllers/addontemplate"
+	"open-cluster-management.io/ocm/pkg/addon/controllers/addontokeninfra"
 	"open-cluster-management.io/ocm/pkg/addon/controllers/cmainstallprogression"
 	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 )
@@ -194,6 +195,12 @@ func RunControllerManagerWithInformers(
 		workinformers,
 	)
 
+	tokenInfrastructureController := addontokeninfra.NewTokenInfrastructureController(
+		hubKubeClient,
+		hubAddOnClient,
+		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+	)
+
 	go addonManagementController.Run(ctx, 2)
 	go addonConfigurationController.Run(ctx, 2)
 	go addonOwnerController.Run(ctx, 2)
@@ -202,6 +209,7 @@ func RunControllerManagerWithInformers(
 	// There should be only one instance of addonTemplateController running, since the addonTemplateController will
 	// start a goroutine for each template-type addon it watches.
 	go addonTemplateController.Run(ctx, 1)
+	go tokenInfrastructureController.Run(ctx, 1)
 
 	clusterInformers.Start(ctx.Done())
 	addonInformers.Start(ctx.Done())

@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .ClusterName }}-{{ .AddonName }}-token-role
+  namespace: {{ .ClusterName }}
+  labels:
+    addon.open-cluster-management.io/name: {{ .AddonName }}
+    addon.open-cluster-management.io/token-infrastructure: "true"
+rules:
+- apiGroups: [""]
+  resources: ["serviceaccounts/token"]
+  resourceNames: ["{{ .ClusterName }}-{{ .AddonName }}-agent"]
+  verbs: ["create"]
