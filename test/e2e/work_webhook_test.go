@@ -51,6 +51,16 @@ var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validati
 			gomega.Expect(errors.IsBadRequest(err)).Should(gomega.BeTrue())
 		})
 
+		ginkgo.It("Should respond bad request when creating a manifestwork with duplicate manifests", func() {
+			work := newManifestWork(universalClusterName, workName, []runtime.Object{
+				util.NewConfigmap("default", "cm1", nil, nil),
+				util.NewConfigmap("default", "cm1", nil, nil), // duplicate
+			}...)
+			_, err := hub.WorkClient.WorkV1().ManifestWorks(universalClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(errors.IsBadRequest(err)).Should(gomega.BeTrue())
+		})
+
 		ginkgo.Context("executor", func() {
 			var hubUser string
 			var roleName string
