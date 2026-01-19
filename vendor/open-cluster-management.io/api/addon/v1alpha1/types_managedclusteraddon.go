@@ -73,6 +73,16 @@ type RegistrationConfig struct {
 	//
 	// +optional
 	Subject Subject `json:"subject,omitempty"`
+
+	// driver specifies the authentication driver used by the ManagedClusterAddOn
+	// for this registration configuration when the signer name is
+	// `kubernetes.io/kube-apiserver-client`.
+	// This field is ignored for other signer names.
+	// Supported values are `csr` and `token`.
+	// The field is set by the agent to declare which authentication driver it is using.
+	// +optional
+	// +kubebuilder:validation:Enum=csr;token
+	Driver string `json:"driver,omitempty"`
 }
 
 type AddOnConfig struct {

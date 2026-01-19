@@ -50,15 +50,15 @@ const (
 	// the hub kube-apiserver using kubeClient.
 	KubeClient RegistrationType = "kubeClient"
 
-	// csr represents the registration type for addon agents that need to access non-kube endpoints
+	// customSigner represents the registration type for addon agents that need to access non-kube endpoints
 	// on the hub cluster with client certificate authentication.
-	CSR RegistrationType = "csr"
+	CustomSigner RegistrationType = "customSigner"
 )
 
 // RegistrationConfig defines the configuration for the addon agent to register to the hub cluster.
 type RegistrationConfig struct {
 	// type specifies the type of registration configuration.
-	// +kubebuilder:validation:Enum=kubeClient;csr
+	// +kubebuilder:validation:Enum=kubeClient;customSigner
 	// +required
 	Type RegistrationType `json:"type"`
 
@@ -67,19 +67,25 @@ type RegistrationConfig struct {
 	// +optional
 	KubeClient *KubeClientConfig `json:"kubeClient,omitempty"`
 
-	// csr holds the configuration for csr type registration.
-	// It should be set when type is "csr".
+	// customSigner holds the configuration for customSigner type registration.
+	// It should be set when type is "customSigner".
 	// +optional
-	CSR *CSRConfig `json:"csr,omitempty"`
+	CustomSigner *CustomSignerConfig `json:"customSigner,omitempty"`
 }
 
 type KubeClientConfig struct {
 	// subject is the user subject of the addon agent to be registered to the hub.
 	// +optional
 	Subject KubeClientSubject `json:"subject,omitempty"`
+
+	// driver is the authentication driver used by managedclusteraddon for kubeClient registration. Possible values are csr and token.
+	// This field is set by the agent to declare which driver it is using.
+	// +optional
+	// +kubebuilder:validation:Enum=csr;token
+	Driver string `json:"driver,omitempty"`
 }
 
-type CSRConfig struct {
+type CustomSignerConfig struct {
 	// signerName is the name of signer that addon agent will use to create csr.
 	// +required
 	// +kubebuilder:validation:MaxLength=571

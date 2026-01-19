@@ -3,6 +3,7 @@ package v1beta1
 
 import (
 	"fmt"
+
 	certificates "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"open-cluster-management.io/api/addon/v1alpha1"
@@ -117,12 +118,13 @@ func Convert_v1beta1_RegistrationConfig_To_v1alpha1_RegistrationConfig(in *Regis
 			User:   in.KubeClient.Subject.User,
 			Groups: in.KubeClient.Subject.Groups,
 		}
+		out.Driver = in.KubeClient.Driver
 	} else {
-		if in.CSR == nil {
-			return fmt.Errorf("nil CSR")
+		if in.CustomSigner == nil {
+			return fmt.Errorf("nil CustomSigner")
 		}
-		out.SignerName = in.CSR.SignerName
-		if err := Convert_v1beta1_Subject_To_v1alpha1_Subject(&in.CSR.Subject, &out.Subject, s); err != nil {
+		out.SignerName = in.CustomSigner.SignerName
+		if err := Convert_v1beta1_Subject_To_v1alpha1_Subject(&in.CustomSigner.Subject, &out.Subject, s); err != nil {
 			return err
 		}
 	}
@@ -141,10 +143,11 @@ func Convert_v1alpha1_RegistrationConfig_To_v1beta1_RegistrationConfig(in *v1alp
 					Groups: in.Subject.Groups,
 				},
 			},
+			Driver: in.Driver,
 		}
 	} else {
-		out.Type = CSR
-		out.CSR = &CSRConfig{
+		out.Type = CustomSigner
+		out.CustomSigner = &CustomSignerConfig{
 			SignerName: in.SignerName,
 			Subject: Subject{
 				BaseSubject: BaseSubject{

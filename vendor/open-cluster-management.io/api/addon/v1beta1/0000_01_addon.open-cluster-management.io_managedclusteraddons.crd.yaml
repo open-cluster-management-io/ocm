@@ -303,6 +303,18 @@ spec:
                     RegistrationConfig defines the configuration of the addon agent to register to hub. The Klusterlet agent will
                     create a csr for the addon agent with the registrationConfig.
                   properties:
+                    driver:
+                      description: |-
+                        driver specifies the authentication driver used by the ManagedClusterAddOn
+                        for this registration configuration when the signer name is
+                        `kubernetes.io/kube-apiserver-client`.
+                        This field is ignored for other signer names.
+                        Supported values are `csr` and `token`.
+                        The field is set by the agent to declare which authentication driver it is using.
+                      enum:
+                      - csr
+                      - token
+                      type: string
                     signerName:
                       description: |-
                         Deprecated: Will be replaced with type: kubeClient and type: csr in v1beta1.
@@ -648,10 +660,10 @@ spec:
                   description: RegistrationConfig defines the configuration for the
                     addon agent to register to the hub cluster.
                   properties:
-                    csr:
+                    customSigner:
                       description: |-
-                        csr holds the configuration for csr type registration.
-                        It should be set when type is "csr".
+                        customSigner holds the configuration for customSigner type registration.
+                        It should be set when type is "customSigner".
                       properties:
                         signerName:
                           description: signerName is the name of signer that addon
@@ -687,6 +699,14 @@ spec:
                         kubeClient holds the configuration for kubeClient type registration.
                         It should be set when type is "kubeClient".
                       properties:
+                        driver:
+                          description: |-
+                            driver is the authentication driver used by managedclusteraddon for kubeClient registration. Possible values are csr and token.
+                            This field is set by the agent to declare which driver it is using.
+                          enum:
+                          - csr
+                          - token
+                          type: string
                         subject:
                           description: subject is the user subject of the addon agent
                             to be registered to the hub.
@@ -705,7 +725,7 @@ spec:
                       description: type specifies the type of registration configuration.
                       enum:
                       - kubeClient
-                      - csr
+                      - customSigner
                       type: string
                   required:
                   - type

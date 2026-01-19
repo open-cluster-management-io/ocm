@@ -178,9 +178,13 @@ type RegistrationConfiguration struct {
 	// +optional
 	BootstrapKubeConfigs BootstrapKubeConfigs `json:"bootstrapKubeConfigs,omitempty"`
 
-	// This provides driver details required to register with hub
+	// This provides driver details required to register klusterlet agent with hub
 	// +optional
 	RegistrationDriver RegistrationDriver `json:"registrationDriver,omitempty"`
+
+	// This provides driver details required to register add-ons with hub for kubeClient type
+	// +optional
+	AddOnKubeClientRegistrationDriver AddOnRegistrationDriver `json:"addOnKubeClientRegistrationDriver,omitempty"`
 
 	// ClusterClaimConfiguration represents the configuration of ClusterClaim
 	// Effective only when the `ClusterClaim` feature gate is enabled.
@@ -230,6 +234,30 @@ type AwsIrsa struct {
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Pattern=`^arn:aws:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$`
 	ManagedClusterArn string `json:"managedClusterArn"`
+}
+
+type AddOnRegistrationDriver struct {
+	// AuthType is the authentication driver used for add-on registration.
+	// Possible values are csr and token.
+	// Currently, this field only affects kubeClient type add-on registration. The csr type add-on registration always uses csr driver.
+	// In the future, this may be extended to customize authentication for csr type add-on registration as well.
+	// +optional
+	// +kubebuilder:validation:Enum=csr;token
+	AuthType string `json:"authType,omitempty"`
+
+	// Token contains the configuration for token-based registration.
+	// +optional
+	Token *TokenConfig `json:"token,omitempty"`
+}
+
+type TokenConfig struct {
+	// ExpirationSeconds represents the seconds of a token to expire.
+	// If it is not set or 0, the default duration will be used, which is
+	// the same as the certificate expiration set by the hub cluster's
+	// kube-controller-manager (typically 1 year).
+	// The minimum valid value for production use is 3600 (1 hour), though smaller values are allowed for testing.
+	// +optional
+	ExpirationSeconds int64 `json:"expirationSeconds,omitempty"`
 }
 
 type TypeBootstrapKubeConfigs string
