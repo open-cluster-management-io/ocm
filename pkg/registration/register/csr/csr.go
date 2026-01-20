@@ -33,6 +33,7 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/registration/hub/user"
 	"open-cluster-management.io/ocm/pkg/registration/register"
+	"open-cluster-management.io/ocm/pkg/registration/register/token"
 )
 
 const (
@@ -67,10 +68,16 @@ type CSRDriver struct {
 
 	csrControl CSRControl
 
+	// addonClients holds the addon clients and informers (for addon driver only)
+	addonClients *register.AddOnClients
+
+	// tokenControl is used for token-based addon authentication
+	tokenControl token.TokenControl
+
 	// HaltCSRCreation halt the csr creation
 	haltCSRCreation func() bool
 
-	opt *Option
+	opt register.CSRConfiguration
 
 	csrOption *CSROption
 }
@@ -213,7 +220,7 @@ func (c *CSRDriver) Process(
 		}
 
 		// do not set expiration second if it is 0
-		expirationSeconds := pointer.Int32(c.opt.ExpirationSeconds)
+		expirationSeconds := pointer.Int32(c.opt.GetExpirationSeconds())
 		if *expirationSeconds == 0 {
 			expirationSeconds = nil
 		}
@@ -295,30 +302,28 @@ func (c *CSRDriver) ManagedClusterDecorator(cluster *clusterv1.ManagedCluster) *
 	return cluster
 }
 
-func (c *CSRDriver) Fork(addonName string, secretOption register.SecretOption) register.RegisterDriver {
-	csrOption := &CSROption{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: fmt.Sprintf("addon-%s-%s-", secretOption.ClusterName, addonName),
-			Labels: map[string]string{
-				// the labels are only hints. Anyone could set/modify them.
-				clusterv1.ClusterNameLabelKey: secretOption.ClusterName,
-				addonv1alpha1.AddonLabelKey:   addonName,
-			},
-		},
-		Subject:         secretOption.Subject,
-		DNSNames:        []string{fmt.Sprintf("%s.addon.open-cluster-management.io", addonName)},
-		SignerName:      secretOption.Signer,
-		EventFilterFunc: createCSREventFilterFunc(secretOption.ClusterName, addonName, secretOption.Signer),
+func (c *CSRDriver) Fork(addonName string, authConfig register.AddonAuthConfig, secretOption register.SecretOption) (register.RegisterDriver, error) {
+	// Check if token-based authentication should be used (shared helper)
+	tokenDriver, err := token.TryForkTokenDriver(addonName, authConfig, secretOption, c.tokenControl, c.addonClients)
+	if err != nil {
+		return nil, err
+	}
+	if tokenDriver != nil {
+		return tokenDriver, nil
 	}
 
-	driver := &CSRDriver{
-		csrOption:       csrOption,
-		opt:             c.opt,
-		csrControl:      c.csrControl,
-		haltCSRCreation: haltAddonCSRCreationFunc(c.csrControl.Informer().GetIndexer(), secretOption.ClusterName, addonName),
+	// For CSR driver, return a CSR-based driver
+	// This handles:
+	// - CustomSigner type (secretOption.Signer != KubeAPIServerClientSignerName)
+	// - KubeClient type with CSR authentication
+
+	// Get CSR configuration from AddonAuthConfig (type-safe interface)
+	csrConfig := authConfig.GetCSRConfiguration()
+	if csrConfig == nil {
+		return nil, fmt.Errorf("CSR configuration is nil for addon %s", addonName)
 	}
 
-	return driver
+	return NewCSRDriverForAddOn(addonName, csrConfig, secretOption, c.csrControl), nil
 }
 
 func (c *CSRDriver) BuildClients(ctx context.Context, secretOption register.SecretOption, bootstrap bool) (*register.Clients, error) {
@@ -353,6 +358,16 @@ func (c *CSRDriver) BuildClients(ctx context.Context, secretOption register.Secr
 	if err != nil {
 		return nil, err
 	}
+
+	// Initialize addon clients and token control for addon mode after bootstrap
+	if !bootstrap {
+		c.addonClients = &register.AddOnClients{
+			AddonClient:   clients.AddonClient,
+			AddonInformer: clients.AddonInformer,
+		}
+		c.tokenControl = token.NewTokenControl(kubeClient.CoreV1())
+	}
+
 	return clients, nil
 }
 
@@ -370,10 +385,45 @@ func (c *CSRDriver) SetCSRControl(csrControl CSRControl, clusterName string) err
 	return nil
 }
 
-var _ register.RegisterDriver = &CSRDriver{}
-var _ register.AddonDriver = &CSRDriver{}
+// SetAddonClients sets the addon clients for the CSR driver
+func (c *CSRDriver) SetAddonClients(addonClients *register.AddOnClients) {
+	c.addonClients = addonClients
+}
 
-func NewCSRDriver(opt *Option, secretOpts register.SecretOption) (*CSRDriver, error) {
+// SetTokenControl sets the token control for the CSR driver
+func (c *CSRDriver) SetTokenControl(tokenControl token.TokenControl) {
+	c.tokenControl = tokenControl
+}
+
+var _ register.RegisterDriver = &CSRDriver{}
+var _ register.AddonDriverFactory = &CSRDriver{}
+
+// NewCSRDriverForAddOn creates a CSRDriver for addon registration with the given parameters
+func NewCSRDriverForAddOn(addonName string, csrConfig register.CSRConfiguration, secretOption register.SecretOption, csrControl CSRControl) *CSRDriver {
+	csrOption := &CSROption{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: fmt.Sprintf("addon-%s-%s-", secretOption.ClusterName, addonName),
+			Labels: map[string]string{
+				// the labels are only hints. Anyone could set/modify them.
+				clusterv1.ClusterNameLabelKey: secretOption.ClusterName,
+				addonv1alpha1.AddonLabelKey:   addonName,
+			},
+		},
+		Subject:         secretOption.Subject,
+		DNSNames:        []string{fmt.Sprintf("%s.addon.open-cluster-management.io", addonName)},
+		SignerName:      secretOption.Signer,
+		EventFilterFunc: createCSREventFilterFunc(secretOption.ClusterName, addonName, secretOption.Signer),
+	}
+
+	return &CSRDriver{
+		csrOption:       csrOption,
+		opt:             csrConfig,
+		csrControl:      csrControl,
+		haltCSRCreation: haltAddonCSRCreationFunc(csrControl.Informer().GetIndexer(), secretOption.ClusterName, addonName),
+	}
+}
+
+func NewCSRDriver(csrConfig register.CSRConfiguration, secretOpts register.SecretOption) (*CSRDriver, error) {
 	signer := certificates.KubeAPIServerClientSignerName
 	if secretOpts.Signer != "" {
 		signer = secretOpts.Signer
@@ -385,7 +435,7 @@ func NewCSRDriver(opt *Option, secretOpts register.SecretOption) (*CSRDriver, er
 	}
 
 	driver := &CSRDriver{
-		opt: opt,
+		opt: csrConfig,
 	}
 	driver.csrOption = &CSROption{
 		ObjectMeta: metav1.ObjectMeta{

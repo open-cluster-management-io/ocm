@@ -272,10 +272,12 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 		_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		created, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		created.Status = addonv1alpha1.ManagedClusterAddOnStatus{
-			Registrations: []addonv1alpha1.RegistrationConfig{
+		gomega.Eventually(func() error {
+			created, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			created.Status.Registrations = []addonv1alpha1.RegistrationConfig{
 				{
 					SignerName: signerName,
 					Subject: addonv1alpha1.Subject{
@@ -285,10 +287,10 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 						},
 					},
 				},
-			},
-		}
-		_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.TODO(), created, metav1.UpdateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			}
+			_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.TODO(), created, metav1.UpdateOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		assertSuccessCSRApproval(managedClusterName, addOnName, hubKubeClient)
 		assertValidClientCertificate(addOnName, getSecretName(addOnName, signerName), signerName, spokeKubeClient)

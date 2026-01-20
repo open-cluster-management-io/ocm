@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -23,6 +24,8 @@ import (
 	"k8s.io/klog/v2/ktesting"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
+	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
@@ -32,6 +35,8 @@ import (
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/hub/user"
 	"open-cluster-management.io/ocm/pkg/registration/register"
+	registertesting "open-cluster-management.io/ocm/pkg/registration/register/testing"
+	"open-cluster-management.io/ocm/pkg/registration/register/token"
 )
 
 const (
@@ -623,8 +628,15 @@ func TestNewCSRDriver(t *testing.T) {
 			CommonName: "addonagent1",
 		},
 	}
-	addonDriver := driver.Fork("addon1", addonSecretOptions)
-	csrAddonDriver := addonDriver.(*CSRDriver)
+	regOption := &registertesting.TestAddonAuthConfig{
+		KubeClientAuth: "csr",
+		CSROption:      NewCSROption(),
+	}
+	forkedDriver, err := driver.Fork("addon1", regOption, addonSecretOptions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	csrAddonDriver := forkedDriver.(*CSRDriver)
 	if csrAddonDriver.csrOption.Subject.CommonName != "addonagent1" {
 		t.Errorf("common name is not set correctly")
 	}
@@ -782,5 +794,246 @@ func TestBuildClient(t *testing.T) {
 				t.Errorf("expected error %v but got %v", tt.expectErr, err)
 			}
 		})
+	}
+}
+
+func TestCSRDriver_Fork_TokenAuth(t *testing.T) {
+	// Setup addon client and informer
+	addon := &addonv1alpha1.ManagedClusterAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "addon1",
+			Namespace: "cluster1",
+		},
+	}
+	addonClient := addonfake.NewSimpleClientset(addon)
+	addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 10*time.Minute)
+	addonInformer := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns()
+
+	ctrl := &mockCSRControl{}
+	hubKubeClient := kubefake.NewClientset()
+	ctrl.csrClient = &hubKubeClient.Fake
+
+	addonClients := &register.AddOnClients{
+		AddonClient:   addonClient,
+		AddonInformer: addonInformer,
+	}
+
+	tests := []struct {
+		name           string
+		setupDriver    func() *CSRDriver
+		addonName      string
+		secretOption   register.SecretOption
+		regOption      register.AddonAuthConfig
+		expectErr      bool
+		expectErrMsg   string
+		validateResult func(t *testing.T, driver register.RegisterDriver)
+	}{
+		{
+			name: "token auth - success",
+			setupDriver: func() *CSRDriver {
+				driver := &CSRDriver{
+					csrControl:   ctrl,
+					tokenControl: &registertesting.MockTokenControl{},
+					addonClients: addonClients,
+				}
+				return driver
+			},
+			addonName: "addon1",
+			secretOption: register.SecretOption{
+				ClusterName: "cluster1",
+				Signer:      certificates.KubeAPIServerClientSignerName,
+			},
+			regOption: &registertesting.TestAddonAuthConfig{
+				KubeClientAuth: "token",
+				TokenOption:    token.NewTokenOption(),
+			},
+			expectErr: false,
+			validateResult: func(t *testing.T, driver register.RegisterDriver) {
+				if _, ok := driver.(*token.TokenDriver); !ok {
+					t.Errorf("expected TokenDriver, got %T", driver)
+				}
+			},
+		},
+		{
+			name: "token auth - invalid token option",
+			setupDriver: func() *CSRDriver {
+				driver := &CSRDriver{
+					csrControl:   ctrl,
+					tokenControl: &registertesting.MockTokenControl{},
+					addonClients: addonClients,
+				}
+				return driver
+			},
+			addonName: "addon1",
+			secretOption: register.SecretOption{
+				ClusterName: "cluster1",
+				Signer:      certificates.KubeAPIServerClientSignerName,
+			},
+			regOption: &registertesting.TestAddonAuthConfig{
+				KubeClientAuth: "token",
+				TokenOption:    nil,
+			},
+			expectErr:    true,
+			expectErrMsg: "token authentication requested but TokenConfiguration is nil",
+		},
+		{
+			name: "token auth - tokenControl not initialized",
+			setupDriver: func() *CSRDriver {
+				driver := &CSRDriver{
+					csrControl:   ctrl,
+					tokenControl: nil,
+					addonClients: addonClients,
+				}
+				return driver
+			},
+			addonName: "addon1",
+			secretOption: register.SecretOption{
+				ClusterName: "cluster1",
+				Signer:      certificates.KubeAPIServerClientSignerName,
+			},
+			regOption: &registertesting.TestAddonAuthConfig{
+				KubeClientAuth: "token",
+				TokenOption:    token.NewTokenOption(),
+			},
+			expectErr:    true,
+			expectErrMsg: "tokenControl is not initialized",
+		},
+		{
+			name: "token auth - addonClients not initialized",
+			setupDriver: func() *CSRDriver {
+				driver := &CSRDriver{
+					csrControl:   ctrl,
+					tokenControl: &registertesting.MockTokenControl{},
+					addonClients: nil,
+				}
+				return driver
+			},
+			addonName: "addon1",
+			secretOption: register.SecretOption{
+				ClusterName: "cluster1",
+				Signer:      certificates.KubeAPIServerClientSignerName,
+			},
+			regOption: &registertesting.TestAddonAuthConfig{
+				KubeClientAuth: "token",
+				TokenOption:    token.NewTokenOption(),
+			},
+			expectErr:    true,
+			expectErrMsg: "addonClients is not initialized",
+		},
+		{
+			name: "csr auth with custom signer - success",
+			setupDriver: func() *CSRDriver {
+				driver := &CSRDriver{
+					csrControl:   ctrl,
+					tokenControl: &registertesting.MockTokenControl{},
+					addonClients: addonClients,
+				}
+				return driver
+			},
+			addonName: "addon1",
+			secretOption: register.SecretOption{
+				ClusterName: "cluster1",
+				Signer:      "custom.signer.io/custom",
+				Subject: &pkix.Name{
+					CommonName: "custom-addon",
+				},
+			},
+			regOption: &registertesting.TestAddonAuthConfig{
+				KubeClientAuth: "csr",
+				CSROption:      NewCSROption(),
+			},
+			expectErr: false,
+			validateResult: func(t *testing.T, driver register.RegisterDriver) {
+				if _, ok := driver.(*CSRDriver); !ok {
+					t.Errorf("expected CSRDriver, got %T", driver)
+				}
+			},
+		},
+		{
+			name: "csr auth - invalid CSR option",
+			setupDriver: func() *CSRDriver {
+				driver := &CSRDriver{
+					csrControl:   ctrl,
+					tokenControl: &registertesting.MockTokenControl{},
+					addonClients: addonClients,
+				}
+				return driver
+			},
+			addonName: "addon1",
+			secretOption: register.SecretOption{
+				ClusterName: "cluster1",
+				Signer:      certificates.KubeAPIServerClientSignerName,
+			},
+			regOption: &registertesting.TestAddonAuthConfig{
+				KubeClientAuth: "csr",
+				CSROption:      nil,
+			},
+			expectErr:    true,
+			expectErrMsg: "CSR configuration is nil",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			driver := tt.setupDriver()
+
+			forkedDriver, err := driver.Fork(tt.addonName, tt.regOption, tt.secretOption)
+
+			if tt.expectErr {
+				if err == nil {
+					t.Errorf("expected error but got nil")
+					return
+				}
+				if tt.expectErrMsg != "" && !strings.Contains(err.Error(), tt.expectErrMsg) {
+					t.Errorf("expected error message to contain %q, got %q", tt.expectErrMsg, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+
+			if tt.validateResult != nil {
+				tt.validateResult(t, forkedDriver)
+			}
+		})
+	}
+}
+
+func TestCSRDriver_SetTokenControl(t *testing.T) {
+	driver := &CSRDriver{}
+	mockControl := &registertesting.MockTokenControl{}
+
+	driver.SetTokenControl(mockControl)
+
+	if driver.tokenControl != mockControl {
+		t.Error("SetTokenControl did not set tokenControl correctly")
+	}
+}
+
+func TestCSRDriver_SetAddonClients(t *testing.T) {
+	driver := &CSRDriver{}
+
+	addon := &addonv1alpha1.ManagedClusterAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "addon1",
+			Namespace: "cluster1",
+		},
+	}
+	addonClient := addonfake.NewSimpleClientset(addon)
+	addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 10*time.Minute)
+	addonInformer := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns()
+
+	addonClients := &register.AddOnClients{
+		AddonClient:   addonClient,
+		AddonInformer: addonInformer,
+	}
+
+	driver.SetAddonClients(addonClients)
+
+	if driver.addonClients != addonClients {
+		t.Error("SetAddonClients did not set addonClients correctly")
 	}
 }

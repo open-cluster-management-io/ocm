@@ -206,6 +206,11 @@ type klusterletConfig struct {
 	Labels             map[string]string
 	RegistrationDriver RegistrationDriver
 
+	// AddOnKubeClientRegistrationAuth is the authentication type for add-on registration (csr or token)
+	AddOnKubeClientRegistrationAuth string
+	// AddOnTokenExpirationSeconds is the expiration seconds for add-on tokens
+	AddOnTokenExpirationSeconds int64
+
 	ManagedClusterArn        string
 	ManagedClusterRoleArn    string
 	ManagedClusterRoleSuffix string
@@ -390,6 +395,19 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			annotationsArray = append(annotationsArray, fmt.Sprintf("%s=%s", k, v))
 		}
 		config.ClusterAnnotationsString = strings.Join(annotationsArray, ",")
+
+		// Set AddOnKubeClientRegistrationAuth from the Klusterlet spec
+		if klusterlet.Spec.RegistrationConfiguration.AddOnKubeClientRegistrationDriver != nil &&
+			klusterlet.Spec.RegistrationConfiguration.AddOnKubeClientRegistrationDriver.AuthType != "" {
+			config.AddOnKubeClientRegistrationAuth = klusterlet.Spec.RegistrationConfiguration.AddOnKubeClientRegistrationDriver.AuthType
+		}
+
+		// Set AddOnTokenExpirationSeconds from the Klusterlet spec
+		if klusterlet.Spec.RegistrationConfiguration.AddOnKubeClientRegistrationDriver != nil &&
+			klusterlet.Spec.RegistrationConfiguration.AddOnKubeClientRegistrationDriver.Token != nil &&
+			klusterlet.Spec.RegistrationConfiguration.AddOnKubeClientRegistrationDriver.Token.ExpirationSeconds > 0 {
+			config.AddOnTokenExpirationSeconds = klusterlet.Spec.RegistrationConfiguration.AddOnKubeClientRegistrationDriver.Token.ExpirationSeconds
+		}
 	}
 
 	config.AboutAPIEnabled = helpers.FeatureGateEnabled(

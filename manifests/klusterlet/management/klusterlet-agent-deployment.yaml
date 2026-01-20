@@ -125,6 +125,12 @@ spec:
           {{if .ReservedClusterClaimSuffixes}}
           - "--reserved-cluster-claim-suffixes={{ .ReservedClusterClaimSuffixes }}"
           {{end}}
+          {{if .AddOnKubeClientRegistrationAuth}}
+          - "--addon-kubeclient-registration-auth={{ .AddOnKubeClientRegistrationAuth }}"
+          {{end}}
+          {{if gt .AddOnTokenExpirationSeconds 0}}
+          - "--addon-token-expiration-seconds={{ .AddOnTokenExpirationSeconds }}"
+          {{end}}
           {{if .AppliedManifestWorkEvictionGracePeriod}}
           - "--appliedmanifestwork-eviction-grace-period={{ .AppliedManifestWorkEvictionGracePeriod }}"
           {{end}}

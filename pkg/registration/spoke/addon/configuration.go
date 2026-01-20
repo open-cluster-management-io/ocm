@@ -81,34 +81,37 @@ func isAddonRunningOutsideManagedCluster(addOn *addonv1alpha1.ManagedClusterAddO
 	return false
 }
 
-// getRegistrationConfigs reads annotations of a addon and returns a map of registrationConfig whose
-// key is the hash of the registrationConfig
-func getRegistrationConfigs(addOn *addonv1alpha1.ManagedClusterAddOn) (map[string]registrationConfig, error) {
+// getRegistrationConfigs reads registrations and returns a map of registrationConfig whose
+// key is the hash of the registrationConfig.
+func getRegistrationConfigs(
+	addOnName string,
+	installOption addonInstallOption,
+	registrations []addonv1alpha1.RegistrationConfig,
+	kubeClientDriver string,
+) (map[string]registrationConfig, error) {
 	configs := map[string]registrationConfig{}
 
-	for _, registration := range addOn.Status.Registrations {
+	for _, registration := range registrations {
 		config := registrationConfig{
-			addOnName: addOn.Name,
-			addonInstallOption: addonInstallOption{
-				AgentRunningOutsideManagedCluster: isAddonRunningOutsideManagedCluster(addOn),
-				InstallationNamespace:             getAddOnInstallationNamespace(addOn),
-			},
-			registration: registration,
+			addOnName:          addOnName,
+			addonInstallOption: installOption,
+			registration:       registration,
 		}
 
 		// set the secret name of client certificate
 		switch registration.SignerName {
 		case certificatesv1.KubeAPIServerClientSignerName:
-			config.secretName = fmt.Sprintf("%s-hub-kubeconfig", addOn.Name)
+			config.secretName = fmt.Sprintf("%s-hub-kubeconfig", addOnName)
 		default:
-			config.secretName = fmt.Sprintf("%s-%s-client-cert", addOn.Name, strings.ReplaceAll(registration.SignerName, "/", "-"))
+			config.secretName = fmt.Sprintf("%s-%s-client-cert", addOnName, strings.ReplaceAll(registration.SignerName, "/", "-"))
 		}
 
 		// hash registration configuration, install namespace and addOnAgentRunningOutsideManagedCluster. Use the hash
 		// value as the key of map to make sure each registration configuration and addon installation option is unique
 		hash, err := getConfigHash(
 			registration,
-			config.addonInstallOption)
+			config.addonInstallOption,
+			kubeClientDriver)
 		if err != nil {
 			return configs, err
 		}
@@ -119,8 +122,23 @@ func getRegistrationConfigs(addOn *addonv1alpha1.ManagedClusterAddOn) (map[strin
 	return configs, nil
 }
 
-func getConfigHash(registration addonv1alpha1.RegistrationConfig, installOption addonInstallOption) (string, error) {
-	data, err := json.Marshal(registration)
+func getConfigHash(registration addonv1alpha1.RegistrationConfig, installOption addonInstallOption, kubeClientDriver string) (string, error) {
+	// Create a canonical config for hashing, excluding status fields set by the agent.
+	// Driver is always excluded (set by agent as status, not configuration)
+	// Subject is excluded only for token-based authentication (set by token driver)
+	// Subject is included for CSR-based and custom signer authentication (part of the configuration)
+	canonicalConfig := addonv1alpha1.RegistrationConfig{
+		SignerName: registration.SignerName,
+	}
+
+	// For KubeClient type registrations, check if driver is token
+	// For custom signers, always include subject
+	isKubeClientType := registration.SignerName == certificatesv1.KubeAPIServerClientSignerName
+	if !isKubeClientType || kubeClientDriver != "token" {
+		canonicalConfig.Subject = registration.Subject
+	}
+
+	data, err := json.Marshal(canonicalConfig)
 	if err != nil {
 		return "", err
 	}

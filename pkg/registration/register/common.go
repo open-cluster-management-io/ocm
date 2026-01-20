@@ -254,6 +254,12 @@ type Clients struct {
 	AddonInformer   addonv1alpha1informers.ManagedClusterAddOnInformer
 }
 
+// AddOnClients hold clients and informers used by addon driver
+type AddOnClients struct {
+	AddonClient   addonclient.Interface
+	AddonInformer addonv1alpha1informers.ManagedClusterAddOnInformer
+}
+
 func KubeConfigFromSecretOption(s SecretOption, bootstrap bool) (*rest.Config, error) {
 	var kubeConfig *rest.Config
 	var err error

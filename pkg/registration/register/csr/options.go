@@ -10,6 +10,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
+
+	"open-cluster-management.io/ocm/pkg/registration/register"
 )
 
 // CSROption includes options that is used to create and monitor csrs
@@ -43,6 +45,9 @@ type Option struct {
 	ExpirationSeconds int32
 }
 
+// Ensure Option implements register.CSRConfiguration interface at compile time
+var _ register.CSRConfiguration = &Option{}
+
 func NewCSROption() *Option {
 	return &Option{}
 }
@@ -58,6 +63,10 @@ func (o *Option) Validate() error {
 		return errors.New("client certificate expiration seconds must greater or qual to 3600")
 	}
 	return nil
+}
+
+func (o *Option) GetExpirationSeconds() int32 {
+	return o.ExpirationSeconds
 }
 
 func haltCSRCreationFunc(indexer cache.Indexer, clusterName string) func() bool {
