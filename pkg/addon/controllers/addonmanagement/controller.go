@@ -2,6 +2,7 @@ package addonmanagement
 
 import (
 	"context"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -63,16 +64,21 @@ func NewAddonManagementController(
 		},
 	}
 
-	return factory.New().WithInformersQueueKeysFunc(
-		queue.QueueKeyByMetaName,
-		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
-		WithInformersQueueKeysFunc(
+	return factory.New().
+		// Delay all events to batch sequential updates and avoid unnecessary addon recreation
+		WithInformersQueueKeysFuncAndDelay(
+			queue.QueueKeyByMetaName,
+			100*time.Millisecond,
+			addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
+		WithInformersQueueKeysFuncAndDelay(
 			addonindex.ClusterManagementAddonByPlacementDecisionQueueKey(
 				clusterManagementAddonInformers),
+			100*time.Millisecond,
 			placementDecisionInformer.Informer()).
-		WithInformersQueueKeysFunc(
+		WithInformersQueueKeysFuncAndDelay(
 			addonindex.ClusterManagementAddonByPlacementQueueKey(
 				clusterManagementAddonInformers),
+			100*time.Millisecond,
 			placementInformer.Informer()).
 		WithSync(c.sync).ToController("addon-management-controller")
 }

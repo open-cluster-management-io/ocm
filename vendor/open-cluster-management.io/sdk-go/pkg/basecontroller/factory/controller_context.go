@@ -2,6 +2,8 @@ package factory
 
 import (
 	"fmt"
+	"time"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -38,7 +40,7 @@ func (c syncContext) Recorder() events.Recorder {
 }
 
 // eventHandler provides default event handler that is added to an informers passed to controller factory.
-func (c syncContext) eventHandler(queueKeysFunc ObjectQueueKeysFunc, filter EventFilterFunc) cache.ResourceEventHandler {
+func (c syncContext) eventHandler(queueKeysFunc ObjectQueueKeysFunc, filter EventFilterFunc, delay time.Duration) cache.ResourceEventHandler {
 	resourceEventHandler := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			runtimeObj, ok := obj.(runtime.Object)
@@ -46,7 +48,7 @@ func (c syncContext) eventHandler(queueKeysFunc ObjectQueueKeysFunc, filter Even
 				utilruntime.HandleError(fmt.Errorf("added object %+v is not runtime Object", obj))
 				return
 			}
-			c.enqueueKeys(queueKeysFunc(runtimeObj)...)
+			c.enqueueKeysWithDelay(delay, queueKeysFunc(runtimeObj)...)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			runtimeObj, ok := new.(runtime.Object)
@@ -54,12 +56,13 @@ func (c syncContext) eventHandler(queueKeysFunc ObjectQueueKeysFunc, filter Even
 				utilruntime.HandleError(fmt.Errorf("updated object %+v is not runtime Object", runtimeObj))
 				return
 			}
-			c.enqueueKeys(queueKeysFunc(runtimeObj)...)
+			c.enqueueKeysWithDelay(delay, queueKeysFunc(runtimeObj)...)
 		},
 		DeleteFunc: func(obj interface{}) {
 			runtimeObj, ok := obj.(runtime.Object)
 			if !ok {
 				if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+					// Delete events are processed immediately without delay
 					c.enqueueKeys(queueKeysFunc(tombstone.Obj.(runtime.Object))...)
 
 					return
@@ -67,6 +70,7 @@ func (c syncContext) eventHandler(queueKeysFunc ObjectQueueKeysFunc, filter Even
 				utilruntime.HandleError(fmt.Errorf("updated object %+v is not runtime Object", runtimeObj))
 				return
 			}
+			// Delete events are processed immediately without delay
 			c.enqueueKeys(queueKeysFunc(runtimeObj)...)
 		},
 	}
@@ -79,8 +83,22 @@ func (c syncContext) eventHandler(queueKeysFunc ObjectQueueKeysFunc, filter Even
 	}
 }
 
-func (c syncContext) enqueueKeys(keys ...string) {
+// enqueueKeysWithDelay adds keys to the work queue with optional delay.
+// If delay > 0, uses AddAfter() which supports automatic deduplication:
+// - If the same key is added multiple times before delay expires, only one reconcile happens
+// - The earliest readyAt time is kept if key already exists in waiting queue
+// This enables batching of rapid sequential updates to the same resource.
+func (c syncContext) enqueueKeysWithDelay(delay time.Duration, keys ...string) {
 	for _, qKey := range keys {
-		c.queue.Add(qKey)
+		if delay > 0 {
+			c.queue.AddAfter(qKey, delay)
+		} else {
+			c.queue.Add(qKey)
+		}
 	}
+}
+
+// enqueueKeys adds keys to the work queue immediately without delay.
+func (c syncContext) enqueueKeys(keys ...string) {
+	c.enqueueKeysWithDelay(0, keys...)
 }

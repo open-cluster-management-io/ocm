@@ -1961,7 +1961,7 @@ open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v1.1.1-0.20260120013142-6d087c9a2a3d
+# open-cluster-management.io/sdk-go v1.1.1-0.20260120013142-6d087c9a2a3d => github.com/haoqing0110/sdk-go v0.0.0-20260120095521-fe81e417c1e1
 ## explicit; go 1.25.0
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
@@ -2139,3 +2139,4 @@ sigs.k8s.io/structured-merge-diff/v6/value
 ## explicit; go 1.22
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v3
+# open-cluster-management.io/sdk-go => github.com/haoqing0110/sdk-go v0.0.0-20260120095521-fe81e417c1e1
