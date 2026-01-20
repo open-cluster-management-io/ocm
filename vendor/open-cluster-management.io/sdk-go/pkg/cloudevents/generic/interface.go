@@ -72,7 +72,7 @@ type CloudEventsClient[T ResourceObject] interface {
 	// ResourceHandler to handle them.
 	Subscribe(ctx context.Context, handlers ...ResourceHandler[T])
 
-	// ReconnectedChan returns a chan which indicates the source/agent client is reconnected.
+	// SubscribedChan returns a chan which indicates the source/agent client is subscribed.
 	// The source/agent client callers should consider sending a resync request when receiving this signal.
-	ReconnectedChan() <-chan struct{}
+	SubscribedChan() <-chan struct{}
 }

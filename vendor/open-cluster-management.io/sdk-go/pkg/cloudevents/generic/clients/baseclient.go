@@ -60,7 +60,7 @@ type baseClient struct {
 	transport              options.CloudEventTransport
 	cloudEventsRateLimiter flowcontrol.RateLimiter
 	receiverChan           chan int
-	resyncChan             chan struct{}
+	subscribedChan         chan struct{}
 	subscribeChan          chan struct{}
 	connected              atomic.Bool
 	subscribed             atomic.Bool
@@ -71,7 +71,7 @@ func newBaseClient(clientID string, transport options.CloudEventTransport, limit
 		clientID:               clientID,
 		transport:              transport,
 		cloudEventsRateLimiter: utils.NewRateLimiter(limit),
-		resyncChan:             make(chan struct{}, 1),
+		subscribedChan:         make(chan struct{}, 1),
 		subscribeChan:          make(chan struct{}, 1),
 		receiverChan:           make(chan int, 2), // Allow both stop and start signals to be buffered
 	}
@@ -229,7 +229,7 @@ func (c *baseClient) subscribe(ctx context.Context, receive receiveFn) {
 
 				// Notify the client caller to resync the resources
 				select {
-				case c.resyncChan <- struct{}{}:
+				case c.subscribedChan <- struct{}{}:
 					// Signal sent successfully
 				default:
 					// Resync channel is unavailable, that's okay - don't block

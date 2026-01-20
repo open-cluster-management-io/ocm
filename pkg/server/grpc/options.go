@@ -12,6 +12,7 @@ import (
 	csrce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
 	eventce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
 	leasece "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/lease"
+	sace "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/serviceaccount"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/payload"
 	pbv1 "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protobuf/v1"
 	cloudeventsgrpc "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc"
@@ -25,6 +26,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/server/services/csr"
 	"open-cluster-management.io/ocm/pkg/server/services/event"
 	"open-cluster-management.io/ocm/pkg/server/services/lease"
+	"open-cluster-management.io/ocm/pkg/server/services/tokenrequest"
 	"open-cluster-management.io/ocm/pkg/server/services/work"
 )
 
@@ -69,6 +71,7 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 		lease.NewLeaseService(clients.KubeClient, clients.KubeInformers.Coordination().V1().Leases()))
 	grpcEventServer.RegisterService(ctx, payload.ManifestBundleEventDataType,
 		work.NewWorkService(clients.WorkClient, clients.WorkInformers.Work().V1().ManifestWorks()))
+	grpcEventServer.RegisterService(ctx, sace.TokenRequestDataType, tokenrequest.NewTokenRequestService(clients.KubeClient))
 
 	// start clients
 	go clients.Run(ctx)

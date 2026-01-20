@@ -1961,7 +1961,7 @@ open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v1.1.1-0.20260112054941-b6c1a665df1b
+# open-cluster-management.io/sdk-go v1.1.1-0.20260120013142-6d087c9a2a3d
 ## explicit; go 1.25.0
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
@@ -1984,6 +1984,7 @@ open-cluster-management.io/sdk-go/pkg/cloudevents/clients/errors
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/lease
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/serviceaccount
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/statushash
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/store
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/utils

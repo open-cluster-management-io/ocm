@@ -59,10 +59,10 @@ func NewCloudEventAgentClient[T generic.ResourceObject](
 	}, nil
 }
 
-// ReconnectedChan returns a chan which indicates the source/agent client is reconnected.
-// The source/agent client callers should consider sending a resync request when receiving this signal.
-func (c *CloudEventAgentClient[T]) ReconnectedChan() <-chan struct{} {
-	return c.resyncChan
+// SubscribedChan returns a chan which indicates the agent client is subscribed.
+// The agent client callers should consider sending a resync request when receiving this signal.
+func (c *CloudEventAgentClient[T]) SubscribedChan() <-chan struct{} {
+	return c.subscribedChan
 }
 
 // Resync the resources spec by sending a spec resync request from the current to the given source.
