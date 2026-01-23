@@ -232,6 +232,8 @@ github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 h1:Ovs26xHkKqVztRpIrF/92Bcuy
 github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0/go.mod h1:8NvIoxWQoOIhqOTXgfV/d3M/q6VIi02HzZEHgUlZvzk=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3 h1:5ZPtiqj0JL5oKWmcsq4VMaAW5ukBEgSGXEN89zeH1Jo=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3/go.mod h1:ndYquD05frm2vACXE1nsccT4oJzjhw2arTS2cpUD1PI=
+github.com/haoqing0110/sdk-go v0.0.0-20260120095521-fe81e417c1e1 h1:tuv/cqv58yofGUOPiCzN3VA5tnWMBEtlzb/ylI7G1YE=
+github.com/haoqing0110/sdk-go v0.0.0-20260120095521-fe81e417c1e1/go.mod h1:4haPv/uuKqQ3gxi62/PPknlrUFi132ga0KYLwj5tpx0=
 github.com/huandu/xstrings v1.5.0 h1:2ag3IFq9ZDANvthTwTiqSSZLjDc+BedvHPAp5tJy2TI=
 github.com/huandu/xstrings v1.5.0/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
 github.com/ianlancetaylor/demangle v0.0.0-20210905161508-09a460cdf81d/go.mod h1:aYm2/VgdVmcIU8iMfdMvDMsRAQjcfZSKFby6HOFvi/w=
@@ -587,8 +589,6 @@ open-cluster-management.io/addon-framework v1.1.1-0.20251222073158-b5846d76add9 
 open-cluster-management.io/addon-framework v1.1.1-0.20251222073158-b5846d76add9/go.mod h1:St9LTEuZ5ADLY9cVXSp+rVE/ZbPJ+hzNQ7/YcsiQVd8=
 open-cluster-management.io/api v1.1.1-0.20260116065909-8307845802e0 h1:FLYkctX92dosLXm8+SQhfXm3h9K4iiKAKUwJiK88bF4=
 open-cluster-management.io/api v1.1.1-0.20260116065909-8307845802e0/go.mod h1:YcmA6SpGEekIMxdoeVIIyOaBhMA6ImWRLXP4g8n8T+4=
-open-cluster-management.io/sdk-go v1.1.1-0.20260120013142-6d087c9a2a3d h1:V+2LZY0aPOStdRxnFvW+yL4y5UqC97R9x4lTQdjLVfg=
-open-cluster-management.io/sdk-go v1.1.1-0.20260120013142-6d087c9a2a3d/go.mod h1:4haPv/uuKqQ3gxi62/PPknlrUFi132ga0KYLwj5tpx0=
 sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03 h1:1ShFiMjGQOR/8jTBkmZrk1gORxnvMwm1nOy2/DbHg4U=
 sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03/go.mod h1:F1pT4mK53U6F16/zuaPSYpBaR7x5Kjym6aKJJC0/DHU=
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 h1:jpcvIRr3GLoUoEKRkHKSmGjxb6lWwrBlJsXc+eUYQHM=

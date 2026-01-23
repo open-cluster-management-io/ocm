@@ -40,6 +40,7 @@ type informersWithQueueKey struct {
 	informers  []Informer
 	filter     EventFilterFunc
 	queueKeyFn ObjectQueueKeysFunc
+	delay      time.Duration
 }
 
 type filteredInformers struct {
@@ -105,6 +106,26 @@ func (f *Factory) WithInformersQueueKeysFunc(queueKeyFn ObjectQueueKeysFunc, inf
 	f.informerQueueKeys = append(f.informerQueueKeys, informersWithQueueKey{
 		informers:  informers,
 		queueKeyFn: queueKeyFn,
+		delay:      0,
+	})
+	return f
+}
+
+// WithInformersQueueKeysFuncAndDelay registers event handlers with delayed queue processing.
+// This method is similar to WithInformersQueueKeysFunc but allows specifying a delay before
+// events are processed. This is useful for batching rapid sequential updates.
+//
+// Parameters:
+//   - queueKeyFn: Function to transform informer runtime.Object into string key
+//   - delay: Time to wait before processing events (use time.Duration, e.g., 100*time.Millisecond)
+//   - informers: Informers to register handlers for
+//
+// Note: Delete events are always processed immediately without delay to ensure timely cleanup.
+func (f *Factory) WithInformersQueueKeysFuncAndDelay(queueKeyFn ObjectQueueKeysFunc, delay time.Duration, informers ...Informer) *Factory {
+	f.informerQueueKeys = append(f.informerQueueKeys, informersWithQueueKey{
+		informers:  informers,
+		queueKeyFn: queueKeyFn,
+		delay:      delay,
 	})
 	return f
 }
@@ -119,6 +140,27 @@ func (f *Factory) WithFilteredEventsInformersQueueKeysFunc(queueKeyFn ObjectQueu
 		informers:  informers,
 		filter:     filter,
 		queueKeyFn: queueKeyFn,
+		delay:      0,
+	})
+	return f
+}
+
+// WithFilteredEventsInformersQueueKeysFuncAndDelay registers event handlers with filtering and delayed processing.
+// This method combines event filtering with delayed queue processing.
+//
+// Parameters:
+//   - queueKeyFn: Function to transform informer runtime.Object into string key
+//   - delay: Time to wait before processing events
+//   - filter: Function to filter events that should not trigger Sync()
+//   - informers: Informers to register handlers for
+//
+// Note: Delete events are always processed immediately without delay.
+func (f *Factory) WithFilteredEventsInformersQueueKeysFuncAndDelay(queueKeyFn ObjectQueueKeysFunc, delay time.Duration, filter EventFilterFunc, informers ...Informer) *Factory {
+	f.informerQueueKeys = append(f.informerQueueKeys, informersWithQueueKey{
+		informers:  informers,
+		filter:     filter,
+		queueKeyFn: queueKeyFn,
+		delay:      delay,
 	})
 	return f
 }
@@ -168,7 +210,8 @@ func (f *Factory) ToController(name string) Controller {
 		for d := range f.informerQueueKeys[i].informers {
 			informer := f.informerQueueKeys[i].informers[d]
 			queueKeyFn := f.informerQueueKeys[i].queueKeyFn
-			_, err := informer.AddEventHandler(c.syncContext.(syncContext).eventHandler(queueKeyFn, f.informerQueueKeys[i].filter))
+			delay := f.informerQueueKeys[i].delay
+			_, err := informer.AddEventHandler(c.syncContext.(syncContext).eventHandler(queueKeyFn, f.informerQueueKeys[i].filter, delay))
 			if err != nil {
 				utilruntime.HandleError(err)
 			}
@@ -179,7 +222,7 @@ func (f *Factory) ToController(name string) Controller {
 	for i := range f.informers {
 		for d := range f.informers[i].informers {
 			informer := f.informers[i].informers[d]
-			_, err := informer.AddEventHandler(c.syncContext.(syncContext).eventHandler(DefaultQueueKeysFunc, f.informers[i].filter))
+			_, err := informer.AddEventHandler(c.syncContext.(syncContext).eventHandler(DefaultQueueKeysFunc, f.informers[i].filter, 0))
 			if err != nil {
 				utilruntime.HandleError(err)
 			}
