@@ -99,9 +99,37 @@ func Convert_v1alpha1_ManagedClusterAddOnSpec_To_v1beta1_ManagedClusterAddOnSpec
 	return nil
 }
 
+func Convert_v1beta1_ManagedClusterAddOnStatus_To_v1alpha1_ManagedClusterAddOnStatus(in *ManagedClusterAddOnStatus, out *v1alpha1.ManagedClusterAddOnStatus, s conversion.Scope) error {
+	if err := autoConvert_v1beta1_ManagedClusterAddOnStatus_To_v1alpha1_ManagedClusterAddOnStatus(in, out, s); err != nil {
+		return err
+	}
+
+	// Extract the kubeClientDriver from kubeClient registration config to status level
+	for i := range in.Registrations {
+		if in.Registrations[i].Type == KubeClient && in.Registrations[i].KubeClient != nil {
+			out.KubeClientDriver = in.Registrations[i].KubeClient.Driver
+			break
+		}
+	}
+
+	return nil
+}
+
 func Convert_v1alpha1_ManagedClusterAddOnStatus_To_v1beta1_ManagedClusterAddOnStatus(in *v1alpha1.ManagedClusterAddOnStatus, out *ManagedClusterAddOnStatus, s conversion.Scope) error {
 	if err := autoConvert_v1alpha1_ManagedClusterAddOnStatus_To_v1beta1_ManagedClusterAddOnStatus(in, out, s); err != nil {
 		return err
+	}
+
+	// Set the kubeClientDriver from status level to the kubeClient registration config
+	if in.KubeClientDriver != "" {
+		for i := range out.Registrations {
+			if out.Registrations[i].Type == KubeClient {
+				if out.Registrations[i].KubeClient == nil {
+					out.Registrations[i].KubeClient = &KubeClientConfig{}
+				}
+				out.Registrations[i].KubeClient.Driver = in.KubeClientDriver
+			}
+		}
 	}
 
 	return nil
@@ -118,7 +146,7 @@ func Convert_v1beta1_RegistrationConfig_To_v1alpha1_RegistrationConfig(in *Regis
 			User:   in.KubeClient.Subject.User,
 			Groups: in.KubeClient.Subject.Groups,
 		}
-		out.Driver = in.KubeClient.Driver
+		// Driver is now handled at status level, not in RegistrationConfig
 	} else {
 		if in.CustomSigner == nil {
 			return fmt.Errorf("nil CustomSigner")
@@ -143,7 +171,7 @@ func Convert_v1alpha1_RegistrationConfig_To_v1beta1_RegistrationConfig(in *v1alp
 					Groups: in.Subject.Groups,
 				},
 			},
-			Driver: in.Driver,
+			// Driver is now handled at status level, not in RegistrationConfig
 		}
 	} else {
 		out.Type = CustomSigner

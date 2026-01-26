@@ -184,7 +184,7 @@ type RegistrationConfiguration struct {
 
 	// This provides driver details required to register add-ons with hub for kubeClient type
 	// +optional
-	AddOnKubeClientRegistrationDriver AddOnRegistrationDriver `json:"addOnKubeClientRegistrationDriver,omitempty"`
+	AddOnKubeClientRegistrationDriver *AddOnRegistrationDriver `json:"addOnKubeClientRegistrationDriver,omitempty"`
 
 	// ClusterClaimConfiguration represents the configuration of ClusterClaim
 	// Effective only when the `ClusterClaim` feature gate is enabled.

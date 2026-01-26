@@ -284,6 +284,14 @@ spec:
                             - type
                             type: object
                           type: array
+                        feedbackScrapeType:
+                          default: Poll
+                          description: FeedbackScrapeType represents the way to monitor
+                            resource, it could be Poll or Watch
+                          enum:
+                          - Poll
+                          - Watch
+                          type: string
                         resourceIdentifier:
                           description: |-
                             ResourceIdentifier represents the group, resource, name and namespace of a resoure.
