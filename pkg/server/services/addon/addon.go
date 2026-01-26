@@ -3,6 +3,7 @@ package addon
 import (
 	"context"
 	"fmt"
+	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -11,6 +12,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonclientset "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
@@ -37,21 +39,7 @@ func NewAddonService(addonClient addonclientset.Interface, addonInformer addonin
 	}
 }
 
-func (s *AddonService) Get(_ context.Context, resourceID string) (*cloudevents.Event, error) {
-	namespace, name, err := cache.SplitMetaNamespaceKey(resourceID)
-	if err != nil {
-		return nil, err
-	}
-
-	addon, err := s.addonLister.ManagedClusterAddOns(namespace).Get(name)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.codec.Encode(services.CloudEventsSourceKube, types.CloudEventsType{CloudEventsDataType: addonce.ManagedClusterAddOnEventDataType}, addon)
-}
-
-func (s *AddonService) List(listOpts types.ListOptions) ([]*cloudevents.Event, error) {
+func (s *AddonService) List(ctx context.Context, listOpts types.ListOptions) ([]*cloudevents.Event, error) {
 	addons, err := s.addonLister.ManagedClusterAddOns(listOpts.ClusterName).List(labels.Everything())
 	if err != nil {
 		return nil, err
@@ -98,26 +86,93 @@ func (s *AddonService) RegisterHandler(ctx context.Context, handler server.Event
 	}
 }
 
+// TODO handle type check error and event handler error
 func (s *AddonService) EventHandlerFuncs(ctx context.Context, handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
 	return &cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			if err != nil {
-				utilruntime.HandleErrorWithContext(ctx, err, "failed to get key for addon")
+			addon, ok := obj.(*addonv1alpha1.ManagedClusterAddOn)
+			if !ok {
+				utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", obj), "addon add")
 				return
 			}
-			if err := handler.OnCreate(ctx, addonce.ManagedClusterAddOnEventDataType, key); err != nil {
-				utilruntime.HandleErrorWithContext(ctx, err, "failed to create addon", "key", key)
+
+			createEventTypes := types.CloudEventsType{
+				CloudEventsDataType: addonce.ManagedClusterAddOnEventDataType,
+				SubResource:         types.SubResourceSpec,
+				Action:              types.CreateRequestAction,
+			}
+			evt, err := s.codec.Encode(services.CloudEventsSourceKube, createEventTypes, addon)
+			if err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to encode addon",
+					"namespace", addon.Namespace, "name", addon.Name)
+				return
+			}
+
+			if err := handler.HandleEvent(ctx, evt); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to create addon",
+					"namespace", addon.Namespace, "name", addon.Name)
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(newObj)
-			if err != nil {
-				utilruntime.HandleErrorWithContext(ctx, err, "failed to get key for addon")
+			addon, ok := newObj.(*addonv1alpha1.ManagedClusterAddOn)
+			if !ok {
+				utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", newObj), "addon add")
 				return
 			}
-			if err := handler.OnUpdate(ctx, addonce.ManagedClusterAddOnEventDataType, key); err != nil {
-				utilruntime.HandleErrorWithContext(ctx, err, "failed to update addon", "key", key)
+
+			updateEventTypes := types.CloudEventsType{
+				CloudEventsDataType: addonce.ManagedClusterAddOnEventDataType,
+				SubResource:         types.SubResourceSpec,
+				Action:              types.UpdateRequestAction,
+			}
+			evt, err := s.codec.Encode(services.CloudEventsSourceKube, updateEventTypes, addon)
+			if err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to encode addon",
+					"namespace", addon.Namespace, "name", addon.Name)
+				return
+			}
+
+			if err := handler.HandleEvent(ctx, evt); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to update addon",
+					"namespace", addon.Namespace, "name", addon.Name)
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			addon, ok := obj.(*addonv1alpha1.ManagedClusterAddOn)
+			if !ok {
+				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+				if !ok {
+					utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", obj), "addon delete")
+					return
+				}
+
+				addon, ok = tombstone.Obj.(*addonv1alpha1.ManagedClusterAddOn)
+				if !ok {
+					utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", obj), "addon delete")
+					return
+				}
+			}
+
+			addon = addon.DeepCopy()
+			if addon.DeletionTimestamp.IsZero() {
+				addon.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+			}
+
+			deleteEventTypes := types.CloudEventsType{
+				CloudEventsDataType: addonce.ManagedClusterAddOnEventDataType,
+				SubResource:         types.SubResourceSpec,
+				Action:              types.DeleteRequestAction,
+			}
+			evt, err := s.codec.Encode(services.CloudEventsSourceKube, deleteEventTypes, addon)
+			if err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to encode addon",
+					"namespace", addon.Namespace, "name", addon.Name)
+				return
+			}
+
+			if err := handler.HandleEvent(ctx, evt); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to delete addon",
+					"namespace", addon.Namespace, "name", addon.Name)
 			}
 		},
 	}

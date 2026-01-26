@@ -24,6 +24,7 @@ func CreateAndApproveKlusterlet(
 	mode operatorapiv1.InstallMode,
 	bootstrapHubKubeConfigSecret *corev1.Secret,
 	images Images,
+	registrationDriver string,
 ) {
 	// on the spoke side
 	_, err := spoke.CreateKlusterlet(
@@ -33,6 +34,7 @@ func CreateAndApproveKlusterlet(
 		mode,
 		bootstrapHubKubeConfigSecret,
 		images,
+		registrationDriver,
 	)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -59,7 +61,8 @@ func (spoke *Spoke) CreateKlusterlet(
 	name, clusterName, klusterletNamespace string,
 	mode operatorapiv1.InstallMode,
 	bootstrapHubKubeConfigSecret *corev1.Secret,
-	images Images) (*operatorapiv1.Klusterlet, error) {
+	images Images,
+	registrationDriver string) (*operatorapiv1.Klusterlet, error) {
 	if name == "" {
 		return nil, fmt.Errorf("the name should not be null")
 	}
@@ -91,8 +94,18 @@ func (spoke *Spoke) CreateKlusterlet(
 		},
 	}
 
+	// Add registration configuration for gRPC driver
+	if registrationDriver == "grpc" {
+		klusterlet.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationConfiguration{
+			RegistrationDriver: operatorapiv1.RegistrationDriver{
+				AuthType: "grpc",
+			},
+		}
+	}
+
 	agentNamespace := helpers.AgentNamespace(klusterlet)
-	klog.Infof("klusterlet: %s/%s, \t mode: %v, \t agent namespace: %s", klusterlet.Name, klusterlet.Namespace, mode, agentNamespace)
+	klog.Infof("klusterlet: %s/%s, \t mode: %v, \t agent namespace: %s, \t registration driver: %s",
+		klusterlet.Name, klusterlet.Namespace, mode, agentNamespace, registrationDriver)
 
 	// create agentNamespace
 	namespace := &corev1.Namespace{

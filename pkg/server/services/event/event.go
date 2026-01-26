@@ -28,11 +28,7 @@ func NewEventService(client kubernetes.Interface) server.Service {
 	}
 }
 
-func (e *EventService) Get(ctx context.Context, resourceID string) (*cloudevents.Event, error) {
-	return nil, errors.NewMethodNotSupported(eventv1.Resource("events"), "get")
-}
-
-func (e *EventService) List(listOpts types.ListOptions) ([]*cloudevents.Event, error) {
+func (e *EventService) List(ctx context.Context, listOpts types.ListOptions) ([]*cloudevents.Event, error) {
 	return nil, errors.NewMethodNotSupported(eventv1.Resource("events"), "list")
 }
 

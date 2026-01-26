@@ -3,9 +3,10 @@ package csr
 import (
 	"context"
 	"fmt"
+	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
-	"k8s.io/apimachinery/pkg/api/meta"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -42,16 +43,7 @@ func NewCSRService(csrClient kubernetes.Interface, csrInformer certificatesv1inf
 	}
 }
 
-func (c *CSRService) Get(_ context.Context, resourceID string) (*cloudevents.Event, error) {
-	csr, err := c.csrLister.Get(resourceID)
-	if err != nil {
-		return nil, err
-	}
-
-	return c.codec.Encode(services.CloudEventsSourceKube, types.CloudEventsType{CloudEventsDataType: csrce.CSREventDataType}, csr)
-}
-
-func (c *CSRService) List(listOpts types.ListOptions) ([]*cloudevents.Event, error) {
+func (c *CSRService) List(ctx context.Context, listOpts types.ListOptions) ([]*cloudevents.Event, error) {
 	var evts []*cloudevents.Event
 	requirement, err := labels.NewRequirement(clusterv1.ClusterNameLabelKey, selection.Equals, []string{listOpts.ClusterName})
 	if err != nil {
@@ -106,27 +98,89 @@ func (c *CSRService) RegisterHandler(ctx context.Context, handler server.EventHa
 	}
 }
 
+// TODO handle type check error and event handler error
 func (c *CSRService) EventHandlerFuncs(ctx context.Context, handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
 	return &cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			accessor, err := meta.Accessor(obj)
-			if err != nil {
-				utilruntime.HandleErrorWithContext(ctx, err, "failed to get accessor for csr")
+			csr, ok := obj.(*certificatesv1.CertificateSigningRequest)
+			if !ok {
+				utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", obj), "csr add")
 				return
 			}
-			if err := handler.OnCreate(ctx, csrce.CSREventDataType, accessor.GetName()); err != nil {
-				utilruntime.HandleErrorWithContext(ctx, err, "failed to create csr", "csrName", accessor.GetName())
+
+			eventTypes := types.CloudEventsType{
+				CloudEventsDataType: csrce.CSREventDataType,
+				SubResource:         types.SubResourceSpec,
+				Action:              types.CreateRequestAction,
+			}
+			evt, err := c.codec.Encode(services.CloudEventsSourceKube, eventTypes, csr)
+			if err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to encode csr", "name", csr.Name)
+				return
+			}
+
+			if err := handler.HandleEvent(ctx, evt); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to create csr", "name", csr.Name)
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			accessor, err := meta.Accessor(newObj)
-			if err != nil {
-				utilruntime.HandleErrorWithContext(ctx, err, "failed to get accessor for csr")
+			csr, ok := newObj.(*certificatesv1.CertificateSigningRequest)
+			if !ok {
+				utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", newObj), "csr update")
 				return
 			}
-			if err := handler.OnUpdate(ctx, csrce.CSREventDataType, accessor.GetName()); err != nil {
-				utilruntime.HandleErrorWithContext(ctx, err, "failed to update csr", "csrName", accessor.GetName())
+
+			eventTypes := types.CloudEventsType{
+				CloudEventsDataType: csrce.CSREventDataType,
+				SubResource:         types.SubResourceSpec,
+				Action:              types.UpdateRequestAction,
 			}
+			evt, err := c.codec.Encode(services.CloudEventsSourceKube, eventTypes, csr)
+			if err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to encode csr", "name", csr.Name)
+				return
+			}
+
+			if err := handler.HandleEvent(ctx, evt); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to update csr", "name", csr.Name)
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			csr, ok := obj.(*certificatesv1.CertificateSigningRequest)
+			if !ok {
+				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+				if !ok {
+					utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", obj), "csr delete")
+					return
+				}
+
+				csr, ok = tombstone.Obj.(*certificatesv1.CertificateSigningRequest)
+				if !ok {
+					utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", obj), "csr delete")
+					return
+				}
+			}
+
+			csr = csr.DeepCopy()
+			if csr.DeletionTimestamp.IsZero() {
+				csr.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+			}
+
+			eventTypes := types.CloudEventsType{
+				CloudEventsDataType: csrce.CSREventDataType,
+				SubResource:         types.SubResourceSpec,
+				Action:              types.DeleteRequestAction,
+			}
+			evt, err := c.codec.Encode(services.CloudEventsSourceKube, eventTypes, csr)
+			if err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to encode csr", "name", csr.Name)
+				return
+			}
+
+			if err := handler.HandleEvent(ctx, evt); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to delete csr", "name", csr.Name)
+			}
+
 		},
 	}
 }

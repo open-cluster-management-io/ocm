@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"open-cluster-management.io/sdk-go/pkg/helpers"
 	"time"
+
+	"open-cluster-management.io/sdk-go/pkg/helpers"
 
 	"github.com/openshift/library-go/pkg/crypto"
 	corev1 "k8s.io/api/core/v1"
@@ -25,6 +26,9 @@ type SigningRotation struct {
 	Validity         time.Duration
 	Lister           corev1listers.SecretLister
 	Client           corev1client.SecretsGetter
+	// OwnerReference is an optional owner reference to set on the secret for garbage collection.
+	// When set, the secret will be automatically deleted when the owner resource is deleted.
+	OwnerReference *metav1.OwnerReference
 }
 
 func (c SigningRotation) EnsureSigningCertKeyPair() (*crypto.CA, error) {
@@ -38,6 +42,11 @@ func (c SigningRotation) EnsureSigningCertKeyPair() (*crypto.CA, error) {
 		signingCertKeyPairSecret = &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: c.Namespace, Name: c.Name}}
 	}
 	signingCertKeyPairSecret.Type = corev1.SecretTypeTLS
+
+	// Set owner reference if configured (ApplySecret handles add-only logic)
+	if c.OwnerReference != nil {
+		signingCertKeyPairSecret.OwnerReferences = []metav1.OwnerReference{*c.OwnerReference}
+	}
 
 	if reason := needNewSigningCertKeyPair(signingCertKeyPairSecret); len(reason) > 0 {
 		if err := setSigningCertKeyPairSecret(signingCertKeyPairSecret, c.SignerNamePrefix, c.Validity); err != nil {

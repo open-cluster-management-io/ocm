@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/cloudevents/sdk-go/v2/binding"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/serviceaccount"
+	grpcprotocol "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protocol"
 
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
@@ -83,7 +85,21 @@ func (s *SARAuthorizer) AuthorizeRequest(ctx context.Context, req any) (authz.De
 		return authz.DecisionDeny, fmt.Errorf("missing ce-clustername in event attributes, %v", pReq.Event.Attributes)
 	}
 
-	decision, err := s.authorize(ctx, clusterAttr.GetCeString(), *eventsType)
+	if pReq.Event == nil {
+		return authz.DecisionDeny, fmt.Errorf("missing event in request")
+	}
+
+	var partial metav1.PartialObjectMetadata
+
+	evt, err := binding.ToEvent(ctx, grpcprotocol.NewMessage(pReq.Event))
+	if err != nil {
+		return authz.DecisionDeny, fmt.Errorf("failed to convert protobuf to cloudevent: %v", err)
+	}
+	if err := evt.DataAs(&partial); err != nil {
+		return authz.DecisionDeny, err
+	}
+
+	decision, err := s.authorize(ctx, clusterAttr.GetCeString(), *eventsType, partial.ObjectMeta)
 	return decision, err
 }
 
@@ -113,7 +129,9 @@ func (s *SARAuthorizer) AuthorizeStream(ctx context.Context, ss grpc.ServerStrea
 		Action:              types.WatchRequestAction,
 	}
 
-	decision, err := s.authorize(ss.Context(), req.ClusterName, eventsType)
+	// for now, we subscribe to all resources of a specified type
+	// TODO enhance the SubscriptionRequest to support specifying a resource name
+	decision, err := s.authorize(ss.Context(), req.ClusterName, eventsType, metav1.ObjectMeta{})
 	if err != nil {
 		return decision, nil, err
 	}
@@ -121,13 +139,13 @@ func (s *SARAuthorizer) AuthorizeStream(ctx context.Context, ss grpc.ServerStrea
 	return decision, &wrappedAuthorizedStream{ServerStream: ss, authorizedReq: &req}, nil
 }
 
-func (s *SARAuthorizer) authorize(ctx context.Context, cluster string, eventsType types.CloudEventsType) (authz.Decision, error) {
+func (s *SARAuthorizer) authorize(ctx context.Context, cluster string, eventsType types.CloudEventsType, metaObj metav1.ObjectMeta) (authz.Decision, error) {
 	user, groups, err := userInfo(ctx)
 	if err != nil {
 		return authz.DecisionDeny, err
 	}
 
-	sar, err := toSubjectAccessReview(cluster, user, groups, eventsType)
+	sar, err := toSubjectAccessReview(cluster, user, groups, eventsType, metaObj)
 	if err != nil {
 		return authz.DecisionDeny, err
 	}
@@ -170,7 +188,7 @@ func userInfo(ctx context.Context) (user string, groups []string, err error) {
 	return user, groups, nil
 }
 
-func toSubjectAccessReview(clusterName string, user string, groups []string, eventsType types.CloudEventsType) (*authv1.SubjectAccessReview, error) {
+func toSubjectAccessReview(clusterName string, user string, groups []string, eventsType types.CloudEventsType, metaObj metav1.ObjectMeta) (*authv1.SubjectAccessReview, error) {
 	verb, err := toVerb(eventsType.Action)
 	if err != nil {
 		return nil, err
@@ -208,9 +226,19 @@ func toSubjectAccessReview(clusterName string, user string, groups []string, eve
 		sar.Spec.ResourceAttributes.Group = ""
 		sar.Spec.ResourceAttributes.Resource = "serviceaccounts"
 		sar.Spec.ResourceAttributes.Subresource = "token"
-		// the verb "create" is required for both token request pub and sub.
-		sar.Spec.ResourceAttributes.Verb = "create"
-		return sar, nil
+
+		switch verb {
+		case "create":
+			sar.Spec.ResourceAttributes.Name = metaObj.Name
+			return sar, nil
+		case "watch":
+			// for sub request, we use verb subscribe
+			// TODO enhance the SubscriptionRequest to support specifying a resource name
+			sar.Spec.ResourceAttributes.Verb = "subscribe"
+			return sar, nil
+		}
+
+		return nil, fmt.Errorf("unsupported action %s", verb)
 	case payload.ManifestBundleEventDataType:
 		sar.Spec.ResourceAttributes.Group = workv1.SchemeGroupVersion.Group
 		sar.Spec.ResourceAttributes.Resource = "manifestworks"

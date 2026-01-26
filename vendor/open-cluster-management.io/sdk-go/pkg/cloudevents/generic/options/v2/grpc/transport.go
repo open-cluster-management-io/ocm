@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/cloudevents/sdk-go/v2/binding"
@@ -120,7 +121,28 @@ func (t *grpcTransport) Subscribe(ctx context.Context) error {
 
 	values := header.Get(constants.GRPCSubscriptionIDKey)
 	if len(values) != 1 {
-		return fmt.Errorf("expected exactly one subscription-id header, got %d", len(values))
+		// Header() succeeded but no subscription-id was sent (header is nil or empty).
+		// This typically means the server rejected the subscription before sending headers
+		// (e.g., authorization failure). The actual error is only available via Recv().
+		// Call Recv() to get the real error from the server.
+		recvErrCh := make(chan error, 1)
+		go func() {
+			_, err := subClient.Recv()
+			recvErrCh <- err
+		}()
+		select {
+		case recvErr := <-recvErrCh:
+			if recvErr != nil {
+				return recvErr
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(5 * time.Second):
+			_ = subClient.CloseSend()
+			return fmt.Errorf("no subscription-id in header (%v): recv timeout", header)
+		}
+		// If Recv() didn't return an error, this is a server-side configuration issue
+		return fmt.Errorf("no subscription-id in header (%v)", header)
 	}
 	t.subID = values[0]
 	t.subClient = subClient

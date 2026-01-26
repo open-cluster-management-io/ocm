@@ -20,54 +20,6 @@ import (
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
-func TestGet(t *testing.T) {
-	cases := []struct {
-		name          string
-		leases        []runtime.Object
-		resourceID    string
-		expectedError bool
-	}{
-		{
-			name:          "lease not found",
-			leases:        []runtime.Object{},
-			resourceID:    "test-cluster",
-			expectedError: true,
-		},
-		{
-			name:       "lease found",
-			resourceID: "test-lease-namespace/test-lease",
-			leases: []runtime.Object{&coordinationv1.Lease{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-lease", Namespace: "test-lease-namespace"},
-			}},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			kubeClient := kubefake.NewSimpleClientset(c.leases...)
-			kubeInformers := informers.NewSharedInformerFactory(kubeClient, 10*time.Minute)
-			kubeInformer := kubeInformers.Coordination().V1().Leases()
-			for _, obj := range c.leases {
-				if err := kubeInformer.Informer().GetStore().Add(obj); err != nil {
-					t.Fatal(err)
-				}
-			}
-
-			service := NewLeaseService(kubeClient, kubeInformer)
-			_, err := service.Get(context.Background(), c.resourceID)
-			if c.expectedError {
-				if err == nil {
-					t.Errorf("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-		})
-	}
-}
-
 func TestList(t *testing.T) {
 	cases := []struct {
 		name             string
@@ -114,7 +66,7 @@ func TestList(t *testing.T) {
 			}
 
 			service := NewLeaseService(kubeClient, kubeInformer)
-			evts, err := service.List(types.ListOptions{ClusterName: c.clusterName})
+			evts, err := service.List(context.Background(), types.ListOptions{ClusterName: c.clusterName})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -217,7 +169,13 @@ func TestEventHandlerFuncs(t *testing.T) {
 	eventHandlerFuncs := service.EventHandlerFuncs(context.Background(), handler)
 
 	lease := &coordinationv1.Lease{
-		ObjectMeta: metav1.ObjectMeta{Name: "test-lease", Namespace: "test-lease-namespace"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-lease",
+			Namespace: "test-lease-namespace",
+			Labels: map[string]string{
+				"open-cluster-management.io/cluster-name": "test-cluster",
+			},
+		},
 	}
 	eventHandlerFuncs.AddFunc(lease)
 	if !handler.onCreateCalled {
@@ -228,29 +186,37 @@ func TestEventHandlerFuncs(t *testing.T) {
 	if !handler.onUpdateCalled {
 		t.Errorf("onUpdate not called")
 	}
+
+	eventHandlerFuncs.DeleteFunc(lease)
+	if !handler.onDeleteCalled {
+		t.Errorf("onDelete not called")
+	}
 }
 
 type leaseHandler struct {
 	onCreateCalled bool
 	onUpdateCalled bool
+	onDeleteCalled bool
 }
 
-func (m *leaseHandler) OnCreate(ctx context.Context, t types.CloudEventsDataType, resourceID string) error {
-	if t != leasece.LeaseEventDataType {
-		return fmt.Errorf("expected %v, got %v", leasece.LeaseEventDataType, t)
+func (m *leaseHandler) HandleEvent(ctx context.Context, evt *cloudevents.Event) error {
+	eventType, err := types.ParseCloudEventsType(evt.Type())
+	if err != nil {
+		return err
 	}
-	m.onCreateCalled = true
-	return nil
-}
 
-func (m *leaseHandler) OnUpdate(ctx context.Context, t types.CloudEventsDataType, resourceID string) error {
-	if t != leasece.LeaseEventDataType {
-		return fmt.Errorf("expected %v, got %v", leasece.LeaseEventDataType, t)
+	if eventType.CloudEventsDataType != leasece.LeaseEventDataType {
+		return fmt.Errorf("expected %v, got %v", leasece.LeaseEventDataType, eventType.CloudEventsDataType)
 	}
-	m.onUpdateCalled = true
-	return nil
-}
 
-func (m *leaseHandler) OnDelete(ctx context.Context, t types.CloudEventsDataType, resourceID string) error {
+	switch eventType.Action {
+	case types.CreateRequestAction:
+		m.onCreateCalled = true
+	case types.UpdateRequestAction:
+		m.onUpdateCalled = true
+	case types.DeleteRequestAction:
+		m.onDeleteCalled = true
+	}
+
 	return nil
 }

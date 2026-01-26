@@ -145,6 +145,12 @@ func (c *ManagedClusterAddOnClient) Patch(
 	// and reject the update if it's status update is outdated.
 	eventType.Action = types.UpdateRequestAction
 	if err := c.cloudEventsClient.Publish(ctx, eventType, newAddon); err != nil {
+		if errors.IsNotFound(err) {
+			// addon is not found from server, delete it from local cache
+			if err := c.watcherStore.Delete(last); err != nil {
+				return nil, errors.NewInternalError(err)
+			}
+		}
 		return nil, cloudeventserrors.ToStatusError(common.ManagedClusterAddOnGR, name, err)
 	}
 

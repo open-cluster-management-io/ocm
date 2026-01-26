@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	cetypes "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
@@ -11,11 +12,8 @@ import (
 
 // TODO need a method to check if an event has been processed already.
 type Service interface {
-	// Get the cloudEvent based on resourceID from the service
-	Get(ctx context.Context, resourceID string) (*cloudevents.Event, error)
-
 	// List the cloudEvent from the service
-	List(listOpts cetypes.ListOptions) ([]*cloudevents.Event, error)
+	List(ctx context.Context, listOpts cetypes.ListOptions) ([]*cloudevents.Event, error)
 
 	// HandleStatusUpdate processes the resource status update from the agent.
 	HandleStatusUpdate(ctx context.Context, evt *cloudevents.Event) error

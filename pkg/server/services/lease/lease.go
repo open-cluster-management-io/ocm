@@ -3,8 +3,10 @@ package lease
 import (
 	"context"
 	"fmt"
+	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -38,19 +40,7 @@ func NewLeaseService(client kubernetes.Interface, informer leasev1.LeaseInformer
 	}
 }
 
-func (l *LeaseService) Get(ctx context.Context, resourceID string) (*cloudevents.Event, error) {
-	namespace, name, err := cache.SplitMetaNamespaceKey(resourceID)
-	if err != nil {
-		return nil, err
-	}
-	lease, err := l.lister.Leases(namespace).Get(name)
-	if err != nil {
-		return nil, err
-	}
-	return l.codec.Encode(services.CloudEventsSourceKube, types.CloudEventsType{CloudEventsDataType: leasece.LeaseEventDataType}, lease)
-}
-
-func (l *LeaseService) List(listOpts types.ListOptions) ([]*cloudevents.Event, error) {
+func (l *LeaseService) List(ctx context.Context, listOpts types.ListOptions) ([]*cloudevents.Event, error) {
 	leases, err := l.lister.Leases(listOpts.ClusterName).List(labels.SelectorFromSet(labels.Set{
 		clusterv1.ClusterNameLabelKey: listOpts.ClusterName,
 	}))
@@ -97,26 +87,87 @@ func (l *LeaseService) RegisterHandler(ctx context.Context, handler server.Event
 	}
 }
 
+// TODO handle type check error and event handler error
 func (l *LeaseService) EventHandlerFuncs(ctx context.Context, handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
 	return &cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			if err != nil {
-				utilruntime.HandleErrorWithContext(ctx, err, "failed to get key for lease")
+			lease, ok := obj.(*coordinationv1.Lease)
+			if !ok {
+				utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", obj), "lease add")
 				return
 			}
-			if err := handler.OnCreate(ctx, leasece.LeaseEventDataType, key); err != nil {
-				utilruntime.HandleErrorWithContext(ctx, err, "failed to create lease", "key", key)
+
+			eventTypes := types.CloudEventsType{
+				CloudEventsDataType: leasece.LeaseEventDataType,
+				SubResource:         types.SubResourceSpec,
+				Action:              types.CreateRequestAction,
+			}
+			evt, err := l.codec.Encode(services.CloudEventsSourceKube, eventTypes, lease)
+			if err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to encode lease", "namespace", lease.Namespace, "name", lease.Name)
+				return
+			}
+
+			if err := handler.HandleEvent(ctx, evt); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to create lease", "namespace", lease.Namespace, "name", lease.Name)
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(newObj)
-			if err != nil {
-				utilruntime.HandleErrorWithContext(ctx, err, "failed to get key for lease")
+			lease, ok := newObj.(*coordinationv1.Lease)
+			if !ok {
+				utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", newObj), "lease update")
 				return
 			}
-			if err := handler.OnUpdate(ctx, leasece.LeaseEventDataType, key); err != nil {
-				utilruntime.HandleErrorWithContext(ctx, err, "failed to update lease", "key", key)
+
+			eventTypes := types.CloudEventsType{
+				CloudEventsDataType: leasece.LeaseEventDataType,
+				SubResource:         types.SubResourceSpec,
+				Action:              types.UpdateRequestAction,
+			}
+			evt, err := l.codec.Encode(services.CloudEventsSourceKube, eventTypes, lease)
+			if err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to encode lease", "namespace", lease.Namespace, "name", lease.Name)
+				return
+			}
+
+			if err := handler.HandleEvent(ctx, evt); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to update lease", "namespace", lease.Namespace, "name", lease.Name)
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			lease, ok := obj.(*coordinationv1.Lease)
+			if !ok {
+				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+				if !ok {
+					utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", obj), "lease delete")
+					return
+				}
+
+				lease, ok = tombstone.Obj.(*coordinationv1.Lease)
+				if !ok {
+					utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", obj), "lease delete")
+					return
+				}
+			}
+
+			lease = lease.DeepCopy()
+			if lease.DeletionTimestamp.IsZero() {
+				lease.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+			}
+
+			eventTypes := types.CloudEventsType{
+				CloudEventsDataType: leasece.LeaseEventDataType,
+				SubResource:         types.SubResourceSpec,
+				Action:              types.DeleteRequestAction,
+			}
+			evt, err := l.codec.Encode(services.CloudEventsSourceKube, eventTypes, lease)
+			if err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to encode lease", "namespace", lease.Namespace, "name", lease.Name)
+				return
+			}
+
+			if err := handler.HandleEvent(ctx, evt); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to delete lease", "namespace", lease.Namespace, "name", lease.Name)
 			}
 		},
 	}

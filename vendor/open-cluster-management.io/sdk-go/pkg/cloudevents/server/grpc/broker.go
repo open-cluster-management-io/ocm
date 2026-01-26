@@ -11,8 +11,6 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/heartbeat"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/metrics"
 
-	"k8s.io/apimachinery/pkg/api/errors"
-
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/cloudevents/sdk-go/v2/binding"
 	cloudeventstypes "github.com/cloudevents/sdk-go/v2/types"
@@ -124,34 +122,28 @@ func (bkr *GRPCBroker) Publish(ctx context.Context, pubReq *pbv1.PublishRequest)
 	return &emptypb.Empty{}, nil
 }
 
-// register registers a subscriber and return client id and error channel.
-func (bkr *GRPCBroker) register(ctx context.Context,
+// registerSubscriber registers a subscriber with a pre-generated ID.
+// The subscription header must already be sent before calling this function.
+func (bkr *GRPCBroker) registerSubscriber(ctx context.Context,
+	id string,
 	dataType types.CloudEventsDataType,
 	subReq *pbv1.SubscriptionRequest,
-	subServer pbv1.CloudEventService_SubscribeServer,
-	handler resourceHandler) (string, error) {
+	handler resourceHandler) error {
 	logger := klog.FromContext(ctx)
 
 	bkr.mu.Lock()
 	defer bkr.mu.Unlock()
 
-	id := uuid.NewString()
+	logger.Info("registering subscriber", "id", id, "clusterName", subReq.ClusterName, "dataType", dataType)
+
 	bkr.subscribers[id] = &subscriber{
 		clusterName: subReq.ClusterName,
 		dataType:    dataType,
 		handler:     handler,
 	}
 
-	// Signal subscriber is registered
-	if err := subServer.SendHeader(metadata.Pairs(constants.GRPCSubscriptionIDKey, id)); err != nil {
-		logger.Error(err, "failed to send subscription header, unregister subscriber", "subID", id)
-		delete(bkr.subscribers, id)
-		return "", err
-	}
-	logger.V(4).Info("register a subscriber", "id", id, "clusterName", subReq.ClusterName, "dataType", dataType)
 	metrics.IncGRPCCESubscribersMetric(subReq.ClusterName, dataType.String())
-
-	return id, nil
+	return nil
 }
 
 // unregister a subscriber by id
@@ -181,10 +173,17 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 		return fmt.Errorf("invalid subscription request: invalid data type %v", err)
 	}
 
+	// Generate subscription ID and send header IMMEDIATELY, before any other operations
+	// This ensures the client receives the header as soon as possible after the stream is established
+	subID := uuid.NewString()
+	if err := subServer.SendHeader(metadata.Pairs(constants.GRPCSubscriptionIDKey, subID)); err != nil {
+		return fmt.Errorf("failed to send subscription header for subID %s: %w", subID, err)
+	}
+
 	subCtx, cancel := context.WithCancel(subServer.Context())
 	defer cancel()
 
-	logger := klog.FromContext(subCtx).WithValues("clusterName", subReq.ClusterName)
+	logger := klog.FromContext(subCtx).WithValues("clusterName", subReq.ClusterName, "subID", subID)
 
 	// TODO make the channel size configurable
 	eventCh := make(chan *pbv1.CloudEvent, 100)
@@ -194,6 +193,35 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 		heartbeater = heartbeat.NewHeartbeater(bkr.heartbeatCheckInterval, 10)
 	}
 	sendErrCh := make(chan error, 1)
+
+	// Register the subscriber with the ID we already created and sent in the header
+	err = bkr.registerSubscriber(klog.NewContext(subCtx, logger), subID, *dataType, subReq, func(handlerCtx context.Context, subID string, evt *cloudevents.Event) error {
+		// convert the cloudevents.Event to pbv1.CloudEvent
+		// WARNING: don't use "pbEvt, err := pb.ToProto(evt)" to convert cloudevent to protobuf
+		pbEvt := &pbv1.CloudEvent{}
+		if err := grpcprotocol.WritePBMessage(handlerCtx, binding.ToMessage(evt), pbEvt); err != nil {
+			return fmt.Errorf("failed to convert cloudevent to protobuf for resource(%s): %v", evt.ID(), err)
+		}
+
+		// send the cloudevent to the subscriber
+		klog.FromContext(handlerCtx).V(4).Info("sending the event to spec subscribers",
+			"subID", subID, "eventType", evt.Type(), "extensions", evt.Extensions())
+		select {
+		case eventCh <- pbEvt:
+		case <-subCtx.Done():
+			// The context of the stream has been canceled or completed.
+			// This could happen if:
+			// - The client closed the connection or canceled the stream.
+			// - The server closed the stream, potentially due to a shutdown.
+			// No error is returned here because the stream closure is expected.
+			return nil
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 
 	// send events
 	// The grpc send is not concurrency safe and non-blocking, see: https://github.com/grpc/grpc-go/blob/v1.75.1/stream.go#L1571
@@ -237,34 +265,6 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 			}
 		}
 	}()
-
-	subID, err := bkr.register(klog.NewContext(subCtx, logger), *dataType, subReq, subServer, func(handlerCtx context.Context, subID string, evt *cloudevents.Event) error {
-		// convert the cloudevents.Event to pbv1.CloudEvent
-		// WARNING: don't use "pbEvt, err := pb.ToProto(evt)" to convert cloudevent to protobuf
-		pbEvt := &pbv1.CloudEvent{}
-		if err := grpcprotocol.WritePBMessage(handlerCtx, binding.ToMessage(evt), pbEvt); err != nil {
-			return fmt.Errorf("failed to convert cloudevent to protobuf for resource(%s): %v", evt.ID(), err)
-		}
-
-		// send the cloudevent to the subscriber
-		logger.V(4).Info("sending the event to spec subscribers",
-			"subID", subID, "eventType", evt.Type(), "extensions", evt.Extensions())
-		select {
-		case eventCh <- pbEvt:
-		case <-subCtx.Done():
-			// The context of the stream has been canceled or completed.
-			// This could happen if:
-			// - The client closed the connection or canceled the stream.
-			// - The server closed the stream, potentially due to a shutdown.
-			// No error is returned here because the stream closure is expected.
-			return nil
-		}
-
-		return nil
-	})
-	if err != nil {
-		return err
-	}
 
 	if heartbeater != nil {
 		go heartbeater.Start(subCtx)
@@ -315,30 +315,36 @@ func (bkr *GRPCBroker) respondResyncSpecRequest(ctx context.Context, eventDataTy
 		return fmt.Errorf("failed to find service for event type %s", eventDataType)
 	}
 
-	objs, err := service.List(types.ListOptions{ClusterName: clusterName, CloudEventsDataType: eventDataType})
+	evts, err := service.List(ctx, types.ListOptions{ClusterName: clusterName, CloudEventsDataType: eventDataType})
 	if err != nil {
 		return err
 	}
 
-	if len(objs) == 0 {
+	if len(evts) == 0 {
 		log.V(4).Info("no objs from the lister, do nothing")
 		return nil
 	}
 
-	for _, obj := range objs {
+	for _, evt := range evts {
 		// respond with the deleting resource regardless of the resource version
-		objLogger := log.WithValues("eventType", obj.Type(), "extensions", obj.Extensions())
-		if _, ok := obj.Extensions()[types.ExtensionDeletionTimestamp]; ok {
+		objLogger := log.WithValues("eventType", evt.Type(), "extensions", evt.Extensions())
+		if _, ok := evt.Extensions()[types.ExtensionDeletionTimestamp]; ok {
 			objLogger.V(4).Info("respond spec resync request")
-			err = bkr.handleRes(ctx, obj, eventDataType, "delete_request")
+			deleteEventTypes := types.CloudEventsType{
+				CloudEventsDataType: eventDataType,
+				SubResource:         types.SubResourceSpec,
+				Action:              types.DeleteRequestAction,
+			}
+			evt.SetType(deleteEventTypes.String())
+			err = bkr.HandleEvent(ctx, evt)
 			if err != nil {
 				objLogger.Error(err, "failed to handle resync spec request")
 			}
 			continue
 		}
 
-		lastResourceVersion := findResourceVersion(obj.ID(), resourceVersions.Versions)
-		currentResourceVersion, err := cloudeventstypes.ToInteger(obj.Extensions()[types.ExtensionResourceVersion])
+		lastResourceVersion := findResourceVersion(evt.ID(), resourceVersions.Versions)
+		currentResourceVersion, err := cloudeventstypes.ToInteger(evt.Extensions()[types.ExtensionResourceVersion])
 		if err != nil {
 			objLogger.V(4).Info("ignore the event since it has a invalid resourceVersion", "error", err)
 			continue
@@ -348,7 +354,13 @@ func (bkr *GRPCBroker) respondResyncSpecRequest(ctx context.Context, eventDataTy
 		// the newer work to agent
 		if currentResourceVersion == 0 || int64(currentResourceVersion) > lastResourceVersion {
 			objLogger.V(4).Info("respond spec resync request")
-			err := bkr.handleRes(ctx, obj, eventDataType, "update_request")
+			updateEventTypes := types.CloudEventsType{
+				CloudEventsDataType: eventDataType,
+				SubResource:         types.SubResourceSpec,
+				Action:              types.UpdateRequestAction,
+			}
+			evt.SetType(updateEventTypes.String())
+			err := bkr.HandleEvent(ctx, evt)
 			if err != nil {
 				objLogger.Error(err, "failed to handle resync spec request")
 			}
@@ -357,7 +369,7 @@ func (bkr *GRPCBroker) respondResyncSpecRequest(ctx context.Context, eventDataTy
 
 	// the resources do not exist on the source, but exist on the agent, delete them
 	for _, rv := range resourceVersions.Versions {
-		_, exists := getObj(rv.ResourceID, objs)
+		_, exists := getObj(rv.ResourceID, evts)
 		if exists {
 			continue
 		}
@@ -365,6 +377,7 @@ func (bkr *GRPCBroker) respondResyncSpecRequest(ctx context.Context, eventDataTy
 		deleteEventTypes := types.CloudEventsType{
 			CloudEventsDataType: eventDataType,
 			SubResource:         types.SubResourceSpec,
+			Action:              types.DeleteRequestAction,
 		}
 		obj := types.NewEventBuilder("source", deleteEventTypes).
 			WithResourceID(rv.ResourceID).
@@ -375,7 +388,7 @@ func (bkr *GRPCBroker) respondResyncSpecRequest(ctx context.Context, eventDataTy
 
 		// send a delete event for the current resource
 		log.V(4).Info("respond spec resync request")
-		err := bkr.handleRes(ctx, &obj, eventDataType, "delete_request")
+		err := bkr.HandleEvent(ctx, &obj)
 		if err != nil {
 			log.Error(err, "failed to handle delete request")
 		}
@@ -384,22 +397,20 @@ func (bkr *GRPCBroker) respondResyncSpecRequest(ctx context.Context, eventDataTy
 	return nil
 }
 
-// handleRes publish the resource to the correct subscriber.
-func (bkr *GRPCBroker) handleRes(
-	ctx context.Context,
-	evt *cloudevents.Event,
-	t types.CloudEventsDataType,
-	action types.EventAction) error {
+// HandleEvent publish the event to the correct subscriber.
+func (bkr *GRPCBroker) HandleEvent(ctx context.Context, evt *cloudevents.Event) error {
+	if evt == nil {
+		return fmt.Errorf("event is nil")
+	}
 
 	bkr.mu.RLock()
 	defer bkr.mu.RUnlock()
 
-	eventType := types.CloudEventsType{
-		CloudEventsDataType: t,
-		SubResource:         types.SubResourceSpec,
-		Action:              action,
+	eventType, err := types.ParseCloudEventsType(evt.Type())
+	if err != nil {
+		return err
 	}
-	evt.SetType(eventType.String())
+	evtDataType := eventType.CloudEventsDataType
 
 	clusterNameValue, err := evt.Context.GetExtension(types.ExtensionClusterName)
 	if err != nil {
@@ -412,70 +423,13 @@ func (bkr *GRPCBroker) handleRes(
 		// the resource consumer name and its data type is in the subscriber list, ensuring
 		// the event will be only processed when the consumer is subscribed to the current
 		// broker.
-		if subscriber.clusterName == clusterName && subscriber.dataType == t {
+		if subscriber.clusterName == clusterName && subscriber.dataType == evtDataType {
 			if err := subscriber.handler(ctx, subID, evt); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
-}
-
-// OnCreate is called by the controller when a resource is created on the maestro server.
-func (bkr *GRPCBroker) OnCreate(ctx context.Context, t types.CloudEventsDataType, id string) error {
-	service, ok := bkr.services[t]
-	if !ok {
-		return fmt.Errorf("failed to find service for event type %s", t)
-	}
-
-	resource, err := service.Get(ctx, id)
-	// if the resource is not found, it indicates the resource has been processed.
-	if errors.IsNotFound(err) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-
-	return bkr.handleRes(ctx, resource, t, "create_request")
-}
-
-// OnUpdate is called by the controller when a resource is updated on the maestro server.
-func (bkr *GRPCBroker) OnUpdate(ctx context.Context, t types.CloudEventsDataType, id string) error {
-	service, ok := bkr.services[t]
-	if !ok {
-		return fmt.Errorf("failed to find service for event type %s", t)
-	}
-
-	resource, err := service.Get(ctx, id)
-	// if the resource is not found, it indicates the resource has been processed.
-	if errors.IsNotFound(err) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-
-	return bkr.handleRes(ctx, resource, t, "update_request")
-}
-
-// OnDelete is called by the controller when a resource is deleted from the maestro server.
-func (bkr *GRPCBroker) OnDelete(ctx context.Context, t types.CloudEventsDataType, id string) error {
-	service, ok := bkr.services[t]
-	if !ok {
-		return fmt.Errorf("failed to find service for event type %s", t)
-	}
-
-	resource, err := service.Get(ctx, id)
-	// if the resource is not found, it indicates the resource has been processed.
-	if errors.IsNotFound(err) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-
-	return bkr.handleRes(ctx, resource, t, "delete_request")
 }
 
 // IsConsumerSubscribed returns true if the consumer is subscribed to the broker for resource spec.

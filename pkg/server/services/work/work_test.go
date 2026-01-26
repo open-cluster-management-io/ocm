@@ -16,62 +16,11 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/common"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/payload"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/source/codec"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
-
-func TestGet(t *testing.T) {
-	cases := []struct {
-		name          string
-		works         []runtime.Object
-		resourceID    string
-		expectedError bool
-	}{
-		{
-			name:          "work not found",
-			works:         []runtime.Object{},
-			resourceID:    "test-namespace/test-work",
-			expectedError: true,
-		},
-		{
-			name:       "get work",
-			resourceID: "test-namespace/test-work",
-			works: []runtime.Object{&workv1.ManifestWork{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-work",
-					Namespace:       "test-namespace",
-					ResourceVersion: "1",
-				},
-			}},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			workClient := workfake.NewSimpleClientset(c.works...)
-			workInformers := workinformers.NewSharedInformerFactory(workClient, 10*time.Minute)
-			workInformer := workInformers.Work().V1().ManifestWorks()
-			for _, obj := range c.works {
-				if err := workInformer.Informer().GetStore().Add(obj); err != nil {
-					t.Fatal(err)
-				}
-			}
-
-			service := NewWorkService(workClient, workInformer)
-			_, err := service.Get(context.Background(), c.resourceID)
-			if c.expectedError {
-				if err == nil {
-					t.Errorf("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-		})
-	}
-}
 
 func TestList(t *testing.T) {
 	cases := []struct {
@@ -121,7 +70,7 @@ func TestList(t *testing.T) {
 			}
 
 			service := NewWorkService(workClient, workInformer)
-			evts, err := service.List(types.ListOptions{ClusterName: c.clusterName})
+			evts, err := service.List(context.Background(), types.ListOptions{ClusterName: c.clusterName})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -433,10 +382,11 @@ func TestHandleOnCreateFunc(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			handler := &workHandler{}
-			createFunc := handleOnCreateFunc(context.Background(), handler)
+			service := &WorkService{codec: codec.NewManifestBundleCodec()}
+			createFunc := service.handleOnCreateFunc(context.Background(), handler)
 			createFunc(c.obj)
-			if handler.onCreateCallCount != c.expectedCallCount {
-				t.Errorf("expected %d onCreate calls, got %d", c.expectedCallCount, handler.onCreateCallCount)
+			if handler.handleEventCallCount != c.expectedCallCount {
+				t.Errorf("expected %d HandleEvent calls, got %d", c.expectedCallCount, handler.handleEventCallCount)
 			}
 		})
 	}
@@ -625,10 +575,11 @@ func TestHandleOnUpdateFunc(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			handler := &workHandler{}
-			updateFunc := handleOnUpdateFunc(context.Background(), handler)
+			service := &WorkService{codec: codec.NewManifestBundleCodec()}
+			updateFunc := service.handleOnUpdateFunc(context.Background(), handler)
 			updateFunc(c.oldObj, c.newObj)
-			if handler.onUpdateCallCount != c.expectedCallCount {
-				t.Errorf("%s: expected %d OnUpdate calls, got %d", c.description, c.expectedCallCount, handler.onUpdateCallCount)
+			if handler.handleEventCallCount != c.expectedCallCount {
+				t.Errorf("%s: expected %d HandleEvent calls, got %d", c.description, c.expectedCallCount, handler.handleEventCallCount)
 			}
 		})
 	}
@@ -659,56 +610,43 @@ func TestHandleOnDeleteFunc(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			handler := &workHandler{}
-			deleteFunc := handleOnDeleteFunc(context.Background(), handler)
+			service := &WorkService{codec: codec.NewManifestBundleCodec()}
+			deleteFunc := service.handleOnDeleteFunc(context.Background(), handler)
 			deleteFunc(c.obj)
-			if handler.onDeleteCallCount != c.expectedCallCount {
-				t.Errorf("expected %d onDelete calls, got %d", c.expectedCallCount, handler.onDeleteCallCount)
+			if handler.handleEventCallCount != c.expectedCallCount {
+				t.Errorf("expected %d HandleEvent calls, got %d", c.expectedCallCount, handler.handleEventCallCount)
 			}
 		})
 	}
 }
 
 type workHandler struct {
-	onCreateCalled    bool
-	onUpdateCalled    bool
-	onDeleteCalled    bool
-	onCreateCallCount int
-	onUpdateCallCount int
-	onDeleteCallCount int
+	onCreateCalled       bool
+	onUpdateCalled       bool
+	onDeleteCalled       bool
+	handleEventCallCount int
 }
 
-func (m *workHandler) OnCreate(ctx context.Context, t types.CloudEventsDataType, resourceID string) error {
-	if t != payload.ManifestBundleEventDataType {
-		return fmt.Errorf("expected %v, got %v", payload.ManifestBundleEventDataType, t)
+func (m *workHandler) HandleEvent(ctx context.Context, evt *cloudevents.Event) error {
+	eventType, err := types.ParseCloudEventsType(evt.Type())
+	if err != nil {
+		return err
 	}
-	if resourceID != "test-namespace/test-work" {
-		return fmt.Errorf("expected %v, got %v", "test-namespace/test-work", resourceID)
-	}
-	m.onCreateCalled = true
-	m.onCreateCallCount++
-	return nil
-}
 
-func (m *workHandler) OnUpdate(ctx context.Context, t types.CloudEventsDataType, resourceID string) error {
-	if t != payload.ManifestBundleEventDataType {
-		return fmt.Errorf("expected %v, got %v", payload.ManifestBundleEventDataType, t)
+	if eventType.CloudEventsDataType != payload.ManifestBundleEventDataType {
+		return fmt.Errorf("expected %v, got %v", payload.ManifestBundleEventDataType, eventType.CloudEventsDataType)
 	}
-	if resourceID != "test-namespace/test-work" {
-		return fmt.Errorf("expected %v, got %v", "test-namespace/test-work", resourceID)
-	}
-	m.onUpdateCalled = true
-	m.onUpdateCallCount++
-	return nil
-}
 
-func (m *workHandler) OnDelete(ctx context.Context, t types.CloudEventsDataType, resourceID string) error {
-	if t != payload.ManifestBundleEventDataType {
-		return fmt.Errorf("expected %v, got %v", payload.ManifestBundleEventDataType, t)
+	// Track which type of event was called based on the action type
+	switch eventType.Action {
+	case types.CreateRequestAction:
+		m.onCreateCalled = true
+	case types.UpdateRequestAction:
+		m.onUpdateCalled = true
+	case types.DeleteRequestAction:
+		m.onDeleteCalled = true
 	}
-	if resourceID != "test-namespace/test-work" {
-		return fmt.Errorf("expected %v, got %v", "test-namespace/test-work", resourceID)
-	}
-	m.onDeleteCalled = true
-	m.onDeleteCallCount++
+
+	m.handleEventCallCount++
 	return nil
 }

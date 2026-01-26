@@ -231,7 +231,7 @@ var _ = ginkgo.Describe("Addon Health Check", ginkgo.Label("addon-lease"), func(
 			agentNamespace := fmt.Sprintf("open-cluster-management-agent-%s", rand.String(6))
 			framework.CreateAndApproveKlusterlet(
 				hub, spoke,
-				klusterletName, clusterName, agentNamespace, operatorapiv1.InstallMode(klusterletDeployMode), bootstrapHubKubeConfigSecret, images)
+				klusterletName, clusterName, agentNamespace, operatorapiv1.InstallMode(klusterletDeployMode), bootstrapHubKubeConfigSecret, images, registrationDriver)
 			// create an addon on created managed cluster
 			addOnName = fmt.Sprintf("addon-%s", rand.String(6))
 			ginkgo.By(fmt.Sprintf("Creating managed cluster addon %q", addOnName))

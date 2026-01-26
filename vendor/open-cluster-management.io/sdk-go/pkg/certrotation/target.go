@@ -34,6 +34,9 @@ type TargetRotation struct {
 	HostNames []string
 	Lister    corev1listers.SecretLister
 	Client    corev1client.SecretsGetter
+	// OwnerReference is an optional owner reference to set on the secret for garbage collection.
+	// When set, the secret will be automatically deleted when the owner resource is deleted.
+	OwnerReference *metav1.OwnerReference
 }
 
 func (c TargetRotation) EnsureTargetCertKeyPair(signingCertKeyPair *crypto.CA, caBundleCerts []*x509.Certificate,
@@ -42,12 +45,18 @@ func (c TargetRotation) EnsureTargetCertKeyPair(signingCertKeyPair *crypto.CA, c
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
+
 	targetCertKeyPairSecret := originalTargetCertKeyPairSecret.DeepCopy()
 	if apierrors.IsNotFound(err) {
 		// create an empty one
 		targetCertKeyPairSecret = &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: c.Namespace, Name: c.Name}}
 	}
 	targetCertKeyPairSecret.Type = corev1.SecretTypeTLS
+
+	// Set owner reference if configured (ApplySecret handles add-only logic)
+	if c.OwnerReference != nil {
+		targetCertKeyPairSecret.OwnerReferences = []metav1.OwnerReference{*c.OwnerReference}
+	}
 
 	reason := needNewTargetCertKeyPair(targetCertKeyPairSecret, caBundleCerts, c.HostNames)
 	if len(reason) == 0 {
@@ -59,6 +68,7 @@ func (c TargetRotation) EnsureTargetCertKeyPair(signingCertKeyPair *crypto.CA, c
 		return err
 	}
 
+	// Apply the secret (handles both create and update)
 	if targetCertKeyPairSecret, _, err = helpers.ApplySecret(context.TODO(), c.Client, targetCertKeyPairSecret); err != nil {
 		return err
 	}

@@ -37,6 +37,12 @@ func (l LeaseClient) Update(ctx context.Context, lease *coordinationv1.Lease, op
 	}
 
 	if err := l.cloudEventsClient.Publish(ctx, eventType, lease); err != nil {
+		if errors.IsNotFound(err) {
+			// lease is not found from server, delete it from local cache
+			if err := l.watcherStore.Delete(lease); err != nil {
+				return nil, errors.NewInternalError(err)
+			}
+		}
 		return nil, cloudeventserrors.ToStatusError(coordinationv1.Resource("leases"), lease.Name, err)
 	}
 

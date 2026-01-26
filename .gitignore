@@ -30,6 +30,7 @@ _output/
 
 .kubeconfig
 .hub-kubeconfig
+.grpc-config
 .external-hub-kubeconfig
 .external-managed-kubeconfig
 

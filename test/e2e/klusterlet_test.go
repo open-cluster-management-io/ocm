@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/klog/v2"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
@@ -18,6 +19,13 @@ import (
 )
 
 var _ = Describe("Create klusterlet CR", Label("klusterlet"), func() {
+	// Skip entire suite if using grpc driver
+	if registrationDriver == "grpc" {
+		// TODO enable this test after https://github.com/open-cluster-management-io/ocm/issues/1246 is resolved
+		klog.Infof("Skip the klusterlet test when registrationDriver is grpc")
+		return
+	}
+
 	var klusterletName string
 	var clusterName string
 	var klusterletNamespace string
@@ -38,7 +46,7 @@ var _ = Describe("Create klusterlet CR", Label("klusterlet"), func() {
 		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v", klusterletName, clusterName))
 		// Set install mode empty
 		_, err := spoke.CreateKlusterlet(klusterletName, clusterName, klusterletNamespace,
-			"", bootstrapHubKubeConfigSecret, images)
+			"", bootstrapHubKubeConfigSecret, images, registrationDriver)
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("waiting for the managed cluster %v to be created", clusterName))
@@ -80,7 +88,7 @@ var _ = Describe("Create klusterlet CR", Label("klusterlet"), func() {
 	It("Create klusterlet CR with managed cluster name", func() {
 		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v", klusterletName, clusterName))
 		_, err := spoke.CreateKlusterlet(klusterletName, clusterName, klusterletNamespace,
-			operatorapiv1.InstallMode(klusterletDeployMode), bootstrapHubKubeConfigSecret, images)
+			operatorapiv1.InstallMode(klusterletDeployMode), bootstrapHubKubeConfigSecret, images, registrationDriver)
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("waiting for the managed cluster %v to be created", clusterName))
@@ -125,7 +133,7 @@ var _ = Describe("Create klusterlet CR", Label("klusterlet"), func() {
 		var err error
 		By(fmt.Sprintf("create klusterlet %v without managed cluster name", klusterletName))
 		_, err = spoke.CreateKlusterlet(klusterletName, clusterName, klusterletNamespace,
-			operatorapiv1.InstallMode(klusterletDeployMode), bootstrapHubKubeConfigSecret, images)
+			operatorapiv1.InstallMode(klusterletDeployMode), bootstrapHubKubeConfigSecret, images, registrationDriver)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("waiting for the managed cluster to be created")
@@ -178,7 +186,7 @@ var _ = Describe("Create klusterlet CR", Label("klusterlet"), func() {
 	It("Update klusterlet CR namespace", func() {
 		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v", klusterletName, clusterName))
 		_, err := spoke.CreateKlusterlet(klusterletName, clusterName, klusterletNamespace,
-			operatorapiv1.InstallMode(klusterletDeployMode), bootstrapHubKubeConfigSecret, images)
+			operatorapiv1.InstallMode(klusterletDeployMode), bootstrapHubKubeConfigSecret, images, registrationDriver)
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("waiting for the managed cluster %v to be created", clusterName))
