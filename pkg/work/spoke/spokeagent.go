@@ -29,6 +29,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
+	"open-cluster-management.io/ocm/pkg/work/spoke/conditions"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/finalizercontroller"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/manifestcontroller"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/statuscontroller"
@@ -132,6 +133,16 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		restMapper,
 	).NewExecutorValidator(ctx, features.SpokeMutableFeatureGate.Enabled(ocmfeature.ExecutorValidatingCaches))
 
+	conditionReader, err := conditions.NewConditionReader()
+	if err != nil {
+		return err
+	}
+
+	objectReader, err := o.workOptions.ObjectReaderOption.NewObjectReader(spokeDynamicClient, hubWorkInformer)
+	if err != nil {
+		return err
+	}
+
 	manifestWorkController := manifestcontroller.NewManifestWorkController(
 		spokeDynamicClient,
 		spokeKubeClient,
@@ -141,6 +152,7 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		hubWorkInformer.Lister().ManifestWorks(o.agentOptions.SpokeClusterName),
 		spokeWorkClient.WorkV1().AppliedManifestWorks(),
 		spokeWorkInformerFactory.Work().V1().AppliedManifestWorks(),
+		objectReader,
 		hubHash, agentID,
 		restMapper,
 		validator,
@@ -154,6 +166,7 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		spokeDynamicClient,
 		spokeWorkClient.WorkV1().AppliedManifestWorks(),
 		spokeWorkInformerFactory.Work().V1().AppliedManifestWorks(),
+		objectReader,
 		agentID,
 	)
 	manifestWorkFinalizeController := finalizercontroller.NewManifestWorkFinalizeController(
@@ -172,17 +185,15 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		o.workOptions.AppliedManifestWorkEvictionGracePeriod,
 		hubHash, agentID,
 	)
-	availableStatusController, err := statuscontroller.NewAvailableStatusController(
-		spokeDynamicClient,
+	availableStatusController := statuscontroller.NewAvailableStatusController(
 		hubWorkClient,
 		hubWorkInformer,
 		hubWorkInformer.Lister().ManifestWorks(o.agentOptions.SpokeClusterName),
+		conditionReader,
+		objectReader,
 		o.workOptions.MaxJSONRawLength,
 		o.workOptions.StatusSyncInterval,
 	)
-	if err != nil {
-		return err
-	}
 
 	go spokeWorkInformerFactory.Start(ctx.Done())
 	go hubWorkInformer.Informer().Run(ctx.Done())

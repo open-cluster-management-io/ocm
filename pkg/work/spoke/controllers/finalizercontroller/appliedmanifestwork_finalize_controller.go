@@ -21,6 +21,7 @@ import (
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/work/helper"
+	"open-cluster-management.io/ocm/pkg/work/spoke/objectreader"
 )
 
 const appliedManifestWorkFinalizer = "AppliedManifestWorkFinalizer"
@@ -31,6 +32,7 @@ type AppliedManifestWorkFinalizeController struct {
 	patcher                   patcher.Patcher[*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus]
 	appliedManifestWorkLister worklister.AppliedManifestWorkLister
 	spokeDynamicClient        dynamic.Interface
+	objectReader              objectreader.ObjectReader
 	rateLimiter               workqueue.TypedRateLimiter[string]
 }
 
@@ -38,6 +40,7 @@ func NewAppliedManifestWorkFinalizeController(
 	spokeDynamicClient dynamic.Interface,
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
 	appliedManifestWorkInformer workinformer.AppliedManifestWorkInformer,
+	objectReader objectreader.ObjectReader,
 	agentID string,
 ) factory.Controller {
 
@@ -47,6 +50,7 @@ func NewAppliedManifestWorkFinalizeController(
 			appliedManifestWorkClient),
 		appliedManifestWorkLister: appliedManifestWorkInformer.Lister(),
 		spokeDynamicClient:        spokeDynamicClient,
+		objectReader:              objectReader,
 		// After 11 retries (approximately 1 mins), the delay reaches the maximum of 60 seconds.
 		rateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[string](50*time.Millisecond, 60*time.Second),
 	}
@@ -92,6 +96,10 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 	}
 
 	owner := helper.NewAppliedManifestWorkOwner(appliedManifestWork)
+
+	// unregister from objectReader
+	objectreader.UnRegisterInformerFromAppliedManifestWork(
+		ctx, m.objectReader, appliedManifestWork.Spec.ManifestWorkName, appliedManifestWork.Status.AppliedResources)
 
 	// Work is deleting, we remove its related resources on spoke cluster
 	// We still need to run delete for every resource even with ownerref on it, since ownerref does not handle cluster

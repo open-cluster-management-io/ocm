@@ -17,11 +17,13 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
+	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/helper"
+	"open-cluster-management.io/ocm/pkg/work/spoke/objectreader"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
@@ -186,16 +188,24 @@ func TestFinalize(t *testing.T) {
 
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), c.existingResources...)
 			fakeClient := fakeworkclient.NewSimpleClientset(testingWork)
+			informerFactory := workinformers.NewSharedInformerFactory(fakeClient, 0)
+
+			r, err := objectreader.NewOptions().NewObjectReader(fakeDynamicClient, informerFactory.Work().V1().ManifestWorks())
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			controller := AppliedManifestWorkFinalizeController{
 				patcher: patcher.NewPatcher[
 					*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus](
 					fakeClient.WorkV1().AppliedManifestWorks()),
 				spokeDynamicClient: fakeDynamicClient,
+				objectReader:       r,
 				rateLimiter:        workqueue.NewTypedItemExponentialFailureRateLimiter[string](0, 1*time.Second),
 			}
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, testingWork.Name)
-			err := controller.syncAppliedManifestWork(context.TODO(), controllerContext, testingWork)
+			err = controller.syncAppliedManifestWork(context.TODO(), controllerContext, testingWork)
 			if err != nil {
 				t.Fatal(err)
 			}

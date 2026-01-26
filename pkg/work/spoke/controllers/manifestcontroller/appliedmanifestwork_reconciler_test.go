@@ -24,6 +24,7 @@ import (
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/helper"
+	"open-cluster-management.io/ocm/pkg/work/spoke/objectreader"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
@@ -276,6 +277,11 @@ func TestSyncManifestWork(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			r, err := objectreader.NewOptions().NewObjectReader(fakeDynamicClient, informerFactory.Work().V1().ManifestWorks())
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			controller := ManifestWorkController{
 				manifestWorkLister: informerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks("cluster1"),
 				manifestWorkPatcher: patcher.NewPatcher[
@@ -291,6 +297,7 @@ func TestSyncManifestWork(t *testing.T) {
 					},
 					&appliedManifestWorkReconciler{
 						spokeDynamicClient: fakeDynamicClient,
+						objectReader:       r,
 						rateLimiter:        workqueue.NewTypedItemExponentialFailureRateLimiter[string](0, 1*time.Second),
 					},
 				},
@@ -298,7 +305,7 @@ func TestSyncManifestWork(t *testing.T) {
 			}
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, testingWork.Name)
-			err := controller.sync(context.TODO(), controllerContext, testingWork.Name)
+			err = controller.sync(context.TODO(), controllerContext, testingWork.Name)
 			if err != nil {
 				t.Fatal(err)
 			}

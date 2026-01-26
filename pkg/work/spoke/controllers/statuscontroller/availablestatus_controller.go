@@ -11,8 +11,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
@@ -44,7 +44,7 @@ const (
 type AvailableStatusController struct {
 	patcher            patcher.Patcher[*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus]
 	manifestWorkLister worklister.ManifestWorkNamespaceLister
-	objectReader       *objectreader.ObjectReader
+	objectReader       objectreader.ObjectReader
 	statusReader       *statusfeedback.StatusReader
 	conditionReader    *conditions.ConditionReader
 	syncInterval       time.Duration
@@ -52,23 +52,14 @@ type AvailableStatusController struct {
 
 // NewAvailableStatusController returns a AvailableStatusController
 func NewAvailableStatusController(
-	spokeDynamicClient dynamic.Interface,
 	manifestWorkClient workv1client.ManifestWorkInterface,
 	manifestWorkInformer workinformer.ManifestWorkInformer,
 	manifestWorkLister worklister.ManifestWorkNamespaceLister,
+	conditionReader *conditions.ConditionReader,
+	objectReader objectreader.ObjectReader,
 	maxJSONRawLength int32,
 	syncInterval time.Duration,
-) (factory.Controller, error) {
-	conditionReader, err := conditions.NewConditionReader()
-	if err != nil {
-		return nil, err
-	}
-
-	objectReader, err := objectreader.NewObjectReader(spokeDynamicClient, manifestWorkInformer)
-	if err != nil {
-		return nil, err
-	}
-
+) factory.Controller {
 	controller := &AvailableStatusController{
 		patcher: patcher.NewPatcher[
 			*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
@@ -82,7 +73,7 @@ func NewAvailableStatusController(
 
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, manifestWorkInformer.Informer()).
-		WithSync(controller.sync).ToController(controllerName), nil
+		WithSync(controller.sync).ToController(controllerName)
 }
 
 func (c *AvailableStatusController) sync(ctx context.Context, controllerContext factory.SyncContext, manifestWorkName string) error {
@@ -103,7 +94,7 @@ func (c *AvailableStatusController) sync(ctx context.Context, controllerContext 
 	logger = logging.SetLogTracingByObject(logger, manifestWork)
 	ctx = klog.NewContext(ctx, logger)
 
-	err = c.syncManifestWork(ctx, manifestWork)
+	err = c.syncManifestWork(ctx, controllerContext, manifestWork)
 	if err != nil {
 		return fmt.Errorf("unable to sync manifestwork %q: %w", manifestWork.Name, err)
 	}
@@ -113,7 +104,7 @@ func (c *AvailableStatusController) sync(ctx context.Context, controllerContext 
 	return nil
 }
 
-func (c *AvailableStatusController) syncManifestWork(ctx context.Context, originalManifestWork *workapiv1.ManifestWork) error {
+func (c *AvailableStatusController) syncManifestWork(ctx context.Context, controllerContext factory.SyncContext, originalManifestWork *workapiv1.ManifestWork) error {
 	manifestWork := originalManifestWork.DeepCopy()
 
 	// do nothing when finalizer is not added.
@@ -138,6 +129,15 @@ func (c *AvailableStatusController) syncManifestWork(ctx context.Context, origin
 		}
 
 		option := helper.FindManifestConfiguration(manifest.ResourceMeta, manifestWork.Spec.ManifestConfigs)
+		if option != nil && option.FeedbackScrapeType == workapiv1.FeedbackWatchType {
+			if err := c.objectReader.RegisterInformer(ctx, manifestWork.Name, manifest.ResourceMeta, controllerContext.Queue()); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to register informer")
+			}
+		} else {
+			if err := c.objectReader.UnRegisterInformer(manifestWork.Name, manifest.ResourceMeta); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "failed to unregister informer")
+			}
+		}
 
 		// Read status of the resource according to feedback rules.
 		values, statusFeedbackCondition := c.getFeedbackValues(obj, option)

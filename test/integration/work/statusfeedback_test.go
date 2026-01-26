@@ -3,6 +3,7 @@ package work
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -16,7 +17,9 @@ import (
 	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
+	"open-cluster-management.io/ocm/pkg/work/spoke"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
@@ -1014,6 +1017,117 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 					return fmt.Errorf("status sync condition should be True")
 				}
 				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+	})
+
+	ginkgo.Context("Watch-based Status Feedback", func() {
+		ginkgo.BeforeEach(func() {
+			u, _, err := util.NewDeployment(clusterName, "deploy-watch", "sa")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			manifests = append(manifests, util.ToManifest(u))
+
+			var ctx context.Context
+			ctx, cancel = context.WithCancel(context.Background())
+			// increase normal sync interval so we can validate watch based status feedback
+			syncIntervalOptionDecorator := func(
+				opt *spoke.WorkloadAgentOptions,
+				commonOpt *commonoptions.AgentOptions) (*spoke.WorkloadAgentOptions, *commonoptions.AgentOptions) {
+				opt.StatusSyncInterval = 30 * time.Second
+				return opt, commonOpt
+			}
+			go startWorkAgent(ctx, clusterName, syncIntervalOptionDecorator)
+		})
+
+		ginkgo.AfterEach(func() {
+			if cancel != nil {
+				cancel()
+			}
+		})
+
+		ginkgo.It("should register informer and watch resource status changes", func() {
+			// Create ManifestWork with watch-based feedback
+			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Namespace: clusterName,
+						Name:      "deploy-watch",
+					},
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.JSONPathsType,
+							JsonPaths: []workapiv1.JsonPath{
+								{
+									Name: "replicas",
+									Path: ".spec.replicas",
+								},
+								{
+									Name: "availableReplicas",
+									Path: ".status.availableReplicas",
+								},
+							},
+						},
+					},
+					FeedbackScrapeType: workapiv1.FeedbackWatchType,
+				},
+			}
+
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Wait for work to be applied
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient,
+				workapiv1.WorkApplied, metav1.ConditionTrue, []metav1.ConditionStatus{metav1.ConditionTrue},
+				eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient,
+				workapiv1.WorkAvailable, metav1.ConditionTrue, []metav1.ConditionStatus{metav1.ConditionTrue},
+				eventuallyTimeout, eventuallyInterval)
+
+			// Update Deployment status on spoke
+			gomega.Eventually(func() error {
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).
+					Get(context.Background(), "deploy-watch", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				deploy.Status.Replicas = 3
+				deploy.Status.ReadyReplicas = 3
+				deploy.Status.AvailableReplicas = 3
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).
+					UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			// Verify feedback values are updated via watch
+			gomega.Eventually(func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).
+					Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if len(work.Status.ResourceStatus.Manifests) != 1 {
+					return fmt.Errorf("expected 1 manifest status, got %d",
+						len(work.Status.ResourceStatus.Manifests))
+				}
+
+				values := work.Status.ResourceStatus.Manifests[0].StatusFeedbacks.Values
+				if len(values) != 2 {
+					return fmt.Errorf("expected 2 feedback values, got %d", len(values))
+				}
+
+				for _, v := range values {
+					if v.Name == "availableReplicas" {
+						if v.Value.Integer == nil || *v.Value.Integer != 3 {
+							return fmt.Errorf("expected availableReplicas to be 3, got %v", v.Value.Integer)
+						}
+					}
+				}
+
+				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 		})
 	})

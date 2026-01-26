@@ -400,6 +400,7 @@ func FindManifestConfiguration(resourceMeta workapiv1.ManifestResourceMeta,
 		if rstOption.UpdateStrategy == nil && option.UpdateStrategy != nil {
 			rstOption.UpdateStrategy = option.UpdateStrategy
 		}
+		rstOption.FeedbackScrapeType = option.FeedbackScrapeType
 	}
 
 	if len(rstOption.FeedbackRules) == 0 && len(rstOption.ConditionRules) == 0 && rstOption.UpdateStrategy == nil {

@@ -20,10 +20,12 @@ import (
 
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/work/helper"
+	"open-cluster-management.io/ocm/pkg/work/spoke/objectreader"
 )
 
 type appliedManifestWorkReconciler struct {
 	spokeDynamicClient dynamic.Interface
+	objectReader       objectreader.ObjectReader
 	rateLimiter        workqueue.TypedRateLimiter[string]
 }
 
@@ -88,6 +90,10 @@ func (m *appliedManifestWorkReconciler) reconcile(
 	noLongerMaintainedResources := helper.FindUntrackedResources(appliedManifestWork.Status.AppliedResources, appliedResources)
 
 	reason := fmt.Sprintf("it is no longer maintained by manifestwork %s", manifestWork.Name)
+
+	// unregister from objectReader
+	objectreader.UnRegisterInformerFromAppliedManifestWork(
+		ctx, m.objectReader, appliedManifestWork.Spec.ManifestWorkName, noLongerMaintainedResources)
 
 	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(
 		ctx, noLongerMaintainedResources, reason, m.spokeDynamicClient, *owner)
