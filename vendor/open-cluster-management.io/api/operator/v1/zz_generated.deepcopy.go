@@ -851,7 +851,11 @@ func (in *RegistrationConfiguration) DeepCopyInto(out *RegistrationConfiguration
 	}
 	in.BootstrapKubeConfigs.DeepCopyInto(&out.BootstrapKubeConfigs)
 	in.RegistrationDriver.DeepCopyInto(&out.RegistrationDriver)
-	in.AddOnKubeClientRegistrationDriver.DeepCopyInto(&out.AddOnKubeClientRegistrationDriver)
+	if in.AddOnKubeClientRegistrationDriver != nil {
+		in, out := &in.AddOnKubeClientRegistrationDriver, &out.AddOnKubeClientRegistrationDriver
+		*out = new(AddOnRegistrationDriver)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.ClusterClaimConfiguration != nil {
 		in, out := &in.ClusterClaimConfiguration, &out.ClusterClaimConfiguration
 		*out = new(ClusterClaimConfiguration)
