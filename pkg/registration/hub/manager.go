@@ -327,6 +327,8 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.ClusterProfile) {
 		clusterProfileController = clusterprofile.NewClusterProfileController(
 			clusterInformers.Cluster().V1().ManagedClusters(),
+			clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
+			clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings(),
 			clusterProfileClient,
 			clusterProfileInformers.Apis().V1alpha1().ClusterProfiles(),
 		)

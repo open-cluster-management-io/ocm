@@ -82,6 +82,8 @@ var CRDPaths = []string{
 	// external API deps
 	"./test/integration/testdeps/capi/cluster.x-k8s.io_clusters.yaml",
 	"./manifests/klusterlet/managed/clusterproperties.crd.yaml",
+	// cluster profile
+	"./manifests/cluster-manager/hub/crds/0000_00_multicluster.x-k8s.io_clusterprofiles.crd.yaml",
 }
 
 func runAgent(name string, opt *spoke.SpokeAgentOptions, commOption *commonoptions.AgentOptions, cfg *rest.Config) context.CancelFunc {
@@ -210,6 +212,10 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	// enable clusterImporter feature gate
 	err = features.HubMutableFeatureGate.Set("ClusterImporter=true")
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	// enable ClusterProfile feature gate
+	err = features.HubMutableFeatureGate.Set("ClusterProfile=true")
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	// start hub controller
