@@ -6,7 +6,9 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 KUBECTL?=kubectl
 KUBECONFIG?=./.kubeconfig
 HUB_KUBECONFIG?=./.hub-kubeconfig
+GRPC_CONFIG?=./.grpc-config
 KLUSTERLET_DEPLOY_MODE?=Default
+REGISTRATION_DRIVER?=csr
 MANAGED_CLUSTER_NAME?=cluster1
 KLUSTERLET_NAME?=klusterlet
 
@@ -21,6 +23,22 @@ hub-kubeconfig:
 deploy-hub: deploy-hub-helm hub-kubeconfig cluster-ip
 
 deploy-hub-helm: ensure-helm
+ifeq ($(REGISTRATION_DRIVER),grpc)
+	$(HELM) install cluster-manager deploy/cluster-manager/chart/cluster-manager --namespace=open-cluster-management \
+			--create-namespace \
+			--set images.overrides.operatorImage=$(OPERATOR_IMAGE_NAME) \
+			--set images.overrides.registrationImage=$(REGISTRATION_IMAGE) \
+			--set images.overrides.workImage=$(WORK_IMAGE) \
+			--set images.overrides.placementImage=$(PLACEMENT_IMAGE) \
+			--set images.overrides.addOnManagerImage=$(ADDON_MANAGER_IMAGE) \
+			--set replicaCount=1 \
+			--set createBootstrapSA=true \
+			--set clusterManager.registrationConfiguration.registrationDrivers[0].authType=csr \
+			--set clusterManager.registrationConfiguration.registrationDrivers[1].authType=grpc \
+			--set clusterManager.serverConfiguration.endpointsExposure[0].protocol=grpc \
+			--set clusterManager.serverConfiguration.endpointsExposure[0].grpc.type=hostname \
+			--set clusterManager.serverConfiguration.endpointsExposure[0].grpc.hostname.host=cluster-manager-grpc-server.open-cluster-management-hub.svc
+else
 	$(HELM) install cluster-manager deploy/cluster-manager/chart/cluster-manager --namespace=open-cluster-management \
 			--create-namespace \
 			--set images.overrides.operatorImage=$(OPERATOR_IMAGE_NAME) \
@@ -29,6 +47,7 @@ deploy-hub-helm: ensure-helm
 			--set images.overrides.placementImage=$(PLACEMENT_IMAGE) \
 			--set images.overrides.addOnManagerImage=$(ADDON_MANAGER_IMAGE) \
 			--set replicaCount=1
+endif
 
 deploy-hub-operator: ensure-kustomize
 	cp deploy/cluster-manager/config/kustomization.yaml deploy/cluster-manager/config/kustomization.yaml.tmp
@@ -47,7 +66,13 @@ test-e2e: deploy-hub deploy-spoke-operator-helm run-e2e
 
 run-e2e:
 	go test -c ./test/e2e
-	./e2e.test -test.v -ginkgo.v -nil-executor-validating=true -registration-image=$(REGISTRATION_IMAGE) -work-image=$(WORK_IMAGE) -singleton-image=$(OPERATOR_IMAGE_NAME) -klusterlet-deploy-mode=$(KLUSTERLET_DEPLOY_MODE) -expected-image-tag=$(IMAGE_TAG)
+	./e2e.test -test.v -ginkgo.v -nil-executor-validating=true \
+	-registration-image=$(REGISTRATION_IMAGE) \
+	-work-image=$(WORK_IMAGE) \
+	-singleton-image=$(OPERATOR_IMAGE_NAME) \
+	-expected-image-tag=$(IMAGE_TAG) \
+	-klusterlet-deploy-mode=$(KLUSTERLET_DEPLOY_MODE) \
+	-registration-driver=$(REGISTRATION_DRIVER)
 
 clean-hub: clean-hub-cr clean-hub-operator
 
@@ -66,7 +91,41 @@ bootstrap-secret:
 	$(KUBECTL) get ns open-cluster-management-agent; if [ $$? -ne 0 ] ; then $(KUBECTL) create ns open-cluster-management-agent; fi
 	$(KUSTOMIZE) build deploy/klusterlet/config/samples/bootstrap | $(KUBECTL) apply -f -
 
+grpc-config:
+	@set -e; \
+	retry=0; \
+	while ! $(KUBECTL) get deploy cluster-manager-grpc-server -n open-cluster-management-hub >/dev/null 2>&1; do \
+		if [ $$retry -ge 150 ]; then \
+			exit 1; \
+		fi; \
+		sleep 2; \
+		retry=$$(($$retry + 1)); \
+	done; \
+	$(KUBECTL) wait --for=condition=available --timeout=300s \
+		deployment/cluster-manager-grpc-server \
+		-n open-cluster-management-hub; \
+	CA_DATA=$$($(KUBECTL) get configmap ca-bundle-configmap \
+		-n open-cluster-management-hub \
+		-o jsonpath='{.data.ca-bundle\.crt}' | base64 | tr -d '\n'); \
+	TOKEN=$$($(KUBECTL) create token agent-registration-bootstrap \
+		-n open-cluster-management \
+		--duration=24h); \
+	echo "caData: $$CA_DATA" > $(GRPC_CONFIG); \
+	echo "token: $$TOKEN" >> $(GRPC_CONFIG); \
+	echo "url: cluster-manager-grpc-server.open-cluster-management-hub.svc:8090" >> $(GRPC_CONFIG); \
+
 deploy-spoke-operator-helm: ensure-helm
+ifeq ($(REGISTRATION_DRIVER),grpc)
+deploy-spoke-operator-helm: grpc-config
+	$(HELM) install klusterlet deploy/klusterlet/chart/klusterlet --namespace=open-cluster-management \
+        --create-namespace \
+        --set-file bootstrapHubKubeConfig=$(HUB_KUBECONFIG) \
+        --set-file grpcConfig=$(GRPC_CONFIG) \
+        --set klusterlet.create=false \
+        --set images.overrides.operatorImage=$(OPERATOR_IMAGE_NAME) \
+        --set images.overrides.registrationImage=$(REGISTRATION_IMAGE) \
+        --set images.overrides.workImage=$(WORK_IMAGE)
+else
 	$(HELM) install klusterlet deploy/klusterlet/chart/klusterlet --namespace=open-cluster-management \
         --create-namespace \
         --set-file bootstrapHubKubeConfig=$(HUB_KUBECONFIG) \
@@ -74,6 +133,7 @@ deploy-spoke-operator-helm: ensure-helm
         --set images.overrides.operatorImage=$(OPERATOR_IMAGE_NAME) \
         --set images.overrides.registrationImage=$(REGISTRATION_IMAGE) \
         --set images.overrides.workImage=$(WORK_IMAGE)
+endif
 
 deploy-spoke-operator: ensure-kustomize
 	cp deploy/klusterlet/config/kustomization.yaml deploy/klusterlet/config/kustomization.yaml.tmp

@@ -45,6 +45,9 @@ var (
 	// hub hash
 	hubHash string
 
+	// registration driver
+	registrationDriver string
+
 	// bootstrap-hub-kubeconfig
 	// It's a secret named 'bootstrap-hub-kubeconfig' under the namespace 'open-cluster-management-agent',
 	// the content of the secret is a kubeconfig file.
@@ -66,6 +69,7 @@ func init() {
 	flag.StringVar(&workImage, "work-image", "", "The image of the work")
 	flag.StringVar(&singletonImage, "singleton-image", "", "The image of the klusterlet agent")
 	flag.StringVar(&expectedImageTag, "expected-image-tag", "", "The expected image tag for all OCM components (e.g., 'e2e')")
+	flag.StringVar(&registrationDriver, "registration-driver", "csr", "The registration driver (csr or grpc)")
 }
 
 var hub *framework.Hub
@@ -181,7 +185,7 @@ var _ = BeforeSuite(func() {
 	framework.CreateAndApproveKlusterlet(
 		hub, spoke,
 		universalKlusterletName, universalClusterName, universalAgentNamespace, operatorapiv1.InstallMode(klusterletDeployMode),
-		bootstrapHubKubeConfigSecret, images,
+		bootstrapHubKubeConfigSecret, images, registrationDriver,
 	)
 
 	By("Create a universal ClusterSet and bind it with the universal managedcluster")

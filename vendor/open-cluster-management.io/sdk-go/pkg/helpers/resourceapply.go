@@ -65,10 +65,8 @@ func ApplyConfigMap(ctx context.Context, client coreclientv1.ConfigMapsGetter, r
 	return actual, true, err
 }
 
-// ApplySecret merges objectmeta, requires data. ref from openshift/library-go
+// ApplySecret merges objectmeta, requires data, and updates OwnerReferences. ref from openshift/library-go
 func ApplySecret(ctx context.Context, client coreclientv1.SecretsGetter, requiredInput *corev1.Secret) (*corev1.Secret, bool, error) {
-	// copy the stringData to data.  Error on a data content conflict inside required.  This is usually a bug.
-
 	existing, err := client.Secrets(requiredInput.Namespace).Get(ctx, requiredInput.Name, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, false, err
@@ -117,6 +115,11 @@ func ApplySecret(ctx context.Context, client coreclientv1.SecretsGetter, require
 	}
 
 	existingCopy.Type = required.Type
+
+	// Add OwnerReferences only if the existing secret has none (add-only strategy)
+	if len(existingCopy.OwnerReferences) == 0 && len(required.OwnerReferences) > 0 {
+		existingCopy.OwnerReferences = required.OwnerReferences
+	}
 
 	// Server defaults some values and we need to do it as well or it will never equal.
 	if existingCopy.Type == "" {

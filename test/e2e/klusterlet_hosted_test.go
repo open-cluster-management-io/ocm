@@ -71,7 +71,7 @@ var _ = Describe("Delete hosted klusterlet CR", Label("klusterlet-hosted"), func
 	It("Delete klusterlet CR in Hosted mode when the managed cluster was destroyed", func() {
 		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v", klusterletName, clusterName))
 		klusterlet, err := spoke.CreateKlusterlet(klusterletName, clusterName, klusterletNamespace,
-			operatorapiv1.InstallModeHosted, bootstrapHubKubeConfigSecret, images)
+			operatorapiv1.InstallModeHosted, bootstrapHubKubeConfigSecret, images, registrationDriver)
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("waiting for the managed cluster %v to be created", clusterName))

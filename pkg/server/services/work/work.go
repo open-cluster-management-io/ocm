@@ -3,12 +3,14 @@ package work
 import (
 	"context"
 	"fmt"
+	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	cloudeventstypes "github.com/cloudevents/sdk-go/v2/types"
 	"github.com/google/go-cmp/cmp"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -50,21 +52,7 @@ func NewWorkService(
 	}
 }
 
-func (w *WorkService) Get(ctx context.Context, resourceID string) (*cloudevents.Event, error) {
-	namespace, name, err := cache.SplitMetaNamespaceKey(resourceID)
-	if err != nil {
-		return nil, err
-	}
-	work, err := w.workLister.ManifestWorks(namespace).Get(name)
-	if err != nil {
-		return nil, err
-	}
-
-	work = work.DeepCopy()
-	return w.codec.Encode(services.CloudEventsSourceKube, types.CloudEventsType{CloudEventsDataType: payload.ManifestBundleEventDataType}, work)
-}
-
-func (w *WorkService) List(listOpts types.ListOptions) ([]*cloudevents.Event, error) {
+func (w *WorkService) List(ctx context.Context, listOpts types.ListOptions) ([]*cloudevents.Event, error) {
 	works, err := w.workLister.ManifestWorks(listOpts.ClusterName).List(labels.Everything())
 	if err != nil {
 		return nil, err
@@ -158,10 +146,11 @@ func (w *WorkService) RegisterHandler(ctx context.Context, handler server.EventH
 }
 
 func (w *WorkService) EventHandlerFuncs(ctx context.Context, handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
+	// TODO handle type check error and event handler error
 	return &cache.ResourceEventHandlerFuncs{
-		AddFunc:    handleOnCreateFunc(ctx, handler),
-		UpdateFunc: handleOnUpdateFunc(ctx, handler),
-		DeleteFunc: handleOnDeleteFunc(ctx, handler),
+		AddFunc:    w.handleOnCreateFunc(ctx, handler),
+		UpdateFunc: w.handleOnUpdateFunc(ctx, handler),
+		DeleteFunc: w.handleOnDeleteFunc(ctx, handler),
 	}
 }
 
@@ -180,61 +169,110 @@ func (w *WorkService) getWorkByUID(clusterName string, uid kubetypes.UID) (*work
 	return nil, apierrors.NewNotFound(common.ManifestWorkGR, string(uid))
 }
 
-func handleOnCreateFunc(ctx context.Context, handler server.EventHandler) func(obj interface{}) {
+func (w *WorkService) handleOnCreateFunc(ctx context.Context, handler server.EventHandler) func(obj interface{}) {
 	return func(obj interface{}) {
-		accessor, err := meta.Accessor(obj)
-		if err != nil {
-			utilruntime.HandleErrorWithContext(ctx, err, "failed to get accessor for work")
+		work, ok := obj.(*workv1.ManifestWork)
+		if !ok {
+			utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", obj), "work create")
 			return
 		}
-		id := accessor.GetNamespace() + "/" + accessor.GetName()
-		if err := handler.OnCreate(ctx, payload.ManifestBundleEventDataType, id); err != nil {
+
+		eventTypes := types.CloudEventsType{
+			CloudEventsDataType: payload.ManifestBundleEventDataType,
+			SubResource:         types.SubResourceSpec,
+			Action:              types.CreateRequestAction,
+		}
+		evt, err := w.codec.Encode(services.CloudEventsSourceKube, eventTypes, work)
+		if err != nil {
+			utilruntime.HandleErrorWithContext(ctx, err, "failed to encode work",
+				"namespace", work.Namespace, "name", work.Name)
+			return
+		}
+
+		if err := handler.HandleEvent(ctx, evt); err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "failed to create work",
-				"manifestWork", accessor.GetName(), "manifestWorkNamespace", accessor.GetNamespace())
+				"namespace", work.Namespace, "name", work.Name)
 		}
 	}
 }
 
-func handleOnUpdateFunc(ctx context.Context, handler server.EventHandler) func(oldObj, newObj interface{}) {
+func (w *WorkService) handleOnUpdateFunc(ctx context.Context, handler server.EventHandler) func(oldObj, newObj interface{}) {
 	return func(oldObj, newObj interface{}) {
-		oldAccessor, err := meta.Accessor(oldObj)
-		if err != nil {
-			utilruntime.HandleErrorWithContext(ctx, err, "failed to get accessor for work")
+		oldWork, ok := oldObj.(*workv1.ManifestWork)
+		if !ok {
+			utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", oldObj), "work update")
 			return
 		}
-		newAccessor, err := meta.Accessor(newObj)
-		if err != nil {
-			utilruntime.HandleErrorWithContext(ctx, err, "failed to get accessor for work")
+		newWork, ok := newObj.(*workv1.ManifestWork)
+		if !ok {
+			utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", newObj), "work update")
 			return
 		}
 
 		// the manifestwork is not changed and is not deleting
-		if cmp.Equal(oldAccessor.GetLabels(), newAccessor.GetLabels()) &&
-			cmp.Equal(oldAccessor.GetAnnotations(), newAccessor.GetAnnotations()) &&
-			oldAccessor.GetGeneration() >= newAccessor.GetGeneration() &&
-			newAccessor.GetDeletionTimestamp().IsZero() {
+		if cmp.Equal(oldWork.Labels, newWork.Labels) &&
+			cmp.Equal(oldWork.Annotations, newWork.Annotations) &&
+			oldWork.Generation >= newWork.Generation &&
+			newWork.DeletionTimestamp.IsZero() {
 			return
 		}
 
-		id := newAccessor.GetNamespace() + "/" + newAccessor.GetName()
-		if err := handler.OnUpdate(ctx, payload.ManifestBundleEventDataType, id); err != nil {
+		eventTypes := types.CloudEventsType{
+			CloudEventsDataType: payload.ManifestBundleEventDataType,
+			SubResource:         types.SubResourceSpec,
+			Action:              types.UpdateRequestAction,
+		}
+		evt, err := w.codec.Encode(services.CloudEventsSourceKube, eventTypes, newWork)
+		if err != nil {
+			utilruntime.HandleErrorWithContext(ctx, err, "failed to encode work",
+				"namespace", newWork.Namespace, "name", newWork.Name)
+			return
+		}
+
+		if err := handler.HandleEvent(ctx, evt); err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "failed to update work",
-				"manifestWork", newAccessor.GetName(), "manifestWorkNamespace", newAccessor.GetNamespace())
+				"namespace", newWork.Namespace, "name", newWork.Name)
 		}
 	}
 }
 
-func handleOnDeleteFunc(ctx context.Context, handler server.EventHandler) func(obj interface{}) {
+func (w *WorkService) handleOnDeleteFunc(ctx context.Context, handler server.EventHandler) func(obj interface{}) {
 	return func(obj interface{}) {
-		accessor, err := meta.Accessor(obj)
+		work, ok := obj.(*workv1.ManifestWork)
+		if !ok {
+			tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+			if !ok {
+				utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", obj), "work delete")
+				return
+			}
+
+			work, ok = tombstone.Obj.(*workv1.ManifestWork)
+			if !ok {
+				utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", obj), "work delete")
+				return
+			}
+		}
+
+		work = work.DeepCopy()
+		if work.DeletionTimestamp.IsZero() {
+			work.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+		}
+
+		eventTypes := types.CloudEventsType{
+			CloudEventsDataType: payload.ManifestBundleEventDataType,
+			SubResource:         types.SubResourceSpec,
+			Action:              types.DeleteRequestAction,
+		}
+		evt, err := w.codec.Encode(services.CloudEventsSourceKube, eventTypes, work)
 		if err != nil {
-			utilruntime.HandleErrorWithContext(ctx, err, "failed to get accessor for work")
+			utilruntime.HandleErrorWithContext(ctx, err, "failed to encode work",
+				"namespace", work.Namespace, "name", work.Name)
 			return
 		}
-		id := accessor.GetNamespace() + "/" + accessor.GetName()
-		if err := handler.OnDelete(ctx, payload.ManifestBundleEventDataType, id); err != nil {
+
+		if err := handler.HandleEvent(ctx, evt); err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "failed to delete work",
-				"manifestWork", accessor.GetName(), "manifestWorkNamespace", accessor.GetNamespace())
+				"namespace", work.Namespace, "name", work.Name)
 		}
 	}
 }

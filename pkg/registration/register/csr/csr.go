@@ -187,7 +187,7 @@ func (c *CSRDriver) Process(
 	shouldHalt := c.haltCSRCreation()
 	if shouldHalt {
 		recorder.Eventf(ctx, "ClientCertificateCreationHalted",
-			"Stop creating csr since there are too many csr created already on hub", controllerName)
+			"Stop creating CSR for %s since there are too many CSRs created already on the hub.", controllerName)
 		return nil, &metav1.Condition{
 			Type:    "ClusterCertificateRotated",
 			Status:  metav1.ConditionFalse,

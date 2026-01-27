@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 
+	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
@@ -22,14 +23,8 @@ type AgentEventServer interface {
 }
 
 type EventHandler interface {
-	// OnCreate is the callback when resource is created in the service.
-	OnCreate(ctx context.Context, t types.CloudEventsDataType, resourceID string) error
-
-	// OnUpdate is the callback when resource is updated in the service.
-	OnUpdate(ctx context.Context, t types.CloudEventsDataType, resourceID string) error
-
-	// OnDelete is the callback when resource is deleted from the service.
-	OnDelete(ctx context.Context, t types.CloudEventsDataType, resourceID string) error
+	// HandleEvent publish the event to the correct subscriber.
+	HandleEvent(ctx context.Context, evt *cloudevents.Event) error
 }
 
 // TODO SourceEventServer to handle the grpc conversation between consumers and grpcserver.

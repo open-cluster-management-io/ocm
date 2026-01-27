@@ -210,10 +210,23 @@ func (c *baseClient) subscribe(ctx context.Context, receive receiveFn) {
 			case <-ctx.Done():
 				return
 			case <-c.subscribeChan:
-				if err := c.transport.Subscribe(ctx); err != nil {
-					// Failed to send subscribe request, it should be connection failed, will retry on next reconnection
-					runtime.HandleErrorWithContext(ctx, err, "failed to subscribe after connection")
-					continue
+				// Retry subscribe with backoff until success or context cancellation
+				for {
+					if err := c.transport.Subscribe(ctx); err != nil {
+						runtime.HandleErrorWithContext(ctx, err, "failed to subscribe after connection")
+
+						// Wait with backoff before retrying
+						select {
+						case <-ctx.Done():
+							return
+						case <-wait.RealTimer(DelayFn()).C():
+							// Continue to retry
+						}
+						continue
+					}
+
+					// Subscribe succeeded, break out of retry loop
+					break
 				}
 
 				// Send startReceiverSignal to start/restart the receiver after successful subscription.

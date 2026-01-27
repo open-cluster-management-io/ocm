@@ -10,8 +10,10 @@ import (
 
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/status"
 	"k8s.io/apimachinery/pkg/util/errors"
 	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
@@ -221,7 +223,7 @@ func newAuthzUnaryInterceptor(authorizers ...authz.UnaryAuthorizer) grpc.UnarySe
 			case authz.DecisionAllow:
 				return handler(ctx, req)
 			case authz.DecisionDeny:
-				return nil, fmt.Errorf("access denied: %v", err)
+				return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("access denied: %v", err))
 			case authz.DecisionNoOpinion:
 				if err != nil {
 					errs = append(errs, err)
@@ -234,7 +236,7 @@ func newAuthzUnaryInterceptor(authorizers ...authz.UnaryAuthorizer) grpc.UnarySe
 			return nil, errors.NewAggregate(errs)
 		}
 
-		return nil, fmt.Errorf("no authorizer found for %s", info.FullMethod)
+		return nil, status.Error(codes.Unauthenticated, fmt.Sprintf("no authorizer found for %s", info.FullMethod))
 	}
 }
 
@@ -301,7 +303,7 @@ func newAuthzStreamInterceptor(authorizers []authz.StreamAuthorizer) grpc.Stream
 			case authz.DecisionAllow:
 				return handler(srv, authorizedStream)
 			case authz.DecisionDeny:
-				return fmt.Errorf("access denied: %v", err)
+				return status.Error(codes.PermissionDenied, fmt.Sprintf("access denied: %v", err))
 			case authz.DecisionNoOpinion:
 				if err != nil {
 					errs = append(errs, err)
@@ -311,9 +313,9 @@ func newAuthzStreamInterceptor(authorizers []authz.StreamAuthorizer) grpc.Stream
 		}
 
 		if len(errs) > 0 {
-			return errors.NewAggregate(errs)
+			return status.Error(codes.Internal, errors.NewAggregate(errs).Error())
 		}
 
-		return fmt.Errorf("no authorizer found for %s", info.FullMethod)
+		return status.Error(codes.Unauthenticated, fmt.Sprintf("no authorizer found for %s", info.FullMethod))
 	}
 }

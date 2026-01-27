@@ -20,54 +20,6 @@ import (
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
-func TestGet(t *testing.T) {
-	cases := []struct {
-		name          string
-		clusters      []runtime.Object
-		resourceID    string
-		expectedError bool
-	}{
-		{
-			name:          "cluster not found",
-			clusters:      []runtime.Object{},
-			resourceID:    "test-cluster",
-			expectedError: true,
-		},
-		{
-			name:       "cluster found",
-			resourceID: "test-cluster",
-			clusters: []runtime.Object{&clusterv1.ManagedCluster{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"},
-			}},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			clusterClient := clusterfake.NewSimpleClientset(c.clusters...)
-			clusterInformers := clusterinformers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
-			clusterInformer := clusterInformers.Cluster().V1().ManagedClusters()
-			for _, obj := range c.clusters {
-				if err := clusterInformer.Informer().GetStore().Add(obj); err != nil {
-					t.Fatal(err)
-				}
-			}
-
-			service := NewClusterService(clusterClient, clusterInformer)
-			_, err := service.Get(context.Background(), c.resourceID)
-			if c.expectedError {
-				if err == nil {
-					t.Errorf("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-		})
-	}
-}
-
 func TestList(t *testing.T) {
 	cases := []struct {
 		name             string
@@ -108,7 +60,7 @@ func TestList(t *testing.T) {
 			}
 
 			service := NewClusterService(clusterClient, clusterInformer)
-			evts, err := service.List(types.ListOptions{ClusterName: c.clusterName})
+			evts, err := service.List(context.Background(), types.ListOptions{ClusterName: c.clusterName})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -274,22 +226,17 @@ type clusterHandler struct {
 	onUpdateCalled bool
 }
 
-func (m *clusterHandler) OnCreate(ctx context.Context, t types.CloudEventsDataType, resourceID string) error {
-	if t != clusterce.ManagedClusterEventDataType {
-		return fmt.Errorf("expected %v, got %v", clusterce.ManagedClusterEventDataType, t)
+func (m *clusterHandler) HandleEvent(ctx context.Context, evt *cloudevents.Event) error {
+	eventType, err := types.ParseCloudEventsType(evt.Type())
+	if err != nil {
+		return err
 	}
+
+	if eventType.CloudEventsDataType != clusterce.ManagedClusterEventDataType {
+		return fmt.Errorf("expected %v, got %v", clusterce.ManagedClusterEventDataType, eventType.CloudEventsDataType)
+	}
+
 	m.onCreateCalled = true
-	return nil
-}
-
-func (m *clusterHandler) OnUpdate(ctx context.Context, t types.CloudEventsDataType, resourceID string) error {
-	if t != clusterce.ManagedClusterEventDataType {
-		return fmt.Errorf("expected %v, got %v", clusterce.ManagedClusterEventDataType, t)
-	}
 	m.onUpdateCalled = true
-	return nil
-}
-
-func (m *clusterHandler) OnDelete(ctx context.Context, t types.CloudEventsDataType, resourceID string) error {
 	return nil
 }

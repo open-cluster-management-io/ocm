@@ -17,16 +17,9 @@ import (
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
-func TestGet(t *testing.T) {
-	service := NewEventService(kubefake.NewSimpleClientset())
-	if _, err := service.Get(context.Background(), "test-event"); err == nil {
-		t.Errorf("expected error, but failed")
-	}
-}
-
 func TestList(t *testing.T) {
 	service := NewEventService(kubefake.NewSimpleClientset())
-	if _, err := service.List(types.ListOptions{}); err == nil {
+	if _, err := service.List(context.Background(), types.ListOptions{}); err == nil {
 		t.Errorf("expected error, but failed")
 	}
 }

@@ -20,54 +20,6 @@ import (
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
-func TestGet(t *testing.T) {
-	cases := []struct {
-		name          string
-		addons        []runtime.Object
-		resourceID    string
-		expectedError bool
-	}{
-		{
-			name:          "addon not found",
-			addons:        []runtime.Object{},
-			resourceID:    "test-namespace/test-addon",
-			expectedError: true,
-		},
-		{
-			name:       "get addon",
-			resourceID: "test-namespace/test-addon",
-			addons: []runtime.Object{&addonv1alpha1.ManagedClusterAddOn{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-namespace"},
-			}},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			addonClient := addonfake.NewSimpleClientset(c.addons...)
-			addonInformers := addoninformers.NewSharedInformerFactory(addonClient, 10*time.Minute)
-			addonInformer := addonInformers.Addon().V1alpha1().ManagedClusterAddOns()
-			for _, obj := range c.addons {
-				if err := addonInformer.Informer().GetStore().Add(obj); err != nil {
-					t.Fatal(err)
-				}
-			}
-
-			service := NewAddonService(addonClient, addonInformer)
-			_, err := service.Get(context.Background(), c.resourceID)
-			if c.expectedError {
-				if err == nil {
-					t.Errorf("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-		})
-	}
-}
-
 func TestList(t *testing.T) {
 	cases := []struct {
 		name           string
@@ -108,7 +60,7 @@ func TestList(t *testing.T) {
 			}
 
 			service := NewAddonService(addonClient, addonInformer)
-			evts, err := service.List(types.ListOptions{ClusterName: c.clusterName})
+			evts, err := service.List(context.Background(), types.ListOptions{ClusterName: c.clusterName})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -229,22 +181,23 @@ type addOnHandler struct {
 	onUpdateCalled bool
 }
 
-func (m *addOnHandler) OnCreate(ctx context.Context, t types.CloudEventsDataType, resourceID string) error {
-	if t != addonce.ManagedClusterAddOnEventDataType {
-		return fmt.Errorf("expected %v, got %v", addonce.ManagedClusterAddOnEventDataType, t)
+func (m *addOnHandler) HandleEvent(ctx context.Context, evt *cloudevents.Event) error {
+	eventType, err := types.ParseCloudEventsType(evt.Type())
+	if err != nil {
+		return err
 	}
-	m.onCreateCalled = true
-	return nil
-}
 
-func (m *addOnHandler) OnUpdate(ctx context.Context, t types.CloudEventsDataType, resourceID string) error {
-	if t != addonce.ManagedClusterAddOnEventDataType {
-		return fmt.Errorf("expected %v, got %v", addonce.ManagedClusterAddOnEventDataType, t)
+	if eventType.CloudEventsDataType != addonce.ManagedClusterAddOnEventDataType {
+		return fmt.Errorf("expected %v, got %v", addonce.ManagedClusterAddOnEventDataType, eventType.CloudEventsDataType)
 	}
-	m.onUpdateCalled = true
-	return nil
-}
 
-func (m *addOnHandler) OnDelete(ctx context.Context, t types.CloudEventsDataType, resourceID string) error {
+	// Determine action type
+	switch eventType.Action {
+	case types.CreateRequestAction:
+		m.onCreateCalled = true
+	case types.UpdateRequestAction:
+		m.onUpdateCalled = true
+	}
+
 	return nil
 }

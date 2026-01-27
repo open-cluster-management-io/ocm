@@ -20,59 +20,6 @@ import (
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
-func TestGet(t *testing.T) {
-	cases := []struct {
-		name          string
-		csrs          []runtime.Object
-		resourceID    string
-		expectedError bool
-	}{
-		{
-			name:          "csr not found",
-			csrs:          []runtime.Object{},
-			resourceID:    "test-csr",
-			expectedError: true,
-		},
-		{
-			name:       "get csr",
-			resourceID: "test-csr",
-			csrs: []runtime.Object{&certificatesv1.CertificateSigningRequest{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-csr",
-					Labels: map[string]string{
-						"open-cluster-management.io/cluster-name": "test-cluster",
-					},
-				},
-			}},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			csrClient := kubefake.NewSimpleClientset(c.csrs...)
-			csrInformers := informers.NewSharedInformerFactory(csrClient, 10*time.Minute)
-			csrInformer := csrInformers.Certificates().V1().CertificateSigningRequests()
-			for _, obj := range c.csrs {
-				if err := csrInformer.Informer().GetStore().Add(obj); err != nil {
-					t.Fatal(err)
-				}
-			}
-
-			service := NewCSRService(csrClient, csrInformer)
-			_, err := service.Get(context.Background(), c.resourceID)
-			if c.expectedError {
-				if err == nil {
-					t.Errorf("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-		})
-	}
-}
-
 func TestList(t *testing.T) {
 	cases := []struct {
 		name         string
@@ -120,7 +67,7 @@ func TestList(t *testing.T) {
 			}
 
 			service := NewCSRService(csrClient, csrInformer)
-			evts, err := service.List(types.ListOptions{ClusterName: c.clusterName})
+			evts, err := service.List(context.Background(), types.ListOptions{ClusterName: c.clusterName})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -216,7 +163,12 @@ func TestEventHandlerFuncs(t *testing.T) {
 	eventHandlerFuncs := service.EventHandlerFuncs(context.Background(), handler)
 
 	csr := &certificatesv1.CertificateSigningRequest{
-		ObjectMeta: metav1.ObjectMeta{Name: "test-csr"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-csr",
+			Labels: map[string]string{
+				"open-cluster-management.io/cluster-name": "test-cluster",
+			},
+		},
 	}
 	eventHandlerFuncs.AddFunc(csr)
 	if !handler.onCreateCalled {
@@ -234,22 +186,17 @@ type csrOnHandler struct {
 	onUpdateCalled bool
 }
 
-func (m *csrOnHandler) OnCreate(ctx context.Context, t types.CloudEventsDataType, resourceID string) error {
-	if t != csrce.CSREventDataType {
-		return fmt.Errorf("expected %v, got %v", csrce.CSREventDataType, t)
+func (m *csrOnHandler) HandleEvent(ctx context.Context, evt *cloudevents.Event) error {
+	eventType, err := types.ParseCloudEventsType(evt.Type())
+	if err != nil {
+		return err
 	}
+
+	if eventType.CloudEventsDataType != csrce.CSREventDataType {
+		return fmt.Errorf("expected %v, got %v", csrce.CSREventDataType, eventType.CloudEventsDataType)
+	}
+
 	m.onCreateCalled = true
-	return nil
-}
-
-func (m *csrOnHandler) OnUpdate(ctx context.Context, t types.CloudEventsDataType, resourceID string) error {
-	if t != csrce.CSREventDataType {
-		return fmt.Errorf("expected %v, got %v", csrce.CSREventDataType, t)
-	}
 	m.onUpdateCalled = true
-	return nil
-}
-
-func (m *csrOnHandler) OnDelete(ctx context.Context, t types.CloudEventsDataType, resourceID string) error {
 	return nil
 }

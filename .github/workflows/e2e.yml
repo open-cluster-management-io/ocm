@@ -137,3 +137,41 @@ jobs:
           IMAGE_TAG=e2e KLUSTERLET_DEPLOY_MODE=Singleton make test-e2e
         env:
           KUBECONFIG: /home/runner/.kube/config
+  e2e-grpc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: add permisson to docker.sock
+        run: sudo chown runner:docker /var/run/docker.sock
+        if: ${{ env.ACT }} # this step only runs locally when using the https://github.com/nektos/act to debug the e2e
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Setup kind
+        uses: engineerd/setup-kind@v0.6.2
+        with:
+          version: v0.22.0
+          skipClusterCreation: ${{ env.USE_EXISTING_CLUSTER }}
+      - name: Set KUBECONFIG
+        run: |
+          mkdir -p /home/runner/.kube
+          kind get kubeconfig > /home/runner/.kube/config
+        if: ${{ env.USE_EXISTING_CLUSTER }}
+      - name: install imagebuilder
+        run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
+      - name: Build images
+        run: IMAGE_TAG=e2e make images
+      - name: Load images
+        run: |
+          kind load docker-image --name=kind quay.io/open-cluster-management/registration-operator:e2e
+          kind load docker-image --name=kind quay.io/open-cluster-management/registration:e2e
+          kind load docker-image --name=kind quay.io/open-cluster-management/work:e2e
+          kind load docker-image --name=kind quay.io/open-cluster-management/placement:e2e
+          kind load docker-image --name=kind quay.io/open-cluster-management/addon-manager:e2e
+      - name: Test E2E
+        run: |
+          IMAGE_TAG=e2e REGISTRATION_DRIVER=grpc make test-e2e
+        env:
+          KUBECONFIG: /home/runner/.kube/config
