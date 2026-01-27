@@ -66,5 +66,17 @@ rules:
   resources: ["signers"]
   verbs: ["approve", "sign"]
 - apiGroups: ["rbac.authorization.k8s.io"]
-  resources: ["rolebindings"]
+  resources: ["rolebindings", "roles"]
   verbs: ["get", "list", "watch", "create", "update", "delete"]
+# Allow controller to manage serviceaccounts for token-based authentication
+- apiGroups: [""]
+  resources: ["serviceaccounts"]
+  verbs: ["get", "list", "watch", "create", "update", "delete"]
+# Allow controller to create RoleBindings that grant serviceaccounts/token permission
+- apiGroups: [""]
+  resources: ["serviceaccounts/token"]
+  verbs: ["create"]
+# Allow gRPC client to connect to the gRPC server on hub
+- apiGroups: [""]
+  resources: ["serviceaccounts/token"]
+  verbs: ["subscribe"]

@@ -9,9 +9,11 @@ rules:
   verbs: ["create", "get", "list", "update", "watch", "patch", "delete", "deletecollection"]
 - apiGroups: [""]
   resources: ["serviceaccounts/token"]
-  resourceNames:
-    - "agent-registration-bootstrap"
-  verbs: ["get", "create"]
+  verbs: ["create"]
+# Allow gRPC client to connect to the gRPC server on hub
+- apiGroups: [""]
+  resources: ["serviceaccounts/token"]
+  verbs: ["subscribe"]
 - apiGroups: [""]
   resources: ["pods"]
   verbs: ["get"]

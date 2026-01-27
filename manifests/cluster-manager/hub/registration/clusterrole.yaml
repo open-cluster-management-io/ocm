@@ -24,7 +24,7 @@ rules:
   resources: ["serviceaccounts/token"]
   resourceNames:
     - "agent-registration-bootstrap"
-  verbs: ["get", "create"]
+  verbs: ["create"]
 - apiGroups: [""]
   resources: ["pods"]
   verbs: ["get"]
