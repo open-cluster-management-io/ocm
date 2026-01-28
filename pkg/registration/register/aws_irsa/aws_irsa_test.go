@@ -4,14 +4,25 @@ import (
 	"context"
 	"os"
 	"path"
+	"strings"
 	"testing"
 	"time"
 
+	certificatesv1 "k8s.io/api/certificates/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
+	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/register"
+	"open-cluster-management.io/ocm/pkg/registration/register/csr"
+	registertesting "open-cluster-management.io/ocm/pkg/registration/register/testing"
+	"open-cluster-management.io/ocm/pkg/registration/register/token"
 )
 
 var _ AWSIRSAControl = &mockAWSIRSAControl{}
@@ -200,5 +211,268 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 				t.Errorf("expect %t, but %t", c.isValid, valid)
 			}
 		})
+	}
+}
+
+func TestAWSIRSADriver_Fork_TokenAuth(t *testing.T) {
+	// Setup addon client and informer
+	addon := &addonv1alpha1.ManagedClusterAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "addon1",
+			Namespace: "cluster1",
+		},
+	}
+	addonClient := addonfake.NewSimpleClientset(addon)
+	addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 10*time.Minute)
+	addonInformer := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns()
+
+	addonClients := &register.AddOnClients{
+		AddonClient:   addonClient,
+		AddonInformer: addonInformer,
+	}
+
+	// Setup mock AWS IRSA control
+	mockAWSIRSACtrl := &mockAWSIRSAControl{}
+
+	tests := []struct {
+		name           string
+		setupDriver    func() *AWSIRSADriver
+		addonName      string
+		secretOption   register.SecretOption
+		regOption      register.AddonAuthConfig
+		expectErr      bool
+		expectErrMsg   string
+		validateResult func(t *testing.T, driver register.RegisterDriver)
+	}{
+		{
+			name: "token auth - success",
+			setupDriver: func() *AWSIRSADriver {
+				driver := &AWSIRSADriver{
+					tokenControl:   &registertesting.MockTokenControl{},
+					addonClients:   addonClients,
+					awsIRSAControl: mockAWSIRSACtrl,
+				}
+				return driver
+			},
+			addonName: "addon1",
+			secretOption: register.SecretOption{
+				ClusterName: "cluster1",
+				Signer:      certificatesv1.KubeAPIServerClientSignerName,
+			},
+			regOption: &registertesting.TestAddonAuthConfig{
+				KubeClientAuth: "token",
+				TokenOption:    token.NewTokenOption(),
+			},
+			expectErr: false,
+			validateResult: func(t *testing.T, driver register.RegisterDriver) {
+				if _, ok := driver.(*token.TokenDriver); !ok {
+					t.Errorf("expected TokenDriver, got %T", driver)
+				}
+			},
+		},
+		{
+			name: "token auth - invalid token option",
+			setupDriver: func() *AWSIRSADriver {
+				driver := &AWSIRSADriver{
+					tokenControl:   &registertesting.MockTokenControl{},
+					addonClients:   addonClients,
+					awsIRSAControl: mockAWSIRSACtrl,
+				}
+				return driver
+			},
+			addonName: "addon1",
+			secretOption: register.SecretOption{
+				ClusterName: "cluster1",
+				Signer:      certificatesv1.KubeAPIServerClientSignerName,
+			},
+			regOption: &registertesting.TestAddonAuthConfig{
+				KubeClientAuth: "token",
+				TokenOption:    nil,
+			},
+			expectErr:    true,
+			expectErrMsg: "token authentication requested but TokenConfiguration is nil",
+		},
+		{
+			name: "token auth - tokenControl not initialized",
+			setupDriver: func() *AWSIRSADriver {
+				driver := &AWSIRSADriver{
+					tokenControl:   nil,
+					addonClients:   addonClients,
+					awsIRSAControl: mockAWSIRSACtrl,
+				}
+				return driver
+			},
+			addonName: "addon1",
+			secretOption: register.SecretOption{
+				ClusterName: "cluster1",
+				Signer:      certificatesv1.KubeAPIServerClientSignerName,
+			},
+			regOption: &registertesting.TestAddonAuthConfig{
+				KubeClientAuth: "token",
+				TokenOption:    token.NewTokenOption(),
+			},
+			expectErr:    true,
+			expectErrMsg: "tokenControl is not initialized",
+		},
+		{
+			name: "token auth - addonClients not initialized",
+			setupDriver: func() *AWSIRSADriver {
+				driver := &AWSIRSADriver{
+					tokenControl:   &registertesting.MockTokenControl{},
+					addonClients:   nil,
+					awsIRSAControl: mockAWSIRSACtrl,
+				}
+				return driver
+			},
+			addonName: "addon1",
+			secretOption: register.SecretOption{
+				ClusterName: "cluster1",
+				Signer:      certificatesv1.KubeAPIServerClientSignerName,
+			},
+			regOption: &registertesting.TestAddonAuthConfig{
+				KubeClientAuth: "token",
+				TokenOption:    token.NewTokenOption(),
+			},
+			expectErr:    true,
+			expectErrMsg: "addonClients is not initialized",
+		},
+		{
+			name: "csr auth with KubeAPIServerClientSigner - success",
+			setupDriver: func() *AWSIRSADriver {
+				driver := &AWSIRSADriver{
+					tokenControl:   &registertesting.MockTokenControl{},
+					csrControl:     newMockCSRControl(),
+					addonClients:   addonClients,
+					awsIRSAControl: mockAWSIRSACtrl,
+				}
+				return driver
+			},
+			addonName: "addon1",
+			secretOption: register.SecretOption{
+				ClusterName: "cluster1",
+				Signer:      certificatesv1.KubeAPIServerClientSignerName,
+			},
+			regOption: &registertesting.TestAddonAuthConfig{
+				KubeClientAuth: "csr",
+				CSROption:      csr.NewCSROption(),
+			},
+			expectErr: false,
+			validateResult: func(t *testing.T, driver register.RegisterDriver) {
+				if _, ok := driver.(*csr.CSRDriver); !ok {
+					t.Errorf("expected CSRDriver, got %T", driver)
+				}
+			},
+		},
+		{
+			name: "csr auth with custom signer - success",
+			setupDriver: func() *AWSIRSADriver {
+				driver := &AWSIRSADriver{
+					tokenControl:   &registertesting.MockTokenControl{},
+					csrControl:     newMockCSRControl(),
+					addonClients:   addonClients,
+					awsIRSAControl: mockAWSIRSACtrl,
+				}
+				return driver
+			},
+			addonName: "addon1",
+			secretOption: register.SecretOption{
+				ClusterName: "cluster1",
+				Signer:      "custom.signer.io/custom",
+			},
+			regOption: &registertesting.TestAddonAuthConfig{
+				KubeClientAuth: "csr",
+				CSROption:      csr.NewCSROption(),
+			},
+			expectErr: false,
+			validateResult: func(t *testing.T, driver register.RegisterDriver) {
+				if _, ok := driver.(*csr.CSRDriver); !ok {
+					t.Errorf("expected CSRDriver, got %T", driver)
+				}
+			},
+		},
+		{
+			name: "csr auth - invalid CSR option",
+			setupDriver: func() *AWSIRSADriver {
+				driver := &AWSIRSADriver{
+					tokenControl:   &registertesting.MockTokenControl{},
+					csrControl:     newMockCSRControl(),
+					addonClients:   addonClients,
+					awsIRSAControl: mockAWSIRSACtrl,
+				}
+				return driver
+			},
+			addonName: "addon1",
+			secretOption: register.SecretOption{
+				ClusterName: "cluster1",
+				Signer:      certificatesv1.KubeAPIServerClientSignerName,
+			},
+			regOption: &registertesting.TestAddonAuthConfig{
+				KubeClientAuth: "csr",
+				CSROption:      nil,
+			},
+			expectErr:    true,
+			expectErrMsg: "CSR configuration is nil",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			driver := tt.setupDriver()
+
+			forkedDriver, err := driver.Fork(tt.addonName, tt.regOption, tt.secretOption)
+
+			if tt.expectErr {
+				if err == nil {
+					t.Errorf("expected error but got nil")
+					return
+				}
+				if tt.expectErrMsg != "" && !strings.Contains(err.Error(), tt.expectErrMsg) {
+					t.Errorf("expected error message to contain %q, got %q", tt.expectErrMsg, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+
+			if tt.validateResult != nil {
+				tt.validateResult(t, forkedDriver)
+			}
+		})
+	}
+}
+
+// mockCSRControl is a simple mock for testing CSR-based registration
+type mockCSRControl struct {
+	informer cache.SharedIndexInformer
+}
+
+func (m *mockCSRControl) Create(ctx context.Context, recorder events.Recorder, objMeta metav1.ObjectMeta, csrData []byte, signerName string, expirationSeconds *int32) (string, error) {
+	return "mock-csr", nil
+}
+
+func (m *mockCSRControl) IsApproved(name string) (bool, error) {
+	return true, nil
+}
+
+func (m *mockCSRControl) GetIssuedCertificate(name string) ([]byte, error) {
+	return []byte("mock-cert"), nil
+}
+
+func (m *mockCSRControl) Informer() cache.SharedIndexInformer {
+	return m.informer
+}
+
+func newMockCSRControl() *mockCSRControl {
+	// Create a fake client and informer
+	return &mockCSRControl{
+		informer: cache.NewSharedIndexInformer(
+			nil,
+			nil,
+			0,
+			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		),
 	}
 }

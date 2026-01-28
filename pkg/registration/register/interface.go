@@ -24,6 +24,18 @@ const (
 	KubeconfigFile = "kubeconfig"
 )
 
+// CSRConfiguration provides configuration for CSR-based authentication.
+type CSRConfiguration interface {
+	// GetExpirationSeconds returns the requested duration of validity of the issued certificate in seconds
+	GetExpirationSeconds() int32
+}
+
+// TokenConfiguration provides configuration for token-based authentication.
+type TokenConfiguration interface {
+	// GetExpirationSeconds returns the requested duration of validity of the token in seconds
+	GetExpirationSeconds() int64
+}
+
 type SecretOption struct {
 	// SecretNamespace is the namespace of the secret containing client certificate.
 	SecretNamespace string
@@ -81,9 +93,30 @@ type RegisterDriver interface {
 	BuildClients(ctx context.Context, secretOption SecretOption, bootstrap bool) (*Clients, error)
 }
 
-// AddonDriver is an interface for the driver to fork a driver for addons registration
-type AddonDriver interface {
-	Fork(addonName string, secretOption SecretOption) RegisterDriver
+// AddonAuthConfig provides complete configuration for addon registration,
+// including authentication method and access to driver options.
+type AddonAuthConfig interface {
+	// GetKubeClientAuth returns the authentication method for addons with registration type KubeClient.
+	// Possible values are "csr" (default) and "token".
+	GetKubeClientAuth() string
+
+	// GetCSRConfiguration returns the CSR driver configuration interface
+	GetCSRConfiguration() CSRConfiguration
+
+	// GetTokenConfiguration returns the token driver configuration interface
+	GetTokenConfiguration() TokenConfiguration
+}
+
+// AddonDriverFactory is an interface for creating RegisterDriver instances for addon registration.
+// It acts as a factory that creates (forks) driver instances for specific addons.
+type AddonDriverFactory interface {
+	// Fork creates a RegisterDriver instance for a specific addon.
+	// Parameters:
+	//   - addonName: the name of the addon
+	//   - authConfig: authentication configuration including type and authentication method
+	//   - secretOption: configuration for the secret that will store credentials
+	// Returns the driver instance and an error if the driver cannot be created
+	Fork(addonName string, authConfig AddonAuthConfig, secretOption SecretOption) (RegisterDriver, error)
 }
 
 // HubDriver interface is used to implement operations required to complete aws-irsa registration and csr registration.

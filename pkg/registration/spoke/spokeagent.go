@@ -414,8 +414,8 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 			AddOnLeaseControllerSyncInterval, //TODO: this interval time should be allowed to change from outside
 		)
 
-		// addon registration only enabled when the registration driver is csr.
-		if addonDriver, ok := o.driver.(register.AddonDriver); ok {
+		// addon registration enabled when AddonDriverFactory is provided (supports CSR and token-based drivers)
+		if addonDriverFactory, ok := o.driver.(register.AddonDriverFactory); ok {
 			addOnRegistrationController = addon.NewAddOnRegistrationController(
 				o.agentOptions.SpokeClusterName,
 				o.agentOptions.AgentID,
@@ -423,7 +423,8 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 				hubClient.AddonClient,
 				managementKubeClient,
 				spokeKubeClient,
-				addonDriver,
+				addonDriverFactory,
+				o.registrationOption.RegisterDriverOption,
 				hubClient.AddonInformer,
 			)
 		}
@@ -475,8 +476,9 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	go managedClusterHealthCheckController.Run(ctx, 1)
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.AddonManagement) {
 		go addOnLeaseController.Run(ctx, 1)
-		// addon controller will only run when the registration driver is csr.
-		if _, ok := o.driver.(register.AddonDriver); ok {
+		// addon registration controller runs when the driver implements AddonDriverFactory
+		// (supports CSR, GRPC, and AWS IRSA drivers with both CSR and token-based authentication)
+		if _, ok := o.driver.(register.AddonDriverFactory); ok {
 			go addOnRegistrationController.Run(ctx, 1)
 		}
 	}

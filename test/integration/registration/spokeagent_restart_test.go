@@ -101,18 +101,22 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 
 		// remove the join condition. A new join condition will be added once the registration agent
 		// is restarted successfully
-		spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		var conditions []metav1.Condition
-		for _, condition := range spokeCluster.Status.Conditions {
-			if condition.Type == clusterv1.ManagedClusterConditionJoined {
-				continue
+		gomega.Eventually(func() error {
+			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
+			if err != nil {
+				return err
 			}
-			conditions = append(conditions, condition)
-		}
-		spokeCluster.Status.Conditions = conditions
-		_, err = clusterClient.ClusterV1().ManagedClusters().UpdateStatus(context.TODO(), spokeCluster, metav1.UpdateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			var conditions []metav1.Condition
+			for _, condition := range spokeCluster.Status.Conditions {
+				if condition.Type == clusterv1.ManagedClusterConditionJoined {
+					continue
+				}
+				conditions = append(conditions, condition)
+			}
+			spokeCluster.Status.Conditions = conditions
+			_, err = clusterClient.ClusterV1().ManagedClusters().UpdateStatus(context.TODO(), spokeCluster, metav1.UpdateOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		ginkgo.By("Restart registration agent")
 		agentOptions = &spoke.SpokeAgentOptions{

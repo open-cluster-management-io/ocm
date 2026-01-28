@@ -14,9 +14,18 @@ import (
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
+	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	"open-cluster-management.io/ocm/pkg/registration/register"
+	registertesting "open-cluster-management.io/ocm/pkg/registration/register/testing"
 )
+
+type testDriverFactory struct{}
+
+func (f *testDriverFactory) Fork(addonName string, authConfig register.AddonAuthConfig, secretOption register.SecretOption) (register.RegisterDriver, error) {
+	return nil, nil
+}
 
 func TestRegistrationSync(t *testing.T) {
 	clusterName := "cluster1"
@@ -327,16 +336,41 @@ func TestRegistrationSync(t *testing.T) {
 				managementKubeClient: managementClient,
 				spokeKubeClient:      kubeClient,
 				hubAddOnLister:       addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				startRegistrationFunc: func(ctx context.Context, config registrationConfig) context.CancelFunc {
+				patcher: patcher.NewPatcher[
+					*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus](
+					addonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName)),
+				addonDriverFactory: &testDriverFactory{},
+				startRegistrationFunc: func(ctx context.Context, config registrationConfig) (context.CancelFunc, error) {
 					_, cancel := context.WithCancel(context.Background())
-					return cancel
+					return cancel, nil
 				},
 				addOnRegistrationConfigs: c.addOnRegistrationConfigs,
+				addonAuthConfig: &registertesting.TestAddonAuthConfig{
+					KubeClientAuth: "csr",
+				},
 			}
 
+			// First sync: sets the driver and returns early (status updated)
 			err := controller.sync(context.Background(), testingcommon.NewFakeSyncContext(t, c.queueKey), c.queueKey)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
+			}
+
+			// Second sync: processes registrations (only if addon has registrations to process)
+			// The condition checks if there are registrations to test, not whether driver is set
+			if c.addOn != nil && len(c.addOn.Status.Registrations) > 0 {
+				// Update addon in store with driver set (simulating informer update)
+				updatedAddOn := c.addOn.DeepCopy()
+				updatedAddOn.Status.KubeClientDriver = "csr"
+				if err := addonStore.Update(updatedAddOn); err != nil {
+					t.Fatal(err)
+				}
+
+				// Sync again to process registrations
+				err = controller.sync(context.Background(), testingcommon.NewFakeSyncContext(t, c.queueKey), c.queueKey)
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
 			}
 
 			if len(c.expectedAddOnRegistrationConfigHashs) != len(controller.addOnRegistrationConfigs) {
@@ -404,6 +438,6 @@ func hash(registration addonv1alpha1.RegistrationConfig, installNamespace string
 	h, _ := getConfigHash(registration, addonInstallOption{
 		InstallationNamespace:             installNamespace,
 		AgentRunningOutsideManagedCluster: addOnAgentRunningOutsideManagedCluster,
-	})
+	}, "")
 	return h
 }

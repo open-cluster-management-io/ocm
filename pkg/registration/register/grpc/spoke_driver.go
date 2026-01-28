@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v2"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +31,7 @@ import (
 	cloudeventsevent "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
 	cloudeventslease "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/lease"
 	cloudeventsoptions "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options"
+	cloudeventsserviceaccount "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/serviceaccount"
 	cloudeventsstore "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/store"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/constants"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/builder"
@@ -38,6 +40,7 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
+	"open-cluster-management.io/ocm/pkg/registration/register/token"
 )
 
 type GRPCDriver struct {
@@ -45,10 +48,12 @@ type GRPCDriver struct {
 	control        *ceCSRControl
 	opt            *Option
 	configTemplate []byte
+	addonClients   *register.AddOnClients
+	tokenControl   token.TokenControl
 }
 
 var _ register.RegisterDriver = &GRPCDriver{}
-var _ register.AddonDriver = &GRPCDriver{}
+var _ register.AddonDriverFactory = &GRPCDriver{}
 
 func NewGRPCDriver(opt *Option, csrOption *csr.Option, secretOption register.SecretOption) (register.RegisterDriver, error) {
 	secretOption.Signer = operatorv1.GRPCAuthSigner
@@ -161,16 +166,34 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 		LeaseClient:     leaseClient,
 		EventsClient:    eventClient,
 	}
+
+	// Initialize addon clients for addon mode
+	d.addonClients = &register.AddOnClients{
+		AddonClient:   addonClient,
+		AddonInformer: addonInformer,
+	}
+
+	// Initialize gRPC token control for token-based addon authentication
+	grpcOptions, ok := config.(*grpc.GRPCOptions)
+	if !ok {
+		return nil, fmt.Errorf("invalid gRPC config type")
+	}
+	saClient := cloudeventsserviceaccount.NewServiceAccountClient(secretOption.ClusterName, grpcOptions)
+	d.tokenControl = &grpcTokenControl{
+		saClient: saClient,
+	}
+
+	// Set addonClients and tokenControl on the embedded csrDriver for forked driver instances
+	d.csrDriver.SetAddonClients(d.addonClients)
+	d.csrDriver.SetTokenControl(d.tokenControl)
+
 	return clients, nil
 }
 
-func (d *GRPCDriver) Fork(addonName string, secretOption register.SecretOption) register.RegisterDriver {
-	csrDriver := d.csrDriver.Fork(addonName, secretOption)
-	return &GRPCDriver{
-		control:   d.control,
-		opt:       d.opt,
-		csrDriver: csrDriver.(*csr.CSRDriver),
-	}
+func (d *GRPCDriver) Fork(addonName string, authConfig register.AddonAuthConfig, secretOption register.SecretOption) (register.RegisterDriver, error) {
+	// Delegate to csrDriver.Fork which handles both token and CSR authentication
+	// Return the driver directly (either TokenDriver or CSRDriver) without wrapping
+	return d.csrDriver.Fork(addonName, authConfig, secretOption)
 }
 
 func (d *GRPCDriver) Process(
@@ -281,6 +304,32 @@ type ceCSRControl struct {
 }
 
 var _ csr.CSRControl = &ceCSRControl{}
+
+type grpcTokenControl struct {
+	saClient *cloudeventsserviceaccount.ServiceAccountClient
+}
+
+var _ token.TokenControl = &grpcTokenControl{}
+
+// CreateToken creates a ServiceAccount token using cloud events
+func (g *grpcTokenControl) CreateToken(ctx context.Context, serviceAccountName, namespace string, expirationSeconds int64) (string, error) {
+	if g.saClient == nil {
+		return "", fmt.Errorf("ServiceAccount client is not initialized")
+	}
+
+	tokenRequest := &authenticationv1.TokenRequest{
+		Spec: authenticationv1.TokenRequestSpec{
+			ExpirationSeconds: &expirationSeconds,
+		},
+	}
+
+	result, err := g.saClient.CreateToken(ctx, serviceAccountName, tokenRequest, metav1.CreateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to create token for ServiceAccount %s/%s: %w", namespace, serviceAccountName, err)
+	}
+
+	return result.Status.Token, nil
+}
 
 func (c *ceCSRControl) IsApproved(name string) (bool, error) {
 	csr, err := c.csrClientHolder.Clients().Get(context.Background(), name, metav1.GetOptions{})
