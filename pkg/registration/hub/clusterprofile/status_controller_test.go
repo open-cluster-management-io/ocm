@@ -580,13 +580,14 @@ func TestStatusControllerQueueKeyMapping(t *testing.T) {
 		},
 	}
 
-	profile2 := &cpv1alpha1.ClusterProfile{
+	// Profile without cluster-name label to test fallback
+	profileNoLabel := &cpv1alpha1.ClusterProfile{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "profile2",
+			Name:      "profile-no-label",
 			Namespace: "ns1",
 			Labels: map[string]string{
 				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
-				v1.ClusterNameLabelKey:            "profile2",
+				// v1.ClusterNameLabelKey is intentionally missing to test fallback
 			},
 		},
 	}
@@ -607,11 +608,11 @@ func TestStatusControllerQueueKeyMapping(t *testing.T) {
 		}
 	})
 
-	t.Run("profileToQueueKey without cluster-name label", func(t *testing.T) {
+	t.Run("profileToQueueKey without cluster-name label (fallback to name)", func(t *testing.T) {
 		ctrl := &clusterProfileStatusController{}
-		keys := ctrl.profileToQueueKey(profile2)
-		if len(keys) != 1 || keys[0] != "profile2" {
-			t.Errorf("expected [profile2] (fallback to name), got %v", keys)
+		keys := ctrl.profileToQueueKey(profileNoLabel)
+		if len(keys) != 1 || keys[0] != "profile-no-label" {
+			t.Errorf("expected [profile-no-label] (fallback to name), got %v", keys)
 		}
 	})
 }
