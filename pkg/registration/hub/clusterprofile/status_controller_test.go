@@ -346,6 +346,9 @@ func TestStatusControllerSync(t *testing.T) {
 			// We expect 2 patches per profile (labels + status)
 			// But if nothing changed, there might be fewer patches
 			// Just verify we got some activity
+			if c.expectedUpdates == 0 && patchCount != 0 {
+				t.Errorf("expected no patches but got %d", patchCount)
+			}
 			if c.expectedUpdates > 0 && patchCount == 0 {
 				t.Errorf("expected patches but got none")
 			}

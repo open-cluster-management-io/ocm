@@ -208,11 +208,8 @@ func (c *clusterProfileStatusController) updateClusterProfile(
 
 	// Patch labels (patcher handles change detection)
 	_, err = profilePatcher.PatchLabelAnnotations(ctx, newProfile, newProfile.ObjectMeta, existing.ObjectMeta)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func syncLabelsFromCluster(profile *cpv1alpha1.ClusterProfile, cluster *v1.ManagedCluster) {

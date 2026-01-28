@@ -27,11 +27,12 @@ import (
 	v1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	clustersdkv1beta2 "open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta2"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
+
+	"open-cluster-management.io/ocm/pkg/registration/hub/managedclustersetbinding"
 )
 
 const (
 	ClusterProfileManagerName = "open-cluster-management"
-	byClusterSet              = "by-clusterset"
 )
 
 // clusterProfileLifecycleController manages ClusterProfile creation and deletion
@@ -52,15 +53,6 @@ type clusterProfileLifecycleController struct {
 	clusterProfileLister     cplisterv1alpha1.ClusterProfileLister
 }
 
-// indexByClusterSet is the indexer function for ManagedClusterSetBinding by ClusterSet name
-func indexByClusterSet(obj interface{}) ([]string, error) {
-	binding, ok := obj.(*v1beta2.ManagedClusterSetBinding)
-	if !ok {
-		return []string{}, fmt.Errorf("obj is supposed to be a ManagedClusterSetBinding, but is %T", obj)
-	}
-	return []string{binding.Spec.ClusterSet}, nil
-}
-
 // NewClusterProfileLifecycleController creates a controller that manages ClusterProfile lifecycle
 func NewClusterProfileLifecycleController(
 	clusterInformer informerv1.ManagedClusterInformer,
@@ -69,13 +61,8 @@ func NewClusterProfileLifecycleController(
 	clusterProfileClient cpclientset.Interface,
 	clusterProfileInformer cpinformerv1alpha1.ClusterProfileInformer) factory.Controller {
 
-	// Add indexer for efficient lookup of bindings by clusterset
-	err := clusterSetBindingInformer.Informer().AddIndexers(cache.Indexers{
-		byClusterSet: indexByClusterSet,
-	})
-	if err != nil {
-		utilruntime.HandleError(err)
-	}
+	// Note: ByClusterSetIndex indexer is already added by managedclustersetbinding controller,
+	// so we don't need to add it again here. Informers are shared across controllers.
 
 	c := &clusterProfileLifecycleController{
 		clusterLister:            clusterInformer.Lister(),
@@ -190,7 +177,7 @@ func (c *clusterProfileLifecycleController) registerProfileEventHandler(
 
 // getBindingsByClusterSet efficiently retrieves all bindings for a given clusterset using the indexer
 func (c *clusterProfileLifecycleController) getBindingsByClusterSet(clusterSetName string) ([]*v1beta2.ManagedClusterSetBinding, error) {
-	objs, err := c.clusterSetBindingIndexer.ByIndex(byClusterSet, clusterSetName)
+	objs, err := c.clusterSetBindingIndexer.ByIndex(managedclustersetbinding.ByClusterSetIndex, clusterSetName)
 	if err != nil {
 		return nil, err
 	}

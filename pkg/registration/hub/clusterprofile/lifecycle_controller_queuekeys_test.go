@@ -13,7 +13,19 @@ import (
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	v1 "open-cluster-management.io/api/cluster/v1"
 	v1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+
+	"open-cluster-management.io/ocm/pkg/registration/hub/managedclustersetbinding"
 )
+
+// indexByClusterSet is a test helper for indexing ManagedClusterSetBindings by ClusterSet name.
+// In production, this indexer is registered by the managedclustersetbinding controller.
+func indexByClusterSet(obj interface{}) ([]string, error) {
+	binding, ok := obj.(*v1beta2.ManagedClusterSetBinding)
+	if !ok {
+		return []string{}, fmt.Errorf("obj is supposed to be a ManagedClusterSetBinding, but is %T", obj)
+	}
+	return []string{binding.Spec.ClusterSet}, nil
+}
 
 func TestClusterToQueueKeys(t *testing.T) {
 	cases := []struct {
@@ -681,7 +693,7 @@ func TestClusterToQueueKeys(t *testing.T) {
 			// Add indexer for bindings
 			bindingInformer := clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings()
 			err := bindingInformer.Informer().AddIndexers(cache.Indexers{
-				byClusterSet: indexByClusterSet,
+				managedclustersetbinding.ByClusterSetIndex: indexByClusterSet,
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -944,7 +956,7 @@ func TestClusterSetToQueueKeys(t *testing.T) {
 			// Add indexer for bindings
 			bindingInformer := clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings()
 			err := bindingInformer.Informer().AddIndexers(cache.Indexers{
-				byClusterSet: indexByClusterSet,
+				managedclustersetbinding.ByClusterSetIndex: indexByClusterSet,
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -1144,7 +1156,7 @@ func BenchmarkClusterToQueueKeys(b *testing.B) {
 	// Add indexer for bindings
 	bindingInformer := clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings()
 	err := bindingInformer.Informer().AddIndexers(cache.Indexers{
-		byClusterSet: indexByClusterSet,
+		managedclustersetbinding.ByClusterSetIndex: indexByClusterSet,
 	})
 	if err != nil {
 		b.Fatal(err)

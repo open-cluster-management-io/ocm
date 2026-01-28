@@ -23,8 +23,11 @@ import (
 )
 
 const (
-	byClusterSet = "by-clusterset"
+	// ByClusterSetIndex is the indexer name for ManagedClusterSetBinding by ClusterSet
+	ByClusterSetIndex = "by-clusterset"
 )
+
+const byClusterSet = ByClusterSetIndex // Use exported constant internally
 
 // managedClusterSetController reconciles instances of ManagedClusterSet on the hub.
 type managedClusterSetBindingController struct {
