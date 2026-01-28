@@ -764,8 +764,8 @@ func TestLifecycleControllerSync(t *testing.T) {
 						if profile.Labels[cpv1alpha1.LabelClusterManagerKey] != ClusterProfileManagerName {
 							t.Errorf("expected label %s, got %s", ClusterProfileManagerName, profile.Labels[cpv1alpha1.LabelClusterManagerKey])
 						}
-						if profile.Labels[ClusterProfileForManagedClusterLabelKey] != expectedName {
-							t.Errorf("expected cluster-name label %s, got %s", expectedName, profile.Labels[ClusterProfileForManagedClusterLabelKey])
+						if profile.Labels[v1.ClusterNameLabelKey] != expectedName {
+							t.Errorf("expected cluster-name label %s, got %s", expectedName, profile.Labels[v1.ClusterNameLabelKey])
 						}
 						break
 					}

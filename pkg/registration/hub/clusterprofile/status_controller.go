@@ -3,15 +3,15 @@ package clusterprofile
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	cpv1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
 	cpclientset "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned"
@@ -24,14 +24,37 @@ import (
 	v1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
+
+	"open-cluster-management.io/ocm/pkg/common/queue"
+)
+
+const (
+	byClusterName = "by-cluster-name"
 )
 
 // clusterProfileStatusController updates ClusterProfile status and labels from ManagedCluster
 // Queue key: cluster name (e.g., "cluster1")
 type clusterProfileStatusController struct {
-	clusterLister        listerv1.ManagedClusterLister
-	clusterProfileClient cpclientset.Interface
-	clusterProfileLister cplisterv1alpha1.ClusterProfileLister
+	clusterLister         listerv1.ManagedClusterLister
+	clusterProfileClient  cpclientset.Interface
+	clusterProfileLister  cplisterv1alpha1.ClusterProfileLister
+	clusterProfileIndexer cache.Indexer
+}
+
+// indexByClusterName is the indexer function for ClusterProfile by cluster name
+func indexByClusterName(obj interface{}) ([]string, error) {
+	profile, ok := obj.(*cpv1alpha1.ClusterProfile)
+	if !ok {
+		return []string{}, fmt.Errorf("obj is supposed to be a ClusterProfile, but is %T", obj)
+	}
+
+	// Index by the cluster-name label
+	if clusterName, ok := profile.Labels[v1.ClusterNameLabelKey]; ok {
+		return []string{clusterName}, nil
+	}
+
+	// Fallback: use profile name as cluster name (lifecycle controller sets Name = cluster name)
+	return []string{profile.Name}, nil
 }
 
 func NewClusterProfileStatusController(
@@ -39,15 +62,30 @@ func NewClusterProfileStatusController(
 	clusterProfileClient cpclientset.Interface,
 	clusterProfileInformer cpinformerv1alpha1.ClusterProfileInformer) factory.Controller {
 
+	// Add indexer for efficient lookup of profiles by cluster name
+	err := clusterProfileInformer.Informer().AddIndexers(cache.Indexers{
+		byClusterName: indexByClusterName,
+	})
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
+
 	c := &clusterProfileStatusController{
-		clusterLister:        clusterInformer.Lister(),
-		clusterProfileClient: clusterProfileClient,
-		clusterProfileLister: clusterProfileInformer.Lister(),
+		clusterLister:         clusterInformer.Lister(),
+		clusterProfileClient:  clusterProfileClient,
+		clusterProfileLister:  clusterProfileInformer.Lister(),
+		clusterProfileIndexer: clusterProfileInformer.Informer().GetIndexer(),
 	}
 
 	return factory.New().
 		WithInformersQueueKeysFunc(c.clusterToQueueKey, clusterInformer.Informer()).
-		WithInformersQueueKeysFunc(c.profileToQueueKey, clusterProfileInformer.Informer()).
+		WithFilteredEventsInformersQueueKeysFunc(
+			c.profileToQueueKey,
+			queue.UnionFilter(
+				queue.FileterByLabel(v1.ClusterNameLabelKey),
+				queue.FileterByLabelKeyValue(cpv1alpha1.LabelClusterManagerKey, ClusterProfileManagerName),
+			),
+			clusterProfileInformer.Informer()).
 		WithSync(c.sync).
 		ToController("ClusterProfileStatusController")
 }
@@ -66,8 +104,8 @@ func (c *clusterProfileStatusController) profileToQueueKey(obj runtime.Object) [
 		return nil
 	}
 
-	// Use cluster-name label if available
-	if clusterName, ok := profile.Labels[ClusterProfileForManagedClusterLabelKey]; ok {
+	// Use cluster-name label (filtering already done by WithFilteredEventsInformersQueueKeysFunc)
+	if clusterName, ok := profile.Labels[v1.ClusterNameLabelKey]; ok {
 		return []string{clusterName}
 	}
 
@@ -90,7 +128,8 @@ func (c *clusterProfileStatusController) sync(ctx context.Context, syncCtx facto
 		return err
 	}
 
-	allProfiles, err := c.findAllProfilesForCluster(clusterName)
+	// Use indexer for efficient lookup instead of listing all profiles across all namespaces
+	allProfiles, err := c.getProfilesByClusterName(clusterName)
 	if err != nil {
 		return err
 	}
@@ -98,6 +137,7 @@ func (c *clusterProfileStatusController) sync(ctx context.Context, syncCtx facto
 	logger.V(4).Info("Found profiles to update", "count", len(allProfiles))
 
 	updatedCount := 0
+	var errs []error
 	for _, profile := range allProfiles {
 		if profile.Spec.ClusterManager.Name != ClusterProfileManagerName {
 			continue
@@ -105,10 +145,9 @@ func (c *clusterProfileStatusController) sync(ctx context.Context, syncCtx facto
 
 		err := c.updateClusterProfile(ctx, profile, cluster)
 		if err != nil {
-			// Continue with others - don't fail entire sync
 			logger.Error(err, "Failed to update profile",
 				"namespace", profile.Namespace, "name", profile.Name)
-			utilruntime.HandleError(fmt.Errorf("failed to update ClusterProfile %s/%s: %w", profile.Namespace, profile.Name, err))
+			errs = append(errs, fmt.Errorf("failed to update ClusterProfile %s/%s: %w", profile.Namespace, profile.Name, err))
 			continue
 		}
 		updatedCount++
@@ -120,28 +159,32 @@ func (c *clusterProfileStatusController) sync(ctx context.Context, syncCtx facto
 			"updated %d cluster profiles for cluster %s", updatedCount, clusterName)
 	}
 
-	return nil
+	return utilerrors.NewAggregate(errs)
 }
 
-func (c *clusterProfileStatusController) findAllProfilesForCluster(clusterName string) ([]*cpv1alpha1.ClusterProfile, error) {
-	// TODO: optimize the operation to list  profiles across all namespaces.
-	selector := labels.SelectorFromSet(labels.Set{ClusterProfileForManagedClusterLabelKey: clusterName})
-	allProfiles, err := c.clusterProfileLister.List(selector)
+// getProfilesByClusterName efficiently retrieves all profiles for a given cluster using the indexer
+func (c *clusterProfileStatusController) getProfilesByClusterName(clusterName string) ([]*cpv1alpha1.ClusterProfile, error) {
+	objs, err := c.clusterProfileIndexer.ByIndex(byClusterName, clusterName)
 	if err != nil {
 		return nil, err
 	}
 
-	return allProfiles, nil
+	profiles := make([]*cpv1alpha1.ClusterProfile, 0, len(objs))
+	for _, obj := range objs {
+		profile, ok := obj.(*cpv1alpha1.ClusterProfile)
+		if !ok {
+			continue
+		}
+		profiles = append(profiles, profile)
+	}
+
+	return profiles, nil
 }
 
 func (c *clusterProfileStatusController) updateClusterProfile(
 	ctx context.Context,
 	existing *cpv1alpha1.ClusterProfile,
 	cluster *v1.ManagedCluster) error {
-
-	logger := klog.FromContext(ctx).WithValues(
-		"namespace", existing.Namespace,
-		"profile", existing.Name)
 
 	// Create a patcher for this specific namespace
 	profilePatcher := patcher.NewPatcher[
@@ -150,31 +193,23 @@ func (c *clusterProfileStatusController) updateClusterProfile(
 
 	newProfile := existing.DeepCopy()
 
-	// Sync labels
-	syncLabelsFromCluster(newProfile, cluster)
-
-	// Patch labels if modified
-	labelsModified := !reflect.DeepEqual(existing.Labels, newProfile.Labels)
-
-	if labelsModified {
-		_, err := profilePatcher.PatchLabelAnnotations(ctx, newProfile, newProfile.ObjectMeta, existing.ObjectMeta)
-		if err != nil {
-			return err
-		}
-		logger.V(4).Info("Updated profile labels")
-	}
-
 	// Sync status
 	syncStatusFromCluster(newProfile, cluster)
 
-	// Patch status
-	statusModified := !reflect.DeepEqual(existing.Status, newProfile.Status)
-	if statusModified {
-		_, err := profilePatcher.PatchStatus(ctx, newProfile, newProfile.Status, existing.Status)
-		if err != nil {
-			return err
-		}
-		logger.V(4).Info("Updated profile status")
+	// Patch status first to avoid ResourceVersion conflict
+	// If status has been updated, return early - labels will be updated in next reconcile
+	updated, err := profilePatcher.PatchStatus(ctx, newProfile, newProfile.Status, existing.Status)
+	if updated {
+		return err
+	}
+
+	// Status wasn't updated, now safe to patch labels
+	syncLabelsFromCluster(newProfile, cluster)
+
+	// Patch labels (patcher handles change detection)
+	_, err = profilePatcher.PatchLabelAnnotations(ctx, newProfile, newProfile.ObjectMeta, existing.ObjectMeta)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -188,7 +223,7 @@ func syncLabelsFromCluster(profile *cpv1alpha1.ClusterProfile, cluster *v1.Manag
 		cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
 		cpv1alpha1.LabelClusterSetKey:     mclSetLabel,
 		// Keep the cluster-name label that lifecycle controller added
-		ClusterProfileForManagedClusterLabelKey: cluster.Name,
+		v1.ClusterNameLabelKey: cluster.Name,
 	}
 
 	modified := false

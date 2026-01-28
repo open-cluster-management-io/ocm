@@ -6,6 +6,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/cache"
 	cpv1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -677,13 +678,23 @@ func TestClusterToQueueKeys(t *testing.T) {
 			for _, set := range c.clusterSets {
 				clusterInformers.Cluster().V1beta2().ManagedClusterSets().Informer().GetStore().Add(set)
 			}
+			// Add indexer for bindings
+			bindingInformer := clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings()
+			err := bindingInformer.Informer().AddIndexers(cache.Indexers{
+				byClusterSet: indexByClusterSet,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			for _, binding := range c.bindings {
-				clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings().Informer().GetStore().Add(binding)
+				bindingInformer.Informer().GetStore().Add(binding)
 			}
 
 			ctrl := &clusterProfileLifecycleController{
-				clusterSetLister:        clusterInformers.Cluster().V1beta2().ManagedClusterSets().Lister(),
-				clusterSetBindingLister: clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
+				clusterSetLister:         clusterInformers.Cluster().V1beta2().ManagedClusterSets().Lister(),
+				clusterSetBindingLister:  bindingInformer.Lister(),
+				clusterSetBindingIndexer: bindingInformer.Informer().GetIndexer(),
 			}
 
 			keys := ctrl.clusterToQueueKeys(c.cluster)
@@ -930,12 +941,22 @@ func TestClusterSetToQueueKeys(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.bindings...)
 			clusterInformers := clusterinformers.NewSharedInformerFactory(clusterClient, 0)
 
+			// Add indexer for bindings
+			bindingInformer := clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings()
+			err := bindingInformer.Informer().AddIndexers(cache.Indexers{
+				byClusterSet: indexByClusterSet,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			for _, binding := range c.bindings {
-				clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings().Informer().GetStore().Add(binding)
+				bindingInformer.Informer().GetStore().Add(binding)
 			}
 
 			ctrl := &clusterProfileLifecycleController{
-				clusterSetBindingLister: clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
+				clusterSetBindingLister:  bindingInformer.Lister(),
+				clusterSetBindingIndexer: bindingInformer.Informer().GetIndexer(),
 			}
 
 			keys := ctrl.clusterSetToQueueKeys(c.clusterSet)
@@ -1119,13 +1140,24 @@ func BenchmarkClusterToQueueKeys(b *testing.B) {
 	for _, set := range clusterSets {
 		clusterInformers.Cluster().V1beta2().ManagedClusterSets().Informer().GetStore().Add(set)
 	}
+
+	// Add indexer for bindings
+	bindingInformer := clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings()
+	err := bindingInformer.Informer().AddIndexers(cache.Indexers{
+		byClusterSet: indexByClusterSet,
+	})
+	if err != nil {
+		b.Fatal(err)
+	}
+
 	for _, binding := range bindings {
-		clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings().Informer().GetStore().Add(binding)
+		bindingInformer.Informer().GetStore().Add(binding)
 	}
 
 	ctrl := &clusterProfileLifecycleController{
-		clusterSetLister:        clusterInformers.Cluster().V1beta2().ManagedClusterSets().Lister(),
-		clusterSetBindingLister: clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
+		clusterSetLister:         clusterInformers.Cluster().V1beta2().ManagedClusterSets().Lister(),
+		clusterSetBindingLister:  bindingInformer.Lister(),
+		clusterSetBindingIndexer: bindingInformer.Informer().GetIndexer(),
 	}
 
 	cluster := &v1.ManagedCluster{

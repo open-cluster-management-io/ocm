@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/cache"
 	cpv1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
 	cpfake "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned/fake"
 	cpinformers "sigs.k8s.io/cluster-inventory-api/client/informers/externalversions"
@@ -55,8 +56,8 @@ func TestStatusControllerSync(t *testing.T) {
 			Name:      "cluster1",
 			Namespace: "ns1",
 			Labels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey:       ClusterProfileManagerName,
-				ClusterProfileForManagedClusterLabelKey: "cluster1",
+				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				v1.ClusterNameLabelKey:            "cluster1",
 			},
 		},
 		Spec: cpv1alpha1.ClusterProfileSpec{
@@ -72,8 +73,8 @@ func TestStatusControllerSync(t *testing.T) {
 			Name:      "cluster1",
 			Namespace: "ns2",
 			Labels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey:       ClusterProfileManagerName,
-				ClusterProfileForManagedClusterLabelKey: "cluster1",
+				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				v1.ClusterNameLabelKey:            "cluster1",
 			},
 		},
 		Spec: cpv1alpha1.ClusterProfileSpec{
@@ -89,7 +90,7 @@ func TestStatusControllerSync(t *testing.T) {
 			Name:      "cluster1",
 			Namespace: "ns3",
 			Labels: map[string]string{
-				ClusterProfileForManagedClusterLabelKey: "cluster1",
+				v1.ClusterNameLabelKey: "cluster1",
 			},
 		},
 		Spec: cpv1alpha1.ClusterProfileSpec{
@@ -131,8 +132,8 @@ func TestStatusControllerSync(t *testing.T) {
 			Name:      "cluster-label-selector",
 			Namespace: "prod-ns1",
 			Labels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey:       ClusterProfileManagerName,
-				ClusterProfileForManagedClusterLabelKey: "cluster-label-selector",
+				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				v1.ClusterNameLabelKey:            "cluster-label-selector",
 			},
 		},
 		Spec: cpv1alpha1.ClusterProfileSpec{
@@ -148,8 +149,8 @@ func TestStatusControllerSync(t *testing.T) {
 			Name:      "cluster-label-selector",
 			Namespace: "region-ns1",
 			Labels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey:       ClusterProfileManagerName,
-				ClusterProfileForManagedClusterLabelKey: "cluster-label-selector",
+				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				v1.ClusterNameLabelKey:            "cluster-label-selector",
 			},
 		},
 		Spec: cpv1alpha1.ClusterProfileSpec{
@@ -188,8 +189,8 @@ func TestStatusControllerSync(t *testing.T) {
 			Name:      "cluster-mixed",
 			Namespace: "exclusive-ns",
 			Labels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey:       ClusterProfileManagerName,
-				ClusterProfileForManagedClusterLabelKey: "cluster-mixed",
+				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				v1.ClusterNameLabelKey:            "cluster-mixed",
 			},
 		},
 		Spec: cpv1alpha1.ClusterProfileSpec{
@@ -205,8 +206,8 @@ func TestStatusControllerSync(t *testing.T) {
 			Name:      "cluster-mixed",
 			Namespace: "labelselector-ns",
 			Labels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey:       ClusterProfileManagerName,
-				ClusterProfileForManagedClusterLabelKey: "cluster-mixed",
+				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				v1.ClusterNameLabelKey:            "cluster-mixed",
 			},
 		},
 		Spec: cpv1alpha1.ClusterProfileSpec{
@@ -303,18 +304,29 @@ func TestStatusControllerSync(t *testing.T) {
 			for _, cluster := range c.clusters {
 				clusterInformers.Cluster().V1().ManagedClusters().Informer().GetStore().Add(cluster)
 			}
+
+			// Add indexer for profiles
+			cpInformer := cpInformers.Apis().V1alpha1().ClusterProfiles()
+			err := cpInformer.Informer().AddIndexers(cache.Indexers{
+				byClusterName: indexByClusterName,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			for _, profile := range c.existingProfiles {
-				cpInformers.Apis().V1alpha1().ClusterProfiles().Informer().GetStore().Add(profile)
+				cpInformer.Informer().GetStore().Add(profile)
 			}
 
 			ctrl := &clusterProfileStatusController{
-				clusterLister:        clusterInformers.Cluster().V1().ManagedClusters().Lister(),
-				clusterProfileClient: cpClient,
-				clusterProfileLister: cpInformers.Apis().V1alpha1().ClusterProfiles().Lister(),
+				clusterLister:         clusterInformers.Cluster().V1().ManagedClusters().Lister(),
+				clusterProfileClient:  cpClient,
+				clusterProfileLister:  cpInformer.Lister(),
+				clusterProfileIndexer: cpInformer.Informer().GetIndexer(),
 			}
 
 			syncCtx := testingcommon.NewFakeSyncContext(t, c.key)
-			err := ctrl.sync(context.TODO(), syncCtx, c.key)
+			err = ctrl.sync(context.TODO(), syncCtx, c.key)
 
 			if c.expectError && err == nil {
 				t.Errorf("expected error but got none")
@@ -364,9 +376,9 @@ func TestStatusSyncLabelsFromCluster(t *testing.T) {
 				},
 			},
 			expectedLabels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey:       ClusterProfileManagerName,
-				cpv1alpha1.LabelClusterSetKey:           "set1",
-				ClusterProfileForManagedClusterLabelKey: "cluster1",
+				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha1.LabelClusterSetKey:     "set1",
+				v1.ClusterNameLabelKey:            "cluster1",
 			},
 		},
 		{
@@ -388,9 +400,9 @@ func TestStatusSyncLabelsFromCluster(t *testing.T) {
 				},
 			},
 			expectedLabels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey:       ClusterProfileManagerName,
-				cpv1alpha1.LabelClusterSetKey:           "", // Empty when no ClusterSetLabel
-				ClusterProfileForManagedClusterLabelKey: "cluster-no-set",
+				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha1.LabelClusterSetKey:     "", // Empty when no ClusterSetLabel
+				v1.ClusterNameLabelKey:            "cluster-no-set",
 			},
 		},
 		{
@@ -413,9 +425,9 @@ func TestStatusSyncLabelsFromCluster(t *testing.T) {
 				},
 			},
 			expectedLabels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey:       ClusterProfileManagerName,
-				cpv1alpha1.LabelClusterSetKey:           "set1",
-				ClusterProfileForManagedClusterLabelKey: "cluster-mixed",
+				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha1.LabelClusterSetKey:     "set1",
+				v1.ClusterNameLabelKey:            "cluster-mixed",
 			},
 		},
 		{
@@ -434,9 +446,9 @@ func TestStatusSyncLabelsFromCluster(t *testing.T) {
 				},
 			},
 			expectedLabels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey:       ClusterProfileManagerName,
-				cpv1alpha1.LabelClusterSetKey:           "", // Empty when no ClusterSetLabel
-				ClusterProfileForManagedClusterLabelKey: "cluster-empty",
+				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha1.LabelClusterSetKey:     "", // Empty when no ClusterSetLabel
+				v1.ClusterNameLabelKey:            "cluster-empty",
 			},
 		},
 		{
@@ -458,10 +470,10 @@ func TestStatusSyncLabelsFromCluster(t *testing.T) {
 				},
 			},
 			expectedLabels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey:       ClusterProfileManagerName,
-				cpv1alpha1.LabelClusterSetKey:           "new-set",
-				ClusterProfileForManagedClusterLabelKey: "cluster-update",
-				"custom-label":                          "keep-me", // Custom labels preserved
+				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha1.LabelClusterSetKey:     "new-set",
+				v1.ClusterNameLabelKey:            "cluster-update",
+				"custom-label":                    "keep-me", // Custom labels preserved
 			},
 		},
 	}
@@ -562,7 +574,8 @@ func TestStatusControllerQueueKeyMapping(t *testing.T) {
 			Name:      "cluster1",
 			Namespace: "ns1",
 			Labels: map[string]string{
-				ClusterProfileForManagedClusterLabelKey: "cluster1",
+				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				v1.ClusterNameLabelKey:            "cluster1",
 			},
 		},
 	}
@@ -571,6 +584,10 @@ func TestStatusControllerQueueKeyMapping(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "profile2",
 			Namespace: "ns1",
+			Labels: map[string]string{
+				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				v1.ClusterNameLabelKey:            "profile2",
+			},
 		},
 	}
 
