@@ -323,9 +323,18 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		)
 	}
 
-	var clusterProfileController factory.Controller
+	var clusterProfileLifecycleController factory.Controller
+	var clusterProfileStatusController factory.Controller
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.ClusterProfile) {
-		clusterProfileController = clusterprofile.NewClusterProfileController(
+		clusterProfileLifecycleController = clusterprofile.NewClusterProfileLifecycleController(
+			clusterInformers.Cluster().V1().ManagedClusters(),
+			clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
+			clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings(),
+			clusterProfileClient,
+			clusterProfileInformers.Apis().V1alpha1().ClusterProfiles(),
+		)
+
+		clusterProfileStatusController = clusterprofile.NewClusterProfileStatusController(
 			clusterInformers.Cluster().V1().ManagedClusters(),
 			clusterProfileClient,
 			clusterProfileInformers.Apis().V1alpha1().ClusterProfiles(),
@@ -384,7 +393,8 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		go globalManagedClusterSetController.Run(ctx, 1)
 	}
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.ClusterProfile) {
-		go clusterProfileController.Run(ctx, 1)
+		go clusterProfileLifecycleController.Run(ctx, 1)
+		go clusterProfileStatusController.Run(ctx, 1)
 	}
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.ClusterImporter) {
 		for _, provider := range providers {
