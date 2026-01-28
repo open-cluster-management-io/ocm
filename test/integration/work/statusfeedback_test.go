@@ -1130,5 +1130,126 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 		})
+
+		ginkgo.It("should watch cluster-scope resources like namespaces", func() {
+			// Create a namespace manifest
+			testNsName := fmt.Sprintf("test-ns-%s", rand.String(5))
+			namespaceManifest := util.ToManifest(&corev1.Namespace{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Namespace",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: testNsName,
+					Labels: map[string]string{
+						"test": "watch-feedback",
+					},
+				},
+			})
+
+			// Create ManifestWork with watch-based feedback for cluster-scope resource
+			work.Spec.Workload.Manifests = []workapiv1.Manifest{namespaceManifest}
+			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:    "",
+						Resource: "namespaces",
+						Name:     testNsName,
+						// Note: No Namespace field for cluster-scoped resources
+					},
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.JSONPathsType,
+							JsonPaths: []workapiv1.JsonPath{
+								{
+									Name: "phase",
+									Path: ".status.phase",
+								},
+								{
+									Name: "name",
+									Path: ".metadata.name",
+								},
+							},
+						},
+					},
+					FeedbackScrapeType: workapiv1.FeedbackWatchType,
+				},
+			}
+
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Wait for work to be applied
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient,
+				workapiv1.WorkApplied, metav1.ConditionTrue, []metav1.ConditionStatus{metav1.ConditionTrue},
+				eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient,
+				workapiv1.WorkAvailable, metav1.ConditionTrue, []metav1.ConditionStatus{metav1.ConditionTrue},
+				eventuallyTimeout, eventuallyInterval)
+
+			// Update namespace status - Kubernetes sets phase to Active automatically,
+			// but we'll verify it's being watched
+			gomega.Eventually(func() error {
+				ns, err := spokeKubeClient.CoreV1().Namespaces().Get(context.Background(), testNsName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				// Kubernetes automatically sets the phase to Active for new namespaces
+				// We just need to ensure it has a phase set
+				if ns.Status.Phase == "" {
+					ns.Status.Phase = corev1.NamespaceActive
+					_, err = spokeKubeClient.CoreV1().Namespaces().UpdateStatus(context.Background(), ns, metav1.UpdateOptions{})
+					return err
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			// Verify feedback values are updated via watch
+			gomega.Eventually(func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).
+					Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if len(work.Status.ResourceStatus.Manifests) != 1 {
+					return fmt.Errorf("expected 1 manifest status, got %d",
+						len(work.Status.ResourceStatus.Manifests))
+				}
+
+				values := work.Status.ResourceStatus.Manifests[0].StatusFeedbacks.Values
+				if len(values) != 2 {
+					return fmt.Errorf("expected 2 feedback values, got %d", len(values))
+				}
+
+				var foundPhase, foundName bool
+				for _, v := range values {
+					if v.Name == "phase" {
+						if v.Value.String == nil || *v.Value.String != string(corev1.NamespaceActive) {
+							return fmt.Errorf("expected phase to be Active, got %v", v.Value.String)
+						}
+						foundPhase = true
+					}
+					if v.Name == "name" {
+						if v.Value.String == nil || *v.Value.String != testNsName {
+							return fmt.Errorf("expected name to be %s, got %v", testNsName, v.Value.String)
+						}
+						foundName = true
+					}
+				}
+
+				if !foundPhase || !foundName {
+					return fmt.Errorf("missing expected feedback values: phase=%v, name=%v", foundPhase, foundName)
+				}
+
+				if !util.HaveManifestCondition(work.Status.ResourceStatus.Manifests,
+					"StatusFeedbackSynced", []metav1.ConditionStatus{metav1.ConditionTrue}) {
+					return fmt.Errorf("status sync condition should be True")
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
 	})
 })

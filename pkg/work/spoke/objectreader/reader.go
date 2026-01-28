@@ -120,20 +120,31 @@ func (o *objectReader) getObject(ctx context.Context, resourceMeta workapiv1.Man
 	o.RLock()
 	i, found := o.informers[key]
 	o.RUnlock()
-	if !found {
-		return o.dynamicClient.Resource(gvr).Namespace(resourceMeta.Namespace).Get(ctx, resourceMeta.Name, metav1.GetOptions{})
+
+	// Use informer cache only if it exists and has synced.
+	// If informer is not synced (e.g., watch permission denied, initial sync in progress),
+	// fallback to direct client.Get() which only requires GET permission.
+	if found && i.informer.HasSynced() {
+		var runObj runtime.Object
+		var err error
+		// For cluster-scoped resources (empty namespace), use Get() directly
+		// ByNamespace("") doesn't work for cluster-scoped resources
+		if resourceMeta.Namespace == "" {
+			runObj, err = i.lister.Get(resourceMeta.Name)
+		} else {
+			runObj, err = i.lister.ByNamespace(resourceMeta.Namespace).Get(resourceMeta.Name)
+		}
+		if err != nil {
+			return nil, err
+		}
+		obj, ok := runObj.(*unstructured.Unstructured)
+		if !ok {
+			return nil, fmt.Errorf("unexpected type from lister: %T", runObj)
+		}
+		return obj, nil
 	}
 
-	var runObj runtime.Object
-	runObj, err := i.lister.ByNamespace(resourceMeta.Namespace).Get(resourceMeta.Name)
-	if err != nil {
-		return nil, err
-	}
-	obj, ok := runObj.(*unstructured.Unstructured)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type from lister: %T", runObj)
-	}
-	return obj, nil
+	return o.dynamicClient.Resource(gvr).Namespace(resourceMeta.Namespace).Get(ctx, resourceMeta.Name, metav1.GetOptions{})
 }
 
 // RegisterInformer checks if there is an informer and if the event handler has been registered to the informer.
