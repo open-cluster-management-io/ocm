@@ -108,7 +108,7 @@ func (c *clusterProfileLifecycleController) registerClusterEventHandler(
 
 	queue := controller.SyncContext().Queue()
 
-	clusterInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := clusterInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			cluster, ok := obj.(*v1.ManagedCluster)
 			if !ok {
@@ -139,6 +139,9 @@ func (c *clusterProfileLifecycleController) registerClusterEventHandler(
 			}
 		},
 	})
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
 }
 
 // registerProfileEventHandler adds a custom event handler to profile informer that only processes
@@ -149,7 +152,7 @@ func (c *clusterProfileLifecycleController) registerProfileEventHandler(
 
 	queue := controller.SyncContext().Queue()
 
-	clusterProfileInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := clusterProfileInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			profile, ok := obj.(*cpv1alpha1.ClusterProfile)
 			if !ok {
@@ -180,6 +183,9 @@ func (c *clusterProfileLifecycleController) registerProfileEventHandler(
 			}
 		},
 	})
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
 }
 
 // getBindingsByClusterSet efficiently retrieves all bindings for a given clusterset using the indexer
