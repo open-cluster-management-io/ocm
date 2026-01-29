@@ -272,8 +272,14 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			})
 
-			ginkgo.By("getting managedclusters joined condition", func() {
-				assertManagedClusterJoined(grpcManagedClusterName, hubGRPCConfigSecret)
+			ginkgo.By("checking hub kubeconfig secret", func() {
+				// the hub kubeconfig secret should be filled after the csr is approved
+				gomega.Eventually(func() error {
+					if _, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubGRPCConfigSecret); err != nil {
+						return err
+					}
+					return nil
+				}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 			})
 
 			// the agent should rotate the certificate because the certificate with a short valid time
