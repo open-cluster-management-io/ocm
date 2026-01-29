@@ -223,16 +223,12 @@ func (c *clusterProfileLifecycleController) clusterSetToQueueKeys(obj runtime.Ob
 	}
 
 	// Collect unique namespaces that have bindings to this clusterset
-	namespaces := make(map[string]bool)
+	namespaces := sets.New[string]()
 	for _, binding := range bindings {
-		namespaces[binding.Namespace] = true
+		namespaces.Insert(binding.Namespace)
 	}
 
-	keys := make([]string, 0, len(namespaces))
-	for ns := range namespaces {
-		keys = append(keys, ns)
-	}
-	return keys
+	return namespaces.UnsortedList()
 }
 
 // clusterToQueueKeys maps a ManagedCluster to all namespaces that should have its profile
@@ -250,7 +246,7 @@ func (c *clusterProfileLifecycleController) clusterToQueueKeys(obj runtime.Objec
 	}
 
 	// For each clusterset, use indexer to efficiently find namespaces with bindings to it
-	namespaces := make(map[string]bool)
+	namespaces := sets.New[string]()
 	for _, clusterSet := range clusterSets {
 		bindings, err := c.getBindingsByClusterSet(clusterSet.Name)
 		if err != nil {
@@ -258,15 +254,11 @@ func (c *clusterProfileLifecycleController) clusterToQueueKeys(obj runtime.Objec
 			continue
 		}
 		for _, binding := range bindings {
-			namespaces[binding.Namespace] = true
+			namespaces.Insert(binding.Namespace)
 		}
 	}
 
-	keys := make([]string, 0, len(namespaces))
-	for ns := range namespaces {
-		keys = append(keys, ns)
-	}
-	return keys
+	return namespaces.UnsortedList()
 }
 
 // profileToQueueKey maps a ClusterProfile to its namespace
@@ -382,8 +374,6 @@ func (c *clusterProfileLifecycleController) sync(ctx context.Context, syncCtx fa
 	// Clusters to delete = existing - desired
 	clustersToDelete := existingClusters.Difference(desiredClusters)
 
-	profilesCreated := 0
-	profilesDeleted := 0
 	var errs []error
 
 	// Create missing profiles
@@ -392,8 +382,6 @@ func (c *clusterProfileLifecycleController) sync(ctx context.Context, syncCtx fa
 		if err != nil {
 			logger.Error(err, "Failed to create ClusterProfile", "cluster", clusterName)
 			errs = append(errs, fmt.Errorf("failed to create ClusterProfile %s/%s: %w", namespace, clusterName, err))
-		} else {
-			profilesCreated++
 		}
 	}
 
@@ -406,19 +394,8 @@ func (c *clusterProfileLifecycleController) sync(ctx context.Context, syncCtx fa
 			logger.Error(err, "Failed to delete ClusterProfile", "cluster", clusterName)
 			errs = append(errs, fmt.Errorf("failed to delete ClusterProfile %s/%s: %w", namespace, clusterName, err))
 		} else if err == nil {
-			profilesDeleted++
-			logger.V(2).Info("Deleted ClusterProfile", "namespace", namespace, "name", clusterName)
+			logger.V(2).Info("Deleted ClusterProfile", "name", clusterName)
 		}
-	}
-
-	if profilesCreated > 0 || profilesDeleted > 0 {
-		logger.Info("Namespace reconciliation complete",
-			"profilesCreated", profilesCreated,
-			"profilesDeleted", profilesDeleted,
-			"totalDesired", desiredClusters.Len())
-		syncCtx.Recorder().Eventf(ctx, "ClusterProfilesReconciled",
-			"reconciled namespace %s: created %d, deleted %d profiles",
-			namespace, profilesCreated, profilesDeleted)
 	}
 
 	return utilerrors.NewAggregate(errs)
