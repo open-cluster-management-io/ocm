@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"strings"
 
-	jsonpatch "github.com/evanphx/json-patch/v5"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -17,11 +16,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -249,44 +245,6 @@ func ownerRefMatched(existing, required metav1.OwnerReference) bool {
 	}
 
 	return true
-}
-
-func PatchAddonCondition(ctx context.Context, addonClient addonv1alpha1client.Interface, new, old *addonapiv1alpha1.ManagedClusterAddOn) error {
-	if equality.Semantic.DeepEqual(new.Status.Conditions, old.Status.Conditions) {
-		return nil
-	}
-
-	oldData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
-		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-			Conditions: old.Status.Conditions,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	newData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:             new.UID,
-			ResourceVersion: new.ResourceVersion,
-		},
-		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-			Conditions: new.Status.Conditions,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
-	if err != nil {
-		return fmt.Errorf("failed to create patch for addon %s: %w", new.Name, err)
-	}
-
-	klog.V(2).Infof("Patching addon %s/%s condition with %s", new.Namespace, new.Name, string(patchBytes))
-	_, err = addonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Patch(
-		ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
-	return err
 }
 
 // AddonManagementFilterFunc is to check if the addon should be managed by addon manager or self-managed

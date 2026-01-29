@@ -361,6 +361,14 @@ func (c *addonDeployController) applyWork(ctx context.Context, appliedType strin
 	WorkAppliedCond := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkApplied)
 	switch {
 	case WorkAppliedCond == nil:
+		// ManifestWork has been created but work-agent hasn't reported status yet
+		// Clear any stale False condition to avoid showing outdated errors
+		existingCond := meta.FindStatusCondition(addon.Status.Conditions, appliedType)
+		if existingCond != nil && existingCond.Status == metav1.ConditionFalse {
+			// Remove the outdated False condition, wait for work-agent to report
+			meta.RemoveStatusCondition(&addon.Status.Conditions, appliedType)
+		}
+		// If it was already True or doesn't exist, leave it unchanged
 		return work, nil
 	case WorkAppliedCond.Status == metav1.ConditionTrue:
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
