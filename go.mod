@@ -39,9 +39,9 @@ require (
 	k8s.io/kube-aggregator v0.34.3
 	k8s.io/kubectl v0.34.3
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
-	open-cluster-management.io/addon-framework v1.1.1-0.20251222073158-b5846d76add9
-	open-cluster-management.io/api v1.1.1-0.20260126032025-b449b3b4e4b9
-	open-cluster-management.io/sdk-go v1.1.1-0.20260127092137-c07e0fafa331
+	open-cluster-management.io/addon-framework v1.2.0
+	open-cluster-management.io/api v1.2.0
+	open-cluster-management.io/sdk-go v1.2.0
 	sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03
 	sigs.k8s.io/cluster-inventory-api v0.0.0-20251124125836-445319b6307a
 	sigs.k8s.io/controller-runtime v0.22.4
@@ -159,17 +159,17 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.45.0 // indirect
+	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67 // indirect
-	golang.org/x/mod v0.29.0 // indirect
+	golang.org/x/mod v0.30.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/oauth2 v0.32.0 // indirect
-	golang.org/x/sync v0.18.0 // indirect
-	golang.org/x/sys v0.38.0 // indirect
-	golang.org/x/term v0.37.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
+	golang.org/x/sys v0.39.0 // indirect
+	golang.org/x/term v0.38.0 // indirect
+	golang.org/x/text v0.32.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
-	golang.org/x/tools v0.38.0 // indirect
+	golang.org/x/tools v0.39.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/api v0.255.0 // indirect
 	google.golang.org/genproto v0.0.0-20250603155806-513f23925822 // indirect
