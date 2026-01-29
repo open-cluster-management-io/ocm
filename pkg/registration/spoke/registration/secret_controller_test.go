@@ -12,8 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
-
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
@@ -118,8 +116,7 @@ func TestDumpSecret(t *testing.T) {
 			}
 
 			err = DumpSecret(
-				kubeClient.CoreV1(), testNamespace, testSecretName, hubKubeconfigDir, context.TODO(),
-				events.NewContextualLoggingEventRecorder(t.Name()))
+				context.TODO(), kubeClient.CoreV1(), testNamespace, testSecretName, hubKubeconfigDir)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}

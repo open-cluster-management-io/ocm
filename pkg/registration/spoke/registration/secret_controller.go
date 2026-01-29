@@ -16,7 +16,6 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/klog/v2"
 
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -62,21 +61,21 @@ func NewHubKubeconfigSecretController(
 		ToController("HubKubeconfigSecretController")
 }
 
-func (s *hubKubeconfigSecretController) sync(ctx context.Context, syncCtx factory.SyncContext, _ string) error {
+func (s *hubKubeconfigSecretController) sync(ctx context.Context, _ factory.SyncContext, _ string) error {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Reconciling Hub KubeConfig secret", "hubKubeconfigSecretName", s.hubKubeconfigSecretName)
-	return DumpSecret(s.spokeCoreClient, s.hubKubeconfigSecretNamespace, s.hubKubeconfigSecretName, s.hubKubeconfigDir, ctx, syncCtx.Recorder())
+	return DumpSecret(ctx, s.spokeCoreClient, s.hubKubeconfigSecretNamespace, s.hubKubeconfigSecretName, s.hubKubeconfigDir)
 }
 
 // DumpSecret dumps the data in the given seccret into a directory in file system.
 // The output directory will be created if not exists.
 // TO DO: remove the file once the corresponding key is removed from secret.
 func DumpSecret(
-	coreV1Client corev1client.CoreV1Interface,
-	secretNamespace, secretName, outputDir string,
 	ctx context.Context,
-	recorder events.Recorder) error {
+	coreV1Client corev1client.CoreV1Interface,
+	secretNamespace, secretName, outputDir string) error {
 	secret, err := coreV1Client.Secrets(secretNamespace).Get(ctx, secretName, metav1.GetOptions{})
+	logger := klog.FromContext(ctx).WithValues("secretNamespace", secretNamespace, "secretName", secretName)
 	if errors.IsNotFound(err) {
 		return nil
 	}
@@ -98,7 +97,7 @@ func DumpSecret(
 			if err := os.WriteFile(filename, data, 0600); err != nil {
 				return fmt.Errorf("unable to write file %q: %w", filename, err)
 			}
-			recorder.Event(ctx, "FileCreated", fmt.Sprintf("File %q is created from secret %s/%s", filename, secretNamespace, secretName))
+			logger.V(4).Info("Files is created from secret", "filename", filename)
 		case err != nil:
 			return fmt.Errorf("unable to read file %q: %w", filename, err)
 		case bytes.Equal(lastData, data):
@@ -109,7 +108,7 @@ func DumpSecret(
 			if err := os.WriteFile(path.Clean(filename), data, 0600); err != nil {
 				return fmt.Errorf("unable to write file %q: %w", filename, err)
 			}
-			recorder.Event(ctx, "FileUpdated", fmt.Sprintf("File %q is updated from secret %s/%s", filename, secretNamespace, secretName))
+			logger.V(4).Info("Files is updated from secret", "filename", filename)
 		}
 	}
 	return nil
