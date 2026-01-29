@@ -11,6 +11,17 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
+// SubjectNotReadyError indicates that the registration subject is not yet set.
+// When PermissionConfig returns this error, the controller will set the condition to pending.
+// Reconciliation will be triggered again when the addon is updated (e.g., when the agent sets
+// the kubeClientDriver or subject).
+type SubjectNotReadyError struct {
+}
+
+func (e *SubjectNotReadyError) Error() string {
+	return "registration subject not ready"
+}
+
 // AgentAddon is a mandatory interface for implementing a custom addon.
 // The addon is expected to be registered into an AddonManager so the manager will be invoking the addon
 // implementation below as callbacks upon:
