@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	certificatesv1 "k8s.io/api/certificates/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,6 +32,17 @@ type RBACPermissionBuilder interface {
 	BindRoleToUser(clusterRole *rbacv1.Role, username string) RBACPermissionBuilder
 	// BindRoleToGroup is a shortcut that ensures a role binding and binds to a hub user.
 	BindRoleToGroup(clusterRole *rbacv1.Role, userGroup string) RBACPermissionBuilder
+
+	// BindKubeClientClusterRole ensures a cluster role and binds to subjects from addon.Status.Registrations.
+	// It looks for the registration with signerName == KubeAPIServerClientSignerName.
+	// Both subject.User and subject.Groups will be included in the binding.
+	// This is useful for token-based authentication where subjects are dynamically set by the addon agent.
+	BindKubeClientClusterRole(clusterRole *rbacv1.ClusterRole) RBACPermissionBuilder
+	// BindKubeClientRole ensures a role and binds to subjects from addon.Status.Registrations.
+	// It looks for the registration with signerName == KubeAPIServerClientSignerName.
+	// Both subject.User and subject.Groups will be included in the binding.
+	// This is useful for token-based authentication where subjects are dynamically set by the addon agent.
+	BindKubeClientRole(role *rbacv1.Role) RBACPermissionBuilder
 
 	// WithStaticClusterRole ensures a cluster role to the hub cluster.
 	WithStaticClusterRole(clusterRole *rbacv1.ClusterRole) RBACPermissionBuilder
@@ -136,6 +148,70 @@ func (p *permissionBuilder) BindRoleToGroup(role *rbacv1.Role, userGroup string)
 		})
 }
 
+func (p *permissionBuilder) BindKubeClientClusterRole(clusterRole *rbacv1.ClusterRole) RBACPermissionBuilder {
+	p.WithStaticClusterRole(clusterRole)
+
+	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+		// Build subjects from the registration status
+		subjects := buildSubjectsFromRegistration(addon, certificatesv1.KubeAPIServerClientSignerName)
+
+		// If no subjects found, return pending error
+		if len(subjects) == 0 {
+			return &agent.SubjectNotReadyError{}
+		}
+
+		binding := &rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: clusterRole.Name,
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "ClusterRole",
+				Name:     clusterRole.Name,
+			},
+			Subjects: subjects,
+		}
+
+		_, _, err := ApplyClusterRoleBinding(context.TODO(), p.kubeClient.RbacV1(), binding)
+		return err
+	})
+
+	return p
+}
+
+func (p *permissionBuilder) BindKubeClientRole(role *rbacv1.Role) RBACPermissionBuilder {
+	p.WithStaticRole(role)
+
+	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+		// Build subjects from the registration status
+		subjects := buildSubjectsFromRegistration(addon, certificatesv1.KubeAPIServerClientSignerName)
+
+		// If no subjects found, return pending error
+		if len(subjects) == 0 {
+			return &agent.SubjectNotReadyError{}
+		}
+
+		binding := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      role.Name,
+				Namespace: cluster.Name,
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "Role",
+				Name:     role.Name,
+			},
+			Subjects: subjects,
+		}
+
+		ensureAddonOwnerReference(&binding.ObjectMeta, addon)
+		_, _, err := ApplyRoleBinding(context.TODO(), p.kubeClient.RbacV1(), binding)
+		return err
+	})
+
+	return p
+}
+
 func (p *permissionBuilder) WithStaticClusterRole(clusterRole *rbacv1.ClusterRole) RBACPermissionBuilder {
 	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
 		_, _, err := ApplyClusterRole(context.TODO(), p.kubeClient.RbacV1(), clusterRole)
@@ -189,6 +265,47 @@ func (b *unionPermissionBuilder) build() agent.PermissionConfigFunc {
 		}
 		return nil
 	}
+}
+
+// buildSubjectsFromRegistration extracts and builds RBAC subjects from addon registration status.
+// Returns nil if no matching registration is found or if the subject is empty.
+func buildSubjectsFromRegistration(addon *addonapiv1alpha1.ManagedClusterAddOn, signerName string) []rbacv1.Subject {
+	// Find the registration config for the specified signer
+	var subject *addonapiv1alpha1.Subject
+	for _, registration := range addon.Status.Registrations {
+		if registration.SignerName == signerName {
+			subject = &registration.Subject
+			break
+		}
+	}
+
+	// If no registration config found or subject is empty, return nil
+	if subject == nil || equality.Semantic.DeepEqual(*subject, addonapiv1alpha1.Subject{}) {
+		return nil
+	}
+
+	// Build subjects from the registration config subject
+	subjects := []rbacv1.Subject{}
+
+	// Include user if set
+	if subject.User != "" {
+		subjects = append(subjects, rbacv1.Subject{
+			Kind:     rbacv1.UserKind,
+			APIGroup: rbacv1.GroupName,
+			Name:     subject.User,
+		})
+	}
+
+	// Include groups
+	for _, group := range subject.Groups {
+		subjects = append(subjects, rbacv1.Subject{
+			Kind:     rbacv1.GroupKind,
+			APIGroup: rbacv1.GroupName,
+			Name:     group,
+		})
+	}
+
+	return subjects
 }
 
 func ensureAddonOwnerReference(metadata *metav1.ObjectMeta, addon *addonapiv1alpha1.ManagedClusterAddOn) {
