@@ -116,6 +116,11 @@ func (i *Importer) sync(ctx context.Context, syncCtx factory.SyncContext, cluste
 		return err
 	}
 
+	// If the cluster is in terminating state, skip the reconcile
+	if !cluster.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
 	// If the cluster is imported, skip the reconcile
 	if meta.IsStatusConditionTrue(cluster.Status.Conditions, ManagedClusterConditionImported) {
 		return nil

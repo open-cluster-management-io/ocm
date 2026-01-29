@@ -28,6 +28,7 @@ import (
 )
 
 func TestSync(t *testing.T) {
+	now := metav1.Now()
 	cases := []struct {
 		name     string
 		provider *fakeProvider
@@ -58,6 +59,15 @@ func TestSync(t *testing.T) {
 			provider: &fakeProvider{isOwned: true},
 			key:      "cluster1",
 			cluster:  &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster2"}},
+			validate: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertNoActions(t, actions)
+			},
+		},
+		{
+			name:     "cluster in terminating state",
+			provider: &fakeProvider{isOwned: true},
+			key:      "cluster1",
+			cluster:  &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster1", DeletionTimestamp: &now}},
 			validate: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertNoActions(t, actions)
 			},
