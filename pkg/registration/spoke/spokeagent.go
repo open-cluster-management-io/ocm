@@ -177,8 +177,8 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 	// dump data in hub kubeconfig secret into file system if it exists
 	err = registration.DumpSecret(
-		managementKubeClient.CoreV1(), o.agentOptions.ComponentNamespace, o.registrationOption.HubKubeconfigSecret,
-		o.agentOptions.HubKubeconfigDir, ctx, recorder)
+		ctx, managementKubeClient.CoreV1(), o.agentOptions.ComponentNamespace, o.registrationOption.HubKubeconfigSecret,
+		o.agentOptions.HubKubeconfigDir)
 	if err != nil {
 		return err
 	}

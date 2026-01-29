@@ -14,8 +14,6 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clocktesting "k8s.io/utils/clock/testing"
 
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
-
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/registration"
@@ -90,8 +88,8 @@ func TestComplete(t *testing.T) {
 			options.HubKubeconfigDir = dir
 
 			err = registration.DumpSecret(
-				kubeClient.CoreV1(), componentNamespace, "hub-kubeconfig-secret",
-				options.HubKubeconfigDir, context.TODO(), events.NewContextualLoggingEventRecorder(t.Name()))
+				context.TODO(), kubeClient.CoreV1(), componentNamespace, "hub-kubeconfig-secret",
+				options.HubKubeconfigDir)
 			if err != nil {
 				t.Error(err)
 			}
