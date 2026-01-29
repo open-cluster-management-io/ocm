@@ -12,6 +12,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	cpv1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
@@ -45,6 +46,7 @@ const (
 //
 // Key constraint: ManagedClusterSetBinding.Name MUST equal ManagedClusterSetBinding.Spec.ClusterSet
 type clusterProfileLifecycleController struct {
+	kubeClient               kubernetes.Interface
 	clusterLister            listerv1.ManagedClusterLister
 	clusterSetLister         clusterlisterv1beta2.ManagedClusterSetLister
 	clusterSetBindingLister  clusterlisterv1beta2.ManagedClusterSetBindingLister
@@ -55,6 +57,7 @@ type clusterProfileLifecycleController struct {
 
 // NewClusterProfileLifecycleController creates a controller that manages ClusterProfile lifecycle
 func NewClusterProfileLifecycleController(
+	kubeClient kubernetes.Interface,
 	clusterInformer informerv1.ManagedClusterInformer,
 	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer,
 	clusterSetBindingInformer clusterinformerv1beta2.ManagedClusterSetBindingInformer,
@@ -65,6 +68,7 @@ func NewClusterProfileLifecycleController(
 	// so we don't need to add it again here. Informers are shared across controllers.
 
 	c := &clusterProfileLifecycleController{
+		kubeClient:               kubeClient,
 		clusterLister:            clusterInformer.Lister(),
 		clusterSetLister:         clusterSetInformer.Lister(),
 		clusterSetBindingLister:  clusterSetBindingInformer.Lister(),
@@ -285,6 +289,20 @@ func (c *clusterProfileLifecycleController) sync(ctx context.Context, syncCtx fa
 	logger := klog.FromContext(ctx).WithValues("namespace", namespace)
 
 	logger.V(4).Info("Reconciling ClusterProfiles in namespace")
+
+	// 0. Check if namespace exists and is not terminating
+	ns, err := c.kubeClient.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		logger.V(4).Info("Namespace not found, skipping reconciliation")
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !ns.DeletionTimestamp.IsZero() {
+		logger.V(4).Info("Namespace is terminating, skipping reconciliation")
+		return nil
+	}
 
 	// 1. Get all bindings in this namespace
 	allBindings, err := c.clusterSetBindingLister.ManagedClusterSetBindings(namespace).List(labels.Everything())

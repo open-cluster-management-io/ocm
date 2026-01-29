@@ -327,6 +327,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	var clusterProfileStatusController factory.Controller
 	if features.HubMutableFeatureGate.Enabled(ocmfeature.ClusterProfile) {
 		clusterProfileLifecycleController = clusterprofile.NewClusterProfileLifecycleController(
+			kubeClient,
 			clusterInformers.Cluster().V1().ManagedClusters(),
 			clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
 			clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings(),
