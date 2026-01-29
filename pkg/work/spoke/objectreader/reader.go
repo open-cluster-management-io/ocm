@@ -17,15 +17,29 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
 
-	workinformers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
 const byWorkIndex = "byWorkIndex"
 
+type ObjectReader interface {
+	// Get returns an object based on resourceMeta
+	Get(ctx context.Context, resourceMeta workapiv1.ManifestResourceMeta) (*unstructured.Unstructured, metav1.Condition, error)
+
+	// RegisterInformer registers an informer to the ObjectReader
+	RegisterInformer(
+		ctx context.Context, workName string,
+		resourceMeta workapiv1.ManifestResourceMeta,
+		queue workqueue.TypedRateLimitingInterface[string]) error
+
+	// UnRegisterInformer unregister the informer from the ObjectReader
+	UnRegisterInformer(workName string, resourceMeta workapiv1.ManifestResourceMeta) error
+}
+
 // ObjectReader reads spoke resources using informer-based caching or direct dynamic client calls.
-type ObjectReader struct {
+type objectReader struct {
 	sync.RWMutex
 
 	dynamicClient dynamic.Interface
@@ -33,6 +47,8 @@ type ObjectReader struct {
 	informers map[informerKey]*informerWithCancel
 
 	indexer cache.Indexer
+
+	maxWatch int32
 }
 
 type informerWithCancel struct {
@@ -57,21 +73,7 @@ type registrationKey struct {
 	workName  string
 }
 
-func NewObjectReader(dynamicClient dynamic.Interface, workInformer workinformers.ManifestWorkInformer) (*ObjectReader, error) {
-	if err := workInformer.Informer().AddIndexers(map[string]cache.IndexFunc{
-		byWorkIndex: indexWorkByResource,
-	}); err != nil {
-		return nil, err
-	}
-
-	return &ObjectReader{
-		dynamicClient: dynamicClient,
-		informers:     map[informerKey]*informerWithCancel{},
-		indexer:       workInformer.Informer().GetIndexer(),
-	}, nil
-}
-
-func (o *ObjectReader) Get(ctx context.Context, resourceMeta workapiv1.ManifestResourceMeta) (*unstructured.Unstructured, metav1.Condition, error) {
+func (o *objectReader) Get(ctx context.Context, resourceMeta workapiv1.ManifestResourceMeta) (*unstructured.Unstructured, metav1.Condition, error) {
 	if len(resourceMeta.Resource) == 0 || len(resourceMeta.Version) == 0 || len(resourceMeta.Name) == 0 {
 		return nil, metav1.Condition{
 			Type:    workapiv1.ManifestAvailable,
@@ -107,7 +109,7 @@ func (o *ObjectReader) Get(ctx context.Context, resourceMeta workapiv1.ManifestR
 	}, nil
 }
 
-func (o *ObjectReader) getObject(ctx context.Context, resourceMeta workapiv1.ManifestResourceMeta) (*unstructured.Unstructured, error) {
+func (o *objectReader) getObject(ctx context.Context, resourceMeta workapiv1.ManifestResourceMeta) (*unstructured.Unstructured, error) {
 	gvr := schema.GroupVersionResource{
 		Group:    resourceMeta.Group,
 		Version:  resourceMeta.Version,
@@ -118,28 +120,40 @@ func (o *ObjectReader) getObject(ctx context.Context, resourceMeta workapiv1.Man
 	o.RLock()
 	i, found := o.informers[key]
 	o.RUnlock()
-	if !found {
-		return o.dynamicClient.Resource(gvr).Namespace(resourceMeta.Namespace).Get(ctx, resourceMeta.Name, metav1.GetOptions{})
+
+	// Use informer cache only if it exists and has synced.
+	// If informer is not synced (e.g., watch permission denied, initial sync in progress),
+	// fallback to direct client.Get() which only requires GET permission.
+	if found && i.informer.HasSynced() {
+		var runObj runtime.Object
+		var err error
+		// For cluster-scoped resources (empty namespace), use Get() directly
+		// ByNamespace("") doesn't work for cluster-scoped resources
+		if resourceMeta.Namespace == "" {
+			runObj, err = i.lister.Get(resourceMeta.Name)
+		} else {
+			runObj, err = i.lister.ByNamespace(resourceMeta.Namespace).Get(resourceMeta.Name)
+		}
+		if err != nil {
+			return nil, err
+		}
+		obj, ok := runObj.(*unstructured.Unstructured)
+		if !ok {
+			return nil, fmt.Errorf("unexpected type from lister: %T", runObj)
+		}
+		return obj, nil
 	}
 
-	var runObj runtime.Object
-	runObj, err := i.lister.ByNamespace(resourceMeta.Namespace).Get(resourceMeta.Name)
-	if err != nil {
-		return nil, err
-	}
-	obj, ok := runObj.(*unstructured.Unstructured)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type from lister: %T", runObj)
-	}
-	return obj, nil
+	return o.dynamicClient.Resource(gvr).Namespace(resourceMeta.Namespace).Get(ctx, resourceMeta.Name, metav1.GetOptions{})
 }
 
 // RegisterInformer checks if there is an informer and if the event handler has been registered to the informer.
 // this is called each time a resource needs to be watched. It is idempotent.
-func (o *ObjectReader) RegisterInformer(
+func (o *objectReader) RegisterInformer(
 	ctx context.Context, workName string,
 	resourceMeta workapiv1.ManifestResourceMeta,
 	queue workqueue.TypedRateLimitingInterface[string]) error {
+	logger := klog.FromContext(ctx)
 	o.Lock()
 	defer o.Unlock()
 
@@ -158,6 +172,11 @@ func (o *ObjectReader) RegisterInformer(
 	}
 	informer, found := o.informers[key]
 	if !found {
+		if len(o.informers) >= int(o.maxWatch) {
+			logger.Info("The number of registered informers has reached the maximum limit, fallback to feedback with poll")
+			return nil
+		}
+
 		resourceInformer := dynamicinformer.NewFilteredDynamicInformer(
 			o.dynamicClient, gvr, resourceMeta.Namespace, 24*time.Hour,
 			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, nil)
@@ -169,6 +188,7 @@ func (o *ObjectReader) RegisterInformer(
 			registrations: map[registrationKey]cache.ResourceEventHandlerRegistration{},
 		}
 		o.informers[key] = informer
+		logger.V(4).Info("Registered informer for objecr reader", "informerKey", key)
 		go resourceInformer.Informer().Run(informerCtx.Done())
 	}
 
@@ -176,6 +196,8 @@ func (o *ObjectReader) RegisterInformer(
 	if _, registrationFound := informer.registrations[regKey]; registrationFound {
 		return nil
 	}
+
+	logger.V(4).Info("Add event handler of informer for objecr reader", "informerKey", key, "resourceKey", regKey)
 	// Add event handler into the informer so it can trigger work reconcile
 	registration, err := informer.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: o.queueWorkByResourceFunc(ctx, gvr, queue),
@@ -188,11 +210,12 @@ func (o *ObjectReader) RegisterInformer(
 	}
 	// record the event handler registration
 	informer.registrations[regKey] = registration
+
 	return nil
 }
 
 // UnRegisterInformer is called each time a resource is not watched.
-func (o *ObjectReader) UnRegisterInformer(workName string, resourceMeta workapiv1.ManifestResourceMeta) error {
+func (o *objectReader) UnRegisterInformer(workName string, resourceMeta workapiv1.ManifestResourceMeta) error {
 	o.Lock()
 	defer o.Unlock()
 
@@ -233,8 +256,9 @@ func (o *ObjectReader) UnRegisterInformer(workName string, resourceMeta workapiv
 	return nil
 }
 
-func (o *ObjectReader) queueWorkByResourceFunc(ctx context.Context, gvr schema.GroupVersionResource, queue workqueue.TypedRateLimitingInterface[string]) func(object interface{}) {
+func (o *objectReader) queueWorkByResourceFunc(ctx context.Context, gvr schema.GroupVersionResource, queue workqueue.TypedRateLimitingInterface[string]) func(object interface{}) {
 	return func(object interface{}) {
+		logger := klog.FromContext(ctx)
 		accessor, err := meta.Accessor(object)
 		if err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "failed to access object")
@@ -250,6 +274,7 @@ func (o *ObjectReader) queueWorkByResourceFunc(ctx context.Context, gvr schema.G
 
 		for _, obj := range objects {
 			work := obj.(*workapiv1.ManifestWork)
+			logger.V(4).Info("enqueue work by resource", "resourceKey", key)
 			queue.Add(work.Name)
 		}
 	}
@@ -267,4 +292,22 @@ func indexWorkByResource(obj interface{}) ([]string, error) {
 		keys = append(keys, key)
 	}
 	return keys, nil
+}
+
+func UnRegisterInformerFromAppliedManifestWork(ctx context.Context, o ObjectReader, workName string, appliedResources []workapiv1.AppliedManifestResourceMeta) {
+	if o == nil {
+		return
+	}
+	for _, r := range appliedResources {
+		resourceMeta := workapiv1.ManifestResourceMeta{
+			Group:     r.Group,
+			Version:   r.Version,
+			Resource:  r.Resource,
+			Name:      r.Name,
+			Namespace: r.Namespace,
+		}
+		if err := o.UnRegisterInformer(workName, resourceMeta); err != nil {
+			utilruntime.HandleErrorWithContext(ctx, err, "failed to unregister informer")
+		}
+	}
 }

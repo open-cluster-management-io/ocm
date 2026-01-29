@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+
+	"open-cluster-management.io/ocm/pkg/work/spoke/objectreader"
 )
 
 const (
@@ -20,6 +22,8 @@ type WorkloadAgentOptions struct {
 	CloudEventsClientID                    string
 	CloudEventsClientCodecs                []string
 	DefaultUserAgent                       string
+
+	ObjectReaderOption *objectreader.Options
 }
 
 // NewWorkloadAgentOptions returns the flags with default value set
@@ -31,6 +35,7 @@ func NewWorkloadAgentOptions() *WorkloadAgentOptions {
 		WorkloadSourceDriver:                   "kube",
 		WorkloadSourceConfig:                   "/spoke/hub-kubeconfig/kubeconfig",
 		DefaultUserAgent:                       defaultUserAgent,
+		ObjectReaderOption:                     objectreader.NewOptions(),
 	}
 }
 
@@ -50,4 +55,6 @@ func (o *WorkloadAgentOptions) AddFlags(fs *pflag.FlagSet) {
 		o.CloudEventsClientID, "The ID of the cloudevents client when workload source source is based on cloudevents")
 	fs.StringSliceVar(&o.CloudEventsClientCodecs, "cloudevents-client-codecs", o.CloudEventsClientCodecs,
 		"The codecs for cloudevents client when workload source source is based on cloudevents, the valid codecs: manifest or manifestbundle")
+
+	o.ObjectReaderOption.AddFlags(fs)
 }

@@ -31,6 +31,7 @@ import (
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
+	"open-cluster-management.io/ocm/pkg/work/spoke/objectreader"
 )
 
 var (
@@ -72,6 +73,7 @@ func NewManifestWorkController(
 	manifestWorkLister worklister.ManifestWorkNamespaceLister,
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
 	appliedManifestWorkInformer workinformer.AppliedManifestWorkInformer,
+	objectReader objectreader.ObjectReader,
 	hubHash, agentID string,
 	restMapper meta.RESTMapper,
 	validator auth.ExecutorValidator) factory.Controller {
@@ -98,6 +100,7 @@ func NewManifestWorkController(
 			},
 			&appliedManifestWorkReconciler{
 				spokeDynamicClient: spokeDynamicClient,
+				objectReader:       objectReader,
 				rateLimiter:        workqueue.NewTypedItemExponentialFailureRateLimiter[string](5*time.Millisecond, 1000*time.Second),
 			},
 		},

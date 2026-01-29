@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -20,7 +22,7 @@ import (
 
 func TestNewObjectReader(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = workapiv1.Install(scheme)
+	_ = corev1.AddToScheme(scheme)
 
 	fakeWorkClient := fakeworkclient.NewSimpleClientset()
 	workInformerFactory := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
@@ -28,7 +30,7 @@ func TestNewObjectReader(t *testing.T) {
 
 	fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(scheme)
 
-	reader, err := NewObjectReader(fakeDynamicClient, workInformer)
+	reader, err := NewOptions().NewObjectReader(fakeDynamicClient, workInformer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,16 +39,16 @@ func TestNewObjectReader(t *testing.T) {
 		t.Fatal("Expected ObjectReader to be created, but got nil")
 	}
 
-	if reader.dynamicClient != fakeDynamicClient {
-		t.Error("Expected dynamicClient to be set correctly")
-	}
-
-	if reader.informers == nil {
-		t.Error("Expected informers map to be initialized")
-	}
-
-	if reader.indexer == nil {
-		t.Error("Expected indexer to be set correctly")
+	// Verify ObjectReader is functional by calling Get
+	_, _, err = reader.Get(context.TODO(), workapiv1.ManifestResourceMeta{
+		Group:     "",
+		Version:   "v1",
+		Resource:  "secrets",
+		Namespace: "default",
+		Name:      "test",
+	})
+	if err == nil {
+		t.Error("Expected error for non-existent resource")
 	}
 }
 
@@ -83,13 +85,13 @@ func TestGet_IncompleteResourceMeta(t *testing.T) {
 	}
 
 	scheme := runtime.NewScheme()
-	_ = workapiv1.Install(scheme)
+	_ = corev1.AddToScheme(scheme)
 	fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(scheme)
 	fakeWorkClient := fakeworkclient.NewSimpleClientset()
 	workInformerFactory := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
 	workInformer := workInformerFactory.Work().V1().ManifestWorks()
 
-	reader, err := NewObjectReader(fakeDynamicClient, workInformer)
+	reader, err := NewOptions().NewObjectReader(fakeDynamicClient, workInformer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,13 +129,13 @@ func TestGet_IncompleteResourceMeta(t *testing.T) {
 
 func TestGet_ResourceNotFound(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = workapiv1.Install(scheme)
+	_ = corev1.AddToScheme(scheme)
 	fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(scheme)
 	fakeWorkClient := fakeworkclient.NewSimpleClientset()
 	workInformerFactory := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
 	workInformer := workInformerFactory.Work().V1().ManifestWorks()
 
-	reader, err := NewObjectReader(fakeDynamicClient, workInformer)
+	reader, err := NewOptions().NewObjectReader(fakeDynamicClient, workInformer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +177,7 @@ func TestGet_ResourceNotFound(t *testing.T) {
 
 func TestGet_ResourceFound(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = workapiv1.Install(scheme)
+	_ = corev1.AddToScheme(scheme)
 
 	secret := &unstructured.Unstructured{
 		Object: map[string]any{
@@ -196,7 +198,7 @@ func TestGet_ResourceFound(t *testing.T) {
 	workInformerFactory := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
 	workInformer := workInformerFactory.Work().V1().ManifestWorks()
 
-	reader, err := NewObjectReader(fakeDynamicClient, workInformer)
+	reader, err := NewOptions().NewObjectReader(fakeDynamicClient, workInformer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +248,7 @@ func TestGet_ResourceFound(t *testing.T) {
 
 func TestRegisterInformer(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = workapiv1.Install(scheme)
+	_ = corev1.AddToScheme(scheme)
 
 	fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(scheme)
 	fakeWorkClient := fakeworkclient.NewSimpleClientset()
@@ -254,7 +256,7 @@ func TestRegisterInformer(t *testing.T) {
 	workInformer := workInformerFactory.Work().V1().ManifestWorks()
 	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]())
 
-	reader, err := NewObjectReader(fakeDynamicClient, workInformer)
+	reader, err := NewOptions().NewObjectReader(fakeDynamicClient, workInformer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,9 +285,11 @@ func TestRegisterInformer(t *testing.T) {
 	}
 	key := informerKey{GroupVersionResource: gvr, namespace: resourceMeta.Namespace}
 
-	reader.RLock()
-	informer, found := reader.informers[key]
-	reader.RUnlock()
+	// Cast to concrete type to access internal fields in tests
+	concreteReader := reader.(*objectReader)
+	concreteReader.RLock()
+	informer, found := concreteReader.informers[key]
+	concreteReader.RUnlock()
 
 	if !found {
 		t.Fatal("Expected informer to be registered")
@@ -313,9 +317,9 @@ func TestRegisterInformer(t *testing.T) {
 		t.Fatalf("Expected no error on second registration, got %v", err)
 	}
 
-	reader.RLock()
-	informer, found = reader.informers[key]
-	reader.RUnlock()
+	concreteReader.RLock()
+	informer, found = concreteReader.informers[key]
+	concreteReader.RUnlock()
 
 	if !found {
 		t.Fatal("Expected informer to still be registered")
@@ -328,7 +332,7 @@ func TestRegisterInformer(t *testing.T) {
 
 func TestRegisterInformer_MultipleResources(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = workapiv1.Install(scheme)
+	_ = corev1.AddToScheme(scheme)
 
 	fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(scheme)
 	fakeWorkClient := fakeworkclient.NewSimpleClientset()
@@ -336,7 +340,7 @@ func TestRegisterInformer_MultipleResources(t *testing.T) {
 	workInformer := workInformerFactory.Work().V1().ManifestWorks()
 	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]())
 
-	reader, err := NewObjectReader(fakeDynamicClient, workInformer)
+	reader, err := NewOptions().NewObjectReader(fakeDynamicClient, workInformer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -378,9 +382,11 @@ func TestRegisterInformer_MultipleResources(t *testing.T) {
 	}
 	key := informerKey{GroupVersionResource: gvr, namespace: "default"}
 
-	reader.RLock()
-	informer, found := reader.informers[key]
-	reader.RUnlock()
+	// Cast to concrete type to access internal fields in tests
+	concreteReader := reader.(*objectReader)
+	concreteReader.RLock()
+	informer, found := concreteReader.informers[key]
+	concreteReader.RUnlock()
 
 	if !found {
 		t.Fatal("Expected informer to be registered")
@@ -394,7 +400,7 @@ func TestRegisterInformer_MultipleResources(t *testing.T) {
 
 func TestUnRegisterInformer(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = workapiv1.Install(scheme)
+	_ = corev1.AddToScheme(scheme)
 
 	fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(scheme)
 	fakeWorkClient := fakeworkclient.NewSimpleClientset()
@@ -402,7 +408,7 @@ func TestUnRegisterInformer(t *testing.T) {
 	workInformer := workInformerFactory.Work().V1().ManifestWorks()
 	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]())
 
-	reader, err := NewObjectReader(fakeDynamicClient, workInformer)
+	reader, err := NewOptions().NewObjectReader(fakeDynamicClient, workInformer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -431,9 +437,10 @@ func TestUnRegisterInformer(t *testing.T) {
 	key := informerKey{GroupVersionResource: gvr, namespace: resourceMeta.Namespace}
 
 	// Verify informer exists
-	reader.RLock()
-	_, found := reader.informers[key]
-	reader.RUnlock()
+	concreteReader := reader.(*objectReader)
+	concreteReader.RLock()
+	_, found := concreteReader.informers[key]
+	concreteReader.RUnlock()
 	if !found {
 		t.Fatal("Expected informer to be registered")
 	}
@@ -445,9 +452,9 @@ func TestUnRegisterInformer(t *testing.T) {
 	}
 
 	// Verify informer was removed (since it was the last registration)
-	reader.RLock()
-	_, found = reader.informers[key]
-	reader.RUnlock()
+	concreteReader.RLock()
+	_, found = concreteReader.informers[key]
+	concreteReader.RUnlock()
 	if found {
 		t.Error("Expected informer to be removed")
 	}
@@ -455,7 +462,7 @@ func TestUnRegisterInformer(t *testing.T) {
 
 func TestUnRegisterInformer_MultipleRegistrations(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = workapiv1.Install(scheme)
+	_ = corev1.AddToScheme(scheme)
 
 	fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(scheme)
 	fakeWorkClient := fakeworkclient.NewSimpleClientset()
@@ -463,7 +470,7 @@ func TestUnRegisterInformer_MultipleRegistrations(t *testing.T) {
 	workInformer := workInformerFactory.Work().V1().ManifestWorks()
 	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]())
 
-	reader, err := NewObjectReader(fakeDynamicClient, workInformer)
+	reader, err := NewOptions().NewObjectReader(fakeDynamicClient, workInformer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -511,9 +518,10 @@ func TestUnRegisterInformer_MultipleRegistrations(t *testing.T) {
 	}
 
 	// Verify informer still exists (since second resource is still registered)
-	reader.RLock()
-	informer, found := reader.informers[key]
-	reader.RUnlock()
+	concreteReader := reader.(*objectReader)
+	concreteReader.RLock()
+	informer, found := concreteReader.informers[key]
+	concreteReader.RUnlock()
 	if !found {
 		t.Fatal("Expected informer to still be registered")
 	}
@@ -529,9 +537,9 @@ func TestUnRegisterInformer_MultipleRegistrations(t *testing.T) {
 	}
 
 	// Verify informer was removed (since it was the last registration)
-	reader.RLock()
-	_, found = reader.informers[key]
-	reader.RUnlock()
+	concreteReader.RLock()
+	_, found = concreteReader.informers[key]
+	concreteReader.RUnlock()
 	if found {
 		t.Error("Expected informer to be removed after unregistering all resources")
 	}
@@ -539,14 +547,14 @@ func TestUnRegisterInformer_MultipleRegistrations(t *testing.T) {
 
 func TestUnRegisterInformer_NotRegistered(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = workapiv1.Install(scheme)
+	_ = corev1.AddToScheme(scheme)
 
 	fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(scheme)
 	fakeWorkClient := fakeworkclient.NewSimpleClientset()
 	workInformerFactory := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
 	workInformer := workInformerFactory.Work().V1().ManifestWorks()
 
-	reader, err := NewObjectReader(fakeDynamicClient, workInformer)
+	reader, err := NewOptions().NewObjectReader(fakeDynamicClient, workInformer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -563,6 +571,204 @@ func TestUnRegisterInformer_NotRegistered(t *testing.T) {
 	err = reader.UnRegisterInformer("test-work", resourceMeta)
 	if err != nil {
 		t.Errorf("Expected no error when unregistering non-existent informer, got %v", err)
+	}
+}
+
+func TestUnRegisterInformerFromAppliedManifestWork(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+	_ = appsv1.AddToScheme(scheme)
+
+	fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(scheme)
+	fakeWorkClient := fakeworkclient.NewSimpleClientset()
+	workInformerFactory := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
+	workInformer := workInformerFactory.Work().V1().ManifestWorks()
+	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]())
+
+	reader, err := NewOptions().NewObjectReader(fakeDynamicClient, workInformer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := t.Context()
+
+	// Register informers for multiple resources
+	resources := []workapiv1.ManifestResourceMeta{
+		{
+			Group:     "",
+			Version:   "v1",
+			Resource:  "secrets",
+			Namespace: "default",
+			Name:      "secret1",
+		},
+		{
+			Group:     "apps",
+			Version:   "v1",
+			Resource:  "deployments",
+			Namespace: "kube-system",
+			Name:      "deployment1",
+		},
+		{
+			Group:     "",
+			Version:   "v1",
+			Resource:  "configmaps",
+			Namespace: "default",
+			Name:      "cm1",
+		},
+	}
+
+	for _, resource := range resources {
+		err = reader.RegisterInformer(ctx, "test-work", resource, queue)
+		if err != nil {
+			t.Fatalf("Expected no error registering informer, got %v", err)
+		}
+	}
+
+	// Verify all informers are registered
+	concreteReader := reader.(*objectReader)
+	concreteReader.RLock()
+	initialCount := len(concreteReader.informers)
+	concreteReader.RUnlock()
+
+	if initialCount != 3 {
+		t.Errorf("Expected 3 informers to be registered, got %d", initialCount)
+	}
+
+	// Create applied resources from the manifest resources
+	appliedResources := []workapiv1.AppliedManifestResourceMeta{
+		{
+			ResourceIdentifier: workapiv1.ResourceIdentifier{
+				Group:     "",
+				Resource:  "secrets",
+				Namespace: "default",
+				Name:      "secret1",
+			},
+			Version: "v1",
+		},
+		{
+			ResourceIdentifier: workapiv1.ResourceIdentifier{
+				Group:     "apps",
+				Resource:  "deployments",
+				Namespace: "kube-system",
+				Name:      "deployment1",
+			},
+			Version: "v1",
+		},
+	}
+
+	// Unregister using the helper function
+	UnRegisterInformerFromAppliedManifestWork(context.TODO(), reader, "test-work", appliedResources)
+
+	// Verify that 2 informers were removed
+	concreteReader.RLock()
+	finalCount := len(concreteReader.informers)
+	concreteReader.RUnlock()
+
+	if finalCount != 1 {
+		t.Errorf("Expected 1 informer to remain after unregistering 2 resources, got %d", finalCount)
+	}
+}
+
+func TestUnRegisterInformerFromAppliedManifestWork_NilObjectReader(t *testing.T) {
+	// This test ensures the function handles nil objectReader gracefully
+	appliedResources := []workapiv1.AppliedManifestResourceMeta{
+		{
+			ResourceIdentifier: workapiv1.ResourceIdentifier{
+				Group:     "",
+				Resource:  "secrets",
+				Namespace: "default",
+				Name:      "secret1",
+			},
+			Version: "v1",
+		},
+	}
+
+	// Should not panic when objectReader is nil
+	UnRegisterInformerFromAppliedManifestWork(context.TODO(), nil, "test-work", appliedResources)
+}
+
+func TestGet_InformerFallbackToClient(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+
+	secret := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "v1",
+			"kind":       "Secret",
+			"metadata": map[string]any{
+				"name":      "test-secret",
+				"namespace": "default",
+			},
+			"data": map[string]any{
+				"key": "dmFsdWU=",
+			},
+		},
+	}
+
+	// Create dynamic client with the secret - object exists in client
+	fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(scheme, secret)
+	fakeWorkClient := fakeworkclient.NewSimpleClientset()
+	workInformerFactory := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
+	workInformer := workInformerFactory.Work().V1().ManifestWorks()
+	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]())
+
+	reader, err := NewOptions().NewObjectReader(fakeDynamicClient, workInformer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resourceMeta := workapiv1.ManifestResourceMeta{
+		Group:     "",
+		Version:   "v1",
+		Resource:  "secrets",
+		Namespace: "default",
+		Name:      "test-secret",
+	}
+
+	ctx := t.Context()
+
+	// Register informer - this creates an informer but it is not synced yet.
+	// This simulates scenarios where:
+	// 1. Watch permission is denied - informer starts but can't sync
+	// 2. Informer is still performing initial cache sync
+	// In both cases, HasSynced() returns false and Get() should fallback to client.Get()
+	// which only requires GET permission (not WATCH permission).
+	err = reader.RegisterInformer(ctx, "test-work", resourceMeta, queue)
+	if err != nil {
+		t.Fatalf("Expected no error registering informer, got %v", err)
+	}
+
+	// Get should fallback to dynamic client when informer is not synced.
+	// This ensures that even without WATCH permission, resources can still be retrieved
+	// using GET permission via the dynamic client.
+	obj, condition, err := reader.Get(ctx, resourceMeta)
+
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	if obj == nil {
+		t.Fatal("Expected object to be returned from fallback to client, got nil")
+	}
+
+	if obj.GetName() != "test-secret" {
+		t.Errorf("Expected object name test-secret, got %s", obj.GetName())
+	}
+
+	if obj.GetNamespace() != "default" {
+		t.Errorf("Expected object namespace default, got %s", obj.GetNamespace())
+	}
+
+	if condition.Type != workapiv1.ManifestAvailable {
+		t.Errorf("Expected condition type %s, got %s", workapiv1.ManifestAvailable, condition.Type)
+	}
+
+	if condition.Status != metav1.ConditionTrue {
+		t.Errorf("Expected condition status %s, got %s", metav1.ConditionTrue, condition.Status)
+	}
+
+	if condition.Reason != "ResourceAvailable" {
+		t.Errorf("Expected reason ResourceAvailable, got %s", condition.Reason)
 	}
 }
 
