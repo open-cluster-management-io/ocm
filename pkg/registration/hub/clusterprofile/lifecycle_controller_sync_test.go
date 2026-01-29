@@ -4,8 +4,10 @@ import (
 	"context"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	cpv1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
 	cpfake "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned/fake"
@@ -531,10 +533,29 @@ func TestLifecycleControllerSync(t *testing.T) {
 		},
 	}
 
+	// ========== Helper function ==========
+	createNamespace := func(name string) *corev1.Namespace {
+		return &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+		}
+	}
+
+	// ========== Namespaces ==========
+	ns1 := createNamespace("ns1")
+	nsTerminating := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "ns-terminating",
+			DeletionTimestamp: &metav1.Time{Time: metav1.Now().Time},
+		},
+	}
+
 	// ========== Test Cases ==========
 	cases := []struct {
 		name               string
 		key                string
+		namespace          *corev1.Namespace // if nil, namespace doesn't exist
 		clusters           []runtime.Object
 		clusterSets        []runtime.Object
 		bindings           []runtime.Object
@@ -544,8 +565,49 @@ func TestLifecycleControllerSync(t *testing.T) {
 		expectedNumActions int
 	}{
 		{
+			name:               "namespace not found - skip reconciliation",
+			key:                "ns-not-found",
+			namespace:          nil, // namespace doesn't exist
+			clusters:           []runtime.Object{cluster1, cluster2},
+			clusterSets:        []runtime.Object{defaultClusterSet},
+			bindings:           []runtime.Object{boundBindingDefault},
+			expectedCreates:    nil,
+			expectedDeletes:    nil,
+			expectedNumActions: 0, // should skip reconciliation
+		},
+		{
+			name:        "namespace terminating - skip reconciliation",
+			key:         "ns-terminating",
+			namespace:   nsTerminating,
+			clusters:    []runtime.Object{cluster1, cluster2},
+			clusterSets: []runtime.Object{defaultClusterSet},
+			bindings: []runtime.Object{
+				&v1beta2.ManagedClusterSetBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "default",
+						Namespace: "ns-terminating",
+					},
+					Spec: v1beta2.ManagedClusterSetBindingSpec{
+						ClusterSet: "default",
+					},
+					Status: v1beta2.ManagedClusterSetBindingStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   v1beta2.ClusterSetBindingBoundType,
+								Status: metav1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+			expectedCreates:    nil,
+			expectedDeletes:    nil,
+			expectedNumActions: 0, // should skip reconciliation
+		},
+		{
 			name:               "create profiles for bound binding",
 			key:                "ns1",
+			namespace:          ns1,
 			clusters:           []runtime.Object{cluster1, cluster2},
 			clusterSets:        []runtime.Object{defaultClusterSet},
 			bindings:           []runtime.Object{boundBindingDefault},
@@ -555,6 +617,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 		{
 			name:               "no action for unbound binding",
 			key:                "ns2",
+			namespace:          createNamespace("ns2"),
 			clusters:           []runtime.Object{cluster1, cluster2},
 			clusterSets:        []runtime.Object{defaultClusterSet},
 			bindings:           []runtime.Object{unboundBindingDefault},
@@ -565,6 +628,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 		{
 			name:               "update existing profile (no creates)",
 			key:                "ns1",
+			namespace:          ns1,
 			clusters:           []runtime.Object{cluster1, cluster2},
 			clusterSets:        []runtime.Object{defaultClusterSet},
 			bindings:           []runtime.Object{boundBindingDefault},
@@ -575,6 +639,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 		{
 			name:               "delete stale profile",
 			key:                "ns1",
+			namespace:          ns1,
 			clusters:           []runtime.Object{cluster1, cluster2},
 			clusterSets:        []runtime.Object{defaultClusterSet},
 			bindings:           []runtime.Object{boundBindingDefault},
@@ -586,6 +651,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 		{
 			name:               "namespace with no bindings",
 			key:                "empty-ns",
+			namespace:          createNamespace("empty-ns"),
 			clusters:           []runtime.Object{cluster1},
 			clusterSets:        []runtime.Object{defaultClusterSet},
 			bindings:           []runtime.Object{},
@@ -595,6 +661,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 		{
 			name:               "multiple bindings in same namespace - non-overlapping",
 			key:                "ns1",
+			namespace:          ns1,
 			clusters:           []runtime.Object{cluster1, cluster2, clusterBoundSet},
 			clusterSets:        []runtime.Object{defaultClusterSet, clusterSetbound},
 			bindings:           []runtime.Object{boundBindingDefault, boundBindingSet},
@@ -604,6 +671,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 		{
 			name:               "multiple bindings with clusters in deletion state",
 			key:                "ns1",
+			namespace:          ns1,
 			clusters:           []runtime.Object{cluster1, clusterDeleting, cluster2},
 			clusterSets:        []runtime.Object{defaultClusterSet},
 			bindings:           []runtime.Object{boundBindingDefault},
@@ -613,6 +681,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 		{
 			name:               "multiple bindings, one unbound",
 			key:                "ns1",
+			namespace:          ns1,
 			clusters:           []runtime.Object{cluster1, cluster2, clusterUnboundSet},
 			clusterSets:        []runtime.Object{defaultClusterSet, clusterSetUnbound},
 			bindings:           []runtime.Object{boundBindingDefault, unboundBindingSetUnbound},
@@ -623,6 +692,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 		{
 			name:               "LabelSelector - create profiles for clusters matching label selector",
 			key:                "ns-label",
+			namespace:          createNamespace("ns-label"),
 			clusters:           []runtime.Object{clusterProdUSWest, clusterDevUSWest, clusterMixed},
 			clusterSets:        []runtime.Object{clusterSetProdLabelSelector},
 			bindings:           []runtime.Object{boundBindingProdLabelSelector},
@@ -632,6 +702,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 		{
 			name:               "LabelSelector with MatchExpressions - select multiple environments",
 			key:                "ns-expr",
+			namespace:          createNamespace("ns-expr"),
 			clusters:           []runtime.Object{clusterProdUSWest, clusterDevUSWest, cluster1},
 			clusterSets:        []runtime.Object{clusterSetEnvMatchExpressions},
 			bindings:           []runtime.Object{boundBindingEnvMatchExpr},
@@ -641,6 +712,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 		{
 			name:               "overlap - ExclusiveClusterSetLabel and LabelSelector selecting same cluster",
 			key:                "ns-overlap",
+			namespace:          createNamespace("ns-overlap"),
 			clusters:           []runtime.Object{cluster1, clusterMixed, clusterProdUSWest},
 			clusterSets:        []runtime.Object{defaultClusterSet, clusterSetProdLabelSelector},
 			bindings:           []runtime.Object{boundBindingDefaultOverlap, boundBindingProdLabelSelectorOverlap},
@@ -650,6 +722,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 		{
 			name:               "overlap - multiple LabelSelectors selecting overlapping clusters",
 			key:                "ns-label-overlap",
+			namespace:          createNamespace("ns-label-overlap"),
 			clusters:           []runtime.Object{clusterProdUSWest, clusterProdEUWest},
 			clusterSets:        []runtime.Object{clusterSetProdLabelSelector, clusterSetUSWestLabelSelector},
 			bindings:           []runtime.Object{boundBindingProdLabelSelectorLabelOverlap, boundBindingUSWestLabelSelectorLabelOverlap},
@@ -659,6 +732,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 		{
 			name:               "global clusterset - matches all clusters",
 			key:                "ns-global",
+			namespace:          createNamespace("ns-global"),
 			clusters:           []runtime.Object{cluster1, clusterProdUSWest, clusterDevUSWest, clusterNoLabels},
 			clusterSets:        []runtime.Object{globalClusterSet},
 			bindings:           []runtime.Object{boundBindingGlobal},
@@ -668,6 +742,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 		{
 			name:               "global clusterset - skips clusters in deletion",
 			key:                "ns-global",
+			namespace:          createNamespace("ns-global"),
 			clusters:           []runtime.Object{cluster1, clusterProdUSWest, clusterDeleting},
 			clusterSets:        []runtime.Object{globalClusterSet},
 			bindings:           []runtime.Object{boundBindingGlobal},
@@ -677,6 +752,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 		{
 			name:               "global clusterset - overlap with default clusterset",
 			key:                "ns-global-overlap",
+			namespace:          createNamespace("ns-global-overlap"),
 			clusters:           []runtime.Object{cluster1, cluster2, clusterProdUSWest},
 			clusterSets:        []runtime.Object{globalClusterSet, defaultClusterSet},
 			bindings:           []runtime.Object{boundBindingGlobalOverlap, boundBindingDefaultGlobalOverlap},
@@ -686,6 +762,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 		{
 			name:               "complex overlap - ExclusiveClusterSetLabel, LabelSelector with MatchLabels, and MatchExpressions",
 			key:                "ns-complex",
+			namespace:          createNamespace("ns-complex"),
 			clusters:           []runtime.Object{cluster1, clusterMixed, clusterProdUSWest, clusterDevUSWest},
 			clusterSets:        []runtime.Object{defaultClusterSet, clusterSetProdLabelSelector, clusterSetEnvMatchExpressions},
 			bindings:           []runtime.Object{boundBindingDefaultComplex, boundBindingProdLabelSelectorComplex, boundBindingEnvMatchExprComplex},
@@ -696,6 +773,14 @@ func TestLifecycleControllerSync(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			// Create kubeClient with namespace if specified
+			var kubeClient *kubefake.Clientset
+			if c.namespace != nil {
+				kubeClient = kubefake.NewSimpleClientset(c.namespace)
+			} else {
+				kubeClient = kubefake.NewSimpleClientset()
+			}
+
 			clusterObjects := append(c.clusters, c.clusterSets...)
 			clusterObjects = append(clusterObjects, c.bindings...)
 			clusterClient := clusterfake.NewSimpleClientset(clusterObjects...)
@@ -719,11 +804,13 @@ func TestLifecycleControllerSync(t *testing.T) {
 			}
 
 			ctrl := &clusterProfileLifecycleController{
-				clusterLister:           clusterInformers.Cluster().V1().ManagedClusters().Lister(),
-				clusterSetLister:        clusterInformers.Cluster().V1beta2().ManagedClusterSets().Lister(),
-				clusterSetBindingLister: clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
-				clusterProfileClient:    cpClient,
-				clusterProfileLister:    cpInformers.Apis().V1alpha1().ClusterProfiles().Lister(),
+				kubeClient:               kubeClient,
+				clusterLister:            clusterInformers.Cluster().V1().ManagedClusters().Lister(),
+				clusterSetLister:         clusterInformers.Cluster().V1beta2().ManagedClusterSets().Lister(),
+				clusterSetBindingLister:  clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
+				clusterSetBindingIndexer: clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings().Informer().GetIndexer(),
+				clusterProfileClient:     cpClient,
+				clusterProfileLister:     cpInformers.Apis().V1alpha1().ClusterProfiles().Lister(),
 			}
 
 			syncCtx := testingcommon.NewFakeSyncContext(t, c.key)
