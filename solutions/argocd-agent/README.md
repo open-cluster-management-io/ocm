@@ -70,7 +70,7 @@ enabling efficient templating for deployment modifications.
 
 ## Prerequisites
 
-- [Helm CLI](https://helm.sh/).
+- [clusteradm CLI](https://open-cluster-management.io/docs/getting-started/quick-start/#install-clusteradm-cli-tool).
 
 - Setup an OCM environment with at least two clusters (one hub and at least one managed).
 Refer to the [Quick Start guide](https://open-cluster-management.io/docs/getting-started/quick-start/) for more details.
@@ -81,16 +81,13 @@ Refer to the [Additional Resources](#additional-resources) for more details.
 
 ## Setup Guide
 
-### Deploy OCM Argo CD AddOn Managers on the Hub Cluster
+### Deploy OCM Argo CD Agent AddOn on the Hub Cluster
 
 ```shell
 # After OCM and load balancer setup:
 #
 # kubectl config use-context <hub-cluster>
-helm repo add ocm https://open-cluster-management.io/helm-charts
-helm repo update
-helm search repo ocm
-helm install argocd-agent-addon ocm/argocd-agent-addon --namespace argocd --create-namespace
+clusteradm install hub-addon --names argocd-agent --create-namespace
 ```
 
 Validate that the Argo CD Agent AddOn is successfully deployed and available:
@@ -170,9 +167,14 @@ spec:
 EOF
 ```
 
-then create the application on the **hub cluster**:
+then create the target namespace on the managed cluster and the application on the **hub cluster**:
 
 ```shell
+# Create the target namespace on the managed cluster
+# kubectl config use-context <managed-cluster>
+kubectl create namespace guestbook
+
+# Create the application on the hub cluster
 # kubectl config use-context <hub-cluster>
 kubectl apply -f - <<EOF
 apiVersion: argoproj.io/v1alpha1
@@ -190,8 +192,6 @@ spec:
     server: https://172.18.255.200:443?agentName=cluster1 # Replace with https://<principal-external-ip:port>?agentName=<managed-cluster-name>
     namespace: guestbook
   syncPolicy:
-    syncOptions:
-    - CreateNamespace=true
     automated:
       prune: true
 EOF
