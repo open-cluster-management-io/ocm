@@ -157,6 +157,11 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 	})
 
 	ginkgo.AfterEach(func() {
+		if ginkgo.CurrentSpecReport().Failed() {
+			ginkgo.By(fmt.Sprintf("Test failed, preserving resources for debugging: %v", workName))
+			return
+		}
+
 		ginkgo.By(fmt.Sprintf("delete manifestwork %v/%v", universalClusterName, workName))
 		gomega.Expect(hub.CleanManifestWorks(universalClusterName, workName)).To(gomega.BeNil())
 	})
@@ -178,6 +183,11 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 		})
 
 		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentSpecReport().Failed() {
+				ginkgo.By(fmt.Sprintf("Test failed, preserving resources for debugging: %v", workName))
+				return
+			}
+
 			// remove finalizer from cm3 if necessary
 			cm3, err := spoke.KubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
 			if err == nil {
@@ -455,6 +465,11 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 		})
 
 		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentSpecReport().Failed() {
+				ginkgo.By(fmt.Sprintf("Test failed, preserving resources for debugging: %v", workName))
+				return
+			}
+
 			// delete namespace for cr
 			err = spoke.KubeClient.CoreV1().Namespaces().Delete(context.Background(), crNamespace, metav1.DeleteOptions{})
 			if err != nil {
@@ -639,6 +654,11 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 		})
 
 		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentSpecReport().Failed() {
+				ginkgo.By(fmt.Sprintf("Test failed, preserving resources for debugging: %v", workName))
+				return
+			}
+
 			err := spoke.KubeClient.CoreV1().Namespaces().Delete(ctx, nsName, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 

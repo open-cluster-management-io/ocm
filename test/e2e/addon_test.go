@@ -17,6 +17,11 @@ var _ = Describe("Manage the managed cluster addons", Label("addon"), func() {
 	})
 
 	AfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			By(fmt.Sprintf("Test failed, preserving resources for debugging: %s", addOnName))
+			return
+		}
+
 		err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})

@@ -38,6 +38,11 @@ var _ = ginkgo.Describe("Taints update check", ginkgo.Label("registration-taint"
 		})
 
 		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentSpecReport().Failed() {
+				ginkgo.By(fmt.Sprintf("Test failed, preserving resources for debugging: %v", clusterName))
+				return
+			}
+
 			err := hub.ClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), clusterName, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
+	ginkgo "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -223,6 +224,19 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
+	if ginkgo.CurrentSpecReport().Failed() {
+		ginkgo.By("Test failed, collecting logs for debugging")
+
+		// Collect logs from hub and spoke clusters
+		config := framework.DefaultLogCollectorConfig()
+		if err := framework.CollectE2ELogs(hub, spoke, config); err != nil {
+			fmt.Printf("Warning: failed to collect logs: %v\n", err)
+		}
+
+		ginkgo.By("Logs collected, preserving resources for debugging")
+		return
+	}
+
 	By(fmt.Sprintf("clean klusterlet %v resources after the test case", universalKlusterletName))
 	framework.CleanKlusterletRelatedResources(hub, spoke, universalKlusterletName, universalClusterName)
 })

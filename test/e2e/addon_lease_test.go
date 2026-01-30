@@ -44,6 +44,11 @@ var _ = ginkgo.Describe("Addon Health Check", ginkgo.Label("addon-lease"), func(
 		})
 
 		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentSpecReport().Failed() {
+				ginkgo.By(fmt.Sprintf("Test failed, preserving resources for debugging: %s", addOnName))
+				return
+			}
+
 			ginkgo.By(fmt.Sprintf("Cleaning managed cluster addon installation namespace %q", addOnName))
 			err := spoke.KubeClient.CoreV1().Namespaces().Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -248,6 +253,11 @@ var _ = ginkgo.Describe("Addon Health Check", ginkgo.Label("addon-lease"), func(
 		})
 
 		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentSpecReport().Failed() {
+				ginkgo.By(fmt.Sprintf("Test failed, preserving resources for debugging: %s, %s, %s", klusterletName, clusterName, addOnName))
+				return
+			}
+
 			ginkgo.By(fmt.Sprintf("Cleaning managed cluster addon installation namespace %q", addOnName))
 			err := hub.KubeClient.CoreV1().Namespaces().Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
