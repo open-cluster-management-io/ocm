@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,7 +51,7 @@ func CollectE2ELogs(hub *Hub, spoke *Spoke, config *LogCollectorConfig) error {
 	if err := os.MkdirAll(hubDir, 0755); err != nil {
 		return fmt.Errorf("failed to create hub directory: %w", err)
 	}
-	if err := collectClusterLogs(hub.KubeClient, hubDir, config, "hub"); err != nil {
+	if err := collectClusterLogs(hub.OCMClients, hubDir, config, "hub"); err != nil {
 		fmt.Printf("Warning: failed to collect hub logs: %v\n", err)
 	}
 
@@ -61,7 +60,7 @@ func CollectE2ELogs(hub *Hub, spoke *Spoke, config *LogCollectorConfig) error {
 	if err := os.MkdirAll(spokeDir, 0755); err != nil {
 		return fmt.Errorf("failed to create spoke directory: %w", err)
 	}
-	if err := collectClusterLogs(spoke.KubeClient, spokeDir, config, "spoke"); err != nil {
+	if err := collectClusterLogs(spoke.OCMClients, spokeDir, config, "spoke"); err != nil {
 		fmt.Printf("Warning: failed to collect spoke logs: %v\n", err)
 	}
 
@@ -70,11 +69,14 @@ func CollectE2ELogs(hub *Hub, spoke *Spoke, config *LogCollectorConfig) error {
 }
 
 // collectClusterLogs collects logs from a single cluster
-func collectClusterLogs(client kubernetes.Interface, outputDir string, config *LogCollectorConfig, clusterType string) error {
+func collectClusterLogs(clients *OCMClients, outputDir string, config *LogCollectorConfig, clusterType string) error {
 	ctx := context.Background()
 
 	// Define namespaces to collect logs from
-	namespaces := getRelevantNamespaces(clusterType)
+	namespaces, err := getRelevantNamespaces(ctx, clients.KubeClient)
+	if err != nil {
+		return fmt.Errorf("failed to get relevant namespaces: %w", err)
+	}
 
 	for _, ns := range namespaces {
 		nsDir := filepath.Join(outputDir, ns)
@@ -85,26 +87,26 @@ func collectClusterLogs(client kubernetes.Interface, outputDir string, config *L
 
 		// Collect pod logs and descriptions
 		if config.IncludePodLogs {
-			if err := collectPodLogs(ctx, client, ns, nsDir, config.TailLines); err != nil {
+			if err := collectPodLogs(ctx, clients.KubeClient, ns, nsDir, config.TailLines); err != nil {
 				fmt.Printf("Warning: failed to collect pod logs for namespace %s: %v\n", ns, err)
 			}
 		}
 
 		// Collect pod descriptions
-		if err := collectPodDescriptions(ctx, client, ns, nsDir); err != nil {
+		if err := collectPodDescriptions(ctx, clients.KubeClient, ns, nsDir); err != nil {
 			fmt.Printf("Warning: failed to collect pod descriptions for namespace %s: %v\n", ns, err)
 		}
 
 		// Collect events
 		if config.IncludeEvents {
-			if err := collectEvents(ctx, client, ns, nsDir); err != nil {
+			if err := collectEvents(ctx, clients.KubeClient, ns, nsDir); err != nil {
 				fmt.Printf("Warning: failed to collect events for namespace %s: %v\n", ns, err)
 			}
 		}
 	}
 
 	// Collect cluster-wide resources
-	if err := collectClusterResources(ctx, client, outputDir); err != nil {
+	if err := collectClusterResources(ctx, clients, outputDir, namespaces, clusterType); err != nil {
 		fmt.Printf("Warning: failed to collect cluster resources: %v\n", err)
 	}
 
@@ -112,16 +114,29 @@ func collectClusterLogs(client kubernetes.Interface, outputDir string, config *L
 }
 
 // getRelevantNamespaces returns the list of namespaces to collect logs from
-func getRelevantNamespaces(clusterType string) []string {
-	baseNamespaces := []string{
-		"open-cluster-management",
-		"open-cluster-management-hub",
-		"open-cluster-management-agent",
-		"open-cluster-management-agent-addon",
+// It gets all namespaces except for common system namespaces that are not relevant
+func getRelevantNamespaces(ctx context.Context, client kubernetes.Interface) ([]string, error) {
+	// Namespaces to exclude from log collection
+	excludedNamespaces := map[string]bool{
+		"kube-node-lease":    true,
+		"kube-public":        true,
+		"kube-system":        true,
+		"local-path-storage": true,
 	}
 
-	// Always include kube-system for both hub and spoke
-	return append(baseNamespaces, "kube-system")
+	namespaces, err := client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list namespaces: %w", err)
+	}
+
+	var relevantNamespaces []string
+	for _, ns := range namespaces.Items {
+		if !excludedNamespaces[ns.Name] {
+			relevantNamespaces = append(relevantNamespaces, ns.Name)
+		}
+	}
+
+	return relevantNamespaces, nil
 }
 
 // collectPodLogs collects logs from all pods in a namespace
@@ -286,7 +301,7 @@ func collectEvents(ctx context.Context, client kubernetes.Interface, namespace, 
 }
 
 // collectClusterResources collects cluster-wide resource information
-func collectClusterResources(ctx context.Context, client kubernetes.Interface, outputDir string) error {
+func collectClusterResources(ctx context.Context, clients *OCMClients, outputDir string, relevantNamespaces []string, clusterType string) error {
 	filename := filepath.Join(outputDir, "cluster-resources.txt")
 	file, err := os.Create(filename)
 	if err != nil {
@@ -295,7 +310,7 @@ func collectClusterResources(ctx context.Context, client kubernetes.Interface, o
 	defer file.Close()
 
 	// List all nodes
-	nodes, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	nodes, err := clients.KubeClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err == nil {
 		fmt.Fprintf(file, "=== Nodes ===\n")
 		for _, node := range nodes.Items {
@@ -314,7 +329,7 @@ func collectClusterResources(ctx context.Context, client kubernetes.Interface, o
 	}
 
 	// List all namespaces
-	namespaces, err := client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	namespaces, err := clients.KubeClient.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err == nil {
 		fmt.Fprintf(file, "\n=== Namespaces ===\n")
 		for _, ns := range namespaces.Items {
@@ -322,15 +337,9 @@ func collectClusterResources(ctx context.Context, client kubernetes.Interface, o
 		}
 	}
 
-	// List deployments in OCM namespaces
-	ocmNamespaces := []string{
-		"open-cluster-management",
-		"open-cluster-management-hub",
-		"open-cluster-management-agent",
-	}
-
-	for _, ns := range ocmNamespaces {
-		deployments, err := client.AppsV1().Deployments(ns).List(ctx, metav1.ListOptions{})
+	// List deployments in relevant namespaces
+	for _, ns := range relevantNamespaces {
+		deployments, err := clients.KubeClient.AppsV1().Deployments(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			continue
 		}
@@ -346,37 +355,157 @@ func collectClusterResources(ctx context.Context, client kubernetes.Interface, o
 		}
 	}
 
+	// Collect OCM custom resources
+	if err := collectOCMCustomResources(ctx, clients, file, clusterType); err != nil {
+		fmt.Printf("Warning: failed to collect OCM custom resources: %v\n", err)
+	}
+
 	return nil
 }
 
-// CollectResourceYAML collects YAML representation of specific resources
-func CollectResourceYAML(ctx context.Context, client kubernetes.Interface, outputDir, resourceType, namespace, name string) error {
-	// This is a placeholder for collecting specific resources as YAML
-	// Can be extended based on specific needs
-	return nil
-}
+// collectOCMCustomResources collects OCM-specific custom resources
+func collectOCMCustomResources(ctx context.Context, clients *OCMClients, file *os.File, clusterType string) error {
+	if clusterType == "hub" {
+		// Collect hub-specific CRs
 
-// GetAllDynamicNamespaces finds all namespaces that match OCM patterns
-func GetAllDynamicNamespaces(ctx context.Context, client kubernetes.Interface) ([]string, error) {
-	namespaces, err := client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
+		// ClusterManager
+		clusterManagers, err := clients.OperatorClient.OperatorV1().ClusterManagers().List(ctx, metav1.ListOptions{})
+		if err == nil && len(clusterManagers.Items) > 0 {
+			fmt.Fprintf(file, "\n=== ClusterManagers ===\n")
+			for _, cm := range clusterManagers.Items {
+				fmt.Fprintf(file, "- %s (DeployOption: %s)\n",
+					cm.Name,
+					cm.Spec.DeployOption.Mode)
+			}
+		}
 
-	var ocmNamespaces []string
-	ocmPrefixes := []string{
-		"open-cluster-management",
-		"klusterlet-",
-	}
+		// ManagedClusters
+		managedClusters, err := clients.ClusterClient.ClusterV1().ManagedClusters().List(ctx, metav1.ListOptions{})
+		if err == nil && len(managedClusters.Items) > 0 {
+			fmt.Fprintf(file, "\n=== ManagedClusters ===\n")
+			for _, mc := range managedClusters.Items {
+				fmt.Fprintf(file, "- %s (Accepted: %v, Available: %v)\n",
+					mc.Name,
+					mc.Spec.HubAcceptsClient,
+					len(mc.Status.Conditions) > 0)
+			}
+		}
 
-	for _, ns := range namespaces.Items {
-		for _, prefix := range ocmPrefixes {
-			if strings.HasPrefix(ns.Name, prefix) {
-				ocmNamespaces = append(ocmNamespaces, ns.Name)
-				break
+		// ManagedClusterSets
+		managedClusterSets, err := clients.ClusterClient.ClusterV1beta2().ManagedClusterSets().List(ctx, metav1.ListOptions{})
+		if err == nil && len(managedClusterSets.Items) > 0 {
+			fmt.Fprintf(file, "\n=== ManagedClusterSets ===\n")
+			for _, mcs := range managedClusterSets.Items {
+				fmt.Fprintf(file, "- %s\n", mcs.Name)
+			}
+		}
+
+		// Placements
+		placements, err := clients.ClusterClient.ClusterV1beta1().Placements("").List(ctx, metav1.ListOptions{})
+		if err == nil && len(placements.Items) > 0 {
+			fmt.Fprintf(file, "\n=== Placements ===\n")
+			for _, p := range placements.Items {
+				fmt.Fprintf(file, "- %s/%s (NumberOfSelectedClusters: %d)\n",
+					p.Namespace, p.Name, p.Status.NumberOfSelectedClusters)
+			}
+		}
+
+		// PlacementDecisions
+		placementDecisions, err := clients.ClusterClient.ClusterV1beta1().PlacementDecisions("").List(ctx, metav1.ListOptions{})
+		if err == nil && len(placementDecisions.Items) > 0 {
+			fmt.Fprintf(file, "\n=== PlacementDecisions ===\n")
+			for _, pd := range placementDecisions.Items {
+				fmt.Fprintf(file, "- %s/%s (Decisions: %d)\n",
+					pd.Namespace, pd.Name, len(pd.Status.Decisions))
+			}
+		}
+
+		// ClusterManagementAddons (v1alpha1 only)
+		clusterMgmtAddons, err := clients.AddonClient.AddonV1alpha1().ClusterManagementAddOns().List(ctx, metav1.ListOptions{})
+		if err == nil && len(clusterMgmtAddons.Items) > 0 {
+			fmt.Fprintf(file, "\n=== ClusterManagementAddons (v1alpha1) ===\n")
+			for _, cma := range clusterMgmtAddons.Items {
+				fmt.Fprintf(file, "- %s\n", cma.Name)
+			}
+		}
+
+		// ManagedClusterAddons (v1alpha1 only)
+		managedClusterAddons, err := clients.AddonClient.AddonV1alpha1().ManagedClusterAddOns("").List(ctx, metav1.ListOptions{})
+		if err == nil && len(managedClusterAddons.Items) > 0 {
+			fmt.Fprintf(file, "\n=== ManagedClusterAddons (v1alpha1) ===\n")
+			for _, mca := range managedClusterAddons.Items {
+				fmt.Fprintf(file, "- %s/%s\n", mca.Namespace, mca.Name)
+			}
+		}
+
+		// AddonDeploymentConfigs (v1alpha1 only)
+		addonDeploymentConfigs, err := clients.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs("").List(ctx, metav1.ListOptions{})
+		if err == nil && len(addonDeploymentConfigs.Items) > 0 {
+			fmt.Fprintf(file, "\n=== AddonDeploymentConfigs (v1alpha1) ===\n")
+			for _, adc := range addonDeploymentConfigs.Items {
+				fmt.Fprintf(file, "- %s/%s\n", adc.Namespace, adc.Name)
+			}
+		}
+
+		// AddonTemplates (v1alpha1 only)
+		addonTemplates, err := clients.AddonClient.AddonV1alpha1().AddOnTemplates().List(ctx, metav1.ListOptions{})
+		if err == nil && len(addonTemplates.Items) > 0 {
+			fmt.Fprintf(file, "\n=== AddonTemplates (v1alpha1) ===\n")
+			for _, at := range addonTemplates.Items {
+				fmt.Fprintf(file, "- %s\n", at.Name)
+			}
+		}
+
+		// ManifestWorks
+		manifestWorks, err := clients.WorkClient.WorkV1().ManifestWorks("").List(ctx, metav1.ListOptions{})
+		if err == nil && len(manifestWorks.Items) > 0 {
+			fmt.Fprintf(file, "\n=== ManifestWorks ===\n")
+			for _, mw := range manifestWorks.Items {
+				fmt.Fprintf(file, "- %s/%s\n", mw.Namespace, mw.Name)
+			}
+		}
+
+		// ManifestWorkReplicaSets
+		manifestWorkReplicaSets, err := clients.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets("").List(ctx, metav1.ListOptions{})
+		if err == nil && len(manifestWorkReplicaSets.Items) > 0 {
+			fmt.Fprintf(file, "\n=== ManifestWorkReplicaSets ===\n")
+			for _, mwrs := range manifestWorkReplicaSets.Items {
+				fmt.Fprintf(file, "- %s/%s\n", mwrs.Namespace, mwrs.Name)
+			}
+		}
+	} else {
+		// Collect spoke-specific CRs
+
+		// Klusterlet
+		klusterlets, err := clients.OperatorClient.OperatorV1().Klusterlets().List(ctx, metav1.ListOptions{})
+		if err == nil && len(klusterlets.Items) > 0 {
+			fmt.Fprintf(file, "\n=== Klusterlets ===\n")
+			for _, kl := range klusterlets.Items {
+				fmt.Fprintf(file, "- %s (DeployOption: %s, ClusterName: %s)\n",
+					kl.Name,
+					kl.Spec.DeployOption.Mode,
+					kl.Spec.ClusterName)
+			}
+		}
+
+		// AppliedManifestWorks
+		appliedManifestWorks, err := clients.WorkClient.WorkV1().AppliedManifestWorks().List(ctx, metav1.ListOptions{})
+		if err == nil && len(appliedManifestWorks.Items) > 0 {
+			fmt.Fprintf(file, "\n=== AppliedManifestWorks ===\n")
+			for _, amw := range appliedManifestWorks.Items {
+				fmt.Fprintf(file, "- %s\n", amw.Name)
+			}
+		}
+
+		// ClusterClaims
+		clusterClaims, err := clients.ClusterClient.ClusterV1alpha1().ClusterClaims().List(ctx, metav1.ListOptions{})
+		if err == nil && len(clusterClaims.Items) > 0 {
+			fmt.Fprintf(file, "\n=== ClusterClaims ===\n")
+			for _, cc := range clusterClaims.Items {
+				fmt.Fprintf(file, "- %s: %s\n", cc.Name, cc.Spec.Value)
 			}
 		}
 	}
 
-	return ocmNamespaces, nil
+	return nil
 }
