@@ -169,6 +169,7 @@ func kubeClientSignerConfigurations(addonName, agentName string) agent.CSRConfig
 func defaultGroups(clusterName, addonName string) []string {
 	return []string{
 		fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", clusterName, addonName),
+		fmt.Sprintf("system:open-cluster-management:addon:%s", addonName),
 	}
 }
 
@@ -556,6 +557,9 @@ func buildSubjectsFromRegistration(addon *addonapiv1alpha1.ManagedClusterAddOn, 
 
 	// Include groups
 	for _, group := range subject.Groups {
+		if group == "system:authenticated" {
+			continue
+		}
 		subjects = append(subjects, rbacv1.Subject{
 			Kind:     rbacv1.GroupKind,
 			APIGroup: rbacv1.GroupName,
