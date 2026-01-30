@@ -458,9 +458,25 @@ func NewFakeTemplateManagedClusterAddon(name, clusterName, addonTemplateName, ad
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: clusterName,
+			UID:       "fakeuid",
 		},
-		Spec:   addonapiv1alpha1.ManagedClusterAddOnSpec{},
-		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{},
+		Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{},
+		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+			// Add default registration status with subjects for dynamic RBAC binding
+			Registrations: []addonapiv1alpha1.RegistrationConfig{
+				{
+					SignerName: certificatesv1.KubeAPIServerClientSignerName,
+					Subject: addonapiv1alpha1.Subject{
+						User: fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s:agent:%s-agent",
+							clusterName, name, name),
+						Groups: []string{
+							fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", clusterName, name),
+							fmt.Sprintf("system:open-cluster-management:addon:%s", name),
+						},
+					},
+				},
+			},
+		},
 	}
 
 	if addonTemplateName != "" {
@@ -677,12 +693,24 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 				if len(rb.OwnerReferences) != 0 {
 					t.Errorf("expected rolebinding to have 0 owner reference, got %d", len(rb.OwnerReferences))
 				}
-				if len(rb.Subjects) != 1 {
-					t.Errorf("expected rolebinding to have 1 subject, got %d", len(rb.Subjects))
+				// Dynamic subjects: 1 user + 2 groups
+				if len(rb.Subjects) != 3 {
+					t.Errorf("expected rolebinding to have 3 subjects, got %d", len(rb.Subjects))
 				}
-				if rb.Subjects[0].Name != "system:open-cluster-management:cluster:cluster1:addon:addon1" {
-					t.Errorf("expected rolebinding subject name to be system:open-cluster-management:cluster:cluster1:addon:addon1, got %s",
+				// Verify user subject
+				if rb.Subjects[0].Kind != rbacv1.UserKind {
+					t.Errorf("expected first subject to be User, got %s", rb.Subjects[0].Kind)
+				}
+				if rb.Subjects[0].Name != "system:open-cluster-management:cluster:cluster1:addon:addon1:agent:addon1-agent" {
+					t.Errorf("expected user subject name to be system:open-cluster-management:cluster:cluster1:addon:addon1:agent:addon1-agent, got %s",
 						rb.Subjects[0].Name)
+				}
+				// Verify group subjects
+				if rb.Subjects[1].Kind != rbacv1.GroupKind {
+					t.Errorf("expected second subject to be Group, got %s", rb.Subjects[1].Kind)
+				}
+				if rb.Subjects[2].Kind != rbacv1.GroupKind {
+					t.Errorf("expected third subject to be Group, got %s", rb.Subjects[2].Kind)
 				}
 			},
 		},
@@ -789,5 +817,256 @@ func TestAddonManagerNamespace(t *testing.T) {
 		// reset podNamespace and env
 		podNamespace = ""
 		os.Setenv("POD_NAMESPACE", "")
+	}
+}
+
+func TestBuildSubjectsFromRegistration(t *testing.T) {
+	cases := []struct {
+		name             string
+		addon            *addonapiv1alpha1.ManagedClusterAddOn
+		signerName       string
+		expectedSubjects []rbacv1.Subject
+	}{
+		{
+			name: "no registrations",
+			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-addon",
+					Namespace: "cluster1",
+				},
+				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{},
+			},
+			signerName:       certificatesv1.KubeAPIServerClientSignerName,
+			expectedSubjects: nil,
+		},
+		{
+			name: "registration with user and groups",
+			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-addon",
+					Namespace: "cluster1",
+				},
+				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+					Registrations: []addonapiv1alpha1.RegistrationConfig{
+						{
+							SignerName: certificatesv1.KubeAPIServerClientSignerName,
+							Subject: addonapiv1alpha1.Subject{
+								User: "system:open-cluster-management:cluster:cluster1:addon:test-addon:agent:test-addon-agent",
+								Groups: []string{
+									"system:open-cluster-management:cluster:cluster1:addon:test-addon",
+									"system:open-cluster-management:addon:test-addon",
+								},
+							},
+						},
+					},
+				},
+			},
+			signerName: certificatesv1.KubeAPIServerClientSignerName,
+			expectedSubjects: []rbacv1.Subject{
+				{
+					Kind:     rbacv1.UserKind,
+					APIGroup: rbacv1.GroupName,
+					Name:     "system:open-cluster-management:cluster:cluster1:addon:test-addon:agent:test-addon-agent",
+				},
+				{
+					Kind:     rbacv1.GroupKind,
+					APIGroup: rbacv1.GroupName,
+					Name:     "system:open-cluster-management:cluster:cluster1:addon:test-addon",
+				},
+				{
+					Kind:     rbacv1.GroupKind,
+					APIGroup: rbacv1.GroupName,
+					Name:     "system:open-cluster-management:addon:test-addon",
+				},
+			},
+		},
+		{
+			name: "registration with only groups",
+			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-addon",
+					Namespace: "cluster1",
+				},
+				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+					Registrations: []addonapiv1alpha1.RegistrationConfig{
+						{
+							SignerName: certificatesv1.KubeAPIServerClientSignerName,
+							Subject: addonapiv1alpha1.Subject{
+								Groups: []string{
+									"system:open-cluster-management:cluster:cluster1:addon:test-addon",
+								},
+							},
+						},
+					},
+				},
+			},
+			signerName: certificatesv1.KubeAPIServerClientSignerName,
+			expectedSubjects: []rbacv1.Subject{
+				{
+					Kind:     rbacv1.GroupKind,
+					APIGroup: rbacv1.GroupName,
+					Name:     "system:open-cluster-management:cluster:cluster1:addon:test-addon",
+				},
+			},
+		},
+		{
+			name: "registration with only user",
+			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-addon",
+					Namespace: "cluster1",
+				},
+				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+					Registrations: []addonapiv1alpha1.RegistrationConfig{
+						{
+							SignerName: certificatesv1.KubeAPIServerClientSignerName,
+							Subject: addonapiv1alpha1.Subject{
+								User: "system:serviceaccount:cluster1:test-addon-sa",
+							},
+						},
+					},
+				},
+			},
+			signerName: certificatesv1.KubeAPIServerClientSignerName,
+			expectedSubjects: []rbacv1.Subject{
+				{
+					Kind:     rbacv1.UserKind,
+					APIGroup: rbacv1.GroupName,
+					Name:     "system:serviceaccount:cluster1:test-addon-sa",
+				},
+			},
+		},
+		{
+			name: "empty subject",
+			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-addon",
+					Namespace: "cluster1",
+				},
+				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+					Registrations: []addonapiv1alpha1.RegistrationConfig{
+						{
+							SignerName: certificatesv1.KubeAPIServerClientSignerName,
+							Subject:    addonapiv1alpha1.Subject{},
+						},
+					},
+				},
+			},
+			signerName:       certificatesv1.KubeAPIServerClientSignerName,
+			expectedSubjects: nil,
+		},
+		{
+			name: "signer name not found",
+			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-addon",
+					Namespace: "cluster1",
+				},
+				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+					Registrations: []addonapiv1alpha1.RegistrationConfig{
+						{
+							SignerName: "custom.signer/name",
+							Subject: addonapiv1alpha1.Subject{
+								User: "test-user",
+							},
+						},
+					},
+				},
+			},
+			signerName:       certificatesv1.KubeAPIServerClientSignerName,
+			expectedSubjects: nil,
+		},
+		{
+			name: "multiple registrations - finds correct one",
+			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-addon",
+					Namespace: "cluster1",
+				},
+				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+					Registrations: []addonapiv1alpha1.RegistrationConfig{
+						{
+							SignerName: "custom.signer/name",
+							Subject: addonapiv1alpha1.Subject{
+								User: "custom-user",
+							},
+						},
+						{
+							SignerName: certificatesv1.KubeAPIServerClientSignerName,
+							Subject: addonapiv1alpha1.Subject{
+								User: "kube-user",
+								Groups: []string{
+									"kube-group",
+								},
+							},
+						},
+					},
+				},
+			},
+			signerName: certificatesv1.KubeAPIServerClientSignerName,
+			expectedSubjects: []rbacv1.Subject{
+				{
+					Kind:     rbacv1.UserKind,
+					APIGroup: rbacv1.GroupName,
+					Name:     "kube-user",
+				},
+				{
+					Kind:     rbacv1.GroupKind,
+					APIGroup: rbacv1.GroupName,
+					Name:     "kube-group",
+				},
+			},
+		},
+		{
+			name: "groups with system:authenticated should be filtered out",
+			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-addon",
+					Namespace: "cluster1",
+				},
+				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+					Registrations: []addonapiv1alpha1.RegistrationConfig{
+						{
+							SignerName: certificatesv1.KubeAPIServerClientSignerName,
+							Subject: addonapiv1alpha1.Subject{
+								User: "system:serviceaccount:cluster1:test-addon-sa",
+								Groups: []string{
+									"system:authenticated",
+									"system:open-cluster-management:cluster:cluster1:addon:test-addon",
+									"system:serviceaccounts",
+								},
+							},
+						},
+					},
+				},
+			},
+			signerName: certificatesv1.KubeAPIServerClientSignerName,
+			expectedSubjects: []rbacv1.Subject{
+				{
+					Kind:     rbacv1.UserKind,
+					APIGroup: rbacv1.GroupName,
+					Name:     "system:serviceaccount:cluster1:test-addon-sa",
+				},
+				{
+					Kind:     rbacv1.GroupKind,
+					APIGroup: rbacv1.GroupName,
+					Name:     "system:open-cluster-management:cluster:cluster1:addon:test-addon",
+				},
+				{
+					Kind:     rbacv1.GroupKind,
+					APIGroup: rbacv1.GroupName,
+					Name:     "system:serviceaccounts",
+				},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			subjects := buildSubjectsFromRegistration(c.addon, c.signerName)
+			if !equality.Semantic.DeepEqual(subjects, c.expectedSubjects) {
+				t.Errorf("expected subjects %v, got %v", c.expectedSubjects, subjects)
+			}
+		})
 	}
 }
