@@ -226,8 +226,9 @@ func (n *klusterletCleanupController) checkConnectivity(ctx context.Context,
 	}
 
 	// if the managed cluster is destroyed, the returned err is TCP timeout or TCP no such host,
-	// the k8s.io/apimachinery/pkg/api/errors.IsTimeout,IsServerTimeout can not match this error
-	if isTCPTimeOutError(err) || isTCPNoSuchHostError(err) || isTCPConnectionRefusedError(err) {
+	// the k8s.io/apimachinery/pkg/api/errors.IsTimeout,IsServerTimeout can not match this error.
+	// Also handle Unauthorized/Forbidden errors which occur when the hub has revoked RBAC for this cluster.
+	if isTCPTimeOutError(err) || isTCPNoSuchHostError(err) || isTCPConnectionRefusedError(err) || isUnauthorizedOrForbiddenError(err) {
 		logger.V(4).Info("check the connectivity for klusterlet",
 			"annotations", klusterlet.Annotations, "err", err)
 		if klusterlet.Annotations == nil {
@@ -276,6 +277,12 @@ func isTCPConnectionRefusedError(err error) bool {
 	return err != nil &&
 		strings.Contains(err.Error(), "dial tcp") &&
 		strings.Contains(err.Error(), "connection refused")
+}
+
+// isUnauthorizedOrForbiddenError checks if the error is an Unauthorized (401) or Forbidden (403) error.
+// This typically occurs when the hub has revoked RBAC for the managed cluster during deletion.
+func isUnauthorizedOrForbiddenError(err error) bool {
+	return errors.IsUnauthorized(err) || errors.IsForbidden(err)
 }
 
 // readyToAddHostedFinalizer checkes whether the hosted finalizer should be added.

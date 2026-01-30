@@ -6,9 +6,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clienttesting "k8s.io/client-go/testing"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
@@ -230,11 +232,12 @@ func TestSyncAddHostedFinalizerWhenKubeconfigReady(t *testing.T) {
 
 func TestConnectivityError(t *testing.T) {
 	cases := []struct {
-		name                        string
-		err                         error
-		isTCPTimeOutError           bool
-		isTCPNoSuchHostError        bool
-		isTCPConnectionRefusedError bool
+		name                           string
+		err                            error
+		isTCPTimeOutError              bool
+		isTCPNoSuchHostError           bool
+		isTCPConnectionRefusedError    bool
+		isUnauthorizedOrForbiddenError bool
 	}{
 		{
 			name:              "TCPTimeOutError",
@@ -251,6 +254,23 @@ func TestConnectivityError(t *testing.T) {
 			err:                         fmt.Errorf("dial tcp 172.0.0.1:443: connect: connection refused"),
 			isTCPConnectionRefusedError: true,
 		},
+		{
+			name:                           "UnauthorizedError",
+			err:                            errors.NewUnauthorized("unauthorized"),
+			isUnauthorizedOrForbiddenError: true,
+		},
+		{
+			name: "ForbiddenError",
+			err: errors.NewForbidden(
+				schema.GroupResource{Group: "work.open-cluster-management.io", Resource: "appliedmanifestworks"},
+				"test",
+				fmt.Errorf("forbidden")),
+			isUnauthorizedOrForbiddenError: true,
+		},
+		{
+			name: "OtherError",
+			err:  fmt.Errorf("some other error"),
+		},
 	}
 
 	for _, c := range cases {
@@ -258,6 +278,7 @@ func TestConnectivityError(t *testing.T) {
 			assert.Equal(t, c.isTCPTimeOutError, isTCPTimeOutError(c.err), c.name)
 			assert.Equal(t, c.isTCPNoSuchHostError, isTCPNoSuchHostError(c.err), c.name)
 			assert.Equal(t, c.isTCPConnectionRefusedError, isTCPConnectionRefusedError(c.err), c.name)
+			assert.Equal(t, c.isUnauthorizedOrForbiddenError, isUnauthorizedOrForbiddenError(c.err), c.name)
 		})
 	}
 }
