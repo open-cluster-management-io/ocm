@@ -79,7 +79,6 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 						Groups: []string{
 							"system:open-cluster-management:cluster:cluster1:addon:addon1",
 							"system:open-cluster-management:addon:addon1",
-							"system:authenticated",
 						},
 						OrganizationUnits: []string{},
 					},
@@ -1014,6 +1013,48 @@ func TestBuildSubjectsFromRegistration(t *testing.T) {
 					Kind:     rbacv1.GroupKind,
 					APIGroup: rbacv1.GroupName,
 					Name:     "kube-group",
+				},
+			},
+		},
+		{
+			name: "groups with system:authenticated should be filtered out",
+			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-addon",
+					Namespace: "cluster1",
+				},
+				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+					Registrations: []addonapiv1alpha1.RegistrationConfig{
+						{
+							SignerName: certificatesv1.KubeAPIServerClientSignerName,
+							Subject: addonapiv1alpha1.Subject{
+								User: "system:serviceaccount:cluster1:test-addon-sa",
+								Groups: []string{
+									"system:authenticated",
+									"system:open-cluster-management:cluster:cluster1:addon:test-addon",
+									"system:serviceaccounts",
+								},
+							},
+						},
+					},
+				},
+			},
+			signerName: certificatesv1.KubeAPIServerClientSignerName,
+			expectedSubjects: []rbacv1.Subject{
+				{
+					Kind:     rbacv1.UserKind,
+					APIGroup: rbacv1.GroupName,
+					Name:     "system:serviceaccount:cluster1:test-addon-sa",
+				},
+				{
+					Kind:     rbacv1.GroupKind,
+					APIGroup: rbacv1.GroupName,
+					Name:     "system:open-cluster-management:cluster:cluster1:addon:test-addon",
+				},
+				{
+					Kind:     rbacv1.GroupKind,
+					APIGroup: rbacv1.GroupName,
+					Name:     "system:serviceaccounts",
 				},
 			},
 		},
