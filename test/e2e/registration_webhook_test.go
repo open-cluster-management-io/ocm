@@ -37,6 +37,11 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 		})
 
 		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentSpecReport().Failed() {
+				ginkgo.By(fmt.Sprintf("Test failed, preserving resources for debugging: %v", clusterName))
+				return
+			}
+
 			gomega.Expect(hub.DeleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 		})
 
@@ -416,6 +421,11 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 			})
 
 			ginkgo.AfterEach(func() {
+				if ginkgo.CurrentSpecReport().Failed() {
+					ginkgo.By(fmt.Sprintf("Test failed, preserving resources for debugging: %v", clusterName))
+					return
+				}
+
 				ginkgo.By(fmt.Sprintf("Cleaning managed cluster %q", clusterName))
 				gomega.Expect(hub.DeleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 			})
@@ -694,6 +704,11 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 		})
 
 		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentSpecReport().Failed() {
+				ginkgo.By(fmt.Sprintf("Test failed, preserving resources for debugging: %v", namespace))
+				return
+			}
+
 			err := hub.KubeClient.CoreV1().Namespaces().Delete(context.TODO(), namespace, metav1.DeleteOptions{})
 			if errors.IsNotFound(err) {
 				return

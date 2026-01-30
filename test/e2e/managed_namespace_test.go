@@ -56,6 +56,11 @@ var _ = ginkgo.Describe("ManagedNamespace", func() {
 		})
 
 		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentSpecReport().Failed() {
+				ginkgo.By(fmt.Sprintf("Test failed, preserving resources for debugging: %v, %v", expectedNamespaces, originalManagedNamespaces))
+				return
+			}
+
 			// Restore original managed namespaces in the universal cluster set
 			gomega.Eventually(func() error {
 				clusterSet, err := hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Get(
@@ -302,6 +307,12 @@ var _ = ginkgo.Describe("ManagedNamespace", func() {
 		})
 
 		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentSpecReport().Failed() {
+				ginkgo.By(fmt.Sprintf("Test failed, preserving resources for debugging: %v, %v, %v, %v",
+					additionalClusterSetName, namespace1, namespace2, originalUniversalManagedNamespaces))
+				return
+			}
+
 			// Restore original managed namespaces in the universal cluster set
 			gomega.Eventually(func() error {
 				clusterSet, err := hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Get(

@@ -56,6 +56,11 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("placement", "sanity-check"), 
 	})
 
 	ginkgo.AfterEach(func() {
+		if ginkgo.CurrentSpecReport().Failed() {
+			ginkgo.By(fmt.Sprintf("Test failed, preserving resources for debugging: %v", namespace))
+			return
+		}
+
 		var errs []error
 		ginkgo.By("Delete managedclustersets")
 		err := hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{
