@@ -17,6 +17,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
@@ -24,6 +25,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
@@ -251,7 +253,72 @@ func KubeClientCSRApprover(agentName string) agent.CSRApproveFunc {
 		if csr.Spec.SignerName != certificatesv1.KubeAPIServerClientSignerName {
 			return false
 		}
-		return utils.DefaultCSRApprover(agentName)(cluster, addon, csr)
+		return defaultCSRApprover(agentName)(cluster, addon, csr)
+	}
+}
+
+const defaultGRPCServiceAccount = "system:serviceaccount:open-cluster-management-hub:grpc-server-sa"
+
+// defaultCSRApprover approves CSRs when addon agents use the default groups and user to sign certificates.
+// Based on addon-framework's implementation, but modified to accept both 2 and 3 organization units:
+// - 3 orgs: legacy behavior that included system:authenticated group in CSRs
+// - 2 orgs: new behavior where system:authenticated is filtered out from CSR organization units
+// The function validates that all required default addon groups are present in the CSR.
+func defaultCSRApprover(agentName string) agent.CSRApproveFunc {
+	return func(
+		cluster *clusterv1.ManagedCluster,
+		addon *addonapiv1alpha1.ManagedClusterAddOn,
+		csr *certificatesv1.CertificateSigningRequest) bool {
+		defaultGroups := agent.DefaultGroups(cluster.Name, addon.Name)
+
+		defaultUser := agent.DefaultUser(cluster.Name, addon.Name, agentName)
+		// check org field and commonName field
+		block, _ := pem.Decode(csr.Spec.Request)
+		if block == nil || block.Type != "CERTIFICATE REQUEST" {
+			klog.Infof("CSR Approve Check Failed csr %q was not recognized: PEM block type is not CERTIFICATE REQUEST", csr.Name)
+			return false
+		}
+
+		x509cr, err := x509.ParseCertificateRequest(block.Bytes)
+		if err != nil {
+			klog.Infof("CSR Approve Check Failed csr %q was not recognized: %v", csr.Name, err)
+			return false
+		}
+
+		requestingOrgs := sets.NewString(x509cr.Subject.Organization...)
+		if requestingOrgs.Len() != 3 && requestingOrgs.Len() != 2 {
+			klog.Infof("CSR Approve Check Failed csr %q org is not equal to 3", csr.Name)
+			return false
+		}
+
+		for _, group := range defaultGroups {
+			if !requestingOrgs.Has(group) {
+				klog.Infof("CSR Approve Check Failed csr requesting orgs doesn't contain %s", group)
+				return false
+			}
+		}
+
+		// check commonName field
+		if defaultUser != x509cr.Subject.CommonName {
+			klog.Infof("CSR Approve Check Failed commonName not right; request %s get %s", x509cr.Subject.CommonName, defaultUser)
+			return false
+		}
+
+		// check user name
+		username := csr.Spec.Username
+		if csr.Spec.Username == defaultGRPCServiceAccount {
+			// the CSR username is the service account of gRPC server rather than the user of agent.
+			// use the CSRUsernameAnnotation that identifies the agent user who requested the CSR.
+			username = csr.Annotations[operatorapiv1.CSRUsernameAnnotation]
+		}
+
+		if strings.HasPrefix(username, "system:open-cluster-management:"+cluster.Name) {
+			klog.Info("CSR approved")
+			return true
+		}
+
+		klog.Info("CSR not approved due to illegal requester", "requester", csr.Spec.Username)
+		return false
 	}
 }
 
