@@ -73,7 +73,7 @@ var (
 	}
 )
 
-var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, ginkgo.Label("addon-manager"), func() {
+var _ = ginkgo.Describe("Addon management", ginkgo.Ordered, ginkgo.Label("addon-manager"), func() {
 	addOnName := "hello-template"
 	addonInstallNamespace := "test-addon-template"
 
