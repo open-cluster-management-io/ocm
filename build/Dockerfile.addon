@@ -10,7 +10,7 @@ RUN GOOS=${OS} \
     GO_BUILD_PACKAGES=./cmd/addon \
     make build --warn-undefined-variables
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+FROM gcr.io/distroless/static-debian13:latest
 ENV USER_UID=10001
 COPY --from=builder /go/src/open-cluster-management.io/ocm/addon /
 
