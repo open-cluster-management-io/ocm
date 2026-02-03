@@ -51,6 +51,18 @@ var _ = ginkgo.Describe("Template addon with token-based authentication", ginkgo
 			originalAddOnDriver = klusterlet.Spec.RegistrationConfiguration.AddOnKubeClientRegistrationDriver
 		}
 
+		ginkgo.By("Get initial registration agent deployment generation before updating klusterlet")
+		var initialGeneration int64
+		var registrationDeploymentName string
+		registrationDeploymentName = fmt.Sprintf("%s-registration-agent", klusterlet.Name)
+		if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingleton {
+			registrationDeploymentName = fmt.Sprintf("%s-agent", klusterlet.Name)
+		}
+		deployment, err := spoke.KubeClient.AppsV1().Deployments(universalAgentNamespace).Get(
+			context.TODO(), registrationDeploymentName, metav1.GetOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		initialGeneration = deployment.Generation
+
 		ginkgo.By("Update klusterlet to use token-based authentication for addons")
 		gomega.Eventually(func() error {
 			klusterlet, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(
@@ -98,25 +110,16 @@ var _ = ginkgo.Describe("Template addon with token-based authentication", ginkgo
 
 		ginkgo.By("Wait for registration agent deployment to rollout with new token auth configuration")
 		gomega.Eventually(func() error {
-			// Get klusterlet to determine deployment mode
-			klusterlet, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(
-				context.TODO(), universalKlusterletName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-
-			// Determine deployment name based on mode:
-			// Singleton mode: {klusterletName}-agent
-			// Default mode: {klusterletName}-registration-agent
-			registrationDeploymentName := fmt.Sprintf("%s-registration-agent", klusterlet.Name)
-			if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingleton {
-				registrationDeploymentName = fmt.Sprintf("%s-agent", klusterlet.Name)
-			}
-
 			deployment, err := spoke.KubeClient.AppsV1().Deployments(universalAgentNamespace).Get(
 				context.TODO(), registrationDeploymentName, metav1.GetOptions{})
 			if err != nil {
 				return err
+			}
+
+			// Wait for deployment generation to increment (indicates config change was applied)
+			if deployment.Generation <= initialGeneration {
+				return fmt.Errorf("deployment generation has not incremented yet: current=%d, initial=%d",
+					deployment.Generation, initialGeneration)
 			}
 
 			// Ensure the deployment controller has observed the latest spec
