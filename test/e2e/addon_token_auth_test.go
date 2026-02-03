@@ -96,6 +96,55 @@ var _ = ginkgo.Describe("Template addon with token-based authentication", ginkgo
 			return nil
 		}).Should(gomega.Succeed())
 
+		ginkgo.By("Wait for registration agent deployment to rollout with new token auth configuration")
+		gomega.Eventually(func() error {
+			// Get klusterlet to determine deployment mode
+			klusterlet, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(
+				context.TODO(), universalKlusterletName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			// Determine deployment name based on mode:
+			// Singleton mode: {klusterletName}-agent
+			// Default mode: {klusterletName}-registration-agent
+			registrationDeploymentName := fmt.Sprintf("%s-registration-agent", klusterlet.Name)
+			if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingleton {
+				registrationDeploymentName = fmt.Sprintf("%s-agent", klusterlet.Name)
+			}
+
+			deployment, err := spoke.KubeClient.AppsV1().Deployments(universalAgentNamespace).Get(
+				context.TODO(), registrationDeploymentName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			// Ensure the deployment controller has observed the latest spec
+			if deployment.Status.ObservedGeneration != deployment.Generation {
+				return fmt.Errorf("deployment has not observed latest generation: observed=%d, current=%d",
+					deployment.Status.ObservedGeneration, deployment.Generation)
+			}
+
+			// Ensure all replicas have been updated with the new configuration
+			if deployment.Status.UpdatedReplicas != deployment.Status.Replicas {
+				return fmt.Errorf("deployment has not updated all replicas: updated=%d, total=%d",
+					deployment.Status.UpdatedReplicas, deployment.Status.Replicas)
+			}
+
+			// Ensure all updated replicas are ready
+			if deployment.Status.ReadyReplicas != deployment.Status.Replicas {
+				return fmt.Errorf("deployment not fully ready: ready=%d, total=%d",
+					deployment.Status.ReadyReplicas, deployment.Status.Replicas)
+			}
+
+			// Ensure there are no unavailable replicas
+			if deployment.Status.UnavailableReplicas > 0 {
+				return fmt.Errorf("deployment has unavailable replicas: %d", deployment.Status.UnavailableReplicas)
+			}
+
+			return nil
+		}, "2m", "5s").Should(gomega.Succeed())
+
 		signerSecretNamespace = "signer-secret-token-ns-" + rand.String(6)
 		ginkgo.By("Create addon custom sign secret namespace")
 		_, err = hub.KubeClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
