@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -22,12 +23,14 @@ import (
 	"open-cluster-management.io/ocm/test/e2e/manifests"
 )
 
-var _ = ginkgo.Describe("Template addon with token-based authentication", ginkgo.Ordered, ginkgo.Label("addon-token-auth"), func() {
+var _ = ginkgo.Describe("Template addon with token-based authentication", ginkgo.Ordered, ginkgo.Label("addon-manager", "addon-token-auth"), func() {
 	addOnName := "hello-template"
 	addonInstallNamespace := "test-addon-template-token"
 	var signerSecretNamespace string
 	var originalAddOnDriver *operatorapiv1.AddOnRegistrationDriver
 
+	var agentClient kubernetes.Interface
+	var agentNamespace string
 	s := runtime.NewScheme()
 	_ = scheme.AddToScheme(s)
 	_ = addonapiv1alpha1.Install(s)
@@ -55,10 +58,21 @@ var _ = ginkgo.Describe("Template addon with token-based authentication", ginkgo
 		var initialGeneration int64
 		var registrationDeploymentName string
 		registrationDeploymentName = fmt.Sprintf("%s-registration-agent", klusterlet.Name)
-		if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingleton {
+		if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingleton ||
+			klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingletonHosted {
 			registrationDeploymentName = fmt.Sprintf("%s-agent", klusterlet.Name)
 		}
-		deployment, err := spoke.KubeClient.AppsV1().Deployments(universalAgentNamespace).Get(
+
+		// In hosted mode, agents run on the hub cluster, otherwise on the spoke cluster
+		agentClient = spoke.KubeClient
+		agentNamespace = universalAgentNamespace
+		if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeHosted ||
+			klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingletonHosted {
+			agentClient = hub.KubeClient
+			agentNamespace = klusterlet.Name
+		}
+
+		deployment, err := agentClient.AppsV1().Deployments(agentNamespace).Get(
 			context.TODO(), registrationDeploymentName, metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		initialGeneration = deployment.Generation
@@ -110,7 +124,7 @@ var _ = ginkgo.Describe("Template addon with token-based authentication", ginkgo
 
 		ginkgo.By("Wait for registration agent deployment to rollout with new token auth configuration")
 		gomega.Eventually(func() error {
-			deployment, err := spoke.KubeClient.AppsV1().Deployments(universalAgentNamespace).Get(
+			deployment, err := agentClient.AppsV1().Deployments(agentNamespace).Get(
 				context.TODO(), registrationDeploymentName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -232,7 +246,7 @@ var _ = ginkgo.Describe("Template addon with token-based authentication", ginkgo
 
 		ginkgo.By("Step 4: Verify hub kubeconfig secret is created with token authentication")
 		gomega.Eventually(func() error {
-			secret, err := hub.KubeClient.CoreV1().Secrets(addonInstallNamespace).Get(context.TODO(),
+			secret, err := agentClient.CoreV1().Secrets(addonInstallNamespace).Get(context.TODO(),
 				templateagent.HubKubeconfigSecretName(addOnName), metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -254,7 +268,7 @@ var _ = ginkgo.Describe("Template addon with token-based authentication", ginkgo
 
 		ginkgo.By("Step 5: Verify custom client cert secret is created")
 		gomega.Eventually(func() error {
-			_, err := hub.KubeClient.CoreV1().Secrets(addonInstallNamespace).Get(context.TODO(),
+			_, err := agentClient.CoreV1().Secrets(addonInstallNamespace).Get(context.TODO(),
 				templateagent.CustomSignedSecretName(addOnName, customSignerName), metav1.GetOptions{})
 			return err
 		}).Should(gomega.Succeed())
