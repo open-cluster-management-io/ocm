@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.1
 	github.com/aws/aws-sdk-go-v2/config v1.32.7
-	github.com/aws/aws-sdk-go-v2/service/eks v1.77.0
+	github.com/aws/aws-sdk-go-v2/service/eks v1.77.1
 	github.com/aws/aws-sdk-go-v2/service/iam v1.53.2
 	github.com/aws/smithy-go v1.24.0
 	github.com/cloudevents/sdk-go/v2 v2.16.2

@@ -1,3 +1,7 @@
+# v1.77.1 (2026-02-04)
+
+* **Documentation**: Update delete cluster description
+
 # v1.77.0 (2026-01-14)
 
 * **Feature**: Added support for BOTTLEROCKET NVIDIA FIPS AMIs to AMI types in US regions.
