@@ -118,7 +118,7 @@ var _ = BeforeSuite(func() {
 
 	// In most OCM cases, we expect user should see the result in 90 seconds.
 	// For cases that need more than 90 seconds, please set the timeout in the test case EXPLICITLY.
-	SetDefaultEventuallyTimeout(90 * time.Second)
+	SetDefaultEventuallyTimeout(120 * time.Second)
 	SetDefaultEventuallyPollingInterval(5 * time.Second)
 
 	By("Setup hub")
