@@ -8,7 +8,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -19,7 +21,6 @@ const (
 type LogCollectorConfig struct {
 	OutputDir      string
 	TailLines      int64
-	IncludeEvents  bool
 	IncludePodLogs bool
 }
 
@@ -28,7 +29,6 @@ func DefaultLogCollectorConfig() *LogCollectorConfig {
 	return &LogCollectorConfig{
 		OutputDir:      "_artifacts",
 		TailLines:      defaultLogTailLines,
-		IncludeEvents:  true,
 		IncludePodLogs: true,
 	}
 }
@@ -96,13 +96,6 @@ func collectClusterLogs(clients *OCMClients, outputDir string, config *LogCollec
 		if err := collectPodDescriptions(ctx, clients.KubeClient, ns, nsDir); err != nil {
 			fmt.Printf("Warning: failed to collect pod descriptions for namespace %s: %v\n", ns, err)
 		}
-
-		// Collect events
-		if config.IncludeEvents {
-			if err := collectEvents(ctx, clients.KubeClient, ns, nsDir); err != nil {
-				fmt.Printf("Warning: failed to collect events for namespace %s: %v\n", ns, err)
-			}
-		}
 	}
 
 	// Collect cluster-wide resources
@@ -158,6 +151,10 @@ func collectPodLogs(ctx context.Context, client kubernetes.Interface, namespace,
 			if err := collectContainerLog(ctx, client, namespace, pod.Name, container.Name, podDir, tailLines, false); err != nil {
 				fmt.Printf("Warning: failed to collect logs for container %s/%s/%s: %v\n", namespace, pod.Name, container.Name, err)
 			}
+			// Also try to collect previous logs (will fail silently if no previous logs exist)
+			if err := collectContainerLog(ctx, client, namespace, pod.Name, container.Name, podDir, tailLines, true); err == nil {
+				// Previous logs exist, we collected them
+			}
 		}
 
 		// Collect logs for init containers
@@ -165,14 +162,9 @@ func collectPodLogs(ctx context.Context, client kubernetes.Interface, namespace,
 			if err := collectContainerLog(ctx, client, namespace, pod.Name, container.Name, podDir, tailLines, false); err != nil {
 				fmt.Printf("Warning: failed to collect logs for init container %s/%s/%s: %v\n", namespace, pod.Name, container.Name, err)
 			}
-		}
-
-		// Also collect previous container logs if pod has restarted
-		for _, containerStatus := range pod.Status.ContainerStatuses {
-			if containerStatus.RestartCount > 0 {
-				if err := collectContainerLog(ctx, client, namespace, pod.Name, containerStatus.Name, podDir, tailLines, true); err != nil {
-					fmt.Printf("Warning: failed to collect previous logs for container %s/%s/%s: %v\n", namespace, pod.Name, containerStatus.Name, err)
-				}
+			// Also try to collect previous logs (will fail silently if no previous logs exist)
+			if err := collectContainerLog(ctx, client, namespace, pod.Name, container.Name, podDir, tailLines, true); err == nil {
+				// Previous logs exist, we collected them
 			}
 		}
 	}
@@ -266,40 +258,6 @@ func collectPodDescriptions(ctx context.Context, client kubernetes.Interface, na
 	return nil
 }
 
-// collectEvents collects events from a namespace
-func collectEvents(ctx context.Context, client kubernetes.Interface, namespace, outputDir string) error {
-	events, err := client.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to list events: %w", err)
-	}
-
-	filename := filepath.Join(outputDir, "events.txt")
-	file, err := os.Create(filename)
-	if err != nil {
-		return fmt.Errorf("failed to create events file: %w", err)
-	}
-	defer file.Close()
-
-	fmt.Fprintf(file, "=== Events in namespace %s ===\n\n", namespace)
-	for _, event := range events.Items {
-		fmt.Fprintf(file, "[%s] %s - %s/%s: %s\n",
-			event.Type,
-			event.LastTimestamp.Format("2006-01-02 15:04:05"),
-			event.InvolvedObject.Kind,
-			event.InvolvedObject.Name,
-			event.Message)
-		if event.Reason != "" {
-			fmt.Fprintf(file, "  Reason: %s\n", event.Reason)
-		}
-		if event.Count > 1 {
-			fmt.Fprintf(file, "  Count: %d\n", event.Count)
-		}
-		fmt.Fprintf(file, "\n")
-	}
-
-	return nil
-}
-
 // collectClusterResources collects cluster-wide resource information
 func collectClusterResources(ctx context.Context, clients *OCMClients, outputDir string, relevantNamespaces []string, clusterType string) error {
 	filename := filepath.Join(outputDir, "cluster-resources.txt")
@@ -363,6 +321,19 @@ func collectClusterResources(ctx context.Context, clients *OCMClients, outputDir
 	return nil
 }
 
+// writeResourceAsYAML writes a Kubernetes resource object as YAML to a file
+func writeResourceAsYAML(file *os.File, resource runtime.Object, name string) error {
+	yamlBytes, err := yaml.Marshal(resource)
+	if err != nil {
+		return fmt.Errorf("failed to marshal %s to YAML: %w", name, err)
+	}
+	fmt.Fprintf(file, "\n---\n# %s\n", name)
+	if _, err := file.Write(yamlBytes); err != nil {
+		return fmt.Errorf("failed to write %s YAML: %w", name, err)
+	}
+	return nil
+}
+
 // collectOCMCustomResources collects OCM-specific custom resources
 func collectOCMCustomResources(ctx context.Context, clients *OCMClients, file *os.File, clusterType string) error {
 	if clusterType == "hub" {
@@ -373,9 +344,9 @@ func collectOCMCustomResources(ctx context.Context, clients *OCMClients, file *o
 		if err == nil && len(clusterManagers.Items) > 0 {
 			fmt.Fprintf(file, "\n=== ClusterManagers ===\n")
 			for _, cm := range clusterManagers.Items {
-				fmt.Fprintf(file, "- %s (DeployOption: %s)\n",
-					cm.Name,
-					cm.Spec.DeployOption.Mode)
+				if err := writeResourceAsYAML(file, &cm, fmt.Sprintf("ClusterManager/%s", cm.Name)); err != nil {
+					fmt.Printf("Warning: failed to write ClusterManager %s: %v\n", cm.Name, err)
+				}
 			}
 		}
 
@@ -384,10 +355,9 @@ func collectOCMCustomResources(ctx context.Context, clients *OCMClients, file *o
 		if err == nil && len(managedClusters.Items) > 0 {
 			fmt.Fprintf(file, "\n=== ManagedClusters ===\n")
 			for _, mc := range managedClusters.Items {
-				fmt.Fprintf(file, "- %s (Accepted: %v, Available: %v)\n",
-					mc.Name,
-					mc.Spec.HubAcceptsClient,
-					len(mc.Status.Conditions) > 0)
+				if err := writeResourceAsYAML(file, &mc, fmt.Sprintf("ManagedCluster/%s", mc.Name)); err != nil {
+					fmt.Printf("Warning: failed to write ManagedCluster %s: %v\n", mc.Name, err)
+				}
 			}
 		}
 
@@ -396,7 +366,9 @@ func collectOCMCustomResources(ctx context.Context, clients *OCMClients, file *o
 		if err == nil && len(managedClusterSets.Items) > 0 {
 			fmt.Fprintf(file, "\n=== ManagedClusterSets ===\n")
 			for _, mcs := range managedClusterSets.Items {
-				fmt.Fprintf(file, "- %s\n", mcs.Name)
+				if err := writeResourceAsYAML(file, &mcs, fmt.Sprintf("ManagedClusterSet/%s", mcs.Name)); err != nil {
+					fmt.Printf("Warning: failed to write ManagedClusterSet %s: %v\n", mcs.Name, err)
+				}
 			}
 		}
 
@@ -405,8 +377,9 @@ func collectOCMCustomResources(ctx context.Context, clients *OCMClients, file *o
 		if err == nil && len(placements.Items) > 0 {
 			fmt.Fprintf(file, "\n=== Placements ===\n")
 			for _, p := range placements.Items {
-				fmt.Fprintf(file, "- %s/%s (NumberOfSelectedClusters: %d)\n",
-					p.Namespace, p.Name, p.Status.NumberOfSelectedClusters)
+				if err := writeResourceAsYAML(file, &p, fmt.Sprintf("Placement/%s/%s", p.Namespace, p.Name)); err != nil {
+					fmt.Printf("Warning: failed to write Placement %s/%s: %v\n", p.Namespace, p.Name, err)
+				}
 			}
 		}
 
@@ -415,8 +388,9 @@ func collectOCMCustomResources(ctx context.Context, clients *OCMClients, file *o
 		if err == nil && len(placementDecisions.Items) > 0 {
 			fmt.Fprintf(file, "\n=== PlacementDecisions ===\n")
 			for _, pd := range placementDecisions.Items {
-				fmt.Fprintf(file, "- %s/%s (Decisions: %d)\n",
-					pd.Namespace, pd.Name, len(pd.Status.Decisions))
+				if err := writeResourceAsYAML(file, &pd, fmt.Sprintf("PlacementDecision/%s/%s", pd.Namespace, pd.Name)); err != nil {
+					fmt.Printf("Warning: failed to write PlacementDecision %s/%s: %v\n", pd.Namespace, pd.Name, err)
+				}
 			}
 		}
 
@@ -425,7 +399,9 @@ func collectOCMCustomResources(ctx context.Context, clients *OCMClients, file *o
 		if err == nil && len(clusterMgmtAddons.Items) > 0 {
 			fmt.Fprintf(file, "\n=== ClusterManagementAddons (v1alpha1) ===\n")
 			for _, cma := range clusterMgmtAddons.Items {
-				fmt.Fprintf(file, "- %s\n", cma.Name)
+				if err := writeResourceAsYAML(file, &cma, fmt.Sprintf("ClusterManagementAddOn/%s", cma.Name)); err != nil {
+					fmt.Printf("Warning: failed to write ClusterManagementAddOn %s: %v\n", cma.Name, err)
+				}
 			}
 		}
 
@@ -434,7 +410,9 @@ func collectOCMCustomResources(ctx context.Context, clients *OCMClients, file *o
 		if err == nil && len(managedClusterAddons.Items) > 0 {
 			fmt.Fprintf(file, "\n=== ManagedClusterAddons (v1alpha1) ===\n")
 			for _, mca := range managedClusterAddons.Items {
-				fmt.Fprintf(file, "- %s/%s\n", mca.Namespace, mca.Name)
+				if err := writeResourceAsYAML(file, &mca, fmt.Sprintf("ManagedClusterAddOn/%s/%s", mca.Namespace, mca.Name)); err != nil {
+					fmt.Printf("Warning: failed to write ManagedClusterAddOn %s/%s: %v\n", mca.Namespace, mca.Name, err)
+				}
 			}
 		}
 
@@ -443,7 +421,9 @@ func collectOCMCustomResources(ctx context.Context, clients *OCMClients, file *o
 		if err == nil && len(addonDeploymentConfigs.Items) > 0 {
 			fmt.Fprintf(file, "\n=== AddonDeploymentConfigs (v1alpha1) ===\n")
 			for _, adc := range addonDeploymentConfigs.Items {
-				fmt.Fprintf(file, "- %s/%s\n", adc.Namespace, adc.Name)
+				if err := writeResourceAsYAML(file, &adc, fmt.Sprintf("AddOnDeploymentConfig/%s/%s", adc.Namespace, adc.Name)); err != nil {
+					fmt.Printf("Warning: failed to write AddOnDeploymentConfig %s/%s: %v\n", adc.Namespace, adc.Name, err)
+				}
 			}
 		}
 
@@ -452,7 +432,9 @@ func collectOCMCustomResources(ctx context.Context, clients *OCMClients, file *o
 		if err == nil && len(addonTemplates.Items) > 0 {
 			fmt.Fprintf(file, "\n=== AddonTemplates (v1alpha1) ===\n")
 			for _, at := range addonTemplates.Items {
-				fmt.Fprintf(file, "- %s\n", at.Name)
+				if err := writeResourceAsYAML(file, &at, fmt.Sprintf("AddOnTemplate/%s", at.Name)); err != nil {
+					fmt.Printf("Warning: failed to write AddOnTemplate %s: %v\n", at.Name, err)
+				}
 			}
 		}
 
@@ -461,7 +443,9 @@ func collectOCMCustomResources(ctx context.Context, clients *OCMClients, file *o
 		if err == nil && len(manifestWorks.Items) > 0 {
 			fmt.Fprintf(file, "\n=== ManifestWorks ===\n")
 			for _, mw := range manifestWorks.Items {
-				fmt.Fprintf(file, "- %s/%s\n", mw.Namespace, mw.Name)
+				if err := writeResourceAsYAML(file, &mw, fmt.Sprintf("ManifestWork/%s/%s", mw.Namespace, mw.Name)); err != nil {
+					fmt.Printf("Warning: failed to write ManifestWork %s/%s: %v\n", mw.Namespace, mw.Name, err)
+				}
 			}
 		}
 
@@ -470,7 +454,9 @@ func collectOCMCustomResources(ctx context.Context, clients *OCMClients, file *o
 		if err == nil && len(manifestWorkReplicaSets.Items) > 0 {
 			fmt.Fprintf(file, "\n=== ManifestWorkReplicaSets ===\n")
 			for _, mwrs := range manifestWorkReplicaSets.Items {
-				fmt.Fprintf(file, "- %s/%s\n", mwrs.Namespace, mwrs.Name)
+				if err := writeResourceAsYAML(file, &mwrs, fmt.Sprintf("ManifestWorkReplicaSet/%s/%s", mwrs.Namespace, mwrs.Name)); err != nil {
+					fmt.Printf("Warning: failed to write ManifestWorkReplicaSet %s/%s: %v\n", mwrs.Namespace, mwrs.Name, err)
+				}
 			}
 		}
 	} else {
@@ -481,10 +467,9 @@ func collectOCMCustomResources(ctx context.Context, clients *OCMClients, file *o
 		if err == nil && len(klusterlets.Items) > 0 {
 			fmt.Fprintf(file, "\n=== Klusterlets ===\n")
 			for _, kl := range klusterlets.Items {
-				fmt.Fprintf(file, "- %s (DeployOption: %s, ClusterName: %s)\n",
-					kl.Name,
-					kl.Spec.DeployOption.Mode,
-					kl.Spec.ClusterName)
+				if err := writeResourceAsYAML(file, &kl, fmt.Sprintf("Klusterlet/%s", kl.Name)); err != nil {
+					fmt.Printf("Warning: failed to write Klusterlet %s: %v\n", kl.Name, err)
+				}
 			}
 		}
 
@@ -493,7 +478,9 @@ func collectOCMCustomResources(ctx context.Context, clients *OCMClients, file *o
 		if err == nil && len(appliedManifestWorks.Items) > 0 {
 			fmt.Fprintf(file, "\n=== AppliedManifestWorks ===\n")
 			for _, amw := range appliedManifestWorks.Items {
-				fmt.Fprintf(file, "- %s\n", amw.Name)
+				if err := writeResourceAsYAML(file, &amw, fmt.Sprintf("AppliedManifestWork/%s", amw.Name)); err != nil {
+					fmt.Printf("Warning: failed to write AppliedManifestWork %s: %v\n", amw.Name, err)
+				}
 			}
 		}
 
@@ -502,7 +489,9 @@ func collectOCMCustomResources(ctx context.Context, clients *OCMClients, file *o
 		if err == nil && len(clusterClaims.Items) > 0 {
 			fmt.Fprintf(file, "\n=== ClusterClaims ===\n")
 			for _, cc := range clusterClaims.Items {
-				fmt.Fprintf(file, "- %s: %s\n", cc.Name, cc.Spec.Value)
+				if err := writeResourceAsYAML(file, &cc, fmt.Sprintf("ClusterClaim/%s", cc.Name)); err != nil {
+					fmt.Printf("Warning: failed to write ClusterClaim %s: %v\n", cc.Name, err)
+				}
 			}
 		}
 	}

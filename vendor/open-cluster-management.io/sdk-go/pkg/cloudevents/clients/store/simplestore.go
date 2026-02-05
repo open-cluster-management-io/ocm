@@ -49,30 +49,48 @@ func (s *SimpleStore[T]) HasInitiated() bool {
 }
 
 func (s *SimpleStore[T]) HandleReceivedResource(ctx context.Context, resource T) error {
-	runtimeObj, err := utils.ToRuntimeObject(resource)
+	newRuntimeObj, err := utils.ToRuntimeObject(resource)
 	if err != nil {
 		return err
 	}
 
-	metaObj, err := meta.Accessor(runtimeObj)
+	newMetaObj, err := meta.Accessor(newRuntimeObj)
 	if err != nil {
 		return err
 	}
 
-	_, exists, err := s.Get(ctx, metaObj.GetNamespace(), metaObj.GetName())
+	if !newMetaObj.GetDeletionTimestamp().IsZero() {
+		cachedResource, exists, err := s.findObjByUID(ctx, newMetaObj.GetUID())
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return nil
+		}
+
+		if len(newMetaObj.GetFinalizers()) != 0 {
+			return nil
+		}
+
+		cachedMetaObj, err := meta.Accessor(cachedResource)
+		if err != nil {
+			return err
+		}
+
+		cachedRuntimeObj, err := utils.ToRuntimeObject(cachedMetaObj)
+		if err != nil {
+			return err
+		}
+		return s.Delete(cachedRuntimeObj)
+	}
+
+	_, exists, err := s.Get(ctx, newMetaObj.GetNamespace(), newMetaObj.GetName())
 	if err != nil {
 		return err
 	}
 	if !exists {
-		return s.Add(runtimeObj)
+		return s.Add(newRuntimeObj)
 	}
 
-	if !metaObj.GetDeletionTimestamp().IsZero() {
-		if len(metaObj.GetFinalizers()) != 0 {
-			return nil
-		}
-		return s.Delete(runtimeObj)
-	}
-
-	return s.Update(runtimeObj)
+	return s.Update(newRuntimeObj)
 }
