@@ -613,28 +613,13 @@ func TestGetValidManagedClusterSetBindings(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
-
-			ctrl := &schedulingController{
-				clusterSetLister:        clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
-				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
-			}
+			ctrl, _, _ := newTestSchedulingController(t, c.initObjs)
 			bindings, err := ctrl.getValidManagedClusterSetBindings(placementNamespace)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}
 
-			expectedBindingNames := sets.NewString(c.expectedClusterSetBindingNames...)
-			if len(bindings) != expectedBindingNames.Len() {
-				t.Errorf("expected %d bindings but got %d", expectedBindingNames.Len(), len(bindings))
-			}
-			for _, binding := range bindings {
-				expectedBindingNames.Delete(binding.Name)
-			}
-			if expectedBindingNames.Len() > 0 {
-				t.Errorf("expected bindings: %s", strings.Join(expectedBindingNames.List(), ","))
-			}
+			assertClusterSetBindingNames(t, bindings, c.expectedClusterSetBindingNames)
 		})
 	}
 }
@@ -688,25 +673,9 @@ func TestGetValidManagedClusterSets(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
-
-			ctrl := &schedulingController{
-				clusterSetLister:        clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
-				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
-			}
+			ctrl, _, _ := newTestSchedulingController(t, c.initObjs)
 			actualClusterSetNames := ctrl.getEligibleClusterSets(c.placement, c.bindings)
-
-			expectedClusterSetNames := sets.NewString(c.expectedClusterSetNames...)
-			if len(actualClusterSetNames) != expectedClusterSetNames.Len() {
-				t.Errorf("expected %d bindings but got %d", expectedClusterSetNames.Len(), len(actualClusterSetNames))
-			}
-			for _, name := range actualClusterSetNames {
-				expectedClusterSetNames.Delete(name)
-			}
-			if expectedClusterSetNames.Len() > 0 {
-				t.Errorf("expected names: %s", strings.Join(expectedClusterSetNames.List(), ","))
-			}
+			assertClusterSetNames(t, actualClusterSetNames, c.expectedClusterSetNames)
 		})
 	}
 }
@@ -829,26 +798,9 @@ func TestGetAvailableClusters(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
-
-			ctrl := &schedulingController{
-				clusterLister:    clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				clusterSetLister: clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
-			}
-
+			ctrl, _, _ := newTestSchedulingController(t, c.initObjs)
 			clusters, _ := ctrl.getAvailableClusters(c.clusterSetNames)
-
-			expectedClusterNames := sets.NewString(c.expectedClusterNames...)
-			if len(clusters) != expectedClusterNames.Len() {
-				t.Errorf("expected %d clusters but got %d", expectedClusterNames.Len(), len(clusters))
-			}
-			for _, cluster := range clusters {
-				expectedClusterNames.Delete(cluster.Name)
-			}
-			if expectedClusterNames.Len() > 0 {
-				t.Errorf("expected clusters not selected: %s", strings.Join(expectedClusterNames.List(), ","))
-			}
+			assertClusterNames(t, clusters, c.expectedClusterNames)
 		})
 	}
 }
@@ -1467,4 +1419,61 @@ func newSelectedClusters(num int) (clusters []string) {
 	})
 
 	return clusters
+}
+
+// newTestSchedulingController creates a test scheduling controller with the given objects.
+// This helper reduces boilerplate code in tests.
+// Returns the controller, cluster client, and fake events recorder.
+func newTestSchedulingController(t *testing.T, objs []runtime.Object) (*schedulingController, *clusterfake.Clientset, *kevents.FakeRecorder) {
+	clusterClient := clusterfake.NewSimpleClientset(objs...)
+	clusterInformerFactory := newClusterInformerFactory(t, clusterClient, objs...)
+	fakeRecorder := kevents.NewFakeRecorder(100)
+
+	ctrl := &schedulingController{
+		clusterClient:           clusterClient,
+		clusterLister:           clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
+		clusterSetLister:        clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
+		clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
+		placementLister:         clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
+		placementDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
+		eventsRecorder:          fakeRecorder,
+		metricsRecorder:         metrics.NewScheduleMetrics(clock.RealClock{}),
+	}
+
+	return ctrl, clusterClient, fakeRecorder
+}
+
+// assertClusterSetBindingNames validates that the bindings match expected names.
+func assertClusterSetBindingNames(t *testing.T, bindings []*clusterapiv1beta2.ManagedClusterSetBinding, expectedNames []string) {
+	expectedBindingNames := sets.NewString(expectedNames...)
+	if len(bindings) != expectedBindingNames.Len() {
+		t.Errorf("expected %d bindings but got %d", expectedBindingNames.Len(), len(bindings))
+	}
+	for _, binding := range bindings {
+		expectedBindingNames.Delete(binding.Name)
+	}
+	if expectedBindingNames.Len() > 0 {
+		t.Errorf("expected bindings: %s", strings.Join(expectedBindingNames.List(), ","))
+	}
+}
+
+// assertClusterSetNames validates that the cluster set names match expected names.
+func assertClusterSetNames(t *testing.T, clusterSetNames []string, expectedNames []string) {
+	actual := sets.NewString(clusterSetNames...)
+	expected := sets.NewString(expectedNames...)
+	if !actual.Equal(expected) {
+		t.Errorf("expected cluster sets %v, but got %v", expected.List(), actual.List())
+	}
+}
+
+// assertClusterNames validates that the clusters match expected cluster names.
+func assertClusterNames(t *testing.T, clusters []*clusterapiv1.ManagedCluster, expectedNames []string) {
+	actual := sets.NewString()
+	for _, cluster := range clusters {
+		actual.Insert(cluster.Name)
+	}
+	expected := sets.NewString(expectedNames...)
+	if !actual.Equal(expected) {
+		t.Errorf("expected clusters %v, but got %v", expected.List(), actual.List())
+	}
 }
