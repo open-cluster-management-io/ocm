@@ -32,6 +32,11 @@ var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validati
 	})
 
 	ginkgo.AfterEach(func() {
+		if ginkgo.CurrentSpecReport().Failed() {
+			ginkgo.By(fmt.Sprintf("Test failed, preserving resources for debugging: %v", workName))
+			return
+		}
+
 		ginkgo.By(fmt.Sprintf("delete manifestwork %v/%v", universalClusterName, workName))
 		gomega.Expect(hub.CleanManifestWorks(universalClusterName, workName)).To(gomega.BeNil())
 	})
@@ -114,6 +119,11 @@ var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validati
 			})
 
 			ginkgo.AfterEach(func() {
+				if ginkgo.CurrentSpecReport().Failed() {
+					ginkgo.By(fmt.Sprintf("Test failed, preserving resources for debugging: %v", roleName))
+					return
+				}
+
 				// delete the temporary role
 				err := hub.KubeClient.RbacV1().Roles(universalClusterName).Delete(context.TODO(), roleName, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {

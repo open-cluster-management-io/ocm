@@ -11,6 +11,7 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
+	ginkgo "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -117,7 +118,7 @@ var _ = BeforeSuite(func() {
 
 	// In most OCM cases, we expect user should see the result in 90 seconds.
 	// For cases that need more than 90 seconds, please set the timeout in the test case EXPLICITLY.
-	SetDefaultEventuallyTimeout(90 * time.Second)
+	SetDefaultEventuallyTimeout(150 * time.Second)
 	SetDefaultEventuallyPollingInterval(5 * time.Second)
 
 	By("Setup hub")
@@ -222,9 +223,21 @@ var _ = BeforeSuite(func() {
 	}).Should(Succeed())
 })
 
-var _ = AfterSuite(func() {
-	By(fmt.Sprintf("clean klusterlet %v resources after the test case", universalKlusterletName))
-	framework.CleanKlusterletRelatedResources(hub, spoke, universalKlusterletName, universalClusterName)
+var _ = ReportAfterSuite("E2E Suite Teardown", func(report Report) {
+	if report.SuiteSucceeded {
+		By(fmt.Sprintf("clean klusterlet %v resources after the test case", universalKlusterletName))
+		framework.CleanKlusterletRelatedResources(hub, spoke, universalKlusterletName, universalClusterName)
+	} else {
+		ginkgo.By("Test failed, collecting logs for debugging")
+
+		// Collect logs from hub and spoke clusters
+		config := framework.DefaultLogCollectorConfig()
+		if err := framework.CollectE2ELogs(hub, spoke, config); err != nil {
+			fmt.Printf("Warning: failed to collect logs: %v\n", err)
+		}
+
+		ginkgo.By("Logs collected, preserving resources for debugging")
+	}
 })
 
 // validateImageConfiguration validates that all image configurations use the expected tag

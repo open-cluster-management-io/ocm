@@ -8,7 +8,10 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/utils"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
+	genericutils "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/utils"
 )
 
 var ManagedClusterEventDataType = types.CloudEventsDataType{
@@ -36,12 +39,15 @@ func (c *ManagedClusterCodec) Encode(source string, eventType types.CloudEventsT
 	}
 
 	evt := types.NewEventBuilder(source, eventType).
-		WithResourceID(cluster.Name).
+		WithResourceID(string(cluster.UID)).
 		WithClusterName(cluster.Name).
 		NewEvent()
 
-	if cluster.ResourceVersion != "" {
-		evt.SetExtension(types.ExtensionResourceVersion, cluster.ResourceVersion)
+	genericutils.SetResourceVersion(eventType, &evt, cluster)
+
+	if !cluster.DeletionTimestamp.IsZero() {
+		evt.SetExtension(types.ExtensionDeletionTimestamp, cluster.DeletionTimestamp.Time)
+		return &evt, nil
 	}
 
 	newCluster := cluster.DeepCopy()
@@ -59,10 +65,7 @@ func (c *ManagedClusterCodec) Encode(source string, eventType types.CloudEventsT
 
 // Decode a cloudevent to a ManagedCluster
 func (c *ManagedClusterCodec) Decode(evt *cloudevents.Event) (*clusterv1.ManagedCluster, error) {
-	cluster := &clusterv1.ManagedCluster{}
-	if err := evt.DataAs(cluster); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event data %s, %v", string(evt.Data()), err)
-	}
-
-	return cluster, nil
+	return utils.DecodeWithDeletionHandling(evt, func() *clusterv1.ManagedCluster {
+		return &clusterv1.ManagedCluster{}
+	})
 }

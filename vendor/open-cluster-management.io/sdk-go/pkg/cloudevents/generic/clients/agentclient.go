@@ -15,6 +15,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/utils"
 )
 
 // CloudEventAgentClient is a client for an agent to resync/send/receive its resources with cloud events.
@@ -74,19 +75,23 @@ func (c *CloudEventAgentClient[T]) Resync(ctx context.Context, source string) er
 		return err
 	}
 
-	resources := &payload.ResourceVersionList{Versions: make([]payload.ResourceVersion, len(objs))}
-	for i, obj := range objs {
-		resources.Versions[i] = payload.ResourceVersion{
-			ResourceID: string(obj.GetUID()),
-			// this should be set as generation, since the resource version of the object is local version.
-			ResourceVersion: obj.GetGeneration(),
-		}
-	}
-
 	eventType := types.CloudEventsType{
 		CloudEventsDataType: c.codec.EventDataType(),
 		SubResource:         types.SubResourceSpec,
 		Action:              types.ResyncRequestAction,
+	}
+
+	resources := &payload.ResourceVersionList{Versions: make([]payload.ResourceVersion, len(objs))}
+	for i, obj := range objs {
+		rv, err := utils.GetResourceVersionFromObject(eventType, obj)
+		if err != nil {
+			return err
+		}
+
+		resources.Versions[i] = payload.ResourceVersion{
+			ResourceID:      string(obj.GetUID()),
+			ResourceVersion: rv,
+		}
 	}
 
 	evt := types.NewEventBuilder(c.agentID, eventType).

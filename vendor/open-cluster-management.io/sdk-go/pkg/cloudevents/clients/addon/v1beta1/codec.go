@@ -2,11 +2,15 @@ package v1beta1
 
 import (
 	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/utils"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
+	genericutils "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/utils"
 )
 
 var ManagedClusterAddOnEventDataType = types.CloudEventsDataType{
@@ -34,12 +38,15 @@ func (c *ManagedClusterAddOnCodec) Encode(source string, eventType types.CloudEv
 	}
 
 	evt := types.NewEventBuilder(source, eventType).
-		WithResourceID(addon.Name).
+		WithResourceID(string(addon.UID)).
 		WithClusterName(addon.Namespace).
 		NewEvent()
 
-	if addon.ResourceVersion != "" {
-		evt.SetExtension(types.ExtensionResourceVersion, addon.ResourceVersion)
+	genericutils.SetResourceVersion(eventType, &evt, addon)
+
+	if !addon.DeletionTimestamp.IsZero() {
+		evt.SetExtension(types.ExtensionDeletionTimestamp, addon.DeletionTimestamp.Time)
+		return &evt, nil
 	}
 
 	newAddon := addon.DeepCopy()
@@ -57,10 +64,7 @@ func (c *ManagedClusterAddOnCodec) Encode(source string, eventType types.CloudEv
 
 // Decode a cloudevent to a ManagedClusterAddOn
 func (c *ManagedClusterAddOnCodec) Decode(evt *cloudevents.Event) (*addonapiv1beta1.ManagedClusterAddOn, error) {
-	addon := &addonapiv1beta1.ManagedClusterAddOn{}
-	if err := evt.DataAs(addon); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event data %s, %v", string(evt.Data()), err)
-	}
-
-	return addon, nil
+	return utils.DecodeWithDeletionHandling(evt, func() *addonapiv1beta1.ManagedClusterAddOn {
+		return &addonapiv1beta1.ManagedClusterAddOn{}
+	})
 }
