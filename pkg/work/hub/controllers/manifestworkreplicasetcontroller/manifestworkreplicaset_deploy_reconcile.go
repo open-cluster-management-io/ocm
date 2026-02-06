@@ -226,10 +226,17 @@ func (d *deployReconciler) clusterRolloutStatusFunc(clusterName string, manifest
 	progressingCond := apimeta.FindStatusCondition(manifestWork.Status.Conditions, workv1.WorkProgressing)
 	degradedCond := apimeta.FindStatusCondition(manifestWork.Status.Conditions, workv1.WorkDegraded)
 	appliedCond := apimeta.FindStatusCondition(manifestWork.Status.Conditions, workv1.WorkApplied)
+	availableCond := apimeta.FindStatusCondition(manifestWork.Status.Conditions, workv1.WorkAvailable)
 
 	// Check if the work should be in ToApply status
-	if shouldReturnToApply(manifestWork.Generation, appliedCond, progressingCond, degradedCond) {
+	if shouldReturnToApply(manifestWork.Generation, appliedCond, progressingCond, availableCond, degradedCond) {
 		return clsRolloutStatus, nil
+	}
+
+	// If Progressing condition is not set (no condition rules configured), fall back to Available condition.
+	// This ensures rollout tracking works without requiring explicit condition rules.
+	if progressingCond == nil || progressingCond.ObservedGeneration != manifestWork.Generation {
+		return d.determineStatusFromAvailable(clsRolloutStatus, availableCond, degradedCond)
 	}
 
 	// Agent has observed the latest spec, determine status based on Progressing and Degraded conditions.
@@ -264,26 +271,62 @@ func (d *deployReconciler) clusterRolloutStatusFunc(clusterName string, manifest
 	return clsRolloutStatus, nil
 }
 
+// determineStatusFromAvailable determines rollout status when Progressing condition is not available.
+// Falls back to using Available condition: Available=True means Succeeded, otherwise Progressing.
+func (d *deployReconciler) determineStatusFromAvailable(
+	clsRolloutStatus clustersdkv1alpha1.ClusterRolloutStatus,
+	availableCond, degradedCond *metav1.Condition,
+) (clustersdkv1alpha1.ClusterRolloutStatus, error) {
+	// Check for Failed state: Degraded=True
+	if degradedCond != nil && degradedCond.Status == metav1.ConditionTrue {
+		clsRolloutStatus.Status = clustersdkv1alpha1.Failed
+		clsRolloutStatus.LastTransitionTime = &degradedCond.LastTransitionTime
+		return clsRolloutStatus, nil
+	}
+
+	// Available=True means work is complete (Succeeded)
+	if availableCond != nil && availableCond.Status == metav1.ConditionTrue {
+		clsRolloutStatus.Status = clustersdkv1alpha1.Succeeded
+		clsRolloutStatus.LastTransitionTime = &availableCond.LastTransitionTime
+		return clsRolloutStatus, nil
+	}
+
+	// Not yet available, still progressing
+	if availableCond != nil {
+		clsRolloutStatus.Status = clustersdkv1alpha1.Progressing
+		clsRolloutStatus.LastTransitionTime = &availableCond.LastTransitionTime
+		return clsRolloutStatus, nil
+	}
+
+	// No Available condition yet, still in ToApply/Progressing
+	clsRolloutStatus.Status = clustersdkv1alpha1.Progressing
+	return clsRolloutStatus, nil
+}
+
 // shouldReturnToApply determines if the ManifestWork should be in ToApply status
 // based on the state of its conditions.
 //
 // Returns true if:
 // - The Applied condition is not ready (missing, hasn't observed latest spec, or not True)
-// - The Progressing condition is not ready (missing or hasn't observed latest spec)
+// - Neither Progressing nor Available conditions are ready (need at least one to determine status)
 // - The Degraded condition exists but hasn't observed the latest spec
 //
 // IMPORTANT: Applied condition is checked FIRST to ensure the work has been properly applied
 // by the spoke agent before checking other agent-side conditions (Progressing/Degraded).
 // This prevents using stale timestamps from previous generations when conditions update
 // their ObservedGeneration without changing Status.
-func shouldReturnToApply(generation int64, appliedCond, progressingCond, degradedCond *metav1.Condition) bool {
+func shouldReturnToApply(generation int64, appliedCond, progressingCond, availableCond, degradedCond *metav1.Condition) bool {
 	// Check Applied condition first - work must be applied by spoke agent
 	if !isConditionReady(appliedCond, generation, true) {
 		return true
 	}
 
-	// Check Progressing condition - work must be reconciled by spoke agent
-	if !isConditionReady(progressingCond, generation, false) {
+	// Check if we have at least one condition to determine status.
+	// Progressing is preferred, but Available can be used as fallback when Progressing is not configured.
+	progressingReady := isConditionReady(progressingCond, generation, false)
+	availableReady := isConditionReady(availableCond, generation, false)
+
+	if !progressingReady && !availableReady {
 		return true
 	}
 
