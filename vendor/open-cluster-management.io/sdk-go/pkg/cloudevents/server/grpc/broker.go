@@ -288,7 +288,7 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 	}
 }
 
-// Upon receiving the spec resync event, the source responds by sending resource status events to the broker as follows:
+// Upon receiving the spec resync event, the source responds by sending resource spec events to the broker as follows:
 //   - If the request event message is empty, the source returns all resources associated with the work agent.
 //   - If the request event message contains resource IDs and versions, the source retrieves the resource with the
 //     specified ID and compares the versions.
@@ -296,6 +296,7 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 //     resend the resource.
 //   - If the requested resource version is older than the source's current maintained resource version, the source
 //     sends the resource.
+//   - If the requested resource does not exist in the source, the source send a delete request to the agent.
 func (bkr *GRPCBroker) respondResyncSpecRequest(ctx context.Context, eventDataType types.CloudEventsDataType, evt *cloudevents.Event) error {
 	log := klog.FromContext(ctx).WithValues(
 		"eventDataType", eventDataType, "eventType", evt.Type(), "extensions", evt.Extensions())
@@ -319,11 +320,6 @@ func (bkr *GRPCBroker) respondResyncSpecRequest(ctx context.Context, eventDataTy
 	evts, err := service.List(ctx, types.ListOptions{ClusterName: clusterName, CloudEventsDataType: eventDataType})
 	if err != nil {
 		return err
-	}
-
-	if len(evts) == 0 {
-		log.V(4).Info("no objs from the lister, do nothing")
-		return nil
 	}
 
 	respEventType := types.CloudEventsType{

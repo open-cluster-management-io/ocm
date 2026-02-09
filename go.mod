@@ -188,4 +188,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 )
 
-replace open-cluster-management.io/sdk-go => github.com/skeeey/sdk-go v0.0.0-20260205050227-c6146a71e969
+replace open-cluster-management.io/sdk-go => github.com/skeeey/sdk-go v0.0.0-20260209014627-6abd1b95d238
