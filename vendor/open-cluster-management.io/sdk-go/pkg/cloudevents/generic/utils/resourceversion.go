@@ -6,7 +6,7 @@ import (
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	cloudeventstypes "github.com/cloudevents/sdk-go/v2/types"
 
-	workpaylaod "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/payload"
+	workpayload "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/payload"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
@@ -16,7 +16,7 @@ import (
 // For other event types, it uses the object's resource version, which represents all changes to the object.
 // If the resource version is empty for non-ManifestBundle types, no extension is set.
 func SetResourceVersion(eventType types.CloudEventsType, evt *cloudevents.Event, obj generic.ResourceObject) {
-	if eventType.CloudEventsDataType == workpaylaod.ManifestBundleEventDataType {
+	if eventType.CloudEventsDataType == workpayload.ManifestBundleEventDataType {
 		evt.SetExtension(types.ExtensionResourceVersion, obj.GetGeneration())
 		return
 	}
@@ -34,7 +34,7 @@ func SetResourceVersion(eventType types.CloudEventsType, evt *cloudevents.Event,
 // For other event types, it parses the resource version string to an int64.
 // Returns an error if the resource version string cannot be parsed.
 func GetResourceVersionFromObject(eventType types.CloudEventsType, obj generic.ResourceObject) (int64, error) {
-	if eventType.CloudEventsDataType == workpaylaod.ManifestBundleEventDataType {
+	if eventType.CloudEventsDataType == workpayload.ManifestBundleEventDataType {
 		return obj.GetGeneration(), nil
 	}
 
@@ -46,7 +46,7 @@ func GetResourceVersionFromObject(eventType types.CloudEventsType, obj generic.R
 // For other event types, it converts the extension value to a string and parses it to int64.
 // Returns an error if the extension is missing, has an invalid type, or cannot be parsed.
 func GetResourceVersionFromEvent(eventType types.CloudEventsType, evt cloudevents.Event) (int64, error) {
-	if eventType.CloudEventsDataType == workpaylaod.ManifestBundleEventDataType {
+	if eventType.CloudEventsDataType == workpayload.ManifestBundleEventDataType {
 		gen, err := cloudeventstypes.ToInteger(evt.Extensions()[types.ExtensionResourceVersion])
 		return int64(gen), err
 	}

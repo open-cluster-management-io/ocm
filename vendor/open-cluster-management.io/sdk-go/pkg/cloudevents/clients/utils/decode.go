@@ -45,8 +45,7 @@ func DecodeWithDeletionHandling[T metav1.Object](evt *cloudevents.Event, factory
 	}
 
 	if err := evt.DataAs(obj); err != nil {
-		var zero T
-		return zero, fmt.Errorf("failed to unmarshal even, %v", err)
+		return zero, fmt.Errorf("failed to unmarshal event, %v", err)
 	}
 
 	return obj, nil

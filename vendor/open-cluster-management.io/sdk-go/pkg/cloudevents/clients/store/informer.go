@@ -72,20 +72,23 @@ func (s *AgentInformerWatcherStore[T]) HandleReceivedResource(ctx context.Contex
 			return err
 		}
 
-		cachedRuntimeObj, err := utils.ToRuntimeObject(cachedMetaObj)
-		if err != nil {
-			return err
-		}
-
 		// trigger an update event if the object is deleting.
 		// Only need to update generation/finalizer/deletionTimeStamp of the object.
 		if len(newMetaObj.GetFinalizers()) != 0 {
 			cachedMetaObj.SetDeletionTimestamp(newMetaObj.GetDeletionTimestamp())
 			cachedMetaObj.SetFinalizers(newMetaObj.GetFinalizers())
 			cachedMetaObj.SetGeneration(newMetaObj.GetGeneration())
+			cachedRuntimeObj, err := utils.ToRuntimeObject(cachedMetaObj)
+			if err != nil {
+				return err
+			}
 			return s.Update(cachedRuntimeObj)
 		}
 
+		cachedRuntimeObj, err := utils.ToRuntimeObject(cachedMetaObj)
+		if err != nil {
+			return err
+		}
 		return s.Delete(cachedRuntimeObj)
 	}
 
