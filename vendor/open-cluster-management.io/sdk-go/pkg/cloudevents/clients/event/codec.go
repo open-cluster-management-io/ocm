@@ -35,7 +35,7 @@ func (c *EventCodec) Encode(source string, eventType types.CloudEventsType, even
 	}
 
 	evt := types.NewEventBuilder(source, eventType).
-		WithResourceID(event.Name).
+		WithResourceID(string(event.UID)).
 		WithClusterName(event.Namespace).
 		NewEvent()
 

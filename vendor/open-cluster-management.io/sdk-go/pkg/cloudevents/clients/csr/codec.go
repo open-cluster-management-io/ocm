@@ -10,7 +10,9 @@ import (
 
 	v1 "open-cluster-management.io/api/cluster/v1"
 
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/utils"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
+	genericutils "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/utils"
 )
 
 var CSREventDataType = types.CloudEventsDataType{
@@ -47,12 +49,15 @@ func (c *CSRCodec) Encode(source string, eventType types.CloudEventsType, csr *c
 	}
 
 	evt := types.NewEventBuilder(source, eventType).
-		WithResourceID(csr.Name).
+		WithResourceID(string(csr.UID)).
 		WithClusterName(cluster).
 		NewEvent()
 
-	if csr.ResourceVersion != "" {
-		evt.SetExtension(types.ExtensionResourceVersion, csr.ResourceVersion)
+	genericutils.SetResourceVersion(eventType, &evt, csr)
+
+	if !csr.DeletionTimestamp.IsZero() {
+		evt.SetExtension(types.ExtensionDeletionTimestamp, csr.DeletionTimestamp.Time)
+		return &evt, nil
 	}
 
 	newCSR := csr.DeepCopy()
@@ -70,10 +75,7 @@ func (c *CSRCodec) Encode(source string, eventType types.CloudEventsType, csr *c
 
 // Decode a cloudevent to a CSR
 func (c *CSRCodec) Decode(evt *cloudevents.Event) (*certificatev1.CertificateSigningRequest, error) {
-	csr := &certificatev1.CertificateSigningRequest{}
-	if err := evt.DataAs(csr); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event data %s, %v", string(evt.Data()), err)
-	}
-
-	return csr, nil
+	return utils.DecodeWithDeletionHandling(evt, func() *certificatev1.CertificateSigningRequest {
+		return &certificatev1.CertificateSigningRequest{}
+	})
 }

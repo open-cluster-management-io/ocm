@@ -22,10 +22,9 @@ type ResourceObject interface {
 	// The source should ensure its uniqueness and consistency.
 	GetUID() kubetypes.UID
 
-	// GetResourceVersion returns the resource version of this object. The resource version is a required int64 sequence
-	// number property that must be incremented by the source whenever this resource changes.
-	// The source should guarantee its incremental nature.
-	// Deprecated: use GetGeneration() instead.
+	// GetResourceVersion returns the resourceVersion of this object.
+	// It is updated by the system whenever any part of the object changes,
+	// and is used for optimistic concurrency control.
 	GetResourceVersion() string
 
 	// GetGeneration returns the generation number of this object to reflect the spec change of the resource.

@@ -8,7 +8,9 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/utils"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
+	genericutils "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/utils"
 )
 
 var LeaseEventDataType = types.CloudEventsDataType{
@@ -36,12 +38,15 @@ func (c *LeaseCodec) Encode(source string, eventType types.CloudEventsType, leas
 	}
 
 	evt := types.NewEventBuilder(source, eventType).
-		WithResourceID(lease.Name).
+		WithResourceID(string(lease.UID)).
 		WithClusterName(lease.Namespace).
 		NewEvent()
 
-	if lease.ResourceVersion != "" {
-		evt.SetExtension(types.ExtensionResourceVersion, lease.ResourceVersion)
+	genericutils.SetResourceVersion(eventType, &evt, lease)
+
+	if !lease.DeletionTimestamp.IsZero() {
+		evt.SetExtension(types.ExtensionDeletionTimestamp, lease.DeletionTimestamp.Time)
+		return &evt, nil
 	}
 
 	newLease := lease.DeepCopy()
@@ -59,10 +64,7 @@ func (c *LeaseCodec) Encode(source string, eventType types.CloudEventsType, leas
 
 // Decode a cloudevent to a lease object
 func (c *LeaseCodec) Decode(evt *cloudevents.Event) (*coordinationv1.Lease, error) {
-	lease := &coordinationv1.Lease{}
-	if err := evt.DataAs(lease); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event data %s, %v", string(evt.Data()), err)
-	}
-
-	return lease, nil
+	return utils.DecodeWithDeletionHandling(evt, func() *coordinationv1.Lease {
+		return &coordinationv1.Lease{}
+	})
 }
