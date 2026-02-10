@@ -25,6 +25,7 @@ import (
 	grpcprotocol "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protocol"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/utils"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server"
 )
 
@@ -287,7 +288,7 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 	}
 }
 
-// Upon receiving the spec resync event, the source responds by sending resource status events to the broker as follows:
+// Upon receiving the spec resync event, the source responds by sending resource spec events to the broker as follows:
 //   - If the request event message is empty, the source returns all resources associated with the work agent.
 //   - If the request event message contains resource IDs and versions, the source retrieves the resource with the
 //     specified ID and compares the versions.
@@ -295,6 +296,7 @@ func (bkr *GRPCBroker) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 //     resend the resource.
 //   - If the requested resource version is older than the source's current maintained resource version, the source
 //     sends the resource.
+//   - If the requested resource does not exist in the source, the source send a delete request to the agent.
 func (bkr *GRPCBroker) respondResyncSpecRequest(ctx context.Context, eventDataType types.CloudEventsDataType, evt *cloudevents.Event) error {
 	log := klog.FromContext(ctx).WithValues(
 		"eventDataType", eventDataType, "eventType", evt.Type(), "extensions", evt.Extensions())
@@ -320,77 +322,71 @@ func (bkr *GRPCBroker) respondResyncSpecRequest(ctx context.Context, eventDataTy
 		return err
 	}
 
-	if len(evts) == 0 {
-		log.V(4).Info("no objs from the lister, do nothing")
-		return nil
+	respEventType := types.CloudEventsType{
+		CloudEventsDataType: eventDataType,
+		SubResource:         types.SubResourceSpec,
+		Action:              types.ResyncResponseAction,
 	}
 
 	for _, evt := range evts {
+		evt.SetType(respEventType.String())
+		evtLogger := log.WithValues("eventType", evt.Type(), "extensions", evt.Extensions())
+
 		// respond with the deleting resource regardless of the resource version
-		objLogger := log.WithValues("eventType", evt.Type(), "extensions", evt.Extensions())
 		if _, ok := evt.Extensions()[types.ExtensionDeletionTimestamp]; ok {
-			objLogger.V(4).Info("respond spec resync request")
-			deleteEventTypes := types.CloudEventsType{
-				CloudEventsDataType: eventDataType,
-				SubResource:         types.SubResourceSpec,
-				Action:              types.DeleteRequestAction,
-			}
-			evt.SetType(deleteEventTypes.String())
+			evtLogger.V(4).Info("respond spec resync request")
 			err = bkr.HandleEvent(ctx, evt)
 			if err != nil {
-				objLogger.Error(err, "failed to handle resync spec request")
+				evtLogger.Error(err, "failed to handle resync spec request")
 			}
 			continue
 		}
 
-		lastResourceVersion := findResourceVersion(evt.ID(), resourceVersions.Versions)
-		currentResourceVersion, err := cloudeventstypes.ToInteger(evt.Extensions()[types.ExtensionResourceVersion])
+		resourceID, err := cloudeventstypes.ToString(evt.Extensions()[types.ExtensionResourceID])
 		if err != nil {
-			objLogger.V(4).Info("ignore the event since it has a invalid resourceVersion", "error", err)
+			evtLogger.Error(err, "failed to get resourceid extension")
+			continue
+		}
+
+		lastResourceVersion := findResourceVersion(resourceID, resourceVersions.Versions)
+		currentResourceVersion, err := utils.GetResourceVersionFromEvent(respEventType, *evt)
+		if err != nil {
+			evtLogger.V(4).Info("ignore the event since it has an invalid resourceVersion", "error", err)
 			continue
 		}
 
 		// the version of the work is not maintained on source or the source's work is newer than agent, send
 		// the newer work to agent
-		if currentResourceVersion == 0 || int64(currentResourceVersion) > lastResourceVersion {
-			objLogger.V(4).Info("respond spec resync request")
-			updateEventTypes := types.CloudEventsType{
-				CloudEventsDataType: eventDataType,
-				SubResource:         types.SubResourceSpec,
-				Action:              types.UpdateRequestAction,
-			}
-			evt.SetType(updateEventTypes.String())
+		if currentResourceVersion == 0 || currentResourceVersion > lastResourceVersion {
+			evtLogger.V(4).Info("respond spec resync request")
 			err := bkr.HandleEvent(ctx, evt)
 			if err != nil {
-				objLogger.Error(err, "failed to handle resync spec request")
+				evtLogger.Error(err, "failed to handle resync spec request")
 			}
 		}
 	}
 
 	// the resources do not exist on the source, but exist on the agent, delete them
 	for _, rv := range resourceVersions.Versions {
-		_, exists := getObj(rv.ResourceID, evts)
+		_, exists := getEvent(rv.ResourceID, evts)
 		if exists {
 			continue
 		}
 
-		deleteEventTypes := types.CloudEventsType{
-			CloudEventsDataType: eventDataType,
-			SubResource:         types.SubResourceSpec,
-			Action:              types.DeleteRequestAction,
-		}
-		obj := types.NewEventBuilder("source", deleteEventTypes).
+		// for deletion, we don't care about the resourceVersion.
+		// TODO support to set the source from broker options
+		evt := types.NewEventBuilder("source", respEventType).
 			WithResourceID(rv.ResourceID).
-			WithResourceVersion(rv.ResourceVersion).
 			WithClusterName(clusterName).
 			WithDeletionTimestamp(time.Now()).
 			NewEvent()
 
+		evtLogger := log.WithValues("eventType", evt.Type(), "extensions", evt.Extensions())
 		// send a delete event for the current resource
-		log.V(4).Info("respond spec resync request")
-		err := bkr.HandleEvent(ctx, &obj)
+		evtLogger.V(4).Info("respond spec resync request")
+		err := bkr.HandleEvent(ctx, &evt)
 		if err != nil {
-			log.Error(err, "failed to handle delete request")
+			evtLogger.Error(err, "failed to handle resync spec request")
 		}
 	}
 
@@ -455,13 +451,13 @@ func findResourceVersion(id string, versions []payload.ResourceVersion) int64 {
 	return 0
 }
 
-// getObj returns the object with the given ID from the list of resources.
-func getObj(id string, objs []*cloudevents.Event) (*cloudevents.Event, bool) {
-	for _, obj := range objs {
-		resID := obj.Extensions()[types.ExtensionResourceID]
+// getEvent returns the event with the given ID from the list of events.
+func getEvent(id string, evts []*cloudevents.Event) (*cloudevents.Event, bool) {
+	for _, evt := range evts {
+		resID := evt.Extensions()[types.ExtensionResourceID]
 		resIDStr, ok := resID.(string)
 		if ok && id == resIDStr {
-			return obj, true
+			return evt, true
 		}
 	}
 

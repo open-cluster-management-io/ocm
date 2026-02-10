@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/utils"
@@ -73,4 +74,21 @@ func (s *BaseClientWatchStore[T]) ListAll(ctx context.Context) ([]T, error) {
 	}
 
 	return resources, nil
+}
+
+func (s *BaseClientWatchStore[T]) findObjByUID(ctx context.Context, uid types.UID) (T, bool, error) {
+	var zero T
+
+	objs, err := s.ListAll(ctx)
+	if err != nil {
+		return zero, false, err
+	}
+
+	for _, o := range objs {
+		if o.GetUID() == uid {
+			return o, true, nil
+		}
+	}
+
+	return zero, false, nil
 }

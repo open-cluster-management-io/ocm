@@ -48,47 +48,59 @@ func (s *AgentInformerWatcherStore[T]) Delete(resource runtime.Object) error {
 }
 
 func (s *AgentInformerWatcherStore[T]) HandleReceivedResource(ctx context.Context, resource T) error {
-	runtimeObj, err := utils.ToRuntimeObject(resource)
+	newRuntimeObj, err := utils.ToRuntimeObject(resource)
 	if err != nil {
 		return err
 	}
 
-	metaObj, err := meta.Accessor(runtimeObj)
+	newMetaObj, err := meta.Accessor(newRuntimeObj)
 	if err != nil {
 		return err
 	}
 
-	lastResource, exists, err := s.Get(ctx, metaObj.GetNamespace(), metaObj.GetName())
+	if !newMetaObj.GetDeletionTimestamp().IsZero() {
+		cachedResource, exists, err := s.findObjByUID(ctx, newMetaObj.GetUID())
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return nil
+		}
+
+		cachedMetaObj, err := meta.Accessor(cachedResource)
+		if err != nil {
+			return err
+		}
+
+		// trigger an update event if the object is deleting.
+		// Only need to update generation/finalizer/deletionTimeStamp of the object.
+		if len(newMetaObj.GetFinalizers()) != 0 {
+			cachedMetaObj.SetDeletionTimestamp(newMetaObj.GetDeletionTimestamp())
+			cachedMetaObj.SetFinalizers(newMetaObj.GetFinalizers())
+			cachedMetaObj.SetGeneration(newMetaObj.GetGeneration())
+			cachedRuntimeObj, err := utils.ToRuntimeObject(cachedMetaObj)
+			if err != nil {
+				return err
+			}
+			return s.Update(cachedRuntimeObj)
+		}
+
+		cachedRuntimeObj, err := utils.ToRuntimeObject(cachedMetaObj)
+		if err != nil {
+			return err
+		}
+		return s.Delete(cachedRuntimeObj)
+	}
+
+	_, exists, err := s.Get(ctx, newMetaObj.GetNamespace(), newMetaObj.GetName())
 	if err != nil {
 		return err
 	}
 	if !exists {
-		return s.Add(runtimeObj)
+		return s.Add(newRuntimeObj)
 	}
 
-	if !metaObj.GetDeletionTimestamp().IsZero() {
-		// trigger an update event if the object is deleting.
-		// Only need to update generation/finalizer/deletionTimeStamp of the object.
-		if len(metaObj.GetFinalizers()) != 0 {
-			deletingObj, err := meta.Accessor(lastResource)
-			if err != nil {
-				return err
-			}
-			deletingObj.SetDeletionTimestamp(metaObj.GetDeletionTimestamp())
-			deletingObj.SetFinalizers(metaObj.GetFinalizers())
-			deletingObj.SetGeneration(metaObj.GetGeneration())
-			runtimeObj, err := utils.ToRuntimeObject(deletingObj)
-			if err != nil {
-				return err
-			}
-
-			return s.Update(runtimeObj)
-		}
-
-		return s.Delete(runtimeObj)
-	}
-
-	return s.Update(runtimeObj)
+	return s.Update(newRuntimeObj)
 }
 
 func (s *AgentInformerWatcherStore[T]) GetWatcher(ctx context.Context, namespace string, opts metav1.ListOptions) (watch.Interface, error) {

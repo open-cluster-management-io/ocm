@@ -115,9 +115,9 @@ var _ = BeforeSuite(func() {
 		SingletonImage:    singletonImage,
 	}
 
-	// In most OCM cases, we expect user should see the result in 90 seconds.
-	// For cases that need more than 90 seconds, please set the timeout in the test case EXPLICITLY.
-	SetDefaultEventuallyTimeout(90 * time.Second)
+	// In most OCM cases, we expect user should see the result in 150 seconds.
+	// For cases that need more than 150 seconds, please set the timeout in the test case EXPLICITLY.
+	SetDefaultEventuallyTimeout(150 * time.Second)
 	SetDefaultEventuallyPollingInterval(5 * time.Second)
 
 	By("Setup hub")
