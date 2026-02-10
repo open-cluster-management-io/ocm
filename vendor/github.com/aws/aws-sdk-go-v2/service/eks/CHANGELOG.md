@@ -1,3 +1,7 @@
+# v1.78.0 (2026-02-10)
+
+* **Feature**: Amazon EKS adds a new DescribeUpdate update type, VendedLogsUpdate, to support an integration between EKS Auto Mode and Amazon CloudWatch Vended Logs.
+
 # v1.77.1 (2026-02-04)
 
 * **Documentation**: Update delete cluster description
