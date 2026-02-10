@@ -73,7 +73,7 @@ var (
 	}
 )
 
-var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, ginkgo.Label("addon-manager"), func() {
+var _ = ginkgo.Describe("Addon management", ginkgo.Ordered, ginkgo.Label("addon-manager"), func() {
 	addOnName := "hello-template"
 	addonInstallNamespace := "test-addon-template"
 
@@ -93,7 +93,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 	var signerSecretNamespace string
 
 	ginkgo.BeforeEach(func() {
-		signerSecretNamespace = "signer-secret-test-ns" + rand.String(6)
+		signerSecretNamespace = "signer-secret-test-ns-" + rand.String(6)
 
 		ginkgo.By("create addon custom sign secret namespace")
 		_, err := hub.KubeClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{

@@ -15,6 +15,7 @@ import (
 	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -353,7 +354,8 @@ func extractCAdata(caCertData, caKeyData []byte) ([]byte, []byte, error) {
 // that is deployed by addon template.
 // the returned func will create a rolebinding to bind the clusterRole/role which is
 // specified by the user, so the user is required to make sure the existence of the
-// clusterRole/role
+// clusterRole/role.
+// It uses dynamic subject binding which works with both CSR-based and token-based authentication.
 func (a *CRDTemplateAgentAddon) TemplatePermissionConfigFunc() agent.PermissionConfigFunc {
 
 	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
@@ -451,6 +453,22 @@ func (a *CRDTemplateAgentAddon) createKubeClientPermissions(
 func (a *CRDTemplateAgentAddon) createPermissionBinding(clusterName, addonName, namespace string,
 	roleRef rbacv1.RoleRef, owner *metav1.OwnerReference) error {
 
+	// Get the ManagedClusterAddOn to extract dynamic subjects from Status.Registrations
+	addon, err := a.addonLister.ManagedClusterAddOns(clusterName).Get(addonName)
+	if err != nil {
+		return fmt.Errorf("failed to get ManagedClusterAddOn %s/%s: %w", clusterName, addonName, err)
+	}
+
+	// Build subjects dynamically from addon.Status.Registrations for KubeClient signer
+	// This works with both CSR-based and token-based authentication
+	subjects := buildSubjectsFromRegistration(addon, certificatesv1.KubeAPIServerClientSignerName)
+
+	// If no subjects found, return pending error to retry later
+	// This can happen when the addon is first created and registrations are not yet populated
+	if len(subjects) == 0 {
+		return &agent.SubjectNotReadyError{}
+	}
+
 	binding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("open-cluster-management:%s:%s:agent",
@@ -461,14 +479,8 @@ func (a *CRDTemplateAgentAddon) createPermissionBinding(clusterName, addonName, 
 				AddonTemplateLabelKey:          "",
 			},
 		},
-		RoleRef: roleRef,
-		Subjects: []rbacv1.Subject{
-			{
-				Kind:     rbacv1.GroupKind,
-				APIGroup: rbacv1.GroupName,
-				Name:     clusterAddonGroup(clusterName, addonName),
-			},
-		},
+		RoleRef:  roleRef,
+		Subjects: subjects,
 	}
 	if owner != nil {
 		binding.OwnerReferences = []metav1.OwnerReference{*owner}
@@ -484,12 +496,53 @@ func (a *CRDTemplateAgentAddon) createPermissionBinding(clusterName, addonName, 
 		a.hubKubeClient.RbacV1(), recorderWrapper, binding)
 	if err == nil && modified {
 		a.logger.Info("Rolebinding for addon updated", "namespace", binding.Namespace, "name", binding.Name,
-			"clusterName", clusterName, "addonName", addonName)
+			"clusterName", clusterName, "addonName", addonName, "subjects", subjects)
 	}
 	return err
 }
 
-// clusterAddonGroup returns the group that represents the addon for the cluster
-func clusterAddonGroup(clusterName, addonName string) string {
-	return fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", clusterName, addonName)
+// buildSubjectsFromRegistration extracts and builds RBAC subjects from addon registration status.
+// Returns nil if no matching registration is found or if the subject is empty.
+// This function is based on the addon-framework implementation to support dynamic subject binding
+// for both CSR-based and token-based authentication.
+func buildSubjectsFromRegistration(addon *addonapiv1alpha1.ManagedClusterAddOn, signerName string) []rbacv1.Subject {
+	// Find the registration config for the specified signer
+	var subject *addonapiv1alpha1.Subject
+	for _, registration := range addon.Status.Registrations {
+		if registration.SignerName == signerName {
+			subject = &registration.Subject
+			break
+		}
+	}
+
+	// If no registration config found or subject is empty, return nil
+	if subject == nil || equality.Semantic.DeepEqual(*subject, addonapiv1alpha1.Subject{}) {
+		return nil
+	}
+
+	// Build subjects from the registration config subject
+	subjects := []rbacv1.Subject{}
+
+	// Include user if set
+	if subject.User != "" {
+		subjects = append(subjects, rbacv1.Subject{
+			Kind:     rbacv1.UserKind,
+			APIGroup: rbacv1.GroupName,
+			Name:     subject.User,
+		})
+	}
+
+	// Include groups
+	for _, group := range subject.Groups {
+		if group == "system:authenticated" {
+			continue
+		}
+		subjects = append(subjects, rbacv1.Subject{
+			Kind:     rbacv1.GroupKind,
+			APIGroup: rbacv1.GroupName,
+			Name:     group,
+		})
+	}
+
+	return subjects
 }

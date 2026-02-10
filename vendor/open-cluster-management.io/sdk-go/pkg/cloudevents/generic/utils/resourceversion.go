@@ -26,7 +26,7 @@ func SetResourceVersion(eventType types.CloudEventsType, evt *cloudevents.Event,
 		return
 	}
 
-	evt.SetExtension(types.ExtensionResourceVersion, obj.GetResourceVersion())
+	evt.SetExtension(types.ExtensionResourceVersion, rv)
 }
 
 // GetResourceVersionFromObject extracts the resource version from a resource object as an int64.
@@ -47,6 +47,7 @@ func GetResourceVersionFromObject(eventType types.CloudEventsType, obj generic.R
 // Returns an error if the extension is missing, has an invalid type, or cannot be parsed.
 func GetResourceVersionFromEvent(eventType types.CloudEventsType, evt cloudevents.Event) (int64, error) {
 	if eventType.CloudEventsDataType == workpayload.ManifestBundleEventDataType {
+		// TODO only use string as the resourceversion extension
 		gen, err := cloudeventstypes.ToInteger(evt.Extensions()[types.ExtensionResourceVersion])
 		return int64(gen), err
 	}

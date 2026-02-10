@@ -374,6 +374,7 @@ func (bkr *GRPCBroker) respondResyncSpecRequest(ctx context.Context, eventDataTy
 		}
 
 		// for deletion, we don't care about the resourceVersion.
+		// TODO support to set the source from broker options
 		evt := types.NewEventBuilder("source", respEventType).
 			WithResourceID(rv.ResourceID).
 			WithClusterName(clusterName).
