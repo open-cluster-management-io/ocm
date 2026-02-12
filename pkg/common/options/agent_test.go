@@ -13,8 +13,17 @@ func TestNewAgentOptions(t *testing.T) {
 	if opts.HubKubeconfigDir != "/spoke/hub-kubeconfig" {
 		t.Errorf("unexpected HubKubeconfigDir: %s", opts.HubKubeconfigDir)
 	}
-	if opts.ComponentNamespace != "open-cluster-management-agent" {
-		t.Errorf("unexpected ComponentNamespace: %s", opts.ComponentNamespace)
+	// ComponentNamespace should either be the default or read from the service account namespace file
+	if opts.ComponentNamespace == "" {
+		t.Errorf("ComponentNamespace should not be empty")
+	}
+	// In test environments, it may be read from /var/run/secrets/kubernetes.io/serviceaccount/namespace
+	// Otherwise, it should be the default value
+	if _, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err != nil {
+		// No service account namespace file, should be default
+		if opts.ComponentNamespace != "open-cluster-management-agent" {
+			t.Errorf("unexpected ComponentNamespace: %s", opts.ComponentNamespace)
+		}
 	}
 }
 
