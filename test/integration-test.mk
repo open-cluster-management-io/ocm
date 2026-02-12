@@ -1,26 +1,32 @@
-TEST_TMP :=/tmp
-
-export KUBEBUILDER_ASSETS ?=$(TEST_TMP)/kubebuilder/bin
-
 K8S_VERSION ?=1.30.0
-KB_TOOLS_ARCHIVE_NAME :=kubebuilder-tools-$(K8S_VERSION)-$(GOHOSTOS)-$(GOHOSTARCH).tar.gz
-KB_TOOLS_ARCHIVE_PATH := $(TEST_TMP)/$(KB_TOOLS_ARCHIVE_NAME)
+
+SETUP_ENVTEST ?=$(PERMANENT_TMP_GOPATH)/bin/setup-envtest
+SETUP_ENVTEST_VERSION ?=v0.23.1
+setup_envtest_gen_dir:=$(dir $(SETUP_ENVTEST))
+SETUP_ENVTEST_ARCHOS:=$(GOHOSTOS)-$(GOHOSTARCH)
 
 # download the kubebuilder-tools to get kube-apiserver binaries from it
-ensure-kubebuilder-tools:
-ifeq "" "$(wildcard $(KUBEBUILDER_ASSETS))"
-	$(info Downloading kube-apiserver into '$(KUBEBUILDER_ASSETS)')
-	mkdir -p '$(KUBEBUILDER_ASSETS)'
-	curl -s -f -L https://storage.googleapis.com/kubebuilder-tools/$(KB_TOOLS_ARCHIVE_NAME) -o '$(KB_TOOLS_ARCHIVE_PATH)'
-	tar -C '$(KUBEBUILDER_ASSETS)' --strip-components=2 -zvxf '$(KB_TOOLS_ARCHIVE_PATH)'
-else
-	$(info Using existing kube-apiserver from "$(KUBEBUILDER_ASSETS)")
-endif
+ensure-kubebuilder-tools: ensure-setup-envtest
+	$(info Setting up envtest binaries for Kubernetes $(K8S_VERSION))
+	@$(eval export KUBEBUILDER_ASSETS := $(shell $(SETUP_ENVTEST) use $(K8S_VERSION) --bin-dir $(shell pwd)/$(PERMANENT_TMP_GOPATH)/kubebuilder/bin -p path))
+	@echo "KUBEBUILDER_ASSETS=$(KUBEBUILDER_ASSETS)"
 .PHONY: ensure-kubebuilder-tools
 
+ensure-setup-envtest:
+ifeq "" "$(wildcard $(SETUP_ENVTEST))"
+	$(info Downloading setup-envtest $(SETUP_ENVTEST_VERSION) into '$(SETUP_ENVTEST)')
+	mkdir -p '$(setup_envtest_gen_dir)'
+	curl -s -f -L https://github.com/kubernetes-sigs/controller-runtime/releases/download/$(SETUP_ENVTEST_VERSION)/setup-envtest-$(SETUP_ENVTEST_ARCHOS) -o '$(SETUP_ENVTEST)'
+	chmod +x '$(SETUP_ENVTEST)';
+else
+	$(info Using existing setup-envtest from "$(SETUP_ENVTEST)")
+endif
+.PHONY: ensure-setup-envtest
+
 clean-integration-test:
-	$(RM) '$(KB_TOOLS_ARCHIVE_PATH)'
-	rm -rf $(TEST_TMP)/kubebuilder
+	chmod -R u+w $(PERMANENT_TMP_GOPATH)/kubebuilder 2>/dev/null || true
+	rm -rf $(PERMANENT_TMP_GOPATH)/kubebuilder
+	$(RM) '$(SETUP_ENVTEST)'
 	$(RM) ./*integration.test
 .PHONY: clean-integration-test
 
