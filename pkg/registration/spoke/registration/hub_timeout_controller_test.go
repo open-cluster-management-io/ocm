@@ -13,30 +13,32 @@ import (
 
 func TestHubTimeoutController_Sync(t *testing.T) {
 	cases := []struct {
-		name        string
-		waitSeconds int
-		expect      bool
+		name            string
+		leaseAgeSeconds int
+		timeoutSeconds  int32
+		expect          bool
 	}{
 		{
-			name:        "not timeout",
-			waitSeconds: 1,
-			expect:      false,
+			name:            "not timeout",
+			leaseAgeSeconds: 2,
+			timeoutSeconds:  5,
+			expect:          false,
 		},
 		{
-			name:        "timeout",
-			waitSeconds: 5,
-			expect:      true,
+			name:            "timeout",
+			leaseAgeSeconds: 6,
+			timeoutSeconds:  5,
+			expect:          true,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			var leaseRenewTime = time.Now()
+			// Set lease renew time in the past to simulate aging
+			leaseRenewTime := time.Now().Add(-time.Duration(c.leaseAgeSeconds) * time.Second)
 
 			lease := testinghelpers.NewManagedClusterLease("managed-cluster-lease", leaseRenewTime)
 			leaseClient := kubefake.NewClientset(lease)
-
-			time.Sleep(time.Second * time.Duration(c.waitSeconds))
 
 			handled := false
 			controller := &hubTimeoutController{
@@ -46,7 +48,9 @@ func TestHubTimeoutController_Sync(t *testing.T) {
 					return nil
 				},
 				clusterName:    testinghelpers.TestManagedClusterName,
-				timeoutSeconds: 3,
+				timeoutSeconds: c.timeoutSeconds,
+				// Set startTime in the past to bypass the 10s grace period
+				startTime: time.Now().Add(-time.Second * 15),
 			}
 
 			err := controller.sync(context.Background(), testingcommon.NewFakeSyncContext(t, ""), "")
