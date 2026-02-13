@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -245,15 +244,14 @@ func buildAppliedStatusCondition(result applyResult, generation int64) metav1.Co
 		// Check if this is an ignoreFields processing error
 		reason := workapiv1.AppliedManifestFailed
 		message := fmt.Sprintf("Failed to apply manifest: %v", result.Error)
-		
-		// Detect IgnoreFieldError by checking error message prefix
-		// This is a simple approach that works without importing the apply package
-		errMsg := result.Error.Error()
-		if strings.Contains(errMsg, "JSON Pointer error") || strings.Contains(errMsg, "JQ expression error") {
+
+		// Use type-safe error detection for IgnoreFieldError
+		var ignoreFieldErr *apply.IgnoreFieldError
+		if errors.As(result.Error, &ignoreFieldErr) {
 			reason = workapiv1.AppliedManifestSSAIgnoreFieldError
 			message = fmt.Sprintf("Failed to process ignoreFields: %v", result.Error)
 		}
-		
+
 		return metav1.Condition{
 			Type:               workapiv1.ManifestApplied,
 			Status:             metav1.ConditionFalse,

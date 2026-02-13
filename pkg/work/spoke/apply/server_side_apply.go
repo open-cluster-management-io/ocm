@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -11,7 +12,7 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/itchyny/gojq"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -115,7 +116,7 @@ func (c *ServerSideApply) Apply(
 		existing, err := c.client.Resource(gvr).Namespace(required.GetNamespace()).Get(
 			ctx, required.GetName(), metav1.GetOptions{})
 		switch {
-		case errors.IsNotFound(err):
+		case apierrors.IsNotFound(err):
 			// if object is not found, use requiredOriginal to apply so the ignore fields are kept when create
 			required = requiredOriginal
 		case err != nil:
@@ -139,7 +140,7 @@ func (c *ServerSideApply) Apply(
 		"gvr", gvr.String(), "resourceNamespace", required.GetNamespace(),
 		"resourceName", required.GetName(), "fieldManager", fieldManager)
 
-	if errors.IsConflict(err) {
+	if apierrors.IsConflict(err) {
 		return obj, &ServerSideApplyConflictError{ssaErr: err}
 	}
 
@@ -268,11 +269,11 @@ func removeFieldByJQExpression(obj *unstructured.Unstructured, expression string
 	}
 
 	// Check for errors
-	if err, ok := first.(error); ok {
-		if err == context.DeadlineExceeded {
+	if errVal, ok := first.(error); ok {
+		if errors.Is(errVal, context.DeadlineExceeded) {
 			return fmt.Errorf("jq expression execution timed out after %v", DefaultJQExecutionTimeout)
 		}
-		return fmt.Errorf("jq expression returned error: %w", err)
+		return fmt.Errorf("jq expression returned error: %w", errVal)
 	}
 
 	// Check for multiple results

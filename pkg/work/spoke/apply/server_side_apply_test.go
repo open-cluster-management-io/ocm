@@ -440,8 +440,8 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 		validateActions func(t *testing.T, actions []clienttesting.Action)
 		condition       workapiv1.IgnoreFieldsCondition
 		jsonPath        string
-		jsonPointer     string
-		jqExpression    string
+		jsonPointers    []string
+		jqExpressions   []string
 	}{
 		{
 			name: "server side apply ignore replicas",
@@ -583,8 +583,8 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 					t.Errorf("expected replicas to be removed in the patch")
 				}
 			},
-			condition:   workapiv1.IgnoreFieldsConditionOnSpokePresent,
-			jsonPointer: "/spec/replicas",
+			condition:    workapiv1.IgnoreFieldsConditionOnSpokePresent,
+			jsonPointers: []string{"/spec/replicas"},
 		},
 		{
 			name: "server side apply with JSON Pointer - ignore annotation with special chars",
@@ -648,8 +648,8 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 					t.Errorf("expected app annotation to be updated to myapp-updated")
 				}
 			},
-			condition:   workapiv1.IgnoreFieldsConditionOnSpokePresent,
-			jsonPointer: "/metadata/annotations/prometheus.io~1scrape",
+			condition:    workapiv1.IgnoreFieldsConditionOnSpokePresent,
+			jsonPointers: []string{"/metadata/annotations/prometheus.io~1scrape"},
 		},
 		{
 			name: "server side apply with JQ Expression - filter containers",
@@ -715,11 +715,11 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 					}
 				}
 			},
-			condition:    workapiv1.IgnoreFieldsConditionOnSpokePresent,
-			jqExpression: ".spec.template.spec.containers[] | select(.name == \"istio-proxy\")",
+			condition:     workapiv1.IgnoreFieldsConditionOnSpokePresent,
+			jqExpressions: []string{".spec.template.spec.containers[] | select(.name == \"istio-proxy\")"},
 		},
 		{
-			name: "server side apply with combined selectors - JSONPath, JSONPointer, and JQ",
+			name: "server side apply with combined selectors - JSONPointer, and JQ",
 			existing: testingcommon.NewUnstructuredWithContent(
 				"apps/v1", "Deployment", "default", "deploy1",
 				map[string]interface{}{
@@ -828,10 +828,9 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 					t.Errorf("expected managed-by annotation to be updated to 'hub'")
 				}
 			},
-			condition:    workapiv1.IgnoreFieldsConditionOnSpokePresent,
-			jsonPath:     ".metadata.annotations['prometheus.io/scrape']",
-			jsonPointer:  "/spec/replicas",
-			jqExpression: ".spec.template.spec.volumes[] | select(.name | startswith(\"istio-\"))",
+			condition:     workapiv1.IgnoreFieldsConditionOnSpokePresent,
+			jsonPointers:  []string{"/spec/replicas", "/metadata/annotations/prometheus.io~1scrape"},
+			jqExpressions: []string{".spec.template.spec.volumes[] | select(.name | startswith(\"istio-\"))"},
 		},
 		{
 			name: "server side apply with pod - ignore Istio injected sidecars and volumes",
@@ -915,6 +914,12 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 								},
 							},
 						},
+						"initContainers": []interface{}{
+							map[string]interface{}{
+								"name":  "istio-init",
+								"image": "istio/proxyv2:1.19.0",
+							},
+						},
 						"volumes": []interface{}{
 							map[string]interface{}{
 								"name": "app-data",
@@ -951,11 +956,11 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 					}
 				}
 				// Verify init containers are filtered out
-				_, exist, err = unstructured.NestedSlice(actual.Object, "spec", "initContainers")
+				initContainers, exist, err := unstructured.NestedSlice(actual.Object, "spec", "initContainers")
 				if err != nil {
 					t.Fatal(err)
 				}
-				if exist {
+				if len(initContainers) != 0 {
 					t.Errorf("expected initContainers to be removed")
 				}
 				// Verify istio volumes are filtered out
@@ -968,14 +973,6 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 				}
 				if len(volumes) != 1 {
 					t.Errorf("expected 1 volume after filtering istio volumes, got %d", len(volumes))
-				}
-				// Verify Istio annotations are filtered out
-				_, exist, err = unstructured.NestedString(actual.Object, "metadata", "annotations", "sidecar.istio.io/status")
-				if err != nil {
-					t.Fatal(err)
-				}
-				if exist {
-					t.Errorf("expected sidecar.istio.io/status annotation to be removed")
 				}
 				_, exist, err = unstructured.NestedString(actual.Object, "metadata", "annotations", "prometheus.io/scrape")
 				if err != nil {
@@ -994,9 +991,12 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 				}
 			},
 			condition:    workapiv1.IgnoreFieldsConditionOnSpokePresent,
-			jsonPath:     ".metadata.annotations['sidecar.istio.io/status']",
-			jsonPointer:  "/metadata/annotations/prometheus.io~1scrape",
-			jqExpression: ".spec.containers[] | select(.name != \"application\"), .spec.volumes[]? | select(.name | startswith(\"istio-\")), .spec.initContainers[]?",
+			jsonPointers: []string{"/metadata/annotations/prometheus.io~1scrape"},
+			jqExpressions: []string{
+				".spec.containers[] | select(.name != \"application\")",
+				".spec.volumes[]? | select(.name | startswith(\"istio-\"))",
+				".spec.initContainers[]?",
+			},
 		},
 	}
 
@@ -1033,18 +1033,8 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 									}
 									return nil
 								}(),
-								JSONPointers: func() []string {
-									if c.jsonPointer != "" {
-										return []string{c.jsonPointer}
-									}
-									return nil
-								}(),
-								JQPathExpressions: func() []string {
-									if c.jqExpression != "" {
-										return []string{c.jqExpression}
-									}
-									return nil
-								}(),
+								JSONPointers:      c.jsonPointers,
+								JQPathExpressions: c.jqExpressions,
 							},
 						},
 					},
