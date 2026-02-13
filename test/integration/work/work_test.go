@@ -1410,4 +1410,64 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 		})
 	})
+
+	ginkgo.Context("Resource deletion and recreation", func() {
+		ginkgo.BeforeEach(func() {
+			manifests = []workapiv1.Manifest{
+				util.ToManifest(util.NewConfigmap(clusterName, cm1, map[string]string{"a": "b"}, nil)),
+			}
+		})
+
+		ginkgo.It("should recreate resource after manual deletion", func() {
+			ginkgo.By("verify initial conditions are True")
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("verify configmap exists")
+			_, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			ginkgo.By("manually delete the configmap")
+			err = spokeKubeClient.CoreV1().ConfigMaps(clusterName).Delete(context.Background(), cm1, metav1.DeleteOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			ginkgo.By("verify configmap is deleted")
+			gomega.Eventually(func() bool {
+				_, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+				return errors.IsNotFound(err)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			ginkgo.By("verify Available condition changes to False after deletion")
+			gomega.Eventually(func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				availableCond := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkAvailable)
+				if availableCond == nil {
+					return fmt.Errorf("available condition not found")
+				}
+				if availableCond.Status != metav1.ConditionFalse {
+					return fmt.Errorf("available condition status is %s, expected False", availableCond.Status)
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+			ginkgo.By("verify configmap is recreated")
+			gomega.Eventually(func() error {
+				_, err := spokeKubeClient.CoreV1().ConfigMaps(clusterName).Get(context.Background(), cm1, metav1.GetOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+			ginkgo.By("verify conditions are True again after recreation")
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+		})
+	})
 })
