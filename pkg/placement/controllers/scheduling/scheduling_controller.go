@@ -712,46 +712,60 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 	// If status has been updated, just return, this is to avoid conflict when updating the label later.
 	// Labels and annotations will still be updated in next reconcile.
 	if updated {
+		// Record events when status is updated
+		c.recordDecisionEvents(placement, existPlacementDecision, clusterScores, status)
 		return err
 	}
+	// Do not record events when label is updated
 	_, err = placementDecisionPatcher.PatchLabelAnnotations(ctx, newPlacementDecision, newPlacementDecision.ObjectMeta, existPlacementDecision.ObjectMeta)
-	if err != nil {
-		return err
-	}
+	return err
+}
 
-	// update the event with warning
+// recordDecisionEvents records DecisionUpdate and ScoreUpdate events for placement decision
+func (c *schedulingController) recordDecisionEvents(
+	placement *clusterapiv1beta1.Placement,
+	placementDecision *clusterapiv1beta1.PlacementDecision,
+	clusterScores PrioritizerScore,
+	status *framework.Status,
+) {
+	// Record decision update event with warning or normal type
 	if status.Code() == framework.Warning {
 		c.eventsRecorder.Eventf(
-			placement, existPlacementDecision, corev1.EventTypeWarning,
+			placement, placementDecision, corev1.EventTypeWarning,
 			"DecisionUpdate", "DecisionUpdated",
-			"Decision %s is updated with placement %s in namespace %s: %s in plugin %s", existPlacementDecision.Name, placement.Name, placement.Namespace,
+			"Decision %s is updated with placement %s in namespace %s: %s in plugin %s",
+			placementDecision.Name, placement.Name, placement.Namespace,
 			status.Message(),
 			status.Plugin())
 	} else {
 		c.eventsRecorder.Eventf(
-			placement, existPlacementDecision, corev1.EventTypeNormal,
+			placement, placementDecision, corev1.EventTypeNormal,
 			"DecisionUpdate", "DecisionUpdated",
-			"Decision %s is updated with placement %s in namespace %s", existPlacementDecision.Name, placement.Name, placement.Namespace)
+			"Decision %s is updated with placement %s in namespace %s",
+			placementDecision.Name, placement.Name, placement.Namespace)
 	}
 
-	// update the event with prioritizer score.
+	// Record score update event only if there are scores
+	sortedClusterNames := sets.List(sets.KeySet(clusterScores))
+	if len(sortedClusterNames) == 0 {
+		return
+	}
+
+	// Build score string with sorted cluster names for deterministic event messages
 	scoreStr := ""
-	for k, v := range clusterScores {
-		tmpScore := fmt.Sprintf("%s:%d ", k, v)
+	for _, name := range sortedClusterNames {
+		tmpScore := fmt.Sprintf("%s:%d ", name, clusterScores[name])
 		if len(scoreStr)+len(tmpScore) > maxEventMessageLength {
 			scoreStr += "......"
 			break
-		} else {
-			scoreStr += tmpScore
 		}
+		scoreStr += tmpScore
 	}
 
 	c.eventsRecorder.Eventf(
-		placement, existPlacementDecision, corev1.EventTypeNormal,
+		placement, placementDecision, corev1.EventTypeNormal,
 		"ScoreUpdate", "ScoreUpdated",
 		scoreStr)
-
-	return nil
 }
 
 func calculateLength(intOrStr *intstr.IntOrString, total int) (int, *framework.Status) {
