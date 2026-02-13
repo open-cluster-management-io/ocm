@@ -8,33 +8,40 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/utils/clock"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 type Options struct {
-	CmdConfig *controllercmd.ControllerCommandConfig
-	Burst     int
-	QPS       float32
+	CmdConfig  *controllercmd.ControllerCommandConfig
+	Burst      int
+	QPS        float32
+	EnableOtel bool
 }
 
 // NewOptions returns the flags with default value set
 func NewOptions() *Options {
 	opts := &Options{
-		QPS:   50,
-		Burst: 100,
+		QPS:        50,
+		Burst:      100,
+		EnableOtel: false,
 	}
 	return opts
 }
 
 func (o *Options) NewControllerCommandConfig(
 	componentName string, version version.Info, startFunc controllercmd.StartFunc, clock clock.Clock) *controllercmd.ControllerCommandConfig {
-	o.CmdConfig = controllercmd.NewControllerCommandConfig(componentName, version, o.startWithQPS(startFunc), clock)
+	o.CmdConfig = controllercmd.NewControllerCommandConfig(componentName, version, o.startWithOptions(startFunc), clock)
 	return o.CmdConfig
 }
 
-func (o *Options) startWithQPS(startFunc controllercmd.StartFunc) controllercmd.StartFunc {
+func (o *Options) startWithOptions(startFunc controllercmd.StartFunc) controllercmd.StartFunc {
 	return func(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 		controllerContext.KubeConfig.QPS = o.QPS
 		controllerContext.KubeConfig.Burst = o.Burst
+		if o.EnableOtel {
+			controllerContext.KubeConfig.Transport = otelhttp.NewTransport(controllerContext.KubeConfig.Transport)
+		}
 		return startFunc(ctx, controllerContext)
 	}
 }
@@ -42,6 +49,7 @@ func (o *Options) startWithQPS(startFunc controllercmd.StartFunc) controllercmd.
 func (o *Options) AddFlags(flags *pflag.FlagSet) {
 	flags.Float32Var(&o.QPS, "kube-api-qps", o.QPS, "QPS to use while talking with apiserver on spoke cluster.")
 	flags.IntVar(&o.Burst, "kube-api-burst", o.Burst, "Burst to use while talking with apiserver on spoke cluster.")
+	flags.BoolVar(&o.EnableOtel, "enable-otel-roundtrip", o.EnableOtel, "enable OpenTelemetry roundtrip.")
 	if o.CmdConfig != nil {
 		flags.BoolVar(&o.CmdConfig.DisableLeaderElection, "disable-leader-election", false, "Disable leader election.")
 		flags.DurationVar(&o.CmdConfig.LeaseDuration.Duration, "leader-election-lease-duration", 137*time.Second, ""+
