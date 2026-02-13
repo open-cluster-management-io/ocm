@@ -3,11 +3,16 @@ package apply
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/itchyny/gojq"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -73,8 +78,26 @@ func (c *ServerSideApply) Apply(
 				if field.Condition == workapiv1.IgnoreFieldsConditionOnSpokeChange {
 					continue
 				}
+
+				// Process JSONPaths (existing behavior)
 				for _, path := range field.JSONPaths {
 					removeFieldByJSONPath(required.UnstructuredContent(), path, logger)
+				}
+
+				// Process JSONPointers (RFC 6901)
+				for _, pointer := range field.JSONPointers {
+					if err := removeFieldByJSONPointer(required, pointer, logger); err != nil {
+						logger.Error(err, "failed to remove field by JSON Pointer", "pointer", pointer)
+						return nil, NewIgnoreFieldError("JSON Pointer error in '%s': %v", pointer, err)
+					}
+				}
+
+				// Process JQPathExpressions
+				for _, expr := range field.JQPathExpressions {
+					if err := removeFieldByJQExpression(required, expr, logger); err != nil {
+						logger.Error(err, "failed to remove field by JQ expression", "expression", expr)
+						return nil, NewIgnoreFieldError("JQ expression error in '%s': %v", expr, err)
+					}
 				}
 			}
 			requiredHash = hashOfResourceStruct(required)
@@ -93,7 +116,7 @@ func (c *ServerSideApply) Apply(
 		existing, err := c.client.Resource(gvr).Namespace(required.GetNamespace()).Get(
 			ctx, required.GetName(), metav1.GetOptions{})
 		switch {
-		case errors.IsNotFound(err):
+		case apierrors.IsNotFound(err):
 			// if object is not found, use requiredOriginal to apply so the ignore fields are kept when create
 			required = requiredOriginal
 		case err != nil:
@@ -117,7 +140,7 @@ func (c *ServerSideApply) Apply(
 		"gvr", gvr.String(), "resourceNamespace", required.GetNamespace(),
 		"resourceName", required.GetName(), "fieldManager", fieldManager)
 
-	if errors.IsConflict(err) {
+	if apierrors.IsConflict(err) {
 		return obj, &ServerSideApplyConflictError{ssaErr: err}
 	}
 
@@ -126,6 +149,29 @@ func (c *ServerSideApply) Apply(
 	}
 
 	return obj, err
+}
+
+const (
+	// DefaultJQExecutionTimeout is the default timeout for jq expression execution
+	DefaultJQExecutionTimeout = 1 * time.Second
+)
+
+// IgnoreFieldError represents an error that occurred during ignoreFields processing
+// This error type is used to distinguish ignoreFields errors from other apply errors
+// so they can be reported with the specific AppliedManifestSSAIgnoreFieldError reason
+type IgnoreFieldError struct {
+	message string
+}
+
+func (e *IgnoreFieldError) Error() string {
+	return e.message
+}
+
+// NewIgnoreFieldError creates a new IgnoreFieldError
+func NewIgnoreFieldError(format string, args ...interface{}) error {
+	return &IgnoreFieldError{
+		message: fmt.Sprintf(format, args...),
+	}
 }
 
 // removeFieldByJSONPath remove the field from object by json path. The json path should not point to a
@@ -154,6 +200,96 @@ func removeFieldByJSONPath(obj interface{}, path string, logger klog.Logger) {
 			delete(mapResult, lastKey)
 		}
 	}
+}
+
+// removeFieldByJSONPointer removes the field from object using RFC 6901 JSON Pointer.
+func removeFieldByJSONPointer(obj *unstructured.Unstructured, pointer string, logger klog.Logger) error {
+	// Marshal the object to JSON
+	objJSON, err := obj.MarshalJSON()
+	if err != nil {
+		return fmt.Errorf("failed to marshal object: %w", err)
+	}
+
+	// Create a JSON Patch to remove the field
+	patchData, err := json.Marshal([]map[string]string{{"op": "remove", "path": pointer}})
+	if err != nil {
+		return fmt.Errorf("failed to create patch: %w", err)
+	}
+
+	patch, err := jsonpatch.DecodePatch(patchData)
+	if err != nil {
+		return fmt.Errorf("failed to decode patch: %w", err)
+	}
+
+	// Apply the patch
+	patchedJSON, err := patch.Apply(objJSON)
+	if err != nil {
+		// Silently ignore if path doesn't exist
+		if strings.Contains(err.Error(), "Unable to remove nonexistent key") ||
+			strings.Contains(err.Error(), "remove operation does not apply") {
+			logger.V(4).Info("JSON Pointer path not found, skipping", "pointer", pointer)
+			return nil
+		}
+		return fmt.Errorf("failed to apply JSON Pointer patch: %w", err)
+	}
+
+	// Unmarshal back to the object
+	if err := obj.UnmarshalJSON(patchedJSON); err != nil {
+		return fmt.Errorf("failed to unmarshal patched object: %w", err)
+	}
+
+	return nil
+}
+
+// removeFieldByJQExpression removes fields from object using jq path expression.
+func removeFieldByJQExpression(obj *unstructured.Unstructured, expression string, logger klog.Logger) error {
+	// Parse the jq expression wrapped in del()
+	jqDeletionQuery, err := gojq.Parse(fmt.Sprintf("del(%s)", expression))
+	if err != nil {
+		return fmt.Errorf("failed to parse jq expression: %w", err)
+	}
+
+	// Compile the query
+	jqDeletionCode, err := gojq.Compile(jqDeletionQuery)
+	if err != nil {
+		return fmt.Errorf("failed to compile jq expression: %w", err)
+	}
+
+	// Get object as map
+	dataJSON := obj.UnstructuredContent()
+
+	// Execute with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultJQExecutionTimeout)
+	defer cancel()
+
+	iter := jqDeletionCode.RunWithContext(ctx, dataJSON)
+	first, ok := iter.Next()
+	if !ok {
+		return fmt.Errorf("jq expression did not return any data")
+	}
+
+	// Check for errors
+	if errVal, ok := first.(error); ok {
+		if errors.Is(errVal, context.DeadlineExceeded) {
+			return fmt.Errorf("jq expression execution timed out after %v", DefaultJQExecutionTimeout)
+		}
+		return fmt.Errorf("jq expression returned error: %w", errVal)
+	}
+
+	// Check for multiple results
+	_, ok = iter.Next()
+	if ok {
+		return fmt.Errorf("jq expression returned multiple objects")
+	}
+
+	// Set the modified content back
+	if resultMap, ok := first.(map[string]interface{}); ok {
+		obj.SetUnstructuredContent(resultMap)
+	} else {
+		return fmt.Errorf("jq expression result is not a valid object")
+	}
+
+	return nil
 }
 
 // detect changes in a resource by caching a hash of the string representation of the resource

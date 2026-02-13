@@ -241,11 +241,22 @@ func allInCondition(conditionType string, manifests []workapiv1.ManifestConditio
 
 func buildAppliedStatusCondition(result applyResult, generation int64) metav1.Condition {
 	if result.Error != nil {
+		// Check if this is an ignoreFields processing error
+		reason := workapiv1.AppliedManifestFailed
+		message := fmt.Sprintf("Failed to apply manifest: %v", result.Error)
+
+		// Use type-safe error detection for IgnoreFieldError
+		var ignoreFieldErr *apply.IgnoreFieldError
+		if errors.As(result.Error, &ignoreFieldErr) {
+			reason = workapiv1.AppliedManifestSSAIgnoreFieldError
+			message = fmt.Sprintf("Failed to process ignoreFields: %v", result.Error)
+		}
+
 		return metav1.Condition{
 			Type:               workapiv1.ManifestApplied,
 			Status:             metav1.ConditionFalse,
-			Reason:             "AppliedManifestFailed",
-			Message:            fmt.Sprintf("Failed to apply manifest: %v", result.Error),
+			Reason:             reason,
+			Message:            message,
 			ObservedGeneration: generation,
 		}
 	}
@@ -253,7 +264,7 @@ func buildAppliedStatusCondition(result applyResult, generation int64) metav1.Co
 	return metav1.Condition{
 		Type:               workapiv1.ManifestApplied,
 		Status:             metav1.ConditionTrue,
-		Reason:             "AppliedManifestComplete",
+		Reason:             workapiv1.AppliedManifestComplete,
 		Message:            "Apply manifest complete",
 		ObservedGeneration: generation,
 	}

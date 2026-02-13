@@ -309,19 +309,30 @@ type ServerSideApplyConfig struct {
 
 type IgnoreField struct {
 	// Condition defines the condition that the fields should be ignored when apply the resource.
-	// Fields in JSONPaths are all ignored when condition is met, otherwise no fields is ignored
-	// in the apply operation.
+	// Fields are ignored when condition is met, otherwise no fields are ignored in the apply operation.
 	// +kubebuilder:default=OnSpokePresent
 	// +kubebuilder:validation:Enum=OnSpokePresent;OnSpokeChange
 	// +kubebuilder:validation:Required
 	// +required
 	Condition IgnoreFieldsCondition `json:"condition"`
 
-	// JSONPaths defines the list of json path in the resource to be ignored
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	// +required
-	JSONPaths []string `json:"jsonPaths"`
+	// JSONPaths defines the list of json path in the resource to be ignored.
+	// Uses Kubernetes JSONPath syntax.
+	// +optional
+	JSONPaths []string `json:"jsonPaths,omitempty"`
+
+	// JSONPointers defines the list of JSON Pointers (RFC 6901) in the resource to be ignored.
+	// JSON Pointers provide precise field targeting using a string syntax like "/spec/replicas".
+	// Special characters in keys must be escaped: '~' becomes '~0' and '/' becomes '~1'.
+	// +optional
+	JSONPointers []string `json:"jsonPointers,omitempty"`
+
+	// JQPathExpressions defines the list of jq path expressions in the resource to be ignored.
+	// jq expressions provide powerful querying capabilities including array filtering,
+	// conditional selection, and complex transformations.
+	// Reference: https://stedolan.github.io/jq/manual/
+	// +optional
+	JQPathExpressions []string `json:"jqPathExpressions,omitempty"`
 }
 
 // DefaultFieldManager is the default field manager of the manifestwork when the field manager is not set.
@@ -637,7 +648,18 @@ const (
 	ManifestComplete string = "Complete"
 )
 
-// Manifest condition reasons
+// Manifest condition reasons for Applied condition
+const (
+	// AppliedManifestComplete is set when a manifest is successfully applied
+	AppliedManifestComplete string = "AppliedManifestComplete"
+	// AppliedManifestFailed is set when a manifest fails to apply
+	AppliedManifestFailed string = "AppliedManifestFailed"
+	// AppliedManifestSSAIgnoreFieldError is set when server-side apply fails due to ignoreFields processing errors
+	// This includes JSON Pointer errors, JQ expression errors (timeout, type mismatch, runtime errors), etc.
+	AppliedManifestSSAIgnoreFieldError string = "AppliedManifestSSAIgnoreFieldError"
+)
+
+// Manifest condition reasons for condition rule evaluation
 //
 // All reasons set by condition rule evaluation are expected to be prefixed with "ConditionRule"
 // in order to determine which conditions were set by rules.
