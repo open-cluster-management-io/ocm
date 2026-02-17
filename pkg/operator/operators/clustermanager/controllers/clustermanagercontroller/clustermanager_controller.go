@@ -440,14 +440,7 @@ func isIPFormat(address string) bool {
 func webhookConfigurations(deployOption operatorapiv1.ClusterManagerDeployOption) (registration, work manifests.Webhook) {
 	switch deployOption.Mode {
 	case operatorapiv1.InstallModeDefault:
-		if deployOption.Default == nil {
-			registration.Port = defaultWebhookPort
-			registration.HealthProbePort = defaultHealthProbePort
-			registration.MetricsPort = defaultMetricsPort
-			work.Port = defaultWebhookPort
-			work.HealthProbePort = defaultHealthProbePort
-			work.MetricsPort = defaultMetricsPort
-		} else {
+		if deployOption.Default != nil {
 			registration = convertDefaultWebhookConfiguration(deployOption.Default.RegistrationWebhookConfiguration)
 			work = convertDefaultWebhookConfiguration(deployOption.Default.WorkWebhookConfiguration)
 			return
