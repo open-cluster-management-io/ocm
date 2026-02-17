@@ -11,7 +11,7 @@ metadata:
     {{ end }}
 subsets:
   - addresses:
-      - ip: {{.RegistrationWebhook.Address}}
+      - ip: {{.RegistrationWebhook.HostedAddress}}
     ports:
-      - port: {{.RegistrationWebhook.Port}}
+      - port: {{.RegistrationWebhook.HostedPort}}
         name: tls

@@ -52,10 +52,14 @@ type HubConfig struct {
 }
 
 type Webhook struct {
-	IsIPFormat      bool
+	// Hosted configuration
+	HostedIsIPFormat bool
+	HostedAddress    string
+	HostedPort       int32
+
+	// Bind configuration
 	Port            int32
 	HealthProbePort int32
 	MetricsPort     int32
-	Address         string
 	HostNetwork     bool
 }
