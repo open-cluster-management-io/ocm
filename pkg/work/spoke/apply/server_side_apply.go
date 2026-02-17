@@ -94,7 +94,7 @@ func (c *ServerSideApply) Apply(
 
 				// Process JQPathExpressions
 				for _, expr := range field.JQPathExpressions {
-					if err := removeFieldByJQExpression(required, expr, logger); err != nil {
+					if err := removeFieldByJQExpression(ctx, required, expr, logger); err != nil {
 						logger.Error(err, "failed to remove field by JQ expression", "expression", expr)
 						return nil, NewIgnoreFieldError("JQ expression error in '%s': %v", expr, err)
 					}
@@ -224,9 +224,8 @@ func removeFieldByJSONPointer(obj *unstructured.Unstructured, pointer string, lo
 	// Apply the patch
 	patchedJSON, err := patch.Apply(objJSON)
 	if err != nil {
-		// Silently ignore if path doesn't exist
-		if strings.Contains(err.Error(), "Unable to remove nonexistent key") ||
-			strings.Contains(err.Error(), "remove operation does not apply") {
+		// Silently ignore if path doesn't exist (using proper error checking)
+		if errors.Is(err, jsonpatch.ErrMissing) {
 			logger.V(4).Info("JSON Pointer path not found, skipping", "pointer", pointer)
 			return nil
 		}
@@ -242,7 +241,7 @@ func removeFieldByJSONPointer(obj *unstructured.Unstructured, pointer string, lo
 }
 
 // removeFieldByJQExpression removes fields from object using jq path expression.
-func removeFieldByJQExpression(obj *unstructured.Unstructured, expression string, logger klog.Logger) error {
+func removeFieldByJQExpression(ctx context.Context, obj *unstructured.Unstructured, expression string, logger klog.Logger) error {
 	// Parse the jq expression wrapped in del()
 	jqDeletionQuery, err := gojq.Parse(fmt.Sprintf("del(%s)", expression))
 	if err != nil {
@@ -258,11 +257,12 @@ func removeFieldByJQExpression(obj *unstructured.Unstructured, expression string
 	// Get object as map
 	dataJSON := obj.UnstructuredContent()
 
-	// Execute with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultJQExecutionTimeout)
+	// Execute with timeout derived from parent context
+	// This will cancel when EITHER parent context is cancelled OR timeout expires
+	timeoutCtx, cancel := context.WithTimeout(ctx, DefaultJQExecutionTimeout)
 	defer cancel()
 
-	iter := jqDeletionCode.RunWithContext(ctx, dataJSON)
+	iter := jqDeletionCode.RunWithContext(timeoutCtx, dataJSON)
 	first, ok := iter.Next()
 	if !ok {
 		return fmt.Errorf("jq expression did not return any data")
@@ -272,6 +272,9 @@ func removeFieldByJQExpression(obj *unstructured.Unstructured, expression string
 	if errVal, ok := first.(error); ok {
 		if errors.Is(errVal, context.DeadlineExceeded) {
 			return fmt.Errorf("jq expression execution timed out after %v", DefaultJQExecutionTimeout)
+		}
+		if errors.Is(errVal, context.Canceled) {
+			return fmt.Errorf("jq expression execution cancelled: %w", errVal)
 		}
 		return fmt.Errorf("jq expression returned error: %w", errVal)
 	}

@@ -3,6 +3,7 @@ package apply
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -1046,6 +1047,204 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 				t.Fatal(err)
 			}
 			c.validateActions(t, dynamicClient.Actions())
+		})
+	}
+}
+
+// TestServerSideApplyWithIgnoreFieldErrors tests error handling for ignoreFields
+func TestServerSideApplyWithIgnoreFieldErrors(t *testing.T) {
+	cases := []struct {
+		name             string
+		existing         *unstructured.Unstructured
+		required         *unstructured.Unstructured
+		gvr              schema.GroupVersionResource
+		condition        workapiv1.IgnoreFieldsCondition
+		jsonPointers     []string
+		jqExpressions    []string
+		expectedErrorMsg string
+		cancelContext    bool
+	}{
+		{
+			name: "invalid JSON Pointer format",
+			existing: testingcommon.NewUnstructuredWithContent(
+				"v1", "ConfigMap", "default", "test-cm",
+				map[string]interface{}{
+					"data": map[string]interface{}{
+						"key": "value",
+					},
+				}),
+			required: testingcommon.NewUnstructuredWithContent(
+				"v1", "ConfigMap", "default", "test-cm",
+				map[string]interface{}{
+					"data": map[string]interface{}{
+						"key": "newvalue",
+					},
+				}),
+			gvr:              schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
+			condition:        workapiv1.IgnoreFieldsConditionOnSpokePresent,
+			jsonPointers:     []string{"invalid-pointer-no-slash"},
+			expectedErrorMsg: "JSON Pointer error",
+		},
+		{
+			name: "invalid JQ expression syntax",
+			existing: testingcommon.NewUnstructuredWithContent(
+				"v1", "Pod", "default", "test-pod",
+				map[string]interface{}{
+					"spec": map[string]interface{}{
+						"containers": []interface{}{
+							map[string]interface{}{
+								"name":  "app",
+								"image": "myapp:v1",
+							},
+						},
+					},
+				}),
+			required: testingcommon.NewUnstructuredWithContent(
+				"v1", "Pod", "default", "test-pod",
+				map[string]interface{}{
+					"spec": map[string]interface{}{
+						"containers": []interface{}{
+							map[string]interface{}{
+								"name":  "app",
+								"image": "myapp:v2",
+							},
+						},
+					},
+				}),
+			gvr:              schema.GroupVersionResource{Version: "v1", Resource: "pods"},
+			condition:        workapiv1.IgnoreFieldsConditionOnSpokePresent,
+			jqExpressions:    []string{".spec.containers[] | invalid syntax here"},
+			expectedErrorMsg: "JQ expression error",
+		},
+		{
+			name: "JQ expression returns multiple results",
+			existing: testingcommon.NewUnstructuredWithContent(
+				"v1", "Pod", "default", "test-pod",
+				map[string]interface{}{
+					"spec": map[string]interface{}{
+						"containers": []interface{}{
+							map[string]interface{}{
+								"name":  "app1",
+								"image": "myapp:v1",
+							},
+							map[string]interface{}{
+								"name":  "app2",
+								"image": "myapp:v1",
+							},
+						},
+					},
+				}),
+			required: testingcommon.NewUnstructuredWithContent(
+				"v1", "Pod", "default", "test-pod",
+				map[string]interface{}{
+					"spec": map[string]interface{}{
+						"containers": []interface{}{
+							map[string]interface{}{
+								"name":  "app1",
+								"image": "myapp:v2",
+							},
+							map[string]interface{}{
+								"name":  "app2",
+								"image": "myapp:v2",
+							},
+						},
+					},
+				}),
+			gvr:              schema.GroupVersionResource{Version: "v1", Resource: "pods"},
+			condition:        workapiv1.IgnoreFieldsConditionOnSpokePresent,
+			jqExpressions:    []string{".spec.containers[]"},
+			expectedErrorMsg: "JQ expression error",
+		},
+		{
+			name: "context cancellation during JQ execution",
+			existing: testingcommon.NewUnstructuredWithContent(
+				"v1", "Pod", "default", "test-pod",
+				map[string]interface{}{
+					"spec": map[string]interface{}{
+						"containers": []interface{}{
+							map[string]interface{}{
+								"name":  "app",
+								"image": "myapp:v1",
+							},
+						},
+					},
+				}),
+			required: testingcommon.NewUnstructuredWithContent(
+				"v1", "Pod", "default", "test-pod",
+				map[string]interface{}{
+					"spec": map[string]interface{}{
+						"containers": []interface{}{
+							map[string]interface{}{
+								"name":  "app",
+								"image": "myapp:v2",
+							},
+						},
+					},
+				}),
+			gvr:              schema.GroupVersionResource{Version: "v1", Resource: "pods"},
+			condition:        workapiv1.IgnoreFieldsConditionOnSpokePresent,
+			jqExpressions:    []string{".spec.containers[] | select(.name == \"app\")"},
+			cancelContext:    true,
+			expectedErrorMsg: "JQ expression error",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var objects []runtime.Object
+			owner := metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner}
+			if c.existing != nil {
+				c.existing.SetOwnerReferences([]metav1.OwnerReference{owner})
+				objects = append(objects, c.existing)
+			}
+			scheme := runtime.NewScheme()
+			dynamicClient := fakedynamic.NewSimpleDynamicClient(scheme, objects...)
+			applier := NewServerSideApply(dynamicClient)
+
+			reactor := &reactor{}
+			reactors := []clienttesting.Reactor{reactor}
+			dynamicClient.Fake.ReactionChain = append(reactors, dynamicClient.Fake.ReactionChain...)
+
+			syncContext := testingcommon.NewFakeSyncContext(t, "test")
+			option := &workapiv1.ManifestConfigOption{
+				UpdateStrategy: &workapiv1.UpdateStrategy{
+					Type: workapiv1.UpdateStrategyTypeServerSideApply,
+					ServerSideApply: &workapiv1.ServerSideApplyConfig{
+						FieldManager: "test-agent",
+						IgnoreFields: []workapiv1.IgnoreField{
+							{
+								Condition:         c.condition,
+								JSONPointers:      c.jsonPointers,
+								JQPathExpressions: c.jqExpressions,
+							},
+						},
+					},
+				},
+			}
+
+			ctx := context.Background()
+			if c.cancelContext {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+
+			_, err := applier.Apply(ctx, c.gvr, c.required, owner, option, syncContext.Recorder())
+
+			if err == nil {
+				t.Fatal("expected error but got none")
+			}
+
+			var ignoreFieldErr *IgnoreFieldError
+			if !errors.As(err, &ignoreFieldErr) {
+				t.Fatalf("expected IgnoreFieldError, got %T: %v", err, err)
+			}
+
+			if !strings.Contains(fmt.Sprintf("%v", err), c.expectedErrorMsg) {
+				t.Errorf("expected error message to contain '%s', got: %v", c.expectedErrorMsg, err)
+			}
+
+			t.Logf("Successfully caught expected error: %v", err)
 		})
 	}
 }

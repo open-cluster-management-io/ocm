@@ -259,6 +259,16 @@ func (in *IgnoreField) DeepCopyInto(out *IgnoreField) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.JSONPointers != nil {
+		in, out := &in.JSONPointers, &out.JSONPointers
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.JQPathExpressions != nil {
+		in, out := &in.JQPathExpressions, &out.JQPathExpressions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
