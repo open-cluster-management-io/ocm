@@ -20,6 +20,7 @@ spec:
       {{- else }}
       maxUnavailable: 25%
       {{- end }}
+      maxSurge: 0
     type: RollingUpdate
   {{- end }}
   selector:
