@@ -1891,7 +1891,7 @@ open-cluster-management.io/addon-framework/pkg/agent
 open-cluster-management.io/addon-framework/pkg/assets
 open-cluster-management.io/addon-framework/pkg/index
 open-cluster-management.io/addon-framework/pkg/utils
-# open-cluster-management.io/api v1.2.0 => github.com/ncr38/api v1.2.1-a78a9c
+# open-cluster-management.io/api v1.2.0 => github.com/Groww/ocm-api-clone v1.2.1-a78a9c
 ## explicit; go 1.25.0
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/addon/v1beta1
@@ -2142,4 +2142,4 @@ sigs.k8s.io/structured-merge-diff/v6/value
 ## explicit; go 1.22
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v3
-# open-cluster-management.io/api => github.com/ncr38/api v1.2.1-a78a9c
+# open-cluster-management.io/api => github.com/Groww/ocm-api-clone v1.2.1-a78a9c
