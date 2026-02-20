@@ -801,7 +801,7 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 				if exist {
 					t.Errorf("expected replicas to be removed")
 				}
-				// Verify prometheus annotation removed (JSONPath)
+				// Verify prometheus annotation removed (JSON Pointer)
 				_, exist, err = unstructured.NestedString(actual.Object, "metadata", "annotations", "prometheus.io/scrape")
 				if err != nil {
 					t.Fatal(err)
