@@ -1,0 +1,30 @@
+name: Deploy to prod
+jobs:
+  deploy_to_prod:
+    uses: Groww/github-wf-templates/.github/workflows/deploy-v2.yaml@master
+    with:
+      build_version: ${{ github.event.inputs.build_version }}
+      env: prod
+      BUILD_PROFILE: ${{ github.event.inputs.build_profile }}
+    secrets: inherit
+on:
+  workflow_dispatch:
+    inputs:
+      build_profile:
+        description: Select profile to run
+        required: true
+        default: default
+        type: choice
+        options:
+        - default
+        - registration
+        - work
+        - placement
+        - registration-operator
+        - addon-manager
+      build_version:
+        description: Build Version
+        required: true
+      additional_comments:
+        description: Comments
+        required: true

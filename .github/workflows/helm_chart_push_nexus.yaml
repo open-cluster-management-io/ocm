@@ -1,0 +1,332 @@
+name: Helm Artifact Push
+on:
+  workflow_dispatch:
+    inputs:
+      chart_dir:
+        description: 'Helm Chart Directory'
+        required: true
+      nexus:
+        description: 'Select Nexus Artifactory'
+        required: true
+        type: choice
+        options:
+          - mgmt-nexus
+          - nexus
+      branch:
+        description: 'Branch to checkout for RC version push(leave empty for master branch)'
+        required: false
+        default: 'master'
+      create_github_release:
+        description: 'Create Git tag and GitHub release'
+        required: false
+        type: boolean
+        default: true
+      release_notes:
+        description: 'Custom release notes (optional, auto-generated if empty)'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Dry run (validate without pushing)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  helm_version: '3.9.3'
+
+jobs:
+  helm_chart_nexus_push:
+    runs-on: org-level-runner
+    permissions:
+      contents: write  # Required for creating tags and releases
+      issues: write    # Required for manual approval action
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+      
+      - name: Display Branch Info
+        id: branch_info
+        run: |
+          current_branch=$(git branch --show-current)
+          echo "branch_name=$current_branch" >> "$GITHUB_OUTPUT"
+          echo "📍 Working on branch: $current_branch"
+          echo "📍 Commit: $(git rev-parse --short HEAD)"
+          echo "📍 Commit message: $(git log -1 --pretty=%B)"
+      
+      - uses: azure/setup-helm@5119fcb9089d432beecbf79bb2c7915207344b78 # v3
+        with:
+          version: '${{ env.helm_version }}'
+
+      - name: Validate Chart Directory
+        run: |
+          if [ ! -d "${{ github.event.inputs.chart_dir }}" ]; then
+            echo "Error: Directory '${{ github.event.inputs.chart_dir }}' does not exist"
+            exit 1
+          fi
+          if [ ! -f "${{ github.event.inputs.chart_dir }}/Chart.yaml" ]; then
+            echo "Error: Chart.yaml not found in '${{ github.event.inputs.chart_dir }}'"
+            exit 1
+          fi
+          echo "✓ Chart directory validated"
+
+      - name: Helm Package & Get Chart Metadata
+        id: helm_package_get_chart_version
+        run: |
+          cd ${{ github.event.inputs.chart_dir }}
+          chart_name=$(grep '^name:' Chart.yaml | awk '{print $2}')
+          chart_version=$(grep '^version:' Chart.yaml | awk '{print $2}')
+          echo "chart_name=$chart_name" >> "$GITHUB_OUTPUT"
+          echo "chart_version=$chart_version" >> "$GITHUB_OUTPUT"
+          echo "Chart: $chart_name v$chart_version"
+          
+          # Check if this is an RC version
+          if [[ "$chart_version" == *"-rc."* ]]; then
+            echo "is_rc=true" >> "$GITHUB_OUTPUT"
+            echo "🔄 RC version detected - approval will be bypassed"
+          else
+            echo "is_rc=false" >> "$GITHUB_OUTPUT"
+          fi
+          
+          helm dependency update
+          helm package .
+          
+          package_file="${chart_name}-${chart_version}.tgz"
+          if [ ! -f "$package_file" ]; then
+            echo "Error: Expected package file '$package_file' not found"
+            exit 1
+          fi
+          echo "package_file=$package_file" >> "$GITHUB_OUTPUT"
+          echo "✓ Package created: $package_file"
+
+      - name: Validate Branch for Stable Versions
+        run: |
+          is_rc="${{ steps.helm_package_get_chart_version.outputs.is_rc }}"
+          current_branch="${{ steps.branch_info.outputs.branch_name }}"
+          chart_version="${{ steps.helm_package_get_chart_version.outputs.chart_version }}"
+          
+          echo "Branch: $current_branch"
+          echo "Version: $chart_version"
+          echo "Is RC: $is_rc"
+          
+          if [ "$is_rc" = "false" ]; then
+            if [ "$current_branch" != "main" ] && [ "$current_branch" != "master" ]; then
+              echo ""
+              echo "❌ ERROR: Stable versions must be pushed from main or master branch"
+              echo ""
+              echo "Current situation:"
+              echo "  - Branch: $current_branch"
+              echo "  - Version: $chart_version (stable version)"
+              echo ""
+              echo "Options:"
+              echo "  1. Switch to main/master branch to push stable version $chart_version"
+              echo "  2. Use an RC version (e.g., $chart_version-rc.feature-name) to push from $current_branch"
+              echo ""
+              exit 1
+            else
+              echo "✓ Branch validation passed: Stable version on $current_branch branch"
+            fi
+          else
+            echo "✓ RC version - branch restriction bypassed (current branch: $current_branch)"
+          fi
+      - name: Conditional Manual Approval for Application Helm Chart
+        if: ${{ contains(github.event.inputs.chart_dir, 'application-helm-chart') && steps.helm_package_get_chart_version.outputs.is_rc == 'false' }}
+        uses: trstringer/manual-approval@v1
+        timeout-minutes: 30
+        id: Conditional_Manual_Approval
+        with:
+          secret: ${{ github.TOKEN }}
+          approvers: akash-arora_groww
+          minimum-approvals: 1
+          issue-title: "${{ steps.helm_package_get_chart_version.outputs.chart_name }} v${{ steps.helm_package_get_chart_version.outputs.chart_version }} → ${{ github.event.inputs.nexus }}"
+          issue-body: |
+            **Application Helm Chart Nexus Push Approval Required**
+          
+            Please review and approve the Nexus push operation:
+            - **Chart**: `${{ steps.helm_package_get_chart_version.outputs.chart_name }}`
+            - **Version**: `${{ steps.helm_package_get_chart_version.outputs.chart_version }}`
+            - **Target Nexus**: `${{ github.event.inputs.nexus }}`
+            - **Chart Directory**: `${{ github.event.inputs.chart_dir }}`
+            - **Triggered by**: @${{ github.actor }}
+            - **Workflow Run**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          
+            **To approve**: Comment `approve` on this issue
+            **To deny**: Comment `deny` on this issue
+          
+            Please verify the chart details and approve or deny this operation.
+      - name: Push to Nexus Artifactory
+        if: ${{ github.event.inputs.dry_run == 'false' && (!contains(github.event.inputs.chart_dir, 'application-helm-chart') || steps.helm_package_get_chart_version.outputs.is_rc == 'true' || (contains(github.event.inputs.chart_dir, 'application-helm-chart') && steps.Conditional_Manual_Approval.outcome == 'success')) }}
+        id: push_chart
+        run: |
+          cd ${{ github.event.inputs.chart_dir }}
+          file="${{ steps.helm_package_get_chart_version.outputs.package_file }}"
+          
+          if [ ! -f "$file" ]; then
+            echo "Error: Package file '$file' not found"
+            exit 1
+          fi
+          
+          echo "📦 Pushing $file to ${{ github.event.inputs.nexus }}..."
+          
+          if [ "${{ github.event.inputs.nexus }}" = "nexus" ]; then
+            NEXUS_URL="http://nexus-artifactory.groww.tech/repository/helm-templates/$file"
+            HTTP_CODE=$(curl -u ${{ secrets.NEXUS_USERNAME }}:${{ secrets.NEXUS_PASSWORD }} \
+              "$NEXUS_URL" \
+              --upload-file "$file" \
+              -w "%{http_code}" \
+              -o /tmp/curl_output.txt \
+              --fail-with-body)
+            
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+              echo "✅ Successfully pushed to nexus"
+              echo "artifact_url=$NEXUS_URL" >> "$GITHUB_OUTPUT"
+            else
+              echo "❌ Failed to push to nexus (HTTP $HTTP_CODE)"
+              cat /tmp/curl_output.txt
+              exit 1
+            fi
+            
+          elif [ "${{ github.event.inputs.nexus }}" = "mgmt-nexus" ]; then
+            NEXUS_URL="http://mgmt-nexus.growwinfra.in:8081/repository/helm-templates/$file"
+            HTTP_CODE=$(curl -u ${{ secrets.MGMT_NEXUS_USERNAME }}:${{ secrets.MGMT_NEXUS_PASSWORD }} \
+              "$NEXUS_URL" \
+              --upload-file "$file" \
+              -w "%{http_code}" \
+              -o /tmp/curl_output.txt \
+              --fail-with-body)
+            
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+              echo "✅ Successfully pushed to mgmt-nexus"
+              echo "artifact_url=$NEXUS_URL" >> "$GITHUB_OUTPUT"
+            else
+              echo "❌ Failed to push to mgmt-nexus (HTTP $HTTP_CODE)"
+              cat /tmp/curl_output.txt
+              exit 1
+            fi
+            
+          else
+            echo "❌ Invalid nexus input value: ${{ github.event.inputs.nexus }}"
+            exit 1
+          fi
+          
+          rm -f "$file"
+          echo "🧹 Cleaned up package file"
+
+      - name: Create Git Tag and GitHub Release
+        if: ${{ github.event.inputs.create_github_release == 'true' && github.event.inputs.dry_run == 'false' && steps.helm_package_get_chart_version.outputs.is_rc == 'false' && steps.push_chart.outcome == 'success' && startsWith(github.event.inputs.chart_dir, 'infraservices/') }}
+        env:
+          GH_TOKEN: ${{ github.TOKEN }}
+        run: |
+          chart_name="${{ steps.helm_package_get_chart_version.outputs.chart_name }}"
+          chart_version="${{ steps.helm_package_get_chart_version.outputs.chart_version }}"
+          tag_name="${chart_name}-v${chart_version}"
+          package_file="${{ github.event.inputs.chart_dir }}/${{ steps.helm_package_get_chart_version.outputs.package_file }}"
+          
+          echo "🏷️  Creating tag and release for $tag_name"
+          
+          # Check if tag already exists
+          if git rev-parse "$tag_name" >/dev/null 2>&1; then
+            echo "⚠️  Tag $tag_name already exists, skipping tag creation"
+            echo "Existing tag commit: $(git rev-parse $tag_name)"
+          else
+            # Create and push tag
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$tag_name" -m "Release $chart_name version $chart_version"
+            git push origin "$tag_name"
+            echo "✅ Tag $tag_name created and pushed"
+          fi
+          
+          # Generate release notes if not provided
+          if [ -n "${{ github.event.inputs.release_notes }}" ]; then
+            release_body="${{ github.event.inputs.release_notes }}"
+            echo "Using custom release notes"
+          else
+            # Auto-generate from commits since last tag
+            last_tag=$(git tag -l "${chart_name}-v*" --sort=-v:refname | head -n 2 | tail -n 1)
+            if [ -n "$last_tag" ]; then
+              echo "Generating release notes from commits since $last_tag"
+              commit_log=$(git log ${last_tag}..HEAD --pretty=format:"- %s (%an)" -- "${{ github.event.inputs.chart_dir }}/")
+            else
+              echo "No previous tag found, using recent commits"
+              commit_log=$(git log -10 --pretty=format:"- %s (%an)" -- "${{ github.event.inputs.chart_dir }}/")
+            fi
+            
+            release_body="## Helm Chart Release
+          
+          **Chart**: \`$chart_name\`  
+          **Version**: \`$chart_version\`  
+          **Nexus**: \`${{ github.event.inputs.nexus }}\`  
+          
+          ### Changes
+          $commit_log
+          
+          ### Artifact
+          - Pushed to: \`${{ github.event.inputs.nexus }}\`
+          - Package: \`${{ steps.helm_package_get_chart_version.outputs.package_file }}\`
+          
+          ---
+          _Released by @${{ github.actor }} via [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})_"
+          fi
+          
+          # Check if release already exists
+          echo "Checking if release already exists..."
+          release_check=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: token ${{ github.token }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/releases/tags/$tag_name")
+          
+          if [ "$release_check" = "200" ]; then
+            echo "⚠️  Release $tag_name already exists"
+            echo "📦 View existing release: ${{ github.server_url }}/${{ github.repository }}/releases/tag/$tag_name"
+          else
+            # Create GitHub release via API
+            echo "Creating GitHub release..."
+            release_body_json=$(echo "$release_body" | jq -Rs .)
+            
+            response=$(curl -s -w "\n%{http_code}" \
+              -X POST \
+              -H "Authorization: token ${{ github.token }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "${{ github.api_url }}/repos/${{ github.repository }}/releases" \
+              -d "{
+                \"tag_name\": \"$tag_name\",
+                \"name\": \"$tag_name\",
+                \"body\": $release_body_json,
+                \"target_commitish\": \"${{ steps.branch_info.outputs.branch_name }}\"
+              }")
+            
+            http_code=$(echo "$response" | tail -n1)
+            response_body=$(echo "$response" | sed '$d')
+            
+            if [ "$http_code" = "201" ]; then
+              echo "✅ Release created: $tag_name"
+              echo "📦 View release: ${{ github.server_url }}/${{ github.repository }}/releases/tag/$tag_name"
+            else
+              echo "⚠️  Failed to create release (HTTP $http_code)"
+              echo "$response_body" | jq . || echo "$response_body"
+            fi
+          fi
+
+      - name: Dry Run Summary
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        run: |
+          echo "🏃 DRY RUN MODE - No artifacts were pushed"
+          echo ""
+          echo "Validation successful:"
+          echo "  Chart: ${{ steps.helm_package_get_chart_version.outputs.chart_name }}"
+          echo "  Version: ${{ steps.helm_package_get_chart_version.outputs.chart_version }}"
+          echo "  Package: ${{ steps.helm_package_get_chart_version.outputs.package_file }}"
+          echo "  Target: ${{ github.event.inputs.nexus }}"
+          echo ""
+          echo "To actually push, run again with dry_run=false"
+
+      - name: Success Summary
+        if: ${{ github.event.inputs.dry_run == 'false' && steps.push_chart.outcome == 'success' }}
+        run: |
+          echo "✅ Deployment successful!"
+          echo ""
+          echo "Chart: ${{ steps.helm_package_get_chart_version.outputs.chart_name }} v${{ steps.helm_package_get_chart_version.outputs.chart_version }}"
+          echo "Pushed to: ${{ github.event.inputs.nexus }}"
+          echo "Artifact URL: ${{ steps.push_chart.outputs.artifact_url }}"

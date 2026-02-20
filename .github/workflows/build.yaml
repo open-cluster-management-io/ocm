@@ -1,0 +1,14 @@
+name: CI build
+jobs:
+  ci-default:
+    uses: Groww/github-wf-templates/.github/workflows/app-ci.yaml@master
+    with:
+      BUILD_PROFILE: default
+    secrets: inherit
+on:
+  pull_request:
+    types:
+      - closed
+  issue_comment:
+    types:
+      - created

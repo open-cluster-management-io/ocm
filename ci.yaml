@@ -1,0 +1,38 @@
+team: infra-dev
+org: nbt
+project-language: go
+profiles:
+  registration:
+    build-properties:
+      build-type: docker
+      docker-file-path: build/Dockerfile.registration
+      container-registry-path: registration
+    deploy-properties: {}
+  work:
+    build-properties:
+      build-type: docker
+      docker-file-path: build/Dockerfile.work
+      container-registry-path: work
+    deploy-properties: {}
+  placement:
+    build-properties:
+      build-type: docker
+      docker-file-path: build/Dockerfile.placement
+      container-registry-path: placement
+    deploy-properties: {}
+  registration-operator:
+    build-properties:
+      build-type: docker
+      docker-file-path: build/Dockerfile.registration-operator
+      container-registry-path: registration-operator
+    deploy-properties: {}
+  addon-manager:
+    build-properties:
+      build-type: docker
+      docker-file-path: build/Dockerfile.addon
+      container-registry-path: addon-manager
+    deploy-properties: {}
+  default:
+    build-properties:
+      build-type: docker
+    deploy-properties: {}
