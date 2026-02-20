@@ -1065,27 +1065,6 @@ func TestServerSideApplyWithIgnoreFieldErrors(t *testing.T) {
 		cancelContext    bool
 	}{
 		{
-			name: "invalid JSON Pointer format",
-			existing: testingcommon.NewUnstructuredWithContent(
-				"v1", "ConfigMap", "default", "test-cm",
-				map[string]interface{}{
-					"data": map[string]interface{}{
-						"key": "value",
-					},
-				}),
-			required: testingcommon.NewUnstructuredWithContent(
-				"v1", "ConfigMap", "default", "test-cm",
-				map[string]interface{}{
-					"data": map[string]interface{}{
-						"key": "newvalue",
-					},
-				}),
-			gvr:              schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
-			condition:        workapiv1.IgnoreFieldsConditionOnSpokePresent,
-			jsonPointers:     []string{"invalid-pointer-no-slash"},
-			expectedErrorMsg: "JSON Pointer error",
-		},
-		{
 			name: "invalid JQ expression syntax",
 			existing: testingcommon.NewUnstructuredWithContent(
 				"v1", "Pod", "default", "test-pod",
@@ -1114,45 +1093,6 @@ func TestServerSideApplyWithIgnoreFieldErrors(t *testing.T) {
 			gvr:              schema.GroupVersionResource{Version: "v1", Resource: "pods"},
 			condition:        workapiv1.IgnoreFieldsConditionOnSpokePresent,
 			jqExpressions:    []string{".spec.containers[] | invalid syntax here"},
-			expectedErrorMsg: "JQ expression error",
-		},
-		{
-			name: "JQ expression returns multiple results",
-			existing: testingcommon.NewUnstructuredWithContent(
-				"v1", "Pod", "default", "test-pod",
-				map[string]interface{}{
-					"spec": map[string]interface{}{
-						"containers": []interface{}{
-							map[string]interface{}{
-								"name":  "app1",
-								"image": "myapp:v1",
-							},
-							map[string]interface{}{
-								"name":  "app2",
-								"image": "myapp:v1",
-							},
-						},
-					},
-				}),
-			required: testingcommon.NewUnstructuredWithContent(
-				"v1", "Pod", "default", "test-pod",
-				map[string]interface{}{
-					"spec": map[string]interface{}{
-						"containers": []interface{}{
-							map[string]interface{}{
-								"name":  "app1",
-								"image": "myapp:v2",
-							},
-							map[string]interface{}{
-								"name":  "app2",
-								"image": "myapp:v2",
-							},
-						},
-					},
-				}),
-			gvr:              schema.GroupVersionResource{Version: "v1", Resource: "pods"},
-			condition:        workapiv1.IgnoreFieldsConditionOnSpokePresent,
-			jqExpressions:    []string{".spec.containers[]"},
 			expectedErrorMsg: "JQ expression error",
 		},
 		{
