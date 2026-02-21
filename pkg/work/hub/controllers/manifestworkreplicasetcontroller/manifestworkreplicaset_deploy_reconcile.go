@@ -156,8 +156,11 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 
 		for _, cls := range rolloutResult.ClustersRemoved {
 			// Delete manifestWork for removed clusters
-			err = d.workApplier.Delete(ctx, cls.ClusterName, mwrSet.Name)
-			if err != nil {
+			clusterWorks, _ := listManifestWorksByMWRSetPlacementRef(mwrSet, placementRef.Name, d.manifestWorkLister)
+              for _, mw := range clusterWorks {
+               if mw.Namespace == cls.ClusterName {
+                   d.workApplier.Delete(ctx, mw.Namespace, mw.Name)
+                }
 				errs = append(errs, err)
 				continue
 			}
@@ -381,7 +384,7 @@ func CreateManifestWork(
 
 	return &workv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mwrSet.Name,
+			GenerateName: mwrSet.Name + "-",
 			Namespace: clusterNS,
 			Labels:    mergedLabels,
 		},
