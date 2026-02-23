@@ -1,10 +1,10 @@
-name: Deploy to prod
+name: Deploy to release hotfix
 jobs:
-  deploy_to_prod:
-    uses: Groww/github-wf-templates/.github/workflows/deploy-v2.yaml@master
+  deploy_to_release:
+    uses: Groww/github-wf-templates/.github/workflows/deploy_hotfix.yaml@master
     with:
       build_version: ${{ github.event.inputs.build_version }}
-      env: prod
+      env: release
       BUILD_PROFILE: ${{ github.event.inputs.build_profile }}
     secrets: inherit
 on:
