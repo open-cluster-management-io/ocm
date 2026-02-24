@@ -776,7 +776,7 @@ if len(works) != 0 {
 	works, err = listWorksByMWRS( context.TODO(), fWorkClient, "cls2", mwrSet.Namespace, mwrSet.Name, "place-test2",)
     if err != nil { t.Fatal(err) }
       if len(works) != 1 {
-       t.Fatalf("Expected ManifestWork for current placement to exist, but got %d", len(works))
+       t.Fatalf("Expected ManifestWork for current placement to exist, but got %d, works: %v", len(works), works)
     }
 currentMW := works[0]
 	// Verify the placement label is correct
@@ -864,7 +864,7 @@ func TestDeployReconcileWithMultiplePlacementChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(works) != 1 {
-		t.Fatalf("Expected ManifestWork for placement2 to exist, but got error: %v", len(works))
+		t.Fatalf("Expected ManifestWork for placement2 to exist, but got error: %d, works: %v", len(works), works)
 	}
 	currentMW2 := works[0]
 	assert.Equal(t, currentMW2.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey], "place-test2")
@@ -874,7 +874,7 @@ func TestDeployReconcileWithMultiplePlacementChanges(t *testing.T) {
 		t.Fatalf("Expected ManifestWork for placement3 to exist, but got error: %v", err)
 	}
 	if len(works) != 1 {
-		t.Fatalf("Expected ManifestWork for placement3 to exist, but got error: %v", len(works))
+		t.Fatalf("Expected ManifestWork for placement3 to exist, but got error: %d, works: %v", len(works), works)
 	}
 	currentMW3 := works[0]
 	assert.Equal(t,currentMW3.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey], "place-test3")
