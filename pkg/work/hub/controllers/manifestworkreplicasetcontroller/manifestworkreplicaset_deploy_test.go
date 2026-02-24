@@ -864,7 +864,7 @@ func TestDeployReconcileWithMultiplePlacementChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(works) != 1 {
-		t.Fatalf("Expected ManifestWork for placement2 to exist, but got error: %v", err)
+		t.Fatalf("Expected ManifestWork for placement2 to exist, but got error: %v", len(works))
 	}
 	currentMW2 := works[0]
 	assert.Equal(t, currentMW2.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey], "place-test2")
@@ -874,7 +874,7 @@ func TestDeployReconcileWithMultiplePlacementChanges(t *testing.T) {
 		t.Fatalf("Expected ManifestWork for placement3 to exist, but got error: %v", err)
 	}
 	if len(works) != 1 {
-		t.Fatalf("Expected ManifestWork for placement3 to exist, but got error: %v", err)
+		t.Fatalf("Expected ManifestWork for placement3 to exist, but got error: %v", len(works))
 	}
 	currentMW3 := works[0]
 	assert.Equal(t,currentMW3.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey], "place-test3")
