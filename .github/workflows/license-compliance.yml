@@ -1,0 +1,41 @@
+name: License Compliance
+
+on:
+  pull_request:
+    paths:
+      - 'go.mod'
+      - 'go.sum'
+      - 'vendor/**'
+    branches:
+      - main
+      - release-*
+  push:
+    paths:
+      - 'go.mod'
+      - 'go.sum'
+      - 'vendor/**'
+    branches:
+      - main
+      - release-*
+
+permissions:
+  contents: read
+
+jobs:
+  license-compliance:
+    name: license-compliance
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v6.0.2
+
+      - name: Run FOSSA Scan
+        uses: fossas/fossa-action@v1
+        with:
+          api-key: ${{ secrets.FOSSA_API_KEY }}
+
+      - name: Run FOSSA Test
+        uses: fossas/fossa-action@v1
+        with:
+          api-key: ${{ secrets.FOSSA_API_KEY }}
+          run-tests: true
