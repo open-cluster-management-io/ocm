@@ -25,10 +25,6 @@ HELM?=$(PERMANENT_TMP_GOPATH)/bin/helm
 HELM_VERSION?=v3.14.0
 helm_gen_dir:=$(dir $(HELM))
 
-GOLANGCI_LINT?=$(PERMANENT_TMP_GOPATH)/bin/golangci-lint
-GOLANGCI_LINT_VERSION?=v2.4.0
-golangci_lint_gen_dir:=$(dir $(GOLANGCI_LINT))
-
 # RELEASED_CSV_VERSION indicates the last released operator version.
 # can find the released operator version from
 # https://github.com/k8s-operatorhub/community-operators/tree/main/operators/cluster-manager
@@ -89,8 +85,9 @@ update-csv: ensure-operator-sdk ensure-helm
 verify-crds: ensure-yaml-patch
 	bash -x hack/verify-crds.sh $(YAML_PATCH)
 
-verify-gocilint: ensure-golangci-lint
-	$(GOLANGCI_LINT) run --timeout=5m --modules-download-mode vendor ./...
+.PHONY: lint
+lint:
+	@bash -o pipefail -c 'curl -fsSL https://raw.githubusercontent.com/open-cluster-management-io/sdk-go/main/ci/lint/run-lint.sh | bash'
 
 install-golang-gci:
 	go install github.com/daixiang0/gci@v0.13.7
@@ -108,7 +105,7 @@ verify-fmt-imports: install-golang-gci
 	    echo "Diff output is empty"; \
 	fi
 
-verify: verify-fmt-imports verify-crds verify-gocilint
+verify: verify-fmt-imports verify-crds lint
 
 ensure-operator-sdk:
 ifeq "" "$(wildcard $(OPERATOR_SDK))"
@@ -133,11 +130,3 @@ else
 	$(info Using existing helm from "$(HELM)")
 endif
 
-ensure-golangci-lint:
-ifeq "" "$(wildcard $(GOLANGCI_LINT))"
-	$(info Installing golangci-lint into '$(GOLANGCI_LINT)')
-	mkdir -p '$(golangci_lint_gen_dir)'
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b '$(golangci_lint_gen_dir)' $(GOLANGCI_LINT_VERSION)
-else
-	$(info Using existing golangci-lint from "$(GOLANGCI_LINT)")
-endif
