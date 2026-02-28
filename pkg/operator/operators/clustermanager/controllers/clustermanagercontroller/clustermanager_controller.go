@@ -44,6 +44,8 @@ const (
 	clusterManagerFinalizer = "operator.open-cluster-management.io/cluster-manager-cleanup"
 
 	defaultWebhookPort       = int32(9443)
+	defaultHealthProbePort   = int32(8000)
+	defaultMetricsPort       = int32(8080)
 	clusterManagerReSyncTime = 5 * time.Second
 )
 
@@ -156,6 +158,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	}
 
 	// This config is used to render template of manifests.
+	registrationWebhook, workWebhook := webhookConfigurations(clusterManager.Spec.DeployOption)
 	config := manifests.HubConfig{
 		ClusterManagerName:      clusterManager.Name,
 		ClusterManagerNamespace: clusterManagerNamespace,
@@ -166,12 +169,8 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		AddOnManagerImage:       clusterManager.Spec.AddOnManagerImagePullSpec,
 		Replica:                 replica,
 		HostedMode:              clusterManager.Spec.DeployOption.Mode == operatorapiv1.InstallModeHosted,
-		RegistrationWebhook: manifests.Webhook{
-			Port: defaultWebhookPort,
-		},
-		WorkWebhook: manifests.Webhook{
-			Port: defaultWebhookPort,
-		},
+		RegistrationWebhook:     registrationWebhook,
+		WorkWebhook:             workWebhook,
 		AddonWebhook: manifests.Webhook{
 			Port: defaultWebhookPort,
 		},
@@ -223,14 +222,6 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 
 	// Compute and populate the value of managed cluster identity creator role to be used in cluster manager registration service account
 	config.ManagedClusterIdentityCreatorRole = getIdentityCreatorRoleAndTags(*clusterManager)
-
-	// If we are deploying in the hosted mode, it requires us to create webhook in a different way with the default mode.
-	// In the hosted mode, the webhook servers is running in the management cluster but the users are accessing the hub cluster.
-	// So we need to add configuration to make the apiserver of the hub cluster could access the webhook servers on the management cluster.
-	if clusterManager.Spec.DeployOption.Hosted != nil {
-		config.RegistrationWebhook = convertWebhookConfiguration(clusterManager.Spec.DeployOption.Hosted.RegistrationWebhookConfiguration)
-		config.WorkWebhook = convertWebhookConfiguration(clusterManager.Spec.DeployOption.Hosted.WorkWebhookConfiguration)
-	}
 
 	config.Labels = helpers.GetClusterManagerHubLabels(clusterManager, n.enableSyncLabels)
 	config.LabelsString = helpers.GetRegistrationLabelString(config.Labels)
@@ -433,6 +424,10 @@ func ensureNamespace(ctx context.Context, kubeClient kubernetes.Interface, names
 
 // TODO: support IPV6 address
 func isIPFormat(address string) bool {
+	if address == "" {
+		return false
+	}
+
 	runes := []rune(address)
 	for i := 0; i < len(runes); i++ {
 		if (runes[i] < '0' || runes[i] > '9') && runes[i] != '.' {
@@ -442,12 +437,71 @@ func isIPFormat(address string) bool {
 	return true
 }
 
-func convertWebhookConfiguration(webhookConfiguration operatorapiv1.HostedWebhookConfiguration) manifests.Webhook {
-	return manifests.Webhook{
-		Address:    webhookConfiguration.Address,
-		Port:       webhookConfiguration.Port,
-		IsIPFormat: isIPFormat(webhookConfiguration.Address),
+func webhookConfigurations(deployOption operatorapiv1.ClusterManagerDeployOption) (registration, work manifests.Webhook) {
+	switch deployOption.Mode {
+	case operatorapiv1.InstallModeDefault:
+		if deployOption.Default != nil {
+			registration = convertDefaultWebhookConfiguration(deployOption.Default.RegistrationWebhookConfiguration)
+			work = convertDefaultWebhookConfiguration(deployOption.Default.WorkWebhookConfiguration)
+			return
+		}
+	case operatorapiv1.InstallModeHosted:
+		if deployOption.Hosted != nil {
+			registration = convertHostedWebhookConfiguration(deployOption.Hosted.RegistrationWebhookConfiguration)
+			work = convertHostedWebhookConfiguration(deployOption.Hosted.WorkWebhookConfiguration)
+			return
+		}
 	}
+
+	registration = manifests.Webhook{
+		Port:            defaultWebhookPort,
+		HealthProbePort: defaultHealthProbePort,
+		MetricsPort:     defaultMetricsPort,
+	}
+	work = manifests.Webhook{
+		Port:            defaultWebhookPort,
+		HealthProbePort: defaultHealthProbePort,
+		MetricsPort:     defaultMetricsPort,
+	}
+	return
+}
+
+func convertHostedWebhookConfiguration(webhookConfiguration operatorapiv1.HostedWebhookConfiguration) manifests.Webhook {
+	// If we are deploying in the hosted mode, it requires us to create webhook in a different way with the default mode.
+	// In the hosted mode, the webhook servers is running in the management cluster but the users are accessing the hub cluster.
+	// So we need to add configuration to make the apiserver of the hub cluster could access the webhook servers on the management cluster.
+	webhook := manifests.Webhook{
+		HostedIsIPFormat: isIPFormat(webhookConfiguration.Address),
+		HostedAddress:    webhookConfiguration.Address,
+		HostedPort:       webhookConfiguration.Port,
+		Port:             defaultWebhookPort,
+		HealthProbePort:  defaultHealthProbePort,
+		MetricsPort:      defaultMetricsPort,
+	}
+	if webhookConfiguration.BindConfiguration != nil {
+		webhook.Port = webhookConfiguration.BindConfiguration.Port
+		webhook.HealthProbePort = webhookConfiguration.BindConfiguration.HealthProbePort
+		webhook.MetricsPort = webhookConfiguration.BindConfiguration.MetricsPort
+		webhook.HostNetwork = webhookConfiguration.BindConfiguration.HostNetwork
+	}
+	return webhook
+}
+
+func convertDefaultWebhookConfiguration(webhookConfiguration operatorapiv1.DefaultWebhookConfiguration) manifests.Webhook {
+	// In default mode, webhooks run inside the hub cluster.
+	// These configurations allow the webhooks to configured for different kubernetes environements.
+	webhook := manifests.Webhook{
+		Port:            defaultWebhookPort,
+		HealthProbePort: defaultHealthProbePort,
+		MetricsPort:     defaultMetricsPort,
+	}
+	if webhookConfiguration.BindConfiguration != nil {
+		webhook.Port = webhookConfiguration.BindConfiguration.Port
+		webhook.HealthProbePort = webhookConfiguration.BindConfiguration.HealthProbePort
+		webhook.MetricsPort = webhookConfiguration.BindConfiguration.MetricsPort
+		webhook.HostNetwork = webhookConfiguration.BindConfiguration.HostNetwork
+	}
+	return webhook
 }
 
 // clean specified resources

@@ -11,7 +11,7 @@ metadata:
     {{ end }}
 subsets:
   - addresses:
-      - ip: {{.WorkWebhook.Address}}
+      - ip: {{.WorkWebhook.HostedAddress}}
     ports:
-      - port: {{.WorkWebhook.Port}}
+      - port: {{.WorkWebhook.HostedPort}}
         name: tls

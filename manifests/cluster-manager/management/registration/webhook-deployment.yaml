@@ -12,6 +12,17 @@ metadata:
     {{ end }}
 spec:
   replicas: {{ .Replica }}
+  {{- if .RegistrationWebhook.HostNetwork }}
+  strategy:
+    rollingUpdate:
+      {{- if lt .Replica 4 }}
+      maxUnavailable: 1
+      {{- else }}
+      maxUnavailable: 25%
+      {{- end }}
+      maxSurge: 0
+    type: RollingUpdate
+  {{- end }}
   selector:
     matchLabels:
       app: {{ .ClusterManagerName }}-registration-webhook
@@ -59,7 +70,9 @@ spec:
         args:
         - /registration
         - "webhook-server"
-        - "port=9443"
+        - "--port={{ .RegistrationWebhook.Port }}"
+        - "--health-probe-port={{ .RegistrationWebhook.HealthProbePort }}"
+        - "--metrics-port={{ .RegistrationWebhook.MetricsPort }}"
         {{ if gt (len .RegistrationFeatureGates) 0 }}
         {{range .RegistrationFeatureGates}}
         - {{ . }}
@@ -91,21 +104,23 @@ spec:
           privileged: false
           runAsNonRoot: true
           readOnlyRootFilesystem: true
+        {{- if gt .RegistrationWebhook.HealthProbePort 0 }}
         livenessProbe:
           httpGet:
             path: /healthz
             scheme: HTTP
-            port: 8000
+            port: {{ .RegistrationWebhook.HealthProbePort }}
           initialDelaySeconds: 2
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /readyz
             scheme: HTTP
-            port: 8000
+            port: {{ .RegistrationWebhook.HealthProbePort }}
           initialDelaySeconds: 2
+        {{- end }}
         ports:
-        - containerPort: 9443
+        - containerPort: {{ .RegistrationWebhook.Port }}
           protocol: TCP
         volumeMounts:
         - mountPath: /tmp/k8s-webhook-server/serving-certs
@@ -116,6 +131,10 @@ spec:
           name: kubeconfig
           readOnly: true
         {{ end }}
+      {{- if .RegistrationWebhook.HostNetwork }}
+      dnsPolicy: ClusterFirstWithHostNet
+      hostNetwork: true
+      {{- end }}
       volumes:
       - name: webhook-secret
         secret:

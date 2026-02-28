@@ -185,10 +185,10 @@ func getHubResources(mode operatorapiv1.InstallMode, config manifests.HubConfig)
 	// Note: addon conversion webhook is not supported in hosted mode
 	if helpers.IsHosted(mode) {
 		hubResources = append(hubResources, hubHostedWebhookServiceFiles...)
-		if config.RegistrationWebhook.IsIPFormat {
+		if config.RegistrationWebhook.HostedIsIPFormat {
 			hubResources = append(hubResources, hubHostedWebhookEndpointRegistration)
 		}
-		if config.WorkWebhook.IsIPFormat {
+		if config.WorkWebhook.HostedIsIPFormat {
 			hubResources = append(hubResources, hubHostedWebhookEndpointWork)
 		}
 	} else {
