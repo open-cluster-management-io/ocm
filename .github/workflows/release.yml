@@ -84,6 +84,6 @@ jobs:
           files: |
             /home/runner/work/ocm/ocm/go/src/open-cluster-management.io/ocm/release/*.tgz
       - name: generate helm charts attestation
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: '/home/runner/work/ocm/ocm/go/src/open-cluster-management.io/ocm/release/*.tgz'
