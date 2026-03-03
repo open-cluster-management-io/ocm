@@ -30,6 +30,7 @@ The list includes but is not limited to:
 - [Cluster API](https://github.com/open-cluster-management-io/ocm/tree/main/solutions/cluster-api)
 - [Clusternet](https://github.com/open-cluster-management-io/addon-contrib/tree/main/clusternet-addon)
 - [Fluid](https://github.com/open-cluster-management-io/addon-contrib/tree/main/fluid-addon)
+- [Flower](https://github.com/open-cluster-management-io/addon-contrib/tree/main/flower-addon)
 - [Helm](https://v0-16.open-cluster-management.io/docs/getting-started/integration/app-lifecycle/)
 - [ICOS Meta OS](https://www.icos-project.eu/docs/Administration/ICOS%20Agent/Orchestrators/controlplane/)
 - [Istio](https://github.com/open-cluster-management-io/multicluster-mesh)
