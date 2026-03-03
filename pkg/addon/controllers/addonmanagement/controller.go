@@ -12,6 +12,7 @@ import (
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	clusterinformersv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterinformersv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
@@ -43,6 +44,7 @@ func NewAddonManagementController(
 	addonClient addonv1alpha1client.Interface,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
+	managedClusterInformer clusterinformersv1.ManagedClusterInformer,
 	placementInformer clusterinformersv1beta1.PlacementInformer,
 	placementDecisionInformer clusterinformersv1beta1.PlacementDecisionInformer,
 	addonFilterFunc factory.EventFilterFunc,
@@ -55,6 +57,7 @@ func NewAddonManagementController(
 		reconcilers: []addonManagementReconcile{
 			&managedClusterAddonInstallReconciler{
 				addonClient:                addonClient,
+				managedClusterLister:       managedClusterInformer.Lister(),
 				placementDecisionLister:    placementDecisionInformer.Lister(),
 				placementLister:            placementInformer.Lister(),
 				managedClusterAddonIndexer: addonInformers.Informer().GetIndexer(),
