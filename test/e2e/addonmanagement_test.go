@@ -140,6 +140,32 @@ var _ = ginkgo.Describe("Addon management", ginkgo.Ordered, ginkgo.Label("addon-
 		gomega.Eventually(func() error {
 			return hub.CheckManagedClusterAddOnStatus(universalClusterName, addOnName)
 		}).Should(gomega.Succeed())
+
+		ginkgo.By("Wait for addon agent to be fully functioning by syncing a canary configmap")
+		canary := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "addon-canary-probe",
+				Namespace: universalClusterName,
+			},
+			Data: map[string]string{"probe": "true"},
+		}
+		_, err = hub.KubeClient.CoreV1().ConfigMaps(universalClusterName).Create(
+			context.Background(), canary, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		gomega.Eventually(func() error {
+			_, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
+				context.Background(), canary.Name, metav1.GetOptions{})
+			return err
+		}).Should(gomega.Succeed())
+
+		// Clean up the canary configmap from hub and spoke
+		err = hub.KubeClient.CoreV1().ConfigMaps(universalClusterName).Delete(
+			context.Background(), canary.Name, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		err = spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Delete(
+			context.Background(), canary.Name, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.AfterEach(func() {
