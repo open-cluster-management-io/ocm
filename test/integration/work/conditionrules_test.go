@@ -3,6 +3,7 @@ package work
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -97,6 +98,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			// Update Job status on spoke
+			now := metav1.Now()
 			gomega.Eventually(func() error {
 				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job1", metav1.GetOptions{})
 				if err != nil {
@@ -105,6 +107,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 
 				job.Status.Active = 1
 				job.Status.Ready = ptr.To(int32(1))
+				job.Status.StartTime = &now
 
 				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
 				return err
@@ -129,6 +132,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Update complete condition on job
+			completionTime := metav1.NewTime(now.Add(time.Second))
 			gomega.Eventually(func() error {
 				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job1", metav1.GetOptions{})
 				if err != nil {
@@ -138,7 +142,15 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				job.Status.Active = 0
 				job.Status.Ready = ptr.To(int32(0))
 				job.Status.Succeeded = 1
+				job.Status.StartTime = &now
+				job.Status.CompletionTime = &completionTime
 				job.Status.Conditions = []batchv1.JobCondition{
+					{
+						Type:    batchv1.JobSuccessCriteriaMet,
+						Status:  corev1.ConditionTrue,
+						Reason:  batchv1.JobReasonCompletionsReached,
+						Message: "Reached expected number of succeeded pods",
+					},
 					{
 						Type:    batchv1.JobComplete,
 						Status:  corev1.ConditionTrue,
@@ -381,6 +393,8 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			// Update Job status on spoke
+			now := metav1.Now()
+			completionTime := metav1.NewTime(now.Add(time.Second))
 			gomega.Eventually(func() error {
 				// Set first job as active
 				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job1", metav1.GetOptions{})
@@ -390,6 +404,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 
 				job.Status.Active = 1
 				job.Status.Ready = ptr.To(int32(1))
+				job.Status.StartTime = &now
 
 				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
 				if err != nil {
@@ -405,7 +420,15 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				job.Status.Active = 0
 				job.Status.Ready = ptr.To(int32(0))
 				job.Status.Succeeded = 1
+				job.Status.StartTime = &now
+				job.Status.CompletionTime = &completionTime
 				job.Status.Conditions = []batchv1.JobCondition{
+					{
+						Type:    batchv1.JobSuccessCriteriaMet,
+						Status:  corev1.ConditionTrue,
+						Reason:  batchv1.JobReasonCompletionsReached,
+						Message: "Reached expected number of succeeded pods",
+					},
 					{
 						Type:    batchv1.JobComplete,
 						Status:  corev1.ConditionTrue,
@@ -498,6 +521,8 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			// Update Job status on spoke
+			now := metav1.Now()
+			completionTime := metav1.NewTime(now.Add(time.Second))
 			gomega.Eventually(func() error {
 				// Set first job as active
 				job, err := spokeKubeClient.BatchV1().Jobs(clusterName).Get(context.Background(), "job1", metav1.GetOptions{})
@@ -507,6 +532,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 
 				job.Status.Active = 1
 				job.Status.Ready = ptr.To(int32(1))
+				job.Status.StartTime = &now
 
 				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
 				if err != nil {
@@ -522,7 +548,15 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				job.Status.Active = 0
 				job.Status.Ready = ptr.To(int32(0))
 				job.Status.Succeeded = 1
+				job.Status.StartTime = &now
+				job.Status.CompletionTime = &completionTime
 				job.Status.Conditions = []batchv1.JobCondition{
+					{
+						Type:    batchv1.JobSuccessCriteriaMet,
+						Status:  corev1.ConditionTrue,
+						Reason:  batchv1.JobReasonCompletionsReached,
+						Message: "Reached expected number of succeeded pods",
+					},
 					{
 						Type:    batchv1.JobComplete,
 						Status:  corev1.ConditionTrue,
