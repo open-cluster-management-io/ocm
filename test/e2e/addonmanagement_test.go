@@ -142,9 +142,10 @@ var _ = ginkgo.Describe("Addon management", ginkgo.Ordered, ginkgo.Label("addon-
 		}).Should(gomega.Succeed())
 
 		ginkgo.By("Wait for addon agent to be fully functioning by syncing a canary configmap")
+		canaryName := fmt.Sprintf("addon-canary-probe-%s", rand.String(6))
 		canary := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "addon-canary-probe",
+				Name:      canaryName,
 				Namespace: universalClusterName,
 			},
 			Data: map[string]string{"probe": "true"},
@@ -153,19 +154,26 @@ var _ = ginkgo.Describe("Addon management", ginkgo.Ordered, ginkgo.Label("addon-
 			context.Background(), canary, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+		ginkgo.DeferCleanup(func() {
+			err := hub.KubeClient.CoreV1().ConfigMaps(universalClusterName).Delete(
+				context.Background(), canaryName, metav1.DeleteOptions{})
+			if err != nil && !errors.IsNotFound(err) {
+				klog.Errorf("failed to delete hub canary configmap %s/%s: %v",
+					universalClusterName, canaryName, err)
+			}
+			err = spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Delete(
+				context.Background(), canaryName, metav1.DeleteOptions{})
+			if err != nil && !errors.IsNotFound(err) {
+				klog.Errorf("failed to delete spoke canary configmap %s/%s: %v",
+					addonInstallNamespace, canaryName, err)
+			}
+		})
+
 		gomega.Eventually(func() error {
 			_, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
-				context.Background(), canary.Name, metav1.GetOptions{})
+				context.Background(), canaryName, metav1.GetOptions{})
 			return err
 		}).Should(gomega.Succeed())
-
-		// Clean up the canary configmap from hub and spoke
-		err = hub.KubeClient.CoreV1().ConfigMaps(universalClusterName).Delete(
-			context.Background(), canary.Name, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		err = spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Delete(
-			context.Background(), canary.Name, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.AfterEach(func() {
