@@ -68,7 +68,7 @@ func CreateTestManifestWorks(name, namespace string, placementName string, clust
 	var works []runtime.Object
 	for _, c := range clusters {
 		mw, _ := spoketesting.NewManifestWork(0, obj)
-		mw.Name = name
+		mw.Name = fmt.Sprintf("%s-%s", name, c)
 		mw.Namespace = c
 		mw.Labels = map[string]string{
 			"work.open-cluster-management.io/manifestworkreplicaset": fmt.Sprintf("%s.%s", namespace, name),
@@ -90,7 +90,7 @@ func CreateTestManifestWorks(name, namespace string, placementName string, clust
 func CreateTestManifestWork(name, namespace string, placementName string, clusterName string) *workapiv1.ManifestWork {
 	obj := testingcommon.NewUnstructured("v1", "kind", "test-ns", "test-name")
 	mw, _ := spoketesting.NewManifestWork(0, obj)
-	mw.Name = name
+	mw.Name = fmt.Sprintf("%s-%s", name, clusterName)
 	mw.Namespace = clusterName
 	mw.Labels = map[string]string{
 		"work.open-cluster-management.io/manifestworkreplicaset": fmt.Sprintf("%s.%s", namespace, name),
