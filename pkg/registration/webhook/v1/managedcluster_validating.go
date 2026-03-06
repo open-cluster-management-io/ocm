@@ -12,8 +12,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	v1 "open-cluster-management.io/api/cluster/v1"
@@ -22,14 +20,10 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 )
 
-var _ webhook.CustomValidator = &ManagedClusterWebhook{}
+var _ admission.Validator[*v1.ManagedCluster] = &ManagedClusterWebhook{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *ManagedClusterWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	managedCluster, ok := obj.(*v1.ManagedCluster)
-	if !ok {
-		return nil, apierrors.NewBadRequest("Request cluster obj format is not right")
-	}
+func (r *ManagedClusterWebhook) ValidateCreate(ctx context.Context, managedCluster *v1.ManagedCluster) (admission.Warnings, error) {
 	req, err := admission.RequestFromContext(ctx)
 	if err != nil {
 		return nil, apierrors.NewBadRequest(err.Error())
@@ -64,23 +58,15 @@ func (r *ManagedClusterWebhook) ValidateCreate(ctx context.Context, obj runtime.
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ManagedClusterWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (
-	admission.Warnings, error) {
-	managedCluster, ok := newObj.(*v1.ManagedCluster)
-	if !ok {
-		return nil, apierrors.NewBadRequest("Request new cluster obj format is not right")
-	}
-	oldManagedCluster, ok := oldObj.(*v1.ManagedCluster)
-	if !ok {
-		return nil, apierrors.NewBadRequest("Request old cluster obj format is not right")
-	}
+func (r *ManagedClusterWebhook) ValidateUpdate(
+	ctx context.Context, oldManagedCluster, newManagedCluster *v1.ManagedCluster) (admission.Warnings, error) {
 	req, err := admission.RequestFromContext(ctx)
 	if err != nil {
 		return nil, apierrors.NewBadRequest(err.Error())
 	}
 
 	// Validate if Spec.ManagedClusterClientConfigs is Valid HTTPS URL
-	err = r.validateManagedClusterObj(*managedCluster)
+	err = r.validateManagedClusterObj(*newManagedCluster)
 	if err != nil {
 		return nil, err
 	}
@@ -89,12 +75,12 @@ func (r *ManagedClusterWebhook) ValidateUpdate(ctx context.Context, oldObj, newO
 	// 1. check whether cluster namespace is terminating.
 	// 2. check the request user whether has been allowed to change the HubAcceptsClient field with
 	// SubjectAccessReview api.
-	if managedCluster.Spec.HubAcceptsClient != oldManagedCluster.Spec.HubAcceptsClient {
-		if managedCluster.Spec.HubAcceptsClient {
-			if err := r.validateAcceptByClusterNamespace(managedCluster.Name); err != nil {
+	if newManagedCluster.Spec.HubAcceptsClient != oldManagedCluster.Spec.HubAcceptsClient {
+		if newManagedCluster.Spec.HubAcceptsClient {
+			if err := r.validateAcceptByClusterNamespace(newManagedCluster.Name); err != nil {
 				return nil, err
 			}
-			if err := r.allowUpdateAcceptField(managedCluster.Name, req.UserInfo); err != nil {
+			if err := r.allowUpdateAcceptField(newManagedCluster.Name, req.UserInfo); err != nil {
 				return nil, err
 			}
 		}
@@ -105,15 +91,15 @@ func (r *ManagedClusterWebhook) ValidateUpdate(ctx context.Context, oldObj, newO
 	if len(oldManagedCluster.Labels) > 0 {
 		originalClusterSetName = oldManagedCluster.Labels[clusterv1beta2.ClusterSetLabel]
 	}
-	if len(managedCluster.Labels) > 0 {
-		currentClusterSetName = managedCluster.Labels[clusterv1beta2.ClusterSetLabel]
+	if len(newManagedCluster.Labels) > 0 {
+		currentClusterSetName = newManagedCluster.Labels[clusterv1beta2.ClusterSetLabel]
 	}
 
 	return nil, r.allowSetClusterSetLabel(req.UserInfo, originalClusterSetName, currentClusterSetName)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ManagedClusterWebhook) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
+func (r *ManagedClusterWebhook) ValidateDelete(_ context.Context, _ *v1.ManagedCluster) (admission.Warnings, error) {
 	return nil, nil
 }
 

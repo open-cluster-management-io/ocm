@@ -4,6 +4,7 @@ import (
 	"context"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/utils"
 )
 
@@ -34,12 +35,12 @@ type CloudEventTransport interface {
 	Subscribe(ctx context.Context) error
 
 	// Receive starts receiving events and invokes the provided handler for each event.
-	// This is a BLOCKING call that runs an event loop until the context is cancelled.
+	// This is a BLOCKING call that runs an event loop until the context is canceled.
 	// The handler function is called synchronously for each received event.
 	// This method should typically be run in a separate goroutine.
 	//
 	// The method returns when:
-	//   - The context is cancelled (returns ctx.Err())
+	//   - The context is canceled (returns ctx.Err())
 	//   - A fatal transport error occurs (returns the error)
 	//
 	// Note: The handler should avoid blocking operations to prevent blocking the

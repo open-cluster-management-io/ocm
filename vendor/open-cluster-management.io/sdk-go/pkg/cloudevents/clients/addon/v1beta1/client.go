@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
+
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 
 	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned/typed/addon/v1beta1"

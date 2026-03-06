@@ -19,6 +19,7 @@ const GroupName = "operator.open-cluster-management.io"
 var GroupVersion = metav1.GroupVersion{Group: GroupName, Version: "v1"}
 
 // SchemeGroupVersion is group version used to register these objects
+//
 // Deprecated: use GroupVersion instead.
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1"}
 

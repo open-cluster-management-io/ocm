@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"google.golang.org/grpc/stats"
+
 	cemetrics "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/metrics"
 )
 

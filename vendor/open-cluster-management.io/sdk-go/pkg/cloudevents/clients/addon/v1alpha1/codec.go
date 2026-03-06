@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"

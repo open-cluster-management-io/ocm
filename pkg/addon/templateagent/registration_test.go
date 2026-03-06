@@ -79,7 +79,6 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 						Groups: []string{
 							"system:open-cluster-management:cluster:cluster1:addon:addon1",
 							"system:open-cluster-management:addon:addon1",
-							"system:authenticated",
 						},
 						OrganizationUnits: []string{},
 					},

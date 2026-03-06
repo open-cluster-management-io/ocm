@@ -41,7 +41,7 @@ func NewAddOnTemplateInformer(client versioned.Interface, resyncPeriod time.Dura
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredAddOnTemplateInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -66,7 +66,7 @@ func NewFilteredAddOnTemplateInformer(client versioned.Interface, resyncPeriod t
 				}
 				return client.AddonV1alpha1().AddOnTemplates().Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apiaddonv1alpha1.AddOnTemplate{},
 		resyncPeriod,
 		indexers,

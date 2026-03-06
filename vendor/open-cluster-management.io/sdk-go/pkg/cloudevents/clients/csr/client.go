@@ -118,7 +118,7 @@ func (c *CSRClient) ListWithContext(ctx context.Context, opts metav1.ListOptions
 func (c *CSRClient) WatchWithContext(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("watch csr")
-	watcher, err := c.watcherStore.GetWatcher(context.Background(), "", opts)
+	watcher, err := c.watcherStore.GetWatcher(ctx, "", opts)
 	if err != nil {
 		return nil, errors.NewInternalError(err)
 	}

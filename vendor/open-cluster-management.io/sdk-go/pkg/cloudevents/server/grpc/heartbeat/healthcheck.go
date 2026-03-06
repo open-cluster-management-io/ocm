@@ -3,9 +3,11 @@ package heartbeat
 import (
 	"context"
 	"fmt"
-	"k8s.io/klog/v2"
-	pbv1 "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protobuf/v1"
 	"time"
+
+	"k8s.io/klog/v2"
+
+	pbv1 "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protobuf/v1"
 )
 
 // HealthChecker receives heartbeat from heartbeatChan, if it does not receive heartbeat in healthinessTimout,

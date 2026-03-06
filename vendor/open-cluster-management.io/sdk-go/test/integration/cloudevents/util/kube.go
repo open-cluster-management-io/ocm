@@ -12,8 +12,8 @@ import (
 )
 
 func KubeAuthnClient() kubernetes.Interface {
-	client := fake.NewSimpleClientset()
-	client.Fake.PrependReactor(
+	client := fake.NewClientset()
+	client.PrependReactor(
 		"create",
 		"tokenreviews",
 		func(action clienttesting.Action) (bool, runtime.Object, error) {
@@ -41,9 +41,9 @@ func KubeAuthnClient() kubernetes.Interface {
 }
 
 func KubeAuthzClient() kubernetes.Interface {
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 
-	client.Fake.PrependReactor(
+	client.PrependReactor(
 		"create",
 		"subjectaccessreviews",
 		func(action clienttesting.Action) (bool, runtime.Object, error) {

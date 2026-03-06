@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	cloudeventstypes "github.com/cloudevents/sdk-go/v2/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
-	"strings"
 )
 
 type ContextTracingKey string

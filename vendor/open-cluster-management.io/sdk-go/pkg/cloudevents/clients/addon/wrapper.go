@@ -2,9 +2,11 @@ package addon
 
 import (
 	"context"
+
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1beta1"
 
 	"k8s.io/client-go/discovery"
+
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonclientset "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned/typed/addon/v1alpha1"

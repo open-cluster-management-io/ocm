@@ -10,6 +10,7 @@ import (
 
 	"github.com/cloudevents/sdk-go/v2/binding"
 	cetypes "github.com/cloudevents/sdk-go/v2/types"
+
 	pbv1 "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protobuf/v1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protocol"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
@@ -173,6 +174,7 @@ func NewCloudEventsMetricsUnaryInterceptor() grpc.UnaryServerInterceptor {
 	}
 }
 
+//nolint:unparam // dataType is always "unknown" at current call sites but kept for consistency
 func recordCloudEventsMetrics(cluster, dataType, method string, err error, startTime time.Time) {
 	duration := time.Since(startTime).Seconds()
 	status := statusFromError(err)
@@ -229,7 +231,7 @@ func (w *wrappedCloudEventsMetricsStream) SendMsg(m interface{}) error {
 }
 
 // newWrappedCloudEventsMetricsStream creates a wrappedCloudEventsMetricsStream with the specified type and cluster reference.
-func newWrappedCloudEventsMetricsStream(clusterName, dataType *string, method string, ctx context.Context, ss grpc.ServerStream) grpc.ServerStream {
+func newWrappedCloudEventsMetricsStream(ctx context.Context, clusterName, dataType *string, method string, ss grpc.ServerStream) grpc.ServerStream {
 	return &wrappedCloudEventsMetricsStream{clusterName, dataType, method, ss, ctx}
 }
 
@@ -246,7 +248,7 @@ func NewCloudEventsMetricsStreamInterceptor() grpc.StreamServerInterceptor {
 		dataType := ""
 		cluster := ""
 		// create a wrapped stream to capture the source and emit metrics
-		wrappedCEMetricsStream := newWrappedCloudEventsMetricsStream(&cluster, &dataType, method, stream.Context(), stream)
+		wrappedCEMetricsStream := newWrappedCloudEventsMetricsStream(stream.Context(), &cluster, &dataType, method, stream)
 		// call rpc handler to handle RPC request
 		err := handler(srv, wrappedCEMetricsStream)
 

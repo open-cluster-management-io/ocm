@@ -158,6 +158,21 @@ func (s *SourceLocalWatcherStore) GetWatcher(ctx context.Context, namespace stri
 		return nil, fmt.Errorf("unsupported to watch from the namespace %s", namespace)
 	}
 
+	// If AllowWatchBookmarks is enabled, send a bookmark event to signal the end of the initial event stream.
+	// This is required by Kubernetes 1.35+ reflectors to properly initialize watches.
+	if opts.AllowWatchBookmarks {
+		// Send the bookmark event asynchronously to avoid blocking the watch initialization
+		go func() {
+			// Create a minimal work object for the bookmark event with the required annotation
+			bookmarkWork := &workv1.ManifestWork{}
+			bookmarkWork.SetResourceVersion(opts.ResourceVersion)
+			bookmarkWork.SetAnnotations(map[string]string{
+				metav1.InitialEventsAnnotationKey: "true",
+			})
+			s.watcher.Receive(watch.Event{Type: watch.Bookmark, Object: bookmarkWork})
+		}()
+	}
+
 	return s.watcher, nil
 }
 

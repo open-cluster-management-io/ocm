@@ -332,22 +332,37 @@ spec:
                                     default: OnSpokePresent
                                     description: |-
                                       Condition defines the condition that the fields should be ignored when apply the resource.
-                                      Fields in JSONPaths are all ignored when condition is met, otherwise no fields is ignored
-                                      in the apply operation.
+                                      Fields are ignored when condition is met, otherwise no fields are ignored in the apply operation.
                                     enum:
                                     - OnSpokePresent
                                     - OnSpokeChange
                                     type: string
-                                  jsonPaths:
-                                    description: JSONPaths defines the list of json
-                                      path in the resource to be ignored
+                                  jqPathExpressions:
+                                    description: |-
+                                      JQPathExpressions defines the list of jq path expressions in the resource to be ignored.
+                                      jq expressions provide powerful querying capabilities including array filtering,
+                                      conditional selection, and complex transformations.
+                                      Reference: https://stedolan.github.io/jq/manual/
                                     items:
                                       type: string
-                                    minItems: 1
+                                    type: array
+                                  jsonPaths:
+                                    description: |-
+                                      JSONPaths defines the list of json path in the resource to be ignored.
+                                      Uses Kubernetes JSONPath syntax.
+                                    items:
+                                      type: string
+                                    type: array
+                                  jsonPointers:
+                                    description: |-
+                                      JSONPointers defines the list of JSON Pointers (RFC 6901) in the resource to be ignored.
+                                      JSON Pointers provide precise field targeting using a string syntax like "/spec/replicas".
+                                      Special characters in keys must be escaped: '~' becomes '~0' and '/' becomes '~1'.
+                                    items:
+                                      type: string
                                     type: array
                                 required:
                                 - condition
-                                - jsonPaths
                                 type: object
                               type: array
                               x-kubernetes-list-map-keys:

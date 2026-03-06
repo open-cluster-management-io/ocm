@@ -33,11 +33,7 @@ var manifestWorkSchema = metav1.GroupVersionResource{
 
 func TestValidateCreateUpdate(t *testing.T) {
 	w := ManifestWorkWebhook{}
-	_, err := w.ValidateCreate(context.Background(), &workv1.ManifestWorkList{})
-	if err == nil {
-		t.Errorf("Non work obj, Expect Error but got nil")
-	}
-	_, err = w.ValidateUpdate(context.Background(), nil, &workv1.ManifestWork{})
+	_, err := w.ValidateUpdate(context.Background(), nil, &workv1.ManifestWork{})
 	if err == nil {
 		t.Errorf("Non work obj, Expect Error but got nil")
 	}

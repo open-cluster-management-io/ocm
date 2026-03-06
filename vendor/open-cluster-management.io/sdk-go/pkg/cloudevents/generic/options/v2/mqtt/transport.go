@@ -10,6 +10,7 @@ import (
 	"github.com/cloudevents/sdk-go/v2/binding"
 	"github.com/eclipse/paho.golang/paho"
 	"k8s.io/klog/v2"
+
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt"
 )
@@ -160,7 +161,7 @@ func (t *mqttTransport) Subscribe(ctx context.Context) error {
 }
 
 // Receive starts receiving events and invokes the provided handler for each event.
-// This is a BLOCKING call that runs an event loop until the context is cancelled.
+// This is a BLOCKING call that runs an event loop until the context is canceled.
 func (t *mqttTransport) Receive(ctx context.Context, handleFn options.ReceiveHandlerFn) error {
 	t.mu.RLock()
 	if !t.subscribed {

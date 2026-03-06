@@ -6,6 +6,7 @@ import (
 
 	v2 "github.com/cloudevents/sdk-go/v2"
 	"github.com/eclipse/paho.golang/paho"
+
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt"
 )

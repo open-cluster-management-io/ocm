@@ -2,12 +2,14 @@ package store
 
 import (
 	"context"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
+
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/utils"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 )
@@ -104,6 +106,25 @@ func (s *AgentInformerWatcherStore[T]) HandleReceivedResource(ctx context.Contex
 }
 
 func (s *AgentInformerWatcherStore[T]) GetWatcher(ctx context.Context, namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+	// If AllowWatchBookmarks is enabled, send a bookmark event to signal the end of the initial event stream.
+	// This is required by Kubernetes 1.35+ reflectors to properly initialize watches.
+	if opts.AllowWatchBookmarks {
+		// Send the bookmark event asynchronously to avoid blocking the watch initialization
+		go func() {
+			// Create a minimal object for the bookmark event with the required annotation
+			// We need to use reflection to create a new instance of T
+			var zero T
+			bookmarkObj := reflect.New(reflect.TypeOf(zero).Elem()).Interface().(runtime.Object)
+			if accessor, err := meta.Accessor(bookmarkObj); err == nil {
+				accessor.SetResourceVersion(opts.ResourceVersion)
+				accessor.SetAnnotations(map[string]string{
+					metav1.InitialEventsAnnotationKey: "true",
+				})
+			}
+			s.Watcher.Receive(watch.Event{Type: watch.Bookmark, Object: bookmarkObj})
+		}()
+	}
+
 	return s.Watcher, nil
 }
 

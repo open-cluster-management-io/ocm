@@ -63,14 +63,14 @@ func (l *ConfigLoader) LoadConfig() (string, any, error) {
 
 // BuildCloudEventsSourceOptions builds the cloudevents source options based on the broker type
 func BuildCloudEventsSourceOptions(config any,
-	clientId, sourceId string, dataType types.CloudEventsDataType) (*options.CloudEventsSourceOptions, error) {
+	clientID, sourceID string, dataType types.CloudEventsDataType) (*options.CloudEventsSourceOptions, error) {
 	switch config := config.(type) {
 	case *mqtt.MQTTOptions:
-		return mqttv2.NewSourceOptions(config, clientId, sourceId), nil
+		return mqttv2.NewSourceOptions(config, clientID, sourceID), nil
 	case *grpc.GRPCOptions:
-		return grpcv2.NewSourceOptions(config, sourceId, dataType), nil
+		return grpcv2.NewSourceOptions(config, sourceID, dataType), nil
 	case *pubsub.PubSubOptions:
-		return pubsub.NewSourceOptions(config, sourceId), nil
+		return pubsub.NewSourceOptions(config, sourceID), nil
 	default:
 		return nil, fmt.Errorf("unsupported client configuration type %T", config)
 	}
@@ -78,14 +78,14 @@ func BuildCloudEventsSourceOptions(config any,
 
 // BuildCloudEventsAgentOptions builds the cloudevents agent options based on the broker type
 func BuildCloudEventsAgentOptions(config any,
-	clusterName, clientId string, dataType types.CloudEventsDataType) (*options.CloudEventsAgentOptions, error) {
+	clusterName, clientID string, dataType types.CloudEventsDataType) (*options.CloudEventsAgentOptions, error) {
 	switch config := config.(type) {
 	case *mqtt.MQTTOptions:
-		return mqttv2.NewAgentOptions(config, clusterName, clientId), nil
+		return mqttv2.NewAgentOptions(config, clusterName, clientID), nil
 	case *grpc.GRPCOptions:
-		return grpcv2.NewAgentOptions(config, clusterName, clientId, dataType), nil
+		return grpcv2.NewAgentOptions(config, clusterName, clientID, dataType), nil
 	case *pubsub.PubSubOptions:
-		return pubsub.NewAgentOptions(config, clusterName, clientId), nil
+		return pubsub.NewAgentOptions(config, clusterName, clientID), nil
 	default:
 		return nil, fmt.Errorf("unsupported client configuration type %T", config)
 	}

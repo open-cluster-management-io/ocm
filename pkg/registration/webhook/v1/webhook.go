@@ -26,9 +26,8 @@ func (r *ManagedClusterWebhook) SetExternalKubeClientSet(client kubernetes.Inter
 }
 
 func (r *ManagedClusterWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
+	return ctrl.NewWebhookManagedBy(mgr, &v1.ManagedCluster{}).
 		WithValidator(r).
 		WithDefaulter(r).
-		For(&v1.ManagedCluster{}).
 		Complete()
 }

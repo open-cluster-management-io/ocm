@@ -153,7 +153,7 @@ func (p *permissionBuilder) BindKubeClientClusterRole(clusterRole *rbacv1.Cluste
 
 	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
 		// Build subjects from the registration status
-		subjects := buildSubjectsFromRegistration(addon, certificatesv1.KubeAPIServerClientSignerName)
+		subjects := BuildSubjectsFromRegistration(addon, certificatesv1.KubeAPIServerClientSignerName)
 
 		// If no subjects found, return pending error
 		if len(subjects) == 0 {
@@ -184,7 +184,7 @@ func (p *permissionBuilder) BindKubeClientRole(role *rbacv1.Role) RBACPermission
 
 	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
 		// Build subjects from the registration status
-		subjects := buildSubjectsFromRegistration(addon, certificatesv1.KubeAPIServerClientSignerName)
+		subjects := BuildSubjectsFromRegistration(addon, certificatesv1.KubeAPIServerClientSignerName)
 
 		// If no subjects found, return pending error
 		if len(subjects) == 0 {
@@ -267,9 +267,10 @@ func (b *unionPermissionBuilder) build() agent.PermissionConfigFunc {
 	}
 }
 
-// buildSubjectsFromRegistration extracts and builds RBAC subjects from addon registration status.
+// BuildSubjectsFromRegistration extracts and builds RBAC subjects from addon registration status.
 // Returns nil if no matching registration is found or if the subject is empty.
-func buildSubjectsFromRegistration(addon *addonapiv1alpha1.ManagedClusterAddOn, signerName string) []rbacv1.Subject {
+// The system:authenticated group is filtered out to prevent overly permissive RBAC bindings.
+func BuildSubjectsFromRegistration(addon *addonapiv1alpha1.ManagedClusterAddOn, signerName string) []rbacv1.Subject {
 	// Find the registration config for the specified signer
 	var subject *addonapiv1alpha1.Subject
 	for _, registration := range addon.Status.Registrations {
@@ -298,6 +299,9 @@ func buildSubjectsFromRegistration(addon *addonapiv1alpha1.ManagedClusterAddOn, 
 
 	// Include groups
 	for _, group := range subject.Groups {
+		if group == "system:authenticated" {
+			continue
+		}
 		subjects = append(subjects, rbacv1.Subject{
 			Kind:     rbacv1.GroupKind,
 			APIGroup: rbacv1.GroupName,

@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/clock"
+
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	clusterv1beta1sdk "open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1"
 )
@@ -589,7 +590,10 @@ func parseTimeout(timeoutStr string) (time.Duration, error) {
 }
 
 func decisionGroupsToGroupKeys(decisionsGroup []clusterv1alpha1.MandatoryDecisionGroup) []clusterv1beta1sdk.GroupKey {
-	var result []clusterv1beta1sdk.GroupKey
+	if len(decisionsGroup) == 0 {
+		return nil
+	}
+	result := make([]clusterv1beta1sdk.GroupKey, 0, len(decisionsGroup))
 	for _, d := range decisionsGroup {
 		gk := clusterv1beta1sdk.GroupKey{}
 		// GroupName is considered first to select the decisionGroups then GroupIndex.

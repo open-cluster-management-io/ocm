@@ -2,10 +2,12 @@ package factory
 
 import (
 	"fmt"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 )
 
