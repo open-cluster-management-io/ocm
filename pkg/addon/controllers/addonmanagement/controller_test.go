@@ -222,14 +222,16 @@ func TestAddonInstallReconcile(t *testing.T) {
 			},
 		},
 		{
-			name:                "install addon with hosting cluster name annotation",
+			name:                "install addon with addon annotations from managed cluster",
 			managedClusteraddon: []runtime.Object{},
 			managedClusters: []runtime.Object{
 				&clusterv1.ManagedCluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "cluster1",
 						Annotations: map[string]string{
-							addonv1alpha1.HostingClusterNameAnnotationKey: "hosting-cluster",
+							addonv1alpha1.HostingClusterNameAnnotationKey:    "hosting-cluster",
+							addonv1alpha1.HostedManifestLocationAnnotationKey: "hosting",
+							"non-addon-annotation":                           "should-be-ignored",
 						},
 					},
 				},
@@ -269,18 +271,25 @@ func TestAddonInstallReconcile(t *testing.T) {
 					t.Errorf("expected annotations on addon, got nil")
 					return
 				}
-				hostingCluster, ok := addon.Annotations[addonv1alpha1.HostingClusterNameAnnotationKey]
-				if !ok {
-					t.Errorf("expected hosting cluster name annotation on addon")
+				if len(addon.Annotations) != 2 {
+					t.Errorf("expected 2 addon annotations, got %d: %v", len(addon.Annotations), addon.Annotations)
 					return
 				}
-				if hostingCluster != "hosting-cluster" {
-					t.Errorf("expected hosting cluster name 'hosting-cluster', got '%s'", hostingCluster)
+				if addon.Annotations[addonv1alpha1.HostingClusterNameAnnotationKey] != "hosting-cluster" {
+					t.Errorf("expected hosting cluster name 'hosting-cluster', got '%s'",
+						addon.Annotations[addonv1alpha1.HostingClusterNameAnnotationKey])
+				}
+				if addon.Annotations[addonv1alpha1.HostedManifestLocationAnnotationKey] != "hosting" {
+					t.Errorf("expected hosted manifest location 'hosting', got '%s'",
+						addon.Annotations[addonv1alpha1.HostedManifestLocationAnnotationKey])
+				}
+				if _, ok := addon.Annotations["non-addon-annotation"]; ok {
+					t.Errorf("non-addon annotation should not be propagated")
 				}
 			},
 		},
 		{
-			name:                "install addon without hosting cluster name annotation",
+			name:                "install addon without addon annotations on managed cluster",
 			managedClusteraddon: []runtime.Object{},
 			managedClusters: []runtime.Object{
 				&clusterv1.ManagedCluster{

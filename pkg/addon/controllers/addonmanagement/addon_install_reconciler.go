@@ -2,6 +2,7 @@ package addonmanagement
 
 import (
 	"context"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -80,13 +81,11 @@ func (d *managedClusterAddonInstallReconciler) reconcile(
 			Spec: addonv1alpha1.ManagedClusterAddOnSpec{},
 		}
 
-		// Check if the managed cluster is in hosted mode and add the hosting cluster name annotation
-		if hostingClusterName := d.getHostingClusterName(cluster, logger); hostingClusterName != "" {
-			addon.Annotations = map[string]string{
-				addonv1alpha1.HostingClusterNameAnnotationKey: hostingClusterName,
-			}
-			logger.V(2).Info("Adding hosting cluster name annotation to addon",
-				"cluster", cluster, "hostingCluster", hostingClusterName, "addon", cma.Name)
+		// Copy addon annotations from the managed cluster to the addon
+		if addonAnnotations := d.getAddonAnnotationsFromCluster(cluster, logger); len(addonAnnotations) > 0 {
+			addon.Annotations = addonAnnotations
+			logger.V(2).Info("Adding addon annotations from managed cluster",
+				"cluster", cluster, "annotations", addonAnnotations, "addon", cma.Name)
 		}
 
 		_, err := d.addonClient.AddonV1alpha1().ManagedClusterAddOns(cluster).Create(ctx, addon, metav1.CreateOptions{})
@@ -105,16 +104,22 @@ func (d *managedClusterAddonInstallReconciler) reconcile(
 	return cma, reconcileContinue, utilerrors.NewAggregate(errs)
 }
 
-// getHostingClusterName returns the hosting cluster name from the ManagedCluster's
-// addon.open-cluster-management.io/hosting-cluster-name annotation, or empty string if not set.
-func (d *managedClusterAddonInstallReconciler) getHostingClusterName(clusterName string, logger klog.Logger) string {
+// getAddonAnnotationsFromCluster returns all annotations with the "addon.open-cluster-management.io" prefix
+// from the ManagedCluster, so they can be appended to the ManagedClusterAddOn.
+func (d *managedClusterAddonInstallReconciler) getAddonAnnotationsFromCluster(clusterName string, logger klog.Logger) map[string]string {
 	cluster, err := d.managedClusterLister.Get(clusterName)
 	if err != nil {
 		logger.Error(err, "failed to get cluster")
-		return ""
+		return nil
 	}
 
-	return cluster.Annotations[addonv1alpha1.HostingClusterNameAnnotationKey]
+	addonAnnotations := map[string]string{}
+	for k, v := range cluster.Annotations {
+		if strings.HasPrefix(k, addonv1alpha1.GroupName) {
+			addonAnnotations[k] = v
+		}
+	}
+	return addonAnnotations
 }
 
 func (d *managedClusterAddonInstallReconciler) getAllDecisions(
