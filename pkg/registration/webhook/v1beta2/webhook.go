@@ -50,8 +50,7 @@ func (b *ManagedClusterSetBindingWebhook) SetExternalKubeClientSet(client kubern
 }
 
 func (b *ManagedClusterSetBindingWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
+	return ctrl.NewWebhookManagedBy(mgr, &v1beta2.ManagedClusterSetBinding{}).
 		WithValidator(b).
-		For(&v1beta2.ManagedClusterSetBinding{}).
 		Complete()
 }

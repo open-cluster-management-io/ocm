@@ -20,12 +20,12 @@ var serialNumberLimit = new(big.Int).Lsh(big.NewInt(1), 128)
 // CSRSignerWithExpiry generates a signer func for addon agent to sign the csr using caKey and caData with expiry date.
 func CSRSignerWithExpiry(caKey, caData []byte, duration time.Duration) CSRSignerFunc {
 	return func(csr *certificatesv1.CertificateSigningRequest) []byte {
-		blockTlsCrt, _ := pem.Decode(caData)
-		if blockTlsCrt == nil {
+		blockTLSCrt, _ := pem.Decode(caData)
+		if blockTLSCrt == nil {
 			klog.Errorf("Failed to decode cert")
 			return nil
 		}
-		certs, err := x509.ParseCertificates(blockTlsCrt.Bytes)
+		certs, err := x509.ParseCertificates(blockTLSCrt.Bytes)
 		if err != nil {
 			klog.Errorf("Failed to parse cert: %v", err)
 			return nil

@@ -7,6 +7,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 )
 

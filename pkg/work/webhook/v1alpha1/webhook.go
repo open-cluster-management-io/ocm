@@ -26,8 +26,7 @@ func (r *ManifestWorkReplicaSetWebhook) SetExternalKubeClientSet(client kubernet
 }
 
 func (r *ManifestWorkReplicaSetWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
+	return ctrl.NewWebhookManagedBy(mgr, &v1alpha1.ManifestWorkReplicaSet{}).
 		WithValidator(r).
-		For(&v1alpha1.ManifestWorkReplicaSet{}).
 		Complete()
 }

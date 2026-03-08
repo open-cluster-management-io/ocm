@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/errors"
+
 	"open-cluster-management.io/api/utils/work/v1/workapplier"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
@@ -219,10 +220,7 @@ func (f *internalWorkBuilder) buildManifestWorks(objects []runtime.Object) (appl
 		}
 
 		if len(newManifests) != 0 {
-			newWorks, err := f.newManifestWorks(newManifests, len(updatedWorks))
-			if err != nil {
-				return nil, nil, err
-			}
+			newWorks := f.newManifestWorks(newManifests, len(updatedWorks))
 			appliedWorks = append(appliedWorks, newWorks...)
 		}
 	}
@@ -238,7 +236,7 @@ func (f *internalWorkBuilder) buildManifestWorks(objects []runtime.Object) (appl
 	return appliedWorks, deletedWorks, nil
 }
 
-func (f *internalWorkBuilder) newManifestWorks(manifests []workapiv1.Manifest, workIndex int) ([]*workapiv1.ManifestWork, error) {
+func (f *internalWorkBuilder) newManifestWorks(manifests []workapiv1.Manifest, workIndex int) []*workapiv1.ManifestWork {
 	var manifestWorks []*workapiv1.ManifestWork
 	var totalSize = 0
 
@@ -258,7 +256,7 @@ func (f *internalWorkBuilder) newManifestWorks(manifests []workapiv1.Manifest, w
 		totalSize = manifests[i].Size()
 	}
 
-	return manifestWorks, nil
+	return manifestWorks
 }
 
 func (f *internalWorkBuilder) initManifestWork(index int) *workapiv1.ManifestWork {

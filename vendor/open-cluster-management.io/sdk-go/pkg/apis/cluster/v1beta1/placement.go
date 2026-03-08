@@ -8,6 +8,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
@@ -217,7 +218,7 @@ type ClusterGroupsMap map[GroupKey]sets.Set[string]
 
 // GetOrderedGroupKeys returns an ordered slice of GroupKeys, sorted by group index.
 func (g ClusterGroupsMap) GetOrderedGroupKeys() []GroupKey {
-	groupKeys := []GroupKey{}
+	groupKeys := make([]GroupKey, 0, len(g))
 	for groupKey := range g {
 		groupKeys = append(groupKeys, groupKey)
 	}

@@ -102,7 +102,7 @@ func (c *baseController) Run(ctx context.Context, workers int) {
 
 	// Handle controller shutdown
 
-	<-ctx.Done()                     // wait for controller context to be cancelled
+	<-ctx.Done()                     // wait for controller context to be canceled
 	c.syncContext.Queue().ShutDown() // shutdown the controller queue first
 	queueContextCancel()             // cancel the queue context, which tell workers to initiate shutdown
 
@@ -120,13 +120,13 @@ func (c *baseController) runPeriodicalResync(ctx context.Context, interval time.
 	if interval == 0 {
 		return
 	}
-	go wait.UntilWithContext(ctx, func(ctx context.Context) {
+	go wait.UntilWithContext(ctx, func(_ context.Context) {
 		c.syncContext.Queue().Add(DefaultQueueKey)
 	}, interval)
 }
 
 // runWorker runs a single worker
-// The worker is asked to terminate when the passed context is cancelled and is given terminationGraceDuration time
+// The worker is asked to terminate when the passed context is canceled and is given terminationGraceDuration time
 // to complete its shutdown.
 func (c *baseController) runWorker(queueCtx context.Context) {
 	wait.UntilWithContext(

@@ -150,8 +150,9 @@ func DefaultCSRApprover(agentName string) agent.CSRApproveFunc {
 		}
 
 		requestingOrgs := sets.NewString(x509cr.Subject.Organization...)
-		if requestingOrgs.Len() != 3 {
-			klog.Infof("CSR Approve Check Failed csr %q org is not equal to 3", csr.Name)
+		// Allow 2 or 3 groups for backward compatibility (3 groups includes deprecated "system:authenticated")
+		if requestingOrgs.Len() != 2 && requestingOrgs.Len() != 3 {
+			klog.Infof("CSR Approve Check Failed csr %q org count is %d, expected 2 or 3", csr.Name, requestingOrgs.Len())
 			return false
 		}
 

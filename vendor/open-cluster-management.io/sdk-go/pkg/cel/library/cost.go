@@ -20,7 +20,7 @@ func actualSize(value ref.Val) uint64 {
 }
 
 // CallCost calculates the runtime cost for CEL function calls
-func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, result ref.Val) *uint64 {
+func (l *CostEstimator) CallCost(function, overloadID string, args []ref.Val, result ref.Val) *uint64 {
 	switch function {
 	case "scores":
 		// each scores returns a list
@@ -85,7 +85,7 @@ func calculateListCost(v traits.Lister) uint64 {
 
 	size := v.Size().(types.Int)
 	for i := types.Int(0); i < size; i++ {
-		if item := v.Get(types.Int(i)); item != nil {
+		if item := v.Get(i); item != nil {
 			cost += calculateStructCost(item)
 		}
 	}

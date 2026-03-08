@@ -22,6 +22,8 @@ import (
 // Examples:
 //
 //	parseJSON("{\"key\": \"value\"}") // returns a map with key-value pairs
+//
+//nolint:revive // JsonLib is part of the public API, cannot rename to JSONLib
 func JsonLib() cel.EnvOption {
 	return cel.Lib(jsonLib)
 }

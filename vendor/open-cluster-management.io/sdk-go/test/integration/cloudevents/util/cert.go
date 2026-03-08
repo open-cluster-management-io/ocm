@@ -14,6 +14,7 @@ import (
 	"time"
 
 	certutil "k8s.io/client-go/util/cert"
+
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/cert"
 	"open-cluster-management.io/sdk-go/pkg/testing"
 )

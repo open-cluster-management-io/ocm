@@ -33,12 +33,12 @@ type BaseEnvCostEstimator struct {
 }
 
 // CallCost implements runtime cost estimation for CEL function calls
-func (b *BaseEnvCostEstimator) CallCost(function, overloadId string, args []ref.Val, result ref.Val) *uint64 {
+func (b *BaseEnvCostEstimator) CallCost(function, overloadID string, args []ref.Val, result ref.Val) *uint64 {
 	if b.CostEstimator != nil {
-		return b.CostEstimator.CallCost(function, overloadId, args, result)
+		return b.CostEstimator.CallCost(function, overloadID, args, result)
 	}
 	k8sEstimator := &library.CostEstimator{}
-	return k8sEstimator.CallCost(function, overloadId, args, result)
+	return k8sEstimator.CallCost(function, overloadID, args, result)
 }
 
 // ConvertObjectToUnstructured converts any object to an unstructured.Unstructured object

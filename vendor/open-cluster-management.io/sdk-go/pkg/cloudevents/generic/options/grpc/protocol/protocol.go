@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"k8s.io/klog/v2"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/heartbeat"
 	"sync"
 	"time"
+
+	"k8s.io/klog/v2"
+
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/heartbeat"
 
 	"google.golang.org/grpc"
 

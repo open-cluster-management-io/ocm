@@ -7,6 +7,7 @@ import (
 	"github.com/bwmarrin/snowflake"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	cloudeventstypes "github.com/cloudevents/sdk-go/v2/types"
+
 	"open-cluster-management.io/sdk-go/pkg/logging"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,11 +77,11 @@ func (c *ManifestBundleCodec) Encode(source string, eventType types.CloudEventsT
 	}
 
 	// set the work's meta data to its cloud event
-	metaJson, err := json.Marshal(work.ObjectMeta)
+	metaJSON, err := json.Marshal(work.ObjectMeta)
 	if err != nil {
 		return nil, err
 	}
-	evt.SetExtension(types.ExtensionWorkMeta, string(metaJson))
+	evt.SetExtension(types.ExtensionWorkMeta, string(metaJSON))
 
 	manifestBundleStatus := &payload.ManifestBundleStatus{
 		Conditions:     work.Status.Conditions,
@@ -124,12 +125,12 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 
 	metaObj := metav1.ObjectMeta{}
 	if workMetaExtension, ok := evtExtensions[types.ExtensionWorkMeta]; ok {
-		metaJson, err := cloudeventstypes.ToString(workMetaExtension)
+		metaJSON, err := cloudeventstypes.ToString(workMetaExtension)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := json.Unmarshal([]byte(metaJson), &metaObj); err != nil {
+		if err := json.Unmarshal([]byte(metaJSON), &metaObj); err != nil {
 			return nil, err
 		}
 	}

@@ -42,7 +42,7 @@ func NewPlacementDecisionInformer(client versioned.Interface, namespace string, 
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredPlacementDecisionInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -67,7 +67,7 @@ func NewFilteredPlacementDecisionInformer(client versioned.Interface, namespace 
 				}
 				return client.ClusterV1beta1().PlacementDecisions(namespace).Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apiclusterv1beta1.PlacementDecision{},
 		resyncPeriod,
 		indexers,

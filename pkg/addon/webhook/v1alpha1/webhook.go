@@ -93,9 +93,7 @@ func (w *ManagedClusterAddOnWebhook) Init(mgr ctrl.Manager) error {
 
 // SetupWebhookWithManager sets up the webhook with manager for ManagedClusterAddOn
 func (r *ManagedClusterAddOn) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
-		Complete()
+	return ctrl.NewWebhookManagedBy(mgr, &ManagedClusterAddOn{}).Complete()
 }
 
 // ClusterManagementAddOnWebhook implements the webhook for ClusterManagementAddOn v1alpha1 (Hub version)
@@ -107,7 +105,5 @@ func (w *ClusterManagementAddOnWebhook) Init(mgr ctrl.Manager) error {
 
 // SetupWebhookWithManager sets up the webhook with manager for ClusterManagementAddOn
 func (r *ClusterManagementAddOn) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
-		Complete()
+	return ctrl.NewWebhookManagedBy(mgr, &ClusterManagementAddOn{}).Complete()
 }

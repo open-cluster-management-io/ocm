@@ -26,8 +26,7 @@ func (r *ManifestWorkWebhook) SetExternalKubeClientSet(client kubernetes.Interfa
 }
 
 func (r *ManifestWorkWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
+	return ctrl.NewWebhookManagedBy(mgr, &v1.ManifestWork{}).
 		WithValidator(r).
-		For(&v1.ManifestWork{}).
 		Complete()
 }

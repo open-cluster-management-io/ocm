@@ -2,13 +2,14 @@ package factory
 
 import (
 	"context"
+
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	"k8s.io/client-go/util/workqueue"
 )
 
 // Controller interface represents a runnable Kubernetes controller.
-// Cancelling the syncContext passed will cause the controller to shutdown.
+// Canceling the syncContext passed will cause the controller to shutdown.
 // Number of workers determine how much parallel the job processing should be.
 type Controller interface {
 	// Run runs the controller and blocks until the controller is finished.
@@ -41,6 +42,6 @@ type SyncContext interface {
 }
 
 // SyncFunc is a function that contain main controller logic.
-// The syncContext.syncContext passed is the main controller syncContext, when cancelled it means the controller is being shut down.
+// The syncContext.syncContext passed is the main controller syncContext, when canceled it means the controller is being shut down.
 // The syncContext provides access to controller name, queue and event recorder.
 type SyncFunc func(ctx context.Context, controllerContext SyncContext, key string) error

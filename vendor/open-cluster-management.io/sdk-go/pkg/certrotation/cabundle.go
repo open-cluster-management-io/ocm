@@ -4,8 +4,9 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
-	"open-cluster-management.io/sdk-go/pkg/helpers"
 	"reflect"
+
+	"open-cluster-management.io/sdk-go/pkg/helpers"
 
 	"github.com/openshift/library-go/pkg/crypto"
 	corev1 "k8s.io/api/core/v1"

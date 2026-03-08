@@ -6,12 +6,14 @@ import (
 	"sync"
 
 	"github.com/cloudevents/sdk-go/v2/binding"
+
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/serviceaccount"
 	grpcprotocol "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protocol"
 
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
+
 	pbv1 "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protobuf/v1"
 	"open-cluster-management.io/sdk-go/pkg/server/grpc/authz"
 
@@ -240,7 +242,7 @@ func toSubjectAccessReview(clusterName string, user string, groups []string, eve
 
 		return nil, fmt.Errorf("unsupported action %s", verb)
 	case payload.ManifestBundleEventDataType:
-		sar.Spec.ResourceAttributes.Group = workv1.SchemeGroupVersion.Group
+		sar.Spec.ResourceAttributes.Group = workv1.GroupName
 		sar.Spec.ResourceAttributes.Resource = "manifestworks"
 		return sar, nil
 	default:

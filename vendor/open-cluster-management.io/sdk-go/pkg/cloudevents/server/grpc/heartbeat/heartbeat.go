@@ -2,11 +2,13 @@ package heartbeat
 
 import (
 	"context"
+	"time"
+
 	"github.com/google/uuid"
 	"k8s.io/klog/v2"
+
 	pbv1 "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protobuf/v1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
-	"time"
 )
 
 // Heartbeater is to periodically send heartbeat event to the output channel.

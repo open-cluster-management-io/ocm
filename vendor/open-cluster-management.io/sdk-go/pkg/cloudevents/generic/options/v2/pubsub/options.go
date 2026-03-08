@@ -10,6 +10,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"k8s.io/apimachinery/pkg/util/errors"
+
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 

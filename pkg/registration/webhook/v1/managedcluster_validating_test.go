@@ -229,11 +229,6 @@ func TestValidateCreate(t *testing.T) {
 			}
 		})
 	}
-	w := ManagedClusterWebhook{}
-	_, err := w.ValidateCreate(context.Background(), &v1beta2.ManagedClusterSet{})
-	if err == nil {
-		t.Errorf("Non cluster obj, Expect Error but got nil")
-	}
 }
 
 func TestValidateUpdate(t *testing.T) {
@@ -596,10 +591,5 @@ func TestValidateUpdate(t *testing.T) {
 				t.Errorf("Case:%v, Expect Error but got nil:%v", c.name, err)
 			}
 		})
-	}
-	w := ManagedClusterWebhook{}
-	_, err := w.ValidateUpdate(context.Background(), nil, &v1beta2.ManagedClusterSetBinding{})
-	if err == nil {
-		t.Errorf("Non cluster obj, Expect Error but got nil")
 	}
 }

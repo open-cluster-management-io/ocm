@@ -103,9 +103,6 @@ func TestWebHookUpdateRequest(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expecting error for nil newPlaceMW")
 	}
-	if !apierrors.IsBadRequest(err) {
-		t.Fatal("Expecting bad request error type")
-	}
 
 	request := admission.Request{
 		AdmissionRequest: admissionv1.AdmissionRequest{

@@ -153,7 +153,7 @@ func (t *grpcTransport) Subscribe(ctx context.Context) error {
 }
 
 // Receive starts receiving events and invokes the provided handler for each event.
-// This is a BLOCKING call that runs an event loop until the context is cancelled.
+// This is a BLOCKING call that runs an event loop until the context is canceled.
 func (t *grpcTransport) Receive(ctx context.Context, handleFn options.ReceiveHandlerFn) error {
 	t.mu.Lock()
 	if t.subClient == nil {

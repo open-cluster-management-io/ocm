@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"k8s.io/klog/v2"
+
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 

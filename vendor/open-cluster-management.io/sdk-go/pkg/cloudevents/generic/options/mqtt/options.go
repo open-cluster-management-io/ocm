@@ -17,6 +17,7 @@ import (
 	"github.com/eclipse/paho.golang/paho"
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/errors"
+
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/cert"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
@@ -24,6 +25,7 @@ import (
 type TopicKey string
 type PubTopic string
 
+//nolint:revive // ALL_CAPS constants are part of the public API, cannot rename
 const (
 	MQTT_SOURCE_PUB_TOPIC_KEY TopicKey = "mqtt_source_pub_topic"
 	MQTT_AGENT_PUB_TOPIC_KEY  TopicKey = "mqtt_agent_pub_topic"
@@ -116,7 +118,7 @@ func LoadConfig(configPath string) (*MQTTConfig, error) {
 		return nil, err
 	}
 
-	if err := config.CertConfig.EmbedCerts(); err != nil {
+	if err := config.EmbedCerts(); err != nil {
 		return nil, err
 	}
 
@@ -134,7 +136,7 @@ func BuildMQTTOptionsFromFlags(configPath string) (*MQTTOptions, error) {
 		return nil, fmt.Errorf("brokerHost is required")
 	}
 
-	if err := config.CertConfig.Validate(); err != nil {
+	if err := config.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -173,7 +175,7 @@ func BuildMQTTOptionsFromFlags(configPath string) (*MQTTOptions, error) {
 		Timeout:    dialTimeout,
 	}
 
-	if config.CertConfig.HasCerts() {
+	if config.HasCerts() {
 		// Set up TLS configuration for the MQTT connection if the client certificate and key are provided.
 		// the certificates will be reloaded periodically.
 		options.Dialer.TLSConfig, err = cert.AutoLoadTLSConfig(
@@ -234,11 +236,12 @@ func (o *MQTTOptions) GetCloudEventsProtocol(
 		OnClientError: errorHandler,
 	}
 
-	opts := []cloudeventsmqtt.Option{
+	opts := make([]cloudeventsmqtt.Option, 0, 3+len(clientOpts))
+	opts = append(opts,
 		cloudeventsmqtt.WithConnect(o.GetMQTTConnectOption(clientID)),
 		cloudeventsmqtt.WithDebugLogger(NewPahoDebugLogger(logger)),
 		cloudeventsmqtt.WithErrorLogger(NewPahoErrorLogger(logger)),
-	}
+	)
 	opts = append(opts, clientOpts...)
 	return cloudeventsmqtt.New(ctx, config, opts...)
 }
@@ -291,6 +294,7 @@ func getSourceFromEventsTopic(topic string) (string, error) {
 	return subTopics[1], nil
 }
 
+//nolint:unparam // old is always "+" but kept as parameter for readability
 func replaceLast(str, old, new string) string {
 	last := strings.LastIndex(str, old)
 	if last == -1 {

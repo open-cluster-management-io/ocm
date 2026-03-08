@@ -3,10 +3,9 @@ package v1alpha1
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	ocmfeature "open-cluster-management.io/api/feature"
@@ -16,36 +15,22 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/webhook/common"
 )
 
-var _ webhook.CustomValidator = &ManifestWorkReplicaSetWebhook{}
+var _ admission.Validator[*workv1alpha1.ManifestWorkReplicaSet] = &ManifestWorkReplicaSetWebhook{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *ManifestWorkReplicaSetWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (
+func (r *ManifestWorkReplicaSetWebhook) ValidateCreate(ctx context.Context, mwrSet *workv1alpha1.ManifestWorkReplicaSet) (
 	admission.Warnings, error) {
-	mwrSet, ok := obj.(*workv1alpha1.ManifestWorkReplicaSet)
-	if !ok {
-		return nil, apierrors.NewBadRequest("Request manifestWorkReplicaSet obj format is not right")
-	}
 	return nil, r.validateRequest(mwrSet, nil, ctx)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ManifestWorkReplicaSetWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (
+func (r *ManifestWorkReplicaSetWebhook) ValidateUpdate(ctx context.Context, oldmwrSet, newmwrSet *workv1alpha1.ManifestWorkReplicaSet) (
 	admission.Warnings, error) {
-	newmwrSet, ok := newObj.(*workv1alpha1.ManifestWorkReplicaSet)
-	if !ok {
-		return nil, apierrors.NewBadRequest("Request manifestWorkReplicaSet obj format is not right")
-	}
-
-	oldmwrSet, ok := oldObj.(*workv1alpha1.ManifestWorkReplicaSet)
-	if !ok {
-		return nil, apierrors.NewBadRequest("Request manifestWorkReplicaSet obj format is not right")
-	}
-
 	return nil, r.validateRequest(newmwrSet, oldmwrSet, ctx)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ManifestWorkReplicaSetWebhook) ValidateDelete(_ context.Context, _ runtime.Object) (
+func (r *ManifestWorkReplicaSetWebhook) ValidateDelete(_ context.Context, _ *workv1alpha1.ManifestWorkReplicaSet) (
 	admission.Warnings, error) {
 	if err := checkFeatureEnabled(); err != nil {
 		return nil, err
@@ -59,6 +44,10 @@ func (r *ManifestWorkReplicaSetWebhook) validateRequest(
 	ctx context.Context) error {
 	if err := checkFeatureEnabled(); err != nil {
 		return err
+	}
+
+	if newmwrSet == nil {
+		return fmt.Errorf("new manifestwork replica set is nil")
 	}
 
 	if err := validatePlaceManifests(newmwrSet); err != nil {

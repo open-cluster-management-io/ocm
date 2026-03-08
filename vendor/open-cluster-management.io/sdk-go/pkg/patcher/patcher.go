@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -61,6 +62,10 @@ func (p *patcher[R, Sp, St]) WithOptions(options PatchOptions) Patcher[R, Sp, St
 }
 
 func (p *patcher[R, Sp, St]) AddFinalizer(ctx context.Context, object R, finalizers ...string) (bool, error) {
+	startTime := time.Now()
+	var err error
+	resourceGVK := getResourceGVK(object)
+
 	accessor, err := meta.Accessor(object)
 	if err != nil {
 		return false, err
@@ -111,11 +116,16 @@ func (p *patcher[R, Sp, St]) AddFinalizer(ctx context.Context, object R, finaliz
 
 	_, err = p.client.Patch(
 		ctx, accessor.GetName(), types.MergePatchType, patchBytes, metav1.PatchOptions{})
+	RecordPatcherOperation(OperationAddFinalizer, resourceGVK, err, time.Since(startTime))
 	return true, err
 
 }
 
 func (p *patcher[R, Sp, St]) RemoveFinalizer(ctx context.Context, object R, finalizers ...string) error {
+	startTime := time.Now()
+	var err error
+	resourceGVK := getResourceGVK(object)
+
 	accessor, err := meta.Accessor(object)
 	if err != nil {
 		return err
@@ -166,6 +176,7 @@ func (p *patcher[R, Sp, St]) RemoveFinalizer(ctx context.Context, object R, fina
 
 	_, err = p.client.Patch(
 		ctx, accessor.GetName(), types.MergePatchType, patchBytes, metav1.PatchOptions{})
+	RecordPatcherOperation(OperationRemoveFinalizer, resourceGVK, err, time.Since(startTime))
 	if errors.IsNotFound(err) {
 		return nil
 	}
@@ -213,6 +224,8 @@ func (p *patcher[R, Sp, St]) patch(ctx context.Context, object R, newObject, old
 }
 
 func (p *patcher[R, Sp, St]) PatchStatus(ctx context.Context, object R, newStatus, oldStatus St) (bool, error) {
+	startTime := time.Now()
+	resourceGVK := getResourceGVK(object)
 	statusChanged := !equality.Semantic.DeepEqual(oldStatus, newStatus)
 	if !statusChanged {
 		return false, nil
@@ -221,10 +234,15 @@ func (p *patcher[R, Sp, St]) PatchStatus(ctx context.Context, object R, newStatu
 	oldObject := &Resource[Sp, St]{Status: oldStatus}
 	newObject := &Resource[Sp, St]{Status: newStatus}
 
-	return true, p.patch(ctx, object, newObject, oldObject, "status")
+	err := p.patch(ctx, object, newObject, oldObject, "status")
+	RecordPatcherOperation(OperationPatchStatus, resourceGVK, err, time.Since(startTime))
+
+	return true, err
 }
 
 func (p *patcher[R, Sp, St]) PatchSpec(ctx context.Context, object R, newSpec, oldSpec Sp) (bool, error) {
+	startTime := time.Now()
+	resourceGVK := getResourceGVK(object)
 	specChanged := !equality.Semantic.DeepEqual(newSpec, oldSpec)
 	if !specChanged {
 		return false, nil
@@ -232,10 +250,15 @@ func (p *patcher[R, Sp, St]) PatchSpec(ctx context.Context, object R, newSpec, o
 
 	oldObject := &Resource[Sp, St]{Spec: oldSpec}
 	newObject := &Resource[Sp, St]{Spec: newSpec}
-	return true, p.patch(ctx, object, newObject, oldObject)
+	err := p.patch(ctx, object, newObject, oldObject)
+	RecordPatcherOperation(OperationPatchSpec, resourceGVK, err, time.Since(startTime))
+
+	return true, err
 }
 
 func (p *patcher[R, Sp, St]) PatchLabelAnnotations(ctx context.Context, object R, newObject, oldObject metav1.ObjectMeta) (bool, error) {
+	startTime := time.Now()
+	resourceGVK := getResourceGVK(object)
 	annotationPatch := p.mapPatch(newObject.Annotations, oldObject.Annotations)
 	labelPatch := p.mapPatch(newObject.Labels, oldObject.Labels)
 	if len(annotationPatch) == 0 && len(labelPatch) == 0 {
@@ -281,6 +304,8 @@ func (p *patcher[R, Sp, St]) PatchLabelAnnotations(ctx context.Context, object R
 
 	_, err = p.client.Patch(
 		ctx, accessor.GetName(), types.MergePatchType, patchBytes, metav1.PatchOptions{})
+	RecordPatcherOperation(OperationPatchLabelAnnotation, resourceGVK, err, time.Since(startTime))
+
 	return true, err
 }
 
@@ -306,4 +331,16 @@ func (p *patcher[R, Sp, St]) mapPatch(newMap, oldMap map[string]string) map[stri
 	}
 
 	return mapPatch
+}
+
+// getResourceGVK extracts and formats the GVK from a runtime object for use in metrics
+func getResourceGVK(object runtime.Object) string {
+	gvk := object.GetObjectKind().GroupVersionKind()
+
+	// Format as "Kind.group" (e.g., "ManagedCluster.cluster.open-cluster-management.io")
+	// If group is not available, just use Kind
+	if gvk.Group == "" {
+		return gvk.Kind
+	}
+	return gvk.Kind + "." + gvk.Group
 }

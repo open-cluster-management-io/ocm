@@ -9,8 +9,6 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -22,12 +20,12 @@ import (
 )
 
 var (
-	nowFunc                                       = time.Now
-	defaultClusterSetName                         = "default"
-	_                     webhook.CustomDefaulter = &ManagedClusterWebhook{}
+	nowFunc                                                              = time.Now
+	defaultClusterSetName                                                = "default"
+	_                     admission.Defaulter[*clusterv1.ManagedCluster] = &ManagedClusterWebhook{}
 )
 
-func (r *ManagedClusterWebhook) Default(ctx context.Context, obj runtime.Object) error {
+func (r *ManagedClusterWebhook) Default(ctx context.Context, managedCluster *clusterv1.ManagedCluster) error {
 	req, err := admission.RequestFromContext(ctx)
 	if err != nil {
 		return apierrors.NewBadRequest(err.Error())
@@ -40,11 +38,6 @@ func (r *ManagedClusterWebhook) Default(ctx context.Context, obj runtime.Object)
 			return apierrors.NewBadRequest(err.Error())
 		}
 		oldManagedCluster = cluster
-	}
-
-	managedCluster, ok := obj.(*clusterv1.ManagedCluster)
-	if !ok {
-		return apierrors.NewBadRequest("Request cluster obj format is not right")
 	}
 
 	// Generate taints

@@ -3,8 +3,10 @@ package codec
 import (
 	"encoding/json"
 	"fmt"
+
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	cloudeventstypes "github.com/cloudevents/sdk-go/v2/types"
+
 	"open-cluster-management.io/sdk-go/pkg/logging"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,11 +44,11 @@ func (c *ManifestBundleCodec) Encode(source string, eventType types.CloudEventsT
 		NewEvent()
 
 	// set the work's metadata to its cloud event
-	metaJson, err := json.Marshal(work.ObjectMeta)
+	metaJSON, err := json.Marshal(work.ObjectMeta)
 	if err != nil {
 		return nil, err
 	}
-	evt.SetExtension(types.ExtensionWorkMeta, string(metaJson))
+	evt.SetExtension(types.ExtensionWorkMeta, string(metaJSON))
 
 	// Add log tracing extension
 	if err := logging.LogTracingFromObjectToEvent(work, &evt); err != nil {
@@ -105,12 +107,12 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 	// UID and ResourceVersion to the received work, for the work's other meta data will be got from the work
 	// client local cache.
 	if workMetaExtension, ok := evtExtensions[types.ExtensionWorkMeta]; ok {
-		metaJson, err := cloudeventstypes.ToString(workMetaExtension)
+		metaJSON, err := cloudeventstypes.ToString(workMetaExtension)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := json.Unmarshal([]byte(metaJson), &metaObj); err != nil {
+		if err := json.Unmarshal([]byte(metaJSON), &metaObj); err != nil {
 			return nil, err
 		}
 	}

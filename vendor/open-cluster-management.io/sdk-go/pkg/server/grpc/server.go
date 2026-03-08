@@ -18,11 +18,12 @@ import (
 	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/textlogger"
+	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+
 	"open-cluster-management.io/sdk-go/pkg/server/grpc/authn"
 	"open-cluster-management.io/sdk-go/pkg/server/grpc/authz"
 	"open-cluster-management.io/sdk-go/pkg/server/grpc/metrics"
-	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type GRPCServer struct {

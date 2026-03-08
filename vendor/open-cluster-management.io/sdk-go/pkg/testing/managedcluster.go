@@ -36,7 +36,7 @@ func (b *ManagedClusterBuilder) WithClaim(name, value string) *ManagedClusterBui
 	}
 	claimMap[name] = value
 
-	var clusterClaims []clusterapiv1.ManagedClusterClaim
+	clusterClaims := make([]clusterapiv1.ManagedClusterClaim, 0, len(claimMap))
 	for k, v := range claimMap {
 		clusterClaims = append(clusterClaims, clusterapiv1.ManagedClusterClaim{
 			Name:  k,

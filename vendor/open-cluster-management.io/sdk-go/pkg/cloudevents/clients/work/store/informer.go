@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+
 	workv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/store"
@@ -72,6 +73,21 @@ func (s *SourceInformerWatcherStore) HasInitiated() bool {
 func (s *SourceInformerWatcherStore) GetWatcher(ctx context.Context, namespace string, opts metav1.ListOptions) (watch.Interface, error) {
 	if namespace != metav1.NamespaceAll {
 		return nil, fmt.Errorf("unsupported to watch from the namespace %s", namespace)
+	}
+
+	// If AllowWatchBookmarks is enabled, send a bookmark event to signal the end of the initial event stream.
+	// This is required by Kubernetes 1.35+ reflectors to properly initialize watches.
+	if opts.AllowWatchBookmarks {
+		// Send the bookmark event asynchronously to avoid blocking the watch initialization
+		go func() {
+			// Create a minimal work object for the bookmark event with the required annotation
+			bookmarkWork := &workv1.ManifestWork{}
+			bookmarkWork.SetResourceVersion(opts.ResourceVersion)
+			bookmarkWork.SetAnnotations(map[string]string{
+				metav1.InitialEventsAnnotationKey: "true",
+			})
+			s.watcher.Receive(watch.Event{Type: watch.Bookmark, Object: bookmarkWork})
+		}()
 	}
 
 	return s.watcher, nil
