@@ -102,6 +102,18 @@ func TestAddonInstallReconcile(t *testing.T) {
 		{
 			name:                "install addon",
 			managedClusteraddon: []runtime.Object{},
+			managedClusters: []runtime.Object{
+				&clusterv1.ManagedCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cluster1",
+					},
+				},
+				&clusterv1.ManagedCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cluster2",
+					},
+				},
+			},
 			clusterManagementAddon: func() *addonv1alpha1.ClusterManagementAddOn {
 				addon := addontesting.NewClusterManagementAddon("test", "", "").Build()
 				addon.Spec.InstallStrategy = addonv1alpha1.InstallStrategy{
@@ -151,6 +163,18 @@ func TestAddonInstallReconcile(t *testing.T) {
 				}
 				return addon
 			}(),
+			managedClusters: []runtime.Object{
+				&clusterv1.ManagedCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cluster1",
+					},
+				},
+				&clusterv1.ManagedCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cluster2",
+					},
+				},
+			},
 			placements: []runtime.Object{
 				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
 			},
@@ -191,6 +215,23 @@ func TestAddonInstallReconcile(t *testing.T) {
 				}
 				return addon
 			}(),
+			managedClusters: []runtime.Object{
+				&clusterv1.ManagedCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cluster1",
+					},
+				},
+				&clusterv1.ManagedCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cluster2",
+					},
+				},
+				&clusterv1.ManagedCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cluster3",
+					},
+				},
+			},
 			placements: []runtime.Object{
 				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
 				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement1", Namespace: "default"}},
@@ -229,9 +270,9 @@ func TestAddonInstallReconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "cluster1",
 						Annotations: map[string]string{
-							addonv1alpha1.HostingClusterNameAnnotationKey:    "hosting-cluster",
+							addonv1alpha1.HostingClusterNameAnnotationKey:     "hosting-cluster",
 							addonv1alpha1.HostedManifestLocationAnnotationKey: "hosting",
-							"non-addon-annotation":                           "should-be-ignored",
+							"non-addon-annotation":                            "should-be-ignored",
 						},
 					},
 				},
@@ -445,6 +486,7 @@ func TestAddonManagementControllerSync(t *testing.T) {
 		queueKey                string
 		managedClusterAddons    []runtime.Object
 		clusterManagementAddons []runtime.Object
+		managedClusters         []runtime.Object
 		placements              []runtime.Object
 		placementDecisions      []runtime.Object
 		expectError             bool
@@ -492,6 +534,13 @@ func TestAddonManagementControllerSync(t *testing.T) {
 					return addon
 				}(),
 			},
+			managedClusters: []runtime.Object{
+				&clusterv1.ManagedCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cluster2",
+					},
+				},
+			},
 			placements: []runtime.Object{
 				&clusterv1beta1.Placement{
 					ObjectMeta: metav1.ObjectMeta{
@@ -527,8 +576,8 @@ func TestAddonManagementControllerSync(t *testing.T) {
 
 			fakeAddonClient := fakeaddon.NewSimpleClientset(append(c.managedClusterAddons, c.clusterManagementAddons...)...)
 			clusterObjs := append(c.placements, c.placementDecisions...)
+			clusterObjs = append(clusterObjs, c.managedClusters...)
 			fakeClusterClient := fakecluster.NewSimpleClientset(clusterObjs...)
-
 			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
 			clusterInformers := clusterv1informers.NewSharedInformerFactory(fakeClusterClient, 10*time.Minute)
 
@@ -562,6 +611,12 @@ func TestAddonManagementControllerSync(t *testing.T) {
 
 			for _, obj := range c.placementDecisions {
 				if err := clusterInformers.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(obj); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			for _, obj := range c.managedClusters {
+				if err := clusterInformers.Cluster().V1().ManagedClusters().Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
 				}
 			}

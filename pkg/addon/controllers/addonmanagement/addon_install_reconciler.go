@@ -82,13 +82,16 @@ func (d *managedClusterAddonInstallReconciler) reconcile(
 		}
 
 		// Copy addon annotations from the managed cluster to the addon
-		if addonAnnotations := d.getAddonAnnotationsFromCluster(cluster, logger); len(addonAnnotations) > 0 {
+		addonAnnotations, err := d.getAddonAnnotationsFromCluster(cluster)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if len(addonAnnotations) > 0 {
 			addon.Annotations = addonAnnotations
-			logger.V(2).Info("Adding addon annotations from managed cluster",
-				"cluster", cluster, "annotations", addonAnnotations, "addon", cma.Name)
 		}
 
-		_, err := d.addonClient.AddonV1alpha1().ManagedClusterAddOns(cluster).Create(ctx, addon, metav1.CreateOptions{})
+		_, err = d.addonClient.AddonV1alpha1().ManagedClusterAddOns(cluster).Create(ctx, addon, metav1.CreateOptions{})
 		if err != nil && !errors.IsAlreadyExists(err) {
 			errs = append(errs, err)
 		}
@@ -106,11 +109,11 @@ func (d *managedClusterAddonInstallReconciler) reconcile(
 
 // getAddonAnnotationsFromCluster returns all annotations with the "addon.open-cluster-management.io" prefix
 // from the ManagedCluster, so they can be appended to the ManagedClusterAddOn.
-func (d *managedClusterAddonInstallReconciler) getAddonAnnotationsFromCluster(clusterName string, logger klog.Logger) map[string]string {
+func (d *managedClusterAddonInstallReconciler) getAddonAnnotationsFromCluster(
+	clusterName string) (map[string]string, error) {
 	cluster, err := d.managedClusterLister.Get(clusterName)
 	if err != nil {
-		logger.Error(err, "failed to get cluster")
-		return nil
+		return nil, err
 	}
 
 	addonAnnotations := map[string]string{}
@@ -119,7 +122,7 @@ func (d *managedClusterAddonInstallReconciler) getAddonAnnotationsFromCluster(cl
 			addonAnnotations[k] = v
 		}
 	}
-	return addonAnnotations
+	return addonAnnotations, nil
 }
 
 func (d *managedClusterAddonInstallReconciler) getAllDecisions(
