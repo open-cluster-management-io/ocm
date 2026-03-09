@@ -1060,9 +1060,9 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 			condition:    workapiv1.IgnoreFieldsConditionOnSpokePresent,
 			jsonPointers: []string{"/metadata/annotations/prometheus.io~1scrape"},
 			jqExpressions: []string{
-				".spec.containers[] | select(.name != \"application\")",
+				".spec.containers[] | select(.name == \"istio-proxy\" or (.name | startswith(\"istio-\")))",
 				".spec.volumes[]? | select(.name | startswith(\"istio-\"))",
-				".spec.initContainers[]?",
+				".spec.initContainers[]? | select(.name | startswith(\"istio-\"))",
 			},
 		},
 	}
