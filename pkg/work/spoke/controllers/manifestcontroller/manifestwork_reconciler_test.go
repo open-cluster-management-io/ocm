@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -528,7 +529,7 @@ func TestFailedToApplyResource(t *testing.T) {
 								if cond.Status != metav1.ConditionFalse {
 									t.Errorf("expected manifest condition status False, got %s", cond.Status)
 								}
-								if !contains(cond.Message, "Failed to process ignoreFields") {
+								if !strings.Contains(cond.Message, "Failed to process ignoreFields") {
 									t.Errorf("expected message to contain 'Failed to process ignoreFields', got %q", cond.Message)
 								}
 							}
@@ -710,19 +711,6 @@ func TestServerSideApplyConflict(t *testing.T) {
 	}
 
 	testCase.validate(t, controller.dynamicClient, controller.workClient, controller.kubeClient)
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && searchSubstring(s, substr)
-}
-
-func searchSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
 
 func newManifestConfigOption(

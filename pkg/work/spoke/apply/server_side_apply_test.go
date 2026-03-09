@@ -1154,7 +1154,7 @@ func TestServerSideApplyWithIgnoreFieldErrors(t *testing.T) {
 			expectedErrorMsg: "JQ expression error",
 		},
 		{
-			name: "context cancellation during JQ execution",
+			name: "pre-cancelled context before JQ execution",
 			existing: testingcommon.NewUnstructuredWithContent(
 				"v1", "Pod", "default", "test-pod",
 				map[string]interface{}{

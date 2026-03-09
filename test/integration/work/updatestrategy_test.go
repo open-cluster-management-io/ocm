@@ -1066,6 +1066,66 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 		})
+
+		ginkgo.It("IgnoreField with invalid JQPathExpression should fail with AppliedManifestSSAIgnoreFieldError", func() {
+			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Namespace: clusterName,
+						Name:      "deploy1",
+					},
+					UpdateStrategy: &workapiv1.UpdateStrategy{
+						Type: workapiv1.UpdateStrategyTypeServerSideApply,
+						ServerSideApply: &workapiv1.ServerSideApplyConfig{
+							IgnoreFields: []workapiv1.IgnoreField{
+								{
+									Condition: workapiv1.IgnoreFieldsConditionOnSpokePresent,
+									JQPathExpressions: []string{
+										".spec.containers[] | invalid syntax here",
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionFalse,
+				[]metav1.ConditionStatus{metav1.ConditionFalse}, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("Verify manifest condition has AppliedManifestSSAIgnoreFieldError reason")
+			gomega.Eventually(func() error {
+				appliedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if len(appliedWork.Status.ResourceStatus.Manifests) == 0 {
+					return fmt.Errorf("no manifest conditions found")
+				}
+
+				manifestConditions := appliedWork.Status.ResourceStatus.Manifests[0].Conditions
+				for _, cond := range manifestConditions {
+					if cond.Type == workapiv1.ManifestApplied {
+						if cond.Reason != workapiv1.AppliedManifestSSAIgnoreFieldError {
+							return fmt.Errorf("expected reason %s, got %s",
+								workapiv1.AppliedManifestSSAIgnoreFieldError, cond.Reason)
+						}
+						if cond.Status != metav1.ConditionFalse {
+							return fmt.Errorf("expected status False, got %s", cond.Status)
+						}
+						return nil
+					}
+				}
+
+				return fmt.Errorf("ManifestApplied condition not found in manifest conditions: %v", manifestConditions)
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
 	})
 
 	ginkgo.It("should not increase the workload generation when nothing changes", func() {
