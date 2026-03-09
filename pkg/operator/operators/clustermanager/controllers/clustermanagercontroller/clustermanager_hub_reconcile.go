@@ -80,6 +80,7 @@ var (
 	// Note: addon conversion webhook is not supported in hosted mode
 	hubHostedWebhookEndpointRegistration = "cluster-manager/hub/registration/webhook-endpoint-hosted.yaml"
 	hubHostedWebhookEndpointWork         = "cluster-manager/hub/work/webhook-endpoint-hosted.yaml"
+	hubHostedWebhookEndpointAddon        = "cluster-manager/hub/addon-manager/webhook-endpoint-hosted.yaml"
 
 	grpcServerResourceFiles = []string{
 		"cluster-manager/hub/grpc-server/clusterrole.yaml",
@@ -190,6 +191,9 @@ func getHubResources(mode operatorapiv1.InstallMode, config manifests.HubConfig)
 		}
 		if config.WorkWebhook.HostedIsIPFormat {
 			hubResources = append(hubResources, hubHostedWebhookEndpointWork)
+		}
+		if config.AddonWebhook.HostedIsIPFormat {
+			hubResources = append(hubResources, hubHostedWebhookEndpointAddon)
 		}
 	} else {
 		hubResources = append(hubResources, hubDefaultWebhookServiceFiles...)

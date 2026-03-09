@@ -1,0 +1,29 @@
+{{if .AddonWebhook.HostedIsIPFormat}}
+kind: Service
+apiVersion: v1
+metadata:
+  name: cluster-manager-addon-webhook
+  namespace: {{ .ClusterManagerNamespace }}
+  labels:
+    {{ if gt (len .Labels) 0 }}
+    {{ range $key, $value := .Labels }}
+    "{{ $key }}": "{{ $value }}"
+    {{ end }}
+    {{ end }}
+spec:
+  type: ClusterIP
+  ports:
+  - protocol: TCP
+    port: {{.AddonWebhook.HostedPort}}
+    targetPort: {{.AddonWebhook.HostedPort}}
+    name: tls
+{{else}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: cluster-manager-addon-webhook
+  namespace: {{ .ClusterManagerNamespace }}
+spec:
+  type: ExternalName
+  externalName: {{.AddonWebhook.HostedAddress}}
+{{end}}
