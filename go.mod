@@ -30,12 +30,12 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.19.5
 	k8s.io/api v0.35.2
-	k8s.io/apiextensions-apiserver v0.35.0
+	k8s.io/apiextensions-apiserver v0.35.2
 	k8s.io/apimachinery v0.35.2
 	k8s.io/apiserver v0.35.2
 	k8s.io/client-go v0.35.2
 	k8s.io/component-base v0.35.2
-	k8s.io/klog/v2 v2.130.1
+	k8s.io/klog/v2 v2.140.0
 	k8s.io/kube-aggregator v0.35.2
 	k8s.io/kubectl v0.35.2
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
@@ -44,7 +44,7 @@ require (
 	open-cluster-management.io/sdk-go v1.2.1-0.20260306024852-c0938d15158a
 	sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03
 	sigs.k8s.io/cluster-inventory-api v0.0.0-20251124125836-445319b6307a
-	sigs.k8s.io/controller-runtime v0.23.1
+	sigs.k8s.io/controller-runtime v0.23.3
 	sigs.k8s.io/kube-storage-version-migrator v0.0.6-0.20230721195810-5c8923c5ff96
 	sigs.k8s.io/yaml v1.6.0
 )
