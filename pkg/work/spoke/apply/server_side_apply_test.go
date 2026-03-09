@@ -1241,23 +1241,23 @@ func TestServerSideApplyWithIgnoreFieldErrors(t *testing.T) {
 				t.Fatal("expected error but got none")
 			}
 
+			for _, action := range dynamicClient.Actions() {
+				if action.GetVerb() == "patch" {
+					t.Fatalf("unexpected patch action on ignore-field failure: %#v", action)
+				}
+			}
+
 			var ignoreFieldErr *IgnoreFieldError
 			if !errors.As(err, &ignoreFieldErr) {
 				t.Fatalf("expected IgnoreFieldError, got %T: %v", err, err)
 			}
 
-			if !strings.Contains(fmt.Sprintf("%v", err), c.expectedErrorMsg) {
+			if !strings.Contains(err.Error(), c.expectedErrorMsg) {
 				t.Errorf("expected error message to contain '%s', got: %v", c.expectedErrorMsg, err)
 			}
 
-			if c.cancelContext {
-				for _, a := range dynamicClient.Actions() {
-					verb := a.GetVerb()
-					if verb == "patch" || verb == "update" {
-						t.Errorf("expected no patch/update actions with cancelled context, got %s on %s",
-							verb, a.GetResource().Resource)
-					}
-				}
+			if c.cancelContext && !errors.Is(err, context.Canceled) {
+				t.Fatalf("expected context cancellation to be preserved, got: %v", err)
 			}
 
 			t.Logf("Successfully caught expected error: %v", err)

@@ -88,7 +88,7 @@ func (c *ServerSideApply) Apply(
 				for _, pointer := range field.JSONPointers {
 					if err := removeFieldByJSONPointer(required, pointer, logger); err != nil {
 						logger.Error(err, "failed to remove field by JSON Pointer", "pointer", pointer)
-						return nil, NewIgnoreFieldError("JSON Pointer error in '%s': %v", pointer, err)
+						return nil, NewIgnoreFieldError(err, "JSON Pointer error in '%s': %v", pointer, err)
 					}
 				}
 
@@ -96,7 +96,7 @@ func (c *ServerSideApply) Apply(
 				for _, expr := range field.JQPathExpressions {
 					if err := removeFieldByJQExpression(ctx, required, expr, logger); err != nil {
 						logger.Error(err, "failed to remove field by JQ expression", "expression", expr)
-						return nil, NewIgnoreFieldError("JQ expression error in '%s': %v", expr, err)
+						return nil, NewIgnoreFieldError(err, "JQ expression error in '%s': %v", expr, err)
 					}
 				}
 			}
@@ -161,16 +161,22 @@ const (
 // so they can be reported with the specific AppliedManifestSSAIgnoreFieldError reason
 type IgnoreFieldError struct {
 	message string
+	cause   error
 }
 
 func (e *IgnoreFieldError) Error() string {
 	return e.message
 }
 
-// NewIgnoreFieldError creates a new IgnoreFieldError
-func NewIgnoreFieldError(format string, args ...interface{}) error {
+func (e *IgnoreFieldError) Unwrap() error {
+	return e.cause
+}
+
+// NewIgnoreFieldError creates a new IgnoreFieldError wrapping the given cause
+func NewIgnoreFieldError(cause error, format string, args ...interface{}) error {
 	return &IgnoreFieldError{
 		message: fmt.Sprintf(format, args...),
+		cause:   cause,
 	}
 }
 
