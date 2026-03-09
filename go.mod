@@ -2,7 +2,7 @@ module open-cluster-management.io/ocm
 
 go 1.25.0
 
-replace open-cluster-management.io/api => /home/bhperry/go/src/open-cluster-management.io/api
+replace open-cluster-management.io/api => github.com/bhperry/ocm-api v0.0.0-20260309151336-8973ba6e4eb1
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.3
