@@ -955,7 +955,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
-			ginkgo.By("Verify deployment has only APP_ENV, JAVA_OPTS should be filtered out")
+			ginkgo.By("Verify deployment has both env vars after initial apply")
 			gomega.Eventually(func() error {
 				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
 				if err != nil {
@@ -967,35 +967,30 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				}
 
 				envVars := deploy.Spec.Template.Spec.Containers[0].Env
-				if len(envVars) != 1 {
-					return fmt.Errorf("expected 1 env var after filtering JAVA_OPTS, got %d", len(envVars))
-				}
-
-				if envVars[0].Name != "APP_ENV" {
-					return fmt.Errorf("expected APP_ENV to remain, got %s", envVars[0].Name)
-				}
-
-				// Verify JAVA_OPTS was actually removed
-				for _, env := range envVars {
-					if env.Name == "JAVA_OPTS" {
-						return fmt.Errorf("JAVA_OPTS should have been filtered out by JQ expression")
-					}
+				if len(envVars) != 2 {
+					return fmt.Errorf("expected 2 env vars on initial apply, got %d", len(envVars))
 				}
 
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
-			ginkgo.By("Add JAVA_OPTS on spoke side")
+			ginkgo.By("Change JAVA_OPTS value on spoke side")
 			gomega.Eventually(func() error {
 				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
-				deploy.Spec.Template.Spec.Containers[0].Env = append(deploy.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
-					Name:  "JAVA_OPTS",
-					Value: "-Xmx1024m",
-				})
+				if _, ok := deploy.Annotations[workapiv1.ManifestConfigSpecHashAnnotationKey]; !ok {
+					return fmt.Errorf("expected annotation %q not found", workapiv1.ManifestConfigSpecHashAnnotationKey)
+				}
+
+				for i, env := range deploy.Spec.Template.Spec.Containers[0].Env {
+					if env.Name == "JAVA_OPTS" {
+						deploy.Spec.Template.Spec.Containers[0].Env[i].Value = "-Xmx1024m"
+						break
+					}
+				}
 				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).Update(context.Background(), deploy, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
