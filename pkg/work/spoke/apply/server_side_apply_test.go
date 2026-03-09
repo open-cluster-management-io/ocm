@@ -131,26 +131,34 @@ func (r *reactor) Handles(action clienttesting.Action) bool {
 // React handles the action and returns results.  It may choose to
 // delegate by indicated handled=false.
 func (r *reactor) React(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+	ns := action.GetNamespace()
+	name := "test"
+	if ga, ok := action.(clienttesting.GetAction); ok {
+		name = ga.GetName()
+	} else if pa, ok := action.(clienttesting.PatchAction); ok {
+		name = pa.GetName()
+	}
+
 	switch action.GetResource().Resource {
 	case "namespaces":
 		return true, testingcommon.NewUnstructured(
-			"v1", "Namespace", "", "test",
+			"v1", "Namespace", "", name,
 			metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner}), nil
 	case "deployments":
 		return true, testingcommon.NewUnstructured(
-			"apps/v1", "Deployment", "", "test",
+			"apps/v1", "Deployment", ns, name,
 			metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner}), nil
 	case "configmaps":
 		return true, testingcommon.NewUnstructured(
-			"v1", "ConfigMap", "", "test",
+			"v1", "ConfigMap", ns, name,
 			metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner}), nil
 	case "services":
 		return true, testingcommon.NewUnstructured(
-			"v1", "Service", "", "test",
+			"v1", "Service", ns, name,
 			metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner}), nil
 	case "pods":
 		return true, testingcommon.NewUnstructured(
-			"v1", "Pod", "", "test",
+			"v1", "Pod", ns, name,
 			metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner}), nil
 	case "secrets":
 		return true, nil, apierrors.NewApplyConflict([]metav1.StatusCause{
@@ -1240,6 +1248,16 @@ func TestServerSideApplyWithIgnoreFieldErrors(t *testing.T) {
 
 			if !strings.Contains(fmt.Sprintf("%v", err), c.expectedErrorMsg) {
 				t.Errorf("expected error message to contain '%s', got: %v", c.expectedErrorMsg, err)
+			}
+
+			if c.cancelContext {
+				for _, a := range dynamicClient.Actions() {
+					verb := a.GetVerb()
+					if verb == "patch" || verb == "update" {
+						t.Errorf("expected no patch/update actions with cancelled context, got %s on %s",
+							verb, a.GetResource().Resource)
+					}
+				}
 			}
 
 			t.Logf("Successfully caught expected error: %v", err)
