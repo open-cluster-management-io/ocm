@@ -814,6 +814,263 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 		})
+
+		ginkgo.It("IgnoreField with JSONPointer onSpokePresent", func() {
+			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Namespace: clusterName,
+						Name:      "deploy1",
+					},
+					UpdateStrategy: &workapiv1.UpdateStrategy{
+						Type: workapiv1.UpdateStrategyTypeServerSideApply,
+						ServerSideApply: &workapiv1.ServerSideApplyConfig{
+							IgnoreFields: []workapiv1.IgnoreField{
+								{
+									Condition:    workapiv1.IgnoreFieldsConditionOnSpokePresent,
+									JSONPointers: []string{"/spec/replicas"},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("Update deployment replica to 2")
+			gomega.Eventually(func() error {
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if _, ok := deploy.Annotations[workapiv1.ManifestConfigSpecHashAnnotationKey]; !ok {
+					return fmt.Errorf("expected annotation %q not found", workapiv1.ManifestConfigSpecHashAnnotationKey)
+				}
+
+				deploy.Spec.Replicas = pointer.Int32(2)
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).Update(context.Background(), deploy, metav1.UpdateOptions{})
+
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("update manifestwork's deployment replica to 3")
+			err = unstructured.SetNestedField(object.Object, int64(3), "spec", "replicas")
+			gomega.Eventually(func() error {
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				newWork := updatedWork.DeepCopy()
+				newWork.Spec.Workload.Manifests[0] = util.ToManifest(object)
+
+				pathBytes, err := util.NewWorkPatch(updatedWork, newWork)
+				if err != nil {
+					return err
+				}
+
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
+					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("Deployment replica should not be changed")
+			gomega.Eventually(func() error {
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if *deploy.Spec.Replicas != 2 {
+					return fmt.Errorf("replicas should be 2 but got %d", *deploy.Spec.Replicas)
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("IgnoreField with JQPathExpression to filter container ENV variable", func() {
+			// Create deployment with container that has JAVA_OPTS env var
+			deployWithEnv := object.DeepCopy()
+			err = unstructured.SetNestedSlice(deployWithEnv.Object, []interface{}{
+				map[string]interface{}{
+					"name":  "app",
+					"image": "myapp:v1",
+					"env": []interface{}{
+						map[string]interface{}{
+							"name":  "APP_ENV",
+							"value": "production",
+						},
+						map[string]interface{}{
+							"name":  "JAVA_OPTS",
+							"value": "-Xmx512m",
+						},
+					},
+				},
+			}, "spec", "template", "spec", "containers")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			work.Spec.Workload.Manifests = []workapiv1.Manifest{util.ToManifest(deployWithEnv)}
+			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Namespace: clusterName,
+						Name:      "deploy1",
+					},
+					UpdateStrategy: &workapiv1.UpdateStrategy{
+						Type: workapiv1.UpdateStrategyTypeServerSideApply,
+						ServerSideApply: &workapiv1.ServerSideApplyConfig{
+							IgnoreFields: []workapiv1.IgnoreField{
+								{
+									Condition: workapiv1.IgnoreFieldsConditionOnSpokePresent,
+									JQPathExpressions: []string{
+										".spec.template.spec.containers[].env[] | select(.name == \"JAVA_OPTS\")",
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("Verify deployment has only APP_ENV, JAVA_OPTS should be filtered out")
+			gomega.Eventually(func() error {
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if len(deploy.Spec.Template.Spec.Containers) != 1 {
+					return fmt.Errorf("expected 1 container, got %d", len(deploy.Spec.Template.Spec.Containers))
+				}
+
+				envVars := deploy.Spec.Template.Spec.Containers[0].Env
+				if len(envVars) != 1 {
+					return fmt.Errorf("expected 1 env var after filtering JAVA_OPTS, got %d", len(envVars))
+				}
+
+				if envVars[0].Name != "APP_ENV" {
+					return fmt.Errorf("expected APP_ENV to remain, got %s", envVars[0].Name)
+				}
+
+				// Verify JAVA_OPTS was actually removed
+				for _, env := range envVars {
+					if env.Name == "JAVA_OPTS" {
+						return fmt.Errorf("JAVA_OPTS should have been filtered out by JQ expression")
+					}
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			ginkgo.By("Add JAVA_OPTS on spoke side")
+			gomega.Eventually(func() error {
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				deploy.Spec.Template.Spec.Containers[0].Env = append(deploy.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+					Name:  "JAVA_OPTS",
+					Value: "-Xmx1024m",
+				})
+				_, err = spokeKubeClient.AppsV1().Deployments(clusterName).Update(context.Background(), deploy, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("Update manifestwork to change JAVA_OPTS value")
+			err = unstructured.SetNestedSlice(deployWithEnv.Object, []interface{}{
+				map[string]interface{}{
+					"name":  "app",
+					"image": "myapp:v1",
+					"env": []interface{}{
+						map[string]interface{}{
+							"name":  "APP_ENV",
+							"value": "production",
+						},
+						map[string]interface{}{
+							"name":  "JAVA_OPTS",
+							"value": "-Xmx2048m",
+						},
+					},
+				},
+			}, "spec", "template", "spec", "containers")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			gomega.Eventually(func() error {
+				updatedWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				newWork := updatedWork.DeepCopy()
+				newWork.Spec.Workload.Manifests[0] = util.ToManifest(deployWithEnv)
+
+				pathBytes, err := util.NewWorkPatch(updatedWork, newWork)
+				if err != nil {
+					return err
+				}
+
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Patch(
+					context.Background(), updatedWork.Name, types.MergePatchType, pathBytes, metav1.PatchOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("JAVA_OPTS should remain at spoke value (-Xmx1024m), not updated to hub value (-Xmx2048m)")
+			gomega.Eventually(func() error {
+				deploy, err := spokeKubeClient.AppsV1().Deployments(clusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				envVars := deploy.Spec.Template.Spec.Containers[0].Env
+				if len(envVars) != 2 {
+					return fmt.Errorf("expected 2 env vars, got %d", len(envVars))
+				}
+
+				var javaOptsValue string
+				for _, env := range envVars {
+					if env.Name == "JAVA_OPTS" {
+						javaOptsValue = env.Value
+						break
+					}
+				}
+
+				if javaOptsValue != "-Xmx1024m" {
+					return fmt.Errorf("JAVA_OPTS should be -Xmx1024m (spoke value), got %s", javaOptsValue)
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
 	})
 
 	ginkgo.It("should not increase the workload generation when nothing changes", func() {

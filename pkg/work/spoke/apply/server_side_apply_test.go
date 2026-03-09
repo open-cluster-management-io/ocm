@@ -685,6 +685,10 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 										"name":  "app",
 										"image": "myapp:v2",
 									},
+									map[string]interface{}{
+										"name":  "istio-proxy",
+										"image": "istio/proxyv2:1.20.0",
+									},
 								},
 							},
 						},
@@ -706,13 +710,21 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 				if !exist {
 					t.Errorf("expected containers to exist")
 				}
-				// Should only have app container, istio-proxy should be filtered out
+				// Verify JQ expression removed istio-proxy: should only have 1 container (down from 2)
 				if len(containers) != 1 {
-					t.Errorf("expected 1 container after filtering, got %d", len(containers))
+					t.Errorf("expected 1 container after JQ filtering (was 2 in required), got %d", len(containers))
 				}
 				if container, ok := containers[0].(map[string]interface{}); ok {
 					if container["name"] != "app" {
 						t.Errorf("expected container name to be 'app', got %v", container["name"])
+					}
+				}
+				// Verify istio-proxy was actually removed by JQ expression
+				for _, container := range containers {
+					if c, ok := container.(map[string]interface{}); ok {
+						if c["name"] == "istio-proxy" {
+							t.Errorf("istio-proxy container should have been removed by JQ expression")
+						}
 					}
 				}
 			},
@@ -779,6 +791,9 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 									map[string]interface{}{
 										"name": "data",
 									},
+									map[string]interface{}{
+										"name": "istio-token",
+									},
 								},
 							},
 						},
@@ -809,7 +824,7 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 				if exist {
 					t.Errorf("expected prometheus.io/scrape annotation to be removed")
 				}
-				// Verify istio volumes filtered out (JQ)
+				// Verify istio volumes filtered out by JQ (should be 1 volume, down from 2)
 				volumes, exist, err := unstructured.NestedSlice(actual.Object, "spec", "template", "spec", "volumes")
 				if err != nil {
 					t.Fatal(err)
@@ -818,7 +833,17 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 					t.Errorf("expected volumes to exist")
 				}
 				if len(volumes) != 1 {
-					t.Errorf("expected 1 volume after filtering, got %d", len(volumes))
+					t.Errorf("expected 1 volume after JQ filtering (was 2 in required), got %d", len(volumes))
+				}
+				// Verify istio-token was actually removed by JQ expression
+				for _, volume := range volumes {
+					if v, ok := volume.(map[string]interface{}); ok {
+						if name, ok := v["name"].(string); ok {
+							if name == "istio-token" || name == "istio-envoy" {
+								t.Errorf("istio volume %s should have been removed by JQ expression", name)
+							}
+						}
+					}
 				}
 				// Verify managed-by annotation updated (not ignored)
 				managedBy, exist, err := unstructured.NestedString(actual.Object, "metadata", "annotations", "managed-by")
@@ -914,6 +939,15 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 									},
 								},
 							},
+							map[string]interface{}{
+								"name":  "istio-proxy",
+								"image": "istio/proxyv2:1.19.0",
+								"ports": []interface{}{
+									map[string]interface{}{
+										"containerPort": int64(15090),
+									},
+								},
+							},
 						},
 						"initContainers": []interface{}{
 							map[string]interface{}{
@@ -924,6 +958,12 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 						"volumes": []interface{}{
 							map[string]interface{}{
 								"name": "app-data",
+							},
+							map[string]interface{}{
+								"name": "istio-envoy",
+							},
+							map[string]interface{}{
+								"name": "istio-token",
 							},
 						},
 					},
@@ -937,7 +977,7 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				// Verify istio-proxy container is filtered out
+				// Verify istio-proxy container is filtered out by JQ (should be 1 container, down from 2)
 				containers, exist, err := unstructured.NestedSlice(actual.Object, "spec", "containers")
 				if err != nil {
 					t.Fatal(err)
@@ -946,7 +986,7 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 					t.Errorf("expected containers to exist")
 				}
 				if len(containers) != 1 {
-					t.Errorf("expected 1 container after filtering istio-proxy, got %d", len(containers))
+					t.Errorf("expected 1 container after JQ filtering istio-proxy (was 2 in required), got %d", len(containers))
 				}
 				if container, ok := containers[0].(map[string]interface{}); ok {
 					if container["name"] != "application" {
@@ -956,15 +996,23 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 						t.Errorf("expected image to be updated to 'myapp:2.0.0', got %v", container["image"])
 					}
 				}
-				// Verify init containers are filtered out
+				// Verify istio-proxy was actually removed by JQ expression
+				for _, container := range containers {
+					if c, ok := container.(map[string]interface{}); ok {
+						if c["name"] == "istio-proxy" {
+							t.Errorf("istio-proxy container should have been removed by JQ expression")
+						}
+					}
+				}
+				// Verify init containers are filtered out by JQ (should be 0, down from 1)
 				initContainers, exist, err := unstructured.NestedSlice(actual.Object, "spec", "initContainers")
 				if err != nil {
 					t.Fatal(err)
 				}
 				if len(initContainers) != 0 {
-					t.Errorf("expected initContainers to be removed")
+					t.Errorf("expected initContainers to be removed by JQ expression (was 1 in required), got %d", len(initContainers))
 				}
-				// Verify istio volumes are filtered out
+				// Verify istio volumes are filtered out by JQ (should be 1 volume, down from 3)
 				volumes, exist, err := unstructured.NestedSlice(actual.Object, "spec", "volumes")
 				if err != nil {
 					t.Fatal(err)
@@ -973,7 +1021,17 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 					t.Errorf("expected volumes to exist")
 				}
 				if len(volumes) != 1 {
-					t.Errorf("expected 1 volume after filtering istio volumes, got %d", len(volumes))
+					t.Errorf("expected 1 volume after JQ filtering istio volumes (was 3 in required), got %d", len(volumes))
+				}
+				// Verify istio volumes were actually removed by JQ expression
+				for _, volume := range volumes {
+					if v, ok := volume.(map[string]interface{}); ok {
+						if name, ok := v["name"].(string); ok {
+							if name == "istio-envoy" || name == "istio-token" {
+								t.Errorf("istio volume %s should have been removed by JQ expression", name)
+							}
+						}
+					}
 				}
 				_, exist, err = unstructured.NestedString(actual.Object, "metadata", "annotations", "prometheus.io/scrape")
 				if err != nil {
