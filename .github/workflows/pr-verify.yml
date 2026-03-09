@@ -21,15 +21,16 @@ jobs:
             exit 1
           fi
 
-          if ! [[ "$TITLE" =~ ^($'\u26A0'|$'\u2728'|$'\U0001F41B'|$'\U0001F4D6'|$'\U0001F680'|$'\U0001F331') ]]; then
+          if ! [[ "$TITLE" =~ ^(:sparkles:|:bug:|:book:|:memo:|:warning:|:seedling:|:question:|$'\u2728'|$'\U0001F41B'|$'\U0001F4D6'|$'\U0001F4DD'|$'\u26A0'$'\uFE0F'?|$'\U0001F331'|$'\u2753') ]]; then
             echo "Error: Invalid PR title format."
             echo "Your PR title must start with one of the following indicators:"
-            echo "- Breaking change: ⚠ (U+26A0)"
-            echo "- Non-breaking feature: ✨ (U+2728)"
-            echo "- Patch fix: 🐛 (U+1F41B)"
-            echo "- Docs: 📖 (U+1F4D6)"
-            echo "- Release: 🚀 (U+1F680)"
-            echo "- Infra/Tests/Other: 🌱 (U+1F331)"
+            echo "- :sparkles: ✨ feature"
+            echo "- :bug: 🐛 bug fix"
+            echo "- :book: 📖 docs"
+            echo "- :memo: 📝 proposal"
+            echo "- :warning: ⚠️ breaking change"
+            echo "- :seedling: 🌱 other/misc"
+            echo "- :question: ❓ requires manual review"
             exit 1
           fi
 
