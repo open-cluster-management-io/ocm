@@ -52,7 +52,7 @@ func NewAgentClientHolder(ctx context.Context, opt *options.GenericClientOptions
 		return nil, err
 	}
 
-	manifestWorkClient := agentclient.NewManifestWorkAgentClient(opt.ClusterName(), opt.WatcherStore(), agentClient)
+	manifestWorkClient := agentclient.NewManifestWorkAgentClient(ctx, opt.ClusterName(), opt.WatcherStore(), agentClient)
 	workClient := &internal.WorkV1ClientWrapper{ManifestWorkClient: manifestWorkClient}
 	workClientSet := &internal.WorkClientSetWrapper{WorkV1ClientWrapper: workClient}
 	return &ClientHolder{workClientSet: workClientSet}, nil
