@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
@@ -42,6 +43,61 @@ type ManifestWorkReplicaSetController struct {
 	manifestWorkReplicaSetIndexer cache.Indexer
 
 	reconcilers []ManifestWorkReplicaSetReconcile
+}
+
+// manifestWorkInReplicaSet is to record all the current manifestwork relating to a manifestWorkReplicaSet
+type manifestWorkInReplicaSet struct {
+	workByCluster map[string]*manifestWorkWithPlacements
+
+	workByPlacement map[string][]*workapiv1.ManifestWork
+}
+
+type manifestWorkWithPlacements struct {
+	work       *workapiv1.ManifestWork
+	placements sets.Set[string]
+}
+
+func getManifestWorkInReplicaSet(mwrs *workapiv1alpha1.ManifestWorkReplicaSet,
+	manifestWorkLister worklisterv1.ManifestWorkLister) (*manifestWorkInReplicaSet, []*workapiv1.ManifestWork, error) {
+	req, err := labels.NewRequirement(
+		workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey,
+		selection.Equals, []string{manifestWorkReplicaSetKey(mwrs)})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	selector := labels.NewSelector().Add(*req)
+	mws, err := manifestWorkLister.List(selector)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	result := &manifestWorkInReplicaSet{
+		workByCluster:   make(map[string]*manifestWorkWithPlacements),
+		workByPlacement: make(map[string][]*workapiv1.ManifestWork),
+	}
+
+	for _, mw := range mws {
+		recordedWork := &manifestWorkWithPlacements{
+			work:       mw,
+			placements: sets.New[string](),
+		}
+		result.workByCluster[mw.Namespace] = recordedWork
+
+		// TODO(qiujian) actually a work could be related to multiple placements, we should not
+		// use label, but annotation to record all placements in the mw
+		placementName, ok := mw.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey]
+		if !ok {
+			continue
+		}
+		recordedWork.placements.Insert(placementName)
+		if _, ok := result.workByPlacement[placementName]; !ok {
+			result.workByPlacement[placementName] = []*workapiv1.ManifestWork{mw}
+		} else {
+			result.workByPlacement[placementName] = append(result.workByPlacement[placementName], mw)
+		}
+	}
+	return result, mws, nil
 }
 
 // ManifestWorkReplicaSetReconcile is a interface for reconcile logic. It returns an updated manifestWorkReplicaSet and whether further
@@ -194,35 +250,4 @@ func (m *ManifestWorkReplicaSetController) sync(ctx context.Context, controllerC
 	}
 
 	return nil
-}
-
-func listManifestWorksByManifestWorkReplicaSet(mwrs *workapiv1alpha1.ManifestWorkReplicaSet,
-	manifestWorkLister worklisterv1.ManifestWorkLister) ([]*workapiv1.ManifestWork, error) {
-	req, err := labels.NewRequirement(
-		workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey,
-		selection.Equals, []string{manifestWorkReplicaSetKey(mwrs)})
-	if err != nil {
-		return nil, err
-	}
-
-	selector := labels.NewSelector().Add(*req)
-	return manifestWorkLister.List(selector)
-}
-
-func listManifestWorksByMWRSetPlacementRef(mwrs *workapiv1alpha1.ManifestWorkReplicaSet, placementName string,
-	manifestWorkLister worklisterv1.ManifestWorkLister) ([]*workapiv1.ManifestWork, error) {
-	reqMWRSet, err := labels.NewRequirement(workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey,
-		selection.Equals, []string{manifestWorkReplicaSetKey(mwrs)})
-	if err != nil {
-		return nil, err
-	}
-
-	reqPlacementRef, err := labels.NewRequirement(workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey,
-		selection.Equals, []string{placementName})
-	if err != nil {
-		return nil, err
-	}
-
-	selector := labels.NewSelector().Add(*reqMWRSet, *reqPlacementRef)
-	return manifestWorkLister.List(selector)
 }

@@ -34,7 +34,7 @@ func TestFinalizeReconcile(t *testing.T) {
 				mwrSetTest.DeletionTimestamp = &timeNow
 				mwrSetTest.Finalizers = append(mwrSetTest.Finalizers, workapiv1alpha1.ManifestWorkReplicaSetFinalizer)
 
-				mw, _ := CreateManifestWork(mwrSetTest, "cluster1", "place-test")
+				mw := buildManifestWork(mwrSetTest, "", "cluster1", "place-test")
 				return mwrSetTest, []*workapiv1.ManifestWork{mw}
 			},
 			validateActions: func(t *testing.T, manifestWorkReplicaSet *workapiv1alpha1.ManifestWorkReplicaSet,
@@ -59,8 +59,8 @@ func TestFinalizeReconcile(t *testing.T) {
 				mwrSetTest.Finalizers = append(mwrSetTest.Finalizers, workapiv1alpha1.ManifestWorkReplicaSetFinalizer)
 				mwrSetTest.Spec.CascadeDeletionPolicy = workapiv1alpha1.Foreground
 
-				mw1, _ := CreateManifestWork(mwrSetTest, "cluster1", "place-test")
-				mw2, _ := CreateManifestWork(mwrSetTest, "cluster2", "place-test")
+				mw1 := buildManifestWork(mwrSetTest, "", "cluster1", "place-test")
+				mw2 := buildManifestWork(mwrSetTest, "", "cluster2", "place-test")
 				mw2.Finalizers = append(mw2.Finalizers, workapiv1.ManifestWorkFinalizer)
 				return mwrSetTest, []*workapiv1.ManifestWork{mw1, mw2}
 			},

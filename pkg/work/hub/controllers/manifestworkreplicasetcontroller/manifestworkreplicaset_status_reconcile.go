@@ -22,21 +22,23 @@ func (d *statusReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 	if mwrSet.Status.Summary.Total == 0 {
 		condition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified)
 		if condition != nil && condition.Reason == workapiv1alpha1.ReasonPlacementDecisionEmpty {
-			apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetManifestworkApplied(workapiv1alpha1.ReasonPlacementDecisionEmpty, ""))
+			apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getManifestworkApplied(workapiv1alpha1.ReasonPlacementDecisionEmpty, ""))
 		} else {
-			apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetManifestworkApplied(workapiv1alpha1.ReasonNotAsExpected, ""))
+			apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getManifestworkApplied(workapiv1alpha1.ReasonNotAsExpected, ""))
 		}
 
 		return mwrSet, reconcileContinue, nil
 	}
 
 	appliedCount, availableCount, degradCount, processingCount := 0, 0, 0, 0
-	for id, plcSummary := range mwrSet.Status.PlacementsSummary {
-		manifestWorks, err := listManifestWorksByMWRSetPlacementRef(mwrSet, plcSummary.Name, d.manifestWorkLister)
-		if err != nil {
-			return mwrSet, reconcileContinue, err
-		}
 
+	allManifestWorks, _, err := getManifestWorkInReplicaSet(mwrSet, d.manifestWorkLister)
+	if err != nil {
+		return mwrSet, reconcileContinue, err
+	}
+
+	for id, plcSummary := range mwrSet.Status.PlacementsSummary {
+		manifestWorks := allManifestWorks.workByPlacement[plcSummary.Name]
 		applied, available, degrad, processing := 0, 0, 0, 0
 		for _, mw := range manifestWorks {
 			if !mw.DeletionTimestamp.IsZero() {
@@ -86,11 +88,11 @@ func (d *statusReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 
 	if mwrSet.Status.Summary.Available == mwrSet.Status.Summary.Total && //nolint:gocritic
 		mwrSet.Status.Summary.Progressing == 0 && mwrSet.Status.Summary.Degraded == 0 {
-		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetManifestworkApplied(workapiv1alpha1.ReasonAsExpected, ""))
+		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getManifestworkApplied(workapiv1alpha1.ReasonAsExpected, ""))
 	} else if mwrSet.Status.Summary.Progressing > 0 && mwrSet.Status.Summary.Degraded == 0 {
-		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetManifestworkApplied(workapiv1alpha1.ReasonProcessing, ""))
+		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getManifestworkApplied(workapiv1alpha1.ReasonProcessing, ""))
 	} else {
-		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetManifestworkApplied(workapiv1alpha1.ReasonNotAsExpected, ""))
+		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getManifestworkApplied(workapiv1alpha1.ReasonNotAsExpected, ""))
 	}
 
 	return mwrSet, reconcileContinue, nil
