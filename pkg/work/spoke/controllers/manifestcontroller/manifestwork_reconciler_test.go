@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -414,43 +415,130 @@ func TestSync(t *testing.T) {
 
 // Test applying resource failed
 func TestFailedToApplyResource(t *testing.T) {
-	tc := newTestCase("multiple create&update resource").
-		withWorkManifest(testingcommon.NewUnstructured(
-			"v1", "Secret", "ns1", "test"),
-			testingcommon.NewUnstructured("v1", "Secret", "ns2", "test")).
-		withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
-		withExpectedWorkAction("patch").
-		withAppliedWorkAction("create").
-		withExpectedKubeAction("get", "delete", "create", "get", "create").
-		withExpectedManifestCondition(
-			expectedCondition(workapiv1.ManifestApplied, metav1.ConditionTrue),
-			expectedCondition(workapiv1.ManifestApplied, metav1.ConditionFalse)).
-		withExpectedWorkCondition(expectedCondition(workapiv1.WorkApplied, metav1.ConditionFalse))
+	t.Run("generic apply failure", func(t *testing.T) {
+		tc := newTestCase("multiple create&update resource").
+			withWorkManifest(testingcommon.NewUnstructured(
+				"v1", "Secret", "ns1", "test"),
+				testingcommon.NewUnstructured("v1", "Secret", "ns2", "test")).
+			withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
+			withExpectedWorkAction("patch").
+			withAppliedWorkAction("create").
+			withExpectedKubeAction("get", "delete", "create", "get", "create").
+			withExpectedManifestCondition(
+				expectedCondition(workapiv1.ManifestApplied, metav1.ConditionTrue),
+				expectedCondition(workapiv1.ManifestApplied, metav1.ConditionFalse)).
+			withExpectedWorkCondition(expectedCondition(workapiv1.WorkApplied, metav1.ConditionFalse))
 
-	work, workKey := tc.newManifestWork()
-	controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).withKubeObject(tc.spokeObject...).withUnstructuredObject()
+		work, workKey := tc.newManifestWork()
+		controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).withKubeObject(tc.spokeObject...).withUnstructuredObject()
 
-	// Add a reactor on fake client to throw error when creating secret on namespace ns2
-	controller.kubeClient.PrependReactor("create", "secrets", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-		if action.GetVerb() != "create" {
-			return false, nil, nil
+		// Add a reactor on fake client to throw error when creating secret on namespace ns2
+		controller.kubeClient.PrependReactor("create", "secrets", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+			if action.GetVerb() != "create" {
+				return false, nil, nil
+			}
+
+			createAction := action.(clienttesting.CreateActionImpl)
+			createObject := createAction.Object.(*corev1.Secret)
+			if createObject.Namespace == "ns1" {
+				return false, createObject, nil
+			}
+
+			return true, &corev1.Secret{}, fmt.Errorf("fake error")
+		})
+		syncContext := testingcommon.NewFakeSyncContext(t, workKey)
+		err := controller.toController().sync(context.TODO(), syncContext, work.Name)
+		if err == nil {
+			t.Errorf("Should return an err")
 		}
 
-		createAction := action.(clienttesting.CreateActionImpl)
-		createObject := createAction.Object.(*corev1.Secret)
-		if createObject.Namespace == "ns1" {
-			return false, createObject, nil
-		}
-
-		return true, &corev1.Secret{}, fmt.Errorf("fake error")
+		tc.validate(t, controller.dynamicClient, controller.workClient, controller.kubeClient)
 	})
-	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
-	err := controller.toController().sync(context.TODO(), syncContext, work.Name)
-	if err == nil {
-		t.Errorf("Should return an err")
-	}
 
-	tc.validate(t, controller.dynamicClient, controller.workClient, controller.kubeClient)
+	t.Run("SSA ignoreField error produces AppliedManifestSSAIgnoreFieldError", func(t *testing.T) {
+		manifest := testingcommon.NewUnstructuredWithContent(
+			"v1", "NewObject", "ns1", "n1",
+			map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}})
+
+		existingObject := testingcommon.NewUnstructuredWithContent(
+			"v1", "NewObject", "ns1", "n1",
+			map[string]interface{}{"spec": map[string]interface{}{"key1": "val2"}})
+
+		ssaConfig := workapiv1.ManifestConfigOption{
+			ResourceIdentifier: workapiv1.ResourceIdentifier{
+				Group:     "",
+				Resource:  "newobjects",
+				Namespace: "ns1",
+				Name:      "n1",
+			},
+			UpdateStrategy: &workapiv1.UpdateStrategy{
+				Type: workapiv1.UpdateStrategyTypeServerSideApply,
+				ServerSideApply: &workapiv1.ServerSideApplyConfig{
+					FieldManager: "test-agent",
+					IgnoreFields: []workapiv1.IgnoreField{
+						{
+							Condition:         workapiv1.IgnoreFieldsConditionOnSpokePresent,
+							JQPathExpressions: []string{".spec.containers[] | invalid syntax here"},
+						},
+					},
+				},
+			},
+		}
+
+		tc := newTestCase("SSA with invalid JQ ignoreField").
+			withWorkManifest(manifest).
+			withSpokeDynamicObject(existingObject).
+			withManifestConfig(ssaConfig).
+			withExpectedWorkAction("patch").
+			withAppliedWorkAction("create").
+			withExpectedManifestCondition(metav1.Condition{
+				Type:   workapiv1.ManifestApplied,
+				Status: metav1.ConditionFalse,
+				Reason: workapiv1.AppliedManifestSSAIgnoreFieldError,
+			}).
+			withExpectedWorkCondition(expectedCondition(workapiv1.WorkApplied, metav1.ConditionFalse))
+
+		work, workKey := tc.newManifestWork()
+		controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
+			withKubeObject(tc.spokeObject...).
+			withUnstructuredObject(tc.spokeDynamicObject...)
+
+		syncContext := testingcommon.NewFakeSyncContext(t, workKey)
+		err := controller.toController().sync(context.TODO(), syncContext, work.Name)
+		if err == nil {
+			t.Errorf("Expected an error from sync due to invalid JQ expression")
+		}
+
+		tc.validate(t, controller.dynamicClient, controller.workClient, controller.kubeClient)
+
+		// Additionally verify the patched ManifestWork status has the correct reason and message
+		for _, action := range controller.workClient.Actions() {
+			if action.GetResource().Resource == "manifestworks" {
+				if patchAction, ok := action.(clienttesting.PatchActionImpl); ok {
+					patchedWork := &workapiv1.ManifestWork{}
+					if err := json.Unmarshal(patchAction.Patch, patchedWork); err != nil {
+						t.Fatal(err)
+					}
+					for _, manifest := range patchedWork.Status.ResourceStatus.Manifests {
+						for _, cond := range manifest.Conditions {
+							if cond.Type == workapiv1.ManifestApplied {
+								if cond.Reason != workapiv1.AppliedManifestSSAIgnoreFieldError {
+									t.Errorf("expected manifest condition reason %s, got %s",
+										workapiv1.AppliedManifestSSAIgnoreFieldError, cond.Reason)
+								}
+								if cond.Status != metav1.ConditionFalse {
+									t.Errorf("expected manifest condition status False, got %s", cond.Status)
+								}
+								if !strings.Contains(cond.Message, "Failed to process ignoreFields") {
+									t.Errorf("expected message to contain 'Failed to process ignoreFields', got %q", cond.Message)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	})
 }
 
 func TestUpdateStrategy(t *testing.T) {

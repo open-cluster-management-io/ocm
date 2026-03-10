@@ -3,6 +3,7 @@ package apply
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -130,18 +131,34 @@ func (r *reactor) Handles(action clienttesting.Action) bool {
 // React handles the action and returns results.  It may choose to
 // delegate by indicated handled=false.
 func (r *reactor) React(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+	ns := action.GetNamespace()
+	name := "test"
+	if ga, ok := action.(clienttesting.GetAction); ok {
+		name = ga.GetName()
+	} else if pa, ok := action.(clienttesting.PatchAction); ok {
+		name = pa.GetName()
+	}
+
 	switch action.GetResource().Resource {
 	case "namespaces":
 		return true, testingcommon.NewUnstructured(
-			"v1", "Namespace", "", "test",
+			"v1", "Namespace", "", name,
 			metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner}), nil
 	case "deployments":
 		return true, testingcommon.NewUnstructured(
-			"apps/v1", "Deployment", "", "test",
+			"apps/v1", "Deployment", ns, name,
 			metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner}), nil
 	case "configmaps":
 		return true, testingcommon.NewUnstructured(
-			"v1", "ConfigMap", "", "test",
+			"v1", "ConfigMap", ns, name,
+			metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner}), nil
+	case "services":
+		return true, testingcommon.NewUnstructured(
+			"v1", "Service", ns, name,
+			metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner}), nil
+	case "pods":
+		return true, testingcommon.NewUnstructured(
+			"v1", "Pod", ns, name,
 			metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner}), nil
 	case "secrets":
 		return true, nil, apierrors.NewApplyConflict([]metav1.StatusCause{
@@ -432,6 +449,8 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 		validateActions func(t *testing.T, actions []clienttesting.Action)
 		condition       workapiv1.IgnoreFieldsCondition
 		jsonPath        string
+		jsonPointers    []string
+		jqExpressions   []string
 	}{
 		{
 			name: "server side apply ignore replicas",
@@ -530,6 +549,522 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 			condition: workapiv1.IgnoreFieldsConditionOnSpokeChange,
 			jsonPath:  ".data",
 		},
+		{
+			name: "server side apply with JSON Pointer - ignore replicas",
+			existing: testingcommon.NewUnstructuredWithContent(
+				"apps/v1", "Deployment", "default", "deploy1",
+				map[string]interface{}{
+					"spec": map[string]interface{}{
+						"replicas": int64(5),
+						"selector": map[string]interface{}{
+							"matchLabels": map[string]interface{}{
+								"app": "test",
+							},
+						},
+					},
+				}),
+			required: testingcommon.NewUnstructuredWithContent(
+				"apps/v1", "Deployment", "default", "deploy1",
+				map[string]interface{}{
+					"spec": map[string]interface{}{
+						"replicas": int64(3),
+						"selector": map[string]interface{}{
+							"matchLabels": map[string]interface{}{
+								"app": "test",
+							},
+						},
+					},
+				}),
+			gvr: schema.GroupVersionResource{Version: "v1", Group: "apps", Resource: "deployments"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "get", "patch")
+				p := actions[1].(clienttesting.PatchActionImpl).Patch
+				actual := &unstructured.Unstructured{}
+				err := actual.UnmarshalJSON(p)
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, exist, err := unstructured.NestedInt64(actual.Object, "spec", "replicas")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if exist {
+					t.Errorf("expected replicas to be removed in the patch")
+				}
+			},
+			condition:    workapiv1.IgnoreFieldsConditionOnSpokePresent,
+			jsonPointers: []string{"/spec/replicas"},
+		},
+		{
+			name: "server side apply with JSON Pointer - ignore annotation with special chars",
+			existing: func() *unstructured.Unstructured {
+				obj := testingcommon.NewUnstructuredWithContent(
+					"v1", "Service", "default", "svc1",
+					map[string]interface{}{
+						"spec": map[string]interface{}{
+							"ports": []interface{}{
+								map[string]interface{}{
+									"port": int64(80),
+								},
+							},
+						},
+					})
+				obj.SetAnnotations(map[string]string{
+					"prometheus.io/scrape": "true",
+					"app":                  "myapp",
+				})
+				return obj
+			}(),
+			required: func() *unstructured.Unstructured {
+				obj := testingcommon.NewUnstructuredWithContent(
+					"v1", "Service", "default", "svc1",
+					map[string]interface{}{
+						"spec": map[string]interface{}{
+							"ports": []interface{}{
+								map[string]interface{}{
+									"port": int64(80),
+								},
+							},
+						},
+					})
+				obj.SetAnnotations(map[string]string{
+					"prometheus.io/scrape": "false",
+					"app":                  "myapp-updated",
+				})
+				return obj
+			}(),
+			gvr: schema.GroupVersionResource{Version: "v1", Resource: "services"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "get", "patch")
+				p := actions[1].(clienttesting.PatchActionImpl).Patch
+				actual := &unstructured.Unstructured{}
+				err := actual.UnmarshalJSON(p)
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, exist, err := unstructured.NestedString(actual.Object, "metadata", "annotations", "prometheus.io/scrape")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if exist {
+					t.Errorf("expected prometheus.io/scrape annotation to be removed in the patch")
+				}
+				app, exist, err := unstructured.NestedString(actual.Object, "metadata", "annotations", "app")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !exist || app != "myapp-updated" {
+					t.Errorf("expected app annotation to be updated to myapp-updated")
+				}
+			},
+			condition:    workapiv1.IgnoreFieldsConditionOnSpokePresent,
+			jsonPointers: []string{"/metadata/annotations/prometheus.io~1scrape"},
+		},
+		{
+			name: "server side apply with JQ Expression - filter containers",
+			existing: testingcommon.NewUnstructuredWithContent(
+				"apps/v1", "Deployment", "default", "deploy1",
+				map[string]interface{}{
+					"spec": map[string]interface{}{
+						"template": map[string]interface{}{
+							"spec": map[string]interface{}{
+								"containers": []interface{}{
+									map[string]interface{}{
+										"name":  "app",
+										"image": "myapp:v1",
+									},
+									map[string]interface{}{
+										"name":  "istio-proxy",
+										"image": "istio/proxyv2:1.20.0",
+									},
+								},
+							},
+						},
+					},
+				}),
+			required: testingcommon.NewUnstructuredWithContent(
+				"apps/v1", "Deployment", "default", "deploy1",
+				map[string]interface{}{
+					"spec": map[string]interface{}{
+						"template": map[string]interface{}{
+							"spec": map[string]interface{}{
+								"containers": []interface{}{
+									map[string]interface{}{
+										"name":  "app",
+										"image": "myapp:v2",
+									},
+									map[string]interface{}{
+										"name":  "istio-proxy",
+										"image": "istio/proxyv2:1.20.0",
+									},
+								},
+							},
+						},
+					},
+				}),
+			gvr: schema.GroupVersionResource{Version: "v1", Group: "apps", Resource: "deployments"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "get", "patch")
+				p := actions[1].(clienttesting.PatchActionImpl).Patch
+				actual := &unstructured.Unstructured{}
+				err := actual.UnmarshalJSON(p)
+				if err != nil {
+					t.Fatal(err)
+				}
+				containers, exist, err := unstructured.NestedSlice(actual.Object, "spec", "template", "spec", "containers")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !exist {
+					t.Errorf("expected containers to exist")
+				}
+				// Verify JQ expression removed istio-proxy: should only have 1 container (down from 2)
+				if len(containers) != 1 {
+					t.Errorf("expected 1 container after JQ filtering (was 2 in required), got %d", len(containers))
+				}
+				if container, ok := containers[0].(map[string]interface{}); ok {
+					if container["name"] != "app" {
+						t.Errorf("expected container name to be 'app', got %v", container["name"])
+					}
+				}
+				// Verify istio-proxy was actually removed by JQ expression
+				for _, container := range containers {
+					if c, ok := container.(map[string]interface{}); ok {
+						if c["name"] == "istio-proxy" {
+							t.Errorf("istio-proxy container should have been removed by JQ expression")
+						}
+					}
+				}
+			},
+			condition:     workapiv1.IgnoreFieldsConditionOnSpokePresent,
+			jqExpressions: []string{".spec.template.spec.containers[] | select(.name == \"istio-proxy\")"},
+		},
+		{
+			name: "server side apply with combined selectors - JSONPointer, and JQ",
+			existing: testingcommon.NewUnstructuredWithContent(
+				"apps/v1", "Deployment", "default", "deploy1",
+				map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"annotations": map[string]interface{}{
+							"prometheus.io/scrape": "true",
+							"managed-by":           "ocm",
+						},
+					},
+					"spec": map[string]interface{}{
+						"replicas": int64(5),
+						"template": map[string]interface{}{
+							"spec": map[string]interface{}{
+								"containers": []interface{}{
+									map[string]interface{}{
+										"name":  "app",
+										"image": "myapp:v1",
+									},
+									map[string]interface{}{
+										"name":  "istio-proxy",
+										"image": "istio/proxyv2:1.20.0",
+									},
+								},
+								"volumes": []interface{}{
+									map[string]interface{}{
+										"name": "data",
+									},
+									map[string]interface{}{
+										"name": "istio-token",
+									},
+								},
+							},
+						},
+					},
+				}),
+			required: testingcommon.NewUnstructuredWithContent(
+				"apps/v1", "Deployment", "default", "deploy1",
+				map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"annotations": map[string]interface{}{
+							"prometheus.io/scrape": "false",
+							"managed-by":           "hub",
+						},
+					},
+					"spec": map[string]interface{}{
+						"replicas": int64(3),
+						"template": map[string]interface{}{
+							"spec": map[string]interface{}{
+								"containers": []interface{}{
+									map[string]interface{}{
+										"name":  "app",
+										"image": "myapp:v2",
+									},
+								},
+								"volumes": []interface{}{
+									map[string]interface{}{
+										"name": "data",
+									},
+									map[string]interface{}{
+										"name": "istio-token",
+									},
+								},
+							},
+						},
+					},
+				}),
+			gvr: schema.GroupVersionResource{Version: "v1", Group: "apps", Resource: "deployments"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "get", "patch")
+				p := actions[1].(clienttesting.PatchActionImpl).Patch
+				actual := &unstructured.Unstructured{}
+				err := actual.UnmarshalJSON(p)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// Verify replicas removed (JSONPointer)
+				_, exist, err := unstructured.NestedInt64(actual.Object, "spec", "replicas")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if exist {
+					t.Errorf("expected replicas to be removed")
+				}
+				// Verify prometheus annotation removed (JSON Pointer)
+				_, exist, err = unstructured.NestedString(actual.Object, "metadata", "annotations", "prometheus.io/scrape")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if exist {
+					t.Errorf("expected prometheus.io/scrape annotation to be removed")
+				}
+				// Verify istio volumes filtered out by JQ (should be 1 volume, down from 2)
+				volumes, exist, err := unstructured.NestedSlice(actual.Object, "spec", "template", "spec", "volumes")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !exist {
+					t.Errorf("expected volumes to exist")
+				}
+				if len(volumes) != 1 {
+					t.Errorf("expected 1 volume after JQ filtering (was 2 in required), got %d", len(volumes))
+				}
+				// Verify istio-token was actually removed by JQ expression
+				for _, volume := range volumes {
+					if v, ok := volume.(map[string]interface{}); ok {
+						if name, ok := v["name"].(string); ok {
+							if name == "istio-token" || name == "istio-envoy" {
+								t.Errorf("istio volume %s should have been removed by JQ expression", name)
+							}
+						}
+					}
+				}
+				// Verify managed-by annotation updated (not ignored)
+				managedBy, exist, err := unstructured.NestedString(actual.Object, "metadata", "annotations", "managed-by")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !exist || managedBy != "hub" {
+					t.Errorf("expected managed-by annotation to be updated to 'hub'")
+				}
+			},
+			condition:     workapiv1.IgnoreFieldsConditionOnSpokePresent,
+			jsonPointers:  []string{"/spec/replicas", "/metadata/annotations/prometheus.io~1scrape"},
+			jqExpressions: []string{".spec.template.spec.volumes[] | select(.name | startswith(\"istio-\"))"},
+		},
+		{
+			name: "server side apply with pod - ignore Istio injected sidecars and volumes",
+			existing: testingcommon.NewUnstructuredWithContent(
+				"v1", "Pod", "production", "my-application",
+				map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"labels": map[string]interface{}{
+							"app":     "my-application",
+							"version": "v1",
+						},
+						"annotations": map[string]interface{}{
+							"sidecar.istio.io/status": `{"version":"1.20.0"}`,
+							"prometheus.io/scrape":    "true",
+							"prometheus.io/port":      "15020",
+						},
+					},
+					"spec": map[string]interface{}{
+						"containers": []interface{}{
+							map[string]interface{}{
+								"name":  "application",
+								"image": "myapp:1.2.3",
+								"ports": []interface{}{
+									map[string]interface{}{
+										"containerPort": int64(8080),
+									},
+								},
+							},
+							map[string]interface{}{
+								"name":  "istio-proxy",
+								"image": "istio/proxyv2:1.20.0",
+								"ports": []interface{}{
+									map[string]interface{}{
+										"containerPort": int64(15090),
+									},
+								},
+							},
+						},
+						"initContainers": []interface{}{
+							map[string]interface{}{
+								"name":  "istio-init",
+								"image": "istio/proxyv2:1.20.0",
+							},
+						},
+						"volumes": []interface{}{
+							map[string]interface{}{
+								"name": "app-data",
+							},
+							map[string]interface{}{
+								"name": "istio-envoy",
+							},
+							map[string]interface{}{
+								"name": "istio-token",
+							},
+						},
+					},
+				}),
+			required: testingcommon.NewUnstructuredWithContent(
+				"v1", "Pod", "production", "my-application",
+				map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"labels": map[string]interface{}{
+							"app":     "my-application",
+							"version": "v2",
+						},
+						"annotations": map[string]interface{}{
+							"sidecar.istio.io/status": `{"version":"1.19.0"}`,
+							"prometheus.io/scrape":    "false",
+							"prometheus.io/port":      "9090",
+						},
+					},
+					"spec": map[string]interface{}{
+						"containers": []interface{}{
+							map[string]interface{}{
+								"name":  "application",
+								"image": "myapp:2.0.0",
+								"ports": []interface{}{
+									map[string]interface{}{
+										"containerPort": int64(8080),
+									},
+								},
+							},
+							map[string]interface{}{
+								"name":  "istio-proxy",
+								"image": "istio/proxyv2:1.19.0",
+								"ports": []interface{}{
+									map[string]interface{}{
+										"containerPort": int64(15090),
+									},
+								},
+							},
+						},
+						"initContainers": []interface{}{
+							map[string]interface{}{
+								"name":  "istio-init",
+								"image": "istio/proxyv2:1.19.0",
+							},
+						},
+						"volumes": []interface{}{
+							map[string]interface{}{
+								"name": "app-data",
+							},
+							map[string]interface{}{
+								"name": "istio-envoy",
+							},
+							map[string]interface{}{
+								"name": "istio-token",
+							},
+						},
+					},
+				}),
+			gvr: schema.GroupVersionResource{Version: "v1", Resource: "pods"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "get", "patch")
+				p := actions[1].(clienttesting.PatchActionImpl).Patch
+				actual := &unstructured.Unstructured{}
+				err := actual.UnmarshalJSON(p)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// Verify istio-proxy container is filtered out by JQ (should be 1 container, down from 2)
+				containers, exist, err := unstructured.NestedSlice(actual.Object, "spec", "containers")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !exist {
+					t.Errorf("expected containers to exist")
+				}
+				if len(containers) != 1 {
+					t.Errorf("expected 1 container after JQ filtering istio-proxy (was 2 in required), got %d", len(containers))
+				}
+				if container, ok := containers[0].(map[string]interface{}); ok {
+					if container["name"] != "application" {
+						t.Errorf("expected container name to be 'application', got %v", container["name"])
+					}
+					if container["image"] != "myapp:2.0.0" {
+						t.Errorf("expected image to be updated to 'myapp:2.0.0', got %v", container["image"])
+					}
+				}
+				// Verify istio-proxy was actually removed by JQ expression
+				for _, container := range containers {
+					if c, ok := container.(map[string]interface{}); ok {
+						if c["name"] == "istio-proxy" {
+							t.Errorf("istio-proxy container should have been removed by JQ expression")
+						}
+					}
+				}
+				// Verify init containers are filtered out by JQ (should be 0, down from 1)
+				initContainers, exist, err := unstructured.NestedSlice(actual.Object, "spec", "initContainers")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(initContainers) != 0 {
+					t.Errorf("expected initContainers to be removed by JQ expression (was 1 in required), got %d", len(initContainers))
+				}
+				// Verify istio volumes are filtered out by JQ (should be 1 volume, down from 3)
+				volumes, exist, err := unstructured.NestedSlice(actual.Object, "spec", "volumes")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !exist {
+					t.Errorf("expected volumes to exist")
+				}
+				if len(volumes) != 1 {
+					t.Errorf("expected 1 volume after JQ filtering istio volumes (was 3 in required), got %d", len(volumes))
+				}
+				// Verify istio volumes were actually removed by JQ expression
+				for _, volume := range volumes {
+					if v, ok := volume.(map[string]interface{}); ok {
+						if name, ok := v["name"].(string); ok {
+							if name == "istio-envoy" || name == "istio-token" {
+								t.Errorf("istio volume %s should have been removed by JQ expression", name)
+							}
+						}
+					}
+				}
+				_, exist, err = unstructured.NestedString(actual.Object, "metadata", "annotations", "prometheus.io/scrape")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if exist {
+					t.Errorf("expected prometheus.io/scrape annotation to be removed")
+				}
+				// Verify version label is updated (not ignored)
+				version, exist, err := unstructured.NestedString(actual.Object, "metadata", "labels", "version")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !exist || version != "v2" {
+					t.Errorf("expected version label to be updated to 'v2', got %v", version)
+				}
+			},
+			condition:    workapiv1.IgnoreFieldsConditionOnSpokePresent,
+			jsonPointers: []string{"/metadata/annotations/prometheus.io~1scrape"},
+			jqExpressions: []string{
+				".spec.containers[] | select(.name == \"istio-proxy\" or (.name | startswith(\"istio-\")))",
+				".spec.volumes[]? | select(.name | startswith(\"istio-\"))",
+				".spec.initContainers[]? | select(.name | startswith(\"istio-\"))",
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -559,7 +1094,14 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 						IgnoreFields: []workapiv1.IgnoreField{
 							{
 								Condition: c.condition,
-								JSONPaths: []string{c.jsonPath},
+								JSONPaths: func() []string {
+									if c.jsonPath != "" {
+										return []string{c.jsonPath}
+									}
+									return nil
+								}(),
+								JSONPointers:      c.jsonPointers,
+								JQPathExpressions: c.jqExpressions,
 							},
 						},
 					},
@@ -571,6 +1113,154 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 				t.Fatal(err)
 			}
 			c.validateActions(t, dynamicClient.Actions())
+		})
+	}
+}
+
+// TestServerSideApplyWithIgnoreFieldErrors tests error handling for ignoreFields
+func TestServerSideApplyWithIgnoreFieldErrors(t *testing.T) {
+	cases := []struct {
+		name             string
+		existing         *unstructured.Unstructured
+		required         *unstructured.Unstructured
+		gvr              schema.GroupVersionResource
+		condition        workapiv1.IgnoreFieldsCondition
+		jsonPointers     []string
+		jqExpressions    []string
+		expectedErrorMsg string
+		cancelContext    bool
+	}{
+		{
+			name: "invalid JQ expression syntax",
+			existing: testingcommon.NewUnstructuredWithContent(
+				"v1", "Pod", "default", "test-pod",
+				map[string]interface{}{
+					"spec": map[string]interface{}{
+						"containers": []interface{}{
+							map[string]interface{}{
+								"name":  "app",
+								"image": "myapp:v1",
+							},
+						},
+					},
+				}),
+			required: testingcommon.NewUnstructuredWithContent(
+				"v1", "Pod", "default", "test-pod",
+				map[string]interface{}{
+					"spec": map[string]interface{}{
+						"containers": []interface{}{
+							map[string]interface{}{
+								"name":  "app",
+								"image": "myapp:v2",
+							},
+						},
+					},
+				}),
+			gvr:              schema.GroupVersionResource{Version: "v1", Resource: "pods"},
+			condition:        workapiv1.IgnoreFieldsConditionOnSpokePresent,
+			jqExpressions:    []string{".spec.containers[] | invalid syntax here"},
+			expectedErrorMsg: "JQ expression error",
+		},
+		{
+			name: "pre-cancelled context before JQ execution",
+			existing: testingcommon.NewUnstructuredWithContent(
+				"v1", "Pod", "default", "test-pod",
+				map[string]interface{}{
+					"spec": map[string]interface{}{
+						"containers": []interface{}{
+							map[string]interface{}{
+								"name":  "app",
+								"image": "myapp:v1",
+							},
+						},
+					},
+				}),
+			required: testingcommon.NewUnstructuredWithContent(
+				"v1", "Pod", "default", "test-pod",
+				map[string]interface{}{
+					"spec": map[string]interface{}{
+						"containers": []interface{}{
+							map[string]interface{}{
+								"name":  "app",
+								"image": "myapp:v2",
+							},
+						},
+					},
+				}),
+			gvr:              schema.GroupVersionResource{Version: "v1", Resource: "pods"},
+			condition:        workapiv1.IgnoreFieldsConditionOnSpokePresent,
+			jqExpressions:    []string{".spec.containers[] | select(.name == \"app\")"},
+			cancelContext:    true,
+			expectedErrorMsg: "JQ expression error",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var objects []runtime.Object
+			owner := metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner}
+			if c.existing != nil {
+				c.existing.SetOwnerReferences([]metav1.OwnerReference{owner})
+				objects = append(objects, c.existing)
+			}
+			scheme := runtime.NewScheme()
+			dynamicClient := fakedynamic.NewSimpleDynamicClient(scheme, objects...)
+			applier := NewServerSideApply(dynamicClient)
+
+			reactor := &reactor{}
+			reactors := []clienttesting.Reactor{reactor}
+			dynamicClient.Fake.ReactionChain = append(reactors, dynamicClient.Fake.ReactionChain...)
+
+			syncContext := testingcommon.NewFakeSyncContext(t, "test")
+			option := &workapiv1.ManifestConfigOption{
+				UpdateStrategy: &workapiv1.UpdateStrategy{
+					Type: workapiv1.UpdateStrategyTypeServerSideApply,
+					ServerSideApply: &workapiv1.ServerSideApplyConfig{
+						FieldManager: "test-agent",
+						IgnoreFields: []workapiv1.IgnoreField{
+							{
+								Condition:         c.condition,
+								JSONPointers:      c.jsonPointers,
+								JQPathExpressions: c.jqExpressions,
+							},
+						},
+					},
+				},
+			}
+
+			ctx := context.Background()
+			if c.cancelContext {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+
+			_, err := applier.Apply(ctx, c.gvr, c.required, owner, option, syncContext.Recorder())
+
+			if err == nil {
+				t.Fatal("expected error but got none")
+			}
+
+			for _, action := range dynamicClient.Actions() {
+				if action.GetVerb() == "patch" {
+					t.Fatalf("unexpected patch action on ignore-field failure: %#v", action)
+				}
+			}
+
+			var ignoreFieldErr *IgnoreFieldError
+			if !errors.As(err, &ignoreFieldErr) {
+				t.Fatalf("expected IgnoreFieldError, got %T: %v", err, err)
+			}
+
+			if !strings.Contains(err.Error(), c.expectedErrorMsg) {
+				t.Errorf("expected error message to contain '%s', got: %v", c.expectedErrorMsg, err)
+			}
+
+			if c.cancelContext && !errors.Is(err, context.Canceled) {
+				t.Fatalf("expected context cancellation to be preserved, got: %v", err)
+			}
+
+			t.Logf("Successfully caught expected error: %v", err)
 		})
 	}
 }
