@@ -6,12 +6,14 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/klog/v2"
 
@@ -22,9 +24,15 @@ import (
 	cloudeventserrors "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/errors"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/store"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/utils"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/payload"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/metrics"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
+)
+
+const (
+	// workDeletionCheckInterval defines how often to check for works that need deletion
+	workDeletionCheckInterval = 2 * time.Second
 )
 
 // ManifestWorkAgentClient implements the ManifestWorkInterface. It sends the manifestworks status back to source by
@@ -42,14 +50,39 @@ type ManifestWorkAgentClient struct {
 var _ workv1client.ManifestWorkInterface = &ManifestWorkAgentClient{}
 
 func NewManifestWorkAgentClient(
-	_ string,
+	ctx context.Context,
+	clusterName string,
 	watcherStore store.ClientWatcherStore[*workv1.ManifestWork],
 	cloudEventsClient generic.CloudEventsClient[*workv1.ManifestWork],
 ) *ManifestWorkAgentClient {
-	return &ManifestWorkAgentClient{
+
+	client := &ManifestWorkAgentClient{
 		cloudEventsClient: cloudEventsClient,
 		watcherStore:      watcherStore,
 	}
+
+	// Start a background goroutine to periodically check for works that need deletion.
+	// This ensures that works with deletion timestamps and no finalizers are properly
+	// cleaned up and their deletion status is sent back to the source.
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
+		logger := klog.FromContext(ctx)
+
+		// List all works and check if any need to be deleted
+		works, err := watcherStore.List(ctx, clusterName, metav1.ListOptions{})
+		if err != nil {
+			logger.Error(err, "failed to list all works for deletion check")
+			return
+		}
+
+		// Process each work for potential deletion
+		for _, work := range works.Items {
+			if err := client.deleteWork(ctx, work); err != nil {
+				logger.Error(err, "failed to delete work", "namespace", work.Namespace, "name", work.Name)
+			}
+		}
+	}, workDeletionCheckInterval)
+
+	return client
 }
 
 func (c *ManifestWorkAgentClient) SetNamespace(namespace string) {
@@ -187,18 +220,7 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 
 	newWork := patchedWork.DeepCopy()
 
-	isDeleted := !newWork.DeletionTimestamp.IsZero() && len(newWork.Finalizers) == 0
-
-	if utils.IsStatusPatch(subresources) || isDeleted {
-		if isDeleted {
-			meta.SetStatusCondition(&newWork.Status.Conditions, metav1.Condition{
-				Type:    common.ResourceDeleted,
-				Status:  metav1.ConditionTrue,
-				Reason:  "ManifestsDeleted",
-				Message: fmt.Sprintf("The manifests are deleted from the cluster %s", newWork.Namespace),
-			})
-		}
-
+	if utils.IsStatusPatch(subresources) {
 		// Set work's resource version to remote resource version for publishing
 		workToPublish := newWork.DeepCopy()
 		workToPublish.ResourceVersion = ""
@@ -209,19 +231,6 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 			returnErr = cloudeventserrors.ToStatusError(common.ManifestWorkGR, name, err)
 			return nil, returnErr
 		}
-	}
-
-	// the finalizers of a deleting manifestwork are removed, marking the manifestwork status to deleted and sending
-	// it back to source
-	if isDeleted {
-		if err := c.watcherStore.Delete(newWork); err != nil {
-			returnErr := errors.NewInternalError(err)
-			metrics.IncreaseWorkProcessedCounter("delete", string(returnErr.ErrStatus.Reason))
-			return nil, returnErr
-		}
-
-		metrics.IncreaseWorkProcessedCounter("delete", metav1.StatusSuccess)
-		return newWork, nil
 	}
 
 	// Fetch the latest work from the store and verify the resource version to avoid updating the store
@@ -246,6 +255,46 @@ func (c *ManifestWorkAgentClient) Patch(ctx context.Context, name string, pt kub
 		return nil, returnErr
 	}
 	return newWork, nil
+}
+
+// deleteWork handles the cleanup of a manifestwork that is being deleted. It checks if the work
+// has a deletion timestamp and all finalizers have been removed. If so, it marks the manifestwork
+// status as deleted, publishes the deletion event to the source, and removes the work from the cache.
+func (c *ManifestWorkAgentClient) deleteWork(ctx context.Context, work *workv1.ManifestWork) error {
+	if work.DeletionTimestamp.IsZero() || len(work.Finalizers) != 0 {
+		// not ready for deletion (has finalizers or no deletion timestamp)
+		return nil
+	}
+
+	eventType := types.CloudEventsType{
+		CloudEventsDataType: payload.ManifestBundleEventDataType,
+		SubResource:         types.SubResourceStatus,
+		Action:              types.UpdateRequestAction,
+	}
+
+	workToPublish := work.DeepCopy()
+	workToPublish.ResourceVersion = ""
+	meta.SetStatusCondition(&workToPublish.Status.Conditions, metav1.Condition{
+		Type:    common.ResourceDeleted,
+		Status:  metav1.ConditionTrue,
+		Reason:  "ManifestsDeleted",
+		Message: fmt.Sprintf("The manifests are deleted from the cluster %s", work.Namespace),
+	})
+
+	if err := c.cloudEventsClient.Publish(ctx, eventType, workToPublish); err != nil {
+		return cloudeventserrors.ToStatusError(common.ManifestWorkGR, work.Name, err)
+	}
+
+	c.Lock()
+	defer c.Unlock()
+	if err := c.watcherStore.Delete(work); err != nil {
+		returnErr := errors.NewInternalError(err)
+		metrics.IncreaseWorkProcessedCounter("delete", string(returnErr.ErrStatus.Reason))
+		return returnErr
+	}
+
+	metrics.IncreaseWorkProcessedCounter("delete", metav1.StatusSuccess)
+	return nil
 }
 
 func versionCompare(new, old *workv1.ManifestWork) *errors.StatusError {

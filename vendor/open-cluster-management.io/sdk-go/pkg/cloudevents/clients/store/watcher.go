@@ -15,6 +15,7 @@ type Watcher struct {
 	result  chan watch.Event
 	done    chan struct{}
 	stopped bool
+	wg      sync.WaitGroup
 }
 
 var _ watch.Interface = &Watcher{}
@@ -42,35 +43,44 @@ func (w *Watcher) ResultChan() <-chan watch.Event {
 func (w *Watcher) Stop() {
 	// Call Close() exactly once by locking and setting a flag.
 	w.Lock()
-	defer w.Unlock()
-	// closing a closed channel always panics, therefore check before closing
-	select {
-	case <-w.done:
-		close(w.result)
-	default:
-		w.stopped = true
-		close(w.done)
+
+	if w.stopped {
+		w.Unlock()
+		return
 	}
+
+	w.stopped = true
+	close(w.done)
+	w.Unlock()
+
+	// Wait for all Receive() calls to complete before closing the result channel
+	w.wg.Wait()
+	close(w.result)
 }
 
 // Receive a event from the work client and sends down the result channel.
 func (w *Watcher) Receive(evt watch.Event) {
-	if w.isStopped() {
-		// this watcher is stopped, do nothing.
+	// Atomically check if stopped and add to WaitGroup
+	w.RLock()
+	if w.stopped {
+		w.RUnlock()
 		return
 	}
+	w.wg.Add(1)
+	w.RUnlock()
+
+	defer w.wg.Done()
 
 	if klog.V(4).Enabled() {
 		obj, _ := meta.Accessor(evt.Object)
 		klog.V(4).Infof("Receive the event %v for %v", evt.Type, obj.GetName())
 	}
 
-	w.result <- evt
-}
-
-func (w *Watcher) isStopped() bool {
-	w.RLock()
-	defer w.RUnlock()
-
-	return w.stopped
+	select {
+	case <-w.done:
+		// watcher is stopped, do nothing
+		return
+	case w.result <- evt:
+		// event sent successfully
+	}
 }
