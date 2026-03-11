@@ -64,8 +64,6 @@ github.com/aws/smithy-go v1.24.2 h1:FzA3bu/nt/vDvmnkg+R8Xl46gmzEDam6mZ1hzmwXFng=
 github.com/aws/smithy-go v1.24.2/go.mod h1:YE2RhdIuDbA5E5bTdciG9KrW3+TiEONeUWCqxX9i1Fc=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
-github.com/bhperry/ocm-api v0.0.0-20260310153020-d027d6ab0b46 h1:LkDAbNZ3REb2kzTvuGe7+3KLUTzXG4ge0Ay84H15tJs=
-github.com/bhperry/ocm-api v0.0.0-20260310153020-d027d6ab0b46/go.mod h1:ZpXs1bFTIIqKstMHdLO9IY0NFlbCvZgEtByvvNSmab0=
 github.com/blang/semver/v4 v4.0.0 h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM=
 github.com/blang/semver/v4 v4.0.0/go.mod h1:IbckMUScFkM3pff0VJDNKRiT6TG/YpiHIM2yvyW5YoQ=
 github.com/bwmarrin/snowflake v0.3.0 h1:xm67bEhkKh6ij1790JB83OujPR5CzNe8QuQqAgISZN0=
@@ -589,6 +587,8 @@ k8s.io/utils v0.0.0-20251002143259-bc988d571ff4 h1:SjGebBtkBqHFOli+05xYbK8YF1Dzk
 k8s.io/utils v0.0.0-20251002143259-bc988d571ff4/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 open-cluster-management.io/addon-framework v1.2.1-0.20260306083712-b6f9759b7b6d h1:Xy3isoDUUwFEEo5LEKgTux4j0lHnP0ltdOhm8QcwvCY=
 open-cluster-management.io/addon-framework v1.2.1-0.20260306083712-b6f9759b7b6d/go.mod h1:Bpw37w4GANroADMDR3F/ZUFoEuTKV9GIn4ijwICcK6E=
+open-cluster-management.io/api v1.2.1-0.20260311011850-d71eec7f6889 h1:+whY6tCJbwbq/buZud0xMI6nlGwLUMXYRyvLalqda14=
+open-cluster-management.io/api v1.2.1-0.20260311011850-d71eec7f6889/go.mod h1:ZpXs1bFTIIqKstMHdLO9IY0NFlbCvZgEtByvvNSmab0=
 open-cluster-management.io/sdk-go v1.2.1-0.20260311085014-8db061d07611 h1:CNv03thePJrJNaxj5kUYT2f+pWmRf+HTX2UdWnCJaXk=
 open-cluster-management.io/sdk-go v1.2.1-0.20260311085014-8db061d07611/go.mod h1:lDef+5BvifXww0S7cseux+Wi8melkH29bAf33OZ0ZVg=
 sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03 h1:1ShFiMjGQOR/8jTBkmZrk1gORxnvMwm1nOy2/DbHg4U=
