@@ -14,7 +14,6 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"google.golang.org/grpc"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -27,11 +26,7 @@ import (
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/payload"
-	sourcecodec "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/source/codec"
-	workstore "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/store"
 	pbv1 "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protobuf/v1"
 	cloudeventsgrpc "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc"
 	cemetrics "open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/metrics"
@@ -150,31 +145,6 @@ var _ = ginkgo.BeforeSuite(func() {
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		}()
-	case util.MQTTDriver:
-		sourceID := "work-test-mqtt"
-		err = util.RunMQTTBroker()
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-		sourceConfigFileName = path.Join(tempDir, "mqttconfig")
-		err = util.CreateMQTTConfigFile(sourceConfigFileName, sourceID)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-		hubHash = helper.HubHash(util.MQTTBrokerHost)
-
-		watcherStore, err := workstore.NewSourceLocalWatcherStore(envCtx, func(ctx context.Context) ([]*workapiv1.ManifestWork, error) {
-			return []*workapiv1.ManifestWork{}, nil
-		})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		clientOptions := options.NewGenericClientOptions(
-			util.NewMQTTSourceOptions(sourceID),
-			sourcecodec.NewManifestBundleCodec(),
-			fmt.Sprintf("%s-%s", sourceID, rand.String(5)),
-		).WithSourceID(sourceID).WithClientWatcherStore(watcherStore)
-		sourceClient, err := work.NewSourceClientHolder(envCtx, clientOptions)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		hubWorkClient = sourceClient.WorkInterface()
 	case util.GRPCDriver:
 		hubWorkClient, err = workclientset.NewForConfig(cfg)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -221,9 +191,6 @@ var _ = ginkgo.AfterSuite(func() {
 	envCancel()
 
 	err := testEnv.Stop()
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-	err = util.StopMQTTBroker()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	if tempDir != "" {
