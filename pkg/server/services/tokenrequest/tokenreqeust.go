@@ -56,6 +56,9 @@ func (t *TokenRequestService) HandleStatusUpdate(ctx context.Context, evt *cloud
 
 	switch eventType.Action {
 	case types.CreateRequestAction:
+		// Clear the UID to avoid conflict with the ServiceAccount UID validation
+		// introduced by the TokenRequestServiceAccountUIDValidation feature gate (k8s 1.34+).
+		tokenRequest.UID = ""
 		// Create a token for the service account
 		tokenResponse, err := t.client.CoreV1().ServiceAccounts(tokenRequest.Namespace).CreateToken(ctx, tokenRequest.Name, tokenRequest, metav1.CreateOptions{})
 		if err != nil {
