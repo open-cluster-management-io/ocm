@@ -247,6 +247,44 @@ func TestManifestWorkExecutorValidate(t *testing.T) {
 			expectErr: apierrors.NewBadRequest(
 				"user test1 cannot manipulate the Manifestwork with executor ns1/executor2 in namespace cluster1"),
 		},
+		{
+			name: "validate executor with Extra field success",
+			request: admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Resource:  manifestWorkSchema,
+					Operation: admissionv1.Create,
+					UserInfo: authenticationv1.UserInfo{
+						Username: "test-extra-user",
+						Extra: map[string]authenticationv1.ExtraValue{
+							"department": []string{"platform-team"},
+							"team":       []string{"security"},
+						},
+					},
+				},
+			},
+			manifests: []*unstructured.Unstructured{
+				{
+					Object: map[string]interface{}{
+						"apiVersion": "v1",
+						"kind":       "kind",
+						"metadata": map[string]interface{}{
+							"namespace": "ns1",
+							"name":      "test",
+						},
+					},
+				},
+			},
+			executor: &workv1.ManifestWorkExecutor{
+				Subject: workv1.ManifestWorkExecutorSubject{
+					Type: workv1.ExecutorSubjectTypeServiceAccount,
+					ServiceAccount: &workv1.ManifestWorkSubjectServiceAccount{
+						Namespace: "ns1",
+						Name:      "executor1",
+					},
+				},
+			},
+			expectErr: nil,
+		},
 	}
 
 	utilruntime.Must(features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubWorkFeatureGates))
@@ -282,6 +320,35 @@ func TestManifestWorkExecutorValidate(t *testing.T) {
 					Namespace: "cluster1",
 					Name:      "system:serviceaccount:ns1:executor1",
 				}) {
+				return true, &v1.SubjectAccessReview{
+					Status: v1.SubjectAccessReviewStatus{
+						Allowed: true,
+					},
+				}, nil
+			}
+
+			// Handle test case with Extra field
+			if obj.Spec.User == "test-extra-user" &&
+				reflect.DeepEqual(obj.Spec.ResourceAttributes, &v1.ResourceAttributes{
+					Group:     "work.open-cluster-management.io",
+					Resource:  "manifestworks",
+					Verb:      "execute-as",
+					Namespace: "cluster1",
+					Name:      "system:serviceaccount:ns1:executor1",
+				}) {
+				// Verify that Extra field is properly propagated
+				expectedExtra := map[string]v1.ExtraValue{
+					"department": []string{"platform-team"},
+					"team":       []string{"security"},
+				}
+				if !reflect.DeepEqual(obj.Spec.Extra, expectedExtra) {
+					return true, &v1.SubjectAccessReview{
+						Status: v1.SubjectAccessReviewStatus{
+							Allowed: false,
+							Reason:  fmt.Sprintf("Extra field mismatch: expected %v, got %v", expectedExtra, obj.Spec.Extra),
+						},
+					}, nil
+				}
 				return true, &v1.SubjectAccessReview{
 					Status: v1.SubjectAccessReviewStatus{
 						Allowed: true,
