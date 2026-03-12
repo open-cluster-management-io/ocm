@@ -39,19 +39,6 @@ test-addon-integration: envtest-setup
 .PHONY: test-addon-integration
 
 # In the cloud events scenario, skip the following tests
-# - unmanaged_appliedwork_test.go, this test mainly focus on switching the hub kube-apiserver
-# - manifestworkreplicaset_test.go, this test needs to update the work status with the hub work client,
-#   cloud events work client does not support it. (TODO) may add e2e to for mwrs.
-test-cloudevents-work-mqtt-integration: envtest-setup build-work-integration
-	./work-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast \
-		-ginkgo.skip-file manifestworkreplicaset_test.go \
-		-ginkgo.skip-file unmanaged_appliedwork_test.go \
-		-ginkgo.skip-file manifestworkgarbagecollection_test.go \
-		-test.driver=mqtt \
-		-v=4 ${ARGS}
-.PHONY: test-cloudevents-work-mqtt-integration
-
-# In the cloud events scenario, skip the following tests
 test-cloudevents-work-grpc-integration: envtest-setup build-work-integration
 	./work-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast \
 		-test.driver=grpc \
@@ -60,6 +47,3 @@ test-cloudevents-work-grpc-integration: envtest-setup build-work-integration
 
 test-integration: test-registration-operator-integration test-registration-integration test-placement-integration test-work-integration test-addon-integration
 .PHONY: test-integration
-
-test-cloudevents-integration: test-cloudevents-work-mqtt-integration test-cloudevents-work-grpc-integration
-.PHONY: test-cloudevents-integration

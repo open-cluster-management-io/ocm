@@ -455,7 +455,6 @@ github.com/mitchellh/reflectwalk
 # github.com/mochi-mqtt/server/v2 v2.7.9
 ## explicit; go 1.21
 github.com/mochi-mqtt/server/v2
-github.com/mochi-mqtt/server/v2/hooks/auth
 github.com/mochi-mqtt/server/v2/hooks/storage
 github.com/mochi-mqtt/server/v2/listeners
 github.com/mochi-mqtt/server/v2/mempool
@@ -1973,7 +1972,7 @@ open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v1.2.1-0.20260310072111-3041045c0177
+# open-cluster-management.io/sdk-go v1.2.1-0.20260311085014-8db061d07611
 ## explicit; go 1.25.0
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
