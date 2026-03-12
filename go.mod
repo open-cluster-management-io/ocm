@@ -28,7 +28,7 @@ require (
 	github.com/valyala/fasttemplate v1.2.2
 	google.golang.org/grpc v1.79.1
 	gopkg.in/yaml.v2 v2.4.0
-	helm.sh/helm/v3 v3.19.5
+	helm.sh/helm/v3 v3.20.1
 	k8s.io/api v0.35.2
 	k8s.io/apiextensions-apiserver v0.35.2
 	k8s.io/apimachinery v0.35.2
@@ -59,7 +59,7 @@ require (
 	cloud.google.com/go/pubsub/v2 v2.3.0 // indirect
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6 // indirect
-	github.com/BurntSushi/toml v1.5.0 // indirect
+	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect

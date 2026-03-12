@@ -47,7 +47,7 @@ cloud.google.com/go/pubsub/v2/internal/scheduler
 dario.cat/mergo
 # github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6
 ## explicit; go 1.20
-# github.com/BurntSushi/toml v1.5.0
+# github.com/BurntSushi/toml v1.6.0
 ## explicit; go 1.18
 github.com/BurntSushi/toml
 github.com/BurntSushi/toml/internal
@@ -1109,8 +1109,8 @@ gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# helm.sh/helm/v3 v3.19.5
-## explicit; go 1.24.0
+# helm.sh/helm/v3 v3.20.1
+## explicit; go 1.25.0
 helm.sh/helm/v3/internal/sympath
 helm.sh/helm/v3/internal/version
 helm.sh/helm/v3/pkg/chart
