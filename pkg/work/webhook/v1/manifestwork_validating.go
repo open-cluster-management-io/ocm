@@ -87,11 +87,17 @@ func validateExecutor(kubeClient kubernetes.Interface, work *workv1.ManifestWork
 		return apierrors.NewBadRequest("executor service account can not be nil")
 	}
 
+	extra := make(map[string]authorizationv1.ExtraValue)
+	for k, v := range userInfo.Extra {
+		extra[k] = authorizationv1.ExtraValue(v)
+	}
+
 	sar := &authorizationv1.SubjectAccessReview{
 		Spec: authorizationv1.SubjectAccessReviewSpec{
 			User:   userInfo.Username,
 			UID:    userInfo.UID,
 			Groups: userInfo.Groups,
+			Extra:  extra,
 			ResourceAttributes: &authorizationv1.ResourceAttributes{
 				Group:     "work.open-cluster-management.io",
 				Resource:  "manifestworks",
