@@ -9,7 +9,7 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
@@ -22,7 +22,7 @@ type Clients struct {
 	KubeClient       kubernetes.Interface
 	ClusterClient    clusterv1client.Interface
 	WorkClient       workclientset.Interface
-	AddOnClient      addonv1alpha1client.Interface
+	AddOnClient      addonclient.Interface
 	KubeInformers    kubeinformers.SharedInformerFactory
 	ClusterInformers clusterv1informers.SharedInformerFactory
 	WorkInformers    workinformers.SharedInformerFactory
@@ -38,7 +38,7 @@ func NewClients(controllerContext *controllercmd.ControllerContext) (*Clients, e
 	if err != nil {
 		return nil, err
 	}
-	addonClient, err := addonv1alpha1client.NewForConfig(controllerContext.KubeConfig)
+	addonClient, err := addonclient.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return nil, err
 	}

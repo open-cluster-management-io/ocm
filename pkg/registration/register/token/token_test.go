@@ -13,7 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -27,7 +27,7 @@ func newTestAddonClients() *register.AddOnClients {
 	addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 10*time.Minute)
 	return &register.AddOnClients{
 		AddonClient:   addonClient,
-		AddonInformer: addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
+		AddonInformer: addonInformerFactory.Addon().V1beta1().ManagedClusterAddOns(),
 	}
 }
 
@@ -609,18 +609,18 @@ func TestTokenDriver_NilGuards(t *testing.T) {
 func TestTokenDriver_EnsureTokenInfrastructureReady(t *testing.T) {
 	tests := []struct {
 		name          string
-		addon         *addonv1alpha1.ManagedClusterAddOn
+		addon         *addonv1beta1.ManagedClusterAddOn
 		expectedUID   string
 		expectedReady bool
 		expectedError bool
 	}{
 		{
 			name: "no TokenInfrastructureReady condition",
-			addon: &addonv1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-addon",
 				},
-				Status: addonv1alpha1.ManagedClusterAddOnStatus{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
 					Conditions: []metav1.Condition{},
 				},
 			},
@@ -630,11 +630,11 @@ func TestTokenDriver_EnsureTokenInfrastructureReady(t *testing.T) {
 		},
 		{
 			name: "TokenInfrastructureReady condition is False",
-			addon: &addonv1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-addon",
 				},
-				Status: addonv1alpha1.ManagedClusterAddOnStatus{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:   "TokenInfrastructureReady",
@@ -650,11 +650,11 @@ func TestTokenDriver_EnsureTokenInfrastructureReady(t *testing.T) {
 		},
 		{
 			name: "TokenInfrastructureReady is True with valid UID",
-			addon: &addonv1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-addon",
 				},
-				Status: addonv1alpha1.ManagedClusterAddOnStatus{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:    "TokenInfrastructureReady",
@@ -671,11 +671,11 @@ func TestTokenDriver_EnsureTokenInfrastructureReady(t *testing.T) {
 		},
 		{
 			name: "TokenInfrastructureReady is True but invalid message format",
-			addon: &addonv1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-addon",
 				},
-				Status: addonv1alpha1.ManagedClusterAddOnStatus{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:    "TokenInfrastructureReady",
@@ -786,7 +786,7 @@ func TestTokenDriver_InformerHandlerFilter(t *testing.T) {
 	}{
 		{
 			name: "matching addon name",
-			obj: &addonv1alpha1.ManagedClusterAddOn{
+			obj: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-addon",
 				},
@@ -795,7 +795,7 @@ func TestTokenDriver_InformerHandlerFilter(t *testing.T) {
 		},
 		{
 			name: "non-matching addon name",
-			obj: &addonv1alpha1.ManagedClusterAddOn{
+			obj: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "other-addon",
 				},

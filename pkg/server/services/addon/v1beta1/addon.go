@@ -1,4 +1,4 @@
-package addon
+package v1beta1
 
 import (
 	"context"
@@ -12,11 +12,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonclientset "open-cluster-management.io/api/client/addon/clientset/versioned"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
-	addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
+	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
+	addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server"
 
@@ -25,12 +25,12 @@ import (
 
 type AddonService struct {
 	addonClient   addonclientset.Interface
-	addonLister   addonlisterv1alpha1.ManagedClusterAddOnLister
-	addonInformer addoninformerv1alpha1.ManagedClusterAddOnInformer
+	addonLister   addonlisterv1beta1.ManagedClusterAddOnLister
+	addonInformer addoninformerv1beta1.ManagedClusterAddOnInformer
 	codec         *addonce.ManagedClusterAddOnCodec
 }
 
-func NewAddonService(addonClient addonclientset.Interface, addonInformer addoninformerv1alpha1.ManagedClusterAddOnInformer) server.Service {
+func NewAddonService(addonClient addonclientset.Interface, addonInformer addoninformerv1beta1.ManagedClusterAddOnInformer) server.Service {
 	return &AddonService{
 		addonClient:   addonClient,
 		addonLister:   addonInformer.Lister(),
@@ -72,7 +72,7 @@ func (s *AddonService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.
 
 	switch eventType.Action {
 	case types.UpdateRequestAction:
-		_, err := s.addonClient.AddonV1alpha1().ManagedClusterAddOns(addon.Namespace).UpdateStatus(ctx, addon, metav1.UpdateOptions{})
+		_, err := s.addonClient.AddonV1beta1().ManagedClusterAddOns(addon.Namespace).UpdateStatus(ctx, addon, metav1.UpdateOptions{})
 		return err
 	default:
 		return fmt.Errorf("unsupported action %s for addon %s/%s", eventType.Action, addon.Namespace, addon.Name)
@@ -90,7 +90,7 @@ func (s *AddonService) RegisterHandler(ctx context.Context, handler server.Event
 func (s *AddonService) EventHandlerFuncs(ctx context.Context, handler server.EventHandler) *cache.ResourceEventHandlerFuncs {
 	return &cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			addon, ok := obj.(*addonv1alpha1.ManagedClusterAddOn)
+			addon, ok := obj.(*addonv1beta1.ManagedClusterAddOn)
 			if !ok {
 				utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", obj), "addon add")
 				return
@@ -114,9 +114,9 @@ func (s *AddonService) EventHandlerFuncs(ctx context.Context, handler server.Eve
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			addon, ok := newObj.(*addonv1alpha1.ManagedClusterAddOn)
+			addon, ok := newObj.(*addonv1beta1.ManagedClusterAddOn)
 			if !ok {
-				utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", newObj), "addon add")
+				utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", newObj), "addon update")
 				return
 			}
 
@@ -138,7 +138,7 @@ func (s *AddonService) EventHandlerFuncs(ctx context.Context, handler server.Eve
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			addon, ok := obj.(*addonv1alpha1.ManagedClusterAddOn)
+			addon, ok := obj.(*addonv1beta1.ManagedClusterAddOn)
 			if !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
@@ -146,7 +146,7 @@ func (s *AddonService) EventHandlerFuncs(ctx context.Context, handler server.Eve
 					return
 				}
 
-				addon, ok = tombstone.Obj.(*addonv1alpha1.ManagedClusterAddOn)
+				addon, ok = tombstone.Obj.(*addonv1beta1.ManagedClusterAddOn)
 				if !ok {
 					utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("unknown type: %T", obj), "addon delete")
 					return

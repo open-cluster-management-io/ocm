@@ -11,9 +11,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
@@ -36,14 +36,14 @@ const (
 type addOnFeatureDiscoveryController struct {
 	patcher       patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus]
 	clusterLister clusterv1listers.ManagedClusterLister
-	addOnLister   addonlisterv1alpha1.ManagedClusterAddOnLister
+	addOnLister   addonlisterv1beta1.ManagedClusterAddOnLister
 }
 
 // NewAddOnFeatureDiscoveryController returns an instance of addOnFeatureDiscoveryController
 func NewAddOnFeatureDiscoveryController(
 	clusterClient clientset.Interface,
 	clusterInformer clusterv1informer.ManagedClusterInformer,
-	addOnInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
+	addOnInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
 ) factory.Controller {
 	c := &addOnFeatureDiscoveryController{
 		patcher: patcher.NewPatcher[
@@ -137,8 +137,8 @@ func (c *addOnFeatureDiscoveryController) syncCluster(ctx context.Context, clust
 	return err
 }
 
-func getAddOnLabelValue(addOn *addonv1alpha1.ManagedClusterAddOn) string {
-	availableCondition := meta.FindStatusCondition(addOn.Status.Conditions, addonv1alpha1.ManagedClusterAddOnConditionAvailable)
+func getAddOnLabelValue(addOn *addonv1beta1.ManagedClusterAddOn) string {
+	availableCondition := meta.FindStatusCondition(addOn.Status.Conditions, addonv1beta1.ManagedClusterAddOnConditionAvailable)
 	if availableCondition == nil {
 		return addOnStatusUnreachable
 	}

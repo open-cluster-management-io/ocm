@@ -25,7 +25,7 @@ type WebhookOptions struct {
 	webhooks        []WebhookInitializer
 
 	// for testing
-	cfg *rest.Config
+	Cfg *rest.Config
 }
 
 func NewWebhookOptions() *WebhookOptions {
@@ -71,8 +71,8 @@ func (c *WebhookOptions) RunWebhookServer(ctx context.Context) error {
 	// This line prevents controller-runtime from complaining about log.SetLogger never being called
 	ctrl.SetLogger(logger)
 
-	if c.cfg == nil {
-		c.cfg = ctrl.GetConfigOrDie()
+	if c.Cfg == nil {
+		c.Cfg = ctrl.GetConfigOrDie()
 	}
 
 	healthProbeBindAddress, metricsBindAddress := "0", "0"
@@ -83,7 +83,7 @@ func (c *WebhookOptions) RunWebhookServer(ctx context.Context) error {
 		metricsBindAddress = fmt.Sprintf(":%d", c.MetricsPort)
 	}
 
-	mgr, err := ctrl.NewManager(c.cfg, ctrl.Options{
+	mgr, err := ctrl.NewManager(c.Cfg, ctrl.Options{
 		Scheme:                 c.scheme,
 		HealthProbeBindAddress: healthProbeBindAddress,
 		Metrics: server.Options{

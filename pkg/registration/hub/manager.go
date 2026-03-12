@@ -301,14 +301,14 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 
 	addOnHealthCheckController := addon.NewManagedClusterAddOnHealthCheckController(
 		addOnClient,
-		addOnInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		addOnInformers.Addon().V1beta1().ManagedClusterAddOns(),
 		clusterInformers.Cluster().V1().ManagedClusters(),
 	)
 
 	addOnFeatureDiscoveryController := addon.NewAddOnFeatureDiscoveryController(
 		clusterClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
-		addOnInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		addOnInformers.Addon().V1beta1().ManagedClusterAddOns(),
 	)
 
 	var defaultManagedClusterSetController, globalManagedClusterSetController factory.Controller

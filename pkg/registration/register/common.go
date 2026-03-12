@@ -23,7 +23,7 @@ import (
 
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
-	addonv1alpha1informers "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
+	addonv1beta1informers "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	hubclusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
@@ -251,13 +251,13 @@ type Clients struct {
 	AddonClient     addonclient.Interface
 	EventsClient    eventsv1.EventsV1Interface
 	ClusterInformer clusterv1informer.ManagedClusterInformer
-	AddonInformer   addonv1alpha1informers.ManagedClusterAddOnInformer
+	AddonInformer   addonv1beta1informers.ManagedClusterAddOnInformer
 }
 
 // AddOnClients hold clients and informers used by addon driver
 type AddOnClients struct {
 	AddonClient   addonclient.Interface
-	AddonInformer addonv1alpha1informers.ManagedClusterAddOnInformer
+	AddonInformer addonv1beta1informers.ManagedClusterAddOnInformer
 }
 
 func KubeConfigFromSecretOption(s SecretOption, bootstrap bool) (*rest.Config, error) {
@@ -313,7 +313,7 @@ func BuildClientsFromConfig(kubeConfig *rest.Config, clusterName string) (*Clien
 		clients.AddonClient,
 		10*time.Minute,
 		addoninformers.WithNamespace(clusterName),
-	).Addon().V1alpha1().ManagedClusterAddOns()
+	).Addon().V1beta1().ManagedClusterAddOns()
 	return clients, nil
 }
 

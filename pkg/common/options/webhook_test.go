@@ -92,7 +92,7 @@ func TestWebhookOptions_RunWebhookServer(t *testing.T) {
 
 	opts := NewWebhookOptions()
 	opts.Port = 9444 // Use a different port for webhook server
-	opts.cfg = cfg
+	opts.Cfg = cfg
 
 	initializer := &testWebhookInitializer{}
 	opts.InstallWebhook(initializer)

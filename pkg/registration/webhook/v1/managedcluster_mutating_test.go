@@ -3,7 +3,6 @@ package v1
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -503,7 +502,6 @@ func DiffTaintTime(src, dest []clusterv1.Taint) bool {
 	}
 	for k := range src {
 		if src[k].TimeAdded.Minute() != dest[k].TimeAdded.Minute() || src[k].TimeAdded.Second() != dest[k].TimeAdded.Second() {
-			fmt.Printf("src:%v, \ndest:%v\n", src[k].TimeAdded.String(), dest[k].TimeAdded.String())
 			return false
 		}
 	}

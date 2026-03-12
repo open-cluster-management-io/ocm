@@ -7,7 +7,8 @@ import (
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 
-	addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
+	v1alpha1addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
+	v1beta1addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1beta1"
 	clusterce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
 	csrce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
 	eventce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
@@ -21,7 +22,8 @@ import (
 	sdkgrpc "open-cluster-management.io/sdk-go/pkg/server/grpc"
 	grpcauthn "open-cluster-management.io/sdk-go/pkg/server/grpc/authn"
 
-	"open-cluster-management.io/ocm/pkg/server/services/addon"
+	"open-cluster-management.io/ocm/pkg/server/services/addon/v1alpha1"
+	"open-cluster-management.io/ocm/pkg/server/services/addon/v1beta1"
 	"open-cluster-management.io/ocm/pkg/server/services/cluster"
 	"open-cluster-management.io/ocm/pkg/server/services/csr"
 	"open-cluster-management.io/ocm/pkg/server/services/event"
@@ -63,8 +65,10 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 		cluster.NewClusterService(clients.ClusterClient, clients.ClusterInformers.Cluster().V1().ManagedClusters()))
 	grpcEventServer.RegisterService(ctx, csrce.CSREventDataType,
 		csr.NewCSRService(clients.KubeClient, clients.KubeInformers.Certificates().V1().CertificateSigningRequests()))
-	grpcEventServer.RegisterService(ctx, addonce.ManagedClusterAddOnEventDataType,
-		addon.NewAddonService(clients.AddOnClient, clients.AddOnInformers.Addon().V1alpha1().ManagedClusterAddOns()))
+	grpcEventServer.RegisterService(ctx, v1alpha1addonce.ManagedClusterAddOnEventDataType,
+		v1alpha1.NewAddonService(clients.AddOnClient, clients.AddOnInformers.Addon().V1alpha1().ManagedClusterAddOns()))
+	grpcEventServer.RegisterService(ctx, v1beta1addonce.ManagedClusterAddOnEventDataType,
+		v1beta1.NewAddonService(clients.AddOnClient, clients.AddOnInformers.Addon().V1beta1().ManagedClusterAddOns()))
 	grpcEventServer.RegisterService(ctx, eventce.EventEventDataType,
 		event.NewEventService(clients.KubeClient))
 	grpcEventServer.RegisterService(ctx, leasece.LeaseEventDataType,

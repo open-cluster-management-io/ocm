@@ -1122,7 +1122,6 @@ func createResourcesFromYamlFiles(
 			continue
 		}
 		if err != nil {
-			fmt.Printf("Error creating %q (%T): %v\n", fileName, mapping.Resource, err)
 			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", fileName, mapping.Resource, err))
 		}
 	}
@@ -1163,7 +1162,6 @@ func deleteResourcesFromYamlFiles(
 			continue
 		}
 		if err != nil {
-			fmt.Printf("Error deleting %q (%T): %v\n", fileName, mapping.Resource, err)
 			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", fileName, mapping.Resource, err))
 		}
 	}

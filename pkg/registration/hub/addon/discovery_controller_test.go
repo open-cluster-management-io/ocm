@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -36,7 +36,7 @@ func TestGetAddOnLabelValue(t *testing.T) {
 			name: "status is true",
 			addOnConditions: []metav1.Condition{
 				{
-					Type:   addonv1alpha1.ManagedClusterAddOnConditionAvailable,
+					Type:   addonv1beta1.ManagedClusterAddOnConditionAvailable,
 					Status: metav1.ConditionTrue,
 				},
 			},
@@ -46,7 +46,7 @@ func TestGetAddOnLabelValue(t *testing.T) {
 			name: "status is false",
 			addOnConditions: []metav1.Condition{
 				{
-					Type:   addonv1alpha1.ManagedClusterAddOnConditionAvailable,
+					Type:   addonv1beta1.ManagedClusterAddOnConditionAvailable,
 					Status: metav1.ConditionFalse,
 				},
 			},
@@ -56,7 +56,7 @@ func TestGetAddOnLabelValue(t *testing.T) {
 			name: "status is unknow",
 			addOnConditions: []metav1.Condition{
 				{
-					Type:   addonv1alpha1.ManagedClusterAddOnConditionAvailable,
+					Type:   addonv1beta1.ManagedClusterAddOnConditionAvailable,
 					Status: metav1.ConditionUnknown,
 				},
 			},
@@ -66,8 +66,8 @@ func TestGetAddOnLabelValue(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			addOn := &addonv1alpha1.ManagedClusterAddOn{
-				Status: addonv1alpha1.ManagedClusterAddOnStatus{
+			addOn := &addonv1beta1.ManagedClusterAddOn{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
 					Conditions: c.addOnConditions,
 				},
 			}
@@ -88,7 +88,7 @@ func TestDiscoveryController_Sync(t *testing.T) {
 		name            string
 		queueKey        string
 		cluster         *clusterv1.ManagedCluster
-		addOns          []*addonv1alpha1.ManagedClusterAddOn
+		addOns          []*addonv1beta1.ManagedClusterAddOn
 		validateActions func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
@@ -107,7 +107,7 @@ func TestDiscoveryController_Sync(t *testing.T) {
 					},
 				},
 			},
-			addOns: []*addonv1alpha1.ManagedClusterAddOn{
+			addOns: []*addonv1beta1.ManagedClusterAddOn{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "addon1",
@@ -198,7 +198,7 @@ func TestDiscoveryController_Sync(t *testing.T) {
 					},
 				},
 			},
-			addOns: []*addonv1alpha1.ManagedClusterAddOn{
+			addOns: []*addonv1beta1.ManagedClusterAddOn{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "addon1",
@@ -217,10 +217,10 @@ func TestDiscoveryController_Sync(t *testing.T) {
 						Name:      "addon3",
 						Namespace: clusterName,
 					},
-					Status: addonv1alpha1.ManagedClusterAddOnStatus{
+					Status: addonv1beta1.ManagedClusterAddOnStatus{
 						Conditions: []metav1.Condition{
 							{
-								Type:   addonv1alpha1.ManagedClusterAddOnConditionAvailable,
+								Type:   addonv1beta1.ManagedClusterAddOnConditionAvailable,
 								Status: metav1.ConditionTrue,
 							},
 						},
@@ -265,7 +265,7 @@ func TestDiscoveryController_Sync(t *testing.T) {
 			}
 			addOnClient := addonfake.NewSimpleClientset(objs...)
 			addOnInformerFactory := addoninformers.NewSharedInformerFactoryWithOptions(addOnClient, 10*time.Minute)
-			addOnStore := addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
+			addOnStore := addOnInformerFactory.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore()
 			for _, addOn := range c.addOns {
 				if err := addOnStore.Add(addOn); err != nil {
 					t.Fatal(err)
@@ -277,7 +277,7 @@ func TestDiscoveryController_Sync(t *testing.T) {
 					*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
 					clusterClient.ClusterV1().ManagedClusters()),
 				clusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				addOnLister:   addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				addOnLister:   addOnInformerFactory.Addon().V1beta1().ManagedClusterAddOns().Lister(),
 			}
 
 			err := controller.sync(context.Background(), testingcommon.NewFakeSyncContext(t, c.queueKey), c.queueKey)
