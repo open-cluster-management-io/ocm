@@ -18,12 +18,15 @@ import (
 )
 
 var _ = ginkgo.Describe("Addon install", func() {
-	suffix := rand.String(5)
+	var suffix string
 	var cma *addonapiv1alpha1.ClusterManagementAddOn
 	var placementNamespace string
 	var clusterNames []string
 
 	ginkgo.BeforeEach(func() {
+		suffix = rand.String(5)
+		clusterNames = nil
+
 		// Create clustermanagement addon
 		cma = newClusterManagementAddon(fmt.Sprintf("test-%s", suffix))
 		_, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(), cma, metav1.CreateOptions{})
@@ -160,6 +163,86 @@ var _ = ginkgo.Describe("Addon install", func() {
 				_, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterNames[1]).Get(context.Background(), cma.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("Should sync hosting cluster name annotation from managed cluster to addon", func() {
+			// Add hosting-cluster-name annotation to one of the managed clusters
+			cluster, err := hubClusterClient.ClusterV1().ManagedClusters().Get(context.Background(), clusterNames[0], metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			cluster.Annotations = map[string]string{
+				addonapiv1alpha1.HostingClusterNameAnnotationKey: "hosting-cluster",
+			}
+			_, err = hubClusterClient.ClusterV1().ManagedClusters().Update(context.Background(), cluster, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			placement := &clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement-hosted", Namespace: placementNamespace}}
+			_, err = hubClusterClient.ClusterV1beta1().Placements(placementNamespace).Create(context.Background(), placement, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			decision := &clusterv1beta1.PlacementDecision{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-placement-hosted",
+					Namespace: placementNamespace,
+					Labels: map[string]string{
+						clusterv1beta1.PlacementLabel:          "test-placement-hosted",
+						clusterv1beta1.DecisionGroupIndexLabel: "0",
+					},
+				},
+			}
+			decision, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementNamespace).Create(context.Background(), decision, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			decision.Status.Decisions = []clusterv1beta1.ClusterDecision{
+				{ClusterName: clusterNames[0]},
+				{ClusterName: clusterNames[1]},
+			}
+			_, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementNamespace).UpdateStatus(context.Background(), decision, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			clusterManagementAddon, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), cma.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			clusterManagementAddon.Spec.InstallStrategy = addonapiv1alpha1.InstallStrategy{
+				Type: addonapiv1alpha1.AddonInstallStrategyPlacements,
+				Placements: []addonapiv1alpha1.PlacementStrategy{
+					{
+						PlacementRef: addonapiv1alpha1.PlacementRef{Name: "test-placement-hosted", Namespace: placementNamespace},
+						RolloutStrategy: clusterv1alpha1.RolloutStrategy{
+							Type: clusterv1alpha1.All,
+						},
+					},
+				},
+			}
+			_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Update(context.Background(), clusterManagementAddon, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Verify the addon on the hosted cluster has the hosting-cluster-name annotation
+			gomega.Eventually(func() error {
+				addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterNames[0]).Get(context.Background(), cma.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				hostingCluster, ok := addon.Annotations[addonapiv1alpha1.HostingClusterNameAnnotationKey]
+				if !ok {
+					return fmt.Errorf("expected hosting cluster name annotation on addon in cluster %s", clusterNames[0])
+				}
+				if hostingCluster != "hosting-cluster" {
+					return fmt.Errorf("expected hosting cluster name 'hosting-cluster', got '%s'", hostingCluster)
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			// Verify the addon on the non-hosted cluster does NOT have the hosting-cluster-name annotation
+			gomega.Eventually(func() error {
+				addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterNames[1]).Get(context.Background(), cma.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if _, ok := addon.Annotations[addonapiv1alpha1.HostingClusterNameAnnotationKey]; ok {
+					return fmt.Errorf("expected no hosting cluster name annotation on addon in cluster %s", clusterNames[1])
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())

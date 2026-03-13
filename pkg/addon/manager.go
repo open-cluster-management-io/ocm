@@ -24,6 +24,7 @@ import (
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
 
+	"open-cluster-management.io/ocm/pkg/addon/controllers/addonannotation"
 	"open-cluster-management.io/ocm/pkg/addon/controllers/addonconfiguration"
 	"open-cluster-management.io/ocm/pkg/addon/controllers/addonmanagement"
 	"open-cluster-management.io/ocm/pkg/addon/controllers/addonowner"
@@ -161,6 +162,7 @@ func RunControllerManagerWithInformers(
 		hubAddOnClient,
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
+		clusterInformers.Cluster().V1().ManagedClusters(),
 		clusterInformers.Cluster().V1beta1().Placements(),
 		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
 		utils.ManagedByAddonManager,
@@ -197,6 +199,13 @@ func RunControllerManagerWithInformers(
 		utils.ManagedByAddonManager,
 	)
 
+	addonAnnotationController := addonannotation.NewAddonAnnotationController(
+		hubAddOnClient,
+		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
+		clusterInformers.Cluster().V1().ManagedClusters(),
+	)
+
 	addonTemplateController := addontemplate.NewAddonTemplateController(
 		controllerContext.KubeConfig,
 		hubKubeClient,
@@ -224,6 +233,7 @@ func RunControllerManagerWithInformers(
 	go addonOwnerController.Run(ctx, 2)
 	go addonProgressingController.Run(ctx, 2)
 	go mgmtAddonInstallProgressionController.Run(ctx, 2)
+	go addonAnnotationController.Run(ctx, 2)
 	// There should be only one instance of addonTemplateController running, since the addonTemplateController will
 	// start a goroutine for each template-type addon it watches.
 	go addonTemplateController.Run(ctx, 1)
