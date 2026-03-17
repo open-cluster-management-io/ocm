@@ -105,6 +105,12 @@ var _ = ginkgo.Describe("Addon management", ginkgo.Ordered, ginkgo.Label("addon-
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		}
 
+		ginkgo.By("cleanup csr previous create for the addon")
+		err = hub.KubeClient.CertificatesV1().CertificateSigningRequests().DeleteCollection(
+			context.TODO(), metav1.DeleteOptions{},
+			metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", addonapiv1alpha1.AddonLabelKey, addOnName)})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 		ginkgo.By("create addon custom sign secret")
 		err = copySignerSecret(context.TODO(), hub.KubeClient, "open-cluster-management-hub",
 			"signer-secret", signerSecretNamespace, customSignerSecretName)
