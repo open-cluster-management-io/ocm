@@ -175,10 +175,6 @@ var _ = ginkgo.BeforeSuite(func() {
 						Address: "localhost",
 						Port:    443,
 					},
-					AddonWebhookConfiguration: operatorapiv1.HostedWebhookConfiguration{
-						Address: "localhost",
-						Port:    443,
-					},
 				},
 			},
 			WorkConfiguration: &operatorapiv1.WorkConfiguration{

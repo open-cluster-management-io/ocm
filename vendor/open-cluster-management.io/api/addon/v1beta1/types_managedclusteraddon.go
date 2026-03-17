@@ -457,3 +457,9 @@ const (
 	// successful to set up rbac for the addon agent.
 	RegistrationAppliedSetPermissionApplied = "SetPermissionApplied"
 )
+
+const (
+	// InstallNamespaceAnnotation is the annotation key for storing installNamespace
+	// This is used because installNamespace field was removed in v1beta1
+	InstallNamespaceAnnotation = "addon.open-cluster-management.io/v1alpha1-install-namespace"
+)

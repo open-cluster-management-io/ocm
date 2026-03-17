@@ -2,8 +2,6 @@
 package v1beta1
 
 import (
-	"fmt"
-
 	certificates "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"open-cluster-management.io/api/addon/v1alpha1"
@@ -139,24 +137,22 @@ func Convert_v1alpha1_ManagedClusterAddOnStatus_To_v1beta1_ManagedClusterAddOnSt
 func Convert_v1beta1_RegistrationConfig_To_v1alpha1_RegistrationConfig(in *RegistrationConfig, out *v1alpha1.RegistrationConfig, s conversion.Scope) error {
 	if in.Type == KubeClient {
 		out.SignerName = certificates.KubeAPIServerClientSignerName
-		if in.KubeClient == nil {
-			return fmt.Errorf("nil KubeClient")
+		if in.KubeClient != nil {
+			// Driver is now handled at status level, not in RegistrationConfig
+			out.Subject = v1alpha1.Subject{
+				User:   in.KubeClient.Subject.User,
+				Groups: in.KubeClient.Subject.Groups,
+			}
 		}
-		out.Subject = v1alpha1.Subject{
-			User:   in.KubeClient.Subject.User,
-			Groups: in.KubeClient.Subject.Groups,
-		}
-		// Driver is now handled at status level, not in RegistrationConfig
+
 	} else {
-		if in.CustomSigner == nil {
-			return fmt.Errorf("nil CustomSigner")
-		}
-		out.SignerName = in.CustomSigner.SignerName
-		if err := Convert_v1beta1_Subject_To_v1alpha1_Subject(&in.CustomSigner.Subject, &out.Subject, s); err != nil {
-			return err
+		if in.CustomSigner != nil {
+			out.SignerName = in.CustomSigner.SignerName
+			if err := Convert_v1beta1_Subject_To_v1alpha1_Subject(&in.CustomSigner.Subject, &out.Subject, s); err != nil {
+				return err
+			}
 		}
 	}
-
 	return nil
 }
 

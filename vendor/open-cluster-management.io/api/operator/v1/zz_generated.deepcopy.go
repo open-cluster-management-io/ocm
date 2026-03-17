@@ -493,7 +493,6 @@ func (in *HostedClusterManagerConfiguration) DeepCopyInto(out *HostedClusterMana
 	*out = *in
 	in.RegistrationWebhookConfiguration.DeepCopyInto(&out.RegistrationWebhookConfiguration)
 	in.WorkWebhookConfiguration.DeepCopyInto(&out.WorkWebhookConfiguration)
-	in.AddonWebhookConfiguration.DeepCopyInto(&out.AddonWebhookConfiguration)
 	return
 }
 

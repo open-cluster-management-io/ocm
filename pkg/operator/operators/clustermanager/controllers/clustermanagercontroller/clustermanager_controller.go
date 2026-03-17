@@ -448,7 +448,11 @@ func webhookConfigurations(deployOption operatorapiv1.ClusterManagerDeployOption
 		if deployOption.Hosted != nil {
 			registration = convertHostedWebhookConfiguration(deployOption.Hosted.RegistrationWebhookConfiguration)
 			work = convertHostedWebhookConfiguration(deployOption.Hosted.WorkWebhookConfiguration)
-			addon = convertHostedWebhookConfiguration(deployOption.Hosted.AddonWebhookConfiguration)
+			addon = manifests.Webhook{
+				Port:            defaultWebhookPort,
+				HealthProbePort: defaultHealthProbePort,
+				MetricsPort:     defaultMetricsPort,
+			}
 			return
 		}
 	}
