@@ -212,12 +212,17 @@ var _ = ginkgo.Describe("Addon management", ginkgo.Ordered, ginkgo.Label("addon-
 				return err
 			}
 
-			for _, csr := range csrs.Items {
-				err = hub.KubeClient.CertificatesV1().CertificateSigningRequests().Delete(context.TODO(),
-					csr.Name, metav1.DeleteOptions{})
-				if err != nil {
-					return err
+			if len(csrs.Items) > 0 {
+				ginkgo.By(fmt.Sprintf("Deleting %d CSRs for addon %s/%s", len(csrs.Items), universalClusterName, addOnName))
+				for _, csr := range csrs.Items {
+					err = hub.KubeClient.CertificatesV1().CertificateSigningRequests().Delete(context.TODO(),
+						csr.Name, metav1.DeleteOptions{})
+					if err != nil && !errors.IsNotFound(err) {
+						return err
+					}
 				}
+				// Return error to retry - ensures CSRs are fully deleted from API before proceeding
+				return fmt.Errorf("waiting for %d CSRs to be fully deleted", len(csrs.Items))
 			}
 
 			return nil
