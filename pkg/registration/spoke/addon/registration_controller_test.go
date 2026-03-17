@@ -359,28 +359,10 @@ func TestRegistrationSync(t *testing.T) {
 				},
 			}
 
-			// First sync: sets the driver and returns early (status updated)
 			err := controller.sync(context.Background(), testingcommon.NewFakeSyncContext(t, c.queueKey), c.queueKey)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-
-			// Second sync: processes registrations (only if addon has registrations to process)
-			// The condition checks if there are registrations to test, not whether driver is set
-			/*		if c.addOn != nil && len(c.addOn.Status.Registrations) > 0 {
-					// Update addon in store with driver set (simulating informer update)
-					updatedAddOn := c.addOn.DeepCopy()
-					updatedAddOn.Status.KubeClientDriver = "csr"
-					if err := addonStore.Update(updatedAddOn); err != nil {
-						t.Fatal(err)
-					}
-
-					// Sync again to process registrations
-					err = controller.sync(context.Background(), testingcommon.NewFakeSyncContext(t, c.queueKey), c.queueKey)
-					if err != nil {
-						t.Errorf("unexpected error: %v", err)
-					}
-				}*/
 
 			if len(c.expectedAddOnRegistrationConfigHashs) != len(controller.addOnRegistrationConfigs) {
 				t.Errorf("expected %d addOns, but got %d",

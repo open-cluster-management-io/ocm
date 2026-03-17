@@ -7,7 +7,7 @@ import (
 
 	grpcstatus "google.golang.org/grpc/status"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierros "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -15,13 +15,13 @@ import (
 const StatusReasonPublishError metav1.StatusReason = "PublishError"
 
 // ToStatusError converts the err to a kube status error
-func ToStatusError(qualifiedResource schema.GroupResource, name string, err error) *errors.StatusError {
+func ToStatusError(qualifiedResource schema.GroupResource, name string, err error) *apierros.StatusError {
 	grpcErr, ok := grpcstatus.FromError(err)
 	if !ok {
 		return NewPublishError(qualifiedResource, name, err)
 	}
 
-	var statusErr errors.StatusError
+	var statusErr apierros.StatusError
 	if unmarshalErr := json.Unmarshal([]byte(grpcErr.Message()), &statusErr); unmarshalErr != nil {
 		return NewPublishError(qualifiedResource, name, err)
 	}
@@ -30,8 +30,8 @@ func ToStatusError(qualifiedResource schema.GroupResource, name string, err erro
 }
 
 // NewPublishError returns an error indicating a resource could not be published, and the client can try again.
-func NewPublishError(qualifiedResource schema.GroupResource, name string, err error) *errors.StatusError {
-	return &errors.StatusError{
+func NewPublishError(qualifiedResource schema.GroupResource, name string, err error) *apierros.StatusError {
+	return &apierros.StatusError{
 		ErrStatus: metav1.Status{
 			Status: metav1.StatusFailure,
 			Code:   http.StatusInternalServerError,
@@ -50,5 +50,5 @@ func NewPublishError(qualifiedResource schema.GroupResource, name string, err er
 // IsPublishError determines if err is a publish error which indicates that the request can be retried
 // by the client.
 func IsPublishError(err error) bool {
-	return errors.ReasonForError(err) == StatusReasonPublishError
+	return apierros.ReasonForError(err) == StatusReasonPublishError
 }

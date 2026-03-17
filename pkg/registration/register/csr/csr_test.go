@@ -23,7 +23,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2/ktesting"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
@@ -532,7 +531,7 @@ func TestIndexByClusterName(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						clusterv1.ClusterNameLabelKey: "cluster1",
-						addonv1alpha1.AddonLabelKey:   "addon1",
+						addonv1beta1.AddonLabelKey:    "addon1",
 					},
 				},
 			},
@@ -579,7 +578,7 @@ func TestIndexByAddonFunc(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						clusterv1.ClusterNameLabelKey: "cluster1",
-						addonv1alpha1.AddonLabelKey:   "addon1",
+						addonv1beta1.AddonLabelKey:    "addon1",
 					},
 				},
 			},
@@ -663,7 +662,7 @@ func TestCSREventFilterFunc(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						clusterv1.ClusterNameLabelKey: "cluster2",
-						addonv1alpha1.AddonLabelKey:   "addon1",
+						addonv1beta1.AddonLabelKey:    "addon1",
 					},
 				},
 				Spec: certificates.CertificateSigningRequestSpec{
@@ -678,7 +677,7 @@ func TestCSREventFilterFunc(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						clusterv1.ClusterNameLabelKey: "cluster1",
-						addonv1alpha1.AddonLabelKey:   "addon2",
+						addonv1beta1.AddonLabelKey:    "addon2",
 					},
 				},
 				Spec: certificates.CertificateSigningRequestSpec{
@@ -693,7 +692,7 @@ func TestCSREventFilterFunc(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						clusterv1.ClusterNameLabelKey: "cluster1",
-						addonv1alpha1.AddonLabelKey:   "addon1",
+						addonv1beta1.AddonLabelKey:    "addon1",
 					},
 				},
 				Spec: certificates.CertificateSigningRequestSpec{
@@ -708,7 +707,7 @@ func TestCSREventFilterFunc(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						clusterv1.ClusterNameLabelKey: "cluster1",
-						addonv1alpha1.AddonLabelKey:   "addon1",
+						addonv1beta1.AddonLabelKey:    "addon1",
 					},
 				},
 				Spec: certificates.CertificateSigningRequestSpec{
@@ -807,7 +806,7 @@ func TestBuildClient(t *testing.T) {
 
 func TestCSRDriver_Fork_TokenAuth(t *testing.T) {
 	// Setup addon client and informer
-	addon := &addonv1alpha1.ManagedClusterAddOn{
+	addon := &addonv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "addon1",
 			Namespace: "cluster1",
@@ -1052,7 +1051,7 @@ func TestCSRDriver_SetTokenControl(t *testing.T) {
 func TestCSRDriver_SetAddonClients(t *testing.T) {
 	driver := &CSRDriver{}
 
-	addon := &addonv1alpha1.ManagedClusterAddOn{
+	addon := &addonv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "addon1",
 			Namespace: "cluster1",

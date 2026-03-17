@@ -8,6 +8,7 @@ import (
 	"github.com/cloudevents/sdk-go/v2/binding"
 
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/serviceaccount"
 	grpcprotocol "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protocol"
 
@@ -218,6 +219,7 @@ func toSubjectAccessReview(clusterName string, user string, groups []string, eve
 		sar.Spec.ResourceAttributes.Name = clusterName
 		return sar, nil
 	case v1alpha1.ManagedClusterAddOnEventDataType,
+		v1beta1.ManagedClusterAddOnEventDataType,
 		csr.CSREventDataType,
 		event.EventEventDataType,
 		lease.LeaseEventDataType:
