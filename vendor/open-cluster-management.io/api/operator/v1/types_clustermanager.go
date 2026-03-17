@@ -387,6 +387,10 @@ type DefaultClusterManagerConfiguration struct {
 	// WorkWebhookConfiguration represents the customized webhook-server configuration of work.
 	// +optional
 	WorkWebhookConfiguration DefaultWebhookConfiguration `json:"workWebhookConfiguration,omitempty"`
+
+	// AddonWebhookConfiguration represents the customized webhook-server configuration of addons.
+	// +optional
+	AddonWebhookConfiguration DefaultWebhookConfiguration `json:"addonWebhookConfiguration,omitempty"`
 }
 
 // HostedClusterManagerConfiguration represents customized configurations we need to set for clustermanager in the Hosted mode.
@@ -398,6 +402,10 @@ type HostedClusterManagerConfiguration struct {
 	// WorkWebhookConfiguration represents the customized webhook-server configuration of work.
 	// +optional
 	WorkWebhookConfiguration HostedWebhookConfiguration `json:"workWebhookConfiguration,omitempty"`
+
+	// AddonWebhookConfiguration represents the customized webhook-server configuration of addons.
+	// +optional
+	AddonWebhookConfiguration HostedWebhookConfiguration `json:"addonWebhookConfiguration,omitempty"`
 }
 
 // BindConfiguration represents customization of server bindings

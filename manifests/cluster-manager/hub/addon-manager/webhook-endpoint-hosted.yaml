@@ -1,5 +1,5 @@
+kind: Endpoints
 apiVersion: v1
-kind: Service
 metadata:
   name: cluster-manager-addon-webhook
   namespace: {{ .ClusterManagerNamespace }}
@@ -9,10 +9,9 @@ metadata:
     "{{ $key }}": "{{ $value }}"
     {{ end }}
     {{ end }}
-spec:
-  selector:
-    app: {{ .ClusterManagerName }}-addon-webhook
-  ports:
-  - name: webhook
-    port: {{ .AddonWebhook.Port }}
-    targetPort: {{ .AddonWebhook.Port }}
+subsets:
+  - addresses:
+      - ip: {{.AddonWebhook.HostedAddress}}
+    ports:
+      - port: {{.AddonWebhook.HostedPort}}
+        name: tls
