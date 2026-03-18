@@ -49,6 +49,9 @@ type HubConfig struct {
 	GRPCServerImage                   string
 	GRPCAutoApprovedUsers             string
 	GRPCEndpointType                  string
+	// TLS configuration for addon webhook
+	AddonWebhookTLSMinVersion   string
+	AddonWebhookTLSCipherSuites string
 }
 
 type Webhook struct {

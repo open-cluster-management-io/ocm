@@ -91,6 +91,26 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 	}
 	operatorInformer := operatorinformer.NewSharedInformerFactory(operatorClient, 5*time.Minute)
 
+	// Load TLS config to pass to addon webhook deployment.
+	// This code only runs on the leader pod (due to leader election in controllercmd).
+	currentTLSConfig, err := tlslib.LoadTLSConfigFromConfigMap(ctx, kubeClient, controllerContext.OperatorNamespace)
+	if err != nil {
+		logger.Error(err, "Failed to load TLS ConfigMap, using default TLS config")
+	}
+	if currentTLSConfig == nil {
+		// No ConfigMap, use default TLS config
+		currentTLSConfig = tlslib.GetDefaultTLSConfig()
+		logger.Info("No TLS ConfigMap found, using default TLS config for addon webhook",
+			"minVersion", tlslib.TLSVersionToString(currentTLSConfig.MinVersion))
+	} else {
+		logger.Info("Loaded TLS config from ConfigMap for addon webhook",
+			"minVersion", tlslib.TLSVersionToString(currentTLSConfig.MinVersion),
+			"cipherSuites", len(currentTLSConfig.CipherSuites))
+	}
+	// Convert TLS config to string format for addon webhook flags
+	tlsMinVersion := tlslib.TLSVersionToString(currentTLSConfig.MinVersion)
+	tlsCipherSuites := tlslib.CipherSuitesToString(currentTLSConfig.CipherSuites)
+
 	clusterManagerController := clustermanagercontroller.NewClusterManagerController(
 		kubeClient,
 		controllerContext.KubeConfig,
@@ -103,6 +123,8 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		o.DeploymentReplicas,
 		controllerContext.OperatorNamespace,
 		o.EnableSyncLabels,
+		tlsMinVersion,
+		tlsCipherSuites,
 	)
 
 	statusController := clustermanagerstatuscontroller.NewClusterManagerStatusController(
@@ -128,30 +150,14 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		operatorInformer.Operator().V1().ClusterManagers())
 
 	// Setup TLS ConfigMap watcher to restart operator when TLS config changes.
-	// Note: This code only runs on the leader pod (due to leader election in controllercmd).
-	// Non-leader pods wait idle and run this function when they become leader, loading
-	// the current ConfigMap at that time. This ensures each leader uses the latest config.
-	currentTLSConfig, err := tlslib.LoadTLSConfigFromConfigMap(ctx, kubeClient, controllerContext.OperatorNamespace)
-	if err != nil {
-		logger.Error(err, "Failed to load TLS ConfigMap, using default TLS config")
-	}
-	if currentTLSConfig == nil {
-		// No ConfigMap, use default TLS config
-		currentTLSConfig = tlslib.GetDefaultTLSConfig()
-		logger.Info("No TLS ConfigMap found, using default TLS config",
-			"minVersion", tlslib.TLSVersionToString(currentTLSConfig.MinVersion))
-	} else {
-		logger.Info("Loaded TLS config from ConfigMap",
-			"minVersion", tlslib.TLSVersionToString(currentTLSConfig.MinVersion),
-			"cipherSuites", len(currentTLSConfig.CipherSuites))
-	}
-
 	// Compute hash of current TLS config
 	currentTLSHash := tlslib.HashTLSConfig(currentTLSConfig)
 
 	tlsInformer := tlsConfigMapInformer.Core().V1().ConfigMaps().Informer()
-	tlsInformer.AddEventHandler(
-		tlslib.NewRestartEventHandler(ctx, logger, "cluster-manager operator", currentTLSHash))
+	if _, err := tlsInformer.AddEventHandler(
+		tlslib.NewRestartEventHandler(ctx, logger, "cluster-manager operator", currentTLSHash)); err != nil {
+		return err
+	}
 
 	go operatorInformer.Start(ctx.Done())
 	go deploymentInformer.Start(ctx.Done())

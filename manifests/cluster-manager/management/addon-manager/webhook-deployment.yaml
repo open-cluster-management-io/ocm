@@ -73,6 +73,12 @@ spec:
         - "--port={{ .AddonWebhook.Port }}"
         - "--health-probe-port={{ .AddonWebhook.HealthProbePort }}"
         - "--metrics-port={{ .AddonWebhook.MetricsPort }}"
+        {{- if .AddonWebhookTLSMinVersion }}
+        - "--tls-min-version={{ .AddonWebhookTLSMinVersion }}"
+        {{- end }}
+        {{- if .AddonWebhookTLSCipherSuites }}
+        - "--tls-cipher-suites={{ .AddonWebhookTLSCipherSuites }}"
+        {{- end }}
         {{- if or (eq .ResourceRequirementResourceType "Default") (eq .ResourceRequirementResourceType "") }}
         resources:
           requests:
