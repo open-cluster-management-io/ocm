@@ -16,6 +16,7 @@ import (
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
 
+	tlslib "open-cluster-management.io/ocm/pkg/common/tls"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/certrotationcontroller"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/clustermanagercontroller"
@@ -60,6 +61,7 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 	addonSecretInformer := newOneTermInformer(helpers.AddonWebhookSecret)
 	grpcServerSecretInformer := newOneTermInformer(helpers.GRPCServerSecret)
 	configmapInformer := newOneTermInformer(helpers.CaBundleConfigmap)
+	tlsConfigMapInformer := newOneTermInformer(tlslib.ConfigMapName)
 
 	deploymentInformer := informers.NewSharedInformerFactoryWithOptions(kubeClient, 5*time.Minute,
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
@@ -125,6 +127,32 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		kubeClient,
 		operatorInformer.Operator().V1().ClusterManagers())
 
+	// Setup TLS ConfigMap watcher to restart operator when TLS config changes.
+	// Note: This code only runs on the leader pod (due to leader election in controllercmd).
+	// Non-leader pods wait idle and run this function when they become leader, loading
+	// the current ConfigMap at that time. This ensures each leader uses the latest config.
+	currentTLSConfig, err := tlslib.LoadTLSConfigFromConfigMap(ctx, kubeClient, controllerContext.OperatorNamespace)
+	if err != nil {
+		logger.Error(err, "Failed to load TLS ConfigMap, using default TLS config")
+	}
+	if currentTLSConfig == nil {
+		// No ConfigMap, use default TLS config
+		currentTLSConfig = tlslib.GetDefaultTLSConfig()
+		logger.Info("No TLS ConfigMap found, using default TLS config",
+			"minVersion", tlslib.TLSVersionToString(currentTLSConfig.MinVersion))
+	} else {
+		logger.Info("Loaded TLS config from ConfigMap",
+			"minVersion", tlslib.TLSVersionToString(currentTLSConfig.MinVersion),
+			"cipherSuites", len(currentTLSConfig.CipherSuites))
+	}
+
+	// Compute hash of current TLS config
+	currentTLSHash := tlslib.HashTLSConfig(currentTLSConfig)
+
+	tlsInformer := tlsConfigMapInformer.Core().V1().ConfigMaps().Informer()
+	tlsInformer.AddEventHandler(
+		tlslib.NewRestartEventHandler(ctx, logger, "cluster-manager operator", currentTLSHash))
+
 	go operatorInformer.Start(ctx.Done())
 	go deploymentInformer.Start(ctx.Done())
 	go signerSecretInformer.Start(ctx.Done())
@@ -133,11 +161,13 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 	go addonSecretInformer.Start(ctx.Done())
 	go grpcServerSecretInformer.Start(ctx.Done())
 	go configmapInformer.Start(ctx.Done())
+	go tlsConfigMapInformer.Start(ctx.Done())
 	go clusterManagerController.Run(ctx, 1)
 	go statusController.Run(ctx, 1)
 	go certRotationController.Run(ctx, 1)
 	go crdMigrationController.Run(ctx, 1)
 	go crdStatusController.Run(ctx, 1)
+
 	<-ctx.Done()
 	return nil
 }

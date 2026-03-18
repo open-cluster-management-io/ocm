@@ -2,11 +2,13 @@ package tls
 
 import (
 	"context"
+	"os"
 	"time"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -56,7 +58,7 @@ func (w *ConfigMapWatcher) Start(ctx context.Context) error {
 		// Continue anyway - ConfigMap might be created later
 	}
 	if cm != nil {
-		w.initialHash = hashTLSConfig(cm)
+		w.initialHash = HashTLSConfig(cm)
 		logger.Info("Initial TLS config loaded", "hash", w.initialHash)
 	}
 
@@ -152,12 +154,97 @@ func hashConfigMap(cm *corev1.ConfigMap) string {
 	return cm.Data[ConfigMapKeyMinVersion] + "|" + cm.Data[ConfigMapKeyCipherSuites]
 }
 
-// hashTLSConfig creates a hash from TLSConfig
-func hashTLSConfig(cfg *TLSConfig) string {
+// HashTLSConfig creates a hash from TLSConfig for change detection
+func HashTLSConfig(cfg *TLSConfig) string {
 	if cfg == nil {
 		return ""
 	}
 	minVer := TLSVersionToString(cfg.MinVersion)
 	ciphers := CipherSuitesToString(cfg.CipherSuites)
 	return minVer + "|" + ciphers
+}
+
+// NewRestartEventHandler creates a ResourceEventHandler that restarts the process
+// when the TLS ConfigMap changes. It compares the ConfigMap hash with the current
+// TLS config hash to avoid unnecessary restarts.
+//
+// currentHash is the hash of the TLS config currently in use by this pod.
+// For leader-elected operators, this is loaded when the pod becomes leader, ensuring
+// it always reflects the latest ConfigMap state at that time.
+func NewRestartEventHandler(ctx context.Context, logger logr.Logger, componentName string, currentHash string) cache.ResourceEventHandler {
+	return cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			cm := obj.(*corev1.ConfigMap)
+			if cm.Name != ConfigMapName {
+				return
+			}
+			configMapHash := hashConfigMap(cm)
+
+			// Only restart if the ConfigMap hash differs from what we're currently using
+			if configMapHash != currentHash {
+				logger.Info("TLS ConfigMap created with different config, restarting",
+					"component", componentName,
+					"configmap", cm.Name,
+					"currentHash", currentHash,
+					"configMapHash", configMapHash)
+				os.Exit(0) // Restart to apply TLS config
+			} else {
+				logger.Info("TLS ConfigMap created with same config, no restart needed",
+					"component", componentName,
+					"configmap", cm.Name,
+					"hash", configMapHash)
+			}
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			oldCM := oldObj.(*corev1.ConfigMap)
+			newCM := newObj.(*corev1.ConfigMap)
+			if newCM.Name != ConfigMapName {
+				return
+			}
+
+			// Check if TLS data actually changed
+			oldHash := hashConfigMap(oldCM)
+			newHash := hashConfigMap(newCM)
+
+			if oldHash != newHash {
+				// Compare new hash with current hash
+				if newHash != currentHash {
+					logger.Info("TLS ConfigMap modified with different config, restarting",
+						"component", componentName,
+						"configmap", newCM.Name,
+						"currentHash", currentHash,
+						"oldHash", oldHash,
+						"newHash", newHash,
+					)
+					os.Exit(0) // Kubernetes will restart the pod
+				} else {
+					logger.Info("TLS ConfigMap modified but matches current config, no restart needed",
+						"component", componentName,
+						"configmap", newCM.Name,
+						"hash", newHash)
+				}
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			cm := obj.(*corev1.ConfigMap)
+			if cm.Name != ConfigMapName {
+				return
+			}
+
+			// Only restart if we were using the ConfigMap (not default)
+			defaultHash := HashTLSConfig(GetDefaultTLSConfig())
+			if currentHash != defaultHash {
+				logger.Info("TLS ConfigMap deleted, restarting to use default config",
+					"component", componentName,
+					"configmap", cm.Name,
+					"currentHash", currentHash,
+					"defaultHash", defaultHash)
+				os.Exit(0) // Kubernetes will restart the pod
+			} else {
+				logger.Info("TLS ConfigMap deleted but already using default config, no restart needed",
+					"component", componentName,
+					"configmap", cm.Name)
+			}
+		},
+	}
 }

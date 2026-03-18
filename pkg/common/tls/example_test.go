@@ -56,7 +56,7 @@ func Example_operatorWatchAndRestart() {
 func Example_componentWithFlags() {
 	// Parse TLS configuration from command-line flags
 	// Flags are set by operator when deploying the component
-	minVersion := "VersionTLS13"                                  // from --tls-min-version flag
+	minVersion := "VersionTLS13"                                    // from --tls-min-version flag
 	cipherSuites := "TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384" // from --tls-cipher-suites flag
 
 	tlsConfig, err := tlslib.TLSConfigFromFlags(minVersion, cipherSuites)
@@ -91,7 +91,7 @@ func Example_operatorCreatesConfigMap() {
 	// and creates ConfigMap in managed namespace
 	cm := tlslib.CreateTLSConfigMap(
 		"managed-namespace",
-		"VersionTLS13",                                       // minVersion from operator's ConfigMap
+		"VersionTLS13", // minVersion from operator's ConfigMap
 		"TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384", // cipherSuites from operator's ConfigMap
 	)
 
