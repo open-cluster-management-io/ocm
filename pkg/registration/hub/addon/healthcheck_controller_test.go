@@ -92,9 +92,9 @@ func TestSync(t *testing.T) {
 
 			addOnClient := addonfake.NewSimpleClientset(c.addOns...)
 			addOnInformerFactory := addoninformers.NewSharedInformerFactory(addOnClient, time.Minute*10)
-			addOnStroe := addOnInformerFactory.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore()
+			addOnStore := addOnInformerFactory.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore()
 			for _, addOn := range c.addOns {
-				if err := addOnStroe.Add(addOn); err != nil {
+				if err := addOnStore.Add(addOn); err != nil {
 					t.Fatal(err)
 				}
 			}

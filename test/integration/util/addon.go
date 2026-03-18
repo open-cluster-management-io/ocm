@@ -66,7 +66,6 @@ func AddConversionForAddonAPI(ctx context.Context, apiExtClient apiextensionscli
 		if err != nil {
 			return err
 		}
-		return nil
 	}
 
 	return nil

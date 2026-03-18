@@ -478,7 +478,7 @@ var _ = ginkgo.Describe("Create v1alpha1 ClusterManagementAddOn", ginkgo.Label("
 					},
 					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
 						ConfigReferent: addonv1alpha1.ConfigReferent{
-							Name: "status-config",
+							Name: "test-config",
 						},
 					},
 				},
@@ -505,7 +505,7 @@ var _ = ginkgo.Describe("Create v1alpha1 ClusterManagementAddOn", ginkgo.Label("
 			if len(v1beta1Addon.Status.DefaultConfigReferences) != 1 {
 				return fmt.Errorf("expected 1 default config but got %v", len(v1beta1Addon.Status.DefaultConfigReferences))
 			}
-			if v1beta1Addon.Status.DefaultConfigReferences[0].DesiredConfig.Name != "status-config" {
+			if v1beta1Addon.Status.DefaultConfigReferences[0].DesiredConfig.Name != "test-config" {
 				return fmt.Errorf("expected status-config but got %v", v1beta1Addon.Status.DefaultConfigReferences[0].DesiredConfig.Name)
 			}
 			return nil

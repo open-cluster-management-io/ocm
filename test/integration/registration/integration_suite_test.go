@@ -254,9 +254,9 @@ var _ = ginkgo.BeforeSuite(func() {
 	}
 
 	startHub(hubOption)
+	var webhookCtx context.Context
+	webhookCtx, stopWebhook = context.WithCancel(context.Background())
 	go func() {
-		var webhookCtx context.Context
-		webhookCtx, stopWebhook = context.WithCancel(context.Background())
 		defer ginkgo.GinkgoRecover()
 		err := util.StartWebhook(webhookCtx, testEnv, cfg)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -284,9 +284,15 @@ var _ = ginkgo.BeforeSuite(func() {
 
 var _ = ginkgo.AfterSuite(func() {
 	ginkgo.By("tearing down the test environment")
-	stopHub()
-	stopProxy()
-	stopWebhook()
+	if stopHub != nil {
+		stopHub()
+	}
+	if stopProxy != nil {
+		stopProxy()
+	}
+	if stopWebhook != nil {
+		stopWebhook()
+	}
 
 	err := testEnv.Stop()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())

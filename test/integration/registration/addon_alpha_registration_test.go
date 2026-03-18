@@ -60,7 +60,9 @@ var _ = ginkgo.Describe("Addon Alpha Registration", func() {
 
 	ginkgo.AfterEach(
 		func() {
-			cancel()
+			if cancel != nil {
+				cancel()
+			}
 		})
 
 	assertSuccessClusterBootstrap := func() {

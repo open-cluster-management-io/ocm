@@ -133,7 +133,7 @@ func (c *addOnRegistrationController) syncAddOn(ctx context.Context, syncCtx fac
 
 	// Ensure driver field is set for kubeClient type registrations
 	// If updated, return early to allow re-sync with the updated state
-	if updated, err := c.ensureDriver(ctx, addOn); updated {
+	if updated, err := c.ensureDriver(ctx, addOn); err != nil || updated {
 		return err
 	}
 
