@@ -14,6 +14,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	tlslib "open-cluster-management.io/ocm/pkg/common/tls"
 )
 
 type WebhookOptions struct {
@@ -23,6 +25,10 @@ type WebhookOptions struct {
 	CertDir         string
 	scheme          *runtime.Scheme
 	webhooks        []WebhookInitializer
+
+	// TLS configuration flags
+	TLSMinVersion   string
+	TLSCipherSuites string
 
 	// for testing
 	Cfg *rest.Config
@@ -47,6 +53,14 @@ func (c *WebhookOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.CertDir, "certdir", c.CertDir,
 		"CertDir is the directory that contains the server key and certificate. If not set, "+
 			"webhook server would look up the server key and certificate in {TempDir}/k8s-webhook-server/serving-certs")
+
+	// TLS configuration flags
+	fs.StringVar(&c.TLSMinVersion, "tls-min-version", c.TLSMinVersion,
+		"Minimum TLS version supported. Values: VersionTLS10, VersionTLS11, VersionTLS12, VersionTLS13. "+
+			"If not set, defaults to VersionTLS12.")
+	fs.StringVar(&c.TLSCipherSuites, "tls-cipher-suites", c.TLSCipherSuites,
+		"Comma-separated list of cipher suites for the server. "+
+			"If not set, uses Go's default cipher suites for the specified TLS version.")
 }
 
 type WebhookInitializer interface {
@@ -75,6 +89,21 @@ func (c *WebhookOptions) RunWebhookServer(ctx context.Context) error {
 		c.Cfg = ctrl.GetConfigOrDie()
 	}
 
+	// Parse TLS configuration from flags or use default (TLS 1.2)
+	tlsConfig, err := tlslib.TLSConfigFromFlags(c.TLSMinVersion, c.TLSCipherSuites)
+	if err != nil {
+		logger.Error(err, "invalid TLS configuration flags")
+		return err
+	}
+	if tlsConfig == nil {
+		// No flags provided, use default TLS 1.2
+		tlsConfig = tlslib.GetDefaultTLSConfig()
+	}
+
+	logger.Info("Using TLS configuration",
+		"minVersion", tlslib.TLSVersionToString(tlsConfig.MinVersion),
+		"cipherSuites", len(tlsConfig.CipherSuites))
+
 	healthProbeBindAddress, metricsBindAddress := "0", "0"
 	if c.HealthProbePort > 0 {
 		healthProbeBindAddress = fmt.Sprintf(":%d", c.HealthProbePort)
@@ -93,9 +122,7 @@ func (c *WebhookOptions) RunWebhookServer(ctx context.Context) error {
 			Port:    c.Port,
 			CertDir: c.CertDir,
 			TLSOpts: []func(config *tls.Config){
-				func(config *tls.Config) {
-					config.MinVersion = tls.VersionTLS12
-				},
+				tlslib.TLSConfigToFunc(tlsConfig),
 			},
 		}),
 	})
