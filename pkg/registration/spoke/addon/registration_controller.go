@@ -141,7 +141,7 @@ func (c *addOnRegistrationController) syncAddOn(ctx context.Context, syncCtx fac
 		AgentRunningOutsideManagedCluster: isAddonRunningOutsideManagedCluster(addOn),
 		InstallationNamespace:             getAddOnInstallationNamespace(addOn),
 	}
-	configs, err := getRegistrationConfigs(addOnName, installOption, addOn.Status.Registrations)
+	configs, err := getRegistrationConfigs(addOnName, c.clusterName, installOption, addOn.Status.Registrations, logger)
 	if err != nil {
 		return err
 	}
@@ -301,7 +301,9 @@ func (c *addOnRegistrationController) ensureDriver(ctx context.Context, addon *a
 		}
 
 		updated, err := c.patcher.PatchStatus(ctx, addonCopy, addonCopy.Status, addon.Status)
-		logger.Info("Updated kubeClientDriver in status", "addon", addon.Name, "driver", addonCopy.Status.Registrations)
+		if updated {
+			logger.Info("Updated kubeClientDriver in status", "addon", addon.Name, "driver", addonCopy.Status.Registrations)
+		}
 		return updated, err
 	}
 

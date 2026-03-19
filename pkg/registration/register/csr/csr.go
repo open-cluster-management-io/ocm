@@ -635,7 +635,7 @@ func addonX509Subject(secretOption register.SecretOption, addonName, agentName s
 		}
 		// set the default organization if signer is KubeAPIServerClientSignerName
 		if len(groups) == 0 {
-			groups = []string{defaultOrganization(secretOption.ClusterName, addonName)}
+			groups = []string{DefaultOrganization(secretOption.ClusterName, addonName)}
 		}
 	case addonv1beta1.CustomSigner:
 		if secretOption.AddonRegistration.CustomSigner != nil {
@@ -654,16 +654,16 @@ func addonX509Subject(secretOption register.SecretOption, addonName, agentName s
 
 	// set the default common name
 	if len(subject.CommonName) == 0 {
-		subject.CommonName = defaultCommonName(secretOption.ClusterName, agentName, addonName)
+		subject.CommonName = DefaultCommonName(secretOption.ClusterName, addonName)
 	}
 
 	return signer, subject
 }
 
-func defaultCommonName(clusterName, agentName, addonName string) string {
-	return fmt.Sprintf("%s:agent:%s", defaultOrganization(clusterName, addonName), agentName)
+func DefaultCommonName(clusterName, addonName string) string {
+	return fmt.Sprintf("%s:agent:%s", DefaultOrganization(clusterName, addonName), addonName)
 }
 
-func defaultOrganization(clusterName, addonName string) string {
+func DefaultOrganization(clusterName, addonName string) string {
 	return fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", clusterName, addonName)
 }

@@ -54,6 +54,9 @@ func TestQueueKeyFunc(t *testing.T) {
 					Name:      "test",
 				},
 				Spec: addonv1beta1.ManagedClusterAddOnSpec{},
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Namespace: "other",
+				},
 			}},
 			lease:            testinghelpers.NewAddOnLease("test", "test", time.Now()),
 			expectedQueueKey: "",

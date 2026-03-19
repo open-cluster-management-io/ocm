@@ -35,7 +35,11 @@ func TestRegistrationSync(t *testing.T) {
 		Type: addonv1beta1.CustomSigner,
 		CustomSigner: &addonv1beta1.CustomSignerConfig{
 			SignerName: signerName,
-			Subject:    addonv1beta1.Subject{},
+			Subject: addonv1beta1.Subject{
+				BaseSubject: addonv1beta1.BaseSubject{
+					User: "user1",
+				},
+			},
 		},
 	}
 

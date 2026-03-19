@@ -183,19 +183,15 @@ func (t *TokenDriver) ensureSubject(ctx context.Context, addon *addonv1beta1.Man
 		return false, nil
 	}
 
-	// Set subject for token-based authentication
-	expectedSubjectUser := fmt.Sprintf("system:serviceaccount:%s:%s-agent", t.clusterName, t.addonName)
-
 	// Make a copy and update subject (create new Subject with only User specified)
 	addonCopy := addon.DeepCopy()
 	if addonCopy.Status.Registrations[regIndex].KubeClient == nil {
 		return false, fmt.Errorf("kubeClient field should be set")
 	}
-	if addonCopy.Status.Registrations[regIndex].KubeClient.Subject.User == expectedSubjectUser {
-		return false, nil
-	}
 
-	addonCopy.Status.Registrations[regIndex].KubeClient.Subject.User = expectedSubjectUser
+	// This is to override the subject field which may have already been set by the addon-framework. It also
+	// removes the group field.
+	addonCopy.Status.Registrations[regIndex].KubeClient.Subject = TokenSubject(t.clusterName, addon.Name)
 	// Update the addon status using addonPatcher
 	updated, err := t.addonPatcher.PatchStatus(ctx, addonCopy, addonCopy.Status, addon.Status)
 	if err != nil {
@@ -203,10 +199,18 @@ func (t *TokenDriver) ensureSubject(ctx context.Context, addon *addonv1beta1.Man
 	}
 
 	if updated {
-		logger.Info("Updated subject field", "addon", t.addonName, "subject", expectedSubjectUser)
+		logger.Info("Updated subject field", "addon", t.addonName, "subject", addonCopy.Status.Registrations[regIndex].KubeClient.Subject)
 	}
 
 	return updated, nil
+}
+
+func TokenSubject(clusterName, addonName string) addonv1beta1.KubeClientSubject {
+	return addonv1beta1.KubeClientSubject{
+		BaseSubject: addonv1beta1.BaseSubject{
+			User: fmt.Sprintf("system:serviceaccount:%s:%s-agent", clusterName, addonName),
+		},
+	}
 }
 
 // ensureTokenInfrastructureReady waits for the TokenInfrastructureReady condition and extracts the ServiceAccount UID
