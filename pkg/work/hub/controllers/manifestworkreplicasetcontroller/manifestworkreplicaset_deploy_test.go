@@ -3,17 +3,20 @@ package manifestworkreplicasetcontroller
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	fakeclusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	workclient "open-cluster-management.io/api/client/work/clientset/versioned"
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
@@ -28,7 +31,7 @@ import (
 
 func TestDeployReconcileAsExpected(t *testing.T) {
 	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
-	mw, _ := CreateManifestWork(mwrSet, "cls1", "place-test")
+	mw := buildManifestWork(mwrSet, "", "cls1", "place-test")
 	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet, mw)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
 
@@ -647,7 +650,7 @@ func TestRequeueWithProgressDeadline(t *testing.T) {
 			},
 		},
 	}
-	mw, _ := CreateManifestWork(mwrSet, "cls1", "place-test")
+	mw := buildManifestWork(mwrSet, "", "cls1", "place-test")
 	// Set Applied=True first to ensure work has been applied by hub controller
 	apimeta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
 		Type:               workapiv1.WorkApplied,
@@ -715,8 +718,8 @@ func TestDeployReconcileDeletesOrphanedManifestWorks(t *testing.T) {
 	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test2")
 
 	// Create ManifestWorks for both placement1 (old, should be deleted) and placement2 (current, should be kept)
-	mwOldPlacement, _ := CreateManifestWork(mwrSet, "cls1", "place-test1")
-	mwCurrentPlacement, _ := CreateManifestWork(mwrSet, "cls2", "place-test2")
+	mwOldPlacement := buildManifestWork(mwrSet, "", "cls1", "place-test1")
+	mwCurrentPlacement := buildManifestWork(mwrSet, "", "cls2", "place-test2")
 
 	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet, mwOldPlacement, mwCurrentPlacement)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
@@ -761,20 +764,22 @@ func TestDeployReconcileDeletesOrphanedManifestWorks(t *testing.T) {
 	}
 
 	// Verify that the ManifestWork from the old placement (place-test1) was deleted
-	deletedMW, err := fWorkClient.WorkV1().ManifestWorks("cls1").Get(context.TODO(), mwrSet.Name, metav1.GetOptions{})
-	if err == nil {
-		t.Fatalf("Expected ManifestWork for old placement to be deleted, but it still exists: %v", deletedMW)
-	}
-
-	// Verify that the ManifestWork from the current placement (place-test2) still exists
-	currentMW, err := fWorkClient.WorkV1().ManifestWorks("cls2").Get(context.TODO(), mwrSet.Name, metav1.GetOptions{})
+	works, err := listWorksByMWRS(context.TODO(), fWorkClient, "cls1", mwrSet.Namespace, mwrSet.Name, "place-test1")
 	if err != nil {
-		t.Fatalf("Expected ManifestWork for current placement to exist, but got error: %v", err)
+		t.Fatal(err)
 	}
-	if currentMW == nil {
-		t.Fatal("Expected ManifestWork for current placement to exist, but it is nil")
+	if len(works) != 0 {
+		t.Fatalf("Expected ManifestWork for old placement to be deleted, but it still exists")
 	}
-
+	// Verify that the ManifestWork from the current placement (place-test2) still exists
+	works, err = listWorksByMWRS(context.TODO(), fWorkClient, "cls2", mwrSet.Namespace, mwrSet.Name, "place-test2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(works) != 1 {
+		t.Fatalf("Expected ManifestWork for current placement to exist, but got %d, works: %v", len(works), works)
+	}
+	currentMW := works[0]
 	// Verify the placement label is correct
 	if currentMW.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey] != "place-test2" {
 		t.Fatalf("Expected placement label to be 'place-test2', got '%s'",
@@ -789,9 +794,9 @@ func TestDeployReconcileWithMultiplePlacementChanges(t *testing.T) {
 		map[string]clusterv1alpha1.RolloutStrategy{"place-test2": allRollOut, "place-test3": allRollOut})
 
 	// Create ManifestWorks for placement1 (old), placement2 (current), and placement3 (current)
-	mwOldPlacement, _ := CreateManifestWork(mwrSet, "cls1", "place-test1")
-	mwCurrentPlacement2, _ := CreateManifestWork(mwrSet, "cls2", "place-test2")
-	mwCurrentPlacement3, _ := CreateManifestWork(mwrSet, "cls3", "place-test3")
+	mwOldPlacement := buildManifestWork(mwrSet, mwrSet.Name, "cls1", "place-test1")
+	mwCurrentPlacement2 := buildManifestWork(mwrSet, mwrSet.Name, "cls2", "place-test2")
+	mwCurrentPlacement3 := buildManifestWork(mwrSet, mwrSet.Name, "cls3", "place-test3")
 
 	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet, mwOldPlacement, mwCurrentPlacement2, mwCurrentPlacement3)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
@@ -846,22 +851,33 @@ func TestDeployReconcileWithMultiplePlacementChanges(t *testing.T) {
 	}
 
 	// Verify that the ManifestWork from the old placement (place-test1) was deleted
-	_, err = fWorkClient.WorkV1().ManifestWorks("cls1").Get(context.TODO(), mwrSet.Name, metav1.GetOptions{})
-	if err == nil {
-		t.Fatal("Expected ManifestWork for old placement to be deleted, but it still exists")
+	works, err := listWorksByMWRS(context.TODO(), fWorkClient, "cls1", mwrSet.Namespace, mwrSet.Name, "place-test1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(works) != 0 {
+		t.Fatalf("Expected ManifestWorks for old placement to be deleted, found %d", len(works))
 	}
 
 	// Verify that ManifestWorks from current placements (place-test2 and place-test3) still exist
-	currentMW2, err := fWorkClient.WorkV1().ManifestWorks("cls2").Get(context.TODO(), mwrSet.Name, metav1.GetOptions{})
+	works, err = listWorksByMWRS(context.TODO(), fWorkClient, "cls2", mwrSet.Namespace, mwrSet.Name, "place-test2")
 	if err != nil {
-		t.Fatalf("Expected ManifestWork for placement2 to exist, but got error: %v", err)
+		t.Fatal(err)
 	}
+	if len(works) != 1 {
+		t.Fatalf("Expected ManifestWork for placement2 to exist, but got error: %d, works: %v", len(works), works)
+	}
+	currentMW2 := works[0]
 	assert.Equal(t, currentMW2.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey], "place-test2")
 
-	currentMW3, err := fWorkClient.WorkV1().ManifestWorks("cls3").Get(context.TODO(), mwrSet.Name, metav1.GetOptions{})
+	works, err = listWorksByMWRS(context.TODO(), fWorkClient, "cls3", mwrSet.Namespace, mwrSet.Name, "place-test3")
 	if err != nil {
 		t.Fatalf("Expected ManifestWork for placement3 to exist, but got error: %v", err)
 	}
+	if len(works) != 1 {
+		t.Fatalf("Expected ManifestWork for placement3 to exist, but got error: %d, works: %v", len(works), works)
+	}
+	currentMW3 := works[0]
 	assert.Equal(t, currentMW3.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey], "place-test3")
 }
 func TestDeployRolloutProgressingWhenNotAllSucceeded(t *testing.T) {
@@ -1374,6 +1390,30 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 				"LastTransitionTime should match for test: %s", tt.name)
 		})
 	}
+}
+func listWorksByMWRS(
+	ctx context.Context,
+	client workclient.Interface,
+	cluster string,
+	mwrNamespace string,
+	mwrName string,
+	placement string,
+) ([]workapiv1.ManifestWork, error) {
+
+	selector := labels.Set{
+		workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey: fmt.Sprintf("%s.%s", mwrNamespace, mwrName),
+		workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey:  placement,
+	}.AsSelector().String()
+
+	list, err := client.WorkV1().
+		ManifestWorks(cluster).
+		List(ctx, metav1.ListOptions{LabelSelector: selector})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return list.Items, nil
 }
 
 func TestShouldReturnToApply(t *testing.T) {

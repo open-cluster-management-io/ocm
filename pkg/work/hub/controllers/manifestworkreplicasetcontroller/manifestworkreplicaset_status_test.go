@@ -40,7 +40,7 @@ func TestStatusReconcileAsExpected(t *testing.T) {
 	}
 
 	for _, cls := range clusters {
-		mw, _ := CreateManifestWork(mwrSetTest, cls, plcName)
+		mw := buildManifestWork(mwrSetTest, mwrSetTest.Name, cls, plcName)
 		cond := getCondition(workv1.WorkApplied, "", "", metav1.ConditionTrue)
 		apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 
@@ -115,7 +115,7 @@ func TestStatusReconcileAsProcessing(t *testing.T) {
 	}
 
 	for id, cls := range clusters {
-		mw, _ := CreateManifestWork(mwrSetTest, cls, plcName)
+		mw := buildManifestWork(mwrSetTest, mwrSetTest.Name, cls, plcName)
 		cond := getCondition(workv1.WorkApplied, "", "", metav1.ConditionTrue)
 		apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 
@@ -197,7 +197,7 @@ func TestStatusReconcileNotAsExpected(t *testing.T) {
 
 	avaCount, processingCount, degradCount := 0, 0, 0
 	for id, cls := range clusters {
-		mw, _ := CreateManifestWork(mwrSetTest, cls, plcName)
+		mw := buildManifestWork(mwrSetTest, mwrSetTest.Name, cls, plcName)
 		cond := getCondition(workv1.WorkApplied, "", "", metav1.ConditionTrue)
 		apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 
