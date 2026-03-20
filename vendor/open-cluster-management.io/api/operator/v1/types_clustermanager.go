@@ -402,10 +402,6 @@ type HostedClusterManagerConfiguration struct {
 	// WorkWebhookConfiguration represents the customized webhook-server configuration of work.
 	// +optional
 	WorkWebhookConfiguration HostedWebhookConfiguration `json:"workWebhookConfiguration,omitempty"`
-
-	// AddonWebhookConfiguration represents the customized webhook-server configuration of addons.
-	// +optional
-	AddonWebhookConfiguration HostedWebhookConfiguration `json:"addonWebhookConfiguration,omitempty"`
 }
 
 // BindConfiguration represents customization of server bindings
