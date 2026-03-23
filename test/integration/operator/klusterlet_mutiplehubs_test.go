@@ -111,8 +111,6 @@ var _ = Describe("Deploy Klusterlet with Multiplehubs enabled", func() {
 				return err
 			}
 
-			fmt.Printf("related resources are %v\n", actual.Status.RelatedResources)
-
 			// 10 managed static manifests + 9 management static manifests + 2CRDs + 1 deployments
 			// The number is the same as the singletone mode.
 			if len(actual.Status.RelatedResources) != 22 {

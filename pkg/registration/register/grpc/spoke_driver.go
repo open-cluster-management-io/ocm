@@ -17,7 +17,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
 
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -25,7 +25,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	cloudeventsaddon "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon"
-	cloudeventsaddonv1alpha1 "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
+	cloudeventsaddonv1beta1 "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1beta1"
 	cloudeventscluster "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
 	cloudeventscsr "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
 	cloudeventsevent "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
@@ -143,12 +143,12 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 		return nil, err
 	}
 
-	addonWatchStore := cloudeventsstore.NewAgentInformerWatcherStore[*addonapiv1alpha1.ManagedClusterAddOn]()
+	addonWatchStore := cloudeventsstore.NewAgentInformerWatcherStore[*addonv1beta1.ManagedClusterAddOn]()
 	addonClient, err := cloudeventsaddon.ManagedClusterAddOnInterface(
 		ctx,
 		cloudeventsoptions.NewGenericClientOptions(
 			config,
-			cloudeventsaddonv1alpha1.NewManagedClusterAddOnCodec(),
+			cloudeventsaddonv1beta1.NewManagedClusterAddOnCodec(),
 			secretOption.ClusterName,
 		).WithClusterName(secretOption.ClusterName).WithClientWatcherStore(addonWatchStore))
 	if err != nil {
@@ -156,7 +156,7 @@ func (d *GRPCDriver) BuildClients(ctx context.Context, secretOption register.Sec
 	}
 	addonInformer := addoninformers.NewSharedInformerFactoryWithOptions(
 		addonClient, 10*time.Minute, addoninformers.WithNamespace(secretOption.ClusterName)).
-		Addon().V1alpha1().ManagedClusterAddOns()
+		Addon().V1beta1().ManagedClusterAddOns()
 
 	clients := &register.Clients{
 		ClusterClient:   clusterClient,

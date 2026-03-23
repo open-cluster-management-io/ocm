@@ -93,8 +93,6 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode", func() {
 					return err
 				}
 
-				fmt.Printf("related resources are %v\n", actual.Status.RelatedResources)
-
 				// 10 managed static manifests + 9 management static manifests + 2CRDs + 1 deployments
 				if len(actual.Status.RelatedResources) != 22 {
 					return fmt.Errorf("should get 22 relatedResources, actual got %v", len(actual.Status.RelatedResources))

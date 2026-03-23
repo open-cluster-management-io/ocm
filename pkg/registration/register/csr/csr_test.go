@@ -23,7 +23,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2/ktesting"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -483,7 +483,7 @@ func TestFilterCSREvents(t *testing.T) {
 					Labels: map[string]string{
 						// the labels are only hints. Anyone could set/modify them.
 						clusterv1.ClusterNameLabelKey: clusterName,
-						addonv1alpha1.AddonLabelKey:   addOnName,
+						addonv1beta1.AddonLabelKey:    addOnName,
 					},
 				},
 				Spec: certificates.CertificateSigningRequestSpec{
@@ -531,7 +531,7 @@ func TestIndexByClusterName(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						clusterv1.ClusterNameLabelKey: "cluster1",
-						addonv1alpha1.AddonLabelKey:   "addon1",
+						addonv1beta1.AddonLabelKey:    "addon1",
 					},
 				},
 			},
@@ -578,7 +578,7 @@ func TestIndexByAddonFunc(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						clusterv1.ClusterNameLabelKey: "cluster1",
-						addonv1alpha1.AddonLabelKey:   "addon1",
+						addonv1beta1.AddonLabelKey:    "addon1",
 					},
 				},
 			},
@@ -624,8 +624,15 @@ func TestNewCSRDriver(t *testing.T) {
 	addonSecretOptions := register.SecretOption{
 		ClusterName: "cluster1",
 		AgentName:   "addonagent1",
-		Subject: &pkix.Name{
-			CommonName: "addonagent1",
+		AddonRegistration: addonv1beta1.RegistrationConfig{
+			Type: addonv1beta1.KubeClient,
+			KubeClient: &addonv1beta1.KubeClientConfig{
+				Subject: addonv1beta1.KubeClientSubject{
+					BaseSubject: addonv1beta1.BaseSubject{
+						User: "addonagent1",
+					},
+				},
+			},
 		},
 	}
 	regOption := &registertesting.TestAddonAuthConfig{
@@ -655,7 +662,7 @@ func TestCSREventFilterFunc(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						clusterv1.ClusterNameLabelKey: "cluster2",
-						addonv1alpha1.AddonLabelKey:   "addon1",
+						addonv1beta1.AddonLabelKey:    "addon1",
 					},
 				},
 				Spec: certificates.CertificateSigningRequestSpec{
@@ -670,7 +677,7 @@ func TestCSREventFilterFunc(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						clusterv1.ClusterNameLabelKey: "cluster1",
-						addonv1alpha1.AddonLabelKey:   "addon2",
+						addonv1beta1.AddonLabelKey:    "addon2",
 					},
 				},
 				Spec: certificates.CertificateSigningRequestSpec{
@@ -685,7 +692,7 @@ func TestCSREventFilterFunc(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						clusterv1.ClusterNameLabelKey: "cluster1",
-						addonv1alpha1.AddonLabelKey:   "addon1",
+						addonv1beta1.AddonLabelKey:    "addon1",
 					},
 				},
 				Spec: certificates.CertificateSigningRequestSpec{
@@ -700,7 +707,7 @@ func TestCSREventFilterFunc(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						clusterv1.ClusterNameLabelKey: "cluster1",
-						addonv1alpha1.AddonLabelKey:   "addon1",
+						addonv1beta1.AddonLabelKey:    "addon1",
 					},
 				},
 				Spec: certificates.CertificateSigningRequestSpec{
@@ -799,7 +806,7 @@ func TestBuildClient(t *testing.T) {
 
 func TestCSRDriver_Fork_TokenAuth(t *testing.T) {
 	// Setup addon client and informer
-	addon := &addonv1alpha1.ManagedClusterAddOn{
+	addon := &addonv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "addon1",
 			Namespace: "cluster1",
@@ -807,7 +814,7 @@ func TestCSRDriver_Fork_TokenAuth(t *testing.T) {
 	}
 	addonClient := addonfake.NewSimpleClientset(addon)
 	addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 10*time.Minute)
-	addonInformer := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns()
+	addonInformer := addonInformerFactory.Addon().V1beta1().ManagedClusterAddOns()
 
 	ctrl := &mockCSRControl{}
 	hubKubeClient := kubefake.NewClientset()
@@ -841,7 +848,12 @@ func TestCSRDriver_Fork_TokenAuth(t *testing.T) {
 			addonName: "addon1",
 			secretOption: register.SecretOption{
 				ClusterName: "cluster1",
-				Signer:      certificates.KubeAPIServerClientSignerName,
+				AddonRegistration: addonv1beta1.RegistrationConfig{
+					Type: addonv1beta1.KubeClient,
+					KubeClient: &addonv1beta1.KubeClientConfig{
+						Driver: "token",
+					},
+				},
 			},
 			regOption: &registertesting.TestAddonAuthConfig{
 				KubeClientAuth: "token",
@@ -867,7 +879,12 @@ func TestCSRDriver_Fork_TokenAuth(t *testing.T) {
 			addonName: "addon1",
 			secretOption: register.SecretOption{
 				ClusterName: "cluster1",
-				Signer:      certificates.KubeAPIServerClientSignerName,
+				AddonRegistration: addonv1beta1.RegistrationConfig{
+					Type: addonv1beta1.KubeClient,
+					KubeClient: &addonv1beta1.KubeClientConfig{
+						Driver: "token",
+					},
+				},
 			},
 			regOption: &registertesting.TestAddonAuthConfig{
 				KubeClientAuth: "token",
@@ -889,7 +906,12 @@ func TestCSRDriver_Fork_TokenAuth(t *testing.T) {
 			addonName: "addon1",
 			secretOption: register.SecretOption{
 				ClusterName: "cluster1",
-				Signer:      certificates.KubeAPIServerClientSignerName,
+				AddonRegistration: addonv1beta1.RegistrationConfig{
+					Type: addonv1beta1.KubeClient,
+					KubeClient: &addonv1beta1.KubeClientConfig{
+						Driver: "token",
+					},
+				},
 			},
 			regOption: &registertesting.TestAddonAuthConfig{
 				KubeClientAuth: "token",
@@ -911,7 +933,12 @@ func TestCSRDriver_Fork_TokenAuth(t *testing.T) {
 			addonName: "addon1",
 			secretOption: register.SecretOption{
 				ClusterName: "cluster1",
-				Signer:      certificates.KubeAPIServerClientSignerName,
+				AddonRegistration: addonv1beta1.RegistrationConfig{
+					Type: addonv1beta1.KubeClient,
+					KubeClient: &addonv1beta1.KubeClientConfig{
+						Driver: "token",
+					},
+				},
 			},
 			regOption: &registertesting.TestAddonAuthConfig{
 				KubeClientAuth: "token",
@@ -933,9 +960,15 @@ func TestCSRDriver_Fork_TokenAuth(t *testing.T) {
 			addonName: "addon1",
 			secretOption: register.SecretOption{
 				ClusterName: "cluster1",
-				Signer:      "custom.signer.io/custom",
-				Subject: &pkix.Name{
-					CommonName: "custom-addon",
+				AddonRegistration: addonv1beta1.RegistrationConfig{
+					Type: addonv1beta1.CustomSigner,
+					CustomSigner: &addonv1beta1.CustomSignerConfig{
+						Subject: addonv1beta1.Subject{
+							BaseSubject: addonv1beta1.BaseSubject{
+								User: "custom-addon",
+							},
+						},
+					},
 				},
 			},
 			regOption: &registertesting.TestAddonAuthConfig{
@@ -962,7 +995,9 @@ func TestCSRDriver_Fork_TokenAuth(t *testing.T) {
 			addonName: "addon1",
 			secretOption: register.SecretOption{
 				ClusterName: "cluster1",
-				Signer:      certificates.KubeAPIServerClientSignerName,
+				AddonRegistration: addonv1beta1.RegistrationConfig{
+					Type: addonv1beta1.KubeClient,
+				},
 			},
 			regOption: &registertesting.TestAddonAuthConfig{
 				KubeClientAuth: "csr",
@@ -1016,7 +1051,7 @@ func TestCSRDriver_SetTokenControl(t *testing.T) {
 func TestCSRDriver_SetAddonClients(t *testing.T) {
 	driver := &CSRDriver{}
 
-	addon := &addonv1alpha1.ManagedClusterAddOn{
+	addon := &addonv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "addon1",
 			Namespace: "cluster1",
@@ -1024,7 +1059,7 @@ func TestCSRDriver_SetAddonClients(t *testing.T) {
 	}
 	addonClient := addonfake.NewSimpleClientset(addon)
 	addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 10*time.Minute)
-	addonInformer := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns()
+	addonInformer := addonInformerFactory.Addon().V1beta1().ManagedClusterAddOns()
 
 	addonClients := &register.AddOnClients{
 		AddonClient:   addonClient,

@@ -9,10 +9,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	clusterinformerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -26,13 +26,13 @@ import (
 // the hub cluster.
 type managedClusterAddOnHealthCheckController struct {
 	addOnClient   addonclient.Interface
-	addOnLister   addonlisterv1alpha1.ManagedClusterAddOnLister
+	addOnLister   addonlisterv1beta1.ManagedClusterAddOnLister
 	clusterLister clusterlisterv1.ManagedClusterLister
 }
 
 // NewManagedClusterAddOnHealthCheckController returns an instance of managedClusterAddOnHealthCheckController
 func NewManagedClusterAddOnHealthCheckController(addOnClient addonclient.Interface,
-	addOnInformer addoninformerv1alpha1.ManagedClusterAddOnInformer,
+	addOnInformer addoninformerv1beta1.ManagedClusterAddOnInformer,
 	clusterInformer clusterinformerv1.ManagedClusterInformer) factory.Controller {
 	c := &managedClusterAddOnHealthCheckController{
 		addOnClient:   addOnClient,
@@ -82,13 +82,13 @@ func (c *managedClusterAddOnHealthCheckController) sync(ctx context.Context, syn
 
 	var errs []error
 	patcher := patcher.NewPatcher[
-		*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus](
-		c.addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName),
+		*addonv1beta1.ManagedClusterAddOn, addonv1beta1.ManagedClusterAddOnSpec, addonv1beta1.ManagedClusterAddOnStatus](
+		c.addOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName),
 	)
 	for _, addOn := range addOns {
 		newManagedClusterAddon := addOn.DeepCopy()
 		meta.SetStatusCondition(&newManagedClusterAddon.Status.Conditions, metav1.Condition{
-			Type:    addonv1alpha1.ManagedClusterAddOnConditionAvailable,
+			Type:    addonv1beta1.ManagedClusterAddOnConditionAvailable,
 			Status:  managedClusterAvailableCondition.Status,
 			Reason:  managedClusterAvailableCondition.Reason,
 			Message: managedClusterAvailableCondition.Message,

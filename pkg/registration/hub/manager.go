@@ -18,7 +18,7 @@ import (
 	cpclientset "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned"
 	cpinformerv1alpha1 "sigs.k8s.io/cluster-inventory-api/client/informers/externalversions"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
@@ -169,7 +169,7 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 						Operator: metav1.LabelSelectorOpExists,
 					},
 					{
-						Key:      addonv1alpha1.AddonLabelKey,
+						Key:      addonv1beta1.AddonLabelKey,
 						Operator: metav1.LabelSelectorOpDoesNotExist,
 					},
 				},
@@ -301,14 +301,14 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 
 	addOnHealthCheckController := addon.NewManagedClusterAddOnHealthCheckController(
 		addOnClient,
-		addOnInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		addOnInformers.Addon().V1beta1().ManagedClusterAddOns(),
 		clusterInformers.Cluster().V1().ManagedClusters(),
 	)
 
 	addOnFeatureDiscoveryController := addon.NewAddOnFeatureDiscoveryController(
 		clusterClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
-		addOnInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		addOnInformers.Addon().V1beta1().ManagedClusterAddOns(),
 	)
 
 	var defaultManagedClusterSetController, globalManagedClusterSetController factory.Controller

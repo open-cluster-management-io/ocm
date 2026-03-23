@@ -2,13 +2,13 @@ package register
 
 import (
 	"context"
-	"crypto/x509/pkix"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
@@ -52,13 +52,13 @@ type SecretOption struct {
 	// AgentName is the agent name and it is set as a secret value if it is set.
 	AgentName string
 
+	Signer string
+
 	HubKubeconfigFile string
 	HubKubeconfigDir  string
 
-	// subject of the agent, only used for addon
-	Subject *pkix.Name
-	// csr signer for the addon
-	Signer string
+	// Addon specific info
+	AddonRegistration addonv1beta1.RegistrationConfig
 }
 
 // StatusUpdateFunc is A function to update the condition of the corresponding object.

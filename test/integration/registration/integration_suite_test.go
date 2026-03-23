@@ -11,8 +11,10 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 	"k8s.io/klog/v2"
@@ -66,6 +68,7 @@ var authn *util.TestAuthn
 
 var stopHub context.CancelFunc
 var stopProxy context.CancelFunc
+var stopWebhook context.CancelFunc
 
 var startHub func(m *hub.HubManagerOptions)
 var hubOption *hub.HubManagerOptions
@@ -74,7 +77,7 @@ var CRDPaths = []string{
 	// hub
 	"./vendor/open-cluster-management.io/api/cluster/v1/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml",
 	"./vendor/open-cluster-management.io/api/work/v1/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml",
-	"./vendor/open-cluster-management.io/api/addon/v1alpha1/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml",
+	"./vendor/open-cluster-management.io/api/addon/v1beta1/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml",
 	"./vendor/open-cluster-management.io/api/cluster/v1beta2/0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml",
 	"./vendor/open-cluster-management.io/api/cluster/v1beta2/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml",
 	// spoke
@@ -145,6 +148,7 @@ var _ = ginkgo.BeforeSuite(func() {
 		},
 		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths:     CRDPaths,
+		WebhookInstallOptions: envtest.WebhookInstallOptions{},
 	}
 
 	cfg, err := testEnv.Start()
@@ -154,7 +158,11 @@ var _ = ginkgo.BeforeSuite(func() {
 	features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeRegistrationFeatureGates)
 	features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates)
 
-	err = clusterv1.Install(scheme.Scheme)
+	// install scheme
+	scheme := runtime.NewScheme()
+	err = clusterv1.Install(scheme)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	err = clientgoscheme.AddToScheme(scheme)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	// prepare configs
@@ -175,6 +183,12 @@ var _ = ginkgo.BeforeSuite(func() {
 	kubeClient, err = kubernetes.NewForConfig(cfg)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(kubeClient).ToNot(gomega.BeNil())
+
+	// patch addon for conversion webhook and start webhook
+	apiExtensionClient, err := apiextensionsclient.NewForConfig(cfg)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	err = util.AddConversionForAddonAPI(context.TODO(), apiExtensionClient, testEnv, "managedclusteraddons.addon.open-cluster-management.io")
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	clusterClient, err = clusterclientset.NewForConfig(cfg)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -240,6 +254,13 @@ var _ = ginkgo.BeforeSuite(func() {
 	}
 
 	startHub(hubOption)
+	var webhookCtx context.Context
+	webhookCtx, stopWebhook = context.WithCancel(context.Background())
+	go func() {
+		defer ginkgo.GinkgoRecover()
+		err := util.StartWebhook(webhookCtx, testEnv, cfg)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	}()
 
 	// start a proxy server
 	proxyCertData, proxyKeyData, err := authn.SignServerCert("proxyserver", 24*time.Hour)
@@ -263,8 +284,15 @@ var _ = ginkgo.BeforeSuite(func() {
 
 var _ = ginkgo.AfterSuite(func() {
 	ginkgo.By("tearing down the test environment")
-	stopHub()
-	stopProxy()
+	if stopHub != nil {
+		stopHub()
+	}
+	if stopProxy != nil {
+		stopProxy()
+	}
+	if stopWebhook != nil {
+		stopWebhook()
+	}
 
 	err := testEnv.Stop()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())

@@ -1,4 +1,4 @@
-package addon
+package v1beta1
 
 import (
 	"context"
@@ -11,10 +11,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
-	addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
+	addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
@@ -36,10 +36,10 @@ func TestList(t *testing.T) {
 		{
 			name: "list addons",
 			addons: []runtime.Object{
-				&addonv1alpha1.ManagedClusterAddOn{
+				&addonv1beta1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-cluster1"},
 				},
-				&addonv1alpha1.ManagedClusterAddOn{
+				&addonv1beta1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-addon2", Namespace: "test-cluster2"},
 				},
 			},
@@ -52,7 +52,7 @@ func TestList(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			addonClient := addonfake.NewSimpleClientset(c.addons...)
 			addonInformers := addoninformers.NewSharedInformerFactory(addonClient, 10*time.Minute)
-			addonInformer := addonInformers.Addon().V1alpha1().ManagedClusterAddOns()
+			addonInformer := addonInformers.Addon().V1beta1().ManagedClusterAddOns()
 			for _, obj := range c.addons {
 				if err := addonInformer.Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
@@ -97,7 +97,7 @@ func TestHandleStatusUpdate(t *testing.T) {
 					SubResource:         types.SubResourceStatus,
 					Action:              types.CreateRequestAction,
 				}).NewEvent()
-				addon := &addonv1alpha1.ManagedClusterAddOn{
+				addon := &addonv1beta1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-namespace"},
 				}
 				evt.SetData(cloudevents.ApplicationJSON, addon)
@@ -108,7 +108,7 @@ func TestHandleStatusUpdate(t *testing.T) {
 		{
 			name: "update addon status",
 			addons: []runtime.Object{
-				&addonv1alpha1.ManagedClusterAddOn{
+				&addonv1beta1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-namespace"},
 				},
 			},
@@ -118,7 +118,7 @@ func TestHandleStatusUpdate(t *testing.T) {
 					SubResource:         types.SubResourceStatus,
 					Action:              types.UpdateRequestAction,
 				}).NewEvent()
-				addon := &addonv1alpha1.ManagedClusterAddOn{
+				addon := &addonv1beta1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-namespace"},
 				}
 				evt.SetData(cloudevents.ApplicationJSON, addon)
@@ -137,7 +137,7 @@ func TestHandleStatusUpdate(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			addonClient := addonfake.NewSimpleClientset(c.addons...)
 			addonInformers := addoninformers.NewSharedInformerFactory(addonClient, 10*time.Minute)
-			addonInformer := addonInformers.Addon().V1alpha1().ManagedClusterAddOns()
+			addonInformer := addonInformers.Addon().V1beta1().ManagedClusterAddOns()
 
 			service := NewAddonService(addonClient, addonInformer)
 			err := service.HandleStatusUpdate(context.Background(), c.addonEvt)
@@ -162,7 +162,7 @@ func TestEventHandlerFuncs(t *testing.T) {
 	service := &AddonService{}
 	eventHandlerFuncs := service.EventHandlerFuncs(context.Background(), handler)
 
-	addon := &addonv1alpha1.ManagedClusterAddOn{
+	addon := &addonv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-namespace"},
 	}
 	eventHandlerFuncs.AddFunc(addon)

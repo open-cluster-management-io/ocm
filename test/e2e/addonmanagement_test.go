@@ -203,28 +203,24 @@ var _ = ginkgo.Describe("Addon management", ginkgo.Ordered, ginkgo.Label("addon-
 		// delete all CSR created for the addon on the hub cluster, otherwise if it reches the limit number 10, the
 		// other tests will fail
 		gomega.Eventually(func() error {
-			csrs, err := hub.KubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(),
-				metav1.ListOptions{
-					LabelSelector: fmt.Sprintf("%s=%s,%s=%s", addonapiv1alpha1.AddonLabelKey, addOnName,
-						clusterv1.ClusterNameLabelKey, universalClusterName),
-				})
-			if err != nil {
+			listOpts := metav1.ListOptions{
+				LabelSelector: fmt.Sprintf("%s=%s,%s=%s", addonapiv1alpha1.AddonLabelKey, addOnName,
+					clusterv1.ClusterNameLabelKey, universalClusterName),
+			}
+
+			err := hub.KubeClient.CertificatesV1().CertificateSigningRequests().DeleteCollection(context.TODO(),
+				metav1.DeleteOptions{}, listOpts)
+			if err != nil && !errors.IsNotFound(err) {
 				return err
 			}
 
-			if len(csrs.Items) > 0 {
-				ginkgo.By(fmt.Sprintf("Deleting %d CSRs for addon %s/%s", len(csrs.Items), universalClusterName, addOnName))
-				for _, csr := range csrs.Items {
-					err = hub.KubeClient.CertificatesV1().CertificateSigningRequests().Delete(context.TODO(),
-						csr.Name, metav1.DeleteOptions{})
-					if err != nil && !errors.IsNotFound(err) {
-						return err
-					}
-				}
-				// Return error to retry - ensures CSRs are fully deleted from API before proceeding
-				return fmt.Errorf("waiting for %d CSRs to be fully deleted", len(csrs.Items))
+			csrs, err := hub.KubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(), listOpts)
+			if err != nil {
+				return err
 			}
-
+			if len(csrs.Items) != 0 {
+				return fmt.Errorf("expected no csrs,but got: %+v", csrs.Items)
+			}
 			return nil
 		}).ShouldNot(gomega.HaveOccurred())
 	})
@@ -1122,7 +1118,6 @@ func createResourcesFromYamlFiles(
 			continue
 		}
 		if err != nil {
-			fmt.Printf("Error creating %q (%T): %v\n", fileName, mapping.Resource, err)
 			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", fileName, mapping.Resource, err))
 		}
 	}
@@ -1163,7 +1158,6 @@ func deleteResourcesFromYamlFiles(
 			continue
 		}
 		if err != nil {
-			fmt.Printf("Error deleting %q (%T): %v\n", fileName, mapping.Resource, err)
 			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", fileName, mapping.Resource, err))
 		}
 	}

@@ -8,10 +8,9 @@ import (
 	"testing"
 	"time"
 
-	certificates "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc"
@@ -176,7 +175,7 @@ func TestLoadConfig(t *testing.T) {
 
 func TestGRPCDriver_Fork_TokenAuth(t *testing.T) {
 	// Setup addon client and informer
-	addon := &addonv1alpha1.ManagedClusterAddOn{
+	addon := &addonv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "addon1",
 			Namespace: "cluster1",
@@ -184,7 +183,7 @@ func TestGRPCDriver_Fork_TokenAuth(t *testing.T) {
 	}
 	addonClient := addonfake.NewSimpleClientset(addon)
 	addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 10*time.Minute)
-	addonInformer := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns()
+	addonInformer := addonInformerFactory.Addon().V1beta1().ManagedClusterAddOns()
 
 	addonClients := &register.AddOnClients{
 		AddonClient:   addonClient,
@@ -218,7 +217,9 @@ func TestGRPCDriver_Fork_TokenAuth(t *testing.T) {
 			addonName: "addon1",
 			secretOption: register.SecretOption{
 				ClusterName: "cluster1",
-				Signer:      certificates.KubeAPIServerClientSignerName,
+				AddonRegistration: addonv1beta1.RegistrationConfig{
+					Type: addonv1beta1.KubeClient,
+				},
 			},
 			regOption: &registertesting.TestAddonAuthConfig{
 				KubeClientAuth: "token",
@@ -248,7 +249,9 @@ func TestGRPCDriver_Fork_TokenAuth(t *testing.T) {
 			addonName: "addon1",
 			secretOption: register.SecretOption{
 				ClusterName: "cluster1",
-				Signer:      certificates.KubeAPIServerClientSignerName,
+				AddonRegistration: addonv1beta1.RegistrationConfig{
+					Type: addonv1beta1.KubeClient,
+				},
 			},
 			regOption: &registertesting.TestAddonAuthConfig{
 				KubeClientAuth: "token",
@@ -273,7 +276,9 @@ func TestGRPCDriver_Fork_TokenAuth(t *testing.T) {
 			addonName: "addon1",
 			secretOption: register.SecretOption{
 				ClusterName: "cluster1",
-				Signer:      certificates.KubeAPIServerClientSignerName,
+				AddonRegistration: addonv1beta1.RegistrationConfig{
+					Type: addonv1beta1.KubeClient,
+				},
 			},
 			regOption: &registertesting.TestAddonAuthConfig{
 				KubeClientAuth: "token",
@@ -299,7 +304,9 @@ func TestGRPCDriver_Fork_TokenAuth(t *testing.T) {
 			addonName: "addon1",
 			secretOption: register.SecretOption{
 				ClusterName: "cluster1",
-				Signer:      certificates.KubeAPIServerClientSignerName,
+				AddonRegistration: addonv1beta1.RegistrationConfig{
+					Type: addonv1beta1.KubeClient,
+				},
 			},
 			regOption: &registertesting.TestAddonAuthConfig{
 				KubeClientAuth: "token",

@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -55,14 +55,14 @@ func TestSync(t *testing.T) {
 		{
 			name:            "managed cluster is unknown",
 			managedClusters: []runtime.Object{testinghelpers.NewUnknownManagedCluster()},
-			addOns: []runtime.Object{&addonv1alpha1.ManagedClusterAddOn{
+			addOns: []runtime.Object{&addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{Namespace: testinghelpers.TestManagedClusterName, Name: "test"},
 			}},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
 
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
-				addOn := &addonv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
 					t.Fatal(err)
@@ -92,16 +92,16 @@ func TestSync(t *testing.T) {
 
 			addOnClient := addonfake.NewSimpleClientset(c.addOns...)
 			addOnInformerFactory := addoninformers.NewSharedInformerFactory(addOnClient, time.Minute*10)
-			addOnStroe := addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
+			addOnStore := addOnInformerFactory.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore()
 			for _, addOn := range c.addOns {
-				if err := addOnStroe.Add(addOn); err != nil {
+				if err := addOnStore.Add(addOn); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			ctrl := &managedClusterAddOnHealthCheckController{
 				addOnClient:   addOnClient,
-				addOnLister:   addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				addOnLister:   addOnInformerFactory.Addon().V1beta1().ManagedClusterAddOns().Lister(),
 				clusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 			}
 

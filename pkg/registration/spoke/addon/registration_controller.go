@@ -6,7 +6,6 @@ import (
 	"time"
 
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
-	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,10 +13,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
@@ -35,9 +34,9 @@ type addOnRegistrationController struct {
 	kubeconfigFile       string
 	managementKubeClient kubernetes.Interface // in-cluster local management kubeClient
 	spokeKubeClient      kubernetes.Interface
-	hubAddOnLister       addonlisterv1alpha1.ManagedClusterAddOnLister
+	hubAddOnLister       addonlisterv1beta1.ManagedClusterAddOnLister
 	patcher              patcher.Patcher[
-		*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus]
+		*addonv1beta1.ManagedClusterAddOn, addonv1beta1.ManagedClusterAddOnSpec, addonv1beta1.ManagedClusterAddOnStatus]
 	addonDriverFactory register.AddonDriverFactory
 	// addonAuthConfig holds the cluster-wide addon registration configuration
 	// that provides authentication method and access to driver options (CSR, Token)
@@ -60,7 +59,7 @@ func NewAddOnRegistrationController(
 	managedKubeClient kubernetes.Interface,
 	addonDriverFactory register.AddonDriverFactory,
 	addonAuthConfig register.AddonAuthConfig,
-	hubAddOnInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
+	hubAddOnInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
 ) factory.Controller {
 	c := &addOnRegistrationController{
 		clusterName:          clusterName,
@@ -72,8 +71,8 @@ func NewAddOnRegistrationController(
 		addonDriverFactory:   addonDriverFactory,
 		addonAuthConfig:      addonAuthConfig,
 		patcher: patcher.NewPatcher[
-			*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus](
-			addOnClient.AddonV1alpha1().ManagedClusterAddOns(clusterName)),
+			*addonv1beta1.ManagedClusterAddOn, addonv1beta1.ManagedClusterAddOnSpec, addonv1beta1.ManagedClusterAddOnStatus](
+			addOnClient.AddonV1beta1().ManagedClusterAddOns(clusterName)),
 		addOnRegistrationConfigs: map[string]map[string]registrationConfig{},
 	}
 
@@ -142,7 +141,7 @@ func (c *addOnRegistrationController) syncAddOn(ctx context.Context, syncCtx fac
 		AgentRunningOutsideManagedCluster: isAddonRunningOutsideManagedCluster(addOn),
 		InstallationNamespace:             getAddOnInstallationNamespace(addOn),
 	}
-	configs, err := getRegistrationConfigs(addOnName, installOption, addOn.Status.Registrations, addOn.Status.KubeClientDriver)
+	configs, err := getRegistrationConfigs(addOnName, c.clusterName, installOption, addOn.Status.Registrations, logger)
 	if err != nil {
 		return err
 	}
@@ -207,14 +206,13 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 		kubeClient, 10*time.Minute, informers.WithNamespace(config.InstallationNamespace))
 
 	secretOption := register.SecretOption{
-		SecretNamespace: config.InstallationNamespace,
-		SecretName:      config.secretName,
-		Subject:         config.x509Subject(c.clusterName, c.agentName),
-		Signer:          config.registration.SignerName,
-		ClusterName:     c.clusterName,
+		SecretNamespace:   config.InstallationNamespace,
+		SecretName:        config.secretName,
+		ClusterName:       c.clusterName,
+		AddonRegistration: config.registration,
 	}
 
-	if config.registration.SignerName == certificatesv1.KubeAPIServerClientSignerName {
+	if config.registration.Type == addonv1beta1.KubeClient {
 		secretOption.BootStrapKubeConfigFile = c.kubeconfigFile
 	}
 
@@ -227,7 +225,7 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 		return nil, fmt.Errorf("failed to create driver for addon %s: %w", config.addOnName, err)
 	}
 
-	controllerName := fmt.Sprintf("ClientCertController@addon:%s:signer:%s", config.addOnName, config.registration.SignerName)
+	controllerName := fmt.Sprintf("ClientCertController@addon:%s:type:%s", config.addOnName, config.registration.Type)
 	statusUpdater := c.generateStatusUpdate(c.clusterName, config.addOnName)
 	secretController := register.NewSecretController(
 		secretOption, driver, statusUpdater,
@@ -284,35 +282,32 @@ func (c *addOnRegistrationController) stopRegistration(ctx context.Context, conf
 // the authentication capability (csr or token) to the hub controller.
 // Only sets the driver if the addon has a KubeClient type registration (KubeAPIServerClientSignerName).
 // For custom signers, the driver is set to empty string.
-func (c *addOnRegistrationController) ensureDriver(ctx context.Context, addon *addonv1alpha1.ManagedClusterAddOn) (bool, error) {
+func (c *addOnRegistrationController) ensureDriver(ctx context.Context, addon *addonv1beta1.ManagedClusterAddOn) (bool, error) {
 	logger := klog.FromContext(ctx)
 
-	// Check if addon has any KubeClient type registrations
-	hasKubeClientRegistration := false
-	for _, reg := range addon.Status.Registrations {
-		if reg.SignerName == certificatesv1.KubeAPIServerClientSignerName {
-			hasKubeClientRegistration = true
-			break
-		}
-	}
-
 	addonCopy := addon.DeepCopy()
-	if hasKubeClientRegistration {
-		addonCopy.Status.KubeClientDriver = c.addonAuthConfig.GetKubeClientAuth()
-	} else {
-		addonCopy.Status.KubeClientDriver = ""
+	for i := range addonCopy.Status.Registrations {
+		reg := &addonCopy.Status.Registrations[i]
+		if reg.Type != addonv1beta1.KubeClient {
+			continue
+		}
+		if reg.KubeClient == nil {
+			reg.KubeClient = &addonv1beta1.KubeClientConfig{
+				Driver: c.addonAuthConfig.GetKubeClientAuth(),
+			}
+		}
+		if reg.KubeClient.Driver != c.addonAuthConfig.GetKubeClientAuth() {
+			reg.KubeClient.Driver = c.addonAuthConfig.GetKubeClientAuth()
+		}
+
+		updated, err := c.patcher.PatchStatus(ctx, addonCopy, addonCopy.Status, addon.Status)
+		if updated {
+			logger.Info("Updated kubeClientDriver in status", "addon", addon.Name, "driver", addonCopy.Status.Registrations)
+		}
+		return updated, err
 	}
 
-	updated, err := c.patcher.PatchStatus(ctx, addonCopy, addonCopy.Status, addon.Status)
-	if err != nil {
-		return false, err
-	}
-
-	if updated {
-		logger.Info("Updated kubeClientDriver in status", "addon", addon.Name, "driver", addonCopy.Status.KubeClientDriver, "hasKubeClientRegistration", hasKubeClientRegistration)
-	}
-
-	return updated, nil
+	return false, nil
 }
 
 // cleanup cleans both the registration configs and client certificate controllers for the addon

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -19,7 +18,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
@@ -98,7 +97,7 @@ type TokenDriver struct {
 
 	// addonPatcher for updating addon status
 	addonPatcher patcher.Patcher[
-		*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus]
+		*addonv1beta1.ManagedClusterAddOn, addonv1beta1.ManagedClusterAddOnSpec, addonv1beta1.ManagedClusterAddOnStatus]
 }
 
 var _ register.RegisterDriver = &TokenDriver{}
@@ -113,8 +112,8 @@ func NewTokenDriverForAddOn(addonName, clusterName string, tokenConfig register.
 		addonClients: addonClients,
 		opt:          tokenConfig,
 		addonPatcher: patcher.NewPatcher[
-			*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus](
-			addonClients.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName)),
+			*addonv1beta1.ManagedClusterAddOn, addonv1beta1.ManagedClusterAddOnSpec, addonv1beta1.ManagedClusterAddOnStatus](
+			addonClients.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName)),
 	}
 
 	return driver
@@ -123,9 +122,9 @@ func NewTokenDriverForAddOn(addonName, clusterName string, tokenConfig register.
 // Process updates the secret with the current token from the ServiceAccount token file
 func (t *TokenDriver) Process(
 	ctx context.Context,
-	controllerName string,
+	_ string,
 	secret *corev1.Secret,
-	additionalSecretData map[string][]byte,
+	_ map[string][]byte,
 	recorder events.Recorder) (*corev1.Secret, *metav1.Condition, error) {
 	// Get the addon
 	addon, err := t.addonClients.AddonInformer.Lister().ManagedClusterAddOns(t.clusterName).Get(t.addonName)
@@ -168,13 +167,13 @@ func (t *TokenDriver) Process(
 // ensureSubject ensures the subject field is set correctly for token-based authentication.
 // Subject.user is set to system:serviceaccount:<cluster-namespace>:<addon-name>-agent
 // Returns (updated, error) where updated indicates if an update was performed
-func (t *TokenDriver) ensureSubject(ctx context.Context, addon *addonv1alpha1.ManagedClusterAddOn) (bool, error) {
+func (t *TokenDriver) ensureSubject(ctx context.Context, addon *addonv1beta1.ManagedClusterAddOn) (bool, error) {
 	logger := klog.FromContext(ctx)
 
 	// Find the registration configuration index
 	var regIndex = -1
 	for i := range addon.Status.Registrations {
-		if addon.Status.Registrations[i].SignerName == certificatesv1.KubeAPIServerClientSignerName {
+		if addon.Status.Registrations[i].Type == addonv1beta1.KubeClient {
 			regIndex = i
 			break
 		}
@@ -184,15 +183,15 @@ func (t *TokenDriver) ensureSubject(ctx context.Context, addon *addonv1alpha1.Ma
 		return false, nil
 	}
 
-	// Set subject for token-based authentication
-	expectedSubjectUser := fmt.Sprintf("system:serviceaccount:%s:%s-agent", t.clusterName, t.addonName)
-
 	// Make a copy and update subject (create new Subject with only User specified)
 	addonCopy := addon.DeepCopy()
-	addonCopy.Status.Registrations[regIndex].Subject = addonv1alpha1.Subject{
-		User: expectedSubjectUser,
+	if addonCopy.Status.Registrations[regIndex].KubeClient == nil {
+		return false, fmt.Errorf("kubeClient field should be set")
 	}
 
+	// This is to override the subject field which may have already been set by the addon-framework. It also
+	// removes the group field.
+	addonCopy.Status.Registrations[regIndex].KubeClient.Subject = TokenSubject(t.clusterName, addon.Name)
 	// Update the addon status using addonPatcher
 	updated, err := t.addonPatcher.PatchStatus(ctx, addonCopy, addonCopy.Status, addon.Status)
 	if err != nil {
@@ -200,10 +199,18 @@ func (t *TokenDriver) ensureSubject(ctx context.Context, addon *addonv1alpha1.Ma
 	}
 
 	if updated {
-		logger.Info("Updated subject field", "addon", t.addonName, "subject", expectedSubjectUser)
+		logger.Info("Updated subject field", "addon", t.addonName, "subject", addonCopy.Status.Registrations[regIndex].KubeClient.Subject)
 	}
 
 	return updated, nil
+}
+
+func TokenSubject(clusterName, addonName string) addonv1beta1.KubeClientSubject {
+	return addonv1beta1.KubeClientSubject{
+		BaseSubject: addonv1beta1.BaseSubject{
+			User: fmt.Sprintf("system:serviceaccount:%s:%s-agent", clusterName, addonName),
+		},
+	}
 }
 
 // ensureTokenInfrastructureReady waits for the TokenInfrastructureReady condition and extracts the ServiceAccount UID
@@ -211,7 +218,7 @@ func (t *TokenDriver) ensureSubject(ctx context.Context, addon *addonv1alpha1.Ma
 // - If ready is true, uid is guaranteed to be non-empty
 // - If ready is false, infrastructure is not ready yet (caller should wait and retry)
 // - If error is non-nil, an actual error occurred
-func (t *TokenDriver) ensureTokenInfrastructureReady(ctx context.Context, addon *addonv1alpha1.ManagedClusterAddOn) (string, bool, error) {
+func (t *TokenDriver) ensureTokenInfrastructureReady(ctx context.Context, addon *addonv1beta1.ManagedClusterAddOn) (string, bool, error) {
 	logger := klog.FromContext(ctx)
 
 	infraReady := meta.FindStatusCondition(addon.Status.Conditions, TokenInfrastructureReadyCondition)
@@ -448,7 +455,7 @@ func TryForkTokenDriver(
 	addonClients *register.AddOnClients,
 ) (register.RegisterDriver, error) {
 	// Determine registration type from signer name
-	isKubeClientType := secretOption.Signer == certificatesv1.KubeAPIServerClientSignerName
+	isKubeClientType := secretOption.AddonRegistration.Type == addonv1beta1.KubeClient
 
 	// Only use token auth for KubeClient type with token authentication
 	if !isKubeClientType || authConfig.GetKubeClientAuth() != "token" {

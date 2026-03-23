@@ -72,7 +72,8 @@ run-e2e:
 	-singleton-image=$(OPERATOR_IMAGE_NAME) \
 	-expected-image-tag=$(IMAGE_TAG) \
 	-klusterlet-deploy-mode=$(KLUSTERLET_DEPLOY_MODE) \
-	-registration-driver=$(REGISTRATION_DRIVER)
+	-registration-driver=$(REGISTRATION_DRIVER) \
+	${ARGS}
 
 clean-hub: clean-hub-cr clean-hub-operator
 

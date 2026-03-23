@@ -27,6 +27,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
@@ -400,6 +401,8 @@ var _ register.AddonDriverFactory = &CSRDriver{}
 
 // NewCSRDriverForAddOn creates a CSRDriver for addon registration with the given parameters
 func NewCSRDriverForAddOn(addonName string, csrConfig register.CSRConfiguration, secretOption register.SecretOption, csrControl CSRControl) *CSRDriver {
+	signer, subject := addonX509Subject(secretOption, addonName, addonName)
+
 	csrOption := &CSROption{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("addon-%s-%s-", secretOption.ClusterName, addonName),
@@ -409,10 +412,10 @@ func NewCSRDriverForAddOn(addonName string, csrConfig register.CSRConfiguration,
 				addonv1alpha1.AddonLabelKey:   addonName,
 			},
 		},
-		Subject:         secretOption.Subject,
+		Subject:         subject,
 		DNSNames:        []string{fmt.Sprintf("%s.addon.open-cluster-management.io", addonName)},
-		SignerName:      secretOption.Signer,
-		EventFilterFunc: createCSREventFilterFunc(secretOption.ClusterName, addonName, secretOption.Signer),
+		SignerName:      signer,
+		EventFilterFunc: createCSREventFilterFunc(secretOption.ClusterName, addonName, signer),
 	}
 
 	return &CSRDriver{
@@ -617,4 +620,50 @@ func createCSREventFilterFunc(clusterName, addOnName, signerName string) factory
 		}
 		return true
 	}
+}
+
+func addonX509Subject(secretOption register.SecretOption, addonName, agentName string) (string, *pkix.Name) {
+	var signer, user string
+	var groups, ou []string
+
+	switch secretOption.AddonRegistration.Type {
+	case addonv1beta1.KubeClient:
+		signer = certificates.KubeAPIServerClientSignerName
+		if secretOption.AddonRegistration.KubeClient != nil {
+			user = secretOption.AddonRegistration.KubeClient.Subject.User
+			groups = secretOption.AddonRegistration.KubeClient.Subject.Groups
+		}
+		// set the default organization if signer is KubeAPIServerClientSignerName
+		if len(groups) == 0 {
+			groups = []string{DefaultOrganization(secretOption.ClusterName, addonName)}
+		}
+	case addonv1beta1.CustomSigner:
+		if secretOption.AddonRegistration.CustomSigner != nil {
+			signer = secretOption.AddonRegistration.CustomSigner.SignerName
+			user = secretOption.AddonRegistration.CustomSigner.Subject.User
+			groups = secretOption.AddonRegistration.CustomSigner.Subject.Groups
+			ou = secretOption.AddonRegistration.CustomSigner.Subject.OrganizationUnits
+		}
+	}
+
+	subject := &pkix.Name{
+		CommonName:         user,
+		Organization:       groups,
+		OrganizationalUnit: ou,
+	}
+
+	// set the default common name
+	if len(subject.CommonName) == 0 {
+		subject.CommonName = DefaultCommonName(secretOption.ClusterName, addonName)
+	}
+
+	return signer, subject
+}
+
+func DefaultCommonName(clusterName, addonName string) string {
+	return fmt.Sprintf("%s:agent:%s", DefaultOrganization(clusterName, addonName), addonName)
+}
+
+func DefaultOrganization(clusterName, addonName string) string {
+	return fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", clusterName, addonName)
 }

@@ -3,16 +3,15 @@ package addon
 import (
 	"context"
 
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1beta1"
-
 	"k8s.io/client-go/discovery"
 
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonclientset "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned/typed/addon/v1alpha1"
 	addonv1v1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned/typed/addon/v1beta1"
 
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options"
 )
 
@@ -33,21 +32,20 @@ func (a AddonClientSetWrapper) AddonV1alpha1() addonv1alpha1client.AddonV1alpha1
 }
 
 func (a AddonClientSetWrapper) AddonV1beta1() addonv1v1beta1client.AddonV1beta1Interface {
-	if a.betaClient == nil {
-		panic("AddonV1beta1 is not initialized")
-	}
 	return a.betaClient
 }
 
 // ManagedClusterAddOnInterface returns a client for ManagedClusterAddOn
-func ManagedClusterAddOnInterface(ctx context.Context, opt *options.GenericClientOptions[*addonapiv1alpha1.ManagedClusterAddOn]) (addonclientset.Interface, error) {
-	cloudEventsClient, err := opt.AgentClient(ctx)
+func ManagedClusterAddOnInterface(
+	ctx context.Context,
+	v1beta1Opt *options.GenericClientOptions[*addonapiv1beta1.ManagedClusterAddOn]) (addonclientset.Interface, error) {
+	v1beta1ceClient, err := v1beta1Opt.AgentClient(ctx)
 	if err != nil {
 		return nil, err
 	}
+	v1beta1AddonClient := v1beta1.NewManagedClusterAddOnClient(v1beta1ceClient, v1beta1Opt.WatcherStore())
 
-	addonClient := v1alpha1.NewManagedClusterAddOnClient(cloudEventsClient, opt.WatcherStore())
-
-	// TODO switch to v1beta1
-	return &AddonClientSetWrapper{alphaClient: v1alpha1.NewAddonClientWrapper(addonClient)}, nil
+	return &AddonClientSetWrapper{
+		betaClient: v1beta1.NewAddonClientWrapper(v1beta1AddonClient),
+	}, nil
 }

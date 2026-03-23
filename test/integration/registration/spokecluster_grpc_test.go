@@ -16,7 +16,7 @@ import (
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
-	addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
+	addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1beta1"
 	clusterce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
 	csrce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
 	eventce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
@@ -33,7 +33,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/register/factory"
 	regsgrpc "open-cluster-management.io/ocm/pkg/registration/register/grpc"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
-	"open-cluster-management.io/ocm/pkg/server/services/addon"
+	"open-cluster-management.io/ocm/pkg/server/services/addon/v1beta1"
 	"open-cluster-management.io/ocm/pkg/server/services/cluster"
 	"open-cluster-management.io/ocm/pkg/server/services/csr"
 	"open-cluster-management.io/ocm/pkg/server/services/event"
@@ -89,7 +89,7 @@ var _ = ginkgo.Describe("Registration using GRPC", ginkgo.Ordered, ginkgo.Label(
 		grpcEventServer.RegisterService(grpcServerCtx, csrce.CSREventDataType,
 			csr.NewCSRService(hook.KubeClient, hook.KubeInformers.Certificates().V1().CertificateSigningRequests()))
 		grpcEventServer.RegisterService(grpcServerCtx, addonce.ManagedClusterAddOnEventDataType,
-			addon.NewAddonService(hook.AddOnClient, hook.AddOnInformers.Addon().V1alpha1().ManagedClusterAddOns()))
+			v1beta1.NewAddonService(hook.AddOnClient, hook.AddOnInformers.Addon().V1beta1().ManagedClusterAddOns()))
 		grpcEventServer.RegisterService(grpcServerCtx, eventce.EventEventDataType,
 			event.NewEventService(hook.KubeClient))
 		grpcEventServer.RegisterService(grpcServerCtx, leasece.LeaseEventDataType,
