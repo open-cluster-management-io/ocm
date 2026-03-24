@@ -25,3 +25,18 @@ func NewPlacementController() *cobra.Command {
 
 	return cmd
 }
+
+func NewDebugServer() *cobra.Command {
+	opts := commonoptions.NewOptions()
+	cmdConfig := opts.
+		NewControllerCommandConfig("placement-debug", version.Get(), controllers.RunDebugServer, clock.RealClock{})
+
+	cmd := cmdConfig.NewCommandWithContext(context.TODO())
+	cmd.Use = "debug"
+	cmd.Short = "Start the Placement Debug Service (standalone)"
+
+	flags := cmd.Flags()
+	opts.AddFlags(flags)
+
+	return cmd
+}

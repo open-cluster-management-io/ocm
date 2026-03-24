@@ -2,6 +2,7 @@ package hub
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 
@@ -22,7 +24,9 @@ import (
 	"open-cluster-management.io/ocm/pkg/placement/debugger"
 )
 
-// RunControllerManager starts the controllers on hub to make placement decisions.
+// RunControllerManager starts the placement scheduling controller.
+// This controller requires leader election and runs the scheduling logic.
+// To be run alongside RunDebugServer using different ports.
 func RunControllerManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	// setting up contextual logger
 	logger := klog.NewKlogr()
@@ -70,16 +74,6 @@ func RunControllerManagerWithInformers(
 			recorder, metrics),
 	)
 
-	if controllerContext.Server != nil {
-		debug := debugger.NewDebugger(
-			scheduler,
-			clusterInformers.Cluster().V1beta1().Placements(),
-			clusterInformers.Cluster().V1().ManagedClusters(),
-		)
-
-		installDebugger(controllerContext.Server.Handler.NonGoRestfulMux, debug)
-	}
-
 	schedulingController := scheduling.NewSchedulingController(
 		ctx,
 		clusterClient,
@@ -100,6 +94,74 @@ func RunControllerManagerWithInformers(
 	<-ctx.Done()
 
 	return nil
+}
+
+// RunDebugServer starts only the debug service without scheduling controller.
+// This server does not require leader election and only provides debug endpoints.
+func RunDebugServer(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+	logger := klog.NewKlogr()
+	podName := os.Getenv("POD_NAME")
+	if podName != "" {
+		logger = logger.WithValues("podName", podName)
+	}
+	ctx = klog.NewContext(ctx, logger)
+
+	if controllerContext.Server == nil {
+		return fmt.Errorf("server is required for debug server but was nil")
+	}
+
+	debug, clusterInformers, err := NewDebuggerWithInformers(ctx, controllerContext.KubeConfig)
+	if err != nil {
+		return err
+	}
+
+	installDebugger(controllerContext.Server.Handler.NonGoRestfulMux, debug)
+	klog.FromContext(ctx).Info("Debug service installed")
+
+	go clusterInformers.Start(ctx.Done())
+
+	<-ctx.Done()
+
+	return nil
+}
+
+// NewDebuggerWithInformers creates a debugger with informers. This is useful for testing.
+// The caller is responsible for starting the informers.
+func NewDebuggerWithInformers(
+	ctx context.Context,
+	kubeConfig *rest.Config,
+) (*debugger.Debugger, clusterinformers.SharedInformerFactory, error) {
+	clusterClient, err := clusterclient.NewForConfig(kubeConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	clusterInformers := clusterinformers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
+
+	scheduler := scheduling.NewPluginScheduler(
+		scheduling.NewSchedulerHandler(
+			clusterClient,
+			clusterInformers.Cluster().V1beta1().PlacementDecisions().Lister(),
+			clusterInformers.Cluster().V1alpha1().AddOnPlacementScores().Lister(),
+			clusterInformers.Cluster().V1().ManagedClusters().Lister(),
+			nil, nil), // Debug server doesn't need event recorder or metrics
+	)
+
+	debug := debugger.NewDebugger(
+		scheduler,
+		kubeClient,
+		clusterInformers.Cluster().V1beta1().Placements(),
+		clusterInformers.Cluster().V1().ManagedClusters(),
+		clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
+		clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings(),
+	)
+
+	return debug, clusterInformers, nil
 }
 
 func installDebugger(mux *mux.PathRecorderMux, d *debugger.Debugger) {

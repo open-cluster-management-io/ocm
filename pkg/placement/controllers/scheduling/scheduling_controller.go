@@ -35,8 +35,6 @@ import (
 	clusterlisterv1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
-	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
-	clustersdkv1beta2 "open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta2"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
@@ -226,16 +224,16 @@ func (c *schedulingController) syncPlacement(ctx context.Context, syncCtx factor
 	}
 
 	// get all valid clustersetbindings in the placement namespace
-	bindings, err := c.getValidManagedClusterSetBindings(placement.Namespace)
+	bindings, err := GetValidManagedClusterSetBindings(placement.Namespace, c.clusterSetBindingLister, c.clusterSetLister)
 	if err != nil {
 		return err
 	}
 
 	// get eligible clustersets for the placement
-	clusterSetNames := c.getEligibleClusterSets(placement, bindings)
+	clusterSetNames := GetEligibleClusterSets(placement, bindings)
 
 	// get available clusters for the placement
-	clusters, err := c.getAvailableClusters(clusterSetNames)
+	clusters, err := GetAvailableClusters(clusterSetNames, c.clusterSetLister, c.clusterLister)
 	if err != nil {
 		return err
 	}
@@ -282,93 +280,6 @@ func (c *schedulingController) syncPlacement(ctx context.Context, syncCtx factor
 	}
 
 	return status.AsError()
-}
-
-// getManagedClusterSetBindings returns all bindings found in the placement namespace.
-func (c *schedulingController) getValidManagedClusterSetBindings(placementNamespace string) ([]*clusterapiv1beta2.ManagedClusterSetBinding, error) {
-	// get all clusterset bindings under the placement namespace
-	bindings, err := c.clusterSetBindingLister.ManagedClusterSetBindings(placementNamespace).List(labels.Everything())
-	if err != nil {
-		return nil, err
-	}
-	if len(bindings) == 0 {
-		bindings = nil
-	}
-
-	var validBindings []*clusterapiv1beta2.ManagedClusterSetBinding
-	for _, binding := range bindings {
-		// ignore clustersetbinding refers to a non-existent clusterset
-		_, err := c.clusterSetLister.Get(binding.Name)
-		if errors.IsNotFound(err) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		validBindings = append(validBindings, binding)
-	}
-
-	return validBindings, nil
-}
-
-// getEligibleClusterSets returns the names of clusterset that eligible for the placement
-func (c *schedulingController) getEligibleClusterSets(placement *clusterapiv1beta1.Placement, bindings []*clusterapiv1beta2.ManagedClusterSetBinding) []string {
-	// filter out invaid clustersetbindings
-	clusterSetNames := sets.NewString()
-	for _, binding := range bindings {
-		clusterSetNames.Insert(binding.Name)
-	}
-
-	// get intersection of clustesets bound to placement namespace and clustesets specified
-	// in placement spec
-	if len(placement.Spec.ClusterSets) != 0 {
-		clusterSetNames = clusterSetNames.Intersection(sets.NewString(placement.Spec.ClusterSets...))
-	}
-
-	return clusterSetNames.List()
-}
-
-// getAvailableClusters returns available clusters for the given placement. The clusters must
-// 1) Be from clustersets bound to the placement namespace;
-// 2) Belong to one of particular clustersets if .spec.clusterSets is specified;
-// 3) Not in terminating state;
-func (c *schedulingController) getAvailableClusters(clusterSetNames []string) ([]*clusterapiv1.ManagedCluster, error) {
-	if len(clusterSetNames) == 0 {
-		return nil, nil
-	}
-	// all available clusters
-	availableClusters := map[string]*clusterapiv1.ManagedCluster{}
-
-	for _, name := range clusterSetNames {
-		// ignore clusterset if failed to get
-		clusterSet, err := c.clusterSetLister.Get(name)
-		if errors.IsNotFound(err) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		clusters, err := clustersdkv1beta2.GetClustersFromClusterSet(clusterSet, c.clusterLister)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get clusterset: %v, clusters, Error: %v", clusterSet.Name, err)
-		}
-		for i := range clusters {
-			if clusters[i].DeletionTimestamp.IsZero() {
-				availableClusters[clusters[i].Name] = clusters[i]
-			}
-		}
-	}
-
-	if len(availableClusters) == 0 {
-		return nil, nil
-	}
-
-	var result []*clusterapiv1.ManagedCluster
-	for _, c := range availableClusters {
-		result = append(result, c)
-	}
-
-	return result, nil
 }
 
 // updateStatus updates the status of the placement according to intermediate scheduling data.

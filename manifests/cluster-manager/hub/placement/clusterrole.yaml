@@ -19,7 +19,10 @@ rules:
 - apiGroups: ["apps"]
   resources: ["replicasets"]
   verbs: ["get"] 
-# Allow create subjectaccessreviews to access debug path
+# Allow create tokenreviews and subjectaccessreviews to access debug path
+- apiGroups: ["authentication.k8s.io"]
+  resources: ["tokenreviews"]
+  verbs: ["create"]
 - apiGroups: ["authorization.k8s.io"]
   resources: ["subjectaccessreviews"]
   verbs: ["create"]

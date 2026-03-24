@@ -622,7 +622,7 @@ func TestSyncDeploy(t *testing.T) {
 		"open-cluster-management.io/cluster-name": "test"}
 	clusterManager := newClusterManager("testhub")
 	clusterManager.SetLabels(labels)
-	assertDeployments(t, clusterManager, 30, 12)
+	assertDeployments(t, clusterManager, 31, 12)
 }
 
 func TestSyncDeployWithGRPCAuthEnabled(t *testing.T) {
@@ -640,7 +640,7 @@ func TestSyncDeployWithGRPCAuthEnabled(t *testing.T) {
 			},
 		},
 	}
-	assertDeployments(t, clusterManager, 34, 12)
+	assertDeployments(t, clusterManager, 35, 12)
 }
 
 func TestSyncDeployNoWebhook(t *testing.T) {
@@ -666,7 +666,7 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 
 	// Check if resources are created as expected
 	// We expect create the namespace twice respectively in the management cluster and the hub cluster.
-	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 33)
+	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 34)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager, false)
 	}

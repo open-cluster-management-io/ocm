@@ -1,0 +1,20 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ .ClusterManagerName }}-placement
+  namespace: {{ .ClusterManagerNamespace }}
+  labels:
+    {{ if gt (len .Labels) 0 }}
+    {{ range $key, $value := .Labels }}
+    "{{ $key }}": "{{ $value }}"
+    {{ end }}
+    {{ end }}
+spec:
+  selector:
+    app: clustermanager-placement-controller
+  ports:
+  - name: https
+    port: 9443
+    protocol: TCP
+    targetPort: 9443
+  type: ClusterIP

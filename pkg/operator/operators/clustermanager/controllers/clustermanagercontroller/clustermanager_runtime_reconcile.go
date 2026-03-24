@@ -34,6 +34,11 @@ var (
 		"cluster-manager/management/addon-manager/webhook-deployment.yaml",
 	}
 
+	// Service files deployed in the management cluster
+	managementServiceFiles = []string{
+		"cluster-manager/management/placement/service.yaml",
+	}
+
 	addOnManagerDeploymentFiles = []string{
 		"cluster-manager/management/addon-manager/deployment.yaml",
 	}
@@ -136,10 +141,11 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 		}
 	}
 
-	// Apply management cluster resources(namespace and deployments).
+	// Apply management cluster resources(namespace, services and deployments).
 	// Note: the certrotation-controller will create CABundle after the namespace applied.
 	// And CABundle is used to render apiservice resources.
 	managementResources := []string{namespaceResource}
+	managementResources = append(managementResources, managementServiceFiles...)
 
 	var appliedErrs []error
 	resourceResults := helpers.ApplyDirectly(
