@@ -16,13 +16,13 @@ import (
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
 
-	tlslib "open-cluster-management.io/ocm/pkg/common/tls"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/certrotationcontroller"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/clustermanagercontroller"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/crdstatuccontroller"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/migrationcontroller"
 	clustermanagerstatuscontroller "open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/statuscontroller"
+	tlslib "open-cluster-management.io/sdk-go/pkg/tls"
 )
 
 type Options struct {
@@ -61,7 +61,6 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 	addonSecretInformer := newOneTermInformer(helpers.AddonWebhookSecret)
 	grpcServerSecretInformer := newOneTermInformer(helpers.GRPCServerSecret)
 	configmapInformer := newOneTermInformer(helpers.CaBundleConfigmap)
-	tlsConfigMapInformer := newOneTermInformer(tlslib.ConfigMapName)
 
 	deploymentInformer := informers.NewSharedInformerFactoryWithOptions(kubeClient, 5*time.Minute,
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
@@ -91,25 +90,20 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 	}
 	operatorInformer := operatorinformer.NewSharedInformerFactory(operatorClient, 5*time.Minute)
 
-	// Load TLS config to pass to addon webhook deployment.
-	// This code only runs on the leader pod (due to leader election in controllercmd).
-	currentTLSConfig, err := tlslib.LoadTLSConfigFromConfigMap(ctx, kubeClient, controllerContext.OperatorNamespace)
+	// Load TLS config and start watching for changes. The watcher restarts the process
+	// when the ConfigMap changes so the new TLS settings are applied.
+	currentTLSConfig, err := tlslib.StartTLSConfigMapWatcher(ctx, kubeClient, controllerContext.OperatorNamespace,
+		func() {
+			logger.Info("TLS ConfigMap changed, restarting", "component", "cluster-manager operator")
+			os.Exit(0)
+		},
+	)
 	if err != nil {
-		logger.Error(err, "Failed to load TLS ConfigMap, using default TLS config")
+		return err
 	}
-	if currentTLSConfig == nil {
-		// No ConfigMap, use default TLS config
-		currentTLSConfig = tlslib.GetDefaultTLSConfig()
-		logger.Info("No TLS ConfigMap found, using default TLS config for addon webhook",
-			"minVersion", tlslib.TLSVersionToString(currentTLSConfig.MinVersion))
-	} else {
-		logger.Info("Loaded TLS config from ConfigMap for addon webhook",
-			"minVersion", tlslib.TLSVersionToString(currentTLSConfig.MinVersion),
-			"cipherSuites", len(currentTLSConfig.CipherSuites))
-	}
-	// Convert TLS config to string format for addon webhook flags
-	tlsMinVersion := tlslib.TLSVersionToString(currentTLSConfig.MinVersion)
+	tlsMinVersion := tlslib.VersionToString(currentTLSConfig.MinVersion)
 	tlsCipherSuites := tlslib.CipherSuitesToString(currentTLSConfig.CipherSuites)
+	logger.Info("TLS configuration loaded", "minVersion", tlsMinVersion, "cipherSuites", tlsCipherSuites)
 
 	clusterManagerController := clustermanagercontroller.NewClusterManagerController(
 		kubeClient,
@@ -149,16 +143,6 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		kubeClient,
 		operatorInformer.Operator().V1().ClusterManagers())
 
-	// Setup TLS ConfigMap watcher to restart operator when TLS config changes.
-	// Compute hash of current TLS config
-	currentTLSHash := tlslib.HashTLSConfig(currentTLSConfig)
-
-	tlsInformer := tlsConfigMapInformer.Core().V1().ConfigMaps().Informer()
-	if _, err := tlsInformer.AddEventHandler(
-		tlslib.NewRestartEventHandler(ctx, logger, "cluster-manager operator", currentTLSHash)); err != nil {
-		return err
-	}
-
 	go operatorInformer.Start(ctx.Done())
 	go deploymentInformer.Start(ctx.Done())
 	go signerSecretInformer.Start(ctx.Done())
@@ -167,7 +151,6 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 	go addonSecretInformer.Start(ctx.Done())
 	go grpcServerSecretInformer.Start(ctx.Done())
 	go configmapInformer.Start(ctx.Done())
-	go tlsConfigMapInformer.Start(ctx.Done())
 	go clusterManagerController.Run(ctx, 1)
 	go statusController.Run(ctx, 1)
 	go certRotationController.Run(ctx, 1)
