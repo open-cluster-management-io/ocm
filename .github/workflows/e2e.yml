@@ -45,17 +45,6 @@ jobs:
           mkdir -p /home/runner/.kube
           kind get kubeconfig > /home/runner/.kube/config
         if: ${{ env.USE_EXISTING_CLUSTER }}
-      - name: install imagebuilder
-        run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
-      - name: Build images
-        run: IMAGE_TAG=e2e make images
-      - name: Load images
-        run: |
-          kind load docker-image --name=kind quay.io/open-cluster-management/registration-operator:e2e
-          kind load docker-image --name=kind quay.io/open-cluster-management/registration:e2e
-          kind load docker-image --name=kind quay.io/open-cluster-management/work:e2e
-          kind load docker-image --name=kind quay.io/open-cluster-management/placement:e2e
-          kind load docker-image --name=kind quay.io/open-cluster-management/addon-manager:e2e
       - name: Test E2E
         run: |
           IMAGE_TAG=e2e make test-e2e
@@ -83,17 +72,6 @@ jobs:
           mkdir -p /home/runner/.kube
           kind get kubeconfig > /home/runner/.kube/config
         if: ${{ env.USE_EXISTING_CLUSTER }}
-      - name: install imagebuilder
-        run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
-      - name: Build images
-        run: IMAGE_TAG=e2e make images
-      - name: Load images
-        run: |
-          kind load docker-image --name=kind quay.io/open-cluster-management/registration-operator:e2e
-          kind load docker-image --name=kind quay.io/open-cluster-management/registration:e2e
-          kind load docker-image --name=kind quay.io/open-cluster-management/work:e2e
-          kind load docker-image --name=kind quay.io/open-cluster-management/placement:e2e
-          kind load docker-image --name=kind quay.io/open-cluster-management/addon-manager:e2e
       - name: Test E2E
         run: |
           IMAGE_TAG=e2e KLUSTERLET_DEPLOY_MODE=SingletonHosted make test-e2e
@@ -121,17 +99,6 @@ jobs:
           mkdir -p /home/runner/.kube
           kind get kubeconfig > /home/runner/.kube/config
         if: ${{ env.USE_EXISTING_CLUSTER }}
-      - name: install imagebuilder
-        run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
-      - name: Build images
-        run: IMAGE_TAG=e2e make images
-      - name: Load images
-        run: |
-          kind load docker-image --name=kind quay.io/open-cluster-management/registration-operator:e2e
-          kind load docker-image --name=kind quay.io/open-cluster-management/registration:e2e
-          kind load docker-image --name=kind quay.io/open-cluster-management/work:e2e
-          kind load docker-image --name=kind quay.io/open-cluster-management/placement:e2e
-          kind load docker-image --name=kind quay.io/open-cluster-management/addon-manager:e2e
       - name: Test E2E
         run: |
           IMAGE_TAG=e2e KLUSTERLET_DEPLOY_MODE=Singleton make test-e2e
@@ -159,17 +126,6 @@ jobs:
           mkdir -p /home/runner/.kube
           kind get kubeconfig > /home/runner/.kube/config
         if: ${{ env.USE_EXISTING_CLUSTER }}
-      - name: install imagebuilder
-        run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
-      - name: Build images
-        run: IMAGE_TAG=e2e make images
-      - name: Load images
-        run: |
-          kind load docker-image --name=kind quay.io/open-cluster-management/registration-operator:e2e
-          kind load docker-image --name=kind quay.io/open-cluster-management/registration:e2e
-          kind load docker-image --name=kind quay.io/open-cluster-management/work:e2e
-          kind load docker-image --name=kind quay.io/open-cluster-management/placement:e2e
-          kind load docker-image --name=kind quay.io/open-cluster-management/addon-manager:e2e
       - name: Test E2E
         run: |
           IMAGE_TAG=e2e REGISTRATION_DRIVER=grpc make test-e2e
