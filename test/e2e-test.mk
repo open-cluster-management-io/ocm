@@ -4,7 +4,7 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 )
 
 KUBECTL?=kubectl
-KUBECONFIG?=./.kubeconfig
+KUBECONFIG?=$(HOME)/.kube/config
 HUB_KUBECONFIG?=./.hub-kubeconfig
 GRPC_CONFIG?=./.grpc-config
 KLUSTERLET_DEPLOY_MODE?=Default
@@ -62,11 +62,17 @@ apply-hub-cr:
 	-e "s,quay.io/open-cluster-management/addon-manager:latest,$(ADDON_MANAGER_IMAGE)," \
 	deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers.cr.yaml | $(KUBECTL) apply -f -
 
+# E2E test target
+# Set SKIP_IMAGE_BUILD=true to skip image building and loading (useful when only test code changes)
+ifeq ($(SKIP_IMAGE_BUILD),true)
 test-e2e: deploy-hub deploy-spoke-operator-helm run-e2e
+else
+test-e2e: images-and-load-kind deploy-hub deploy-spoke-operator-helm run-e2e
+endif
 
 run-e2e:
 	go test -c ./test/e2e
-	./e2e.test -test.v -ginkgo.v -nil-executor-validating=true \
+	KUBECONFIG=$(KUBECONFIG) ./e2e.test -test.v -ginkgo.v -nil-executor-validating=true \
 	-registration-image=$(REGISTRATION_IMAGE) \
 	-work-image=$(WORK_IMAGE) \
 	-singleton-image=$(OPERATOR_IMAGE_NAME) \
@@ -81,6 +87,31 @@ clean-spoke: clean-spoke-cr clean-spoke-operator
 
 clean-e2e:
 	$(RM) ./e2e.test
+
+# Clean up e2e test environment (proper cleanup order)
+# Let controllers handle cleanup properly before removing helm releases
+clean-e2e-env: ensure-helm
+	@echo "Cleaning up e2e test environment..."
+	@# Step 1: Delete ClusterManager CR and wait for controller to clean up
+	@if $(KUBECTL) get clustermanager cluster-manager >/dev/null 2>&1; then \
+		echo "Deleting ClusterManager CR (letting controller clean up resources)..."; \
+		$(KUBECTL) delete clustermanager cluster-manager --timeout=120s 2>/dev/null || true; \
+		echo "Waiting for ClusterManager to be fully deleted..."; \
+		timeout=120; \
+		while $(KUBECTL) get clustermanager cluster-manager >/dev/null 2>&1 && [ $$timeout -gt 0 ]; do \
+			sleep 2; \
+			timeout=$$(($$timeout - 2)); \
+		done; \
+	fi
+	@# Step 2: Uninstall helm releases
+	@echo "Uninstalling helm releases..."
+	@$(HELM) uninstall cluster-manager -n open-cluster-management 2>/dev/null || true
+	@$(HELM) uninstall klusterlet -n open-cluster-management 2>/dev/null || true
+	@# Step 3: Delete namespaces
+	@echo "Deleting test namespaces..."
+	@$(KUBECTL) delete ns open-cluster-management open-cluster-management-agent open-cluster-management-hub --timeout=60s 2>/dev/null || true
+	@echo "E2E environment cleaned up successfully!"
+.PHONY: clean-e2e-env
 
 cluster-ip:
 	$(eval HUB_CONTEXT := $(shell $(KUBECTL) config current-context --kubeconfig $(HUB_KUBECONFIG)))
