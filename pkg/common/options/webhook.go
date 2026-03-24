@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	tlslib "open-cluster-management.io/ocm/pkg/common/tls"
+	tlslib "open-cluster-management.io/sdk-go/pkg/tls"
 )
 
 type WebhookOptions struct {
@@ -90,7 +90,7 @@ func (c *WebhookOptions) RunWebhookServer(ctx context.Context) error {
 	}
 
 	// Parse TLS configuration from flags or use default (TLS 1.2)
-	tlsConfig, err := tlslib.TLSConfigFromFlags(c.TLSMinVersion, c.TLSCipherSuites)
+	tlsConfig, err := tlslib.ConfigFromFlags(c.TLSMinVersion, c.TLSCipherSuites)
 	if err != nil {
 		logger.Error(err, "invalid TLS configuration flags")
 		return err
@@ -101,7 +101,7 @@ func (c *WebhookOptions) RunWebhookServer(ctx context.Context) error {
 	}
 
 	logger.Info("Using TLS configuration",
-		"minVersion", tlslib.TLSVersionToString(tlsConfig.MinVersion),
+		"minVersion", tlslib.VersionToString(tlsConfig.MinVersion),
 		"cipherSuites", len(tlsConfig.CipherSuites))
 
 	healthProbeBindAddress, metricsBindAddress := "0", "0"
@@ -122,7 +122,7 @@ func (c *WebhookOptions) RunWebhookServer(ctx context.Context) error {
 			Port:    c.Port,
 			CertDir: c.CertDir,
 			TLSOpts: []func(config *tls.Config){
-				tlslib.TLSConfigToFunc(tlsConfig),
+				tlslib.ConfigToFunc(tlsConfig),
 			},
 		}),
 	})

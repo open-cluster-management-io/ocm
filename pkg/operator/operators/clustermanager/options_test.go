@@ -59,6 +59,7 @@ var _ = ginkgo.Describe("start cluster manager", func() {
 
 		// start hub controller
 		go func() {
+			defer ginkgo.GinkgoRecover()
 			o := &Options{}
 			err := o.RunClusterManagerOperator(ctx, &controllercmd.ControllerContext{
 				KubeConfig:        cfg,

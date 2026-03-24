@@ -12,7 +12,6 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/evanphx/json-patch v5.9.11+incompatible
 	github.com/ghodss/yaml v1.0.0
-	github.com/go-logr/logr v1.4.3
 	github.com/google/cel-go v0.27.0
 	github.com/google/go-cmp v0.7.0
 	github.com/itchyny/gojq v0.12.18
@@ -42,7 +41,7 @@ require (
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
 	open-cluster-management.io/addon-framework v1.2.1-0.20260306083712-b6f9759b7b6d
 	open-cluster-management.io/api v1.2.1-0.20260318031948-8f4e983d30de
-	open-cluster-management.io/sdk-go v1.2.1-0.20260317083210-e8cd33ebb7cf
+	open-cluster-management.io/sdk-go v1.2.1-0.20260324133742-9cbb733e75e4
 	sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03
 	sigs.k8s.io/cluster-inventory-api v0.0.0-20251124125836-445319b6307a
 	sigs.k8s.io/controller-runtime v0.23.3
@@ -94,6 +93,7 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.21.1 // indirect

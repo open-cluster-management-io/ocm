@@ -589,8 +589,8 @@ open-cluster-management.io/addon-framework v1.2.1-0.20260306083712-b6f9759b7b6d 
 open-cluster-management.io/addon-framework v1.2.1-0.20260306083712-b6f9759b7b6d/go.mod h1:Bpw37w4GANroADMDR3F/ZUFoEuTKV9GIn4ijwICcK6E=
 open-cluster-management.io/api v1.2.1-0.20260318031948-8f4e983d30de h1:7rqmnSmLSLIK0TAztQve7lSq22+oM2FcKV3Nbqu8cP8=
 open-cluster-management.io/api v1.2.1-0.20260318031948-8f4e983d30de/go.mod h1:ZpXs1bFTIIqKstMHdLO9IY0NFlbCvZgEtByvvNSmab0=
-open-cluster-management.io/sdk-go v1.2.1-0.20260317083210-e8cd33ebb7cf h1:Re89wrlr0QHKTeLhPLFer493nftYnJ7KMvDD5K2B+BA=
-open-cluster-management.io/sdk-go v1.2.1-0.20260317083210-e8cd33ebb7cf/go.mod h1:lDef+5BvifXww0S7cseux+Wi8melkH29bAf33OZ0ZVg=
+open-cluster-management.io/sdk-go v1.2.1-0.20260324133742-9cbb733e75e4 h1:D7fmD5QU5jnImWwcCL8kH99ptmLve0MzdRxmm0MDh5M=
+open-cluster-management.io/sdk-go v1.2.1-0.20260324133742-9cbb733e75e4/go.mod h1:lDef+5BvifXww0S7cseux+Wi8melkH29bAf33OZ0ZVg=
 sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03 h1:1ShFiMjGQOR/8jTBkmZrk1gORxnvMwm1nOy2/DbHg4U=
 sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03/go.mod h1:F1pT4mK53U6F16/zuaPSYpBaR7x5Kjym6aKJJC0/DHU=
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 h1:jpcvIRr3GLoUoEKRkHKSmGjxb6lWwrBlJsXc+eUYQHM=

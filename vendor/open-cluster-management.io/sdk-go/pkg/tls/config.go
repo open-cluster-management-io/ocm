@@ -7,18 +7,18 @@ import (
 )
 
 const (
-	// DefaultMinTLSVersion is the fallback when no TLS profile is configured
-	DefaultMinTLSVersion = "VersionTLS12"
-
-	// ConfigMapName is the name of the ConfigMap containing TLS profile settings
+	// ConfigMapName is the well-known name of the ConfigMap containing TLS profile settings.
 	ConfigMapName = "ocm-tls-profile"
 
-	// ConfigMapKeyMinVersion is the ConfigMap key for minimum TLS version
+	// ConfigMapKeyMinVersion is the ConfigMap key for the minimum TLS version.
 	ConfigMapKeyMinVersion = "minTLSVersion"
 
 	// ConfigMapKeyCipherSuites is the ConfigMap key for cipher suites
 	ConfigMapKeyCipherSuites = "cipherSuites"
 )
+
+// defaultMinTLSVersion is the fallback when no TLS profile is configured
+const defaultMinTLSVersion = "VersionTLS12"
 
 // TLSConfig represents parsed TLS configuration
 type TLSConfig struct {
@@ -26,8 +26,8 @@ type TLSConfig struct {
 	CipherSuites []uint16
 }
 
-// ParseTLSVersion converts a TLS version string to the corresponding crypto/tls constant
-func ParseTLSVersion(version string) (uint16, error) {
+// parseTLSVersion converts a TLS version string to the corresponding crypto/tls constant
+func parseTLSVersion(version string) (uint16, error) {
 	version = strings.TrimSpace(version)
 	switch version {
 	case "VersionTLS10", "TLSv1.0":
@@ -44,9 +44,9 @@ func ParseTLSVersion(version string) (uint16, error) {
 	}
 }
 
-// ParseCipherSuites converts OpenSSL-style cipher names to Go crypto/tls constants
-// Returns a list of cipher suite IDs and a list of unsupported cipher names
-func ParseCipherSuites(cipherString string) ([]uint16, []string) {
+// parseCipherSuites converts OpenSSL-style cipher names to Go crypto/tls constants.
+// Returns a list of cipher suite IDs and a list of unsupported cipher names.
+func parseCipherSuites(cipherString string) ([]uint16, []string) {
 	if strings.TrimSpace(cipherString) == "" {
 		return nil, nil
 	}
@@ -71,22 +71,6 @@ func ParseCipherSuites(cipherString string) ([]uint16, []string) {
 	return cipherSuites, unsupported
 }
 
-// BuildTLSConfig creates a crypto/tls.Config from parsed TLS configuration
-func BuildTLSConfig(tlsCfg *TLSConfig) *tls.Config {
-	config := &tls.Config{
-		MinVersion: tlsCfg.MinVersion,
-	}
-
-	// TLS 1.3 has fixed cipher suites, don't set CipherSuites field
-	if tlsCfg.MinVersion == tls.VersionTLS13 {
-		config.MaxVersion = tls.VersionTLS13
-	} else if len(tlsCfg.CipherSuites) > 0 {
-		config.CipherSuites = tlsCfg.CipherSuites
-	}
-
-	return config
-}
-
 // GetDefaultTLSConfig returns a TLS config with safe defaults (TLS 1.2)
 func GetDefaultTLSConfig() *TLSConfig {
 	return &TLSConfig{
@@ -95,8 +79,8 @@ func GetDefaultTLSConfig() *TLSConfig {
 	}
 }
 
-// TLSConfigFromFlags creates TLS config from command-line flags
-func TLSConfigFromFlags(minVersion, cipherSuites string) (*TLSConfig, error) {
+// ConfigFromFlags creates TLS config from command-line flags
+func ConfigFromFlags(minVersion, cipherSuites string) (*TLSConfig, error) {
 	if minVersion == "" && cipherSuites == "" {
 		return nil, nil // No flags provided
 	}
@@ -105,7 +89,7 @@ func TLSConfigFromFlags(minVersion, cipherSuites string) (*TLSConfig, error) {
 
 	// Parse min version
 	if minVersion != "" {
-		ver, err := ParseTLSVersion(minVersion)
+		ver, err := parseTLSVersion(minVersion)
 		if err != nil {
 			return nil, fmt.Errorf("invalid --tls-min-version: %w", err)
 		}
@@ -116,7 +100,7 @@ func TLSConfigFromFlags(minVersion, cipherSuites string) (*TLSConfig, error) {
 
 	// Parse cipher suites
 	if cipherSuites != "" {
-		suites, unsupported := ParseCipherSuites(cipherSuites)
+		suites, unsupported := parseCipherSuites(cipherSuites)
 		if len(unsupported) > 0 {
 			return nil, fmt.Errorf("unsupported cipher suites: %v", unsupported)
 		}
@@ -126,8 +110,8 @@ func TLSConfigFromFlags(minVersion, cipherSuites string) (*TLSConfig, error) {
 	return cfg, nil
 }
 
-// TLSVersionToString converts a TLS version constant to its string representation
-func TLSVersionToString(version uint16) string {
+// VersionToString converts a TLS version constant to its string representation
+func VersionToString(version uint16) string {
 	switch version {
 	case tls.VersionTLS10:
 		return "VersionTLS10"
@@ -156,6 +140,24 @@ func CipherSuitesToString(suites []uint16) string {
 		}
 	}
 	return strings.Join(names, ",")
+}
+
+// ConfigToFunc returns a function that applies the TLS configuration to a tls.Config.
+// It is suitable for use with controller-runtime's TLSOpts (webhook/metrics servers).
+// If tlsCfg is nil (e.g. returned by ConfigFromFlags when no flags are set), the
+// returned function is a no-op that leaves the tls.Config unchanged.
+func ConfigToFunc(tlsCfg *TLSConfig) func(*tls.Config) {
+	if tlsCfg == nil {
+		return func(*tls.Config) {}
+	}
+	return func(config *tls.Config) {
+		config.MinVersion = tlsCfg.MinVersion
+		if tlsCfg.MinVersion == tls.VersionTLS13 {
+			config.MaxVersion = tls.VersionTLS13
+		} else if len(tlsCfg.CipherSuites) > 0 {
+			config.CipherSuites = tlsCfg.CipherSuites
+		}
+	}
 }
 
 // cipherIDToName converts a cipher suite ID to its OpenSSL-style name

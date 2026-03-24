@@ -15,6 +15,7 @@ import (
 
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
+	tlslib "open-cluster-management.io/sdk-go/pkg/tls"
 
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/certrotationcontroller"
@@ -22,7 +23,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/crdstatuccontroller"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/migrationcontroller"
 	clustermanagerstatuscontroller "open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/statuscontroller"
-	tlslib "open-cluster-management.io/sdk-go/pkg/tls"
 )
 
 type Options struct {
@@ -99,6 +99,9 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		},
 	)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil
+		}
 		return err
 	}
 	tlsMinVersion := tlslib.VersionToString(currentTLSConfig.MinVersion)

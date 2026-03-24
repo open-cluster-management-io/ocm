@@ -34,12 +34,3 @@ var cipherMap = map[string]uint16{
 	"AES256-SHA":   tls.TLS_RSA_WITH_AES_256_CBC_SHA,
 	"DES-CBC3-SHA": tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA,
 }
-
-// GetSupportedCipherSuites returns a list of all supported cipher suite names
-func GetSupportedCipherSuites() []string {
-	suites := make([]string, 0, len(cipherMap))
-	for name := range cipherMap {
-		suites = append(suites, name)
-	}
-	return suites
-}
