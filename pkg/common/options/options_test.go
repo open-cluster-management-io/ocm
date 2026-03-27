@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path"
+	"strings"
 	"testing"
 	"time"
 
@@ -229,5 +230,110 @@ func TestNewOptions(t *testing.T) {
 	}
 	if err := cmd.Flags().Set("unsupported-flag", "true"); err == nil {
 		t.Errorf("Should return err")
+	}
+}
+
+func TestApplyTLSToCommand(t *testing.T) {
+	cases := []struct {
+		name            string
+		tlsMinVersion   string
+		tlsCipherSuites string
+		configPreSet    bool
+		wantConfigSet   bool
+		wantMinVersion  string
+		wantCiphers     string
+	}{
+		{
+			name:          "no TLS flags set — no-op",
+			wantConfigSet: false,
+		},
+		{
+			name:           "only tls-min-version set",
+			tlsMinVersion:  "VersionTLS13",
+			wantConfigSet:  true,
+			wantMinVersion: "VersionTLS13",
+		},
+		{
+			name:            "only tls-cipher-suites set",
+			tlsCipherSuites: "TLS_AES_256_GCM_SHA384",
+			wantConfigSet:   true,
+			wantCiphers:     "TLS_AES_256_GCM_SHA384",
+		},
+		{
+			name:            "both tls-min-version and tls-cipher-suites set",
+			tlsMinVersion:   "VersionTLS13",
+			tlsCipherSuites: "TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256",
+			wantConfigSet:   true,
+			wantMinVersion:  "VersionTLS13",
+			wantCiphers:     "TLS_AES_256_GCM_SHA384",
+		},
+		{
+			name:          "user already provided --config — skip injection",
+			tlsMinVersion: "VersionTLS13",
+			configPreSet:  true,
+			wantConfigSet: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			opts := NewOptions()
+			opts.TLSMinVersion = c.tlsMinVersion
+			opts.TLSCipherSuites = c.tlsCipherSuites
+
+			// Simulate library-go's --config flag.
+			cmd := &cobra.Command{Use: "test"}
+			var configFile string
+			cmd.Flags().StringVar(&configFile, "config", "", "")
+
+			if c.configPreSet {
+				if err := cmd.Flags().Set("config", "/existing/config.yaml"); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			opts.ApplyTLSToCommand(cmd)
+
+			// PersistentPreRunE is set by ApplyTLSToCommand; invoke it directly.
+			if err := cmd.PersistentPreRunE(cmd, nil); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if c.configPreSet {
+				// --config should remain as the user set it, not overwritten.
+				if configFile != "/existing/config.yaml" {
+					t.Errorf("expected --config to remain %q, got %q", "/existing/config.yaml", configFile)
+				}
+				return
+			}
+
+			if !c.wantConfigSet {
+				if configFile != "" {
+					t.Errorf("expected --config to be empty, got %q", configFile)
+				}
+				return
+			}
+
+			if configFile == "" {
+				t.Fatal("expected --config to be set, but it is empty")
+			}
+			defer os.Remove(configFile)
+
+			content, err := os.ReadFile(configFile)
+			if err != nil {
+				t.Fatalf("failed to read generated config file: %v", err)
+			}
+			s := string(content)
+
+			if c.wantMinVersion != "" && !strings.Contains(s, "minTLSVersion: "+c.wantMinVersion) {
+				t.Errorf("expected config to contain minTLSVersion %q, got:\n%s", c.wantMinVersion, s)
+			}
+			if c.wantMinVersion == "" && strings.Contains(s, "minTLSVersion") {
+				t.Errorf("expected config to NOT contain minTLSVersion, got:\n%s", s)
+			}
+			if c.wantCiphers != "" && !strings.Contains(s, c.wantCiphers) {
+				t.Errorf("expected config to contain cipher %q, got:\n%s", c.wantCiphers, s)
+			}
+		})
 	}
 }

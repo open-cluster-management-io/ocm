@@ -1204,6 +1204,58 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 		})
 
+		ginkgo.It("should inject tls-min-version into all hub deployments when ocm-tls-profile ConfigMap exists", func() {
+			// Create the ocm-tls-profile ConfigMap in the operator namespace.
+			// The operator namespace is metav1.NamespaceDefault (see startHubOperator).
+			tlsCM := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ocm-tls-profile",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Data: map[string]string{
+					"minTLSVersion": "VersionTLS13",
+				},
+			}
+			_, err := kubeClient.CoreV1().ConfigMaps(metav1.NamespaceDefault).Create(
+				context.Background(), tlsCM, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			defer func() {
+				err := kubeClient.CoreV1().ConfigMaps(metav1.NamespaceDefault).Delete(
+					context.Background(), "ocm-tls-profile", metav1.DeleteOptions{})
+				if err != nil && !errors.IsNotFound(err) {
+					ginkgo.GinkgoT().Logf("failed to delete ocm-tls-profile ConfigMap: %v", err)
+				}
+			}()
+
+			// All hub deployments that get TLS flags injected.
+			tlsDeployments := []string{
+				hubRegistrationDeployment,
+				hubRegistrationWebhookDeployment,
+				hubPlacementDeployment,
+				hubWorkWebhookDeployment,
+				hubAddOnManagerDeployment,
+				hubAddOnWebhookDeployment,
+			}
+			for _, deployName := range tlsDeployments {
+				deployName := deployName // capture
+				gomega.Eventually(func() error {
+					actual, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(
+						context.Background(), deployName, metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+					for _, arg := range actual.Spec.Template.Spec.Containers[0].Args {
+						if arg == "--tls-min-version=VersionTLS13" {
+							return nil
+						}
+					}
+					return fmt.Errorf("deployment %s: --tls-min-version=VersionTLS13 not found in args %v",
+						deployName, actual.Spec.Template.Spec.Containers[0].Args)
+				}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			}
+		})
+
 		ginkgo.It("should have labels on resources created by clustermanager", func() {
 
 			labels := map[string]string{helpers.AppLabelKey: "clustermanager", helpers.HubLabelKey: "hub",
