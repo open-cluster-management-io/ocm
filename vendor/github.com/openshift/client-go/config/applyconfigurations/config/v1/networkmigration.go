@@ -4,15 +4,9 @@ package v1
 
 // NetworkMigrationApplyConfiguration represents a declarative configuration of the NetworkMigration type for use
 // with apply.
-//
-// NetworkMigration represents the network migration status.
 type NetworkMigrationApplyConfiguration struct {
-	// networkType is the target plugin that is being deployed.
-	// DEPRECATED: network type migration is no longer supported,
-	// so this should always be unset.
-	NetworkType *string `json:"networkType,omitempty"`
-	// mtu is the MTU configuration that is being deployed.
-	MTU *MTUMigrationApplyConfiguration `json:"mtu,omitempty"`
+	NetworkType *string                         `json:"networkType,omitempty"`
+	MTU         *MTUMigrationApplyConfiguration `json:"mtu,omitempty"`
 }
 
 // NetworkMigrationApplyConfiguration constructs a declarative configuration of the NetworkMigration type for use with

@@ -13,19 +13,11 @@ import (
 
 // KubeAPIServerApplyConfiguration represents a declarative configuration of the KubeAPIServer type for use
 // with apply.
-//
-// KubeAPIServer provides information to configure an operator to manage kube-apiserver.
-//
-// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 type KubeAPIServerApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
-	// metadata is the standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// spec is the specification of the desired behavior of the Kubernetes API Server
-	Spec *KubeAPIServerSpecApplyConfiguration `json:"spec,omitempty"`
-	// status is the most recently observed status of the Kubernetes API Server
-	Status *KubeAPIServerStatusApplyConfiguration `json:"status,omitempty"`
+	Spec                                 *KubeAPIServerSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *KubeAPIServerStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // KubeAPIServer constructs a declarative configuration of the KubeAPIServer type for use with
@@ -38,14 +30,29 @@ func KubeAPIServer(name string) *KubeAPIServerApplyConfiguration {
 	return b
 }
 
-// ExtractKubeAPIServerFrom extracts the applied configuration owned by fieldManager from
-// kubeAPIServer for the specified subresource. Pass an empty string for subresource to extract
-// the main resource. Common subresources include "status", "scale", etc.
+// ExtractKubeAPIServer extracts the applied configuration owned by fieldManager from
+// kubeAPIServer. If no managedFields are found in kubeAPIServer for fieldManager, a
+// KubeAPIServerApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
 // kubeAPIServer must be a unmodified KubeAPIServer API object that was retrieved from the Kubernetes API.
-// ExtractKubeAPIServerFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractKubeAPIServer provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-func ExtractKubeAPIServerFrom(kubeAPIServer *operatorv1.KubeAPIServer, fieldManager string, subresource string) (*KubeAPIServerApplyConfiguration, error) {
+// Experimental!
+func ExtractKubeAPIServer(kubeAPIServer *operatorv1.KubeAPIServer, fieldManager string) (*KubeAPIServerApplyConfiguration, error) {
+	return extractKubeAPIServer(kubeAPIServer, fieldManager, "")
+}
+
+// ExtractKubeAPIServerStatus is the same as ExtractKubeAPIServer except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractKubeAPIServerStatus(kubeAPIServer *operatorv1.KubeAPIServer, fieldManager string) (*KubeAPIServerApplyConfiguration, error) {
+	return extractKubeAPIServer(kubeAPIServer, fieldManager, "status")
+}
+
+func extractKubeAPIServer(kubeAPIServer *operatorv1.KubeAPIServer, fieldManager string, subresource string) (*KubeAPIServerApplyConfiguration, error) {
 	b := &KubeAPIServerApplyConfiguration{}
 	err := managedfields.ExtractInto(kubeAPIServer, internal.Parser().Type("com.github.openshift.api.operator.v1.KubeAPIServer"), fieldManager, b, subresource)
 	if err != nil {
@@ -57,27 +64,6 @@ func ExtractKubeAPIServerFrom(kubeAPIServer *operatorv1.KubeAPIServer, fieldMana
 	b.WithAPIVersion("operator.openshift.io/v1")
 	return b, nil
 }
-
-// ExtractKubeAPIServer extracts the applied configuration owned by fieldManager from
-// kubeAPIServer. If no managedFields are found in kubeAPIServer for fieldManager, a
-// KubeAPIServerApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
-// kubeAPIServer must be a unmodified KubeAPIServer API object that was retrieved from the Kubernetes API.
-// ExtractKubeAPIServer provides a way to perform a extract/modify-in-place/apply workflow.
-// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
-// applied if another fieldManager has updated or force applied any of the previously applied fields.
-func ExtractKubeAPIServer(kubeAPIServer *operatorv1.KubeAPIServer, fieldManager string) (*KubeAPIServerApplyConfiguration, error) {
-	return ExtractKubeAPIServerFrom(kubeAPIServer, fieldManager, "")
-}
-
-// ExtractKubeAPIServerStatus extracts the applied configuration owned by fieldManager from
-// kubeAPIServer for the status subresource.
-func ExtractKubeAPIServerStatus(kubeAPIServer *operatorv1.KubeAPIServer, fieldManager string) (*KubeAPIServerApplyConfiguration, error) {
-	return ExtractKubeAPIServerFrom(kubeAPIServer, fieldManager, "status")
-}
-
 func (b KubeAPIServerApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

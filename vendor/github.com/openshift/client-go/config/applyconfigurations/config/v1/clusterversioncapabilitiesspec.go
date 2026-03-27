@@ -8,20 +8,9 @@ import (
 
 // ClusterVersionCapabilitiesSpecApplyConfiguration represents a declarative configuration of the ClusterVersionCapabilitiesSpec type for use
 // with apply.
-//
-// ClusterVersionCapabilitiesSpec selects the managed set of
-// optional, core cluster components.
 type ClusterVersionCapabilitiesSpecApplyConfiguration struct {
-	// baselineCapabilitySet selects an initial set of
-	// optional capabilities to enable, which can be extended via
-	// additionalEnabledCapabilities.  If unset, the cluster will
-	// choose a default, and the default may change over time.
-	// The current default is vCurrent.
-	BaselineCapabilitySet *configv1.ClusterVersionCapabilitySet `json:"baselineCapabilitySet,omitempty"`
-	// additionalEnabledCapabilities extends the set of managed
-	// capabilities beyond the baseline defined in
-	// baselineCapabilitySet.  The default is an empty set.
-	AdditionalEnabledCapabilities []configv1.ClusterVersionCapability `json:"additionalEnabledCapabilities,omitempty"`
+	BaselineCapabilitySet         *configv1.ClusterVersionCapabilitySet `json:"baselineCapabilitySet,omitempty"`
+	AdditionalEnabledCapabilities []configv1.ClusterVersionCapability   `json:"additionalEnabledCapabilities,omitempty"`
 }
 
 // ClusterVersionCapabilitiesSpecApplyConfiguration constructs a declarative configuration of the ClusterVersionCapabilitiesSpec type for use with

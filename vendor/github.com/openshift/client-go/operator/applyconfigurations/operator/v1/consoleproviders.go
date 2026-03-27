@@ -4,11 +4,7 @@ package v1
 
 // ConsoleProvidersApplyConfiguration represents a declarative configuration of the ConsoleProviders type for use
 // with apply.
-//
-// ConsoleProviders defines a list of optional additional providers of
-// functionality to the console.
 type ConsoleProvidersApplyConfiguration struct {
-	// statuspage contains ID for statuspage.io page that provides status info about.
 	Statuspage *StatuspageProviderApplyConfiguration `json:"statuspage,omitempty"`
 }
 

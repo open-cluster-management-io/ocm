@@ -4,17 +4,11 @@ package v1
 
 // ObjectReferenceApplyConfiguration represents a declarative configuration of the ObjectReference type for use
 // with apply.
-//
-// ObjectReference contains enough information to let you inspect or modify the referred object.
 type ObjectReferenceApplyConfiguration struct {
-	// group of the referent.
-	Group *string `json:"group,omitempty"`
-	// resource of the referent.
-	Resource *string `json:"resource,omitempty"`
-	// namespace of the referent.
+	Group     *string `json:"group,omitempty"`
+	Resource  *string `json:"resource,omitempty"`
 	Namespace *string `json:"namespace,omitempty"`
-	// name of the referent.
-	Name *string `json:"name,omitempty"`
+	Name      *string `json:"name,omitempty"`
 }
 
 // ObjectReferenceApplyConfiguration constructs a declarative configuration of the ObjectReference type for use with

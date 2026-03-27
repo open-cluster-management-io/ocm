@@ -8,16 +8,8 @@ import (
 
 // InsightsReportApplyConfiguration represents a declarative configuration of the InsightsReport type for use
 // with apply.
-//
-// insightsReport provides Insights health check report based on the most
-// recently sent Insights data.
 type InsightsReportApplyConfiguration struct {
-	// downloadedAt is the time when the last Insights report was downloaded.
-	// An empty value means that there has not been any Insights report downloaded yet and
-	// it usually appears in disconnected clusters (or clusters when the Insights data gathering is disabled).
-	DownloadedAt *metav1.Time `json:"downloadedAt,omitempty"`
-	// healthChecks provides basic information about active Insights health checks
-	// in a cluster.
+	DownloadedAt *metav1.Time                    `json:"downloadedAt,omitempty"`
 	HealthChecks []HealthCheckApplyConfiguration `json:"healthChecks,omitempty"`
 }
 

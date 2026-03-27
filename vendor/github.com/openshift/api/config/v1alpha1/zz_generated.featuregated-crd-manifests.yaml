@@ -21,34 +21,35 @@ backups.config.openshift.io:
   - AutomatedEtcdBackup
   Version: v1alpha1
 
-criocredentialproviderconfigs.config.openshift.io:
+clusterimagepolicies.config.openshift.io:
   Annotations: {}
-  ApprovedPRNumber: https://github.com/openshift/api/pull/2557
-  CRDName: criocredentialproviderconfigs.config.openshift.io
+  ApprovedPRNumber: https://github.com/openshift/api/pull/1457
+  CRDName: clusterimagepolicies.config.openshift.io
   Capability: ""
   Category: ""
   FeatureGates:
-  - CRIOCredentialProviderConfig
+  - SigstoreImageVerification
+  - SigstoreImageVerificationPKI
   FilenameOperatorName: config-operator
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_10"
   GroupName: config.openshift.io
   HasStatus: true
-  KindName: CRIOCredentialProviderConfig
+  KindName: ClusterImagePolicy
   Labels: {}
-  PluralName: criocredentialproviderconfigs
+  PluralName: clusterimagepolicies
   PrinterColumns: []
   Scope: Cluster
   ShortNames: null
   TopLevelFeatureGates:
-  - CRIOCredentialProviderConfig
+  - SigstoreImageVerification
   Version: v1alpha1
 
-clustermonitorings.config.openshift.io:
+clustermonitoring.config.openshift.io:
   Annotations:
     description: Cluster Monitoring Operators configuration API
   ApprovedPRNumber: https://github.com/openshift/api/pull/1929
-  CRDName: clustermonitorings.config.openshift.io
+  CRDName: clustermonitoring.config.openshift.io
   Capability: ""
   Category: ""
   FeatureGates:
@@ -60,7 +61,7 @@ clustermonitorings.config.openshift.io:
   HasStatus: true
   KindName: ClusterMonitoring
   Labels: {}
-  PluralName: clustermonitorings
+  PluralName: clustermonitoring
   PrinterColumns: []
   Scope: Cluster
   ShortNames: null
@@ -68,11 +69,35 @@ clustermonitorings.config.openshift.io:
   - ClusterMonitoringConfig
   Version: v1alpha1
 
+imagepolicies.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/1457
+  CRDName: imagepolicies.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates:
+  - SigstoreImageVerification
+  - SigstoreImageVerificationPKI
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: ImagePolicy
+  Labels: {}
+  PluralName: imagepolicies
+  PrinterColumns: []
+  Scope: Namespaced
+  ShortNames: null
+  TopLevelFeatureGates:
+  - SigstoreImageVerification
+  Version: v1alpha1
+
 insightsdatagathers.config.openshift.io:
   Annotations: {}
   ApprovedPRNumber: https://github.com/openshift/api/pull/1245
   CRDName: insightsdatagathers.config.openshift.io
-  Capability: Insights
+  Capability: ""
   Category: ""
   FeatureGates:
   - InsightsConfig
@@ -89,28 +114,5 @@ insightsdatagathers.config.openshift.io:
   ShortNames: null
   TopLevelFeatureGates:
   - InsightsConfig
-  Version: v1alpha1
-
-pkis.config.openshift.io:
-  Annotations: {}
-  ApprovedPRNumber: https://github.com/openshift/api/pull/2645
-  CRDName: pkis.config.openshift.io
-  Capability: ""
-  Category: ""
-  FeatureGates:
-  - ConfigurablePKI
-  FilenameOperatorName: config-operator
-  FilenameOperatorOrdering: "01"
-  FilenameRunLevel: "0000_10"
-  GroupName: config.openshift.io
-  HasStatus: false
-  KindName: PKI
-  Labels: {}
-  PluralName: pkis
-  PrinterColumns: []
-  Scope: Cluster
-  ShortNames: null
-  TopLevelFeatureGates:
-  - ConfigurablePKI
   Version: v1alpha1
 

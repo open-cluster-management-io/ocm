@@ -13,19 +13,11 @@ import (
 
 // InfrastructureApplyConfiguration represents a declarative configuration of the Infrastructure type for use
 // with apply.
-//
-// Infrastructure holds cluster-wide information about Infrastructure.  The canonical name is `cluster`
-//
-// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 type InfrastructureApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
-	// metadata is the standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// spec holds user settable values for configuration
-	Spec *InfrastructureSpecApplyConfiguration `json:"spec,omitempty"`
-	// status holds observed values from the cluster. They may not be overridden.
-	Status *InfrastructureStatusApplyConfiguration `json:"status,omitempty"`
+	Spec                                 *InfrastructureSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *InfrastructureStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Infrastructure constructs a declarative configuration of the Infrastructure type for use with
@@ -38,14 +30,29 @@ func Infrastructure(name string) *InfrastructureApplyConfiguration {
 	return b
 }
 
-// ExtractInfrastructureFrom extracts the applied configuration owned by fieldManager from
-// infrastructure for the specified subresource. Pass an empty string for subresource to extract
-// the main resource. Common subresources include "status", "scale", etc.
+// ExtractInfrastructure extracts the applied configuration owned by fieldManager from
+// infrastructure. If no managedFields are found in infrastructure for fieldManager, a
+// InfrastructureApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
 // infrastructure must be a unmodified Infrastructure API object that was retrieved from the Kubernetes API.
-// ExtractInfrastructureFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractInfrastructure provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-func ExtractInfrastructureFrom(infrastructure *configv1.Infrastructure, fieldManager string, subresource string) (*InfrastructureApplyConfiguration, error) {
+// Experimental!
+func ExtractInfrastructure(infrastructure *configv1.Infrastructure, fieldManager string) (*InfrastructureApplyConfiguration, error) {
+	return extractInfrastructure(infrastructure, fieldManager, "")
+}
+
+// ExtractInfrastructureStatus is the same as ExtractInfrastructure except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractInfrastructureStatus(infrastructure *configv1.Infrastructure, fieldManager string) (*InfrastructureApplyConfiguration, error) {
+	return extractInfrastructure(infrastructure, fieldManager, "status")
+}
+
+func extractInfrastructure(infrastructure *configv1.Infrastructure, fieldManager string, subresource string) (*InfrastructureApplyConfiguration, error) {
 	b := &InfrastructureApplyConfiguration{}
 	err := managedfields.ExtractInto(infrastructure, internal.Parser().Type("com.github.openshift.api.config.v1.Infrastructure"), fieldManager, b, subresource)
 	if err != nil {
@@ -57,27 +64,6 @@ func ExtractInfrastructureFrom(infrastructure *configv1.Infrastructure, fieldMan
 	b.WithAPIVersion("config.openshift.io/v1")
 	return b, nil
 }
-
-// ExtractInfrastructure extracts the applied configuration owned by fieldManager from
-// infrastructure. If no managedFields are found in infrastructure for fieldManager, a
-// InfrastructureApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
-// infrastructure must be a unmodified Infrastructure API object that was retrieved from the Kubernetes API.
-// ExtractInfrastructure provides a way to perform a extract/modify-in-place/apply workflow.
-// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
-// applied if another fieldManager has updated or force applied any of the previously applied fields.
-func ExtractInfrastructure(infrastructure *configv1.Infrastructure, fieldManager string) (*InfrastructureApplyConfiguration, error) {
-	return ExtractInfrastructureFrom(infrastructure, fieldManager, "")
-}
-
-// ExtractInfrastructureStatus extracts the applied configuration owned by fieldManager from
-// infrastructure for the status subresource.
-func ExtractInfrastructureStatus(infrastructure *configv1.Infrastructure, fieldManager string) (*InfrastructureApplyConfiguration, error) {
-	return ExtractInfrastructureFrom(infrastructure, fieldManager, "status")
-}
-
 func (b InfrastructureApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

@@ -4,11 +4,7 @@ package v1
 
 // GCPCSIDriverConfigSpecApplyConfiguration represents a declarative configuration of the GCPCSIDriverConfigSpec type for use
 // with apply.
-//
-// GCPCSIDriverConfigSpec defines properties that can be configured for the GCP CSI driver.
 type GCPCSIDriverConfigSpecApplyConfiguration struct {
-	// kmsKey sets the cluster default storage class to encrypt volumes with customer-supplied
-	// encryption keys, rather than the default keys managed by GCP.
 	KMSKey *GCPKMSKeyReferenceApplyConfiguration `json:"kmsKey,omitempty"`
 }
 

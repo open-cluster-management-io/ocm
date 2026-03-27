@@ -13,19 +13,11 @@ import (
 
 // ProxyApplyConfiguration represents a declarative configuration of the Proxy type for use
 // with apply.
-//
-// Proxy holds cluster-wide information on how to configure default proxies for the cluster. The canonical name is `cluster`
-//
-// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 type ProxyApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
-	// metadata is the standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// spec holds user-settable values for the proxy configuration
-	Spec *ProxySpecApplyConfiguration `json:"spec,omitempty"`
-	// status holds observed values from the cluster. They may not be overridden.
-	Status *ProxyStatusApplyConfiguration `json:"status,omitempty"`
+	Spec                                 *ProxySpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *ProxyStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Proxy constructs a declarative configuration of the Proxy type for use with
@@ -38,14 +30,29 @@ func Proxy(name string) *ProxyApplyConfiguration {
 	return b
 }
 
-// ExtractProxyFrom extracts the applied configuration owned by fieldManager from
-// proxy for the specified subresource. Pass an empty string for subresource to extract
-// the main resource. Common subresources include "status", "scale", etc.
+// ExtractProxy extracts the applied configuration owned by fieldManager from
+// proxy. If no managedFields are found in proxy for fieldManager, a
+// ProxyApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
 // proxy must be a unmodified Proxy API object that was retrieved from the Kubernetes API.
-// ExtractProxyFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractProxy provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-func ExtractProxyFrom(proxy *configv1.Proxy, fieldManager string, subresource string) (*ProxyApplyConfiguration, error) {
+// Experimental!
+func ExtractProxy(proxy *configv1.Proxy, fieldManager string) (*ProxyApplyConfiguration, error) {
+	return extractProxy(proxy, fieldManager, "")
+}
+
+// ExtractProxyStatus is the same as ExtractProxy except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractProxyStatus(proxy *configv1.Proxy, fieldManager string) (*ProxyApplyConfiguration, error) {
+	return extractProxy(proxy, fieldManager, "status")
+}
+
+func extractProxy(proxy *configv1.Proxy, fieldManager string, subresource string) (*ProxyApplyConfiguration, error) {
 	b := &ProxyApplyConfiguration{}
 	err := managedfields.ExtractInto(proxy, internal.Parser().Type("com.github.openshift.api.config.v1.Proxy"), fieldManager, b, subresource)
 	if err != nil {
@@ -57,27 +64,6 @@ func ExtractProxyFrom(proxy *configv1.Proxy, fieldManager string, subresource st
 	b.WithAPIVersion("config.openshift.io/v1")
 	return b, nil
 }
-
-// ExtractProxy extracts the applied configuration owned by fieldManager from
-// proxy. If no managedFields are found in proxy for fieldManager, a
-// ProxyApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
-// proxy must be a unmodified Proxy API object that was retrieved from the Kubernetes API.
-// ExtractProxy provides a way to perform a extract/modify-in-place/apply workflow.
-// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
-// applied if another fieldManager has updated or force applied any of the previously applied fields.
-func ExtractProxy(proxy *configv1.Proxy, fieldManager string) (*ProxyApplyConfiguration, error) {
-	return ExtractProxyFrom(proxy, fieldManager, "")
-}
-
-// ExtractProxyStatus extracts the applied configuration owned by fieldManager from
-// proxy for the status subresource.
-func ExtractProxyStatus(proxy *configv1.Proxy, fieldManager string) (*ProxyApplyConfiguration, error) {
-	return ExtractProxyFrom(proxy, fieldManager, "status")
-}
-
 func (b ProxyApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

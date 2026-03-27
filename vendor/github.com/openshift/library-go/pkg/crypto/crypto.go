@@ -30,8 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/util/cert"
-
-	configv1 "github.com/openshift/api/config/v1"
 )
 
 // TLS versions that are known to golang. Go 1.13 adds support for
@@ -143,11 +141,7 @@ var ciphers = map[string]uint16{
 }
 
 // openSSLToIANACiphersMap maps OpenSSL cipher suite names to IANA names
-// Ref: https://www.iana.org/assignments/tls-parameters/tls-parameters.xml
-// This must hold a 1:1 mapping for each OpenSSL cipher defined in openshift/api TLSSecurityProfiles,
-// so it can be used to translate OpenSSL ciphers to IANA ciphers, which is what go's crypto/tls understands.
-// Ciphers in this map must also be compatible with go's crypto/tls ciphers:
-// https://github.com/golang/go/blob/d4febb45179fa99ee1d5783bcb693ed7ba14115c/src/crypto/tls/cipher_suites.go#L682-L724
+// ref: https://www.iana.org/assignments/tls-parameters/tls-parameters.xml
 var openSSLToIANACiphersMap = map[string]string{
 	// TLS 1.3 ciphers - not configurable in go 1.13, all of them are used in TLSv1.3 flows
 	"TLS_AES_128_GCM_SHA256":       "TLS_AES_128_GCM_SHA256",       // 0x13,0x01
@@ -167,21 +161,6 @@ var openSSLToIANACiphersMap = map[string]string{
 	"AES256-GCM-SHA384":             "TLS_RSA_WITH_AES_256_GCM_SHA384",               // 0x00,0x9D
 	"AES128-SHA256":                 "TLS_RSA_WITH_AES_128_CBC_SHA256",               // 0x00,0x3C
 
-	// Go's crypto/tls does not support CBC mode and DHE ciphers, so we don't want to include them here.
-	// See:
-	//   - https://github.com/golang/go/issues/26652
-	//   - https://github.com/golang/go/issues/7758
-	//   - https://redhat-internal.slack.com/archives/C098FU5MRAB/p1770309657097269
-	//
-	// "ECDHE-ECDSA-AES256-SHA384":     "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384",       // 0xC0,0x24
-	// "ECDHE-RSA-AES256-SHA384":       "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384",         // 0xC0,0x28
-	// "AES256-SHA256":                 "TLS_RSA_WITH_AES_256_CBC_SHA256",               // 0x00,0x3D
-	// "DHE-RSA-AES128-GCM-SHA256":     "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256",           // 0x00,0x9E
-	// "DHE-RSA-AES256-GCM-SHA384":     "TLS_DHE_RSA_WITH_AES_256_GCM_SHA384",           // 0x00,0x9F
-	// "DHE-RSA-CHACHA20-POLY1305":     "TLS_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256",     // 0xCC,0xAA
-	// "DHE-RSA-AES128-SHA256":         "TLS_DHE_RSA_WITH_AES_128_CBC_SHA256",           // 0x00,0x67
-	// "DHE-RSA-AES256-SHA256":         "TLS_DHE_RSA_WITH_AES_256_CBC_SHA256",           // 0x00,0x6B
-
 	// TLS 1
 	"ECDHE-ECDSA-AES128-SHA": "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA", // 0xC0,0x09
 	"ECDHE-RSA-AES128-SHA":   "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA",   // 0xC0,0x13
@@ -189,10 +168,9 @@ var openSSLToIANACiphersMap = map[string]string{
 	"ECDHE-RSA-AES256-SHA":   "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA",   // 0xC0,0x14
 
 	// SSL 3
-	"AES128-SHA":             "TLS_RSA_WITH_AES_128_CBC_SHA",        // 0x00,0x2F
-	"AES256-SHA":             "TLS_RSA_WITH_AES_256_CBC_SHA",        // 0x00,0x35
-	"DES-CBC3-SHA":           "TLS_RSA_WITH_3DES_EDE_CBC_SHA",       // 0x00,0x0A
-	"ECDHE-RSA-DES-CBC3-SHA": "TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA", // 0xC0,0x12
+	"AES128-SHA":   "TLS_RSA_WITH_AES_128_CBC_SHA",  // 0x00,0x2F
+	"AES256-SHA":   "TLS_RSA_WITH_AES_256_CBC_SHA",  // 0x00,0x35
+	"DES-CBC3-SHA": "TLS_RSA_WITH_3DES_EDE_CBC_SHA", // 0x00,0x0A
 }
 
 // CipherSuitesToNamesOrDie given a list of cipher suites as ints, return their readable names
@@ -264,9 +242,6 @@ func ValidCipherSuites() []string {
 	sort.Strings(validCipherSuites)
 	return validCipherSuites
 }
-
-// DefaultTLSProfileType is the intermediate profile type.
-const DefaultTLSProfileType = configv1.TLSProfileIntermediateType
 
 // DefaultCiphers returns the default cipher suites for TLS connections.
 //

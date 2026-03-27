@@ -9,7 +9,6 @@ import (
 // IPFIXConfigApplyConfiguration represents a declarative configuration of the IPFIXConfig type for use
 // with apply.
 type IPFIXConfigApplyConfiguration struct {
-	// ipfixCollectors is list of strings formatted as ip:port with a maximum of ten items
 	Collectors []operatorv1.IPPort `json:"collectors,omitempty"`
 }
 

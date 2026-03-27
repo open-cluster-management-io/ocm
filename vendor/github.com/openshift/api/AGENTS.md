@@ -37,23 +37,15 @@ When working on a specific API group/version, you can regenerate only the affect
 
 ```bash
 # Regenerate CRDs for a specific API group/version
-make update-codegen API_GROUP_VERSIONS=operator.openshift.io/v1alpha1
-make update-codegen API_GROUP_VERSIONS=config.openshift.io/v1
-make update-codegen API_GROUP_VERSIONS=route.openshift.io/v1
+make update-codegen-crds API_GROUP_VERSIONS=operator.openshift.io/v1alpha1
+make update-codegen-crds API_GROUP_VERSIONS=config.openshift.io/v1
+make update-codegen-crds API_GROUP_VERSIONS=route.openshift.io/v1
 
 # Multiple API groups can be specified with comma separation
-make update-codegen API_GROUP_VERSIONS=operator.openshift.io/v1alpha1,config.openshift.io/v1
+make update-codegen-crds API_GROUP_VERSIONS=operator.openshift.io/v1alpha1,config.openshift.io/v1
 ```
 
-**Important:** While using `API_GROUP_VERSIONS` is faster for iteration (e.g., when developing tests),
-it generates invalid OpenAPI data. This targeted generation is useful during development cycles, but you
-**must run `make update`** (without `API_GROUP_VERSIONS`) to regenerate all files correctly before
-committing changes. The full `make update` ensures all generated files, including OpenAPI schemas, are
-properly synchronized.
-
-**Workflow:**
-- During iteration: `make update-codegen API_GROUP_VERSIONS=your.group/v1` (fast feedback)
-- Before committing: `make update` (ensures correctness)
+This is more efficient than running `make update` (which regenerates all CRDs) when you're only working on specific API groups.
 
 ### Testing
 ```bash
@@ -124,20 +116,6 @@ make generate-with-container  # Run code generation in container
 Uses `podman` by default, set `RUNTIME=docker` or `USE_DOCKER=1` to use Docker instead.
 
 ## Custom Claude Code Commands
-
-### Generate Tests
-```
-/generate-tests <path-to-types-file-or-api-directory>
-```
-Generates comprehensive `.testsuite.yaml` integration test files for OpenShift API type definitions:
-- Reads Go types, validation markers, CRD manifests, and CEL rules
-- Generates test suites for each CRD variant in `zz_generated.featuregated-crd-manifests/`
-
-Examples:
-```
-/generate-tests config/v1/types_infrastructure.go
-/generate-tests operator/v1
-```
 
 ### API Review
 ```

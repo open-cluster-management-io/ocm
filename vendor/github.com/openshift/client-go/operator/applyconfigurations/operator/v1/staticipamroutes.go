@@ -4,14 +4,9 @@ package v1
 
 // StaticIPAMRoutesApplyConfiguration represents a declarative configuration of the StaticIPAMRoutes type for use
 // with apply.
-//
-// StaticIPAMRoutes provides Destination/Gateway pairs for static IPAM routes
 type StaticIPAMRoutesApplyConfiguration struct {
-	// destination points the IP route destination
 	Destination *string `json:"destination,omitempty"`
-	// gateway is the route's next-hop IP address
-	// If unset, a default gateway is assumed (as determined by the CNI plugin).
-	Gateway *string `json:"gateway,omitempty"`
+	Gateway     *string `json:"gateway,omitempty"`
 }
 
 // StaticIPAMRoutesApplyConfiguration constructs a declarative configuration of the StaticIPAMRoutes type for use with

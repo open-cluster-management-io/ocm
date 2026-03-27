@@ -9,9 +9,7 @@ import (
 // CustomFeatureGatesApplyConfiguration represents a declarative configuration of the CustomFeatureGates type for use
 // with apply.
 type CustomFeatureGatesApplyConfiguration struct {
-	// enabled is a list of all feature gates that you want to force on
-	Enabled []configv1.FeatureGateName `json:"enabled,omitempty"`
-	// disabled is a list of all feature gates that you want to force off
+	Enabled  []configv1.FeatureGateName `json:"enabled,omitempty"`
 	Disabled []configv1.FeatureGateName `json:"disabled,omitempty"`
 }
 

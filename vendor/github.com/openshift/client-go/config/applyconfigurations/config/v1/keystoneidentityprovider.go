@@ -4,13 +4,9 @@ package v1
 
 // KeystoneIdentityProviderApplyConfiguration represents a declarative configuration of the KeystoneIdentityProvider type for use
 // with apply.
-//
-// KeystonePasswordIdentityProvider provides identities for users authenticating using keystone password credentials
 type KeystoneIdentityProviderApplyConfiguration struct {
-	// OAuthRemoteConnectionInfo contains information about how to connect to the keystone server
 	OAuthRemoteConnectionInfoApplyConfiguration `json:",inline"`
-	// domainName is required for keystone v3
-	DomainName *string `json:"domainName,omitempty"`
+	DomainName                                  *string `json:"domainName,omitempty"`
 }
 
 // KeystoneIdentityProviderApplyConfiguration constructs a declarative configuration of the KeystoneIdentityProvider type for use with

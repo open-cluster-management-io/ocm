@@ -8,32 +8,12 @@ import (
 
 // AWSPlatformStatusApplyConfiguration represents a declarative configuration of the AWSPlatformStatus type for use
 // with apply.
-//
-// AWSPlatformStatus holds the current status of the Amazon Web Services infrastructure provider.
 type AWSPlatformStatusApplyConfiguration struct {
-	// region holds the default AWS region for new AWS resources created by the cluster.
-	Region *string `json:"region,omitempty"`
-	// serviceEndpoints list contains custom endpoints which will override default
-	// service endpoint of AWS Services.
-	// There must be only one ServiceEndpoint for a service.
-	ServiceEndpoints []AWSServiceEndpointApplyConfiguration `json:"serviceEndpoints,omitempty"`
-	// resourceTags is a list of additional tags to apply to AWS resources created for the cluster.
-	// See https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html for information on tagging AWS resources.
-	// AWS supports a maximum of 50 tags per resource. OpenShift reserves 25 tags for its use, leaving 25 tags
-	// available for the user.
-	ResourceTags []AWSResourceTagApplyConfiguration `json:"resourceTags,omitempty"`
-	// cloudLoadBalancerConfig holds configuration related to DNS and cloud
-	// load balancers. It allows configuration of in-cluster DNS as an alternative
-	// to the platform default DNS implementation.
-	// When using the ClusterHosted DNS type, Load Balancer IP addresses
-	// must be provided for the API and internal API load balancers as well as the
-	// ingress load balancer.
+	Region                  *string                                    `json:"region,omitempty"`
+	ServiceEndpoints        []AWSServiceEndpointApplyConfiguration     `json:"serviceEndpoints,omitempty"`
+	ResourceTags            []AWSResourceTagApplyConfiguration         `json:"resourceTags,omitempty"`
 	CloudLoadBalancerConfig *CloudLoadBalancerConfigApplyConfiguration `json:"cloudLoadBalancerConfig,omitempty"`
-	// ipFamily specifies the IP protocol family that should be used for AWS
-	// network resources. This controls whether AWS resources are created with
-	// IPv4-only, or dual-stack networking with IPv4 or IPv6 as the primary
-	// protocol family.
-	IPFamily *configv1.IPFamilyType `json:"ipFamily,omitempty"`
+	IPFamily                *configv1.IPFamilyType                     `json:"ipFamily,omitempty"`
 }
 
 // AWSPlatformStatusApplyConfiguration constructs a declarative configuration of the AWSPlatformStatus type for use with

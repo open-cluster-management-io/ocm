@@ -4,11 +4,7 @@ package v1
 
 // ConfigMapNameReferenceApplyConfiguration represents a declarative configuration of the ConfigMapNameReference type for use
 // with apply.
-//
-// ConfigMapNameReference references a config map in a specific namespace.
-// The namespace must be specified at the point of use.
 type ConfigMapNameReferenceApplyConfiguration struct {
-	// name is the metadata.name of the referenced config map
 	Name *string `json:"name,omitempty"`
 }
 

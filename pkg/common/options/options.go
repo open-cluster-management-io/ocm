@@ -2,6 +2,8 @@ package options
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -69,11 +71,15 @@ func (o *Options) AddFlags(flags *pflag.FlagSet) {
 	}
 }
 
-// ApplyTLSToCommand installs a PersistentPreRunE hook that, after flag parsing,
-// calls CmdConfig.WithServingTLSConfig so library-go applies the TLS settings to
-// the 8443 health/metrics server inside StartController. PersistentPreRunE runs
-// before cmd.Run, so all library-go boilerplate (signal handling, logging, etc.)
-// is preserved.
+// ApplyTLSToCommand installs a PersistentPreRunE hook that writes a minimal
+// GenericOperatorConfig YAML to a temp file under /tmp (which is mounted as an
+// emptyDir in all hub controller deployments) and sets library-go's --config flag
+// to point at it. This runs before cmd.Run so all library-go boilerplate (signal
+// handling, logging, profiling) is fully preserved.
+//
+// Inside cmd.Run, StartController calls Config() which reads the file; the TLS
+// values survive SetRecommendedHTTPServingInfoDefaults because DefaultString only
+// sets fields that are empty.
 func (o *Options) ApplyTLSToCommand(cmd *cobra.Command) {
 	prev := cmd.PersistentPreRunE
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
@@ -82,16 +88,32 @@ func (o *Options) ApplyTLSToCommand(cmd *cobra.Command) {
 				return err
 			}
 		}
-		if o.TLSMinVersion == "" {
+		// Only inject when at least one TLS flag is set and --config not already provided.
+		if (o.TLSMinVersion == "" && o.TLSCipherSuites == "") || cmd.Flags().Changed("config") {
 			return nil
 		}
-		var cipherSuites []string
+		content := "apiVersion: operator.openshift.io/v1alpha1\nkind: GenericOperatorConfig\nservingInfo:\n"
+		if o.TLSMinVersion != "" {
+			content += "  minTLSVersion: " + o.TLSMinVersion + "\n"
+		}
 		if o.TLSCipherSuites != "" {
+			content += "  cipherSuites:\n"
 			for _, c := range strings.Split(o.TLSCipherSuites, ",") {
-				cipherSuites = append(cipherSuites, strings.TrimSpace(c))
+				content += "  - " + strings.TrimSpace(c) + "\n"
 			}
 		}
-		o.CmdConfig.WithServingTLSConfig(o.TLSMinVersion, cipherSuites)
-		return nil
+		// /tmp is mounted as an emptyDir in all hub controller deployments,
+		// so writing here is safe even with readOnlyRootFilesystem: true.
+		f, err := os.CreateTemp("", "ocm-controller-tls-*.yaml")
+		if err != nil {
+			return fmt.Errorf("failed to create TLS config file: %w", err)
+		}
+		if _, err := f.WriteString(content); err != nil {
+			f.Close()
+			os.Remove(f.Name())
+			return fmt.Errorf("failed to write TLS config: %w", err)
+		}
+		f.Close()
+		return cmd.Flags().Set("config", f.Name())
 	}
 }

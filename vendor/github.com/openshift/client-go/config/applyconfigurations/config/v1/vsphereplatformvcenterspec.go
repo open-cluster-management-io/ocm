@@ -4,24 +4,9 @@ package v1
 
 // VSpherePlatformVCenterSpecApplyConfiguration represents a declarative configuration of the VSpherePlatformVCenterSpec type for use
 // with apply.
-//
-// VSpherePlatformVCenterSpec stores the vCenter connection fields.
-// This is used by the vSphere CCM.
 type VSpherePlatformVCenterSpecApplyConfiguration struct {
-	// server is the fully-qualified domain name or the IP address of the vCenter server.
-	// ---
-	Server *string `json:"server,omitempty"`
-	// port is the TCP port that will be used to communicate to
-	// the vCenter endpoint.
-	// When omitted, this means the user has no opinion and
-	// it is up to the platform to choose a sensible default,
-	// which is subject to change over time.
-	Port *int32 `json:"port,omitempty"`
-	// The vCenter Datacenters in which the RHCOS
-	// vm guests are located. This field will
-	// be used by the Cloud Controller Manager.
-	// Each datacenter listed here should be used within
-	// a topology.
+	Server      *string  `json:"server,omitempty"`
+	Port        *int32   `json:"port,omitempty"`
 	Datacenters []string `json:"datacenters,omitempty"`
 }
 

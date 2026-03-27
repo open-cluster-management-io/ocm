@@ -4,115 +4,178 @@ package v1
 // is used by operators to apply TLS security settings to operands.
 // +union
 type TLSSecurityProfile struct {
-	// type is one of Old, Intermediate, Modern or Custom. Custom provides the
-	// ability to specify individual TLS security profile parameters.
+	// type is one of Old, Intermediate, Modern or Custom. Custom provides
+	// the ability to specify individual TLS security profile parameters.
+	// Old, Intermediate and Modern are TLS security profiles based on:
 	//
-	// The profiles are based on version 5.7 of the Mozilla Server Side TLS
-	// configuration guidelines. The cipher lists consist of the configuration's
-	// "ciphersuites" followed by the Go-specific "ciphers" from the guidelines.
-	// See: https://ssl-config.mozilla.org/guidelines/5.7.json
+	// https://wiki.mozilla.org/Security/Server_Side_TLS#Recommended_configurations
 	//
-	// The profiles are intent based, so they may change over time as new ciphers are
-	// developed and existing ciphers are found to be insecure. Depending on
-	// precisely which ciphers are available to a process, the list may be reduced.
+	// The profiles are intent based, so they may change over time as new ciphers are developed and existing ciphers
+	// are found to be insecure.  Depending on precisely which ciphers are available to a process, the list may be
+	// reduced.
+	//
+	// Note that the Modern profile is currently not supported because it is not
+	// yet well adopted by common software libraries.
 	//
 	// +unionDiscriminator
 	// +optional
 	Type TLSProfileType `json:"type"`
-
-	// old is a TLS profile for use when services need to be accessed by very old
-	// clients or libraries and should be used only as a last resort.
+	// old is a TLS security profile based on:
 	//
-	// This profile is equivalent to a Custom profile specified as:
-	//   minTLSVersion: VersionTLS10
+	// https://wiki.mozilla.org/Security/Server_Side_TLS#Old_backward_compatibility
+	//
+	// and looks like this (yaml):
+	//
 	//   ciphers:
+	//
 	//     - TLS_AES_128_GCM_SHA256
+	//
 	//     - TLS_AES_256_GCM_SHA384
+	//
 	//     - TLS_CHACHA20_POLY1305_SHA256
+	//
 	//     - ECDHE-ECDSA-AES128-GCM-SHA256
+	//
 	//     - ECDHE-RSA-AES128-GCM-SHA256
+	//
 	//     - ECDHE-ECDSA-AES256-GCM-SHA384
+	//
 	//     - ECDHE-RSA-AES256-GCM-SHA384
+	//
 	//     - ECDHE-ECDSA-CHACHA20-POLY1305
+	//
 	//     - ECDHE-RSA-CHACHA20-POLY1305
+	//
+	//     - DHE-RSA-AES128-GCM-SHA256
+	//
+	//     - DHE-RSA-AES256-GCM-SHA384
+	//
+	//     - DHE-RSA-CHACHA20-POLY1305
+	//
 	//     - ECDHE-ECDSA-AES128-SHA256
+	//
 	//     - ECDHE-RSA-AES128-SHA256
+	//
 	//     - ECDHE-ECDSA-AES128-SHA
+	//
 	//     - ECDHE-RSA-AES128-SHA
+	//
+	//     - ECDHE-ECDSA-AES256-SHA384
+	//
+	//     - ECDHE-RSA-AES256-SHA384
+	//
 	//     - ECDHE-ECDSA-AES256-SHA
+	//
 	//     - ECDHE-RSA-AES256-SHA
+	//
+	//     - DHE-RSA-AES128-SHA256
+	//
+	//     - DHE-RSA-AES256-SHA256
+	//
 	//     - AES128-GCM-SHA256
+	//
 	//     - AES256-GCM-SHA384
+	//
 	//     - AES128-SHA256
+	//
+	//     - AES256-SHA256
+	//
 	//     - AES128-SHA
+	//
 	//     - AES256-SHA
+	//
 	//     - DES-CBC3-SHA
+	//
+	//   minTLSVersion: VersionTLS10
 	//
 	// +optional
 	// +nullable
 	Old *OldTLSProfile `json:"old,omitempty"`
-
-	// intermediate is a TLS profile for use when you do not need compatibility with
-	// legacy clients and want to remain highly secure while being compatible with
-	// most clients currently in use.
+	// intermediate is a TLS security profile based on:
 	//
-	// This profile is equivalent to a Custom profile specified as:
-	//   minTLSVersion: VersionTLS12
+	// https://wiki.mozilla.org/Security/Server_Side_TLS#Intermediate_compatibility_.28recommended.29
+	//
+	// and looks like this (yaml):
+	//
 	//   ciphers:
+	//
 	//     - TLS_AES_128_GCM_SHA256
+	//
 	//     - TLS_AES_256_GCM_SHA384
+	//
 	//     - TLS_CHACHA20_POLY1305_SHA256
+	//
 	//     - ECDHE-ECDSA-AES128-GCM-SHA256
+	//
 	//     - ECDHE-RSA-AES128-GCM-SHA256
+	//
 	//     - ECDHE-ECDSA-AES256-GCM-SHA384
+	//
 	//     - ECDHE-RSA-AES256-GCM-SHA384
+	//
 	//     - ECDHE-ECDSA-CHACHA20-POLY1305
+	//
 	//     - ECDHE-RSA-CHACHA20-POLY1305
+	//
+	//     - DHE-RSA-AES128-GCM-SHA256
+	//
+	//     - DHE-RSA-AES256-GCM-SHA384
+	//
+	//   minTLSVersion: VersionTLS12
 	//
 	// +optional
 	// +nullable
 	Intermediate *IntermediateTLSProfile `json:"intermediate,omitempty"`
-
-	// modern is a TLS security profile for use with clients that support TLS 1.3 and
-	// do not need backward compatibility for older clients.
+	// modern is a TLS security profile based on:
 	//
-	// This profile is equivalent to a Custom profile specified as:
-	//   minTLSVersion: VersionTLS13
+	// https://wiki.mozilla.org/Security/Server_Side_TLS#Modern_compatibility
+	//
+	// and looks like this (yaml):
+	//
 	//   ciphers:
+	//
 	//     - TLS_AES_128_GCM_SHA256
+	//
 	//     - TLS_AES_256_GCM_SHA384
+	//
 	//     - TLS_CHACHA20_POLY1305_SHA256
+	//
+	//   minTLSVersion: VersionTLS13
 	//
 	// +optional
 	// +nullable
 	Modern *ModernTLSProfile `json:"modern,omitempty"`
-
 	// custom is a user-defined TLS security profile. Be extremely careful using a custom
 	// profile as invalid configurations can be catastrophic. An example custom profile
 	// looks like this:
 	//
-	//   minTLSVersion: VersionTLS11
 	//   ciphers:
+	//
 	//     - ECDHE-ECDSA-CHACHA20-POLY1305
+	//
 	//     - ECDHE-RSA-CHACHA20-POLY1305
+	//
 	//     - ECDHE-RSA-AES128-GCM-SHA256
+	//
 	//     - ECDHE-ECDSA-AES128-GCM-SHA256
+	//
+	//   minTLSVersion: VersionTLS11
 	//
 	// +optional
 	// +nullable
 	Custom *CustomTLSProfile `json:"custom,omitempty"`
 }
 
-// OldTLSProfile is a TLS security profile based on the "old" configuration of
-// the Mozilla Server Side TLS configuration guidelines.
+// OldTLSProfile is a TLS security profile based on:
+// https://wiki.mozilla.org/Security/Server_Side_TLS#Old_backward_compatibility
 type OldTLSProfile struct{}
 
-// IntermediateTLSProfile is a TLS security profile based on the "intermediate"
-// configuration of the Mozilla Server Side TLS configuration guidelines.
+// IntermediateTLSProfile is a TLS security profile based on:
+// https://wiki.mozilla.org/Security/Server_Side_TLS#Intermediate_compatibility_.28default.29
 type IntermediateTLSProfile struct{}
 
-// ModernTLSProfile is a TLS security profile based on the "modern" configuration
-// of the Mozilla Server Side TLS configuration guidelines.
+// ModernTLSProfile is a TLS security profile based on:
+// https://wiki.mozilla.org/Security/Server_Side_TLS#Modern_compatibility
 type ModernTLSProfile struct{}
 
 // CustomTLSProfile is a user-defined TLS security profile. Be extremely careful
@@ -126,33 +189,28 @@ type CustomTLSProfile struct {
 type TLSProfileType string
 
 const (
-	// TLSProfileOldType sets parameters based on the "old" configuration of
-	// the Mozilla Server Side TLS configuration guidelines.
+	// Old is a TLS security profile based on:
+	// https://wiki.mozilla.org/Security/Server_Side_TLS#Old_backward_compatibility
 	TLSProfileOldType TLSProfileType = "Old"
-
-	// TLSProfileIntermediateType sets parameters based on the "intermediate"
-	// configuration of the Mozilla Server Side TLS configuration guidelines.
+	// Intermediate is a TLS security profile based on:
+	// https://wiki.mozilla.org/Security/Server_Side_TLS#Intermediate_compatibility_.28default.29
 	TLSProfileIntermediateType TLSProfileType = "Intermediate"
-
-	// TLSProfileModernType sets parameters based on the "modern" configuration
-	// of the Mozilla Server Side TLS configuration guidelines.
+	// Modern is a TLS security profile based on:
+	// https://wiki.mozilla.org/Security/Server_Side_TLS#Modern_compatibility
 	TLSProfileModernType TLSProfileType = "Modern"
-
-	// TLSProfileCustomType is a TLS security profile that allows for user-defined parameters.
+	// Custom is a TLS security profile that allows for user-defined parameters.
 	TLSProfileCustomType TLSProfileType = "Custom"
 )
 
 // TLSProfileSpec is the desired behavior of a TLSSecurityProfile.
 type TLSProfileSpec struct {
 	// ciphers is used to specify the cipher algorithms that are negotiated
-	// during the TLS handshake. Operators may remove entries that their operands
-	// do not support. For example, to use only ECDHE-RSA-AES128-GCM-SHA256 (yaml):
+	// during the TLS handshake.  Operators may remove entries their operands
+	// do not support.  For example, to use DES-CBC3-SHA  (yaml):
 	//
 	//   ciphers:
-	//     - ECDHE-RSA-AES128-GCM-SHA256
+	//     - DES-CBC3-SHA
 	//
-	// TLS 1.3 cipher suites (e.g. TLS_AES_128_GCM_SHA256) are not configurable
-	// and are always enabled when TLS 1.3 is negotiated.
 	// +listType=atomic
 	Ciphers []string `json:"ciphers"`
 	// minTLSVersion is used to specify the minimal version of the TLS protocol
@@ -160,6 +218,8 @@ type TLSProfileSpec struct {
 	// versions 1.1, 1.2 and 1.3 (yaml):
 	//
 	//   minTLSVersion: VersionTLS11
+	//
+	// NOTE: currently the highest minTLSVersion allowed is VersionTLS12
 	//
 	MinTLSVersion TLSProtocolVersion `json:"minTLSVersion"`
 }
@@ -185,18 +245,11 @@ const (
 	VersionTLS13 TLSProtocolVersion = "VersionTLS13"
 )
 
-// TLSProfiles contains a map of TLSProfileType names to TLSProfileSpec.
+// TLSProfiles Contains a map of TLSProfileType names to TLSProfileSpec.
 //
-// These profiles are based on version 5.7 of the Mozilla Server Side TLS
-// configuration guidelines. See: https://ssl-config.mozilla.org/guidelines/5.7.json
-//
-// Each Ciphers slice is the configuration's "ciphersuites" followed by the
-// Go-specific "ciphers" from the guidelines JSON.
-//
-// NOTE: The caller needs to make sure to check that these constants are valid
-// for their binary. Not all entries map to values for all binaries. In the case
-// of ties, the kube-apiserver wins. Do not fail, just be sure to include only
-// valid entries and everything will be ok.
+// NOTE: The caller needs to make sure to check that these constants are valid for their binary. Not all
+// entries map to values for all binaries.  In the case of ties, the kube-apiserver wins.  Do not fail,
+// just be sure to whitelist only and everything will be ok.
 var TLSProfiles = map[TLSProfileType]*TLSProfileSpec{
 	TLSProfileOldType: {
 		Ciphers: []string{
@@ -209,15 +262,23 @@ var TLSProfiles = map[TLSProfileType]*TLSProfileSpec{
 			"ECDHE-RSA-AES256-GCM-SHA384",
 			"ECDHE-ECDSA-CHACHA20-POLY1305",
 			"ECDHE-RSA-CHACHA20-POLY1305",
+			"DHE-RSA-AES128-GCM-SHA256",
+			"DHE-RSA-AES256-GCM-SHA384",
+			"DHE-RSA-CHACHA20-POLY1305",
 			"ECDHE-ECDSA-AES128-SHA256",
 			"ECDHE-RSA-AES128-SHA256",
 			"ECDHE-ECDSA-AES128-SHA",
 			"ECDHE-RSA-AES128-SHA",
+			"ECDHE-ECDSA-AES256-SHA384",
+			"ECDHE-RSA-AES256-SHA384",
 			"ECDHE-ECDSA-AES256-SHA",
 			"ECDHE-RSA-AES256-SHA",
+			"DHE-RSA-AES128-SHA256",
+			"DHE-RSA-AES256-SHA256",
 			"AES128-GCM-SHA256",
 			"AES256-GCM-SHA384",
 			"AES128-SHA256",
+			"AES256-SHA256",
 			"AES128-SHA",
 			"AES256-SHA",
 			"DES-CBC3-SHA",
@@ -235,6 +296,8 @@ var TLSProfiles = map[TLSProfileType]*TLSProfileSpec{
 			"ECDHE-RSA-AES256-GCM-SHA384",
 			"ECDHE-ECDSA-CHACHA20-POLY1305",
 			"ECDHE-RSA-CHACHA20-POLY1305",
+			"DHE-RSA-AES128-GCM-SHA256",
+			"DHE-RSA-AES256-GCM-SHA384",
 		},
 		MinTLSVersion: VersionTLS12,
 	},

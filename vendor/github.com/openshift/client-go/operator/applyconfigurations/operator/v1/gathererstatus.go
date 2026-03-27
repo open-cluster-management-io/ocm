@@ -9,16 +9,10 @@ import (
 
 // GathererStatusApplyConfiguration represents a declarative configuration of the GathererStatus type for use
 // with apply.
-//
-// gathererStatus represents information about a particular
-// data gatherer.
 type GathererStatusApplyConfiguration struct {
-	// conditions provide details on the status of each gatherer.
-	Conditions []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
-	// name is the name of the gatherer.
-	Name *string `json:"name,omitempty"`
-	// lastGatherDuration represents the time spent gathering.
-	LastGatherDuration *apismetav1.Duration `json:"lastGatherDuration,omitempty"`
+	Conditions         []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	Name               *string                              `json:"name,omitempty"`
+	LastGatherDuration *apismetav1.Duration                 `json:"lastGatherDuration,omitempty"`
 }
 
 // GathererStatusApplyConfiguration constructs a declarative configuration of the GathererStatus type for use with

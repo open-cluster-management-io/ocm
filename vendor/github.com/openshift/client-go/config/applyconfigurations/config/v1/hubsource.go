@@ -4,13 +4,9 @@ package v1
 
 // HubSourceApplyConfiguration represents a declarative configuration of the HubSource type for use
 // with apply.
-//
-// HubSource is used to specify the hub source and its configuration
 type HubSourceApplyConfiguration struct {
-	// name is the name of one of the default hub sources
-	Name *string `json:"name,omitempty"`
-	// disabled is used to disable a default hub source on cluster
-	Disabled *bool `json:"disabled,omitempty"`
+	Name     *string `json:"name,omitempty"`
+	Disabled *bool   `json:"disabled,omitempty"`
 }
 
 // HubSourceApplyConfiguration constructs a declarative configuration of the HubSource type for use with

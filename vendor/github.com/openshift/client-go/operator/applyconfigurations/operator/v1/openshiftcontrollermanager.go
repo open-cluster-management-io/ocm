@@ -13,14 +13,8 @@ import (
 
 // OpenShiftControllerManagerApplyConfiguration represents a declarative configuration of the OpenShiftControllerManager type for use
 // with apply.
-//
-// OpenShiftControllerManager provides information to configure an operator to manage openshift-controller-manager.
-//
-// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 type OpenShiftControllerManagerApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
-	// metadata is the standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                                 *OpenShiftControllerManagerSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                               *OpenShiftControllerManagerStatusApplyConfiguration `json:"status,omitempty"`
@@ -36,14 +30,29 @@ func OpenShiftControllerManager(name string) *OpenShiftControllerManagerApplyCon
 	return b
 }
 
-// ExtractOpenShiftControllerManagerFrom extracts the applied configuration owned by fieldManager from
-// openShiftControllerManager for the specified subresource. Pass an empty string for subresource to extract
-// the main resource. Common subresources include "status", "scale", etc.
+// ExtractOpenShiftControllerManager extracts the applied configuration owned by fieldManager from
+// openShiftControllerManager. If no managedFields are found in openShiftControllerManager for fieldManager, a
+// OpenShiftControllerManagerApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
 // openShiftControllerManager must be a unmodified OpenShiftControllerManager API object that was retrieved from the Kubernetes API.
-// ExtractOpenShiftControllerManagerFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractOpenShiftControllerManager provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-func ExtractOpenShiftControllerManagerFrom(openShiftControllerManager *operatorv1.OpenShiftControllerManager, fieldManager string, subresource string) (*OpenShiftControllerManagerApplyConfiguration, error) {
+// Experimental!
+func ExtractOpenShiftControllerManager(openShiftControllerManager *operatorv1.OpenShiftControllerManager, fieldManager string) (*OpenShiftControllerManagerApplyConfiguration, error) {
+	return extractOpenShiftControllerManager(openShiftControllerManager, fieldManager, "")
+}
+
+// ExtractOpenShiftControllerManagerStatus is the same as ExtractOpenShiftControllerManager except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractOpenShiftControllerManagerStatus(openShiftControllerManager *operatorv1.OpenShiftControllerManager, fieldManager string) (*OpenShiftControllerManagerApplyConfiguration, error) {
+	return extractOpenShiftControllerManager(openShiftControllerManager, fieldManager, "status")
+}
+
+func extractOpenShiftControllerManager(openShiftControllerManager *operatorv1.OpenShiftControllerManager, fieldManager string, subresource string) (*OpenShiftControllerManagerApplyConfiguration, error) {
 	b := &OpenShiftControllerManagerApplyConfiguration{}
 	err := managedfields.ExtractInto(openShiftControllerManager, internal.Parser().Type("com.github.openshift.api.operator.v1.OpenShiftControllerManager"), fieldManager, b, subresource)
 	if err != nil {
@@ -55,27 +64,6 @@ func ExtractOpenShiftControllerManagerFrom(openShiftControllerManager *operatorv
 	b.WithAPIVersion("operator.openshift.io/v1")
 	return b, nil
 }
-
-// ExtractOpenShiftControllerManager extracts the applied configuration owned by fieldManager from
-// openShiftControllerManager. If no managedFields are found in openShiftControllerManager for fieldManager, a
-// OpenShiftControllerManagerApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
-// openShiftControllerManager must be a unmodified OpenShiftControllerManager API object that was retrieved from the Kubernetes API.
-// ExtractOpenShiftControllerManager provides a way to perform a extract/modify-in-place/apply workflow.
-// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
-// applied if another fieldManager has updated or force applied any of the previously applied fields.
-func ExtractOpenShiftControllerManager(openShiftControllerManager *operatorv1.OpenShiftControllerManager, fieldManager string) (*OpenShiftControllerManagerApplyConfiguration, error) {
-	return ExtractOpenShiftControllerManagerFrom(openShiftControllerManager, fieldManager, "")
-}
-
-// ExtractOpenShiftControllerManagerStatus extracts the applied configuration owned by fieldManager from
-// openShiftControllerManager for the status subresource.
-func ExtractOpenShiftControllerManagerStatus(openShiftControllerManager *operatorv1.OpenShiftControllerManager, fieldManager string) (*OpenShiftControllerManagerApplyConfiguration, error) {
-	return ExtractOpenShiftControllerManagerFrom(openShiftControllerManager, fieldManager, "status")
-}
-
 func (b OpenShiftControllerManagerApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

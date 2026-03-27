@@ -4,8 +4,6 @@ package v1
 
 // ConsoleStatusApplyConfiguration represents a declarative configuration of the ConsoleStatus type for use
 // with apply.
-//
-// ConsoleStatus defines the observed status of the Console.
 type ConsoleStatusApplyConfiguration struct {
 	OperatorStatusApplyConfiguration `json:",inline"`
 }

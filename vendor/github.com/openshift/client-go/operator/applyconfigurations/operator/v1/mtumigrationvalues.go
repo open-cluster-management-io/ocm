@@ -4,12 +4,8 @@ package v1
 
 // MTUMigrationValuesApplyConfiguration represents a declarative configuration of the MTUMigrationValues type for use
 // with apply.
-//
-// MTUMigrationValues contains the values for a MTU migration.
 type MTUMigrationValuesApplyConfiguration struct {
-	// to is the MTU to migrate to.
-	To *uint32 `json:"to,omitempty"`
-	// from is the MTU to migrate from.
+	To   *uint32 `json:"to,omitempty"`
 	From *uint32 `json:"from,omitempty"`
 }
 

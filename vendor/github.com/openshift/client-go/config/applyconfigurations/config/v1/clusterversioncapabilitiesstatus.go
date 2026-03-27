@@ -8,14 +8,9 @@ import (
 
 // ClusterVersionCapabilitiesStatusApplyConfiguration represents a declarative configuration of the ClusterVersionCapabilitiesStatus type for use
 // with apply.
-//
-// ClusterVersionCapabilitiesStatus describes the state of optional,
-// core cluster components.
 type ClusterVersionCapabilitiesStatusApplyConfiguration struct {
-	// enabledCapabilities lists all the capabilities that are currently managed.
 	EnabledCapabilities []configv1.ClusterVersionCapability `json:"enabledCapabilities,omitempty"`
-	// knownCapabilities lists all the capabilities known to the current cluster.
-	KnownCapabilities []configv1.ClusterVersionCapability `json:"knownCapabilities,omitempty"`
+	KnownCapabilities   []configv1.ClusterVersionCapability `json:"knownCapabilities,omitempty"`
 }
 
 // ClusterVersionCapabilitiesStatusApplyConfiguration constructs a declarative configuration of the ClusterVersionCapabilitiesStatus type for use with

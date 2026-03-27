@@ -4,17 +4,8 @@ package v1
 
 // IngressControllerCaptureHTTPHeadersApplyConfiguration represents a declarative configuration of the IngressControllerCaptureHTTPHeaders type for use
 // with apply.
-//
-// IngressControllerCaptureHTTPHeaders specifies which HTTP headers the
-// IngressController captures.
 type IngressControllerCaptureHTTPHeadersApplyConfiguration struct {
-	// request specifies which HTTP request headers to capture.
-	//
-	// If this field is empty, no request headers are captured.
-	Request []IngressControllerCaptureHTTPHeaderApplyConfiguration `json:"request,omitempty"`
-	// response specifies which HTTP response headers to capture.
-	//
-	// If this field is empty, no response headers are captured.
+	Request  []IngressControllerCaptureHTTPHeaderApplyConfiguration `json:"request,omitempty"`
 	Response []IngressControllerCaptureHTTPHeaderApplyConfiguration `json:"response,omitempty"`
 }
 

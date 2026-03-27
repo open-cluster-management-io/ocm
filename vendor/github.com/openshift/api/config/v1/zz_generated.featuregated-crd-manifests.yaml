@@ -6,9 +6,7 @@ apiservers.config.openshift.io:
   Capability: ""
   Category: ""
   FeatureGates:
-  - KMSEncryption
   - KMSEncryptionProvider
-  - TLSAdherence
   FilenameOperatorName: config-operator
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_10"
@@ -33,7 +31,6 @@ authentications.config.openshift.io:
   FeatureGates:
   - ExternalOIDC
   - ExternalOIDCWithUIDAndExtraClaimMappings
-  - ExternalOIDCWithUpstreamParity
   FilenameOperatorName: config-operator
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_10"
@@ -144,8 +141,6 @@ clusterversions.config.openshift.io:
   Capability: ""
   Category: ""
   FeatureGates:
-  - ClusterUpdateAcceptRisks
-  - ClusterUpdatePreflight
   - ImageStreamImportMode
   - SignatureStores
   FilenameOperatorName: cluster-version-operator
@@ -373,6 +368,7 @@ infrastructures.config.openshift.io:
   - DualReplica
   - DyanmicServiceEndpointIBMCloud
   - GCPClusterHostedDNSInstall
+  - GCPCustomAPIEndpointsInstall
   - HighlyAvailableArbiter
   - HighlyAvailableArbiter+DualReplica
   - NutanixMultiSubnets
@@ -419,7 +415,7 @@ insightsdatagathers.config.openshift.io:
   Annotations: {}
   ApprovedPRNumber: https://github.com/openshift/api/pull/2448
   CRDName: insightsdatagathers.config.openshift.io
-  Capability: Insights
+  Capability: ""
   Category: ""
   FeatureGates:
   - InsightsConfig
@@ -445,7 +441,8 @@ networks.config.openshift.io:
   CRDName: networks.config.openshift.io
   Capability: ""
   Category: ""
-  FeatureGates: []
+  FeatureGates:
+  - NetworkDiagnosticsConfig
   FilenameOperatorName: config-operator
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_10"
@@ -578,6 +575,7 @@ schedulers.config.openshift.io:
   Capability: ""
   Category: ""
   FeatureGates:
+  - DynamicResourceAllocation
   - HyperShiftOnlyDynamicResourceAllocation
   FilenameOperatorName: config-operator
   FilenameOperatorOrdering: "01"
