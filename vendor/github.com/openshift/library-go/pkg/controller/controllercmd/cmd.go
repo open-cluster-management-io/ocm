@@ -74,6 +74,11 @@ type ControllerCommandConfig struct {
 	ComponentOwnerReference *corev1.ObjectReference
 	healthChecks            []healthz.HealthChecker
 	eventRecorderOptions    record.CorrelatorOptions
+
+	// ServingMinTLSVersion overrides the minimum TLS version for the 8443 health/metrics server.
+	ServingMinTLSVersion string
+	// ServingCipherSuites overrides the cipher suites for the 8443 health/metrics server.
+	ServingCipherSuites []string
 }
 
 // NewControllerConfig returns a new ControllerCommandConfig which can be used to wire up all the boiler plate of a controller
@@ -111,6 +116,15 @@ func (c *ControllerCommandConfig) WithTopologyDetector(topologyDetector Topology
 
 func (c *ControllerCommandConfig) WithEventRecorderOptions(eventRecorderOptions record.CorrelatorOptions) *ControllerCommandConfig {
 	c.eventRecorderOptions = eventRecorderOptions
+	return c
+}
+
+// WithServingTLSConfig sets the minimum TLS version and optional cipher suites for the 8443 health/metrics server.
+// minTLSVersion should be one of the VersionTLS1x constants (e.g. "VersionTLS13").
+// Pass nil for cipherSuites to keep the defaults.
+func (c *ControllerCommandConfig) WithServingTLSConfig(minTLSVersion string, cipherSuites []string) *ControllerCommandConfig {
+	c.ServingMinTLSVersion = minTLSVersion
+	c.ServingCipherSuites = cipherSuites
 	return c
 }
 
@@ -307,6 +321,12 @@ func (c *ControllerCommandConfig) StartController(ctx context.Context) error {
 
 	if len(c.basicFlags.BindAddress) != 0 {
 		config.ServingInfo.BindAddress = c.basicFlags.BindAddress
+	}
+	if c.ServingMinTLSVersion != "" {
+		config.ServingInfo.MinTLSVersion = c.ServingMinTLSVersion
+	}
+	if len(c.ServingCipherSuites) > 0 {
+		config.ServingInfo.CipherSuites = c.ServingCipherSuites
 	}
 
 	exitOnChangeReactorCh := make(chan struct{})

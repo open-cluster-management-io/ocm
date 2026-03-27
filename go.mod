@@ -17,7 +17,7 @@ require (
 	github.com/itchyny/gojq v0.12.18
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
-	github.com/openshift/api v0.0.0-20251125174858-5cf710f68a92
+	github.com/openshift/api v0.0.0-20260317165824-54a3998d81eb
 	github.com/openshift/build-machinery-go v0.0.0-20250602125535-1b6d00b8c37c
 	github.com/openshift/library-go v0.0.0-20251120164824-14a789e09884
 	github.com/pkg/errors v0.9.1
@@ -129,7 +129,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/openshift/client-go v0.0.0-20251125141819-b6281947c285 // indirect
+	github.com/openshift/client-go v0.0.0-20260317180604-743f664b82d1 // indirect
 	github.com/pkg/profile v1.7.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
@@ -188,3 +188,5 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2-0.20260122202528-d9cc6641c482 // indirect
 )
+
+replace github.com/openshift/library-go => github.com/zhujian7/openshift-library-go v0.0.0-20260327083554-c6a5902a9e5b

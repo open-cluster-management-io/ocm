@@ -2,9 +2,11 @@ package options
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/utils/clock"
@@ -64,5 +66,32 @@ func (o *Options) AddFlags(flags *pflag.FlagSet) {
 		flags.DurationVar(&o.CmdConfig.RetryPeriod.Duration, "leader-election-retry-period", 26*time.Second, ""+
 			"The duration the clients should wait between attempting acquisition and renewal "+
 			"of a leadership. This is only applicable if leader election is enabled.")
+	}
+}
+
+// ApplyTLSToCommand installs a PersistentPreRunE hook that, after flag parsing,
+// calls CmdConfig.WithServingTLSConfig so library-go applies the TLS settings to
+// the 8443 health/metrics server inside StartController. PersistentPreRunE runs
+// before cmd.Run, so all library-go boilerplate (signal handling, logging, etc.)
+// is preserved.
+func (o *Options) ApplyTLSToCommand(cmd *cobra.Command) {
+	prev := cmd.PersistentPreRunE
+	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		if prev != nil {
+			if err := prev(cmd, args); err != nil {
+				return err
+			}
+		}
+		if o.TLSMinVersion == "" {
+			return nil
+		}
+		var cipherSuites []string
+		if o.TLSCipherSuites != "" {
+			for _, c := range strings.Split(o.TLSCipherSuites, ",") {
+				cipherSuites = append(cipherSuites, strings.TrimSpace(c))
+			}
+		}
+		o.CmdConfig.WithServingTLSConfig(o.TLSMinVersion, cipherSuites)
+		return nil
 	}
 }

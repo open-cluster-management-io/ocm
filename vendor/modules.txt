@@ -305,7 +305,6 @@ github.com/gobwas/glob/util/strings
 github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/protoc-gen-gogo/descriptor
-github.com/gogo/protobuf/sortkeys
 # github.com/golang/protobuf v1.5.4
 ## explicit; go 1.17
 github.com/golang/protobuf/proto
@@ -506,9 +505,11 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/openshift/api v0.0.0-20251125174858-5cf710f68a92
-## explicit; go 1.24.0
+# github.com/openshift/api v0.0.0-20260317165824-54a3998d81eb
+## explicit; go 1.25.0
 github.com/openshift/api
+github.com/openshift/api/apiextensions
+github.com/openshift/api/apiextensions/v1alpha1
 github.com/openshift/api/apiserver
 github.com/openshift/api/apiserver/v1
 github.com/openshift/api/apps
@@ -525,6 +526,8 @@ github.com/openshift/api/config/v1alpha1
 github.com/openshift/api/config/v1alpha2
 github.com/openshift/api/console
 github.com/openshift/api/console/v1
+github.com/openshift/api/etcd
+github.com/openshift/api/etcd/v1alpha1
 github.com/openshift/api/helm
 github.com/openshift/api/helm/v1beta1
 github.com/openshift/api/image
@@ -587,16 +590,16 @@ github.com/openshift/build-machinery-go/make/targets/golang
 github.com/openshift/build-machinery-go/make/targets/openshift
 github.com/openshift/build-machinery-go/make/targets/openshift/operator
 github.com/openshift/build-machinery-go/scripts
-# github.com/openshift/client-go v0.0.0-20251125141819-b6281947c285
-## explicit; go 1.24.0
+# github.com/openshift/client-go v0.0.0-20260317180604-743f664b82d1
+## explicit; go 1.25.0
 github.com/openshift/client-go/config/applyconfigurations/config/v1
 github.com/openshift/client-go/config/applyconfigurations/internal
 github.com/openshift/client-go/config/clientset/versioned/scheme
 github.com/openshift/client-go/config/clientset/versioned/typed/config/v1
 github.com/openshift/client-go/operator/applyconfigurations/internal
 github.com/openshift/client-go/operator/applyconfigurations/operator/v1
-# github.com/openshift/library-go v0.0.0-20251120164824-14a789e09884
-## explicit; go 1.24.0
+# github.com/openshift/library-go v0.0.0-20251120164824-14a789e09884 => github.com/zhujian7/openshift-library-go v0.0.0-20260327083554-c6a5902a9e5b
+## explicit; go 1.25.0
 github.com/openshift/library-go/pkg/apiserver/jsonpatch
 github.com/openshift/library-go/pkg/assets
 github.com/openshift/library-go/pkg/authorization/hardcodedauthorizer
@@ -2150,3 +2153,4 @@ sigs.k8s.io/structured-merge-diff/v6/value
 ## explicit; go 1.22
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v3
+# github.com/openshift/library-go => github.com/zhujian7/openshift-library-go v0.0.0-20260327083554-c6a5902a9e5b
