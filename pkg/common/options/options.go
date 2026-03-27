@@ -11,9 +11,11 @@ import (
 )
 
 type Options struct {
-	CmdConfig *controllercmd.ControllerCommandConfig
-	Burst     int
-	QPS       float32
+	CmdConfig       *controllercmd.ControllerCommandConfig
+	Burst           int
+	QPS             float32
+	TLSMinVersion   string
+	TLSCipherSuites string
 }
 
 // NewOptions returns the flags with default value set
@@ -42,6 +44,11 @@ func (o *Options) startWithQPS(startFunc controllercmd.StartFunc) controllercmd.
 func (o *Options) AddFlags(flags *pflag.FlagSet) {
 	flags.Float32Var(&o.QPS, "kube-api-qps", o.QPS, "QPS to use while talking with apiserver on spoke cluster.")
 	flags.IntVar(&o.Burst, "kube-api-burst", o.Burst, "Burst to use while talking with apiserver on spoke cluster.")
+	flags.StringVar(&o.TLSMinVersion, "tls-min-version", "",
+		"Minimum TLS version for the serving endpoint. Possible values: VersionTLS12, VersionTLS13.")
+	flags.StringVar(&o.TLSCipherSuites, "tls-cipher-suites", "",
+		"Comma-separated list of TLS cipher suites for the serving endpoint. "+
+			"If omitted, the default Go cipher suites are used.")
 	if o.CmdConfig != nil {
 		flags.BoolVar(&o.CmdConfig.DisableLeaderElection, "disable-leader-election", false, "Disable leader election.")
 		flags.DurationVar(&o.CmdConfig.LeaseDuration.Duration, "leader-election-lease-duration", 137*time.Second, ""+

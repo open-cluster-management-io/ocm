@@ -81,6 +81,12 @@ spec:
           {{ if .HostedMode }}
           - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
           {{ end }}
+          {{- if .TLSMinVersion }}
+          - "--tls-min-version={{ .TLSMinVersion }}"
+          {{- end }}
+          {{- if .TLSCipherSuites }}
+          - "--tls-cipher-suites={{ .TLSCipherSuites }}"
+          {{- end }}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

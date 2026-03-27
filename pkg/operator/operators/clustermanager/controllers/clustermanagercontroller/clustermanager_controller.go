@@ -67,8 +67,8 @@ type clusterManagerController struct {
 	deploymentReplicas            int32
 	operatorNamespace             string
 	enableSyncLabels              bool
-	addonWebhookTLSMinVersion     string
-	addonWebhookTLSCipherSuites   string
+	tlsMinVersion                 string
+	tlsCipherSuites               string
 }
 
 type clusterManagerReconcile interface {
@@ -96,8 +96,8 @@ func NewClusterManagerController(
 	deploymentReplicas int32,
 	operatorNamespace string,
 	enableSyncLabels bool,
-	addonWebhookTLSMinVersion string,
-	addonWebhookTLSCipherSuites string,
+	tlsMinVersion string,
+	tlsCipherSuites string,
 ) factory.Controller {
 	controller := &clusterManagerController{
 		operatorKubeClient: operatorKubeClient,
@@ -115,8 +115,8 @@ func NewClusterManagerController(
 		deploymentReplicas:            deploymentReplicas,
 		operatorNamespace:             operatorNamespace,
 		enableSyncLabels:              enableSyncLabels,
-		addonWebhookTLSMinVersion:     addonWebhookTLSMinVersion,
-		addonWebhookTLSCipherSuites:   addonWebhookTLSCipherSuites,
+		tlsMinVersion:                 tlsMinVersion,
+		tlsCipherSuites:               tlsCipherSuites,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -238,9 +238,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		config.GRPCEndpointType = helpers.GRPCServerEndpointType(clusterManager)
 	}
 
-	// Set TLS config for addon webhook
-	config.AddonWebhookTLSMinVersion = n.addonWebhookTLSMinVersion
-	config.AddonWebhookTLSCipherSuites = n.addonWebhookTLSCipherSuites
+	// Set TLS config for all managed hub component deployments
+	config.TLSMinVersion = n.tlsMinVersion
+	config.TLSCipherSuites = n.tlsCipherSuites
 
 	// Update finalizer at first
 	if clusterManager.DeletionTimestamp.IsZero() {
