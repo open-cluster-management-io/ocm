@@ -95,7 +95,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonProgressing {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions[0].Reason)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "0/2 progressing..., 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "selected clusters 2. configured addons 0/2 progressing..., 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions[0].Message)
 				}
 			},
@@ -202,7 +202,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonProgressing {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions[0].Reason)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/2 progressing..., 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "selected clusters 2. configured addons 1/2 progressing..., 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions[0].Message)
 				}
 			},
@@ -303,7 +303,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonCompleted {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/1 completed with no errors, 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "selected clusters 1. configured addons 1/1 completed with no errors, 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
 			},
@@ -397,7 +397,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonProgressing {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/2 progressing..., 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "selected clusters 2. configured addons 1/2 progressing..., 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
 			},
@@ -506,7 +506,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonCompleted {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/1 completed with no errors, 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "selected clusters 1. configured addons 1/1 completed with no errors, 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
 			},
@@ -592,7 +592,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonCompleted {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/1 completed with no errors, 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "selected clusters 1. configured addons 1/1 completed with no errors, 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
 			},
@@ -704,7 +704,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 					t.Errorf("InstallProgressions condition reason is not correct, expected Completed, got: %v",
 						cma.Status.InstallProgressions[0].Conditions[0].Reason)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "2/2 completed with no errors, 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "selected clusters 2. configured addons 2/2 completed with no errors, 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition message is not correct: %v",
 						cma.Status.InstallProgressions[0].Conditions[0].Message)
 				}
@@ -794,7 +794,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 					t.Errorf("InstallProgressions condition reason is not correct, expected Progressing, got: %v",
 						cma.Status.InstallProgressions[0].Conditions[0].Reason)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/1 progressing..., 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "selected clusters 1. configured addons 1/1 progressing..., 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition message is not correct: %v",
 						cma.Status.InstallProgressions[0].Conditions[0].Message)
 				}
@@ -940,7 +940,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 					t.Errorf("InstallProgressions condition reason is not correct, expected Completed, got: %v",
 						cma.Status.InstallProgressions[0].Conditions[0].Reason)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "2/2 completed with no errors, 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "selected clusters 2. configured addons 2/2 completed with no errors, 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition message is not correct: %v",
 						cma.Status.InstallProgressions[0].Conditions[0].Message)
 				}
@@ -1054,7 +1054,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 					t.Errorf("InstallProgressions condition reason is not correct, expected Progressing, got: %v",
 						cma.Status.InstallProgressions[0].Conditions[0].Reason)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/1 progressing..., 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "selected clusters 1. configured addons 1/1 progressing..., 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition message is not correct: %v",
 						cma.Status.InstallProgressions[0].Conditions[0].Message)
 				}
@@ -1194,7 +1194,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 					t.Errorf("InstallProgressions condition reason is not correct, expected Completed, got: %v",
 						cma.Status.InstallProgressions[0].Conditions[0].Reason)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "2/2 completed with no errors, 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "selected clusters 2. configured addons 2/2 completed with no errors, 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition message is not correct: %v",
 						cma.Status.InstallProgressions[0].Conditions[0].Message)
 				}
@@ -1270,8 +1270,185 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonProgressing {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/2 progressing..., 0 failed 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "selected clusters 2. configured addons 1/2 progressing..., 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions[0].Message)
+				}
+			},
+		},
+		{
+			name: "overlapping placements, cluster selected by both placements",
+			managedClusteraddon: []runtime.Object{
+				func() *addonv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1")
+					addon.Status.ConfigReferences = []addonv1alpha1.ConfigReference{
+						{
+							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+								SpecHash:       "hash1",
+							},
+							LastAppliedConfig: &addonv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+								SpecHash:       "hash1",
+							},
+						},
+					}
+					addon.Status.Conditions = []metav1.Condition{
+						{
+							Type:   addonv1alpha1.ManagedClusterAddOnConditionProgressing,
+							Reason: addonv1alpha1.ProgressingReasonCompleted,
+						},
+					}
+					return addon
+				}(),
+				func() *addonv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster2")
+					addon.Status.ConfigReferences = []addonv1alpha1.ConfigReference{
+						{
+							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+								SpecHash:       "hash2",
+							},
+							LastAppliedConfig: &addonv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+								SpecHash:       "hash2",
+							},
+						},
+					}
+					addon.Status.Conditions = []metav1.Condition{
+						{
+							Type:   addonv1alpha1.ManagedClusterAddOnConditionProgressing,
+							Reason: addonv1alpha1.ProgressingReasonCompleted,
+						},
+					}
+					return addon
+				}(),
+				func() *addonv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster3")
+					addon.Status.ConfigReferences = []addonv1alpha1.ConfigReference{
+						{
+							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+								SpecHash:       "hash2",
+							},
+							LastAppliedConfig: &addonv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+								SpecHash:       "hash2",
+							},
+						},
+					}
+					addon.Status.Conditions = []metav1.Condition{
+						{
+							Type:   addonv1alpha1.ManagedClusterAddOnConditionProgressing,
+							Reason: addonv1alpha1.ProgressingReasonCompleted,
+						},
+					}
+					return addon
+				}(),
+			},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "", "").
+				WithPlacementStrategy(
+					addonv1alpha1.PlacementStrategy{
+						PlacementRef:    addonv1alpha1.PlacementRef{Name: "placement1", Namespace: "test"},
+						RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All},
+					},
+					addonv1alpha1.PlacementStrategy{
+						PlacementRef:    addonv1alpha1.PlacementRef{Name: "placement2", Namespace: "test"},
+						RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All},
+					},
+				).WithInstallProgression(
+				addonv1alpha1.InstallProgression{
+					PlacementRef: addonv1alpha1.PlacementRef{Name: "placement1", Namespace: "test"},
+					ConfigReferences: []addonv1alpha1.InstallConfigReference{
+						{
+							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+								SpecHash:       "hash1",
+							},
+						},
+					},
+				},
+				addonv1alpha1.InstallProgression{
+					PlacementRef: addonv1alpha1.PlacementRef{Name: "placement2", Namespace: "test"},
+					ConfigReferences: []addonv1alpha1.InstallConfigReference{
+						{
+							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+								SpecHash:       "hash2",
+							},
+						},
+					},
+				},
+			).Build()},
+			placements: []runtime.Object{
+				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "placement1", Namespace: "test"}},
+				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "placement2", Namespace: "test"}},
+			},
+			placementDecisions: []runtime.Object{
+				&clusterv1beta1.PlacementDecision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "placement1",
+						Namespace: "test",
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "placement1",
+							clusterv1beta1.DecisionGroupIndexLabel: "0",
+						},
+					},
+					Status: clusterv1beta1.PlacementDecisionStatus{
+						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}, {ClusterName: "cluster2"}},
+					},
+				},
+				&clusterv1beta1.PlacementDecision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "placement2",
+						Namespace: "test",
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "placement2",
+							clusterv1beta1.DecisionGroupIndexLabel: "0",
+						},
+					},
+					Status: clusterv1beta1.PlacementDecisionStatus{
+						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster2"}, {ClusterName: "cluster3"}},
+					},
+				},
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				actual := actions[0].(clienttesting.PatchActionImpl).Patch
+				cma := &addonv1alpha1.ClusterManagementAddOn{}
+				err := json.Unmarshal(actual, cma)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if len(cma.Status.InstallProgressions) != 2 {
+					t.Fatalf("expected 2 install progressions, got %d", len(cma.Status.InstallProgressions))
+				}
+
+				// placement1 selects cluster1 and cluster2, but cluster2 is overridden by placement2,
+				// so configuredTotal=1, total=2. cluster1 succeeded, so it should be completed.
+				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonCompleted {
+					t.Errorf("placement1 condition reason is not correct, expected Completed, got: %v",
+						cma.Status.InstallProgressions[0].Conditions[0].Reason)
+				}
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "selected clusters 2. configured addons 1/1 completed with no errors, 0 failed 0 timeout." {
+					t.Errorf("placement1 condition message is not correct: %v",
+						cma.Status.InstallProgressions[0].Conditions[0].Message)
+				}
+
+				// placement2 selects cluster2 and cluster3, both configured by this placement,
+				// so configuredTotal=2, total=2. Both succeeded, so it should be completed.
+				if cma.Status.InstallProgressions[1].Conditions[0].Reason != addonv1alpha1.ProgressingReasonCompleted {
+					t.Errorf("placement2 condition reason is not correct, expected Completed, got: %v",
+						cma.Status.InstallProgressions[1].Conditions[0].Reason)
+				}
+				if cma.Status.InstallProgressions[1].Conditions[0].Message != "selected clusters 2. configured addons 2/2 completed with no errors, 0 failed 0 timeout." {
+					t.Errorf("placement2 condition message is not correct: %v",
+						cma.Status.InstallProgressions[1].Conditions[0].Message)
 				}
 			},
 		},

@@ -279,7 +279,7 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionFalse,
 				Reason:  addonapiv1alpha1.ProgressingReasonCompleted,
-				Message: "4/4 completed with no errors, 0 failed 0 timeout.",
+				Message: "selected clusters 4. configured addons 4/4 completed with no errors, 0 failed 0 timeout.",
 			})
 
 			ginkgo.By("update all")
@@ -364,7 +364,7 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionFalse,
 				Reason:  addonapiv1alpha1.ProgressingReasonCompleted,
-				Message: "4/4 completed with no errors, 0 failed 0 timeout.",
+				Message: "selected clusters 4. configured addons 4/4 completed with no errors, 0 failed 0 timeout.",
 			})
 
 			ginkgo.By("update work status to avoid addon status update")
@@ -485,7 +485,7 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionTrue,
 				Reason:  addonapiv1alpha1.ProgressingReasonProgressing,
-				Message: "2/4 progressing..., 0 failed 0 timeout.",
+				Message: "selected clusters 4. configured addons 2/4 progressing..., 0 failed 0 timeout.",
 			})
 
 			ginkgo.By("timeout after ProgressDeadline 5s and stop rollout since breach MaxFailures 1")
@@ -493,13 +493,13 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionTrue,
 				Reason:  addonapiv1alpha1.ProgressingReasonProgressing,
-				Message: "0/4 progressing..., 0 failed 2 timeout.",
+				Message: "selected clusters 4. configured addons 0/4 progressing..., 0 failed 2 timeout.",
 			})
 			assertClusterManagementAddOnConditions(testAddOnConfigsImpl.name, metav1.Condition{
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionTrue,
 				Reason:  addonapiv1alpha1.ProgressingReasonProgressing,
-				Message: "0/4 progressing..., 0 failed 2 timeout.",
+				Message: "selected clusters 4. configured addons 0/4 progressing..., 0 failed 2 timeout.",
 			})
 
 			ginkgo.By("update timeouted work status to continue rollout since within MaxFailures 1")
@@ -556,7 +556,7 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionTrue,
 				Reason:  addonapiv1alpha1.ProgressingReasonProgressing,
-				Message: "4/4 progressing..., 0 failed 0 timeout.",
+				Message: "selected clusters 4. configured addons 4/4 progressing..., 0 failed 0 timeout.",
 			})
 
 			ginkgo.By("update another 2 work status to trigger addon status")
@@ -641,7 +641,7 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionFalse,
 				Reason:  addonapiv1alpha1.ProgressingReasonCompleted,
-				Message: "4/4 completed with no errors, 0 failed 0 timeout.",
+				Message: "selected clusters 4. configured addons 4/4 completed with no errors, 0 failed 0 timeout.",
 			})
 
 			ginkgo.By("update work status to avoid addon status update")
@@ -784,7 +784,7 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionTrue,
 				Reason:  addonapiv1alpha1.ProgressingReasonProgressing,
-				Message: "2/4 progressing..., 0 failed 0 timeout.",
+				Message: "selected clusters 4. configured addons 2/4 progressing..., 0 failed 0 timeout.",
 			})
 
 			ginkgo.By("update 2 work status to trigger addon status")
@@ -799,13 +799,13 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionTrue,
 				Reason:  addonapiv1alpha1.ProgressingReasonProgressing,
-				Message: "4/4 progressing..., 0 failed 0 timeout.",
+				Message: "selected clusters 4. configured addons 4/4 progressing..., 0 failed 0 timeout.",
 			})
 			assertClusterManagementAddOnConditions(testAddOnConfigsImpl.name, metav1.Condition{
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionTrue,
 				Reason:  addonapiv1alpha1.ProgressingReasonProgressing,
-				Message: "4/4 progressing..., 0 failed 0 timeout.",
+				Message: "selected clusters 4. configured addons 4/4 progressing..., 0 failed 0 timeout.",
 			})
 
 			ginkgo.By("check mca status")
@@ -892,13 +892,13 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionFalse,
 				Reason:  addonapiv1alpha1.ProgressingReasonCompleted,
-				Message: "4/4 completed with no errors, 0 failed 0 timeout.",
+				Message: "selected clusters 4. configured addons 4/4 completed with no errors, 0 failed 0 timeout.",
 			})
 			assertClusterManagementAddOnConditions(testAddOnConfigsImpl.name, metav1.Condition{
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionFalse,
 				Reason:  addonapiv1alpha1.ProgressingReasonCompleted,
-				Message: "4/4 completed with no errors, 0 failed 0 timeout.",
+				Message: "selected clusters 4. configured addons 4/4 completed with no errors, 0 failed 0 timeout.",
 			})
 
 			ginkgo.By("check cma status")

@@ -37,7 +37,13 @@ type installStrategyNode struct {
 	desiredConfigs  addonConfigMap
 	// children keeps a map of addons node as the children of this node
 	children map[string]*addonNode
+	// clusters is all clusters selected by the placement
 	clusters sets.Set[string]
+	// configuredClusters is the subset of clusters where this placement's config
+	// is actually in effect. When multiple placements select the same cluster,
+	// only the last placement's config takes effect, so the cluster is removed
+	// from earlier placements' configuredClusters.
+	configuredClusters sets.Set[string]
 }
 
 // addonNode is node as a child of installStrategy node represting a mca
@@ -234,12 +240,13 @@ func (g *configurationGraph) addPlacementNode(
 	clusters := pdTracker.ExistingClusterGroupsBesides().GetClusters()
 
 	node := &installStrategyNode{
-		placementRef:    placementRef,
-		pdTracker:       pdTracker,
-		rolloutStrategy: installStrategy.RolloutStrategy,
-		desiredConfigs:  g.defaults.desiredConfigs,
-		children:        map[string]*addonNode{},
-		clusters:        clusters,
+		placementRef:       placementRef,
+		pdTracker:          pdTracker,
+		rolloutStrategy:    installStrategy.RolloutStrategy,
+		desiredConfigs:     g.defaults.desiredConfigs,
+		children:           map[string]*addonNode{},
+		clusters:           clusters,
+		configuredClusters: clusters.Union(nil),
 	}
 
 	// Set MaxConcurrency
@@ -273,6 +280,10 @@ func (g *configurationGraph) addPlacementNode(
 			if _, ok := placementNode.children[cluster]; ok {
 				node.addNode(placementNode.children[cluster].mca)
 				delete(placementNode.children, cluster)
+
+				// this cluster's config is now overridden by the new placement,
+				// remove it from the earlier placement's configuredClusters.
+				placementNode.configuredClusters.Delete(cluster)
 			}
 		}
 	}
