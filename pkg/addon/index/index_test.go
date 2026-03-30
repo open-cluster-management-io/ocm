@@ -9,6 +9,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
@@ -29,24 +30,24 @@ func TestIndexClusterManagementAddonByPlacement(t *testing.T) {
 		},
 		{
 			name: "empty install strategy",
-			obj: &addonv1alpha1.ClusterManagementAddOn{
+			obj: &addonv1beta1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-addon",
 				},
-				Spec: addonv1alpha1.ClusterManagementAddOnSpec{},
+				Spec: addonv1beta1.ClusterManagementAddOnSpec{},
 			},
 			expected: nil,
 			wantErr:  false,
 		},
 		{
 			name: "manual install strategy",
-			obj: &addonv1alpha1.ClusterManagementAddOn{
+			obj: &addonv1beta1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-addon",
 				},
-				Spec: addonv1alpha1.ClusterManagementAddOnSpec{
-					InstallStrategy: addonv1alpha1.InstallStrategy{
-						Type: addonv1alpha1.AddonInstallStrategyManual,
+				Spec: addonv1beta1.ClusterManagementAddOnSpec{
+					InstallStrategy: addonv1beta1.InstallStrategy{
+						Type: addonv1beta1.AddonInstallStrategyManual,
 					},
 				},
 			},
@@ -55,16 +56,16 @@ func TestIndexClusterManagementAddonByPlacement(t *testing.T) {
 		},
 		{
 			name: "placements install strategy with single placement",
-			obj: &addonv1alpha1.ClusterManagementAddOn{
+			obj: &addonv1beta1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-addon",
 				},
-				Spec: addonv1alpha1.ClusterManagementAddOnSpec{
-					InstallStrategy: addonv1alpha1.InstallStrategy{
-						Type: addonv1alpha1.AddonInstallStrategyPlacements,
-						Placements: []addonv1alpha1.PlacementStrategy{
+				Spec: addonv1beta1.ClusterManagementAddOnSpec{
+					InstallStrategy: addonv1beta1.InstallStrategy{
+						Type: addonv1beta1.AddonInstallStrategyPlacements,
+						Placements: []addonv1beta1.PlacementStrategy{
 							{
-								PlacementRef: addonv1alpha1.PlacementRef{
+								PlacementRef: addonv1beta1.PlacementRef{
 									Name:      "test-placement",
 									Namespace: "test-namespace",
 								},
@@ -78,22 +79,22 @@ func TestIndexClusterManagementAddonByPlacement(t *testing.T) {
 		},
 		{
 			name: "placements install strategy with multiple placements",
-			obj: &addonv1alpha1.ClusterManagementAddOn{
+			obj: &addonv1beta1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-addon",
 				},
-				Spec: addonv1alpha1.ClusterManagementAddOnSpec{
-					InstallStrategy: addonv1alpha1.InstallStrategy{
-						Type: addonv1alpha1.AddonInstallStrategyPlacements,
-						Placements: []addonv1alpha1.PlacementStrategy{
+				Spec: addonv1beta1.ClusterManagementAddOnSpec{
+					InstallStrategy: addonv1beta1.InstallStrategy{
+						Type: addonv1beta1.AddonInstallStrategyPlacements,
+						Placements: []addonv1beta1.PlacementStrategy{
 							{
-								PlacementRef: addonv1alpha1.PlacementRef{
+								PlacementRef: addonv1beta1.PlacementRef{
 									Name:      "test-placement-1",
 									Namespace: "test-namespace-1",
 								},
 							},
 							{
-								PlacementRef: addonv1alpha1.PlacementRef{
+								PlacementRef: addonv1beta1.PlacementRef{
 									Name:      "test-placement-2",
 									Namespace: "test-namespace-2",
 								},
@@ -142,7 +143,7 @@ func TestIndexManagedClusterAddonByName(t *testing.T) {
 		},
 		{
 			name: "valid ManagedClusterAddon",
-			obj: &addonv1alpha1.ManagedClusterAddOn{
+			obj: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-addon",
 					Namespace: "cluster1",
@@ -174,16 +175,16 @@ func TestIndexManagedClusterAddonByName(t *testing.T) {
 }
 
 func TestClusterManagementAddonByPlacementQueueKey(t *testing.T) {
-	cma1 := &addonv1alpha1.ClusterManagementAddOn{
+	cma1 := &addonv1beta1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-addon-1",
 		},
-		Spec: addonv1alpha1.ClusterManagementAddOnSpec{
-			InstallStrategy: addonv1alpha1.InstallStrategy{
+		Spec: addonv1beta1.ClusterManagementAddOnSpec{
+			InstallStrategy: addonv1beta1.InstallStrategy{
 				Type: addonv1alpha1.AddonInstallStrategyPlacements,
-				Placements: []addonv1alpha1.PlacementStrategy{
+				Placements: []addonv1beta1.PlacementStrategy{
 					{
-						PlacementRef: addonv1alpha1.PlacementRef{
+						PlacementRef: addonv1beta1.PlacementRef{
 							Name:      "test-placement",
 							Namespace: "test-namespace",
 						},
@@ -193,16 +194,16 @@ func TestClusterManagementAddonByPlacementQueueKey(t *testing.T) {
 		},
 	}
 
-	cma2 := &addonv1alpha1.ClusterManagementAddOn{
+	cma2 := &addonv1beta1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-addon-2",
 		},
-		Spec: addonv1alpha1.ClusterManagementAddOnSpec{
-			InstallStrategy: addonv1alpha1.InstallStrategy{
-				Type: addonv1alpha1.AddonInstallStrategyPlacements,
-				Placements: []addonv1alpha1.PlacementStrategy{
+		Spec: addonv1beta1.ClusterManagementAddOnSpec{
+			InstallStrategy: addonv1beta1.InstallStrategy{
+				Type: addonv1beta1.AddonInstallStrategyPlacements,
+				Placements: []addonv1beta1.PlacementStrategy{
 					{
-						PlacementRef: addonv1alpha1.PlacementRef{
+						PlacementRef: addonv1beta1.PlacementRef{
 							Name:      "test-placement",
 							Namespace: "test-namespace",
 						},
@@ -221,7 +222,7 @@ func TestClusterManagementAddonByPlacementQueueKey(t *testing.T) {
 
 	fakeClient := fakeaddon.NewSimpleClientset(cma1, cma2)
 	informerFactory := addoninformers.NewSharedInformerFactory(fakeClient, 0)
-	cmaInformer := informerFactory.Addon().V1alpha1().ClusterManagementAddOns()
+	cmaInformer := informerFactory.Addon().V1beta1().ClusterManagementAddOns()
 
 	cmaInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
 		ClusterManagementAddonByPlacement: IndexClusterManagementAddonByPlacement,
@@ -279,16 +280,16 @@ func TestClusterManagementAddonByPlacementQueueKey(t *testing.T) {
 }
 
 func TestClusterManagementAddonByPlacementDecisionQueueKey(t *testing.T) {
-	cma1 := &addonv1alpha1.ClusterManagementAddOn{
+	cma1 := &addonv1beta1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-addon-1",
 		},
-		Spec: addonv1alpha1.ClusterManagementAddOnSpec{
-			InstallStrategy: addonv1alpha1.InstallStrategy{
+		Spec: addonv1beta1.ClusterManagementAddOnSpec{
+			InstallStrategy: addonv1beta1.InstallStrategy{
 				Type: addonv1alpha1.AddonInstallStrategyPlacements,
-				Placements: []addonv1alpha1.PlacementStrategy{
+				Placements: []addonv1beta1.PlacementStrategy{
 					{
-						PlacementRef: addonv1alpha1.PlacementRef{
+						PlacementRef: addonv1beta1.PlacementRef{
 							Name:      "test-placement",
 							Namespace: "test-namespace",
 						},
@@ -310,7 +311,7 @@ func TestClusterManagementAddonByPlacementDecisionQueueKey(t *testing.T) {
 
 	fakeClient := fakeaddon.NewSimpleClientset(cma1)
 	informerFactory := addoninformers.NewSharedInformerFactory(fakeClient, 0)
-	cmaInformer := informerFactory.Addon().V1alpha1().ClusterManagementAddOns()
+	cmaInformer := informerFactory.Addon().V1beta1().ClusterManagementAddOns()
 
 	cmaInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
 		ClusterManagementAddonByPlacement: IndexClusterManagementAddonByPlacement,
@@ -367,21 +368,21 @@ func TestClusterManagementAddonByPlacementDecisionQueueKey(t *testing.T) {
 }
 
 func TestManagedClusterAddonByNameQueueKey(t *testing.T) {
-	mca1 := &addonv1alpha1.ManagedClusterAddOn{
+	mca1 := &addonv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-addon",
 			Namespace: "cluster1",
 		},
 	}
 
-	mca2 := &addonv1alpha1.ManagedClusterAddOn{
+	mca2 := &addonv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-addon",
 			Namespace: "cluster2",
 		},
 	}
 
-	testObj := &addonv1alpha1.ClusterManagementAddOn{
+	testObj := &addonv1beta1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-addon",
 		},
@@ -389,7 +390,7 @@ func TestManagedClusterAddonByNameQueueKey(t *testing.T) {
 
 	fakeClient := fakeaddon.NewSimpleClientset(mca1, mca2)
 	informerFactory := addoninformers.NewSharedInformerFactory(fakeClient, 0)
-	mcaInformer := informerFactory.Addon().V1alpha1().ManagedClusterAddOns()
+	mcaInformer := informerFactory.Addon().V1beta1().ManagedClusterAddOns()
 
 	mcaInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
 		ManagedClusterAddonByName: IndexManagedClusterAddonByName,

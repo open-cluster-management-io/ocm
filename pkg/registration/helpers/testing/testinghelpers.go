@@ -28,7 +28,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
@@ -517,8 +517,8 @@ func WriteFile(filename string, data []byte) {
 	}
 }
 
-func NewManagedClusterAddons(name, namespace string, finalizers []string, deletionTimestamp *metav1.Time) *addonv1alpha1.ManagedClusterAddOn {
-	return &addonv1alpha1.ManagedClusterAddOn{
+func NewManagedClusterAddons(name, namespace string, finalizers []string, deletionTimestamp *metav1.Time) *addonv1beta1.ManagedClusterAddOn {
+	return &addonv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
 			Namespace:         namespace,

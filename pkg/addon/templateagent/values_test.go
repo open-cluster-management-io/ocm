@@ -13,6 +13,7 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -61,7 +62,7 @@ func TestGetAddOnRegistriesPrivateValuesFromClusterAnnotation(t *testing.T) {
 				},
 			},
 			expectedValues: addonfactory.Values{
-				RegistriesPrivateValueKey: []addonapiv1alpha1.ImageMirror{
+				RegistriesPrivateValueKey: []addonapiv1beta1.ImageMirror{
 					{
 						Source: "quay-test.io/ocm",
 						Mirror: "quay.io/ocm",
@@ -79,7 +80,7 @@ func TestGetAddOnRegistriesPrivateValuesFromClusterAnnotation(t *testing.T) {
 				},
 			},
 			expectedValues: addonfactory.Values{
-				RegistriesPrivateValueKey: []addonapiv1alpha1.ImageMirror{
+				RegistriesPrivateValueKey: []addonapiv1beta1.ImageMirror{
 					{
 						Source: "quay.io/open-cluster-management/test",
 						Mirror: "quay.io/ocm/test",
@@ -259,7 +260,7 @@ func TestGetValues(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			getValueFunc := func(
 				cluster *clusterv1.ManagedCluster,
-				addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+				addon *addonapiv1beta1.ManagedClusterAddOn) (addonfactory.Values, error) {
 				return c.values, nil
 			}
 
@@ -269,7 +270,7 @@ func TestGetValues(t *testing.T) {
 			}
 
 			cluster := &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"}}
-			addon := &addonapiv1alpha1.ManagedClusterAddOn{ObjectMeta: metav1.ObjectMeta{
+			addon := &addonapiv1beta1.ManagedClusterAddOn{ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-addon",
 				Namespace: "test-cluster",
 			}}

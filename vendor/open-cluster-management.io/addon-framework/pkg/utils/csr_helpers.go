@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -17,7 +18,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
@@ -30,7 +31,7 @@ var serialNumberLimit = new(big.Int).Lsh(big.NewInt(1), 128)
 
 // DefaultSignerWithExpiry generates a signer func for addon agent to sign the csr using caKey and caData with expiry date.
 func DefaultSignerWithExpiry(caKey, caData []byte, duration time.Duration) agent.CSRSignerFunc {
-	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn,
+	return func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn,
 		csr *certificatesv1.CertificateSigningRequest) ([]byte, error) {
 		blockTlsCrt, _ := pem.Decode(caData)
 		if blockTlsCrt == nil {
@@ -130,8 +131,9 @@ func parseCSR(pemBytes []byte) (*x509.CertificateRequest, error) {
 // DefaultCSRApprover approve the csr when addon agent uses default group and default user to sign csr.
 func DefaultCSRApprover(agentName string) agent.CSRApproveFunc {
 	return func(
+		ctx context.Context,
 		cluster *clusterv1.ManagedCluster,
-		addon *addonapiv1alpha1.ManagedClusterAddOn,
+		addon *addonapiv1beta1.ManagedClusterAddOn,
 		csr *certificatesv1.CertificateSigningRequest) bool {
 		defaultGroups := agent.DefaultGroups(cluster.Name, addon.Name)
 
@@ -178,20 +180,24 @@ func DefaultCSRApprover(agentName string) agent.CSRApproveFunc {
 		}
 
 		if strings.HasPrefix(username, "system:open-cluster-management:"+cluster.Name) {
-			klog.Info("CSR approved")
+			klog.Infof("CSR %q approved for cluster %q", csr.Name, cluster.Name)
 			return true
 		}
 
-		klog.Info("CSR not approved due to illegal requester", "requester", csr.Spec.Username)
+		klog.Infof("CSR %q for cluster %q not approved due to illegal requester %q", csr.Name, cluster.Name, csr.Spec.Username)
 		return false
 	}
 }
 
 // UnionCSRApprover is a union func for multiple approvers
 func UnionCSRApprover(approvers ...agent.CSRApproveFunc) agent.CSRApproveFunc {
-	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
+	return func(
+		ctx context.Context,
+		cluster *clusterv1.ManagedCluster,
+		addon *addonapiv1beta1.ManagedClusterAddOn,
+		csr *certificatesv1.CertificateSigningRequest) bool {
 		for _, approver := range approvers {
-			if !approver(cluster, addon, csr) {
+			if !approver(ctx, cluster, addon, csr) {
 				return false
 			}
 		}

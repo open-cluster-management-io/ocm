@@ -12,10 +12,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	clusterinformersv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
@@ -24,16 +24,16 @@ import (
 // addonAnnotationController watches ManagedCluster annotation changes and syncs
 // annotations with the addon prefix to ManagedClusterAddOns in the cluster namespace.
 type addonAnnotationController struct {
-	addonClient                  addonv1alpha1client.Interface
+	addonClient                  addonclient.Interface
 	managedClusterLister         clusterlisterv1.ManagedClusterLister
-	managedClusterAddonLister    addonlisterv1alpha1.ManagedClusterAddOnLister
-	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
+	managedClusterAddonLister    addonlisterv1beta1.ManagedClusterAddOnLister
+	clusterManagementAddonLister addonlisterv1beta1.ClusterManagementAddOnLister
 }
 
 func NewAddonAnnotationController(
-	addonClient addonv1alpha1client.Interface,
-	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
-	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
+	addonClient addonclient.Interface,
+	addonInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
+	clusterManagementAddonInformers addoninformerv1beta1.ClusterManagementAddOnInformer,
 	managedClusterInformer clusterinformersv1.ManagedClusterInformer,
 ) factory.Controller {
 	c := &addonAnnotationController{
@@ -82,7 +82,7 @@ func NewAddonAnnotationController(
 func getAddonAnnotations(annotations map[string]string) map[string]string {
 	result := map[string]string{}
 	for k, v := range annotations {
-		if strings.HasPrefix(k, addonv1alpha1.GroupName) {
+		if strings.HasPrefix(k, addonv1beta1.GroupName) {
 			result[k] = v
 		}
 	}
@@ -120,7 +120,7 @@ func (c *addonAnnotationController) sync(ctx context.Context, syncCtx factory.Sy
 	// Extract annotations with the addon prefix from the managed cluster
 	clusterAddonAnnotations := map[string]string{}
 	for k, v := range cluster.Annotations {
-		if strings.HasPrefix(k, addonv1alpha1.GroupName) {
+		if strings.HasPrefix(k, addonv1beta1.GroupName) {
 			clusterAddonAnnotations[k] = v
 		}
 	}
@@ -144,14 +144,14 @@ func (c *addonAnnotationController) sync(ctx context.Context, syncCtx factory.Sy
 		}
 
 		// Skip addons whose ClusterManagementAddOn install strategy type is empty or manual
-		if cma.Spec.InstallStrategy.Type == "" || cma.Spec.InstallStrategy.Type == addonv1alpha1.AddonInstallStrategyManual {
+		if cma.Spec.InstallStrategy.Type == "" || cma.Spec.InstallStrategy.Type == addonv1beta1.AddonInstallStrategyManual {
 			continue
 		}
 
 		// Sync addon annotations from cluster to addon
 		if updated, addonCopy := syncAddonAnnotations(addon, clusterAddonAnnotations); updated {
 			logger.V(2).Info("Updating addon annotations", "addon", addon.Name)
-			_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Update(
+			_, err = c.addonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).Update(
 				ctx, addonCopy, metav1.UpdateOptions{})
 			if err != nil {
 				errs = append(errs, err)
@@ -165,9 +165,9 @@ func (c *addonAnnotationController) sync(ctx context.Context, syncCtx factory.Sy
 // syncAddonAnnotations syncs annotations with the addon prefix from the cluster to the addon.
 // It returns true and the updated addon copy if there is a change.
 func syncAddonAnnotations(
-	addon *addonv1alpha1.ManagedClusterAddOn,
+	addon *addonv1beta1.ManagedClusterAddOn,
 	clusterAddonAnnotations map[string]string,
-) (bool, *addonv1alpha1.ManagedClusterAddOn) {
+) (bool, *addonv1beta1.ManagedClusterAddOn) {
 	addonCopy := addon.DeepCopy()
 	if addonCopy.Annotations == nil {
 		addonCopy.Annotations = map[string]string{}
@@ -177,7 +177,7 @@ func syncAddonAnnotations(
 
 	// Remove addon-prefix annotations from addon that are no longer on the cluster
 	for k := range addonCopy.Annotations {
-		if strings.HasPrefix(k, addonv1alpha1.GroupName) {
+		if strings.HasPrefix(k, addonv1beta1.GroupName) {
 			if _, exists := clusterAddonAnnotations[k]; !exists {
 				delete(addonCopy.Annotations, k)
 				changed = true

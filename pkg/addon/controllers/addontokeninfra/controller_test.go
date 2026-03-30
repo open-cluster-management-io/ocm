@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -20,43 +19,49 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
-func newAddonWithTokenRegistration(name, cluster string) *addonapiv1alpha1.ManagedClusterAddOn {
+func newAddonWithTokenRegistration(name, cluster string) *addonapiv1beta1.ManagedClusterAddOn {
 	addon := addontesting.NewAddon(name, cluster)
-	addon.Status.Registrations = []addonapiv1alpha1.RegistrationConfig{
+	addon.Status.Registrations = []addonapiv1beta1.RegistrationConfig{
 		{
-			SignerName: certificatesv1.KubeAPIServerClientSignerName,
+			Type: addonapiv1beta1.KubeClient,
+			KubeClient: &addonapiv1beta1.KubeClientConfig{
+				Driver: "token",
+			},
 		},
 	}
-	addon.Status.KubeClientDriver = "token"
 	return addon
 }
 
-func newAddonWithCSRRegistration(name, cluster string) *addonapiv1alpha1.ManagedClusterAddOn {
+func newAddonWithCSRRegistration(name, cluster string) *addonapiv1beta1.ManagedClusterAddOn {
 	addon := addontesting.NewAddon(name, cluster)
-	addon.Status.Registrations = []addonapiv1alpha1.RegistrationConfig{
+	addon.Status.Registrations = []addonapiv1beta1.RegistrationConfig{
 		{
-			SignerName: certificatesv1.KubeAPIServerClientSignerName,
+			Type: addonapiv1beta1.KubeClient,
+			KubeClient: &addonapiv1beta1.KubeClientConfig{
+				Driver: "csr",
+			},
 		},
 	}
-	addon.Status.KubeClientDriver = "csr"
 	return addon
 }
 
-func newAddonWithTokenInfraCondition(name, cluster string, status metav1.ConditionStatus) *addonapiv1alpha1.ManagedClusterAddOn {
+func newAddonWithTokenInfraCondition(name, cluster string, status metav1.ConditionStatus) *addonapiv1beta1.ManagedClusterAddOn {
 	addon := addontesting.NewAddon(name, cluster)
-	addon.Status.Registrations = []addonapiv1alpha1.RegistrationConfig{
+	addon.Status.Registrations = []addonapiv1beta1.RegistrationConfig{
 		{
-			SignerName: certificatesv1.KubeAPIServerClientSignerName,
+			Type: addonapiv1beta1.KubeClient,
+			KubeClient: &addonapiv1beta1.KubeClientConfig{
+				Driver: "token",
+			},
 		},
 	}
-	addon.Status.KubeClientDriver = "token"
 	meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 		Type:    TokenInfrastructureReadyCondition,
 		Status:  status,
@@ -423,7 +428,7 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
 				patchAction := actions[0].(clienttesting.PatchActionImpl)
-				addon := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addon := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patchAction.Patch, addon)
 				if err != nil {
 					t.Fatal(err)
@@ -458,7 +463,7 @@ func TestReconcile(t *testing.T) {
 			name:    "cleanup when addon switches from token to CSR",
 			syncKey: "cluster1/test",
 			managedClusterAddon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := newAddonWithCSRRegistration("test", "cluster1")
 					meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 						Type:    TokenInfrastructureReadyCondition,
@@ -492,7 +497,7 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
 				patchAction := actions[0].(clienttesting.PatchActionImpl)
-				addon := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addon := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patchAction.Patch, addon)
 				if err != nil {
 					t.Fatal(err)
@@ -520,7 +525,7 @@ func TestReconcile(t *testing.T) {
 			name:    "cleanup when addon is being deleted",
 			syncKey: "cluster1/test",
 			managedClusterAddon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := newAddonWithTokenInfraCondition("test", "cluster1", metav1.ConditionTrue)
 					now := metav1.Now()
 					addon.DeletionTimestamp = &now
@@ -594,7 +599,7 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
 				patchAction := actions[0].(clienttesting.PatchActionImpl)
-				addon := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addon := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patchAction.Patch, addon)
 				if err != nil {
 					t.Fatal(err)
@@ -619,7 +624,7 @@ func TestReconcile(t *testing.T) {
 			name:    "addon being deleted without TokenInfrastructureReady condition",
 			syncKey: "cluster1/test",
 			managedClusterAddon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := newAddonWithTokenRegistration("test", "cluster1")
 					now := metav1.Now()
 					addon.DeletionTimestamp = &now
@@ -640,17 +645,19 @@ func TestReconcile(t *testing.T) {
 			name:    "addon with multiple registrations, only one token-based",
 			syncKey: "cluster1/test",
 			managedClusterAddon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Status.Registrations = []addonapiv1alpha1.RegistrationConfig{
+					addon.Status.Registrations = []addonapiv1beta1.RegistrationConfig{
 						{
-							SignerName: certificatesv1.KubeAPIServerClientSignerName,
+							Type: addonapiv1beta1.KubeClient,
+							KubeClient: &addonapiv1beta1.KubeClientConfig{
+								Driver: "token",
+							},
 						},
 						{
-							SignerName: "example.com/custom-signer",
+							Type: addonapiv1beta1.CustomSigner,
 						},
 					}
-					addon.Status.KubeClientDriver = "token"
 					return addon
 				}(),
 			},
@@ -659,7 +666,7 @@ func TestReconcile(t *testing.T) {
 				// Should create infrastructure and set condition
 				testingcommon.AssertActions(t, actions, "patch")
 				patchAction := actions[0].(clienttesting.PatchActionImpl)
-				addon := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addon := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patchAction.Patch, addon)
 				if err != nil {
 					t.Fatal(err)
@@ -712,7 +719,7 @@ func TestReconcile(t *testing.T) {
 			name:    "condition transition from False to True after recovery",
 			syncKey: "cluster1/test",
 			managedClusterAddon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := newAddonWithTokenRegistration("test", "cluster1")
 					meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 						Type:    TokenInfrastructureReadyCondition,
@@ -727,7 +734,7 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
 				patchAction := actions[0].(clienttesting.PatchActionImpl)
-				addon := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addon := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patchAction.Patch, addon)
 				if err != nil {
 					t.Fatal(err)
@@ -768,7 +775,7 @@ func TestReconcile(t *testing.T) {
 			kubeInformers := informers.NewSharedInformerFactory(fakeKubeClient, 10*time.Minute)
 
 			for _, obj := range c.managedClusterAddon {
-				if err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
+				if err := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -778,7 +785,7 @@ func TestReconcile(t *testing.T) {
 			controller := NewTokenInfrastructureController(
 				fakeKubeClient,
 				fakeAddonClient,
-				addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+				addonInformers.Addon().V1beta1().ManagedClusterAddOns(),
 				kubeInformers.Core().V1().ServiceAccounts(),
 				kubeInformers.Rbac().V1().Roles(),
 				kubeInformers.Rbac().V1().RoleBindings(),

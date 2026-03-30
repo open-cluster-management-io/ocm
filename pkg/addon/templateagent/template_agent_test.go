@@ -24,6 +24,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -42,6 +43,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 	_ = scheme.AddToScheme(s)
 	_ = clusterv1apha1.Install(s)
 	_ = addonapiv1alpha1.Install(s)
+	_ = addonapiv1beta1.Install(s)
 	decoder := serializer.NewCodecFactory(s).UniversalDeserializer()
 
 	validatePodTemplate := func(t *testing.T, podTemplate corev1.PodTemplateSpec,
@@ -132,15 +134,15 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 	}
 
 	validateAgentOptions := func(t *testing.T, addonOptions agent.AgentAddonOptions,
-		managedClusterAddon *addonapiv1alpha1.ManagedClusterAddOn, expectedNamespace string) {
+		managedClusterAddon *addonapiv1beta1.ManagedClusterAddOn, expectedNamespace string) {
 		if addonOptions.Registration == nil {
 			t.Fatal("registration is nil")
 		}
-		if addonOptions.Registration.AgentInstallNamespace == nil {
+		if addonOptions.AgentInstallNamespace == nil {
 			t.Fatal("agentInstallNamespace func is nil")
 		}
 
-		registrationNamespace, err := addonOptions.Registration.AgentInstallNamespace(managedClusterAddon)
+		registrationNamespace, err := addonOptions.AgentInstallNamespace(ctx, managedClusterAddon)
 		if err != nil {
 			t.Fatalf("execute agent install namespace func error: %v", err)
 		}
@@ -153,22 +155,22 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 	cases := []struct {
 		name                  string
 		addonTemplatePath     string
-		addonDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
+		addonDeploymentConfig *addonapiv1beta1.AddOnDeploymentConfig
 		managedCluster        *clusterv1.ManagedCluster
 		expectedErr           string
 		validateObjects       func(t *testing.T, objects []runtime.Object)
-		validateAgentOptions  func(t *testing.T, o agent.AgentAddonOptions, mca *addonapiv1alpha1.ManagedClusterAddOn)
+		validateAgentOptions  func(t *testing.T, o agent.AgentAddonOptions, mca *addonapiv1beta1.ManagedClusterAddOn)
 	}{
 		{
 			name:              "no addon template",
 			addonTemplatePath: "",
-			addonDeploymentConfig: &addonapiv1alpha1.AddOnDeploymentConfig{
+			addonDeploymentConfig: &addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "hello-config",
 					Namespace: "default",
 				},
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{
 							Name:  "LOG_LEVEL",
 							Value: "4",
@@ -182,20 +184,20 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 		{
 			name:              "manifests rendered successfully",
 			addonTemplatePath: "./testmanifests/addontemplate.yaml",
-			addonDeploymentConfig: &addonapiv1alpha1.AddOnDeploymentConfig{
+			addonDeploymentConfig: &addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "hello-config",
 					Namespace: "default",
 				},
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					AgentInstallNamespace: "test-install-namespace",
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{
 							Name:  "LOG_LEVEL",
 							Value: "4",
 						},
 					},
-					NodePlacement: &addonapiv1alpha1.NodePlacement{
+					NodePlacement: &addonapiv1beta1.NodePlacement{
 						NodeSelector: map[string]string{
 							"host": "ssd",
 						},
@@ -207,7 +209,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 							},
 						},
 					},
-					Registries: []addonapiv1alpha1.ImageMirror{
+					Registries: []addonapiv1beta1.ImageMirror{
 						{
 							Source: "quay.io/open-cluster-management",
 							Mirror: "quay.io/ocm",
@@ -277,27 +279,27 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 				}
 			},
 			validateAgentOptions: func(t *testing.T, o agent.AgentAddonOptions,
-				mca *addonapiv1alpha1.ManagedClusterAddOn) {
+				mca *addonapiv1beta1.ManagedClusterAddOn) {
 				validateAgentOptions(t, o, mca, "test-install-namespace")
 			},
 		},
 		{
 			name:              "manifests with proxy config rendered successfully",
 			addonTemplatePath: "./testmanifests/addontemplate.yaml",
-			addonDeploymentConfig: &addonapiv1alpha1.AddOnDeploymentConfig{
+			addonDeploymentConfig: &addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "hello-config",
 					Namespace: "default",
 				},
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					AgentInstallNamespace: "test-install-namespace",
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{
 							Name:  "LOG_LEVEL",
 							Value: "4",
 						},
 					},
-					NodePlacement: &addonapiv1alpha1.NodePlacement{
+					NodePlacement: &addonapiv1beta1.NodePlacement{
 						NodeSelector: map[string]string{
 							"host": "ssd",
 						},
@@ -309,13 +311,13 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 							},
 						},
 					},
-					Registries: []addonapiv1alpha1.ImageMirror{
+					Registries: []addonapiv1beta1.ImageMirror{
 						{
 							Source: "quay.io/open-cluster-management",
 							Mirror: "quay.io/ocm",
 						},
 					},
-					ProxyConfig: addonapiv1alpha1.ProxyConfig{
+					ProxyConfig: addonapiv1beta1.ProxyConfig{
 						HTTPProxy:  "http://proxy.example.com:8080",
 						HTTPSProxy: "http://proxy.example.com:8080",
 						NoProxy:    "localhost",
@@ -419,27 +421,27 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 
 			},
 			validateAgentOptions: func(t *testing.T, o agent.AgentAddonOptions,
-				mca *addonapiv1alpha1.ManagedClusterAddOn) {
+				mca *addonapiv1beta1.ManagedClusterAddOn) {
 				validateAgentOptions(t, o, mca, "test-install-namespace")
 			},
 		},
 		{
 			name:              "manifests with only daemonset and no namespace configured by adc rendered successfully",
 			addonTemplatePath: "./testmanifests/addontemplate_daemonset.yaml",
-			addonDeploymentConfig: &addonapiv1alpha1.AddOnDeploymentConfig{
+			addonDeploymentConfig: &addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "hello-config",
 					Namespace: "default",
 				},
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					// AgentInstallNamespace: "test-install-namespace",
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{
 							Name:  "LOG_LEVEL",
 							Value: "4",
 						},
 					},
-					NodePlacement: &addonapiv1alpha1.NodePlacement{
+					NodePlacement: &addonapiv1beta1.NodePlacement{
 						NodeSelector: map[string]string{
 							"host": "ssd",
 						},
@@ -451,7 +453,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 							},
 						},
 					},
-					Registries: []addonapiv1alpha1.ImageMirror{
+					Registries: []addonapiv1beta1.ImageMirror{
 						{
 							Source: "quay.io/open-cluster-management",
 							Mirror: "quay.io/ocm",
@@ -500,27 +502,27 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 				}
 			},
 			validateAgentOptions: func(t *testing.T, o agent.AgentAddonOptions,
-				mca *addonapiv1alpha1.ManagedClusterAddOn) {
+				mca *addonapiv1beta1.ManagedClusterAddOn) {
 				validateAgentOptions(t, o, mca, "open-cluster-management-agent-addon-ds")
 			},
 		},
 		{
 			name:              "manifests with only deployment rendered successfully",
 			addonTemplatePath: "./testmanifests/addontemplate_deployment.yaml",
-			addonDeploymentConfig: &addonapiv1alpha1.AddOnDeploymentConfig{
+			addonDeploymentConfig: &addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "hello-config",
 					Namespace: "default",
 				},
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					AgentInstallNamespace: "test-install-namespace",
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{
 							Name:  "LOG_LEVEL",
 							Value: "4",
 						},
 					},
-					NodePlacement: &addonapiv1alpha1.NodePlacement{
+					NodePlacement: &addonapiv1beta1.NodePlacement{
 						NodeSelector: map[string]string{
 							"host": "ssd",
 						},
@@ -532,7 +534,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 							},
 						},
 					},
-					Registries: []addonapiv1alpha1.ImageMirror{
+					Registries: []addonapiv1beta1.ImageMirror{
 						{
 							Source: "quay.io/open-cluster-management",
 							Mirror: "quay.io/ocm",
@@ -581,7 +583,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 				}
 			},
 			validateAgentOptions: func(t *testing.T, o agent.AgentAddonOptions,
-				mca *addonapiv1alpha1.ManagedClusterAddOn) {
+				mca *addonapiv1beta1.ManagedClusterAddOn) {
 				validateAgentOptions(t, o, mca, "test-install-namespace")
 			},
 		},
@@ -589,19 +591,19 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cma := &addonapiv1alpha1.ClusterManagementAddOn{
+			cma := &addonapiv1beta1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: addonName,
 				},
-				Status: addonapiv1alpha1.ClusterManagementAddOnStatus{
-					DefaultConfigReferences: []addonapiv1alpha1.DefaultConfigReference{
+				Status: addonapiv1beta1.ClusterManagementAddOnStatus{
+					DefaultConfigReferences: []addonapiv1beta1.DefaultConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    utils.AddOnTemplateGVR.Group,
 								Resource: utils.AddOnTemplateGVR.Resource,
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Name: addonName,
 								},
 								SpecHash: "fake-hash",
@@ -630,11 +632,11 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 				}
 			}
 
-			var managedClusterAddon *addonapiv1alpha1.ManagedClusterAddOn
+			var managedClusterAddon *addonapiv1beta1.ManagedClusterAddOn
 			var objs = []runtime.Object{cma}
 
 			managedClusterAddonBuilder := newManagedClusterAddonBuilder(
-				&addonapiv1alpha1.ManagedClusterAddOn{
+				&addonapiv1beta1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      addonName,
 						Namespace: clusterName,
@@ -657,12 +659,12 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 			addonClient := fakeaddon.NewSimpleClientset(objs...)
 
 			addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
-			cmaStore := addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetStore()
+			cmaStore := addonInformerFactory.Addon().V1beta1().ClusterManagementAddOns().Informer().GetStore()
 			if err := cmaStore.Add(cma); err != nil {
 				t.Fatal(err)
 			}
 			if managedClusterAddon != nil {
-				mcaStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
+				mcaStore := addonInformerFactory.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore()
 				if err := mcaStore.Add(managedClusterAddon); err != nil {
 					t.Fatal(err)
 				}
@@ -692,7 +694,7 @@ func TestAddonTemplateAgentManifests(t *testing.T) {
 				),
 			)
 
-			objects, err := agentAddon.Manifests(tc.managedCluster, managedClusterAddon)
+			objects, err := agentAddon.Manifests(ctx, tc.managedCluster, managedClusterAddon)
 			if err != nil {
 				assert.Equal(t, tc.expectedErr, err.Error(), tc.name)
 			} else {
@@ -716,7 +718,7 @@ func TestAgentInstallNamespace(t *testing.T) {
 	cases := []struct {
 		name                       string
 		addonTemplate              *addonapiv1alpha1.AddOnTemplate
-		addonDeploymentConfig      *addonapiv1alpha1.AddOnDeploymentConfig
+		addonDeploymentConfig      *addonapiv1beta1.AddOnDeploymentConfig
 		managedClusterAddonBuilder *testManagedClusterAddOnBuilder
 
 		expected    string
@@ -736,17 +738,17 @@ func TestAgentInstallNamespace(t *testing.T) {
 					},
 				},
 			},
-			addonDeploymentConfig: &addonapiv1alpha1.AddOnDeploymentConfig{
+			addonDeploymentConfig: &addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "hello-config",
 					Namespace: "default",
 				},
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					AgentInstallNamespace: "test-install-namespace",
 				},
 			},
 			managedClusterAddonBuilder: newManagedClusterAddonBuilder(
-				&addonapiv1alpha1.ManagedClusterAddOn{
+				&addonapiv1beta1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      addonName,
 						Namespace: clusterName,
@@ -770,7 +772,7 @@ func TestAgentInstallNamespace(t *testing.T) {
 				},
 			},
 			managedClusterAddonBuilder: newManagedClusterAddonBuilder(
-				&addonapiv1alpha1.ManagedClusterAddOn{
+				&addonapiv1beta1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      addonName,
 						Namespace: clusterName,
@@ -796,7 +798,7 @@ func TestAgentInstallNamespace(t *testing.T) {
 				},
 			},
 			managedClusterAddonBuilder: newManagedClusterAddonBuilder(
-				&addonapiv1alpha1.ManagedClusterAddOn{
+				&addonapiv1beta1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      addonName,
 						Namespace: clusterName,
@@ -822,7 +824,7 @@ func TestAgentInstallNamespace(t *testing.T) {
 				},
 			},
 			managedClusterAddonBuilder: newManagedClusterAddonBuilder(
-				&addonapiv1alpha1.ManagedClusterAddOn{
+				&addonapiv1beta1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      addonName,
 						Namespace: clusterName,
@@ -847,17 +849,17 @@ func TestAgentInstallNamespace(t *testing.T) {
 					},
 				},
 			},
-			addonDeploymentConfig: &addonapiv1alpha1.AddOnDeploymentConfig{
+			addonDeploymentConfig: &addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "hello-config",
 					Namespace: "default",
 				},
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					AgentInstallNamespace: "test-install-namespace",
 				},
 			},
 			managedClusterAddonBuilder: newManagedClusterAddonBuilder(
-				&addonapiv1alpha1.ManagedClusterAddOn{
+				&addonapiv1beta1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      addonName,
 						Namespace: clusterName,
@@ -882,14 +884,14 @@ func TestAgentInstallNamespace(t *testing.T) {
 					},
 				},
 			},
-			addonDeploymentConfig: &addonapiv1alpha1.AddOnDeploymentConfig{
+			addonDeploymentConfig: &addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "hello-config",
 					Namespace: "default",
 				},
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					AgentInstallNamespace: "",
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{
 							Name:  "LOG_LEVEL",
 							Value: "4",
@@ -898,7 +900,7 @@ func TestAgentInstallNamespace(t *testing.T) {
 				},
 			},
 			managedClusterAddonBuilder: newManagedClusterAddonBuilder(
-				&addonapiv1alpha1.ManagedClusterAddOn{
+				&addonapiv1beta1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      addonName,
 						Namespace: clusterName,
@@ -911,7 +913,7 @@ func TestAgentInstallNamespace(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			var managedClusterAddon *addonapiv1alpha1.ManagedClusterAddOn
+			var managedClusterAddon *addonapiv1beta1.ManagedClusterAddOn
 			var objs []runtime.Object
 			if tc.managedClusterAddonBuilder != nil {
 				if tc.addonTemplate != nil {
@@ -930,7 +932,7 @@ func TestAgentInstallNamespace(t *testing.T) {
 
 			addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
 			if managedClusterAddon != nil {
-				mcaStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
+				mcaStore := addonInformerFactory.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore()
 				if err := mcaStore.Add(managedClusterAddon); err != nil {
 					t.Fatal(err)
 				}
@@ -958,7 +960,7 @@ func TestAgentInstallNamespace(t *testing.T) {
 				),
 			)
 
-			ns, err := agentAddon.GetAgentAddonOptions().Registration.AgentInstallNamespace(managedClusterAddon)
+			ns, err := agentAddon.GetAgentAddonOptions().AgentInstallNamespace(ctx, managedClusterAddon)
 			if err == nil {
 				assert.Equal(t, tc.expected, ns, tc.name)
 			} else if tc.expectedErr != err.Error() {
@@ -977,11 +979,12 @@ func TestAgentManifestConfigs(t *testing.T) {
 	_ = scheme.AddToScheme(s)
 	_ = clusterv1apha1.Install(s)
 	_ = addonapiv1alpha1.Install(s)
+	_ = addonapiv1beta1.Install(s)
 
 	cases := []struct {
 		name                   string
 		addonTemplate          *addonapiv1alpha1.AddOnTemplate
-		clusterManagementAddOn *addonapiv1alpha1.ClusterManagementAddOn
+		clusterManagementAddOn *addonapiv1beta1.ClusterManagementAddOn
 		expected               []workapiv1.ManifestConfigOption
 	}{
 		{
@@ -993,13 +996,13 @@ func TestAgentManifestConfigs(t *testing.T) {
 			name: "no addontemplate",
 			clusterManagementAddOn: addontesting.NewClusterManagementAddon("hello", "", "").
 				WithDefaultConfigReferences(
-					addonapiv1alpha1.DefaultConfigReference{
-						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					addonapiv1beta1.DefaultConfigReference{
+						ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 							Group:    utils.AddOnTemplateGVR.Group,
 							Resource: utils.AddOnTemplateGVR.Resource,
 						},
-						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{Name: "hello-template"},
+						DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{Name: "hello-template"},
 							SpecHash:       "hash",
 						},
 					},
@@ -1010,13 +1013,13 @@ func TestAgentManifestConfigs(t *testing.T) {
 			name: "addontemplate does not have manifestconfigs",
 			clusterManagementAddOn: addontesting.NewClusterManagementAddon("hello", "", "").
 				WithDefaultConfigReferences(
-					addonapiv1alpha1.DefaultConfigReference{
-						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					addonapiv1beta1.DefaultConfigReference{
+						ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 							Group:    utils.AddOnTemplateGVR.Group,
 							Resource: utils.AddOnTemplateGVR.Resource,
 						},
-						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{Name: "hello-template"},
+						DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{Name: "hello-template"},
 							SpecHash:       "hash",
 						},
 					},
@@ -1032,13 +1035,13 @@ func TestAgentManifestConfigs(t *testing.T) {
 			name: "addontemplate has manifestconfigs",
 			clusterManagementAddOn: addontesting.NewClusterManagementAddon("hello", "", "").
 				WithDefaultConfigReferences(
-					addonapiv1alpha1.DefaultConfigReference{
-						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					addonapiv1beta1.DefaultConfigReference{
+						ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 							Group:    utils.AddOnTemplateGVR.Group,
 							Resource: utils.AddOnTemplateGVR.Resource,
 						},
-						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{Name: "hello-template"},
+						DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{Name: "hello-template"},
 							SpecHash:       "hash",
 						},
 					},
@@ -1099,7 +1102,7 @@ func TestAgentManifestConfigs(t *testing.T) {
 
 		addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
 		if tc.clusterManagementAddOn != nil {
-			cmaStore := addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetStore()
+			cmaStore := addonInformerFactory.Addon().V1beta1().ClusterManagementAddOns().Informer().GetStore()
 			if err := cmaStore.Add(tc.clusterManagementAddOn); err != nil {
 				t.Fatal(err)
 			}
@@ -1133,13 +1136,13 @@ func TestAgentManifestConfigs(t *testing.T) {
 }
 
 type testManagedClusterAddOnBuilder struct {
-	managedClusterAddOn       *addonapiv1alpha1.ManagedClusterAddOn
+	managedClusterAddOn       *addonapiv1beta1.ManagedClusterAddOn
 	addonTemplate             *addonapiv1alpha1.AddOnTemplate
-	addonDeploymentConfig     *addonapiv1alpha1.AddOnDeploymentConfig
+	addonDeploymentConfig     *addonapiv1beta1.AddOnDeploymentConfig
 	setStatusConfigReferences bool
 }
 
-func newManagedClusterAddonBuilder(mca *addonapiv1alpha1.ManagedClusterAddOn) *testManagedClusterAddOnBuilder {
+func newManagedClusterAddonBuilder(mca *addonapiv1beta1.ManagedClusterAddOn) *testManagedClusterAddOnBuilder {
 	return &testManagedClusterAddOnBuilder{
 		managedClusterAddOn:       mca,
 		setStatusConfigReferences: true,
@@ -1153,7 +1156,7 @@ func (b *testManagedClusterAddOnBuilder) withAddonTemplate(
 }
 
 func (b *testManagedClusterAddOnBuilder) withAddonDeploymentConfig(
-	adc *addonapiv1alpha1.AddOnDeploymentConfig) *testManagedClusterAddOnBuilder {
+	adc *addonapiv1beta1.AddOnDeploymentConfig) *testManagedClusterAddOnBuilder {
 	b.addonDeploymentConfig = adc
 	return b
 }
@@ -1163,20 +1166,16 @@ func (b *testManagedClusterAddOnBuilder) withSetStatusConfigReferences(set bool)
 	return b
 }
 
-func (b *testManagedClusterAddOnBuilder) build() *addonapiv1alpha1.ManagedClusterAddOn {
+func (b *testManagedClusterAddOnBuilder) build() *addonapiv1beta1.ManagedClusterAddOn {
 	if b.addonDeploymentConfig != nil {
 		hash, _ := utils.GetAddOnDeploymentConfigSpecHash(b.addonDeploymentConfig)
-		configReference := addonapiv1alpha1.ConfigReference{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+		configReference := addonapiv1beta1.ConfigReference{
+			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 				Group:    "addon.open-cluster-management.io",
 				Resource: "addondeploymentconfigs",
 			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Name:      b.addonDeploymentConfig.Name,
-				Namespace: b.addonDeploymentConfig.Namespace,
-			},
-			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+			DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+				ConfigReferent: addonapiv1beta1.ConfigReferent{
 					Name:      b.addonDeploymentConfig.Name,
 					Namespace: b.addonDeploymentConfig.Namespace,
 				},
@@ -1189,24 +1188,21 @@ func (b *testManagedClusterAddOnBuilder) build() *addonapiv1alpha1.ManagedCluste
 		}
 
 		b.managedClusterAddOn.Spec.Configs = append(b.managedClusterAddOn.Spec.Configs,
-			addonapiv1alpha1.AddOnConfig{
+			addonapiv1beta1.AddOnConfig{
 				ConfigGroupResource: configReference.ConfigGroupResource,
-				ConfigReferent:      configReference.ConfigReferent,
+				ConfigReferent:      configReference.DesiredConfig.ConfigReferent,
 			})
 	}
 
 	if b.addonTemplate != nil {
 		hash, _ := GetAddOnTemplateSpecHash(b.addonTemplate)
-		configReference := addonapiv1alpha1.ConfigReference{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+		configReference := addonapiv1beta1.ConfigReference{
+			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 				Group:    "addon.open-cluster-management.io",
 				Resource: "addontemplates",
 			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Name: b.addonTemplate.Name,
-			},
-			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+			DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+				ConfigReferent: addonapiv1beta1.ConfigReferent{
 					Name: b.addonTemplate.Name,
 				},
 				SpecHash: hash,
@@ -1217,9 +1213,9 @@ func (b *testManagedClusterAddOnBuilder) build() *addonapiv1alpha1.ManagedCluste
 				b.managedClusterAddOn.Status.ConfigReferences, configReference)
 		}
 		b.managedClusterAddOn.Spec.Configs = append(b.managedClusterAddOn.Spec.Configs,
-			addonapiv1alpha1.AddOnConfig{
+			addonapiv1beta1.AddOnConfig{
 				ConfigGroupResource: configReference.ConfigGroupResource,
-				ConfigReferent:      configReference.ConfigReferent,
+				ConfigReferent:      configReference.DesiredConfig.ConfigReferent,
 			})
 	}
 	return b.managedClusterAddOn

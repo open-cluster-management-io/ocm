@@ -13,7 +13,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
@@ -167,7 +167,7 @@ func TestNamespaceDecorator(t *testing.T) {
 func TestProxyDecorator(t *testing.T) {
 	tests := []struct {
 		name           string
-		config         addonapiv1alpha1.AddOnDeploymentConfig
+		config         addonapiv1beta1.AddOnDeploymentConfig
 		pod            *corev1.PodTemplateSpec
 		validateObject func(t *testing.T, pod *corev1.PodTemplateSpec)
 	}{
@@ -208,9 +208,9 @@ func TestProxyDecorator(t *testing.T) {
 					},
 				},
 			},
-			config: addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					ProxyConfig: addonapiv1alpha1.ProxyConfig{
+			config: addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					ProxyConfig: addonapiv1beta1.ProxyConfig{
 						HTTPProxy:  "http://proxy",
 						HTTPSProxy: "https://proxy",
 						NoProxy:    "no-proxy",
@@ -263,7 +263,7 @@ func TestProxyDecorator(t *testing.T) {
 func TestResourceRequirementsDecorator(t *testing.T) {
 	tests := []struct {
 		name            string
-		config          addonapiv1alpha1.AddOnDeploymentConfig
+		config          addonapiv1beta1.AddOnDeploymentConfig
 		resourceName    string
 		pod             *corev1.PodTemplateSpec
 		supportResource supportResource
@@ -287,9 +287,9 @@ func TestResourceRequirementsDecorator(t *testing.T) {
 			},
 			resourceName:    "d1",
 			supportResource: supportResourceDeployment,
-			config: addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					ResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+			config: addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					ResourceRequirements: []addonapiv1beta1.ContainerResourceRequirements{
 						{
 							ContainerID: "deployments:d1:c1",
 							Resources: corev1.ResourceRequirements{
@@ -333,9 +333,9 @@ func TestResourceRequirementsDecorator(t *testing.T) {
 			},
 			resourceName:    "d1",
 			supportResource: supportResourceDaemonset,
-			config: addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					ResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+			config: addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					ResourceRequirements: []addonapiv1beta1.ContainerResourceRequirements{
 						{
 							ContainerID: "daemonsets:d1:c1",
 							Resources: corev1.ResourceRequirements{
@@ -379,9 +379,9 @@ func TestResourceRequirementsDecorator(t *testing.T) {
 			},
 			resourceName:    "d1",
 			supportResource: supportResourceDeployment,
-			config: addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					ResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+			config: addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					ResourceRequirements: []addonapiv1beta1.ContainerResourceRequirements{
 						{
 							ContainerID: "deployments:d1:c1",
 							Resources: corev1.ResourceRequirements{

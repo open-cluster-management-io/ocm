@@ -8,10 +8,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	clusterinformersv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterinformersv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
@@ -21,8 +21,8 @@ import (
 )
 
 type addonManagementController struct {
-	addonClient                   addonv1alpha1client.Interface
-	clusterManagementAddonLister  addonlisterv1alpha1.ClusterManagementAddOnLister
+	addonClient                   addonclient.Interface
+	clusterManagementAddonLister  addonlisterv1beta1.ClusterManagementAddOnLister
 	clusterManagementAddonIndexer cache.Indexer
 
 	reconcilers []addonManagementReconcile
@@ -30,7 +30,7 @@ type addonManagementController struct {
 
 // addonManagementReconcile is a interface for reconcile logic. It creates ManagedClusterAddon based on install strategy
 type addonManagementReconcile interface {
-	reconcile(ctx context.Context, cma *addonv1alpha1.ClusterManagementAddOn) (*addonv1alpha1.ClusterManagementAddOn, reconcileState, error)
+	reconcile(ctx context.Context, cma *addonv1beta1.ClusterManagementAddOn) (*addonv1beta1.ClusterManagementAddOn, reconcileState, error)
 }
 
 type reconcileState int64
@@ -41,9 +41,9 @@ const (
 )
 
 func NewAddonManagementController(
-	addonClient addonv1alpha1client.Interface,
-	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
-	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
+	addonClient addonclient.Interface,
+	addonInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
+	clusterManagementAddonInformers addoninformerv1beta1.ClusterManagementAddOnInformer,
 	managedClusterInformer clusterinformersv1.ManagedClusterInformer,
 	placementInformer clusterinformersv1beta1.PlacementInformer,
 	placementDecisionInformer clusterinformersv1beta1.PlacementDecisionInformer,

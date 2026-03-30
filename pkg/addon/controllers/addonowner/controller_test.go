@@ -12,7 +12,7 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 
@@ -22,8 +22,8 @@ import (
 func newClusterManagementOwner(name string) metav1.OwnerReference {
 	clusterManagementAddon := addontesting.NewClusterManagementAddon(name, "testcrd", "testcr").Build()
 	return *metav1.NewControllerRef(clusterManagementAddon, schema.GroupVersionKind{
-		Group:   addonapiv1alpha1.GroupName,
-		Version: addonapiv1alpha1.GroupVersion.Version,
+		Group:   addonapiv1beta1.GroupName,
+		Version: addonapiv1beta1.GroupVersion.Version,
 		Kind:    "ClusterManagementAddOn",
 	})
 }
@@ -69,12 +69,12 @@ func TestReconcile(t *testing.T) {
 			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
 
 			for _, obj := range c.managedClusteraddon {
-				if err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
+				if err := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
 				}
 			}
 			for _, obj := range c.clusterManagementAddon {
-				if err := addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetStore().Add(obj); err != nil {
+				if err := addonInformers.Addon().V1beta1().ClusterManagementAddOns().Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -83,8 +83,8 @@ func TestReconcile(t *testing.T) {
 
 			controller := NewAddonOwnerController(
 				fakeAddonClient,
-				addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
-				addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
+				addonInformers.Addon().V1beta1().ManagedClusterAddOns(),
+				addonInformers.Addon().V1beta1().ClusterManagementAddOns(),
 				utils.ManagedByAddonManager)
 
 			err := controller.Sync(context.TODO(), syncContext, c.syncKey)

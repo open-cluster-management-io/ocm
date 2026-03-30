@@ -73,7 +73,7 @@ type HubManagerOptions struct {
 // NewHubManagerOptions returns a HubManagerOptions
 func NewHubManagerOptions() *HubManagerOptions {
 	return &HubManagerOptions{
-		GCResourceList: []string{"addon.open-cluster-management.io/v1alpha1/managedclusteraddons",
+		GCResourceList: []string{"addon.open-cluster-management.io/v1beta1/managedclusteraddons",
 			"work.open-cluster-management.io/v1/manifestworks"},
 		ImportOption:               importeroptions.New(),
 		EnabledRegistrationDrivers: []string{operatorv1.CSRAuthType},

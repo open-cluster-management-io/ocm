@@ -11,7 +11,7 @@ import (
 	fakemetadataclient "k8s.io/client-go/metadata/fake"
 	clienttesting "k8s.io/client-go/testing"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
 
@@ -52,7 +52,7 @@ func TestGCResourcesController(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			scheme := fakemetadataclient.NewTestScheme()
-			_ = addonv1alpha1.Install(scheme)
+			_ = addonv1beta1.Install(scheme)
 			_ = workv1.Install(scheme)
 			_ = metav1.AddMetaToScheme(scheme)
 			metadataClient := fakemetadataclient.NewSimpleMetadataClient(scheme, c.objs...)
@@ -144,7 +144,7 @@ func TestGetFirstDeletePriority(t *testing.T) {
 func newAddonMetadata(namespace, name string, annotations map[string]string) *metav1.PartialObjectMetadata {
 	return &metav1.PartialObjectMetadata{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "addon.open-cluster-management.io/v1alpha1",
+			APIVersion: "addon.open-cluster-management.io/v1beta1",
 			Kind:       "ManagedClusterAddOn",
 		},
 		ObjectMeta: metav1.ObjectMeta{

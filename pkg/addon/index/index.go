@@ -9,8 +9,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
@@ -20,14 +20,14 @@ const (
 )
 
 func IndexClusterManagementAddonByPlacement(obj interface{}) ([]string, error) {
-	cma, ok := obj.(*addonv1alpha1.ClusterManagementAddOn)
+	cma, ok := obj.(*addonv1beta1.ClusterManagementAddOn)
 
 	if !ok {
 		return []string{}, fmt.Errorf("obj %T is not a ClusterManagementAddon", obj)
 	}
 
 	var keys []string
-	if cma.Spec.InstallStrategy.Type == "" || cma.Spec.InstallStrategy.Type == addonv1alpha1.AddonInstallStrategyManual {
+	if cma.Spec.InstallStrategy.Type == "" || cma.Spec.InstallStrategy.Type == addonv1beta1.AddonInstallStrategyManual {
 		return keys, nil
 	}
 
@@ -40,7 +40,7 @@ func IndexClusterManagementAddonByPlacement(obj interface{}) ([]string, error) {
 }
 
 func IndexManagedClusterAddonByName(obj interface{}) ([]string, error) {
-	mca, ok := obj.(*addonv1alpha1.ManagedClusterAddOn)
+	mca, ok := obj.(*addonv1beta1.ManagedClusterAddOn)
 
 	if !ok {
 		return []string{}, fmt.Errorf("obj %T is not a ManagedClusterAddon", obj)
@@ -50,7 +50,7 @@ func IndexManagedClusterAddonByName(obj interface{}) ([]string, error) {
 }
 
 func ClusterManagementAddonByPlacementQueueKey(
-	cmai addoninformerv1alpha1.ClusterManagementAddOnInformer) func(obj runtime.Object) []string {
+	cmai addoninformerv1beta1.ClusterManagementAddOnInformer) func(obj runtime.Object) []string {
 	return func(obj runtime.Object) []string {
 		key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 		if err != nil {
@@ -66,7 +66,7 @@ func ClusterManagementAddonByPlacementQueueKey(
 
 		var keys []string
 		for _, o := range objs {
-			cma := o.(*addonv1alpha1.ClusterManagementAddOn)
+			cma := o.(*addonv1beta1.ClusterManagementAddOn)
 			klog.V(4).Infof("enqueue ClusterManagementAddon %s, because of placement %s", cma.Name, key)
 			keys = append(keys, cma.Name)
 		}
@@ -76,7 +76,7 @@ func ClusterManagementAddonByPlacementQueueKey(
 }
 
 func ClusterManagementAddonByPlacementDecisionQueueKey(
-	cmai addoninformerv1alpha1.ClusterManagementAddOnInformer) func(obj runtime.Object) []string {
+	cmai addoninformerv1beta1.ClusterManagementAddOnInformer) func(obj runtime.Object) []string {
 	return func(obj runtime.Object) []string {
 		accessor, _ := meta.Accessor(obj)
 		placementName, ok := accessor.GetLabels()[clusterv1beta1.PlacementLabel]
@@ -93,7 +93,7 @@ func ClusterManagementAddonByPlacementDecisionQueueKey(
 
 		var keys []string
 		for _, o := range objs {
-			cma := o.(*addonv1alpha1.ClusterManagementAddOn)
+			cma := o.(*addonv1beta1.ClusterManagementAddOn)
 			klog.V(4).Infof("enqueue ClusterManagementAddon %s, because of placementDecision %s/%s",
 				cma.Name, accessor.GetNamespace(), accessor.GetName())
 			keys = append(keys, cma.Name)
@@ -104,7 +104,7 @@ func ClusterManagementAddonByPlacementDecisionQueueKey(
 }
 
 // ManagedClusterAddonByNameQueueKey finds all the addon using the name of the object and return all their keys.
-func ManagedClusterAddonByNameQueueKey(addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer) func(obj runtime.Object) []string {
+func ManagedClusterAddonByNameQueueKey(addonInformers addoninformerv1beta1.ManagedClusterAddOnInformer) func(obj runtime.Object) []string {
 	return func(obj runtime.Object) []string {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {

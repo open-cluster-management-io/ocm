@@ -9,6 +9,7 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	certificatesv1 "k8s.io/api/certificates/v1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -19,6 +20,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
@@ -49,6 +51,7 @@ var testAddOnConfigsImpl *testAddon
 
 var cancel context.CancelFunc
 var mgrContext context.Context
+var stopWebhook context.CancelFunc
 var addonManager addonmanager.AddonManager
 
 func init() {
@@ -71,13 +74,32 @@ var _ = ginkgo.BeforeSuite(func() {
 			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "work", "v1", "0000_00_work.open-cluster-management.io_manifestworks.crd.yaml"),
 			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "cluster", "v1"),
 			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "cluster", "v1beta1"),
-			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "addon", "v1alpha1"),
+			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "addon", "v1beta1"),
+			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "addon", "v1alpha1", "0000_03_addon.open-cluster-management.io_addontemplates.crd.yaml"),
 		},
+		WebhookInstallOptions: envtest.WebhookInstallOptions{},
 	}
 
 	cfg, err := testEnv.Start()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(cfg).ToNot(gomega.BeNil())
+
+	// Configure conversion webhooks for addon CRDs so the API server can convert between
+	// v1alpha1 (storage version) and v1beta1 (used by controllers).
+	apiExtClient, err := apiextensionsclient.NewForConfig(cfg)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	err = util.AddConversionForAddonAPI(context.TODO(), apiExtClient, testEnv,
+		"clustermanagementaddons.addon.open-cluster-management.io",
+		"managedclusteraddons.addon.open-cluster-management.io")
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	var webhookCtx context.Context
+	webhookCtx, stopWebhook = context.WithCancel(context.Background())
+	go func() {
+		defer ginkgo.GinkgoRecover()
+		err := util.StartWebhook(webhookCtx, testEnv, cfg)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	}()
 
 	hubWorkClient, err = workclientset.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -91,17 +113,17 @@ var _ = ginkgo.BeforeSuite(func() {
 	testAddonImpl = &testAddon{
 		name:          "test",
 		manifests:     map[string][]runtime.Object{},
-		registrations: map[string][]addonapiv1alpha1.RegistrationConfig{},
+		registrations: map[string][]agent.RegistrationConfig{},
 	}
 
 	testAddOnConfigsImpl = &testAddon{
 		name:                "test-addon-configs",
 		manifests:           map[string][]runtime.Object{},
-		registrations:       map[string][]addonapiv1alpha1.RegistrationConfig{},
+		registrations:       map[string][]agent.RegistrationConfig{},
 		supportedConfigGVRs: []schema.GroupVersionResource{addOnDeploymentConfigGVR},
 	}
 
-	mgrContext, cancel = context.WithCancel(context.TODO())
+	mgrContext, cancel = context.WithCancel(context.Background())
 	// start hub controller
 	go func() {
 		addonManager, err = addonmanager.New(cfg)
@@ -129,13 +151,21 @@ var _ = ginkgo.AfterSuite(func() {
 
 	cancel()
 	err := testEnv.Stop()
+
+	if cancel != nil {
+		cancel()
+	}
+
+	if stopWebhook != nil {
+		stopWebhook()
+	}
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 })
 
 type testAddon struct {
 	name                string
 	manifests           map[string][]runtime.Object
-	registrations       map[string][]addonapiv1alpha1.RegistrationConfig
+	registrations       map[string][]agent.RegistrationConfig
 	approveCSR          bool
 	cert                []byte
 	prober              *agent.HealthProber
@@ -143,7 +173,7 @@ type testAddon struct {
 	supportedConfigGVRs []schema.GroupVersionResource
 }
 
-func (t *testAddon) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
+func (t *testAddon) Manifests(ctx context.Context, cluster *clusterv1.ManagedCluster, _ *addonv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	return t.manifests[cluster.Name], nil
 }
 
@@ -157,15 +187,15 @@ func (t *testAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 
 	if len(t.registrations) > 0 {
 		option.Registration = &agent.RegistrationOption{
-			CSRConfigurations: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn,
-			) ([]addonapiv1alpha1.RegistrationConfig, error) {
+			Configurations: func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonv1beta1.ManagedClusterAddOn,
+			) ([]agent.RegistrationConfig, error) {
 				return t.registrations[cluster.Name], nil
 			},
-			CSRApproveCheck: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn,
+			CSRApproveCheck: func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonv1beta1.ManagedClusterAddOn,
 				csr *certificatesv1.CertificateSigningRequest) bool {
 				return t.approveCSR
 			},
-			CSRSign: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) ([]byte, error) {
+			CSRSign: func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonv1beta1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) ([]byte, error) {
 				return t.cert, nil
 			},
 		}

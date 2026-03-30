@@ -14,7 +14,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -23,7 +23,7 @@ import (
 // for example: "addon.open-cluster-management.io/values": `{"NodeSelector":{"host":"ssd"},"Image":"quay.io/helloworld:2.4"}`
 func GetValuesFromAddonAnnotation(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 	values := map[string]interface{}{}
 	annotations := addon.GetAnnotations()
 	if len(annotations[AnnotationValuesName]) == 0 {

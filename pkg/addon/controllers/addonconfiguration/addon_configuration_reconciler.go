@@ -8,19 +8,19 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 )
 
 type managedClusterAddonConfigurationReconciler struct {
-	addonClient addonv1alpha1client.Interface
+	addonClient addonclient.Interface
 }
 
 func (d *managedClusterAddonConfigurationReconciler) reconcile(
-	ctx context.Context, cma *addonv1alpha1.ClusterManagementAddOn, graph *configurationGraph) (*addonv1alpha1.ClusterManagementAddOn, reconcileState, error) {
+	ctx context.Context, cma *addonv1beta1.ClusterManagementAddOn, graph *configurationGraph) (*addonv1beta1.ClusterManagementAddOn, reconcileState, error) {
 	var errs []error
 	configured := sets.Set[string]{}
 
@@ -83,7 +83,7 @@ func (d *managedClusterAddonConfigurationReconciler) reconcile(
 }
 
 func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
-	mca *addonv1alpha1.ManagedClusterAddOn, desiredConfigMap addonConfigMap) *addonv1alpha1.ManagedClusterAddOn {
+	mca *addonv1beta1.ManagedClusterAddOn, desiredConfigMap addonConfigMap) *addonv1beta1.ManagedClusterAddOn {
 	mcaCopy := mca.DeepCopy()
 
 	mergedConfigs := make(addonConfigMap)
@@ -93,7 +93,7 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 	for _, configRef := range mcaCopy.Status.ConfigReferences {
 		gr := configRef.ConfigGroupResource
 		if _, ok := mergedConfigs[gr]; !ok {
-			mergedConfigs[gr] = []addonv1alpha1.ConfigReference{}
+			mergedConfigs[gr] = []addonv1beta1.ConfigReference{}
 		}
 		if _, ok := desiredConfigMap.containsConfig(gr, configRef.DesiredConfig.ConfigReferent); ok {
 			mergedConfigs[gr] = append(mergedConfigs[gr], configRef)
@@ -107,12 +107,11 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 	for gr, configReferences := range desiredConfigMap {
 		for _, configRef := range configReferences {
 			if _, ok := mergedConfigs[gr]; !ok {
-				mergedConfigs[gr] = []addonv1alpha1.ConfigReference{}
+				mergedConfigs[gr] = []addonv1beta1.ConfigReference{}
 			}
 
 			referent := configRef.DesiredConfig.ConfigReferent
 			if i, exist := mergedConfigs.containsConfig(gr, referent); exist {
-				mergedConfigs[gr][i].ConfigReferent = configRef.ConfigReferent
 				mergedConfigs[gr][i].DesiredConfig = configRef.DesiredConfig.DeepCopy()
 			} else {
 				mergedConfigs[gr] = append(mergedConfigs[gr], configRef)
@@ -121,7 +120,7 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 	}
 
 	// sort by gvk and set the final config references
-	configRefs := []addonv1alpha1.ConfigReference{}
+	configRefs := []addonv1beta1.ConfigReference{}
 	for _, gvk := range mergedConfigs.orderedKeys() {
 		configRefs = append(configRefs, mergedConfigs[gvk]...)
 	}
@@ -131,9 +130,9 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 
 // setCondition updates the configured condition for the addon
 func (d *managedClusterAddonConfigurationReconciler) setCondition(
-	addon *addonv1alpha1.ManagedClusterAddOn, status metav1.ConditionStatus, reason, message string) {
+	addon *addonv1beta1.ManagedClusterAddOn, status metav1.ConditionStatus, reason, message string) {
 	meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-		Type:    addonv1alpha1.ManagedClusterAddOnConditionConfigured,
+		Type:    addonv1beta1.ManagedClusterAddOnConditionConfigured,
 		Status:  status,
 		Reason:  reason,
 		Message: message,
@@ -142,10 +141,10 @@ func (d *managedClusterAddonConfigurationReconciler) setCondition(
 
 // patchAddonStatus patches the status of the addon
 func (d *managedClusterAddonConfigurationReconciler) patchAddonStatus(
-	ctx context.Context, newaddon *addonv1alpha1.ManagedClusterAddOn, oldaddon *addonv1alpha1.ManagedClusterAddOn) error {
+	ctx context.Context, newaddon *addonv1beta1.ManagedClusterAddOn, oldaddon *addonv1beta1.ManagedClusterAddOn) error {
 	patcher := patcher.NewPatcher[
-		*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus](
-		d.addonClient.AddonV1alpha1().ManagedClusterAddOns(newaddon.Namespace))
+		*addonv1beta1.ManagedClusterAddOn, addonv1beta1.ManagedClusterAddOnSpec, addonv1beta1.ManagedClusterAddOnStatus](
+		d.addonClient.AddonV1beta1().ManagedClusterAddOns(newaddon.Namespace))
 
 	_, err := patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
 	return err

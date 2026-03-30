@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
@@ -92,7 +92,7 @@ func DeploymentAvailabilityHealthCheck(identifier workapiv1.ResourceIdentifier,
 
 // Deprecated: use DeploymentAvailabilityHealthChecker instead.
 func AllDeploymentsAvailabilityHealthCheck(results []agent.FieldResult,
-	cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 	if len(results) < 2 {
 		return fmt.Errorf("all deployments are not available")
 	}
@@ -106,12 +106,12 @@ func AllDeploymentsAvailabilityHealthCheck(results []agent.FieldResult,
 }
 
 func DeploymentAvailabilityHealthChecker(results []agent.FieldResult,
-	cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 	return WorkloadAvailabilityHealthChecker(results, cluster, addon)
 }
 
 func WorkloadAvailabilityHealthChecker(results []agent.FieldResult,
-	cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 	for _, result := range results {
 		if err := checkWorkloadAvailabilityHealth(result.ResourceIdentifier, result.FeedbackResult); err != nil {
 			return err

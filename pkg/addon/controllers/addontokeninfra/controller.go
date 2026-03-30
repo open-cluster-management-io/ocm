@@ -6,7 +6,6 @@ import (
 
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
-	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -20,10 +19,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
@@ -56,36 +55,34 @@ type TokenInfraConfig struct {
 // to create token-based authentication infrastructure
 type tokenInfrastructureController struct {
 	kubeClient  kubernetes.Interface
-	addonClient addonv1alpha1client.Interface
-	addonLister addonlisterv1alpha1.ManagedClusterAddOnLister
+	addonClient addonclient.Interface
+	addonLister addonlisterv1beta1.ManagedClusterAddOnLister
 	cache       resourceapply.ResourceCache
 	recorder    events.Recorder
 }
 
 // usesTokenAuth checks if the addon uses token-based authentication
 // by checking if it has kubeClient registration and kubeClientDriver is "token"
-func usesTokenAuth(addon *addonapiv1alpha1.ManagedClusterAddOn) bool {
-	// First check if addon has kubeClient registration
-	hasKubeClient := false
+func usesTokenAuth(addon *addonapiv1beta1.ManagedClusterAddOn) bool {
 	for _, reg := range addon.Status.Registrations {
-		if reg.SignerName == certificatesv1.KubeAPIServerClientSignerName {
-			hasKubeClient = true
-			break
+		if reg.Type != addonapiv1beta1.KubeClient {
+			continue
 		}
+
+		if reg.KubeClient == nil {
+			continue
+		}
+
+		return reg.KubeClient.Driver == "token"
 	}
 
-	if !hasKubeClient {
-		return false
-	}
-
-	// Then check if kubeClientDriver is "token"
-	return addon.Status.KubeClientDriver == "token"
+	return false
 }
 
 // addonFilter filters addons that use token-based kubeClient registration
 // or have TokenInfrastructureReady condition (for cleanup)
 func addonFilter(obj interface{}) bool {
-	addon, ok := obj.(*addonapiv1alpha1.ManagedClusterAddOn)
+	addon, ok := obj.(*addonapiv1beta1.ManagedClusterAddOn)
 	if !ok {
 		return false
 	}
@@ -178,8 +175,8 @@ func newTokenInfraEventHandler(syncCtx factory.SyncContext, queueKeyFn func(runt
 
 func NewTokenInfrastructureController(
 	kubeClient kubernetes.Interface,
-	addonClient addonv1alpha1client.Interface,
-	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
+	addonClient addonclient.Interface,
+	addonInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
 	serviceAccountInformer coreinformers.ServiceAccountInformer,
 	roleInformer rbacinformers.RoleInformer,
 	roleBindingInformer rbacinformers.RoleBindingInformer,
@@ -295,7 +292,7 @@ func (c *tokenInfrastructureController) sync(ctx context.Context, syncCtx factor
 // ensureTokenInfrastructure creates and maintains token authentication infrastructure
 func (c *tokenInfrastructureController) ensureTokenInfrastructure(
 	ctx context.Context,
-	addon *addonapiv1alpha1.ManagedClusterAddOn,
+	addon *addonapiv1beta1.ManagedClusterAddOn,
 	clusterName, addonName string) error {
 
 	config := TokenInfraConfig{
@@ -351,13 +348,13 @@ func (c *tokenInfrastructureController) applyManifests(ctx context.Context, conf
 }
 
 // updateCondition updates the TokenInfrastructureReady condition on the addon
-func (c *tokenInfrastructureController) updateCondition(ctx context.Context, addon *addonapiv1alpha1.ManagedClusterAddOn,
+func (c *tokenInfrastructureController) updateCondition(ctx context.Context, addon *addonapiv1beta1.ManagedClusterAddOn,
 	status metav1.ConditionStatus, reason, message string) error {
 	addonPatcher := patcher.NewPatcher[
-		*addonapiv1alpha1.ManagedClusterAddOn,
-		addonapiv1alpha1.ManagedClusterAddOnSpec,
-		addonapiv1alpha1.ManagedClusterAddOnStatus](
-		c.addonClient.AddonV1alpha1().ManagedClusterAddOns(addon.Namespace))
+		*addonapiv1beta1.ManagedClusterAddOn,
+		addonapiv1beta1.ManagedClusterAddOnSpec,
+		addonapiv1beta1.ManagedClusterAddOnStatus](
+		c.addonClient.AddonV1beta1().ManagedClusterAddOns(addon.Namespace))
 
 	addonCopy := addon.DeepCopy()
 
@@ -375,12 +372,12 @@ func (c *tokenInfrastructureController) updateCondition(ctx context.Context, add
 }
 
 // removeCondition removes the TokenInfrastructureReady condition from the addon
-func (c *tokenInfrastructureController) removeCondition(ctx context.Context, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+func (c *tokenInfrastructureController) removeCondition(ctx context.Context, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 	addonPatcher := patcher.NewPatcher[
-		*addonapiv1alpha1.ManagedClusterAddOn,
-		addonapiv1alpha1.ManagedClusterAddOnSpec,
-		addonapiv1alpha1.ManagedClusterAddOnStatus](
-		c.addonClient.AddonV1alpha1().ManagedClusterAddOns(addon.Namespace))
+		*addonapiv1beta1.ManagedClusterAddOn,
+		addonapiv1beta1.ManagedClusterAddOnSpec,
+		addonapiv1beta1.ManagedClusterAddOnStatus](
+		c.addonClient.AddonV1beta1().ManagedClusterAddOns(addon.Namespace))
 
 	addonCopy := addon.DeepCopy()
 

@@ -3,7 +3,7 @@ package constants
 import (
 	"fmt"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -36,11 +36,11 @@ func PreDeleteHookHostingWorkName(addonNamespace, addonName string) string {
 }
 
 // GetHostedModeInfo returns addon installation mode and hosting cluster name.
-func GetHostedModeInfo(addon *addonv1alpha1.ManagedClusterAddOn, _ *clusterv1.ManagedCluster) (string, string) {
+func GetHostedModeInfo(addon *addonv1beta1.ManagedClusterAddOn, _ *clusterv1.ManagedCluster) (string, string) {
 	if len(addon.Annotations) == 0 {
 		return InstallModeDefault, ""
 	}
-	hostingClusterName, ok := addon.Annotations[addonv1alpha1.HostingClusterNameAnnotationKey]
+	hostingClusterName, ok := addon.Annotations[addonv1beta1.HostingClusterNameAnnotationKey]
 	if !ok {
 		return InstallModeDefault, ""
 	}
@@ -50,17 +50,17 @@ func GetHostedModeInfo(addon *addonv1alpha1.ManagedClusterAddOn, _ *clusterv1.Ma
 
 // GetHostedManifestLocation returns the location of the manifest in Hosted mode, if it is invalid will return error
 func GetHostedManifestLocation(labels, annotations map[string]string) (string, bool, error) {
-	manifestLocation := annotations[addonv1alpha1.HostedManifestLocationAnnotationKey]
+	manifestLocation := annotations[addonv1beta1.HostedManifestLocationAnnotationKey]
 
 	// TODO: deprecate HostedManifestLocationLabelKey in the future release
 	if manifestLocation == "" {
-		manifestLocation = labels[addonv1alpha1.HostedManifestLocationLabelKey]
+		manifestLocation = labels[addonv1beta1.HostedManifestLocationAnnotationKey]
 	}
 
 	switch manifestLocation {
-	case addonv1alpha1.HostedManifestLocationManagedValue,
-		addonv1alpha1.HostedManifestLocationHostingValue,
-		addonv1alpha1.HostedManifestLocationNoneValue:
+	case addonv1beta1.HostedManifestLocationManagedValue,
+		addonv1beta1.HostedManifestLocationHostingValue,
+		addonv1beta1.HostedManifestLocationNoneValue:
 		return manifestLocation, true, nil
 	case "":
 		return "", false, nil

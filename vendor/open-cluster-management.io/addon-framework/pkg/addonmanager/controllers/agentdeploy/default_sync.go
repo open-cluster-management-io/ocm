@@ -4,7 +4,7 @@ import (
 	"context"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
@@ -16,7 +16,7 @@ type defaultSyncer struct {
 	buildWorks buildDeployWorkFunc
 
 	applyWork func(ctx context.Context, appliedType string,
-		work *workapiv1.ManifestWork, addon *addonapiv1alpha1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
+		work *workapiv1.ManifestWork, addon *addonapiv1beta1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
 
 	getWorkByAddon func(addonName, addonNamespace string) ([]*workapiv1.ManifestWork, error)
 
@@ -28,14 +28,14 @@ type defaultSyncer struct {
 func (s *defaultSyncer) sync(ctx context.Context,
 	syncCtx factory.SyncContext,
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.ManagedClusterAddOn, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) (*addonapiv1beta1.ManagedClusterAddOn, error) {
 	deployWorkNamespace := addon.Namespace
 
 	var errs []error
 
 	// Don't skip syncing if the addon is deleting and there is a predelete hook, since the deployment manifests may
 	// need to be updated during the uninstall.
-	if !addonHasFinalizer(addon, addonapiv1alpha1.AddonPreDeleteHookFinalizer) {
+	if !addonHasFinalizer(addon, addonapiv1beta1.AddonPreDeleteHookFinalizer) {
 		if !addon.DeletionTimestamp.IsZero() {
 			return addon, nil
 		}
@@ -52,7 +52,7 @@ func (s *defaultSyncer) sync(ctx context.Context,
 		return addon, err
 	}
 
-	deployWorks, deleteWorks, err := s.buildWorks(deployWorkNamespace, cluster, currentWorks, addon)
+	deployWorks, deleteWorks, err := s.buildWorks(ctx, deployWorkNamespace, cluster, currentWorks, addon)
 	if err != nil {
 		return addon, err
 	}
@@ -65,7 +65,7 @@ func (s *defaultSyncer) sync(ctx context.Context,
 	}
 
 	for _, deployWork := range deployWorks {
-		_, err = s.applyWork(ctx, addonapiv1alpha1.ManagedClusterAddOnManifestApplied, deployWork, addon)
+		_, err = s.applyWork(ctx, addonapiv1beta1.ManagedClusterAddOnManifestApplied, deployWork, addon)
 		if err != nil {
 			errs = append(errs, err)
 		}

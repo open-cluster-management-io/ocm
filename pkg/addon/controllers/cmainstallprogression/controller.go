@@ -8,10 +8,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
@@ -22,21 +22,21 @@ import (
 // based to update related object and status condition.
 type cmaInstallProgressionController struct {
 	patcher patcher.Patcher[
-		*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus]
-	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
+		*addonv1beta1.ClusterManagementAddOn, addonv1beta1.ClusterManagementAddOnSpec, addonv1beta1.ClusterManagementAddOnStatus]
+	clusterManagementAddonLister addonlisterv1beta1.ClusterManagementAddOnLister
 	addonFilterFunc              factory.EventFilterFunc
 }
 
 func NewCMAInstallProgressionController(
-	addonClient addonv1alpha1client.Interface,
-	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
-	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
+	addonClient addonclient.Interface,
+	addonInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
+	clusterManagementAddonInformers addoninformerv1beta1.ClusterManagementAddOnInformer,
 	addonFilterFunc factory.EventFilterFunc,
 ) factory.Controller {
 	c := &cmaInstallProgressionController{
 		patcher: patcher.NewPatcher[
-			*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus](
-			addonClient.AddonV1alpha1().ClusterManagementAddOns()),
+			*addonv1beta1.ClusterManagementAddOn, addonv1beta1.ClusterManagementAddOnSpec, addonv1beta1.ClusterManagementAddOnStatus](
+			addonClient.AddonV1beta1().ClusterManagementAddOns()),
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
 		addonFilterFunc:              addonFilterFunc,
 	}
@@ -62,11 +62,11 @@ func (c *cmaInstallProgressionController) sync(ctx context.Context, syncCtx fact
 	mgmtAddonCopy := mgmtAddon.DeepCopy()
 
 	// set default config reference
-	mgmtAddonCopy.Status.DefaultConfigReferences = setDefaultConfigReference(mgmtAddonCopy.Spec.SupportedConfigs, mgmtAddonCopy.Status.DefaultConfigReferences)
+	mgmtAddonCopy.Status.DefaultConfigReferences = setDefaultConfigReference(mgmtAddonCopy.Spec.DefaultConfigs, mgmtAddonCopy.Status.DefaultConfigReferences)
 
 	// update default config reference when type is manual
-	if mgmtAddonCopy.Spec.InstallStrategy.Type == "" || mgmtAddonCopy.Spec.InstallStrategy.Type == addonv1alpha1.AddonInstallStrategyManual {
-		mgmtAddonCopy.Status.InstallProgressions = []addonv1alpha1.InstallProgression{}
+	if mgmtAddonCopy.Spec.InstallStrategy.Type == "" || mgmtAddonCopy.Spec.InstallStrategy.Type == addonv1beta1.AddonInstallStrategyManual {
+		mgmtAddonCopy.Status.InstallProgressions = []addonv1beta1.InstallProgression{}
 		_, err = c.patcher.PatchStatus(ctx, mgmtAddonCopy, mgmtAddonCopy.Status, mgmtAddon.Status)
 		return err
 	}
@@ -78,7 +78,7 @@ func (c *cmaInstallProgressionController) sync(ctx context.Context, syncCtx fact
 	}
 
 	// set install progression
-	mgmtAddonCopy.Status.InstallProgressions = setInstallProgression(mgmtAddonCopy.Spec.SupportedConfigs,
+	mgmtAddonCopy.Status.InstallProgressions = setInstallProgression(mgmtAddonCopy.Spec.DefaultConfigs,
 		mgmtAddonCopy.Spec.InstallStrategy.Placements, mgmtAddonCopy.Status.InstallProgressions)
 
 	// update cma status
@@ -86,17 +86,17 @@ func (c *cmaInstallProgressionController) sync(ctx context.Context, syncCtx fact
 	return err
 }
 
-func setDefaultConfigReference(supportedConfigs []addonv1alpha1.ConfigMeta,
-	existDefaultConfigReferences []addonv1alpha1.DefaultConfigReference) []addonv1alpha1.DefaultConfigReference {
-	newDefaultConfigReferences := []addonv1alpha1.DefaultConfigReference{}
+func setDefaultConfigReference(supportedConfigs []addonv1beta1.AddOnConfig,
+	existDefaultConfigReferences []addonv1beta1.DefaultConfigReference) []addonv1beta1.DefaultConfigReference {
+	newDefaultConfigReferences := []addonv1beta1.DefaultConfigReference{}
 	for _, config := range supportedConfigs {
-		if config.DefaultConfig == nil {
+		if config.ConfigReferent.Name == "" {
 			continue
 		}
-		configRef := addonv1alpha1.DefaultConfigReference{
+		configRef := addonv1beta1.DefaultConfigReference{
 			ConfigGroupResource: config.ConfigGroupResource,
-			DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-				ConfigReferent: *config.DefaultConfig,
+			DesiredConfig: &addonv1beta1.ConfigSpecHash{
+				ConfigReferent: config.ConfigReferent,
 			},
 		}
 		// if the config already exists in status, keep the existing spec hash
@@ -109,9 +109,9 @@ func setDefaultConfigReference(supportedConfigs []addonv1alpha1.ConfigMeta,
 }
 
 func findDefaultConfigReference(
-	newobj *addonv1alpha1.DefaultConfigReference,
-	oldobjs []addonv1alpha1.DefaultConfigReference,
-) (*addonv1alpha1.DefaultConfigReference, bool) {
+	newobj *addonv1beta1.DefaultConfigReference,
+	oldobjs []addonv1beta1.DefaultConfigReference,
+) (*addonv1beta1.DefaultConfigReference, bool) {
 	for _, oldconfig := range oldobjs {
 		if oldconfig.ConfigGroupResource == newobj.ConfigGroupResource && oldconfig.DesiredConfig.ConfigReferent == newobj.DesiredConfig.ConfigReferent {
 			return &oldconfig, true
@@ -120,28 +120,34 @@ func findDefaultConfigReference(
 	return nil, false
 }
 
-func setInstallProgression(supportedConfigs []addonv1alpha1.ConfigMeta, placementStrategies []addonv1alpha1.PlacementStrategy,
-	existInstallProgressions []addonv1alpha1.InstallProgression) []addonv1alpha1.InstallProgression {
-	newInstallProgressions := []addonv1alpha1.InstallProgression{}
+func setInstallProgression(supportedConfigs []addonv1beta1.AddOnConfig, placementStrategies []addonv1beta1.PlacementStrategy,
+	existInstallProgressions []addonv1beta1.InstallProgression) []addonv1beta1.InstallProgression {
+	newInstallProgressions := []addonv1beta1.InstallProgression{}
 	for _, placementStrategy := range placementStrategies {
 		// set placement ref
-		installProgression := addonv1alpha1.InstallProgression{
+		installProgression := addonv1beta1.InstallProgression{
 			PlacementRef: placementStrategy.PlacementRef,
 		}
 
 		// set config references as default configuration
-		installConfigReferencesMap := map[addonv1alpha1.ConfigGroupResource]sets.Set[addonv1alpha1.ConfigReferent]{}
+		installConfigReferencesMap := map[addonv1beta1.ConfigGroupResource]sets.Set[addonv1beta1.ConfigReferent]{}
 		for _, config := range supportedConfigs {
-			if config.DefaultConfig != nil {
-				installConfigReferencesMap[config.ConfigGroupResource] = sets.New[addonv1alpha1.ConfigReferent](*config.DefaultConfig)
+			if config.ConfigReferent.Name == "" || config.ConfigReferent.Namespace == addonv1beta1.ReservedNoDefaultConfigName {
+				continue
 			}
+			refs, ok := installConfigReferencesMap[config.ConfigGroupResource]
+			if !ok {
+				refs = sets.New[addonv1beta1.ConfigReferent]()
+				installConfigReferencesMap[config.ConfigGroupResource] = refs
+			}
+			refs.Insert(config.ConfigReferent)
 		}
 
 		// override the default configuration for each placement
 		overrideConfigMapByAddOnConfigs(installConfigReferencesMap, placementStrategy.Configs)
 
 		// sort gvk
-		gvks := []addonv1alpha1.ConfigGroupResource{}
+		gvks := []addonv1beta1.ConfigGroupResource{}
 		for gvk := range installConfigReferencesMap {
 			gvks = append(gvks, gvk)
 		}
@@ -153,14 +159,14 @@ func setInstallProgression(supportedConfigs []addonv1alpha1.ConfigMeta, placemen
 		})
 
 		// set the config references for each install progression
-		installConfigReferences := []addonv1alpha1.InstallConfigReference{}
+		installConfigReferences := []addonv1beta1.InstallConfigReference{}
 		for _, gvk := range gvks {
 			if configRefs, ok := installConfigReferencesMap[gvk]; ok {
 				for configRef := range configRefs {
 					installConfigReferences = append(installConfigReferences,
-						addonv1alpha1.InstallConfigReference{
+						addonv1beta1.InstallConfigReference{
 							ConfigGroupResource: gvk,
-							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							DesiredConfig: &addonv1beta1.ConfigSpecHash{
 								ConfigReferent: configRef,
 							},
 						},
@@ -180,7 +186,7 @@ func setInstallProgression(supportedConfigs []addonv1alpha1.ConfigMeta, placemen
 	return newInstallProgressions
 }
 
-func findInstallProgression(newobj *addonv1alpha1.InstallProgression, oldobjs []addonv1alpha1.InstallProgression) (*addonv1alpha1.InstallProgression, bool) {
+func findInstallProgression(newobj *addonv1beta1.InstallProgression, oldobjs []addonv1beta1.InstallProgression) (*addonv1beta1.InstallProgression, bool) {
 	for _, oldobj := range oldobjs {
 		if oldobj.PlacementRef == newobj.PlacementRef {
 			count := 0
@@ -199,7 +205,7 @@ func findInstallProgression(newobj *addonv1alpha1.InstallProgression, oldobjs []
 	return nil, false
 }
 
-func mergeInstallProgression(newobj, oldobj *addonv1alpha1.InstallProgression) {
+func mergeInstallProgression(newobj, oldobj *addonv1beta1.InstallProgression) {
 	// merge config reference
 	for i := range newobj.ConfigReferences {
 		for _, oldconfig := range oldobj.ConfigReferences {
@@ -218,16 +224,16 @@ func mergeInstallProgression(newobj, oldobj *addonv1alpha1.InstallProgression) {
 
 // Override the desired configs by a slice of AddOnConfig (from cma install strategy),
 func overrideConfigMapByAddOnConfigs(
-	desiredConfigs map[addonv1alpha1.ConfigGroupResource]sets.Set[addonv1alpha1.ConfigReferent],
-	addOnConfigs []addonv1alpha1.AddOnConfig,
+	desiredConfigs map[addonv1beta1.ConfigGroupResource]sets.Set[addonv1beta1.ConfigReferent],
+	addOnConfigs []addonv1beta1.AddOnConfig,
 ) {
-	gvkOverwritten := sets.New[addonv1alpha1.ConfigGroupResource]()
+	gvkOverwritten := sets.New[addonv1beta1.ConfigGroupResource]()
 	// Go through the cma install strategy configs,
 	// for a group of configs with same gvk, install strategy configs override the desiredConfigs.
 	for _, config := range addOnConfigs {
 		gr := config.ConfigGroupResource
 		if !gvkOverwritten.Has(gr) {
-			desiredConfigs[gr] = sets.New[addonv1alpha1.ConfigReferent]()
+			desiredConfigs[gr] = sets.New[addonv1beta1.ConfigReferent]()
 			gvkOverwritten.Insert(gr)
 		}
 		// If a config not exist in the desiredConfigs, append it.

@@ -23,7 +23,9 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2/ktesting"
 
+	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -33,9 +35,9 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 	cases := []struct {
 		name            string
 		cluster         *clusterv1.ManagedCluster
-		addon           *addonapiv1alpha1.ManagedClusterAddOn
+		addon           *addonv1beta1.ManagedClusterAddOn
 		template        *addonapiv1alpha1.AddOnTemplate
-		expectedConfigs []addonapiv1alpha1.RegistrationConfig
+		expectedConfigs []agent.RegistrationConfig
 		expectedErr     string
 	}{
 		{
@@ -43,7 +45,7 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 			cluster:         NewFakeManagedCluster("cluster1"),
 			addon:           NewFakeTemplateManagedClusterAddon("addon1", "cluster1", "", ""),
 			template:        NewFakeAddonTemplate("template1", []addonapiv1alpha1.RegistrationSpec{}),
-			expectedConfigs: []addonapiv1alpha1.RegistrationConfig{},
+			expectedConfigs: []agent.RegistrationConfig{},
 			expectedErr:     "CSRConfigurations failed to get addon template for addon cluster1/addon1, template is nil",
 		},
 		{
@@ -70,17 +72,12 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 				},
 			}),
 			addon: NewFakeTemplateManagedClusterAddon("addon1", "cluster1", "template1", "fakehash"),
-			expectedConfigs: []addonapiv1alpha1.RegistrationConfig{
-				{
-					SignerName: certificates.KubeAPIServerClientSignerName,
-					Subject: addonapiv1alpha1.Subject{
-						User: "system:open-cluster-management:cluster:cluster1:addon:addon1:agent:addon1-agent",
-
-						Groups: []string{
-							"system:open-cluster-management:cluster:cluster1:addon:addon1",
-							"system:open-cluster-management:addon:addon1",
-						},
-						OrganizationUnits: []string{},
+			expectedConfigs: []agent.RegistrationConfig{
+				&agent.KubeClientRegistration{
+					User: "system:open-cluster-management:cluster:cluster1:addon:addon1:agent:addon1-agent",
+					Groups: []string{
+						"system:open-cluster-management:cluster:cluster1:addon:addon1",
+						"system:open-cluster-management:addon:addon1",
 					},
 				},
 			},
@@ -108,16 +105,13 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 				},
 			}),
 			addon: NewFakeTemplateManagedClusterAddon("addon1", "cluster1", "template1", "fakehash"),
-			expectedConfigs: []addonapiv1alpha1.RegistrationConfig{
-				{
+			expectedConfigs: []agent.RegistrationConfig{
+				&agent.CustomSignerRegistration{
 					SignerName: "s1",
-					Subject: addonapiv1alpha1.Subject{
-						User: "u1",
-						Groups: []string{
-							"g1",
-							"g2",
-						},
-						OrganizationUnits: []string{},
+					User:       "u1",
+					Groups: []string{
+						"g1",
+						"g2",
 					},
 				},
 			},
@@ -127,7 +121,7 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 		_, ctx := ktesting.NewTestContext(t)
 		addonClient := fakeaddon.NewSimpleClientset(c.template, c.addon)
 		addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
-		mcaStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
+		mcaStore := addonInformerFactory.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore()
 		if err := mcaStore.Add(c.addon); err != nil {
 			t.Fatal(err)
 		}
@@ -138,7 +132,7 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 
 		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, nil, addonClient, addonInformerFactory, nil, nil)
 		f := agent.TemplateCSRConfigurationsFunc()
-		registrationConfigs, err := f(c.cluster, c.addon)
+		registrationConfigs, err := f(ctx, c.cluster, c.addon)
 		if c.expectedErr == "" {
 			if err != nil {
 				t.Fatalf("case: %s, expected no error but got: %v", c.name, err)
@@ -161,7 +155,7 @@ func TestTemplateCSRApproveCheckFunc(t *testing.T) {
 	cases := []struct {
 		name            string
 		cluster         *clusterv1.ManagedCluster
-		addon           *addonapiv1alpha1.ManagedClusterAddOn
+		addon           *addonv1beta1.ManagedClusterAddOn
 		template        *addonapiv1alpha1.AddOnTemplate
 		csr             *certificatesv1.CertificateSigningRequest
 		expectedApprove bool
@@ -245,7 +239,7 @@ func TestTemplateCSRApproveCheckFunc(t *testing.T) {
 		_, ctx := ktesting.NewTestContext(t)
 		addonClient := fakeaddon.NewSimpleClientset(c.template, c.addon)
 		addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
-		mcaStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
+		mcaStore := addonInformerFactory.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore()
 		if err := mcaStore.Add(c.addon); err != nil {
 			t.Fatal(err)
 		}
@@ -255,7 +249,7 @@ func TestTemplateCSRApproveCheckFunc(t *testing.T) {
 		}
 		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, nil, addonClient, addonInformerFactory, nil, nil)
 		f := agent.TemplateCSRApproveCheckFunc()
-		approve := f(c.cluster, c.addon, c.csr)
+		approve := f(ctx, c.cluster, c.addon, c.csr)
 		if approve != c.expectedApprove {
 			t.Errorf("expected approve result %v, but got %v", c.expectedApprove, approve)
 		}
@@ -282,7 +276,7 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 	cases := []struct {
 		name         string
 		cluster      *clusterv1.ManagedCluster
-		addon        *addonapiv1alpha1.ManagedClusterAddOn
+		addon        *addonv1beta1.ManagedClusterAddOn
 		template     *addonapiv1alpha1.AddOnTemplate
 		casecret     *corev1.Secret
 		csr          *certificatesv1.CertificateSigningRequest
@@ -408,7 +402,7 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 			hubKubeClient = fakekube.NewSimpleClientset(c.casecret)
 		}
 		addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
-		mcaStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
+		mcaStore := addonInformerFactory.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore()
 		if err := mcaStore.Add(c.addon); err != nil {
 			t.Fatal(err)
 		}
@@ -419,7 +413,7 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 
 		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, hubKubeClient, addonClient, addonInformerFactory, nil, nil)
 		f := agent.TemplateCSRSignFunc()
-		cert, err := f(c.cluster, c.addon, c.csr)
+		cert, err := f(ctx, c.cluster, c.addon, c.csr)
 		if c.expectedErr == "" {
 			if err != nil {
 				t.Fatalf("case: %s, expected no error but got: %v", c.name, err)
@@ -451,26 +445,31 @@ func NewFakeManagedCluster(name string) *clusterv1.ManagedCluster {
 	}
 }
 
-func NewFakeTemplateManagedClusterAddon(name, clusterName, addonTemplateName, addonTemplateSpecHash string) *addonapiv1alpha1.ManagedClusterAddOn {
-	addon := &addonapiv1alpha1.ManagedClusterAddOn{
+func NewFakeTemplateManagedClusterAddon(name, clusterName, addonTemplateName, addonTemplateSpecHash string) *addonv1beta1.ManagedClusterAddOn {
+	addon := &addonv1beta1.ManagedClusterAddOn{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: clusterName,
 			UID:       "fakeuid",
 		},
-		Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{},
-		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+		Spec: addonv1beta1.ManagedClusterAddOnSpec{},
+		Status: addonv1beta1.ManagedClusterAddOnStatus{
 			// Add default registration status with subjects for dynamic RBAC binding
-			Registrations: []addonapiv1alpha1.RegistrationConfig{
+			Registrations: []addonv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject: addonapiv1alpha1.Subject{
-						User: fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s:agent:%s-agent",
-							clusterName, name, name),
-						Groups: []string{
-							fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", clusterName, name),
-							fmt.Sprintf("system:open-cluster-management:addon:%s", name),
+					Type: addonv1beta1.KubeClient,
+					KubeClient: &addonv1beta1.KubeClientConfig{
+						Driver: "csr",
+						Subject: addonv1beta1.KubeClientSubject{
+							BaseSubject: addonv1beta1.BaseSubject{
+								User: fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s:agent:%s-agent",
+									clusterName, name, name),
+								Groups: []string{
+									fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", clusterName, name),
+									fmt.Sprintf("system:open-cluster-management:addon:%s", name),
+								},
+							},
 						},
 					},
 				},
@@ -479,17 +478,14 @@ func NewFakeTemplateManagedClusterAddon(name, clusterName, addonTemplateName, ad
 	}
 
 	if addonTemplateName != "" {
-		addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+		addon.Status.ConfigReferences = []addonv1beta1.ConfigReference{
 			{
-				ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
 					Group:    "addon.open-cluster-management.io",
 					Resource: "addontemplates",
 				},
-				ConfigReferent: addonapiv1alpha1.ConfigReferent{
-					Name: addonTemplateName,
-				},
-				DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				DesiredConfig: &addonv1beta1.ConfigSpecHash{
+					ConfigReferent: addonv1beta1.ConfigReferent{
 						Name: addonTemplateName,
 					},
 					SpecHash: addonTemplateSpecHash,
@@ -534,7 +530,7 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 	cases := []struct {
 		name                   string
 		cluster                *clusterv1.ManagedCluster
-		addon                  *addonapiv1alpha1.ManagedClusterAddOn
+		addon                  *addonv1beta1.ManagedClusterAddOn
 		template               *addonapiv1alpha1.AddOnTemplate
 		rolebinding            *rbacv1.RoleBinding
 		expectedErr            error
@@ -618,7 +614,7 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 					Name:     "test",
 				},
 				metav1.OwnerReference{
-					APIVersion: "addon.open-cluster-management.io/v1alpha1",
+					APIVersion: addonv1beta1.GroupVersion.String(),
 					Kind:       "ManagedClusterAddOn",
 					Name:       "addon1",
 					UID:        "fakeuid",
@@ -747,7 +743,7 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 			hubKubeClient = fakekube.NewSimpleClientset(c.rolebinding)
 		}
 		addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
-		mcaStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
+		mcaStore := addonInformerFactory.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore()
 		if err := mcaStore.Add(c.addon); err != nil {
 			t.Fatal(err)
 		}
@@ -767,7 +763,7 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, hubKubeClient, addonClient, addonInformerFactory,
 			kubeInformers.Rbac().V1().RoleBindings().Lister())
 		f := agent.TemplatePermissionConfigFunc()
-		err := f(c.cluster, c.addon)
+		err := f(ctx, c.cluster, c.addon)
 		if err != c.expectedErr {
 			t.Errorf("expected registrationConfigs %v, but got %v", c.expectedErr, err)
 		}
@@ -822,38 +818,42 @@ func TestAddonManagerNamespace(t *testing.T) {
 func TestBuildSubjectsFromRegistration(t *testing.T) {
 	cases := []struct {
 		name             string
-		addon            *addonapiv1alpha1.ManagedClusterAddOn
+		addon            *addonv1beta1.ManagedClusterAddOn
 		signerName       string
 		expectedSubjects []rbacv1.Subject
 	}{
 		{
 			name: "no registrations",
-			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-addon",
 					Namespace: "cluster1",
 				},
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{},
+				Status: addonv1beta1.ManagedClusterAddOnStatus{},
 			},
 			signerName:       certificatesv1.KubeAPIServerClientSignerName,
 			expectedSubjects: nil,
 		},
 		{
 			name: "registration with user and groups",
-			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-addon",
 					Namespace: "cluster1",
 				},
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					Registrations: []addonapiv1alpha1.RegistrationConfig{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1beta1.RegistrationConfig{
 						{
-							SignerName: certificatesv1.KubeAPIServerClientSignerName,
-							Subject: addonapiv1alpha1.Subject{
-								User: "system:open-cluster-management:cluster:cluster1:addon:test-addon:agent:test-addon-agent",
-								Groups: []string{
-									"system:open-cluster-management:cluster:cluster1:addon:test-addon",
-									"system:open-cluster-management:addon:test-addon",
+							Type: addonv1beta1.KubeClient,
+							KubeClient: &addonv1beta1.KubeClientConfig{
+								Subject: addonv1beta1.KubeClientSubject{
+									BaseSubject: addonv1beta1.BaseSubject{
+										User: "system:open-cluster-management:cluster:cluster1:addon:test-addon:agent:test-addon-agent",
+										Groups: []string{
+											"system:open-cluster-management:cluster:cluster1:addon:test-addon",
+											"system:open-cluster-management:addon:test-addon",
+										},
+									},
 								},
 							},
 						},
@@ -881,18 +881,22 @@ func TestBuildSubjectsFromRegistration(t *testing.T) {
 		},
 		{
 			name: "registration with only groups",
-			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-addon",
 					Namespace: "cluster1",
 				},
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					Registrations: []addonapiv1alpha1.RegistrationConfig{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1beta1.RegistrationConfig{
 						{
-							SignerName: certificatesv1.KubeAPIServerClientSignerName,
-							Subject: addonapiv1alpha1.Subject{
-								Groups: []string{
-									"system:open-cluster-management:cluster:cluster1:addon:test-addon",
+							Type: addonv1beta1.KubeClient,
+							KubeClient: &addonv1beta1.KubeClientConfig{
+								Subject: addonv1beta1.KubeClientSubject{
+									BaseSubject: addonv1beta1.BaseSubject{
+										Groups: []string{
+											"system:open-cluster-management:cluster:cluster1:addon:test-addon",
+										},
+									},
 								},
 							},
 						},
@@ -910,17 +914,21 @@ func TestBuildSubjectsFromRegistration(t *testing.T) {
 		},
 		{
 			name: "registration with only user",
-			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-addon",
 					Namespace: "cluster1",
 				},
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					Registrations: []addonapiv1alpha1.RegistrationConfig{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1beta1.RegistrationConfig{
 						{
-							SignerName: certificatesv1.KubeAPIServerClientSignerName,
-							Subject: addonapiv1alpha1.Subject{
-								User: "system:serviceaccount:cluster1:test-addon-sa",
+							Type: addonv1beta1.KubeClient,
+							KubeClient: &addonv1beta1.KubeClientConfig{
+								Subject: addonv1beta1.KubeClientSubject{
+									BaseSubject: addonv1beta1.BaseSubject{
+										User: "system:serviceaccount:cluster1:test-addon-sa",
+									},
+								},
 							},
 						},
 					},
@@ -937,16 +945,15 @@ func TestBuildSubjectsFromRegistration(t *testing.T) {
 		},
 		{
 			name: "empty subject",
-			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-addon",
 					Namespace: "cluster1",
 				},
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					Registrations: []addonapiv1alpha1.RegistrationConfig{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1beta1.RegistrationConfig{
 						{
-							SignerName: certificatesv1.KubeAPIServerClientSignerName,
-							Subject:    addonapiv1alpha1.Subject{},
+							Type: addonv1beta1.KubeClient,
 						},
 					},
 				},
@@ -956,17 +963,22 @@ func TestBuildSubjectsFromRegistration(t *testing.T) {
 		},
 		{
 			name: "signer name not found",
-			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-addon",
 					Namespace: "cluster1",
 				},
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					Registrations: []addonapiv1alpha1.RegistrationConfig{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1beta1.RegistrationConfig{
 						{
-							SignerName: "custom.signer/name",
-							Subject: addonapiv1alpha1.Subject{
-								User: "test-user",
+							Type: addonv1beta1.CustomSigner,
+							CustomSigner: &addonv1beta1.CustomSignerConfig{
+								SignerName: "custom.signer/name",
+								Subject: addonv1beta1.Subject{
+									BaseSubject: addonv1beta1.BaseSubject{
+										User: "test-user",
+									},
+								},
 							},
 						},
 					},
@@ -977,25 +989,34 @@ func TestBuildSubjectsFromRegistration(t *testing.T) {
 		},
 		{
 			name: "multiple registrations - finds correct one",
-			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-addon",
 					Namespace: "cluster1",
 				},
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					Registrations: []addonapiv1alpha1.RegistrationConfig{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1beta1.RegistrationConfig{
 						{
-							SignerName: "custom.signer/name",
-							Subject: addonapiv1alpha1.Subject{
-								User: "custom-user",
+							Type: addonv1beta1.CustomSigner,
+							CustomSigner: &addonv1beta1.CustomSignerConfig{
+								SignerName: "custom.signer/name",
+								Subject: addonv1beta1.Subject{
+									BaseSubject: addonv1beta1.BaseSubject{
+										User: "custom-user",
+									},
+								},
 							},
 						},
 						{
-							SignerName: certificatesv1.KubeAPIServerClientSignerName,
-							Subject: addonapiv1alpha1.Subject{
-								User: "kube-user",
-								Groups: []string{
-									"kube-group",
+							Type: addonv1beta1.KubeClient,
+							KubeClient: &addonv1beta1.KubeClientConfig{
+								Subject: addonv1beta1.KubeClientSubject{
+									BaseSubject: addonv1beta1.BaseSubject{
+										User: "kube-user",
+										Groups: []string{
+											"kube-group",
+										},
+									},
 								},
 							},
 						},
@@ -1018,21 +1039,25 @@ func TestBuildSubjectsFromRegistration(t *testing.T) {
 		},
 		{
 			name: "groups with system:authenticated should be filtered out",
-			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-addon",
 					Namespace: "cluster1",
 				},
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					Registrations: []addonapiv1alpha1.RegistrationConfig{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1beta1.RegistrationConfig{
 						{
-							SignerName: certificatesv1.KubeAPIServerClientSignerName,
-							Subject: addonapiv1alpha1.Subject{
-								User: "system:serviceaccount:cluster1:test-addon-sa",
-								Groups: []string{
-									"system:authenticated",
-									"system:open-cluster-management:cluster:cluster1:addon:test-addon",
-									"system:serviceaccounts",
+							Type: addonv1beta1.KubeClient,
+							KubeClient: &addonv1beta1.KubeClientConfig{
+								Subject: addonv1beta1.KubeClientSubject{
+									BaseSubject: addonv1beta1.BaseSubject{
+										User: "system:serviceaccount:cluster1:test-addon-sa",
+										Groups: []string{
+											"system:authenticated",
+											"system:open-cluster-management:cluster:cluster1:addon:test-addon",
+											"system:serviceaccounts",
+										},
+									},
 								},
 							},
 						},
@@ -1062,7 +1087,7 @@ func TestBuildSubjectsFromRegistration(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			subjects := buildSubjectsFromRegistration(c.addon, c.signerName)
+			subjects := buildSubjectsFromRegistration(c.addon)
 			if !equality.Semantic.DeepEqual(subjects, c.expectedSubjects) {
 				t.Errorf("expected subjects %v, got %v", c.expectedSubjects, subjects)
 			}

@@ -23,13 +23,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
-var (
-	addonGvr = schema.GroupVersionResource{Group: "addon.open-cluster-management.io",
-		Version: "v1alpha1", Resource: "managedclusteraddons"}
-	workGvr = schema.GroupVersionResource{Group: "work.open-cluster-management.io",
-		Version: "v1", Resource: "manifestworks"}
-)
-
 type GCController struct {
 	clusterLister         clusterv1listers.ManagedClusterLister
 	clusterPatcher        patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus]
