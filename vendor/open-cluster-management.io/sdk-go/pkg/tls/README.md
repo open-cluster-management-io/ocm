@@ -14,15 +14,16 @@ metadata:
   namespace: <component-namespace>
 data:
   minTLSVersion: VersionTLS13  # tls.ConfigMapKeyMinVersion
-  cipherSuites: ECDHE-RSA-AES128-GCM-SHA256,ECDHE-ECDSA-AES128-GCM-SHA256
+  cipherSuites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
   #             ^ tls.ConfigMapKeyCipherSuites
 ```
 
 Supported `minTLSVersion` values: `VersionTLS10`, `VersionTLS11`, `VersionTLS12` (default),
 `VersionTLS13`.
 
-Supported cipher suite names follow the OpenSSL naming convention. TLS 1.3 cipher suites
-are fixed by the Go runtime and cannot be configured via `cipherSuites`.
+Cipher suite names use the IANA format (e.g. `TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256`),
+which matches what Go's `crypto/tls` package uses. TLS 1.3 cipher suites are fixed by
+the Go runtime and cannot be configured via `cipherSuites`.
 
 ## Use cases
 
@@ -108,6 +109,6 @@ args := []string{
 | `ConfigFromFlags(minVersion, cipherSuites)` | Parse TLS config from flag strings. Returns `nil` if both are empty. |
 | `ConfigToFunc(tlsCfg)` | Returns a `func(*tls.Config)` for use with controller-runtime `TLSOpts`. |
 | `VersionToString(version)` | Convert a `crypto/tls` version constant to its string name. |
-| `CipherSuitesToString(suites)` | Convert cipher suite IDs back to a comma-separated OpenSSL-style string. |
+| `CipherSuitesToString(suites)` | Convert cipher suite IDs back to a comma-separated IANA-format string. |
 
 Constants: `ConfigMapName`, `ConfigMapKeyMinVersion`, `ConfigMapKeyCipherSuites`.

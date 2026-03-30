@@ -4,6 +4,8 @@ import (
 	"crypto/tls"
 	"fmt"
 	"strings"
+
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -19,6 +21,38 @@ const (
 
 // defaultMinTLSVersion is the fallback when no TLS profile is configured
 const defaultMinTLSVersion = "VersionTLS12"
+
+// secureCiphersByName maps IANA names → IDs for ciphers in tls.CipherSuites().
+var secureCiphersByName map[string]uint16
+
+// insecureCiphersByName maps IANA names → IDs for ciphers in tls.InsecureCipherSuites().
+var insecureCiphersByName map[string]uint16
+
+// cipherNamesByID maps cipher suite IDs → IANA names for all known ciphers.
+var cipherNamesByID map[uint16]string
+
+func init() {
+	secure := tls.CipherSuites()
+	insecure := tls.InsecureCipherSuites()
+
+	secureCiphersByName = make(map[string]uint16, len(secure))
+	for _, s := range secure {
+		secureCiphersByName[s.Name] = s.ID
+	}
+
+	insecureCiphersByName = make(map[string]uint16, len(insecure))
+	for _, s := range insecure {
+		insecureCiphersByName[s.Name] = s.ID
+	}
+
+	cipherNamesByID = make(map[uint16]string, len(secure)+len(insecure))
+	for _, s := range secure {
+		cipherNamesByID[s.ID] = s.Name
+	}
+	for _, s := range insecure {
+		cipherNamesByID[s.ID] = s.Name
+	}
+}
 
 // TLSConfig represents parsed TLS configuration
 type TLSConfig struct {
@@ -44,8 +78,10 @@ func parseTLSVersion(version string) (uint16, error) {
 	}
 }
 
-// parseCipherSuites converts OpenSSL-style cipher names to Go crypto/tls constants.
-// Returns a list of cipher suite IDs and a list of unsupported cipher names.
+// parseCipherSuites converts IANA cipher suite names to Go crypto/tls constants.
+// Secure ciphers (tls.CipherSuites) are accepted silently. Insecure ciphers
+// (tls.InsecureCipherSuites) are accepted but logged as a warning.
+// Returns a list of cipher suite IDs and a list of unrecognized cipher names.
 func parseCipherSuites(cipherString string) ([]uint16, []string) {
 	if strings.TrimSpace(cipherString) == "" {
 		return nil, nil
@@ -61,11 +97,16 @@ func parseCipherSuites(cipherString string) ([]uint16, []string) {
 			continue
 		}
 
-		if suite, ok := cipherMap[name]; ok {
-			cipherSuites = append(cipherSuites, suite)
-		} else {
-			unsupported = append(unsupported, name)
+		if id, ok := secureCiphersByName[name]; ok {
+			cipherSuites = append(cipherSuites, id)
+			continue
 		}
+		if id, ok := insecureCiphersByName[name]; ok {
+			klog.Warningf("Cipher suite %s is insecure and should not be used in production", name)
+			cipherSuites = append(cipherSuites, id)
+			continue
+		}
+		unsupported = append(unsupported, name)
 	}
 
 	return cipherSuites, unsupported
@@ -81,6 +122,8 @@ func GetDefaultTLSConfig() *TLSConfig {
 
 // ConfigFromFlags creates TLS config from command-line flags
 func ConfigFromFlags(minVersion, cipherSuites string) (*TLSConfig, error) {
+	minVersion = strings.TrimSpace(minVersion)
+	cipherSuites = strings.TrimSpace(cipherSuites)
 	if minVersion == "" && cipherSuites == "" {
 		return nil, nil // No flags provided
 	}
@@ -126,7 +169,7 @@ func VersionToString(version uint16) string {
 	}
 }
 
-// CipherSuitesToString converts cipher suite IDs back to OpenSSL-style names
+// CipherSuitesToString converts cipher suite IDs back to IANA names
 func CipherSuitesToString(suites []uint16) string {
 	if len(suites) == 0 {
 		return ""
@@ -160,12 +203,7 @@ func ConfigToFunc(tlsCfg *TLSConfig) func(*tls.Config) {
 	}
 }
 
-// cipherIDToName converts a cipher suite ID to its OpenSSL-style name
+// cipherIDToName converts a cipher suite ID to its IANA name.
 func cipherIDToName(id uint16) string {
-	for name, suiteID := range cipherMap {
-		if suiteID == id {
-			return name
-		}
-	}
-	return ""
+	return cipherNamesByID[id]
 }
