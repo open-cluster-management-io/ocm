@@ -36,6 +36,7 @@ func (d *cmaProgressingReconciler) reconcile(
 			placementNode.countAddonUpgradeFailed(),
 			placementNode.countAddonTimeOut(),
 			len(placementNode.clusters),
+			len(placementNode.configuredClusters),
 		)
 	}
 
@@ -48,15 +49,17 @@ func (d *cmaProgressingReconciler) reconcile(
 
 func setAddOnInstallProgressionsAndLastApplied(
 	installProgression *addonv1alpha1.InstallProgression,
-	progressing, done, failed, timeout, total int) {
+	progressing, done, failed, timeout, total, configuredTotal int) {
 
 	condition := metav1.Condition{
 		Type: addonv1alpha1.ManagedClusterAddOnConditionProgressing,
 	}
-	if (total == 0 && done == 0) || (done != total) {
+	// If we treat 0/0 as completed, it could trigger a rollout to the next group
+	// before the configurations are actually applied.
+	if (configuredTotal == 0 && done == 0) || (done != configuredTotal) {
 		condition.Status = metav1.ConditionTrue
 		condition.Reason = addonv1alpha1.ProgressingReasonProgressing
-		condition.Message = fmt.Sprintf("%d/%d progressing..., %d failed %d timeout.", progressing+done, total, failed, timeout)
+		condition.Message = fmt.Sprintf("selected clusters %d. configured addons %d/%d progressing..., %d failed %d timeout.", total, progressing+done, configuredTotal, failed, timeout)
 	} else {
 		for i, configRef := range installProgression.ConfigReferences {
 			installProgression.ConfigReferences[i].LastAppliedConfig = configRef.DesiredConfig.DeepCopy()
@@ -64,7 +67,7 @@ func setAddOnInstallProgressionsAndLastApplied(
 		}
 		condition.Status = metav1.ConditionFalse
 		condition.Reason = addonv1alpha1.ProgressingReasonCompleted
-		condition.Message = fmt.Sprintf("%d/%d completed with no errors, %d failed %d timeout.", done, total, failed, timeout)
+		condition.Message = fmt.Sprintf("selected clusters %d. configured addons %d/%d completed with no errors, %d failed %d timeout.", total, done, configuredTotal, failed, timeout)
 	}
 	meta.SetStatusCondition(&installProgression.Conditions, condition)
 }

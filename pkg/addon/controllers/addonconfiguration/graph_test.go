@@ -6,6 +6,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -27,14 +28,15 @@ type placementDesicion struct {
 
 func TestConfigurationGraph(t *testing.T) {
 	cases := []struct {
-		name                   string
-		defaultConfigs         []addonv1alpha1.ConfigMeta
-		defaultConfigReference []addonv1alpha1.DefaultConfigReference
-		addons                 []*addonv1alpha1.ManagedClusterAddOn
-		placementDesicions     []placementDesicion
-		placementStrategies    []addonv1alpha1.PlacementStrategy
-		installProgressions    []addonv1alpha1.InstallProgression
-		expected               []*addonNode
+		name                       string
+		defaultConfigs             []addonv1alpha1.ConfigMeta
+		defaultConfigReference     []addonv1alpha1.DefaultConfigReference
+		addons                     []*addonv1alpha1.ManagedClusterAddOn
+		placementDecisions         []placementDesicion
+		placementStrategies        []addonv1alpha1.PlacementStrategy
+		installProgressions        []addonv1alpha1.InstallProgression
+		expected                   []*addonNode
+		expectedConfiguredClusters []sets.Set[string]
 	}{
 		{
 			name:     "no output",
@@ -110,7 +112,7 @@ func TestConfigurationGraph(t *testing.T) {
 				addontesting.NewAddon("test", "cluster2"),
 				addontesting.NewAddon("test", "cluster3"),
 			},
-			placementDesicions: []placementDesicion{
+			placementDecisions: []placementDesicion{
 				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement1", Namespace: "test"},
 					clusters: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}}},
 				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement2", Namespace: "test"},
@@ -308,7 +310,7 @@ func TestConfigurationGraph(t *testing.T) {
 					},
 				}),
 			},
-			placementDesicions: []placementDesicion{
+			placementDecisions: []placementDesicion{
 				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement1", Namespace: "test"},
 					clusters: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}, {ClusterName: "cluster2"},
 						{ClusterName: "cluster3"}, {ClusterName: "cluster4"}}},
@@ -410,7 +412,7 @@ func TestConfigurationGraph(t *testing.T) {
 				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement2", Namespace: "test"},
 					RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All}},
 			},
-			placementDesicions: []placementDesicion{
+			placementDecisions: []placementDesicion{
 				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement1", Namespace: "test"},
 					clusters: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}, {ClusterName: "cluster2"}}},
 				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement2", Namespace: "test"},
@@ -517,6 +519,10 @@ func TestConfigurationGraph(t *testing.T) {
 						Status:      clustersdkv1alpha1.ToApply},
 				},
 			},
+			expectedConfiguredClusters: []sets.Set[string]{
+				sets.New[string]("cluster1"),
+				sets.New[string]("cluster2", "cluster3"),
+			},
 		},
 		{
 			name: "mca override",
@@ -544,7 +550,7 @@ func TestConfigurationGraph(t *testing.T) {
 				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement2", Namespace: "test"},
 					RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All}},
 			},
-			placementDesicions: []placementDesicion{
+			placementDecisions: []placementDesicion{
 				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement1", Namespace: "test"},
 					clusters: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}}},
 				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement2", Namespace: "test"},
@@ -671,7 +677,7 @@ func TestConfigurationGraph(t *testing.T) {
 				addontesting.NewAddon("test", "cluster1"),
 				addontesting.NewAddon("test", "cluster2"),
 			},
-			placementDesicions: []placementDesicion{
+			placementDecisions: []placementDesicion{
 				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement1", Namespace: "test"},
 					clusters: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}}},
 				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement2", Namespace: "test"},
@@ -783,7 +789,7 @@ func TestConfigurationGraph(t *testing.T) {
 				}
 			}
 
-			for _, decision := range c.placementDesicions {
+			for _, decision := range c.placementDecisions {
 				obj := &clusterv1beta1.PlacementDecision{
 					ObjectMeta: metav1.ObjectMeta{Name: decision.Name, Namespace: decision.Namespace,
 						Labels: map[string]string{
@@ -814,6 +820,19 @@ func TestConfigurationGraph(t *testing.T) {
 			actual := graph.getAddonsToUpdate()
 			if len(actual) != len(c.expected) {
 				t.Errorf("output length is not correct, expected %v, got %v", len(c.expected), len(actual))
+			}
+
+			if len(c.expectedConfiguredClusters) > 0 {
+				if len(c.expectedConfiguredClusters) != len(graph.nodes) {
+					t.Fatalf("expectedConfiguredClusters length %d does not match graph nodes length %d",
+						len(c.expectedConfiguredClusters), len(graph.nodes))
+				}
+				for i, expectedClusters := range c.expectedConfiguredClusters {
+					if !graph.nodes[i].configuredClusters.Equal(expectedClusters) {
+						t.Errorf("configuredClusters for placement node %d is not correct, expected %v, got %v",
+							i, expectedClusters, graph.nodes[i].configuredClusters)
+					}
+				}
 			}
 
 			for _, ev := range c.expected {
