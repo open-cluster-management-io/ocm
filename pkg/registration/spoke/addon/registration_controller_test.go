@@ -78,6 +78,20 @@ func TestRegistrationSync(t *testing.T) {
 			},
 		},
 		{
+			name:     "addon registration skipped when namespace not set",
+			queueKey: addOnName,
+			addOn: func() *addonv1beta1.ManagedClusterAddOn {
+				addon := newManagedClusterAddOn(clusterName, addOnName, []addonv1beta1.RegistrationConfig{config1}, false)
+				addon.Status.Namespace = "" // clear the namespace to simulate addon framework not yet setting it
+				return addon
+			}(),
+			validateActions: func(t *testing.T, actions, managementActions []clienttesting.Action) {
+				if len(actions) != 0 {
+					t.Errorf("expect 0 actions but got %d", len(actions))
+				}
+			},
+		},
+		{
 			name:     "addon registration enabled",
 			queueKey: addOnName,
 			addOn: newManagedClusterAddOn(clusterName, addOnName,
@@ -408,6 +422,9 @@ func newManagedClusterAddOn(namespace, name string, registrations []addonv1beta1
 		},
 		Status: addonv1beta1.ManagedClusterAddOnStatus{
 			Registrations: registrations,
+			// Set a default installation namespace so registration is not skipped.
+			// In production, this is always set by the addon framework before registrations are populated.
+			Namespace: defaultAddOnInstallationNamespace,
 		},
 	}
 

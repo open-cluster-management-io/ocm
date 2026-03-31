@@ -137,9 +137,18 @@ func (c *addOnRegistrationController) syncAddOn(ctx context.Context, syncCtx fac
 		return err
 	}
 
+	installationNamespace := getAddOnInstallationNamespace(addOn)
+	if installationNamespace == "" {
+		// Installation namespace is not yet set by the addon framework. Skip registration
+		// until it is available to avoid starting with the wrong namespace, which would
+		// create extra CSRs when the namespace is later corrected.
+		logger.V(4).Info("Skipping addon registration: installation namespace not yet set")
+		return nil
+	}
+
 	installOption := addonInstallOption{
 		AgentRunningOutsideManagedCluster: isAddonRunningOutsideManagedCluster(addOn),
-		InstallationNamespace:             getAddOnInstallationNamespace(addOn),
+		InstallationNamespace:             installationNamespace,
 	}
 	configs, err := getRegistrationConfigs(addOnName, c.clusterName, installOption, addOn.Status.Registrations, logger)
 	if err != nil {

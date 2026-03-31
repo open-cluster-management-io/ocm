@@ -39,22 +39,19 @@ type addonInstallOption struct {
 	AgentRunningOutsideManagedCluster bool   `json:"agentRunningOutsideManagedCluster"`
 }
 
-// getAddOnInstallationNamespace returns addon installation namespace from addon spec.
-// It first checks the installation namespace in status then addon spec, the addon default
-// installation namespace open-cluster-management-agent-addon will be returned.
+// getAddOnInstallationNamespace returns the addon installation namespace.
+// It first checks Status.Namespace (set by the addon framework), then falls back to the
+// v1alpha1-install-namespace annotation (set during v1alpha1→v1beta1 conversion).
+// Returns empty string if neither is set; callers should skip registration until the
+// namespace is populated by the addon framework.
 func getAddOnInstallationNamespace(addOn *addonv1beta1.ManagedClusterAddOn) string {
-	installationNamespace := addOn.Status.Namespace
-	if installationNamespace == "" {
-		annotation, ok := addOn.Annotations[addonwebhook.InstallNamespaceAnnotation]
-		if ok {
-			installationNamespace = annotation
-		}
+	if addOn.Status.Namespace != "" {
+		return addOn.Status.Namespace
 	}
-	if installationNamespace == "" {
-		installationNamespace = defaultAddOnInstallationNamespace
+	if annotation, ok := addOn.Annotations[addonwebhook.InstallNamespaceAnnotation]; ok {
+		return annotation
 	}
-
-	return installationNamespace
+	return ""
 }
 
 // isAddonRunningOutsideManagedCluster returns whether the addon agent is running on the managed cluster
