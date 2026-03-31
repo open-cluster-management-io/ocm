@@ -127,11 +127,16 @@ func (c *secretController) sync(ctx context.Context, syncCtx factory.SyncContext
 		secret.Data = map[string][]byte{}
 	}
 
+	var condToUpdate *metav1.Condition
 	if c.secretToSave == nil {
-		secret, cond, err := c.driver.Process(ctx, c.controllerName, secret, c.additionalSecretData, syncCtx.Recorder())
-		if cond != nil {
-			if updateErr := c.statusUpdater(ctx, *cond); updateErr != nil {
-				return updateErr
+		secret, condToUpdate, err = c.driver.Process(ctx, c.controllerName, secret, c.additionalSecretData, syncCtx.Recorder())
+		// Status condition update strategy:
+		// 1. If process fails or returns no secret, update status immediately before returning
+		// 2. If process succeeds, cache the secret and save it first, then update status
+		// This ensures status update happens after secret save to prevent duplicate CSR creation.
+		if condToUpdate != nil && (err != nil || secret == nil) {
+			if err := c.statusUpdater(ctx, *condToUpdate); err != nil {
+				return err
 			}
 		}
 		if err != nil {
@@ -154,10 +159,16 @@ func (c *secretController) sync(ctx context.Context, syncCtx factory.SyncContext
 	if err := saveSecret(c.managementCoreClient, c.SecretNamespace, c.secretToSave); err != nil {
 		return err
 	}
+
 	syncCtx.Recorder().Eventf(ctx, "SecretSave", "Secret %s/%s for %s is updated",
 		c.SecretNamespace, c.SecretName, c.controllerName)
 	// clean the cached secret.
 	c.secretToSave = nil
+
+	// Update condition after successful secret save
+	if condToUpdate != nil {
+		return c.statusUpdater(ctx, *condToUpdate)
+	}
 
 	return nil
 }
