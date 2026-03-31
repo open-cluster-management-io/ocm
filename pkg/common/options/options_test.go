@@ -240,8 +240,9 @@ func TestApplyTLSToCommand(t *testing.T) {
 		tlsCipherSuites string
 		configPreSet    bool
 		wantConfigSet   bool
+		wantError       bool
 		wantMinVersion  string
-		wantCiphers     string
+		wantCiphers     []string
 	}{
 		{
 			name:          "no TLS flags set — no-op",
@@ -257,7 +258,7 @@ func TestApplyTLSToCommand(t *testing.T) {
 			name:            "only tls-cipher-suites set",
 			tlsCipherSuites: "TLS_AES_256_GCM_SHA384",
 			wantConfigSet:   true,
-			wantCiphers:     "TLS_AES_256_GCM_SHA384",
+			wantCiphers:     []string{"TLS_AES_256_GCM_SHA384"},
 		},
 		{
 			name:            "both tls-min-version and tls-cipher-suites set",
@@ -265,13 +266,23 @@ func TestApplyTLSToCommand(t *testing.T) {
 			tlsCipherSuites: "TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256",
 			wantConfigSet:   true,
 			wantMinVersion:  "VersionTLS13",
-			wantCiphers:     "TLS_AES_256_GCM_SHA384",
+			wantCiphers:     []string{"TLS_AES_256_GCM_SHA384", "TLS_CHACHA20_POLY1305_SHA256"},
 		},
 		{
 			name:          "user already provided --config — skip injection",
 			tlsMinVersion: "VersionTLS13",
 			configPreSet:  true,
 			wantConfigSet: false,
+		},
+		{
+			name:          "invalid tls-min-version — error before file creation",
+			tlsMinVersion: "BadVersion",
+			wantError:     true,
+		},
+		{
+			name:            "invalid tls-cipher-suites — error before file creation",
+			tlsCipherSuites: "NOT_A_REAL_CIPHER",
+			wantError:       true,
 		},
 	}
 
@@ -295,7 +306,14 @@ func TestApplyTLSToCommand(t *testing.T) {
 			opts.ApplyTLSToCommand(cmd)
 
 			// PersistentPreRunE is set by ApplyTLSToCommand; invoke it directly.
-			if err := cmd.PersistentPreRunE(cmd, nil); err != nil {
+			err := cmd.PersistentPreRunE(cmd, nil)
+			if c.wantError {
+				if err == nil {
+					t.Fatal("expected an error but got none")
+				}
+				return
+			}
+			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
@@ -331,8 +349,10 @@ func TestApplyTLSToCommand(t *testing.T) {
 			if c.wantMinVersion == "" && strings.Contains(s, "minTLSVersion") {
 				t.Errorf("expected config to NOT contain minTLSVersion, got:\n%s", s)
 			}
-			if c.wantCiphers != "" && !strings.Contains(s, c.wantCiphers) {
-				t.Errorf("expected config to contain cipher %q, got:\n%s", c.wantCiphers, s)
+			for _, cipher := range c.wantCiphers {
+				if !strings.Contains(s, cipher) {
+					t.Errorf("expected config to contain cipher %q, got:\n%s", cipher, s)
+				}
 			}
 		})
 	}

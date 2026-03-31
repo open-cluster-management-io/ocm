@@ -12,6 +12,8 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/utils/clock"
+
+	tlslib "open-cluster-management.io/sdk-go/pkg/tls"
 )
 
 type Options struct {
@@ -72,9 +74,10 @@ func (o *Options) AddFlags(flags *pflag.FlagSet) {
 }
 
 // ApplyTLSToCommand installs a PersistentPreRunE hook that writes a minimal
-// GenericOperatorConfig YAML to a temp file under /tmp (which is mounted as an
-// emptyDir in all hub controller deployments) and sets library-go's --config flag
-// to point at it. This runs before cmd.Run so all library-go boilerplate (signal
+// GenericOperatorConfig YAML to a temp file in /tmp (which is mounted as an
+// emptyDir in all hub controller deployments, so writing is safe even with
+// readOnlyRootFilesystem: true) and sets library-go's --config flag to point
+// at it. This runs before cmd.Run so all library-go boilerplate (signal
 // handling, logging, profiling) is fully preserved.
 //
 // Inside cmd.Run, StartController calls Config() which reads the file; the TLS
@@ -92,6 +95,11 @@ func (o *Options) ApplyTLSToCommand(cmd *cobra.Command) {
 		if (o.TLSMinVersion == "" && o.TLSCipherSuites == "") || cmd.Flags().Changed("config") {
 			return nil
 		}
+		// Validate TLS flags up-front so invalid values are caught early with a
+		// clear error rather than being deferred to library-go's YAML parsing.
+		if _, err := tlslib.ConfigFromFlags(o.TLSMinVersion, o.TLSCipherSuites); err != nil {
+			return fmt.Errorf("invalid TLS flags: %w", err)
+		}
 		content := "apiVersion: operator.openshift.io/v1alpha1\nkind: GenericOperatorConfig\nservingInfo:\n"
 		if o.TLSMinVersion != "" {
 			content += "  minTLSVersion: " + o.TLSMinVersion + "\n"
@@ -102,9 +110,9 @@ func (o *Options) ApplyTLSToCommand(cmd *cobra.Command) {
 				content += "  - " + strings.TrimSpace(c) + "\n"
 			}
 		}
-		// /tmp is mounted as an emptyDir in all hub controller deployments,
-		// so writing here is safe even with readOnlyRootFilesystem: true.
-		f, err := os.CreateTemp("", "ocm-controller-tls-*.yaml")
+		// Use /tmp explicitly: it is mounted as an emptyDir in all hub controller
+		// deployments so the path is writable even with readOnlyRootFilesystem: true.
+		f, err := os.CreateTemp("/tmp", "ocm-controller-tls-*.yaml")
 		if err != nil {
 			return fmt.Errorf("failed to create TLS config file: %w", err)
 		}
