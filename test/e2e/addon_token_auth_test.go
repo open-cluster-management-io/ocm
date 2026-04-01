@@ -31,6 +31,7 @@ var _ = ginkgo.Describe("Template addon with token-based authentication", ginkgo
 
 	var agentClient kubernetes.Interface
 	var agentNamespace string
+	var registrationDeploymentName string
 	s := runtime.NewScheme()
 	_ = scheme.AddToScheme(s)
 	_ = addonapiv1alpha1.Install(s)
@@ -56,7 +57,6 @@ var _ = ginkgo.Describe("Template addon with token-based authentication", ginkgo
 
 		ginkgo.By("Get initial registration agent deployment generation before updating klusterlet")
 		var initialGeneration int64
-		var registrationDeploymentName string
 		registrationDeploymentName = fmt.Sprintf("%s-registration-agent", klusterlet.Name)
 		if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingleton ||
 			klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingletonHosted {
@@ -195,6 +195,13 @@ var _ = ginkgo.Describe("Template addon with token-based authentication", ginkgo
 			ginkgo.Fail(fmt.Sprintf("failed to delete custom signer secret namespace %v: %v", signerSecretNamespace, err))
 		}
 
+		ginkgo.By("Get current registration agent deployment generation before restoring klusterlet")
+		var preRestoreGeneration int64
+		deployment, err := agentClient.AppsV1().Deployments(agentNamespace).Get(
+			context.TODO(), registrationDeploymentName, metav1.GetOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		preRestoreGeneration = deployment.Generation
+
 		ginkgo.By("Restore original klusterlet AddOnKubeClientRegistrationDriver configuration")
 		gomega.Eventually(func() error {
 			klusterlet, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(
@@ -213,6 +220,46 @@ var _ = ginkgo.Describe("Template addon with token-based authentication", ginkgo
 				context.TODO(), klusterlet, metav1.UpdateOptions{})
 			return err
 		}).Should(gomega.Succeed())
+
+		ginkgo.By("Wait for registration agent deployment to rollout after restoring configuration")
+		gomega.Eventually(func() error {
+			deployment, err := agentClient.AppsV1().Deployments(agentNamespace).Get(
+				context.TODO(), registrationDeploymentName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			// Wait for deployment generation to increment (indicates config change was applied)
+			if deployment.Generation <= preRestoreGeneration {
+				return fmt.Errorf("deployment generation has not incremented yet: current=%d, before=%d",
+					deployment.Generation, preRestoreGeneration)
+			}
+
+			// Ensure the deployment controller has observed the latest spec
+			if deployment.Status.ObservedGeneration != deployment.Generation {
+				return fmt.Errorf("deployment has not observed latest generation: observed=%d, current=%d",
+					deployment.Status.ObservedGeneration, deployment.Generation)
+			}
+
+			// Ensure all replicas have been updated with the new configuration
+			if deployment.Status.UpdatedReplicas != deployment.Status.Replicas {
+				return fmt.Errorf("deployment has not updated all replicas: updated=%d, total=%d",
+					deployment.Status.UpdatedReplicas, deployment.Status.Replicas)
+			}
+
+			// Ensure all updated replicas are ready
+			if deployment.Status.ReadyReplicas != deployment.Status.Replicas {
+				return fmt.Errorf("deployment not fully ready: ready=%d, total=%d",
+					deployment.Status.ReadyReplicas, deployment.Status.Replicas)
+			}
+
+			// Ensure there are no unavailable replicas
+			if deployment.Status.UnavailableReplicas > 0 {
+				return fmt.Errorf("deployment has unavailable replicas: %d", deployment.Status.UnavailableReplicas)
+			}
+
+			return nil
+		}, "2m", "5s").Should(gomega.Succeed())
 
 	})
 
@@ -336,23 +383,24 @@ var _ = ginkgo.Describe("Template addon with token-based authentication", ginkgo
 
 		ginkgo.By("Step 10: Cleanup CSRs")
 		gomega.Eventually(func() error {
-			csrs, err := hub.KubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(),
-				metav1.ListOptions{
-					LabelSelector: fmt.Sprintf("%s=%s,%s=%s", addonapiv1alpha1.AddonLabelKey, addOnName,
-						clusterv1.ClusterNameLabelKey, universalClusterName),
-				})
-			if err != nil {
+			listOpts := metav1.ListOptions{
+				LabelSelector: fmt.Sprintf("%s=%s,%s=%s", addonapiv1alpha1.AddonLabelKey, addOnName,
+					clusterv1.ClusterNameLabelKey, universalClusterName),
+			}
+
+			err := hub.KubeClient.CertificatesV1().CertificateSigningRequests().DeleteCollection(
+				context.TODO(), metav1.DeleteOptions{}, listOpts)
+			if err != nil && !errors.IsNotFound(err) {
 				return err
 			}
 
-			for _, csr := range csrs.Items {
-				err = hub.KubeClient.CertificatesV1().CertificateSigningRequests().Delete(context.TODO(),
-					csr.Name, metav1.DeleteOptions{})
-				if err != nil {
-					return err
-				}
+			csrs, err := hub.KubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(), listOpts)
+			if err != nil {
+				return err
 			}
-
+			if len(csrs.Items) != 0 {
+				return fmt.Errorf("expected no csrs, but got: %+v", csrs.Items)
+			}
 			return nil
 		}).ShouldNot(gomega.HaveOccurred())
 	})
