@@ -67,6 +67,10 @@ func (b *GRPCServer) WithStreamAuthorizer(authorizer authz.StreamAuthorizer) *GR
 }
 
 func (b *GRPCServer) Run(ctx context.Context) error {
+	if err := b.options.Validate(); err != nil {
+		return err
+	}
+
 	var grpcServerOptions []grpc.ServerOption
 	grpcServerOptions = append(grpcServerOptions, grpc.MaxRecvMsgSize(b.options.MaxReceiveMessageSize))
 	grpcServerOptions = append(grpcServerOptions, grpc.MaxSendMsgSize(b.options.MaxSendMessageSize))
@@ -106,8 +110,13 @@ func (b *GRPCServer) Run(ctx context.Context) error {
 		// Use GetCertificate callback from certwatcher
 		// This allows dynamic certificate reloading on each TLS handshake
 		GetCertificate: certWatcher.GetCertificate,
-		MinVersion:     b.options.TLSMinVersion,
-		MaxVersion:     b.options.TLSMaxVersion,
+		MinVersion:     b.options.tlsMinVersion,
+		MaxVersion:     b.options.tlsMaxVersion,
+	}
+
+	// TLS 1.3 cipher suites are not configurable in Go — only set for TLS 1.2 and below.
+	if len(b.options.cipherSuiteIDs) > 0 && b.options.tlsMinVersion < tls.VersionTLS13 {
+		tlsConfig.CipherSuites = b.options.cipherSuiteIDs
 	}
 
 	if b.options.ClientCAFile != "" {

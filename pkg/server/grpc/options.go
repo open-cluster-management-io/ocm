@@ -2,10 +2,12 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
+	"k8s.io/klog/v2"
 
 	v1alpha1addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
 	v1beta1addonce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1beta1"
@@ -35,6 +37,11 @@ import (
 type GRPCServerOptions struct {
 	GRPCServerConfig  string
 	grpcBrokerOptions *cloudeventsgrpc.BrokerOptions
+
+	// TLS overrides from CLI flags (set by grpc_server.go from common options).
+	// These take precedence over the YAML config file loaded by LoadGRPCServerOptions.
+	TLSMinVersionOverride   string
+	TLSCipherSuitesOverride string
 }
 
 func NewGRPCServerOptions() *GRPCServerOptions {
@@ -52,6 +59,16 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 	serverOptions, err := sdkgrpc.LoadGRPCServerOptions(o.GRPCServerConfig)
 	if err != nil {
 		return err
+	}
+
+	// Override gRPC server TLS settings from CLI flags if provided.
+	// These flags are injected by the cluster-manager operator via the deployment manifest.
+	if o.TLSMinVersionOverride != "" || o.TLSCipherSuitesOverride != "" {
+		if err := serverOptions.ApplyTLSFlags(o.TLSMinVersionOverride, o.TLSCipherSuitesOverride); err != nil {
+			return fmt.Errorf("failed to apply gRPC TLS overrides: %w", err)
+		}
+		klog.Infof("gRPC server TLS overridden: minVersion=%s, cipherSuites=%v",
+			o.TLSMinVersionOverride, serverOptions.CipherSuites)
 	}
 
 	clients, err := NewClients(controllerContext)
