@@ -141,6 +141,10 @@ type ClusterManagerConfig struct {
 	// +optional
 	AddOnManagerConfiguration operatorv1.AddOnManagerConfiguration `json:"addOnManagerConfiguration,omitempty"`
 
+	// PlacementConfiguration contains the configuration of placement
+	// +optional
+	PlacementConfiguration operatorv1.PlacementConfiguration `json:"placementConfiguration,omitempty"`
+
 	// ServerConfiguration contains the configuration of http/grpc server.
 	// +optional
 	ServerConfiguration operatorv1.ServerConfiguration `json:"serverConfiguration,omitempty"`

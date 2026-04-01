@@ -64,6 +64,11 @@ spec:
                       description: reason represents the reason why the ManagedCluster
                         is selected.
                       type: string
+                    score:
+                      description: Score is the computed score for the cluster based
+                        on configured prioritizers
+                      format: int64
+                      type: integer
                   required:
                   - clusterName
                   - reason

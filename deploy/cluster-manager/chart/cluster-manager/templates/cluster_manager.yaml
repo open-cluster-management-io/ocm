@@ -41,6 +41,10 @@ spec:
   addOnManagerConfiguration:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with .Values.clusterManager.placementConfiguration }}
+  placementConfiguration:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   {{- with .Values.clusterManager.serverConfiguration }}
   serverConfiguration:
     {{- toYaml . | nindent 4 }}

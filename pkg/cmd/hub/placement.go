@@ -37,6 +37,7 @@ func NewDebugServer() *cobra.Command {
 
 	flags := cmd.Flags()
 	opts.AddFlags(flags)
+	opts.ApplyTLSToCommand(cmd)
 
 	return cmd
 }

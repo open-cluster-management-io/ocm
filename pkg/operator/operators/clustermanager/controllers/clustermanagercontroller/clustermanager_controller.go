@@ -219,7 +219,16 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		addonFeatureGates = clusterManager.Spec.AddOnManagerConfiguration.FeatureGates
 	}
 	_, addonFeatureMsgs = helpers.ConvertToFeatureGateFlags("Addon", addonFeatureGates, ocmfeature.DefaultHubAddonManagerFeatureGates)
-	featureGateCondition := helpers.BuildFeatureCondition(registrationFeatureMsgs, workFeatureMsgs, addonFeatureMsgs)
+
+	var placementFeatureGates []operatorapiv1.FeatureGate
+	var placementFeatureMsgs string
+	if clusterManager.Spec.PlacementConfiguration != nil {
+		placementFeatureGates = clusterManager.Spec.PlacementConfiguration.FeatureGates
+	}
+	_, placementFeatureMsgs = helpers.ConvertToFeatureGateFlags("Placement", placementFeatureGates, ocmfeature.DefaultHubPlacementFeatureGates)
+	config.PlacementDebugServerEnabled = helpers.FeatureGateEnabled(placementFeatureGates, ocmfeature.DefaultHubPlacementFeatureGates, ocmfeature.PlacementDebugServer)
+
+	featureGateCondition := helpers.BuildFeatureCondition(registrationFeatureMsgs, workFeatureMsgs, addonFeatureMsgs, placementFeatureMsgs)
 
 	// Check if addon management is enabled by the feature gate
 	config.AddOnManagerEnabled = helpers.FeatureGateEnabled(addonFeatureGates, ocmfeature.DefaultHubAddonManagerFeatureGates, ocmfeature.AddonManagement)

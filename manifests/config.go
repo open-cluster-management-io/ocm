@@ -13,6 +13,7 @@ type HubConfig struct {
 	WorkImage                      string
 	WorkAPIServiceCABundle         string
 	PlacementImage                 string
+	PlacementDebugServerEnabled    bool
 	AddonAPIServiceCABundle        string
 	Replica                        int32
 	HostedMode                     bool

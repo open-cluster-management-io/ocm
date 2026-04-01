@@ -100,6 +100,23 @@ type PlacementSpec struct {
 	// decisionStrategy divides the created placement decisions into groups and defines the number of clusters per decision group.
 	// +optional
 	DecisionStrategy DecisionStrategy `json:"decisionStrategy,omitempty"`
+
+	// SortBy sets the sort order for decisions.
+	// It can be "ClusterName", or "Score".
+	// If sortBy is "ClusterName", decisions will be ordered alphanumerically by cluster name
+	// If sortBy is "Score", decisions will be ordered numerically in descending order by score,
+	// then by cluster name in the event of a tie
+	// +kubebuilder:default:=ClusterName
+	// +optional
+	SortBy PlacementSortByType `json:"sortBy,omitempty"`
+
+	// ScoreRateLimit sets maximum rate of updates to recorded scores in placement decisions.
+	// Score changes that do not change the selected set of clusters in the placement will
+	// not be reflected in decisions more often than the given duration.
+	// +kubebuilder:validation:Pattern="^[0-9]+[hms]$"
+	// +kubebuilder:default:="1m"
+	// +optional
+	ScoreRateLimit string `json:"scoreRateLimit,omitempty"`
 }
 
 // DecisionGroup define a subset of clusters that will be added to placementDecisions with groupName label.
@@ -164,6 +181,17 @@ type DecisionStrategy struct {
 	// +optional
 	GroupStrategy GroupStrategy `json:"groupStrategy,omitempty"`
 }
+
+// +kubebuilder:validation:Enum=ClusterName;Score
+type PlacementSortByType string
+
+const (
+	// PlacementSortByClusterName sorts decisions alphanumerically by cluster name
+	PlacementSortByClusterName PlacementSortByType = "ClusterName"
+	// PlacementSortByScore sorts decisions numerically in descending order by score.
+	// If one or more clusters are tied on score they will be sorted by name
+	PlacementSortByScore PlacementSortByType = "Score"
+)
 
 // ClusterPredicate represents a predicate to select ManagedClusters.
 type ClusterPredicate struct {
@@ -442,6 +470,9 @@ type PlacementStatus struct {
 	// +listMapKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions"`
+
+	// LastScoreUpdateTime records the last time that placement scores were updated.
+	LastScoreUpdateTime *metav1.Time `json:"lastScoreUpdateTime,omitempty"`
 }
 
 const (

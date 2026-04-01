@@ -115,6 +115,7 @@ spec:
           name: kubeconfig
           readOnly: true
       {{ end }}
+      {{ if .PlacementDebugServerEnabled }}
       - name: debug-server
         image: {{ .PlacementImage }}
         args:
@@ -122,6 +123,12 @@ spec:
           - "debug"
           - "--listen=0.0.0.0:9443"
           - "--disable-leader-election"
+          {{- if .TLSMinVersion }}
+          - "--tls-min-version={{ .TLSMinVersion }}"
+          {{- end }}
+          {{- if .TLSCipherSuites }}
+          - "--tls-cipher-suites={{ .TLSCipherSuites }}"
+          {{- end }}
         env:
           - name: POD_NAME
             valueFrom:
@@ -164,6 +171,7 @@ spec:
         volumeMounts:
         - name: tmpdir
           mountPath: /tmp
+      {{ end }}
       volumes:
       - name: tmpdir
         emptyDir: { }

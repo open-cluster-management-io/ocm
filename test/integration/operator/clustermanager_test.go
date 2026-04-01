@@ -407,8 +407,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 45 {
-					return fmt.Errorf("should get 45 relatedResources, actual got %v, %v",
+				if len(actual.Status.RelatedResources) != 44 {
+					return fmt.Errorf("should get 44 relatedResources, actual got %v, %v",
 						len(actual.Status.RelatedResources), actual.Status.RelatedResources)
 				}
 				return nil
@@ -486,8 +486,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 49 {
-					return fmt.Errorf("should get 49 relatedResources, actual got %v, %v",
+				if len(actual.Status.RelatedResources) != 48 {
+					return fmt.Errorf("should get 48 relatedResources, actual got %v, %v",
 						len(actual.Status.RelatedResources), actual.Status.RelatedResources)
 				}
 				return nil
@@ -698,8 +698,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 44 {
-					return fmt.Errorf("should get 44 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 43 {
+					return fmt.Errorf("should get 43 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -754,11 +754,107 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 49 {
-					return fmt.Errorf("should get 49 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 48 {
+					return fmt.Errorf("should get 48 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should have expected resource created/deleted when feature gates PlacementDebugServer enabled/disabled", func() {
+			placementServiceName := clusterManagerName + "-placement"
+
+			ginkgo.By("Enable PlacementDebugServer feature gate")
+			gomega.Eventually(func() error {
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				clusterManager.Spec.PlacementConfiguration = &operatorapiv1.PlacementConfiguration{
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{
+							Feature: string(feature.PlacementDebugServer),
+							Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+						},
+					},
+				}
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			// Check placement service is created
+			gomega.Eventually(func() error {
+				_, err := kubeClient.CoreV1().Services(hubNamespace).Get(context.Background(), placementServiceName, metav1.GetOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			// Check placement deployment has debug-server container
+			gomega.Eventually(func() error {
+				deployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubPlacementDeployment, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				for _, container := range deployment.Spec.Template.Spec.Containers {
+					if container.Name == "debug-server" {
+						return nil
+					}
+				}
+				return fmt.Errorf("debug-server container not found")
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			ginkgo.By("Disable PlacementDebugServer feature gate")
+			gomega.Eventually(func() error {
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				clusterManager.Spec.PlacementConfiguration = &operatorapiv1.PlacementConfiguration{
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{
+							Feature: string(feature.PlacementDebugServer),
+							Mode:    operatorapiv1.FeatureGateModeTypeDisable,
+						},
+					},
+				}
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			// Check placement service is deleted
+			gomega.Eventually(func() bool {
+				_, err := kubeClient.CoreV1().Services(hubNamespace).Get(context.Background(), placementServiceName, metav1.GetOptions{})
+				if err == nil {
+					return false
+				}
+				return errors.IsNotFound(err)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Check placement deployment has no debug-server container
+			gomega.Eventually(func() error {
+				deployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubPlacementDeployment, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				for _, container := range deployment.Spec.Template.Spec.Containers {
+					if container.Name == "debug-server" {
+						return fmt.Errorf("debug-server container should not exist")
+					}
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			// remove PlacementConfiguration to not affect subsequent tests
+			gomega.Eventually(func() error {
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				clusterManager.Spec.PlacementConfiguration = nil
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 		})
 
 		ginkgo.It("should have expected resource created/deleted when feature gates ClusterProfile enabled/disabled", func() {
@@ -1034,8 +1130,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 50 {
-					return fmt.Errorf("should get 50 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 49 {
+					return fmt.Errorf("should get 49 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -1488,6 +1584,26 @@ var _ = ginkgo.Describe("ClusterManager TLS Profile", func() {
 	var hubAddOnWebhookDeployment = fmt.Sprintf("%s-addon-webhook", clusterManagerName)
 
 	ginkgo.BeforeEach(func() {
+		// Enable PlacementDebugServer feature gate
+		gomega.Eventually(func() error {
+			clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(
+				context.Background(), clusterManagerName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			clusterManager.Spec.PlacementConfiguration = &operatorapiv1.PlacementConfiguration{
+				FeatureGates: []operatorapiv1.FeatureGate{
+					{
+						Feature: string(feature.PlacementDebugServer),
+						Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+					},
+				},
+			}
+			_, err = operatorClient.OperatorV1().ClusterManagers().Update(
+				context.Background(), clusterManager, metav1.UpdateOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
 		// Create the ocm-tls-profile ConfigMap BEFORE starting the operator so that:
 		// 1. The watcher seeds its hash from the ConfigMap at startup (no change detected).
 		// 2. The operator initialises with TLS settings from the ConfigMap.
@@ -1525,6 +1641,19 @@ var _ = ginkgo.Describe("ClusterManager TLS Profile", func() {
 		err = kubeClient.AppsV1().Deployments(hubNamespace).DeleteCollection(
 			context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		// Clean up PlacementConfiguration to avoid affecting other tests
+		gomega.Eventually(func() error {
+			clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(
+				context.Background(), clusterManagerName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			clusterManager.Spec.PlacementConfiguration = nil
+			_, err = operatorClient.OperatorV1().ClusterManagers().Update(
+				context.Background(), clusterManager, metav1.UpdateOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 	})
 
 	ginkgo.It("should inject tls-min-version into all hub deployments when ocm-tls-profile ConfigMap exists at startup", func() {
@@ -1546,13 +1675,20 @@ var _ = ginkgo.Describe("ClusterManager TLS Profile", func() {
 				if err != nil {
 					return err
 				}
-				for _, arg := range actual.Spec.Template.Spec.Containers[0].Args {
-					if arg == "--tls-min-version=VersionTLS13" {
-						return nil
+				for i, container := range actual.Spec.Template.Spec.Containers {
+					found := false
+					for _, arg := range container.Args {
+						if arg == "--tls-min-version=VersionTLS13" {
+							found = true
+							break
+						}
+					}
+					if !found {
+						return fmt.Errorf("deployment %s container[%d] %s: --tls-min-version=VersionTLS13 not found in args %v",
+							deployName, i, container.Name, container.Args)
 					}
 				}
-				return fmt.Errorf("deployment %s: --tls-min-version=VersionTLS13 not found in args %v",
-					deployName, actual.Spec.Template.Spec.Containers[0].Args)
+				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 		}
 	})

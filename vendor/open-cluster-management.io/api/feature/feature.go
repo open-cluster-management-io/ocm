@@ -93,6 +93,11 @@ const (
 	// When enabled, the work controller will automatically clean up completed manifest works based on the configured
 	// time-to-live duration to prevent accumulation of old completed resources.
 	CleanUpCompletedManifestWork featuregate.Feature = "CleanUpCompletedManifestWork"
+
+	// PlacementDebugServer enables the debug server sidecar container in placement controller pod.
+	// When enabled, a debug-server container will be added to the placement pod, providing
+	// /debug/placements/* endpoints for placement scheduling simulation and debugging.
+	PlacementDebugServer featuregate.Feature = "PlacementDebugServer"
 )
 
 // DefaultSpokeRegistrationFeatureGates consists of all known ocm-registration
@@ -120,6 +125,12 @@ var DefaultHubRegistrationFeatureGates = map[featuregate.Feature]featuregate.Fea
 
 var DefaultHubAddonManagerFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	AddonManagement: {Default: true, PreRelease: featuregate.Beta},
+}
+
+// DefaultHubPlacementFeatureGates consists of all known placement feature keys.
+// To add a new feature, define a key for it above and add it here.
+var DefaultHubPlacementFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	PlacementDebugServer: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 // DefaultHubWorkFeatureGates consists of all known acm work wehbook feature keys.
