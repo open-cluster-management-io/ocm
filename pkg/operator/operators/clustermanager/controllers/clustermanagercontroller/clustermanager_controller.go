@@ -67,6 +67,8 @@ type clusterManagerController struct {
 	deploymentReplicas            int32
 	operatorNamespace             string
 	enableSyncLabels              bool
+	tlsMinVersion                 string
+	tlsCipherSuites               string
 }
 
 type clusterManagerReconcile interface {
@@ -94,6 +96,8 @@ func NewClusterManagerController(
 	deploymentReplicas int32,
 	operatorNamespace string,
 	enableSyncLabels bool,
+	tlsMinVersion string,
+	tlsCipherSuites string,
 ) factory.Controller {
 	controller := &clusterManagerController{
 		operatorKubeClient: operatorKubeClient,
@@ -111,6 +115,8 @@ func NewClusterManagerController(
 		deploymentReplicas:            deploymentReplicas,
 		operatorNamespace:             operatorNamespace,
 		enableSyncLabels:              enableSyncLabels,
+		tlsMinVersion:                 tlsMinVersion,
+		tlsCipherSuites:               tlsCipherSuites,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -231,6 +237,10 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	if config.GRPCAuthEnabled {
 		config.GRPCEndpointType = helpers.GRPCServerEndpointType(clusterManager)
 	}
+
+	// Set TLS config for all managed hub component deployments
+	config.TLSMinVersion = n.tlsMinVersion
+	config.TLSCipherSuites = n.tlsCipherSuites
 
 	// Update finalizer at first
 	if clusterManager.DeletionTimestamp.IsZero() {

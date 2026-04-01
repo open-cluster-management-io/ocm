@@ -15,6 +15,7 @@ import (
 
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
+	tlslib "open-cluster-management.io/sdk-go/pkg/tls"
 
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/certrotationcontroller"
@@ -89,6 +90,24 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 	}
 	operatorInformer := operatorinformer.NewSharedInformerFactory(operatorClient, 5*time.Minute)
 
+	// Load TLS config and start watching for changes. The watcher restarts the process
+	// when the ConfigMap changes so the new TLS settings are applied.
+	currentTLSConfig, err := tlslib.StartTLSConfigMapWatcher(ctx, kubeClient, controllerContext.OperatorNamespace,
+		func() {
+			logger.Info("TLS ConfigMap changed, restarting", "component", "cluster-manager operator")
+			os.Exit(0)
+		},
+	)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil
+		}
+		return err
+	}
+	tlsMinVersion := tlslib.VersionToString(currentTLSConfig.MinVersion)
+	tlsCipherSuites := tlslib.CipherSuitesToString(currentTLSConfig.CipherSuites)
+	logger.Info("TLS configuration loaded", "minVersion", tlsMinVersion, "cipherSuites", tlsCipherSuites)
+
 	clusterManagerController := clustermanagercontroller.NewClusterManagerController(
 		kubeClient,
 		controllerContext.KubeConfig,
@@ -101,6 +120,8 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		o.DeploymentReplicas,
 		controllerContext.OperatorNamespace,
 		o.EnableSyncLabels,
+		tlsMinVersion,
+		tlsCipherSuites,
 	)
 
 	statusController := clustermanagerstatuscontroller.NewClusterManagerStatusController(
@@ -138,6 +159,7 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 	go certRotationController.Run(ctx, 1)
 	go crdMigrationController.Run(ctx, 1)
 	go crdStatusController.Run(ctx, 1)
+
 	<-ctx.Done()
 	return nil
 }

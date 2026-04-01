@@ -1474,3 +1474,86 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 	})
 
 })
+
+// ClusterManager TLS profile tests verify that TLS flags are injected into all hub deployments
+// when the ocm-tls-profile ConfigMap is present at operator startup.
+var _ = ginkgo.Describe("ClusterManager TLS Profile", func() {
+	var cancel context.CancelFunc
+	var hubRegistrationDeployment = fmt.Sprintf("%s-registration-controller", clusterManagerName)
+	var hubPlacementDeployment = fmt.Sprintf("%s-placement-controller", clusterManagerName)
+	var hubRegistrationWebhookDeployment = fmt.Sprintf("%s-registration-webhook", clusterManagerName)
+	var hubWorkWebhookDeployment = fmt.Sprintf("%s-work-webhook", clusterManagerName)
+	var hubAddOnManagerDeployment = fmt.Sprintf("%s-addon-manager-controller", clusterManagerName)
+	var hubWorkControllerDeployment = fmt.Sprintf("%s-work-controller", clusterManagerName)
+	var hubAddOnWebhookDeployment = fmt.Sprintf("%s-addon-webhook", clusterManagerName)
+
+	ginkgo.BeforeEach(func() {
+		// Create the ocm-tls-profile ConfigMap BEFORE starting the operator so that:
+		// 1. The watcher seeds its hash from the ConfigMap at startup (no change detected).
+		// 2. The operator initialises with TLS settings from the ConfigMap.
+		// If the ConfigMap were created after startup the watcher would detect a hash change
+		// and call os.Exit(0), which would kill the test process.
+		// The ConfigMap is created in metav1.NamespaceDefault ("default") which matches
+		// the OperatorNamespace set in startHubOperator (also metav1.NamespaceDefault).
+		tlsCM := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ocm-tls-profile",
+				Namespace: metav1.NamespaceDefault,
+			},
+			Data: map[string]string{
+				"minTLSVersion": "VersionTLS13",
+			},
+		}
+		_, err := kubeClient.CoreV1().ConfigMaps(metav1.NamespaceDefault).Create(
+			context.Background(), tlsCM, metav1.CreateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		var ctx context.Context
+		ctx, cancel = context.WithCancel(context.Background())
+		go startHubOperator(ctx, operatorapiv1.InstallModeDefault)
+	})
+
+	ginkgo.AfterEach(func() {
+		if cancel != nil {
+			cancel()
+		}
+		err := kubeClient.CoreV1().ConfigMaps(metav1.NamespaceDefault).Delete(
+			context.Background(), "ocm-tls-profile", metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			ginkgo.GinkgoT().Logf("failed to delete ocm-tls-profile ConfigMap: %v", err)
+		}
+		err = kubeClient.AppsV1().Deployments(hubNamespace).DeleteCollection(
+			context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	})
+
+	ginkgo.It("should inject tls-min-version into all hub deployments when ocm-tls-profile ConfigMap exists at startup", func() {
+		// All hub deployments that get TLS flags injected.
+		tlsDeployments := []string{
+			hubRegistrationDeployment,
+			hubRegistrationWebhookDeployment,
+			hubPlacementDeployment,
+			hubWorkWebhookDeployment,
+			hubWorkControllerDeployment,
+			hubAddOnManagerDeployment,
+			hubAddOnWebhookDeployment,
+		}
+		for _, deployName := range tlsDeployments {
+			deployName := deployName // capture
+			gomega.Eventually(func() error {
+				actual, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(
+					context.Background(), deployName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				for _, arg := range actual.Spec.Template.Spec.Containers[0].Args {
+					if arg == "--tls-min-version=VersionTLS13" {
+						return nil
+					}
+				}
+				return fmt.Errorf("deployment %s: --tls-min-version=VersionTLS13 not found in args %v",
+					deployName, actual.Spec.Template.Spec.Containers[0].Args)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+		}
+	})
+})

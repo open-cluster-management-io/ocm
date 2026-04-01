@@ -23,6 +23,7 @@ func NewRegistrationController() *cobra.Command {
 	flags := cmd.Flags()
 	manager.AddFlags(flags)
 	opts.AddFlags(flags)
+	opts.ApplyTLSToCommand(cmd)
 
 	return cmd
 }

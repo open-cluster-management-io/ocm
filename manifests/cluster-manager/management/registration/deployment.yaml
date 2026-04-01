@@ -102,6 +102,12 @@ spec:
           {{ if .GRPCAutoApprovedUsers }}
           - "--auto-approved-grpc-users={{ .GRPCAutoApprovedUsers }}"
           {{ end }}
+          {{- if .TLSMinVersion }}
+          - "--tls-min-version={{ .TLSMinVersion }}"
+          {{- end }}
+          {{- if .TLSCipherSuites }}
+          - "--tls-cipher-suites={{ .TLSCipherSuites }}"
+          {{- end }}
         env:
           - name: POD_NAME
             valueFrom:

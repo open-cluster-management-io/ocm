@@ -1359,3 +1359,116 @@ func TestWorkControllerEnabledByFeatureGates(t *testing.T) {
 		})
 	}
 }
+
+// TestSyncDeployWithTLSConfig verifies that when tlsMinVersion/tlsCipherSuites are
+// configured on the controller, the --tls-min-version and --tls-cipher-suites flags
+// are injected into the args of every managed hub deployment.
+func TestSyncDeployWithTLSConfig(t *testing.T) {
+	cases := []struct {
+		name            string
+		tlsMinVersion   string
+		tlsCipherSuites string
+		wantMinVersion  bool
+		wantCiphers     bool
+	}{
+		{
+			name:           "no TLS config — flags absent",
+			wantMinVersion: false,
+			wantCiphers:    false,
+		},
+		{
+			name:           "tls-min-version only",
+			tlsMinVersion:  "VersionTLS13",
+			wantMinVersion: true,
+			wantCiphers:    false,
+		},
+		{
+			name:            "tls-cipher-suites only",
+			tlsCipherSuites: "TLS_AES_256_GCM_SHA384",
+			wantMinVersion:  false,
+			wantCiphers:     true,
+		},
+		{
+			name:            "both tls-min-version and tls-cipher-suites",
+			tlsMinVersion:   "VersionTLS13",
+			tlsCipherSuites: "TLS_AES_256_GCM_SHA384",
+			wantMinVersion:  true,
+			wantCiphers:     true,
+		},
+	}
+
+	// Deployments that always exist in a default cluster manager reconciliation
+	// and that we added TLS flag injection to.
+	checkDeployments := []string{
+		"testhub-registration-controller",
+		"testhub-registration-webhook",
+		"testhub-placement-controller",
+		"testhub-work-webhook",
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			clusterManager := newClusterManager("testhub")
+			tc := newTestController(t, clusterManager)
+			tc.clusterManagerController.tlsMinVersion = c.tlsMinVersion
+			tc.clusterManagerController.tlsCipherSuites = c.tlsCipherSuites
+
+			clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
+			cd := setDeployment(clusterManager.Name, clusterManagerNamespace)
+			setup(t, tc, cd)
+
+			syncContext := testingcommon.NewFakeSyncContext(t, clusterManager.Name)
+			if err := tc.clusterManagerController.sync(ctx, syncContext, clusterManager.Name); err != nil {
+				t.Fatalf("unexpected sync error: %v", err)
+			}
+
+			// Collect all deployments created or updated by the sync.
+			deploymentsByName := map[string]*appsv1.Deployment{}
+			kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...)
+			for _, action := range kubeActions {
+				verb := action.GetVerb()
+				if verb != createVerb && verb != "update" {
+					continue
+				}
+				var d *appsv1.Deployment
+				if verb == createVerb {
+					d, _ = action.(clienttesting.CreateActionImpl).Object.(*appsv1.Deployment)
+				} else {
+					d, _ = action.(clienttesting.UpdateActionImpl).Object.(*appsv1.Deployment)
+				}
+				if d != nil {
+					deploymentsByName[d.Name] = d
+				}
+			}
+
+			for _, name := range checkDeployments {
+				d, ok := deploymentsByName[name]
+				if !ok {
+					t.Errorf("deployment %q not found in sync actions", name)
+					continue
+				}
+				args := d.Spec.Template.Spec.Containers[0].Args
+				hasMinVersion := containsArg(args, "--tls-min-version=")
+				hasCiphers := containsArg(args, "--tls-cipher-suites=")
+
+				if hasMinVersion != c.wantMinVersion {
+					t.Errorf("deployment %q: wantMinVersion=%v but hasMinVersion=%v (args: %v)",
+						name, c.wantMinVersion, hasMinVersion, args)
+				}
+				if hasCiphers != c.wantCiphers {
+					t.Errorf("deployment %q: wantCiphers=%v but hasCiphers=%v (args: %v)",
+						name, c.wantCiphers, hasCiphers, args)
+				}
+			}
+		})
+	}
+}
+
+func containsArg(args []string, prefix string) bool {
+	for _, a := range args {
+		if strings.HasPrefix(a, prefix) {
+			return true
+		}
+	}
+	return false
+}

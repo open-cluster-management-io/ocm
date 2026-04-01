@@ -24,6 +24,7 @@ func NewWorkController() *cobra.Command {
 	flags := cmd.Flags()
 	commonOpts.AddFlags(flags)
 	hubOpts.AddFlags(flags)
+	commonOpts.ApplyTLSToCommand(cmd)
 
 	return cmd
 }
