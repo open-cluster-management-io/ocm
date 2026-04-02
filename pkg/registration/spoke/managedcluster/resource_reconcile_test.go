@@ -97,46 +97,6 @@ func TestHealthCheck(t *testing.T) {
 				"managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
 		},
 		{
-			name:        "kube-apiserver is not health",
-			clusters:    []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
-			httpStatus:  http.StatusInternalServerError,
-			responseMsg: "internal server error",
-			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset, hubClient *kubefake.Clientset) {
-				expectedCondition := metav1.Condition{
-					Type:    clusterv1.ManagedClusterConditionAvailable,
-					Status:  metav1.ConditionFalse,
-					Reason:  "ManagedClusterKubeAPIServerUnavailable",
-					Message: "The kube-apiserver is not ok, status code: 500, an error on the server (\"internal server error\") has prevented the request from succeeding",
-				}
-				actions := clusterClient.Actions()
-				testingcommon.AssertActions(t, actions, "patch")
-				patch := actions[0].(clienttesting.PatchAction).GetPatch()
-				managedCluster := &clusterv1.ManagedCluster{}
-				err := json.Unmarshal(patch, managedCluster)
-				if err != nil {
-					t.Fatal(err)
-				}
-				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
-
-				if len(hubClient.Actions()) != 1 {
-					t.Errorf("Expected 1 event created in the sync loop, actual %d",
-						len(hubClient.Actions()))
-				}
-				actionEvent := hubClient.Actions()[0]
-				if actionEvent.GetResource().Resource != "events" {
-					t.Errorf("Expected event created, actual %s", actionEvent.GetResource())
-				}
-				if actionEvent.GetNamespace() != testinghelpers.TestManagedClusterName {
-					t.Errorf("Expected event created in namespace %s, actual %s",
-						testinghelpers.TestManagedClusterName, actionEvent.GetNamespace())
-				}
-				if actionEvent.GetVerb() != "create" {
-					t.Errorf("Expected event created, actual %s", actionEvent.GetVerb())
-				}
-
-			},
-		},
-		{
 			name:     "kube-apiserver is ok",
 			clusters: []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			nodes: []runtime.Object{
@@ -189,52 +149,6 @@ func TestHealthCheck(t *testing.T) {
 				if actionEvent.GetVerb() != "create" {
 					t.Errorf("Expected event created, actual %s", actionEvent.GetVerb())
 				}
-			},
-		},
-		{
-			name:       "there is no livez endpoint",
-			clusters:   []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
-			nodes:      []runtime.Object{},
-			httpStatus: http.StatusNotFound,
-			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset, hubClient *kubefake.Clientset) {
-				expectedCondition := metav1.Condition{
-					Type:    clusterv1.ManagedClusterConditionAvailable,
-					Status:  metav1.ConditionTrue,
-					Reason:  "ManagedClusterAvailable",
-					Message: "Managed cluster is available",
-				}
-				actions := clusterClient.Actions()
-				testingcommon.AssertActions(t, actions, "patch")
-				patch := actions[0].(clienttesting.PatchAction).GetPatch()
-				managedCluster := &clusterv1.ManagedCluster{}
-				err := json.Unmarshal(patch, managedCluster)
-				if err != nil {
-					t.Fatal(err)
-				}
-				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
-			},
-		},
-		{
-			name:       "livez is forbidden",
-			clusters:   []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
-			nodes:      []runtime.Object{},
-			httpStatus: http.StatusForbidden,
-			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset, hubClient *kubefake.Clientset) {
-				expectedCondition := metav1.Condition{
-					Type:    clusterv1.ManagedClusterConditionAvailable,
-					Status:  metav1.ConditionTrue,
-					Reason:  "ManagedClusterAvailable",
-					Message: "Managed cluster is available",
-				}
-				actions := clusterClient.Actions()
-				testingcommon.AssertActions(t, actions, "patch")
-				patch := actions[0].(clienttesting.PatchAction).GetPatch()
-				managedCluster := &clusterv1.ManagedCluster{}
-				err := json.Unmarshal(patch, managedCluster)
-				if err != nil {
-					t.Fatal(err)
-				}
-				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
 		},
 		{

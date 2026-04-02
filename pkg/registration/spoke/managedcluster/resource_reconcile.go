@@ -3,11 +3,8 @@ package managedcluster
 import (
 	"context"
 	"fmt"
-	"net/http"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/discovery"
 	corev1lister "k8s.io/client-go/listers/core/v1"
@@ -22,72 +19,29 @@ type resoureReconcile struct {
 }
 
 func (r *resoureReconcile) reconcile(ctx context.Context, _ factory.SyncContext, cluster *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error) {
-	// check the kube-apiserver health on managed cluster.
-	condition := r.checkKubeAPIServerStatus(ctx)
-
-	// the managed cluster kube-apiserver is health, update its version and resources if necessary.
-	if condition.Status == metav1.ConditionTrue {
-		clusterVersion, err := r.getClusterVersion()
-		if err != nil {
-			return cluster, reconcileStop, fmt.Errorf("unable to get server version of managed cluster %q: %w", cluster.Name, err)
-		}
-
-		capacity, allocatable, err := r.getClusterResources()
-		if err != nil {
-			return cluster, reconcileStop, fmt.Errorf("unable to get capacity and allocatable of managed cluster %q: %w", cluster.Name, err)
-		}
-
-		// we allow other components update the cluster capacity, so we need merge the capacity to this updated, if
-		// one current capacity entry does not exist in this updated capacity, we add it back.
-		for key, val := range cluster.Status.Capacity {
-			if _, ok := capacity[key]; !ok {
-				capacity[key] = val
-			}
-		}
-
-		cluster.Status.Capacity = capacity
-		cluster.Status.Allocatable = allocatable
-		cluster.Status.Version = *clusterVersion
+	clusterVersion, err := r.getClusterVersion()
+	if err != nil {
+		return cluster, reconcileStop, fmt.Errorf("unable to get server version of managed cluster %q: %w", cluster.Name, err)
 	}
 
-	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
+	capacity, allocatable, err := r.getClusterResources()
+	if err != nil {
+		return cluster, reconcileStop, fmt.Errorf("unable to get capacity and allocatable of managed cluster %q: %w", cluster.Name, err)
+	}
+
+	// we allow other components update the cluster capacity, so we need merge the capacity to this updated, if
+	// one current capacity entry does not exist in this updated capacity, we add it back.
+	for key, val := range cluster.Status.Capacity {
+		if _, ok := capacity[key]; !ok {
+			capacity[key] = val
+		}
+	}
+
+	cluster.Status.Capacity = capacity
+	cluster.Status.Allocatable = allocatable
+	cluster.Status.Version = *clusterVersion
+
 	return cluster, reconcileContinue, nil
-}
-
-// using readyz api to check the status of kube apiserver
-func (r *resoureReconcile) checkKubeAPIServerStatus(ctx context.Context) metav1.Condition {
-	statusCode := 0
-	condition := metav1.Condition{Type: clusterv1.ManagedClusterConditionAvailable}
-	result := r.managedClusterDiscoveryClient.RESTClient().Get().AbsPath("/livez").Do(ctx).StatusCode(&statusCode)
-	if statusCode == http.StatusOK {
-		condition.Status = metav1.ConditionTrue
-		condition.Reason = "ManagedClusterAvailable"
-		condition.Message = "Managed cluster is available"
-		return condition
-	}
-
-	// for backward compatible, the livez endpoint is supported from Kubernetes 1.16, so if the livez is not found or
-	// forbidden, the healthz endpoint will be used.
-	if statusCode == http.StatusNotFound || statusCode == http.StatusForbidden {
-		result = r.managedClusterDiscoveryClient.RESTClient().Get().AbsPath("/healthz").Do(ctx).StatusCode(&statusCode)
-		if statusCode == http.StatusOK {
-			condition.Status = metav1.ConditionTrue
-			condition.Reason = "ManagedClusterAvailable"
-			condition.Message = "Managed cluster is available"
-			return condition
-		}
-	}
-
-	condition.Status = metav1.ConditionFalse
-	condition.Reason = "ManagedClusterKubeAPIServerUnavailable"
-	body, err := result.Raw()
-	if err == nil {
-		condition.Message = fmt.Sprintf("The kube-apiserver is not ok, status code: %d, %v", statusCode, string(body))
-		return condition
-	}
-
-	condition.Message = fmt.Sprintf("The kube-apiserver is not ok, status code: %d, %v", statusCode, err)
-	return condition
 }
 
 func (r *resoureReconcile) getClusterVersion() (*clusterv1.ManagedClusterVersion, error) {
