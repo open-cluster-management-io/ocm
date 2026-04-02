@@ -35,11 +35,11 @@ func NewOptions() *Options {
 
 func (o *Options) NewControllerCommandConfig(
 	componentName string, version version.Info, startFunc controllercmd.StartFunc, clock clock.Clock) *controllercmd.ControllerCommandConfig {
-	o.CmdConfig = controllercmd.NewControllerCommandConfig(componentName, version, o.startWithQPS(startFunc), clock)
+	o.CmdConfig = controllercmd.NewControllerCommandConfig(componentName, version, o.StartWithQPS(startFunc), clock)
 	return o.CmdConfig
 }
 
-func (o *Options) startWithQPS(startFunc controllercmd.StartFunc) controllercmd.StartFunc {
+func (o *Options) StartWithQPS(startFunc controllercmd.StartFunc) controllercmd.StartFunc {
 	return func(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 		controllerContext.KubeConfig.QPS = o.QPS
 		controllerContext.KubeConfig.Burst = o.Burst
