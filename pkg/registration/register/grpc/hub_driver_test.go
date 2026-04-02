@@ -194,19 +194,111 @@ func TestEventFilter(t *testing.T) {
 }
 
 func TestGetCSRInfo(t *testing.T) {
-	csr := &certificatesv1.CertificateSigningRequest{
-		ObjectMeta: metav1.ObjectMeta{
-			Annotations: map[string]string{
-				operatorv1.CSRUsernameAnnotation: "test",
+	makeCSRRequest := func(t *testing.T, orgs []string) []byte {
+		t.Helper()
+		clientKey, err := keyutil.MakeEllipticPrivateKeyPEM()
+		if err != nil {
+			t.Fatalf("failed to make key: %v", err)
+		}
+		privateKey, err := keyutil.ParsePrivateKeyPEM(clientKey)
+		if err != nil {
+			t.Fatalf("failed to parse key: %v", err)
+		}
+		request, err := certutil.MakeCSR(privateKey, &pkix.Name{
+			CommonName:   "system:open-cluster-management:cluster1:agent1",
+			Organization: orgs,
+		}, nil, nil)
+		if err != nil {
+			t.Fatalf("failed to make CSR: %v", err)
+		}
+		return request
+	}
+
+	cases := []struct {
+		name             string
+		csr              *certificatesv1.CertificateSigningRequest
+		expectedUsername string
+		expectedUID      string
+		checkGroups      bool
+		expectedGroups   []string
+	}{
+		{
+			name: "username comes from annotation, not spec",
+			csr: &certificatesv1.CertificateSigningRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						operatorv1.CSRUsernameAnnotation: "system:open-cluster-management:cluster1:agent1",
+					},
+				},
+				Spec: certificatesv1.CertificateSigningRequestSpec{
+					Username: "system:serviceaccount:grpc-server:sa",
+				},
 			},
+			expectedUsername: "system:open-cluster-management:cluster1:agent1",
 		},
-		Spec: certificatesv1.CertificateSigningRequestSpec{
-			SignerName: operatorv1.GRPCAuthSigner,
+		{
+			name: "uid is always empty regardless of spec",
+			csr: &certificatesv1.CertificateSigningRequest{
+				Spec: certificatesv1.CertificateSigningRequestSpec{
+					UID: "grpc-server-sa-uid",
+				},
+			},
+			expectedUID: "",
+		},
+		{
+			name: "groups come from CSR request subject organization",
+			csr: &certificatesv1.CertificateSigningRequest{
+				Spec: certificatesv1.CertificateSigningRequestSpec{
+					Groups:  []string{"system:serviceaccounts", "system:serviceaccounts:grpc-server"},
+					Request: makeCSRRequest(t, []string{"system:open-cluster-management:cluster1"}),
+				},
+			},
+			checkGroups:    true,
+			expectedGroups: []string{"system:open-cluster-management:cluster1"},
+		},
+		{
+			name: "groups are nil when no request body, ignoring spec groups from gRPC server SA",
+			csr: &certificatesv1.CertificateSigningRequest{
+				Spec: certificatesv1.CertificateSigningRequestSpec{
+					Groups: []string{"system:serviceaccounts"},
+				},
+			},
+			checkGroups:    true,
+			expectedGroups: nil,
+		},
+		{
+			name: "groups are nil when request body is malformed, ignoring spec groups from gRPC server SA",
+			csr: &certificatesv1.CertificateSigningRequest{
+				Spec: certificatesv1.CertificateSigningRequestSpec{
+					Groups:  []string{"system:serviceaccounts"},
+					Request: []byte("not-a-valid-pem-block"),
+				},
+			},
+			checkGroups:    true,
+			expectedGroups: nil,
 		},
 	}
 
-	info := getCSRInfo(csr)
-	if info.Username != "test" {
-		t.Errorf("unexpected username %s", info.Username)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			info := getCSRInfo(c.csr)
+			if c.expectedUsername != "" && info.Username != c.expectedUsername {
+				t.Errorf("expected username %q, got %q", c.expectedUsername, info.Username)
+			}
+			if info.UID != c.expectedUID {
+				t.Errorf("expected uid %q, got %q", c.expectedUID, info.UID)
+			}
+			if c.checkGroups {
+				if len(info.Groups) != len(c.expectedGroups) {
+					t.Errorf("expected groups %v, got %v", c.expectedGroups, info.Groups)
+				} else {
+					for i, g := range c.expectedGroups {
+						if info.Groups[i] != g {
+							t.Errorf("expected group[%d] %q, got %q", i, g, info.Groups[i])
+						}
+					}
+				}
+			}
+		})
 	}
 }

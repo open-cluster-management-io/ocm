@@ -2,6 +2,8 @@ package grpc
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"os"
 	"time"
@@ -177,21 +179,49 @@ func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContex
 	return err
 }
 
+// getCSRInfo extracts the spoke agent's identity from a CSR created in gRPC mode.
+// In gRPC mode the spoke agent sends its CSR to the gRPC server, which then creates
+// the Kubernetes CSR object using its own ServiceAccount. As a result, c.Spec.Username,
+// c.Spec.UID, and c.Spec.Groups all reflect the gRPC server's ServiceAccount, not the
+// spoke agent. The correct agent identity is recovered as follows:
+//   - Username: from the annotation set by the gRPC server when it created the CSR.
+//   - UID: set to empty, because c.Spec.UID belongs to the gRPC server's ServiceAccount
+//     and would authorize the wrong principal in a SubjectAccessReview.
+//   - Groups: extracted from the CSR's Subject.Organization, which the agent embedded
+//     in the x509 certificate request itself.
+//   - Extra: set to empty, because c.Spec.Extra belongs to the gRPC server's ServiceAccount.
+//     Avoid forwarding it when authorizing spoke-agent renewal.
 func getCSRInfo(c *certificatesv1.CertificateSigningRequest) csr.CSRInfo {
-	extra := make(map[string]authorizationv1.ExtraValue)
-	for k, v := range c.Spec.Extra {
-		extra[k] = authorizationv1.ExtraValue(v)
-	}
 	return csr.CSRInfo{
 		Name:       c.Name,
 		Labels:     c.Labels,
 		SignerName: c.Spec.SignerName,
 		Username:   c.Annotations[operatorv1.CSRUsernameAnnotation],
-		UID:        c.Spec.UID,
-		Groups:     c.Spec.Groups,
-		Extra:      extra,
+		UID:        "",
+		Groups:     extractOrganizationsFromCSR(c.Spec.Request),
+		Extra:      make(map[string]authorizationv1.ExtraValue),
 		Request:    c.Spec.Request,
 	}
+}
+
+// extractOrganizationsFromCSR extracts the Organization field from the CSR request,
+// which represents the groups that will be in the certificate.
+func extractOrganizationsFromCSR(csrRequest []byte) []string {
+	if len(csrRequest) == 0 {
+		return nil
+	}
+
+	block, _ := pem.Decode(csrRequest)
+	if block == nil || block.Type != "CERTIFICATE REQUEST" {
+		return nil
+	}
+
+	x509cr, err := x509.ParseCertificateRequest(block.Bytes)
+	if err != nil {
+		return nil
+	}
+
+	return x509cr.Subject.Organization
 }
 
 func eventFilter(csr any) bool {
