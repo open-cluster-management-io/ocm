@@ -614,7 +614,7 @@ func TestGetValidManagedClusterSetBindings(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			ctrl, _, _ := newTestSchedulingController(t, c.initObjs)
-			bindings, err := ctrl.getValidManagedClusterSetBindings(placementNamespace)
+			bindings, err := GetValidManagedClusterSetBindings(placementNamespace, ctrl.clusterSetBindingLister, ctrl.clusterSetLister)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}
@@ -673,8 +673,8 @@ func TestGetValidManagedClusterSets(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			ctrl, _, _ := newTestSchedulingController(t, c.initObjs)
-			actualClusterSetNames := ctrl.getEligibleClusterSets(c.placement, c.bindings)
+			_, _, _ = newTestSchedulingController(t, c.initObjs)
+			actualClusterSetNames := GetEligibleClusterSets(c.placement, c.bindings)
 			assertClusterSetNames(t, actualClusterSetNames, c.expectedClusterSetNames)
 		})
 	}
@@ -685,6 +685,7 @@ func TestGetAvailableClusters(t *testing.T) {
 		clusterSetNames      []string
 		initObjs             []runtime.Object
 		expectedClusterNames []string
+		expectErr            bool
 	}{
 		{
 			name: "no clusterset",
@@ -787,6 +788,7 @@ func TestGetAvailableClusters(t *testing.T) {
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, "clusterset1").Build(),
 			},
 			expectedClusterNames: []string{},
+			expectErr:            true,
 		},
 		{
 			name:                 "clusterset is removed",
@@ -799,7 +801,16 @@ func TestGetAvailableClusters(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			ctrl, _, _ := newTestSchedulingController(t, c.initObjs)
-			clusters, _ := ctrl.getAvailableClusters(c.clusterSetNames)
+			clusters, err := GetAvailableClusters(c.clusterSetNames, ctrl.clusterSetLister, ctrl.clusterLister)
+			if c.expectErr {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("GetAvailableClusters failed: %v", err)
+			}
 			assertClusterNames(t, clusters, c.expectedClusterNames)
 		})
 	}

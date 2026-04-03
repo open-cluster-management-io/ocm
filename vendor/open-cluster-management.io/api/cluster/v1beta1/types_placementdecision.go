@@ -58,6 +58,10 @@ type ClusterDecision struct {
 	// +kubebuilder:validation:Required
 	// +required
 	Reason string `json:"reason"`
+
+	// Score is the computed score for the cluster based on configured prioritizers
+	// +optional
+	Score int64 `json:"score"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

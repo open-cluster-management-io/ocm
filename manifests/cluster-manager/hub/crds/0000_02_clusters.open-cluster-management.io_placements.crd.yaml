@@ -432,6 +432,26 @@ spec:
                       Exact requires knowing the full set of prioritizers you want, but avoids behavior changes between releases.
                     type: string
                 type: object
+              scoreRateLimit:
+                default: 1m
+                description: |-
+                  ScoreRateLimit sets maximum rate of updates to recorded scores in placement decisions.
+                  Score changes that do not change the selected set of clusters in the placement will
+                  not be reflected in decisions more often than the given duration.
+                pattern: ^[0-9]+[hms]$
+                type: string
+              sortBy:
+                default: ClusterName
+                description: |-
+                  SortBy sets the sort order for decisions.
+                  It can be "ClusterName", or "Score".
+                  If sortBy is "ClusterName", decisions will be ordered alphanumerically by cluster name
+                  If sortBy is "Score", decisions will be ordered numerically in descending order by score,
+                  then by cluster name in the event of a tie
+                enum:
+                - ClusterName
+                - Score
+                type: string
               spreadPolicy:
                 description: |-
                   spreadPolicy defines how placement decisions should be distributed among a
@@ -636,6 +656,11 @@ spec:
                       type: array
                   type: object
                 type: array
+              lastScoreUpdateTime:
+                description: LastScoreUpdateTime records the last time that placement
+                  scores were updated.
+                format: date-time
+                type: string
               numberOfSelectedClusters:
                 description: numberOfSelectedClusters represents the number of selected
                   ManagedClusters

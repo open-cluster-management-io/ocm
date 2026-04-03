@@ -422,6 +422,10 @@ func (in *PlacementStatus) DeepCopyInto(out *PlacementStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.LastScoreUpdateTime != nil {
+		in, out := &in.LastScoreUpdateTime, &out.LastScoreUpdateTime
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 

@@ -73,6 +73,10 @@ type ClusterManagerSpec struct {
 	// +optional
 	AddOnManagerConfiguration *AddOnManagerConfiguration `json:"addOnManagerConfiguration,omitempty"`
 
+	// placementConfiguration contains the configuration of placement
+	// +optional
+	PlacementConfiguration *PlacementConfiguration `json:"placementConfiguration,omitempty"`
+
 	// serverConfiguration contains the configuration for http/grpc server.
 	// +optional
 	ServerConfiguration *ServerConfiguration `json:"serverConfiguration,omitempty"`
@@ -344,6 +348,18 @@ const (
 
 type AddOnManagerConfiguration struct {
 	// FeatureGates represents the list of feature gates for addon manager
+	// If it is set empty, default feature gates will be used.
+	// If it is set, featuregate/Foo is an example of one item in FeatureGates:
+	//   1. If featuregate/Foo does not exist, registration-operator will discard it
+	//   2. If featuregate/Foo exists and is false by default. It is now possible to set featuregate/Foo=[false|true]
+	//   3. If featuregate/Foo exists and is true by default. If a cluster-admin upgrading from 1 to 2 wants to continue having featuregate/Foo=false,
+	//  	he can set featuregate/Foo=false before upgrading. Let's say the cluster-admin wants featuregate/Foo=false.
+	// +optional
+	FeatureGates []FeatureGate `json:"featureGates,omitempty"`
+}
+
+type PlacementConfiguration struct {
+	// FeatureGates represents the list of feature gates for placement
 	// If it is set empty, default feature gates will be used.
 	// If it is set, featuregate/Foo is an example of one item in FeatureGates:
 	//   1. If featuregate/Foo does not exist, registration-operator will discard it

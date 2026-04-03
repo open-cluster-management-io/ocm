@@ -40,7 +40,7 @@ require (
 	k8s.io/kubectl v0.35.3
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
 	open-cluster-management.io/addon-framework v1.2.1-0.20260306083712-b6f9759b7b6d
-	open-cluster-management.io/api v1.2.1-0.20260318031948-8f4e983d30de
+	open-cluster-management.io/api v1.2.1-0.20260401094502-0bf966f2e990
 	open-cluster-management.io/sdk-go v1.2.1-0.20260331032456-0cc72e52e4f2
 	sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03
 	sigs.k8s.io/cluster-inventory-api v0.0.0-20251124125836-445319b6307a

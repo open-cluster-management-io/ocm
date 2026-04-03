@@ -46,6 +46,7 @@ func newPlacementCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(hub.NewPlacementController())
+	cmd.AddCommand(hub.NewDebugServer())
 
 	return cmd
 }

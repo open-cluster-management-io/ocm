@@ -2,6 +2,7 @@
 // Package v1alpha1 contains API Schema definitions for the addon v1alpha1 API group
 
 // +k8s:deepcopy-gen=package,register
+// +k8s:openapi-model-package=io.open-cluster-management.api.addon.v1alpha1
 // +kubebuilder:validation:Optional
 // +kubebuilder:object:generate=true
 // +groupName=addon.open-cluster-management.io

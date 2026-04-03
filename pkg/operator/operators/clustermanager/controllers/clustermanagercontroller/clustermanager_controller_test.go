@@ -1464,6 +1464,103 @@ func TestSyncDeployWithTLSConfig(t *testing.T) {
 	}
 }
 
+func TestPlacementFeatureGate(t *testing.T) {
+	tests := []struct {
+		name                   string
+		placementConfiguration *operatorapiv1.PlacementConfiguration
+		expectDebugServer      bool
+	}{
+		{
+			name: "PlacementDebugServer feature gate enabled",
+			placementConfiguration: &operatorapiv1.PlacementConfiguration{
+				FeatureGates: []operatorapiv1.FeatureGate{
+					{Feature: string(ocmfeature.PlacementDebugServer), Mode: operatorapiv1.FeatureGateModeTypeEnable},
+				},
+			},
+			expectDebugServer: true,
+		},
+		{
+			name: "PlacementDebugServer feature gate disabled",
+			placementConfiguration: &operatorapiv1.PlacementConfiguration{
+				FeatureGates: []operatorapiv1.FeatureGate{
+					{Feature: string(ocmfeature.PlacementDebugServer), Mode: operatorapiv1.FeatureGateModeTypeDisable},
+				},
+			},
+			expectDebugServer: false,
+		},
+		{
+			name:                   "No placement configuration",
+			placementConfiguration: nil,
+			expectDebugServer:      false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			clusterManager := &operatorapiv1.ClusterManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-cluster-manager",
+					Finalizers: []string{clusterManagerFinalizer},
+				},
+				Spec: operatorapiv1.ClusterManagerSpec{
+					RegistrationImagePullSpec: "testregistration",
+					PlacementImagePullSpec:    "testplacement",
+					DeployOption: operatorapiv1.ClusterManagerDeployOption{
+						Mode: operatorapiv1.InstallModeDefault,
+					},
+					PlacementConfiguration: test.placementConfiguration,
+				},
+			}
+
+			tc := newTestController(t, clusterManager)
+			clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
+			setup(t, tc, nil)
+
+			syncContext := testingcommon.NewFakeSyncContext(t, "test-cluster-manager")
+
+			err := tc.clusterManagerController.sync(ctx, syncContext, "test-cluster-manager")
+			if err != nil {
+				t.Fatalf("Expected no error when sync, %v", err)
+			}
+
+			kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...)
+			placementDeploymentName := clusterManager.Name + "-placement-controller"
+			placementServiceName := clusterManager.Name + "-placement"
+
+			// Check if debug-server container and placement service exist
+			var debugServerContainerFound bool
+			var placementServiceFound bool
+			for _, action := range kubeActions {
+				if action.GetVerb() == createVerb {
+					if deployment, ok := action.(clienttesting.CreateActionImpl).Object.(*appsv1.Deployment); ok {
+						if deployment.Name == placementDeploymentName && deployment.Namespace == clusterManagerNamespace {
+							for _, container := range deployment.Spec.Template.Spec.Containers {
+								if container.Name == "debug-server" {
+									debugServerContainerFound = true
+									break
+								}
+							}
+						}
+					}
+					if service, ok := action.(clienttesting.CreateActionImpl).Object.(*corev1.Service); ok {
+						if service.Name == placementServiceName && service.Namespace == clusterManagerNamespace {
+							placementServiceFound = true
+						}
+					}
+				}
+			}
+
+			if test.expectDebugServer != debugServerContainerFound {
+				t.Errorf("Expected debug-server container: %v, found: %v", test.expectDebugServer, debugServerContainerFound)
+			}
+
+			if test.expectDebugServer != placementServiceFound {
+				t.Errorf("Expected placement service: %v, found: %v", test.expectDebugServer, placementServiceFound)
+			}
+		})
+	}
+}
+
 func containsArg(args []string, prefix string) bool {
 	for _, a := range args {
 		if strings.HasPrefix(a, prefix) {

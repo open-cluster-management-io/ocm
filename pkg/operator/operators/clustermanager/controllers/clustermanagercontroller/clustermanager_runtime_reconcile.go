@@ -34,6 +34,10 @@ var (
 		"cluster-manager/management/addon-manager/webhook-deployment.yaml",
 	}
 
+	placementServiceFiles = []string{
+		"cluster-manager/management/placement/service.yaml",
+	}
+
 	addOnManagerDeploymentFiles = []string{
 		"cluster-manager/management/addon-manager/deployment.yaml",
 	}
@@ -81,6 +85,14 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 	// Remove grpc server deployment if the grpc auth is disabled
 	if !config.GRPCAuthEnabled {
 		_, _, err := cleanResources(ctx, c.kubeClient, cm, config, grpcServerDeploymentFiles...)
+		if err != nil {
+			return cm, reconcileStop, err
+		}
+	}
+
+	// Remove placement service if the placement debug server is disabled
+	if !config.PlacementDebugServerEnabled {
+		_, _, err := cleanResources(ctx, c.kubeClient, cm, config, placementServiceFiles...)
 		if err != nil {
 			return cm, reconcileStop, err
 		}
@@ -136,10 +148,13 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 		}
 	}
 
-	// Apply management cluster resources(namespace and deployments).
+	// Apply management cluster resources(namespace, services and deployments).
 	// Note: the certrotation-controller will create CABundle after the namespace applied.
 	// And CABundle is used to render apiservice resources.
 	managementResources := []string{namespaceResource}
+	if config.PlacementDebugServerEnabled {
+		managementResources = append(managementResources, placementServiceFiles...)
+	}
 
 	var appliedErrs []error
 	resourceResults := helpers.ApplyDirectly(

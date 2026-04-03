@@ -123,6 +123,10 @@ clusterManager:
 #   featureGates:
 #     - feature: ""
 #       mode: ""
+  placementConfiguration:
+    featureGates:
+    - feature: PlacementDebugServer
+      mode: Enable
 # serverConfiguration:
 #   endpointsExposure:
 #   - protocol: grpc
