@@ -4,10 +4,10 @@ go 1.25.0
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.5
-	github.com/aws/aws-sdk-go-v2/config v1.32.13
+	github.com/aws/aws-sdk-go-v2/config v1.32.14
 	github.com/aws/aws-sdk-go-v2/service/eks v1.81.2
 	github.com/aws/aws-sdk-go-v2/service/iam v1.53.7
-	github.com/aws/smithy-go v1.24.2
+	github.com/aws/smithy-go v1.24.3
 	github.com/cloudevents/sdk-go/v2 v2.16.2
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/evanphx/json-patch v5.9.11+incompatible
@@ -65,7 +65,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.19.13 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.19.14 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.21 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.21 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.21 // indirect
@@ -73,8 +73,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.21 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.9 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.30.14 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.18 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.30.15 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.19 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.10 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
