@@ -60,8 +60,10 @@ type TLSConfig struct {
 	CipherSuites []uint16
 }
 
-// parseTLSVersion converts a TLS version string to the corresponding crypto/tls constant
-func parseTLSVersion(version string) (uint16, error) {
+// ParseTLSVersion converts a TLS version string to the corresponding crypto/tls constant.
+// Accepted formats: "VersionTLS10"/"TLSv1.0" through "VersionTLS13"/"TLSv1.3".
+// An empty string defaults to TLS 1.2.
+func ParseTLSVersion(version string) (uint16, error) {
 	version = strings.TrimSpace(version)
 	switch version {
 	case "VersionTLS10", "TLSv1.0":
@@ -78,11 +80,11 @@ func parseTLSVersion(version string) (uint16, error) {
 	}
 }
 
-// parseCipherSuites converts IANA cipher suite names to Go crypto/tls constants.
+// ParseCipherSuites converts IANA cipher suite names to Go crypto/tls constants.
 // Secure ciphers (tls.CipherSuites) are accepted silently. Insecure ciphers
 // (tls.InsecureCipherSuites) are accepted but logged as a warning.
 // Returns a list of cipher suite IDs and a list of unrecognized cipher names.
-func parseCipherSuites(cipherString string) ([]uint16, []string) {
+func ParseCipherSuites(cipherString string) ([]uint16, []string) {
 	if strings.TrimSpace(cipherString) == "" {
 		return nil, nil
 	}
@@ -132,7 +134,7 @@ func ConfigFromFlags(minVersion, cipherSuites string) (*TLSConfig, error) {
 
 	// Parse min version
 	if minVersion != "" {
-		ver, err := parseTLSVersion(minVersion)
+		ver, err := ParseTLSVersion(minVersion)
 		if err != nil {
 			return nil, fmt.Errorf("invalid --tls-min-version: %w", err)
 		}
@@ -143,7 +145,7 @@ func ConfigFromFlags(minVersion, cipherSuites string) (*TLSConfig, error) {
 
 	// Parse cipher suites
 	if cipherSuites != "" {
-		suites, unsupported := parseCipherSuites(cipherSuites)
+		suites, unsupported := ParseCipherSuites(cipherSuites)
 		if len(unsupported) > 0 {
 			return nil, fmt.Errorf("unsupported cipher suites: %v", unsupported)
 		}

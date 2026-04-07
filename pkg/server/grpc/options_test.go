@@ -115,6 +115,75 @@ func TestGRPCServerOptionsRunWithInvalidKubeConfig(t *testing.T) {
 	}
 }
 
+func TestGRPCServerOptionsRunWithTLSOverride(t *testing.T) {
+	cases := []struct {
+		name            string
+		tlsMinVersion   string
+		tlsCipherSuites string
+		wantError       bool
+	}{
+		{
+			name:          "valid TLS 1.3 override",
+			tlsMinVersion: "VersionTLS13",
+		},
+		{
+			name:          "valid TLS 1.2 override",
+			tlsMinVersion: "VersionTLS12",
+		},
+		{
+			name:            "valid cipher suites override",
+			tlsCipherSuites: "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+		},
+		{
+			name:            "valid TLS 1.2 with cipher suites",
+			tlsMinVersion:   "VersionTLS12",
+			tlsCipherSuites: "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+		},
+		{
+			name:          "invalid TLS version returns error",
+			tlsMinVersion: "BadVersion",
+			wantError:     true,
+		},
+		{
+			name:            "invalid cipher suite returns error",
+			tlsCipherSuites: "NOT_A_REAL_CIPHER",
+			wantError:       true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			opts := NewGRPCServerOptions()
+			opts.TLSMinVersionOverride = c.tlsMinVersion
+			opts.TLSCipherSuitesOverride = c.tlsCipherSuites
+
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+			defer cancel()
+
+			controllerContext := &controllercmd.ControllerContext{
+				KubeConfig: &rest.Config{Host: "https://example.com"},
+			}
+
+			err := opts.Run(ctx, controllerContext)
+			if c.wantError {
+				if err == nil {
+					t.Fatal("expected an error but got none")
+				}
+				if !strings.Contains(err.Error(), "TLS") && !strings.Contains(err.Error(), "tls") {
+					t.Errorf("expected TLS-related error, got: %v", err)
+				}
+				return
+			}
+			// For valid TLS overrides, Run() will proceed past TLS parsing but eventually
+			// fail due to missing certificates or kubeconfig — that's expected.
+			// We just verify it didn't fail on TLS parsing.
+			if err != nil && (strings.Contains(err.Error(), "failed to apply gRPC TLS overrides") || strings.Contains(err.Error(), "tls-min-version")) {
+				t.Errorf("unexpected TLS parsing error: %v", err)
+			}
+		})
+	}
+}
+
 func TestGRPCServerOptionsRunWithValidConfigFile(t *testing.T) {
 	// Create a temporary config file for testing
 	tempDir := t.TempDir()

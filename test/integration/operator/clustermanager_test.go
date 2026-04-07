@@ -1692,4 +1692,27 @@ var _ = ginkgo.Describe("ClusterManager TLS Profile", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 		}
 	})
+
+	ginkgo.It("should inject tls-min-version into gRPC server deployment when gRPC auth is enabled", func() {
+		// Enable gRPC auth so the operator creates the gRPC server deployment.
+		gomega.Eventually(func() error {
+			return enableGRPCAuth(operatorClient, clusterManagerName)
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		hubGRPCServerDeployment := fmt.Sprintf("%s-grpc-server", clusterManagerName)
+		gomega.Eventually(func() error {
+			actual, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(
+				context.Background(), hubGRPCServerDeployment, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			for _, arg := range actual.Spec.Template.Spec.Containers[0].Args {
+				if arg == "--tls-min-version=VersionTLS13" {
+					return nil
+				}
+			}
+			return fmt.Errorf("deployment %s: --tls-min-version=VersionTLS13 not found in args %v",
+				hubGRPCServerDeployment, actual.Spec.Template.Spec.Containers[0].Args)
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+	})
 })

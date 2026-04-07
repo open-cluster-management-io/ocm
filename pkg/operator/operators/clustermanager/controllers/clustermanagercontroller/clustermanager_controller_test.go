@@ -1561,6 +1561,61 @@ func TestPlacementFeatureGate(t *testing.T) {
 	}
 }
 
+// TestSyncDeployWithTLSConfigGRPC verifies that TLS flags are injected into the
+// gRPC server deployment when gRPC auth is enabled and TLS config is set.
+func TestSyncDeployWithTLSConfigGRPC(t *testing.T) {
+	clusterManager := newClusterManager("testhub")
+	clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+		RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+			{AuthType: operatorapiv1.GRPCAuthType},
+		},
+	}
+
+	tc := newTestController(t, clusterManager)
+	tc.clusterManagerController.tlsMinVersion = "VersionTLS13"
+	tc.clusterManagerController.tlsCipherSuites = "TLS_AES_256_GCM_SHA384"
+
+	clusterManagerNamespace := helpers.ClusterManagerNamespace(
+		clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
+	cd := setDeployment(clusterManager.Name, clusterManagerNamespace)
+	setup(t, tc, cd)
+
+	syncContext := testingcommon.NewFakeSyncContext(t, clusterManager.Name)
+	if err := tc.clusterManagerController.sync(ctx, syncContext, clusterManager.Name); err != nil {
+		t.Fatalf("unexpected sync error: %v", err)
+	}
+
+	// Find the gRPC server deployment in sync actions.
+	kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...)
+	var grpcDeploy *appsv1.Deployment
+	for _, action := range kubeActions {
+		if action.GetVerb() != createVerb && action.GetVerb() != "update" {
+			continue
+		}
+		var d *appsv1.Deployment
+		if action.GetVerb() == createVerb {
+			d, _ = action.(clienttesting.CreateActionImpl).Object.(*appsv1.Deployment)
+		} else {
+			d, _ = action.(clienttesting.UpdateActionImpl).Object.(*appsv1.Deployment)
+		}
+		if d != nil && d.Name == "testhub-grpc-server" {
+			grpcDeploy = d
+		}
+	}
+
+	if grpcDeploy == nil {
+		t.Fatal("gRPC server deployment not found in sync actions")
+	}
+
+	args := grpcDeploy.Spec.Template.Spec.Containers[0].Args
+	if !containsArg(args, "--tls-min-version=VersionTLS13") {
+		t.Errorf("gRPC server deployment missing --tls-min-version flag (args: %v)", args)
+	}
+	if !containsArg(args, "--tls-cipher-suites=TLS_AES_256_GCM_SHA384") {
+		t.Errorf("gRPC server deployment missing --tls-cipher-suites flag (args: %v)", args)
+	}
+}
+
 func containsArg(args []string, prefix string) bool {
 	for _, a := range args {
 		if strings.HasPrefix(a, prefix) {

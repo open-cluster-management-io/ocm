@@ -148,7 +148,7 @@ func parseTLSConfigFromConfigMap(cm *corev1.ConfigMap) (*TLSConfig, error) {
 		minVersionStr = defaultMinTLSVersion
 	}
 
-	minVersion, err := parseTLSVersion(minVersionStr)
+	minVersion, err := ParseTLSVersion(minVersionStr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid minTLSVersion in ConfigMap: %w", err)
 	}
@@ -157,7 +157,7 @@ func parseTLSConfigFromConfigMap(cm *corev1.ConfigMap) (*TLSConfig, error) {
 	// Parse cipher suites
 	cipherSuitesStr := cm.Data[ConfigMapKeyCipherSuites]
 	if cipherSuitesStr != "" {
-		cipherSuites, unsupported := parseCipherSuites(cipherSuitesStr)
+		cipherSuites, unsupported := ParseCipherSuites(cipherSuitesStr)
 		if len(unsupported) > 0 {
 			klog.Warningf("Unsupported cipher suites in ConfigMap %s/%s: %v", cm.Namespace, cm.Name, unsupported)
 			if len(cipherSuites) == 0 {
