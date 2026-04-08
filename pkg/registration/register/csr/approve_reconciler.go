@@ -165,7 +165,34 @@ func validateCSR(logger klog.Logger, csr csrInfo) (bool, string, string) {
 		return false, "", ""
 	}
 
-	if !strings.HasPrefix(x509cr.Subject.CommonName, expectedPerClusterOrg) {
+	// Parse CommonName to extract cluster name and validate exact match
+	// Expected format: system:open-cluster-management:clusterName:agentName
+	if !strings.HasPrefix(x509cr.Subject.CommonName, user.SubjectPrefix) {
+		return false, "", ""
+	}
+
+	// Extract the parts after the prefix
+	nameWithoutPrefix := strings.TrimPrefix(x509cr.Subject.CommonName, user.SubjectPrefix)
+	parts := strings.Split(nameWithoutPrefix, ":")
+	if len(parts) != 2 {
+		// CommonName must have exactly 2 parts: clusterName:agentName
+		return false, "", ""
+	}
+
+	clusterNameFromCN, agentName := parts[0], parts[1]
+	if clusterNameFromCN == "" || agentName == "" {
+		return false, "", ""
+	}
+
+	// Verify exact match: cluster name from CommonName must match the cluster name from label
+	if clusterNameFromCN != spokeClusterName {
+		return false, "", ""
+	}
+
+	// Verify cluster name in CommonName matches the one in organization units
+	// The org should be the same as expectedPerClusterOrg which we already validated exists
+	expectedOrgForCN := fmt.Sprintf("%s%s", user.SubjectPrefix, clusterNameFromCN)
+	if expectedOrgForCN != expectedPerClusterOrg {
 		return false, "", ""
 	}
 
