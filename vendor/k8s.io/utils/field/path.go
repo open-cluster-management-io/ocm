@@ -40,8 +40,8 @@ func NewPath(name string, moreNames ...string) *Path {
 
 // Root returns the root element of this Path.
 func (p *Path) Root() *Path {
-	for ; p.parent != nil; p = p.parent {
-		// Do nothing.
+	for p.parent != nil {
+		p = p.parent
 	}
 	return p
 }

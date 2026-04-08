@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,8 @@ import (
 type Interface interface {
 	// ClusterProfiles returns a ClusterProfileInformer.
 	ClusterProfiles() ClusterProfileInformer
+	// PlacementDecisions returns a PlacementDecisionInformer.
+	PlacementDecisions() PlacementDecisionInformer
 }
 
 type version struct {
@@ -41,4 +43,9 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // ClusterProfiles returns a ClusterProfileInformer.
 func (v *version) ClusterProfiles() ClusterProfileInformer {
 	return &clusterProfileInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// PlacementDecisions returns a PlacementDecisionInformer.
+func (v *version) PlacementDecisions() PlacementDecisionInformer {
+	return &placementDecisionInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
