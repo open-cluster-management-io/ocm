@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,3 +24,11 @@ type ClusterProfileListerExpansion interface{}
 // ClusterProfileNamespaceListerExpansion allows custom methods to be added to
 // ClusterProfileNamespaceLister.
 type ClusterProfileNamespaceListerExpansion interface{}
+
+// PlacementDecisionListerExpansion allows custom methods to be added to
+// PlacementDecisionLister.
+type PlacementDecisionListerExpansion interface{}
+
+// PlacementDecisionNamespaceListerExpansion allows custom methods to be added to
+// PlacementDecisionNamespaceLister.
+type PlacementDecisionNamespaceListerExpansion interface{}

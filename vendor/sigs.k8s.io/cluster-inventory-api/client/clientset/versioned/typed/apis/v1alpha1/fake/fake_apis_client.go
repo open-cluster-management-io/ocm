@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,6 +29,10 @@ type FakeApisV1alpha1 struct {
 
 func (c *FakeApisV1alpha1) ClusterProfiles(namespace string) v1alpha1.ClusterProfileInterface {
 	return newFakeClusterProfiles(c, namespace)
+}
+
+func (c *FakeApisV1alpha1) PlacementDecisions(namespace string) v1alpha1.PlacementDecisionInterface {
+	return newFakePlacementDecisions(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

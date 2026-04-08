@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -54,6 +54,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	// Group=apis, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithResource("clusterprofiles"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apis().V1alpha1().ClusterProfiles().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("placementdecisions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apis().V1alpha1().PlacementDecisions().Informer()}, nil
 
 	}
 
