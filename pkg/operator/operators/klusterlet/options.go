@@ -21,6 +21,7 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/addonsecretcontroller"
+	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/addontlsconfigcontroller"
 	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/klusterletcontroller"
 	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/ssarcontroller"
 	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/statuscontroller"
@@ -157,6 +158,12 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		kubeInformer.Core().V1().Namespaces(),
 	)
 
+	addonTLSConfigController := addontlsconfigcontroller.NewAddonTLSConfigController(
+		kubeClient,
+		helpers.GetOperatorNamespace(),
+		kubeInformer.Core().V1().Namespaces(),
+	)
+
 	go operatorInformer.Start(ctx.Done())
 	go kubeInformer.Start(ctx.Done())
 	go hubConfigSecretInformer.Start(ctx.Done())
@@ -168,6 +175,7 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 	go statusController.Run(ctx, 1)
 	go ssarController.Run(ctx, 1)
 	go addonController.Run(ctx, 1)
+	go addonTLSConfigController.Run(ctx, 1)
 
 	<-ctx.Done()
 	return nil
