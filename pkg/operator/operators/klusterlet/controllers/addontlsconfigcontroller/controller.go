@@ -84,22 +84,23 @@ func (c *addonTLSConfigController) syncConfigMap(ctx context.Context, targetName
 		return err
 	}
 
-	target := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: targetNamespace,
-		},
-		Data: source.Data,
-	}
-
-	if err == nil && equality.Semantic.DeepEqual(existing.Data, target.Data) {
-		return nil
-	}
-
-	if errors.IsNotFound(err) {
-		_, err = c.kubeClient.CoreV1().ConfigMaps(targetNamespace).Create(ctx, target, metav1.CreateOptions{})
+	if err == nil {
+		// Target exists — update only if data changed
+		if equality.Semantic.DeepEqual(existing.Data, source.Data) {
+			return nil
+		}
+		existing.Data = source.Data
+		_, err = c.kubeClient.CoreV1().ConfigMaps(targetNamespace).Update(ctx, existing, metav1.UpdateOptions{})
 	} else {
-		_, err = c.kubeClient.CoreV1().ConfigMaps(targetNamespace).Update(ctx, target, metav1.UpdateOptions{})
+		// Target doesn't exist — create it
+		target := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: targetNamespace,
+			},
+			Data: source.Data,
+		}
+		_, err = c.kubeClient.CoreV1().ConfigMaps(targetNamespace).Create(ctx, target, metav1.CreateOptions{})
 	}
 	if err != nil {
 		return err

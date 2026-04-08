@@ -115,6 +115,48 @@ func TestSync(t *testing.T) {
 			},
 		},
 		{
+			name:     "namespace with addon label, target stale — updated",
+			queueKey: "ns1",
+			objects: []runtime.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      tlslib.ConfigMapName,
+						Namespace: "open-cluster-management",
+					},
+					Data: map[string]string{
+						"minTLSVersion": "VersionTLS13",
+					},
+				},
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      tlslib.ConfigMapName,
+						Namespace: "ns1",
+					},
+					Data: map[string]string{
+						"minTLSVersion": "VersionTLS12",
+					},
+				},
+			},
+			namespaces: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "ns1",
+						Labels: map[string]string{addonInstallNamespaceLabelKey: "true"},
+					},
+				},
+			},
+			verify: func(t *testing.T, client *kubefake.Clientset) {
+				cm, err := client.CoreV1().ConfigMaps("ns1").Get(
+					context.TODO(), tlslib.ConfigMapName, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("expected ConfigMap to exist, got error: %v", err)
+				}
+				if cm.Data["minTLSVersion"] != "VersionTLS13" {
+					t.Errorf("expected minTLSVersion=VersionTLS13 after update, got %v", cm.Data)
+				}
+			},
+		},
+		{
 			name:     "namespace with addon label, target already up-to-date — no update",
 			queueKey: "ns1",
 			objects: []runtime.Object{
