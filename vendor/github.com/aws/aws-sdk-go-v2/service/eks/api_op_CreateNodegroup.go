@@ -201,6 +201,11 @@ type CreateNodegroupInput struct {
 	// [Customizing managed nodes with launch templates]: https://docs.aws.amazon.com/eks/latest/userguide/launch-templates.html
 	Version *string
 
+	// The warm pool configuration for the node group. Warm pools maintain
+	// pre-initialized EC2 instances that can quickly join your cluster during
+	// scale-out events, improving application scaling performance and reducing costs.
+	WarmPoolConfig *types.WarmPoolConfig
+
 	noSmithyDocumentSerde
 }
 

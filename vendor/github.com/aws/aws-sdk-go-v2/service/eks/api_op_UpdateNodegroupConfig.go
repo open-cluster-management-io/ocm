@@ -67,6 +67,11 @@ type UpdateNodegroupConfigInput struct {
 	// The node group update configuration.
 	UpdateConfig *types.NodegroupUpdateConfig
 
+	// The warm pool configuration to apply to the node group. You can use this to add
+	// a warm pool to an existing node group or modify the settings of an existing warm
+	// pool.
+	WarmPoolConfig *types.WarmPoolConfig
+
 	noSmithyDocumentSerde
 }
 
