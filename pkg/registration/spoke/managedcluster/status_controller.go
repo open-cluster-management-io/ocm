@@ -115,6 +115,10 @@ func newManagedClusterStatusController(
 			hubClusterClient.ClusterV1().ManagedClusters()),
 		reconcilers: []statusReconcile{
 			&joiningReconcile{},
+			// availableReconcile must run before resource and claim reconcilers because it checks
+			// kube-apiserver health. If the API server is unavailable, it returns reconcileStop to
+			// skip resource/claim gathering which would fail against an unreachable API server.
+			&availableReconcile{managedClusterDiscoveryClient: managedClusterDiscoveryClient},
 			&resoureReconcile{managedClusterDiscoveryClient: managedClusterDiscoveryClient, nodeLister: nodeInformer.Lister()},
 			&claimReconcile{claimLister: claimInformer.Lister(),
 				maxCustomClusterClaims:       maxCustomClusterClaims,
