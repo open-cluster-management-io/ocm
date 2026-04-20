@@ -61,7 +61,7 @@ type ClusterDecision struct {
 
 	// Score is the computed score for the cluster based on configured prioritizers
 	// +optional
-	Score int64 `json:"score"`
+	Score int64 `json:"score,omitzero"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
