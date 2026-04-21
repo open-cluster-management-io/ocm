@@ -42,6 +42,26 @@ func updateDeploymentsStatusSuccess(kubeClient kubernetes.Interface, namespace s
 	}
 }
 
+func updateAllDeploymentsStatusSuccess(kubeClient kubernetes.Interface, namespace string) {
+	deployments, err := kubeClient.AppsV1().Deployments(namespace).List(context.Background(), metav1.ListOptions{})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	var names []string
+	for _, d := range deployments.Items {
+		names = append(names, d.Name)
+	}
+	updateDeploymentsStatusSuccess(kubeClient, namespace, names...)
+}
+
+func updateAllDeploymentsStatusFail(kubeClient kubernetes.Interface, namespace string) {
+	deployments, err := kubeClient.AppsV1().Deployments(namespace).List(context.Background(), metav1.ListOptions{})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	var names []string
+	for _, d := range deployments.Items {
+		names = append(names, d.Name)
+	}
+	updateDeploymentsStatusFail(kubeClient, namespace, names...)
+}
+
 func updateDeploymentsStatusFail(kubeClient kubernetes.Interface, namespace string, deployments ...string) {
 	for _, deploymentName := range deployments {
 		gomega.Eventually(func() error {
