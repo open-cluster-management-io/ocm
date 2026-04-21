@@ -13,6 +13,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
@@ -284,9 +285,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
-			updateDeploymentsStatusFail(kubeClient, hubNamespace,
-				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
-				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
+			updateAllDeploymentsStatusFail(kubeClient, hubNamespace)
 
 			// Check validating webhook
 			registrationValidatingWebhook := "managedclustervalidators.admission.cluster.open-cluster-management.io"
@@ -310,9 +309,27 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
-			updateDeploymentsStatusSuccess(kubeClient, hubNamespace,
-				hubRegistrationDeployment, hubPlacementDeployment, hubRegistrationWebhookDeployment,
-				hubWorkWebhookDeployment, hubWorkControllerDeployment, hubAddOnManagerDeployment, hubAddOnWebhookDeployment)
+			updateAllDeploymentsStatusSuccess(kubeClient, hubNamespace)
+
+			// Wait for ConditionProgressing to become False before checking webhooks.
+			// This ensures the operator has reconciled all deployment status updates
+			// and avoids a race condition where the webhook check starts before the
+			// operator sees all deployments as ready.
+			gomega.Eventually(func() error {
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(
+					context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				cond := meta.FindStatusCondition(clusterManager.Status.Conditions, operatorapiv1.ConditionProgressing)
+				if cond == nil {
+					return fmt.Errorf("ConditionProgressing not found")
+				}
+				if cond.Status != metav1.ConditionFalse {
+					return fmt.Errorf("ConditionProgressing is %s, waiting for False", cond.Status)
+				}
+				return nil
+			}, eventuallyTimeout*2, eventuallyInterval).Should(gomega.BeNil())
 
 			gomega.Eventually(func() error {
 				_, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
@@ -1642,7 +1659,7 @@ var _ = ginkgo.Describe("ClusterManager TLS Profile", func() {
 			context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		// Clean up PlacementConfiguration to avoid affecting other tests
+		// Clean up PlacementConfiguration and RegistrationConfiguration to avoid affecting other tests
 		gomega.Eventually(func() error {
 			clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(
 				context.Background(), clusterManagerName, metav1.GetOptions{})
@@ -1650,6 +1667,7 @@ var _ = ginkgo.Describe("ClusterManager TLS Profile", func() {
 				return err
 			}
 			clusterManager.Spec.PlacementConfiguration = nil
+			clusterManager.Spec.RegistrationConfiguration = nil
 			_, err = operatorClient.OperatorV1().ClusterManagers().Update(
 				context.Background(), clusterManager, metav1.UpdateOptions{})
 			return err

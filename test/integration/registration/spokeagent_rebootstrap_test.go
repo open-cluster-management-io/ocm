@@ -372,7 +372,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 				case <-agentCtx.Done():
 					// restart agent
 					fmt.Println("[agent-scheduler] - restart agent...")
-					agentCtx, stopAgent, _ = startAgent(spokeCtx, managedClusterName, hubKubeconfigDir, agentOptions)
+					agentCtx, stopAgent, agentConfig = startAgent(spokeCtx, managedClusterName, hubKubeconfigDir, agentOptions)
 				case <-spokeCtx.Done():
 					// exit
 					fmt.Println("[agent-scheduler] - shutting down...")
