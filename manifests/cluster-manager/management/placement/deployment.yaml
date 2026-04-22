@@ -171,10 +171,22 @@ spec:
         volumeMounts:
         - name: tmpdir
           mountPath: /tmp
+        {{- if .ServingCertSecret }}
+        - name: serving-cert
+          mountPath: /var/run/secrets/serving-cert
+          readOnly: true
+        {{- end }}
       {{ end }}
       volumes:
       - name: tmpdir
         emptyDir: { }
+      {{- if .ServingCertSecret }}
+      - name: serving-cert
+        secret:
+          secretName: {{ .ServingCertSecret }}
+          defaultMode: 420
+          optional: true
+      {{- end }}
       {{ if .HostedMode }}
       - name: kubeconfig
         secret:
