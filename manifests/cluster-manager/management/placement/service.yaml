@@ -3,6 +3,12 @@ apiVersion: v1
 metadata:
   name: {{ .ClusterManagerName }}-placement
   namespace: {{ .ClusterManagerNamespace }}
+  {{ if gt (len .Annotations) 0 }}
+  annotations:
+    {{ range $key, $value := .Annotations }}
+    "{{ $key }}": "{{ $value }}"
+    {{ end }}
+  {{ end }}
   labels:
     {{ if gt (len .Labels) 0 }}
     {{ range $key, $value := .Labels }}
