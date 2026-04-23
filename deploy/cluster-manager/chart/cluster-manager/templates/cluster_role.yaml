@@ -165,6 +165,10 @@ rules:
 - apiGroups: [ "cluster.x-k8s.io" ]
   resources: [ "clusters" ]
   verbs: ["get", "list", "watch"]
+# Allow the registration-operator to manage network policies
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["create", "get", "list", "update", "patch", "delete"]
 # for grpc-sever, the grpc-server need join permission for bootstrapping a managed cluster
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["managedclustersets/join"]
