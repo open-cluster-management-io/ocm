@@ -30,6 +30,7 @@ type Options struct {
 	ControlPlaneNodeLabelSelector string
 	DeploymentReplicas            int32
 	EnableSyncLabels              bool
+	EnableNetworkPolicy           bool
 }
 
 // RunClusterManagerOperator starts a new cluster manager operator
@@ -120,6 +121,7 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		o.DeploymentReplicas,
 		controllerContext.OperatorNamespace,
 		o.EnableSyncLabels,
+		o.EnableNetworkPolicy,
 		tlsMinVersion,
 		tlsCipherSuites,
 	)

@@ -17,6 +17,7 @@ import (
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -147,6 +148,8 @@ func CleanUpStaticObject(
 		err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(ctx, t.Name, metav1.DeleteOptions{})
 	case *admissionv1.MutatingWebhookConfiguration:
 		err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(ctx, t.Name, metav1.DeleteOptions{})
+	case *networkingv1.NetworkPolicy:
+		err = client.NetworkingV1().NetworkPolicies(t.Namespace).Delete(ctx, t.Name, metav1.DeleteOptions{})
 	default:
 		err = fmt.Errorf("unhandled type %T", object)
 	}
