@@ -50,6 +50,7 @@ type HubConfig struct {
 	GRPCServerImage                   string
 	GRPCAutoApprovedUsers             string
 	GRPCEndpointType                  string
+	NetworkPolicyEnabled              bool
 	// TLS configuration injected into all managed hub component deployments
 	TLSMinVersion   string
 	TLSCipherSuites string

@@ -67,6 +67,7 @@ type clusterManagerController struct {
 	deploymentReplicas            int32
 	operatorNamespace             string
 	enableSyncLabels              bool
+	enableNetworkPolicy           bool
 	tlsMinVersion                 string
 	tlsCipherSuites               string
 }
@@ -96,6 +97,7 @@ func NewClusterManagerController(
 	deploymentReplicas int32,
 	operatorNamespace string,
 	enableSyncLabels bool,
+	enableNetworkPolicy bool,
 	tlsMinVersion string,
 	tlsCipherSuites string,
 ) factory.Controller {
@@ -115,6 +117,7 @@ func NewClusterManagerController(
 		deploymentReplicas:            deploymentReplicas,
 		operatorNamespace:             operatorNamespace,
 		enableSyncLabels:              enableSyncLabels,
+		enableNetworkPolicy:           enableNetworkPolicy,
 		tlsMinVersion:                 tlsMinVersion,
 		tlsCipherSuites:               tlsCipherSuites,
 	}
@@ -250,6 +253,8 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	// Set TLS config for all managed hub component deployments
 	config.TLSMinVersion = n.tlsMinVersion
 	config.TLSCipherSuites = n.tlsCipherSuites
+
+	config.NetworkPolicyEnabled = n.enableNetworkPolicy
 
 	// Update finalizer at first
 	if clusterManager.DeletionTimestamp.IsZero() {

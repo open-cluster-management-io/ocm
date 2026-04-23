@@ -35,6 +35,10 @@ const (
 )
 
 func startHubOperator(ctx context.Context, mode operatorapiv1.InstallMode) {
+	startHubOperatorWithOptions(ctx, mode, func(_ *clustermanager.Options) {})
+}
+
+func startHubOperatorWithOptions(ctx context.Context, mode operatorapiv1.InstallMode, configure func(*clustermanager.Options)) {
 	certrotation.SigningCertValidity = time.Second * 30
 	certrotation.TargetCertValidity = time.Second * 10
 	certrotation.ResyncInterval = time.Second * 1
@@ -49,6 +53,7 @@ func startHubOperator(ctx context.Context, mode operatorapiv1.InstallMode) {
 
 	o := &clustermanager.Options{}
 	o.EnableSyncLabels = true
+	configure(o)
 	err := o.RunClusterManagerOperator(ctx, &controllercmd.ControllerContext{
 		KubeConfig:        config,
 		EventRecorder:     util.NewIntegrationTestEventRecorder("integration"),
@@ -1732,5 +1737,66 @@ var _ = ginkgo.Describe("ClusterManager TLS Profile", func() {
 			return fmt.Errorf("deployment %s: --tls-min-version=VersionTLS13 not found in args %v",
 				hubGRPCServerDeployment, actual.Spec.Template.Spec.Containers[0].Args)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+	})
+})
+
+var _ = ginkgo.Describe("ClusterManager NetworkPolicy", ginkgo.Ordered, func() {
+	var cancel context.CancelFunc
+
+	ginkgo.BeforeEach(func() {
+		var ctx context.Context
+		ctx, cancel = context.WithCancel(context.Background())
+		go startHubOperatorWithOptions(ctx, operatorapiv1.InstallModeDefault, func(o *clustermanager.Options) {
+			o.EnableNetworkPolicy = true
+		})
+	})
+	ginkgo.AfterEach(func() {
+		if cancel != nil {
+			cancel()
+		}
+		err := kubeClient.AppsV1().Deployments(hubNamespace).DeleteCollection(
+			context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	})
+
+	ginkgo.It("should create network policies when enabled", func() {
+		gomega.Eventually(func() error {
+			if _, err := kubeClient.NetworkingV1().NetworkPolicies(hubNamespace).Get(
+				context.Background(), "default-deny-all", metav1.GetOptions{}); err != nil {
+				return err
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+		gomega.Eventually(func() error {
+			if _, err := kubeClient.NetworkingV1().NetworkPolicies(hubNamespace).Get(
+				context.Background(), "allow-apiserver-egress", metav1.GetOptions{}); err != nil {
+				return err
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+	})
+
+	ginkgo.It("should not create network policies when disabled", func() {
+		if cancel != nil {
+			cancel()
+		}
+		var ctx context.Context
+		ctx, cancel = context.WithCancel(context.Background())
+		go startHubOperator(ctx, operatorapiv1.InstallModeDefault)
+
+		gomega.Eventually(func() error {
+			if _, err := kubeClient.CoreV1().Namespaces().Get(
+				context.Background(), hubNamespace, metav1.GetOptions{}); err != nil {
+				return err
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+		gomega.Consistently(func() bool {
+			_, err := kubeClient.NetworkingV1().NetworkPolicies(hubNamespace).Get(
+				context.Background(), "default-deny-all", metav1.GetOptions{})
+			return errors.IsNotFound(err)
+		}, 5, eventuallyInterval).Should(gomega.BeTrue())
 	})
 })

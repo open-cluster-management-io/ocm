@@ -87,6 +87,11 @@ var (
 		"cluster-manager/hub/grpc-server/serviceaccount.yaml",
 		"cluster-manager/hub/grpc-server/service.yaml",
 	}
+
+	networkPolicyFiles = []string{
+		"cluster-manager/hub/network-policy/default-deny-all.yaml",
+		"cluster-manager/hub/network-policy/allow-apiserver-egress.yaml",
+	}
 )
 
 type hubReconcile struct {
@@ -116,6 +121,14 @@ func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 	// Remove grpc server related resources if grpc auth is disabled
 	if !config.GRPCAuthEnabled {
 		_, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, grpcServerResourceFiles...)
+		if err != nil {
+			return cm, reconcileStop, err
+		}
+	}
+
+	// Remove network policy resources if network policy is disabled
+	if !config.NetworkPolicyEnabled {
+		_, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, networkPolicyFiles...)
 		if err != nil {
 			return cm, reconcileStop, err
 		}
@@ -179,6 +192,10 @@ func getHubResources(mode operatorapiv1.InstallMode, config manifests.HubConfig)
 
 	if config.GRPCAuthEnabled {
 		hubResources = append(hubResources, grpcServerResourceFiles...)
+	}
+
+	if config.NetworkPolicyEnabled {
+		hubResources = append(hubResources, networkPolicyFiles...)
 	}
 
 	// the hubHostedWebhookServiceFiles are only used in hosted mode

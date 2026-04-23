@@ -30,6 +30,8 @@ func NewHubOperatorCmd() *cobra.Command {
 		"Number of deployment replicas, operator will automatically determine replicas if not set")
 	flags.BoolVar(&cmOptions.EnableSyncLabels, "enable-sync-labels", false,
 		"If set, will sync the labels of ClusterManager CR to all hub resources")
+	flags.BoolVar(&cmOptions.EnableNetworkPolicy, "enable-network-policy", false,
+		"If set, will create NetworkPolicy resources in the hub namespace to restrict pod network access")
 	opts.AddFlags(flags)
 	return cmd
 }
