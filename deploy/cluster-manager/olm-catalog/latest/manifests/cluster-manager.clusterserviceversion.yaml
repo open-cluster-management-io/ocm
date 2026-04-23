@@ -551,6 +551,17 @@ spec:
           - list
           - watch
         - apiGroups:
+          - networking.k8s.io
+          resources:
+          - networkpolicies
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - patch
+          - delete
+        - apiGroups:
           - cluster.open-cluster-management.io
           resources:
           - managedclustersets/join
