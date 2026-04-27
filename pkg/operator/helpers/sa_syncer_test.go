@@ -3,6 +3,8 @@ package helpers
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -14,9 +16,152 @@ import (
 	testclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 )
+
+func TestAssembleClusterConfig_TLSServerName(t *testing.T) {
+	tlsName := "kubernetes.default.svc"
+	t.Run("CAData", func(t *testing.T) {
+		cfg := &rest.Config{
+			Host: "https://10.0.0.1:6443",
+			TLSClientConfig: rest.TLSClientConfig{
+				CAData:     []byte("ca-bytes"),
+				ServerName: tlsName,
+			},
+		}
+		c, err := assembleClusterConfig(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.TLSServerName != tlsName {
+			t.Fatalf("TLSServerName = %q, want %q", c.TLSServerName, tlsName)
+		}
+	})
+	t.Run("CAFile", func(t *testing.T) {
+		dir := t.TempDir()
+		caPath := filepath.Join(dir, "ca.crt")
+		if err := os.WriteFile(caPath, []byte("ca-file-bytes"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		cfg := &rest.Config{
+			Host: "https://10.0.0.1:6443",
+			TLSClientConfig: rest.TLSClientConfig{
+				CAFile:     caPath,
+				ServerName: tlsName,
+			},
+		}
+		c, err := assembleClusterConfig(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.TLSServerName != tlsName {
+			t.Fatalf("TLSServerName = %q, want %q", c.TLSServerName, tlsName)
+		}
+	})
+	t.Run("insecure", func(t *testing.T) {
+		// No CAData/CAFile selects the InsecureSkipTLSVerify branch in assembleClusterConfig.
+		cfg := &rest.Config{
+			Host: "https://10.0.0.1:6443",
+			TLSClientConfig: rest.TLSClientConfig{
+				ServerName: tlsName,
+			},
+		}
+		c, err := assembleClusterConfig(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !c.InsecureSkipTLSVerify {
+			t.Fatalf("InsecureSkipTLSVerify = false, want true")
+		}
+		if c.TLSServerName != tlsName {
+			t.Fatalf("TLSServerName = %q, want %q", c.TLSServerName, tlsName)
+		}
+	})
+}
+
+func TestSyncKubeConfigSecret_tlsServerNameDrift(t *testing.T) {
+	tkc := &rest.Config{
+		Host: "https://api.example:6443",
+		TLSClientConfig: rest.TLSClientConfig{
+			CAData:     []byte("caData"),
+			ServerName: "kubernetes.default.svc",
+		},
+	}
+	kubeconfigMissingTLSName, err := clientcmd.Write(clientcmdapi.Config{
+		Kind:       "Config",
+		APIVersion: "v1",
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"cluster": {
+				Server:                   tkc.Host,
+				CertificateAuthorityData: tkc.TLSClientConfig.CAData,
+			},
+		},
+		Contexts: map[string]*clientcmdapi.Context{
+			"context": {Cluster: "cluster", AuthInfo: "user"},
+		},
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"user": {Token: "ignored"},
+		},
+		CurrentContext: "context",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	secretName := "test-secret"
+	secretNamespace := "test-ns"
+	client := testclient.NewSimpleClientset(&corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: secretName, Namespace: secretNamespace},
+		Data: map[string][]byte{
+			"token":      []byte("aaa"),
+			"kubeconfig": kubeconfigMissingTLSName,
+		},
+	})
+	tokenGetter := func() ([]byte, []byte, map[string][]byte, error) {
+		return []byte("aaa"), nil, nil, nil
+	}
+	err = SyncKubeConfigSecret(
+		context.TODO(), secretName, secretNamespace,
+		"/tmp/kubeconfig", tkc, client.CoreV1(), tokenGetter,
+		events.NewContextualLoggingEventRecorder(t.Name()), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actions := client.Actions()
+	var lastSecret *corev1.Secret
+	for i := len(actions) - 1; i >= 0; i-- {
+		switch a := actions[i].(type) {
+		case clienttesting.CreateAction:
+			if s, ok := a.GetObject().(*corev1.Secret); ok {
+				lastSecret = s
+			}
+		case clienttesting.UpdateAction:
+			if s, ok := a.GetObject().(*corev1.Secret); ok {
+				lastSecret = s
+			}
+		}
+		if lastSecret != nil {
+			break
+		}
+	}
+	if lastSecret == nil {
+		t.Fatalf("expected a create/update secret action, got %#v", actions)
+	}
+	loaded, err := clientcmd.Load(lastSecret.Data["kubeconfig"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	cluster := loaded.Clusters["cluster"]
+	if cluster == nil {
+		t.Fatal("cluster context missing")
+	}
+	if cluster.TLSServerName != tkc.ServerName {
+		t.Fatalf("synced TLSServerName = %q, want %q", cluster.TLSServerName, tkc.ServerName)
+	}
+}
 
 func TestTokenGetter(t *testing.T) {
 	saName := "test-sa"
