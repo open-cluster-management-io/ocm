@@ -1201,3 +1201,220 @@ func TestOnUpdateFunc(t *testing.T) {
 		})
 	}
 }
+
+func TestKindOrder(t *testing.T) {
+	cases := []struct {
+		name     string
+		obj      *unstructured.Unstructured
+		expected int
+	}{
+		{
+			name:     "nil object",
+			obj:      nil,
+			expected: 1001,
+		},
+		{
+			name:     "Namespace",
+			obj:      testingcommon.NewUnstructured("v1", "Namespace", "", "test"),
+			expected: 0,
+		},
+		{
+			name:     "ServiceAccount",
+			obj:      testingcommon.NewUnstructured("v1", "ServiceAccount", "ns1", "test"),
+			expected: 2,
+		},
+		{
+			name:     "Deployment",
+			obj:      testingcommon.NewUnstructured("apps/v1", "Deployment", "ns1", "test"),
+			expected: 5,
+		},
+		{
+			name:     "unknown kind",
+			obj:      testingcommon.NewUnstructured("v1", "SomeCustomResource", "ns1", "test"),
+			expected: 1000,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual := kindOrder(c.obj)
+			if actual != c.expected {
+				t.Errorf("expected %d, got %d", c.expected, actual)
+			}
+		})
+	}
+}
+
+func TestParseAndSortManifests(t *testing.T) {
+	toRawManifest := func(obj *unstructured.Unstructured) workapiv1.Manifest {
+		raw, _ := obj.MarshalJSON()
+		return workapiv1.Manifest{RawExtension: runtime.RawExtension{Raw: raw}}
+	}
+
+	cases := []struct {
+		name              string
+		manifests         []workapiv1.Manifest
+		expectedSpecOrder []int
+		expectedKinds     []string
+	}{
+		{
+			name: "single manifest unchanged",
+			manifests: []workapiv1.Manifest{
+				toRawManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "s1")),
+			},
+			expectedSpecOrder: []int{0},
+			expectedKinds:     []string{"Secret"},
+		},
+		{
+			name: "same kind preserves spec order",
+			manifests: []workapiv1.Manifest{
+				toRawManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "s1")),
+				toRawManifest(testingcommon.NewUnstructured("v1", "Secret", "ns2", "s2")),
+			},
+			expectedSpecOrder: []int{0, 1},
+			expectedKinds:     []string{"Secret", "Secret"},
+		},
+		{
+			name: "deployment sorted after service account",
+			manifests: []workapiv1.Manifest{
+				toRawManifest(testingcommon.NewUnstructured("apps/v1", "Deployment", "ns1", "deploy")),
+				toRawManifest(testingcommon.NewUnstructured("v1", "ServiceAccount", "ns1", "sa")),
+			},
+			expectedSpecOrder: []int{1, 0},
+			expectedKinds:     []string{"ServiceAccount", "Deployment"},
+		},
+		{
+			name: "full dependency chain sorted correctly",
+			manifests: []workapiv1.Manifest{
+				toRawManifest(testingcommon.NewUnstructured("apps/v1", "Deployment", "ns1", "deploy")),
+				toRawManifest(testingcommon.NewUnstructured("v1", "ConfigMap", "ns1", "cm")),
+				toRawManifest(testingcommon.NewUnstructured("v1", "Namespace", "", "ns1")),
+				toRawManifest(testingcommon.NewUnstructured("v1", "ServiceAccount", "ns1", "sa")),
+				toRawManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "secret")),
+			},
+			expectedSpecOrder: []int{2, 3, 1, 4, 0},
+			expectedKinds:     []string{"Namespace", "ServiceAccount", "ConfigMap", "Secret", "Deployment"},
+		},
+		{
+			name: "unknown kinds sorted after known kinds",
+			manifests: []workapiv1.Manifest{
+				toRawManifest(testingcommon.NewUnstructured("v1", "CustomThing", "ns1", "ct")),
+				toRawManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "s1")),
+			},
+			expectedSpecOrder: []int{1, 0},
+			expectedKinds:     []string{"Secret", "CustomThing"},
+		},
+		{
+			name: "stable sort preserves relative order for equal priority",
+			manifests: []workapiv1.Manifest{
+				toRawManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "s1")),
+				toRawManifest(testingcommon.NewUnstructured("apps/v1", "Deployment", "ns1", "d1")),
+				toRawManifest(testingcommon.NewUnstructured("v1", "Secret", "ns2", "s2")),
+				toRawManifest(testingcommon.NewUnstructured("apps/v1", "Deployment", "ns2", "d2")),
+			},
+			expectedSpecOrder: []int{0, 2, 1, 3},
+			expectedKinds:     []string{"Secret", "Secret", "Deployment", "Deployment"},
+		},
+		{
+			name:              "empty manifests",
+			manifests:         []workapiv1.Manifest{},
+			expectedSpecOrder: []int{},
+			expectedKinds:     []string{},
+		},
+		{
+			name: "invalid manifest JSON",
+			manifests: []workapiv1.Manifest{
+				{RawExtension: runtime.RawExtension{Raw: []byte("not-json")}},
+				toRawManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "s1")),
+			},
+			expectedSpecOrder: []int{1, 0},
+			expectedKinds:     []string{"Secret", ""},
+		},
+	}
+
+	reconciler := &manifestworkReconciler{restMapper: spoketesting.NewFakeRestMapper()}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ordered := reconciler.parseAndSortManifests(c.manifests)
+			if len(ordered) != len(c.expectedSpecOrder) {
+				t.Fatalf("expected %d items, got %d", len(c.expectedSpecOrder), len(ordered))
+			}
+
+			for i, om := range ordered {
+				if om.specIndex != c.expectedSpecOrder[i] {
+					t.Errorf("index %d: expected specIndex %d, got %d", i, c.expectedSpecOrder[i], om.specIndex)
+				}
+
+				kind := ""
+				if om.obj != nil {
+					kind = om.obj.GetKind()
+				}
+				if kind != c.expectedKinds[i] {
+					t.Errorf("index %d: expected kind %q, got %q", i, c.expectedKinds[i], kind)
+				}
+			}
+		})
+	}
+}
+
+func TestApplyManifestsInDependencyOrder(t *testing.T) {
+	// Verify that when a ManifestWork contains a Deployment (spec index 0) and a
+	// Secret (spec index 1), the Secret is sorted ahead of the Deployment, but
+	// results are stored at the original spec indices.
+	tc := newTestCase("dependency order: sa before deployment").
+		withWorkManifest(
+			testingcommon.NewUnstructured("apps/v1", "Deployment", "ns1", "deploy"),
+			testingcommon.NewUnstructured("v1", "Secret", "ns1", "secret"),
+		).
+		withExpectedWorkAction("patch").
+		withAppliedWorkAction("create").
+		withExpectedKubeAction("get", "create").
+		withExpectedDynamicAction("get", "create").
+		withExpectedManifestCondition(
+			expectedCondition(workapiv1.ManifestApplied, metav1.ConditionTrue),
+			expectedCondition(workapiv1.ManifestApplied, metav1.ConditionTrue),
+		).
+		withExpectedWorkCondition(expectedCondition(workapiv1.WorkApplied, metav1.ConditionTrue))
+
+	work, workKey := tc.newManifestWork()
+	controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
+		withKubeObject().
+		withUnstructuredObject()
+
+	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
+	err := controller.toController().sync(context.TODO(), syncContext, work.Name)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	tc.validate(t, controller.dynamicClient, controller.workClient, controller.kubeClient)
+
+	// Verify the ordinals in manifest conditions match original spec indices
+	for _, action := range controller.workClient.Actions() {
+		if action.GetResource().Resource != "manifestworks" {
+			continue
+		}
+		patchAction, ok := action.(clienttesting.PatchActionImpl)
+		if !ok {
+			continue
+		}
+		patchedWork := &workapiv1.ManifestWork{}
+		if err := json.Unmarshal(patchAction.Patch, patchedWork); err != nil {
+			t.Fatal(err)
+		}
+		for _, mc := range patchedWork.Status.ResourceStatus.Manifests {
+			switch mc.ResourceMeta.Kind {
+			case "Deployment":
+				if mc.ResourceMeta.Ordinal != 0 {
+					t.Errorf("Deployment should have ordinal 0 (spec index), got %d", mc.ResourceMeta.Ordinal)
+				}
+			case "Secret":
+				if mc.ResourceMeta.Ordinal != 1 {
+					t.Errorf("Secret should have ordinal 1 (spec index), got %d", mc.ResourceMeta.Ordinal)
+				}
+			}
+		}
+	}
+
+}

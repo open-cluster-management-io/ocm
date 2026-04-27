@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/util/retry"
@@ -31,6 +33,67 @@ type applyResult struct {
 	Error  error
 
 	resourceMeta workapiv1.ManifestResourceMeta
+}
+
+// resourceApplyOrder defines the priority rank for applying resources by kind.
+// Lower rank means applied first. Resources of the same rank preserve their spec order
+// (stable sort). Kinds not listed here are applied after all listed kinds (rank 1000),
+// preserving their relative spec order; nil/unparseable manifests sort last (rank 1001).
+//
+// Rank 0: Cluster-scoped foundations — no dependencies on other resources
+// Rank 1: RBAC — needed before workloads that reference service accounts
+// Rank 2: Namespace-scoped policies and identity — must exist before workloads
+// Rank 3: Config and storage — referenced by workloads as volumes or env
+// Rank 4: Networking — services, ingress, etc.
+// Rank 5: Workloads — pods, deployments, jobs, etc.
+// Rank 6: Post-workload — webhooks and API aggregation that may depend on running workloads
+var resourceApplyOrder = map[string]int{
+	// Rank 0: cluster-scoped, no deps
+	"PriorityClass":            0,
+	"Namespace":                0,
+	"CustomResourceDefinition": 0,
+	"StorageClass":             0,
+	"PersistentVolume":         0,
+	"PodSecurityPolicy":        0,
+
+	// Rank 1: RBAC
+	"ClusterRole":        1,
+	"ClusterRoleBinding": 1,
+	"Role":               1,
+	"RoleBinding":        1,
+
+	// Rank 2: namespace-scoped policies and identity
+	"NetworkPolicy":       2,
+	"ResourceQuota":       2,
+	"LimitRange":          2,
+	"PodDisruptionBudget": 2,
+	"ServiceAccount":      2,
+
+	// Rank 3: config and storage
+	"Secret":                3,
+	"ConfigMap":             3,
+	"PersistentVolumeClaim": 3,
+
+	// Rank 4: networking
+	"Service": 4,
+
+	// Rank 5: workloads
+	"DaemonSet":               5,
+	"Pod":                     5,
+	"ReplicationController":   5,
+	"ReplicaSet":              5,
+	"Deployment":              5,
+	"HorizontalPodAutoscaler": 5,
+	"StatefulSet":             5,
+	"Job":                     5,
+	"CronJob":                 5,
+
+	// Rank 6: post-workload
+	"APIService":                       6,
+	"MutatingWebhookConfiguration":     6,
+	"ValidatingWebhookConfiguration":   6,
+	"ValidatingAdmissionPolicy":        6,
+	"ValidatingAdmissionPolicyBinding": 6,
 }
 
 type manifestworkReconciler struct {
@@ -131,6 +194,49 @@ func (m *manifestworkReconciler) reconcile(
 	return manifestWork, appliedManifestWork, resourceResults, err
 }
 
+// orderedManifest holds a pre-parsed manifest together with its original position in the spec.
+// Manifests are sorted by resource kind for apply ordering, while specIndex preserves the
+// original position for ordinal tracking and status updates.
+type orderedManifest struct {
+	specIndex    int
+	obj          *unstructured.Unstructured
+	gvr          schema.GroupVersionResource
+	resourceMeta workapiv1.ManifestResourceMeta
+	err          error
+}
+
+func (m *manifestworkReconciler) parseAndSortManifests(manifests []workapiv1.Manifest) []orderedManifest {
+	ordered := make([]orderedManifest, len(manifests))
+	for i, manifest := range manifests {
+		obj := &unstructured.Unstructured{}
+		if err := obj.UnmarshalJSON(manifest.Raw); err != nil {
+			ordered[i] = orderedManifest{specIndex: i, resourceMeta: workapiv1.ManifestResourceMeta{
+				Ordinal: int32(i), //nolint:gosec
+			}, err: err}
+			continue
+		}
+
+		resMeta, gvr, err := helper.BuildResourceMeta(i, obj, m.restMapper)
+		ordered[i] = orderedManifest{specIndex: i, obj: obj, gvr: gvr, resourceMeta: resMeta, err: err}
+	}
+
+	sort.SliceStable(ordered, func(i, j int) bool {
+		return kindOrder(ordered[i].obj) < kindOrder(ordered[j].obj)
+	})
+
+	return ordered
+}
+
+func kindOrder(obj *unstructured.Unstructured) int {
+	if obj == nil {
+		return 1001
+	}
+	if order, ok := resourceApplyOrder[obj.GetKind()]; ok {
+		return order
+	}
+	return 1000
+}
+
 func (m *manifestworkReconciler) applyManifests(
 	ctx context.Context,
 	manifests []workapiv1.Manifest,
@@ -140,14 +246,17 @@ func (m *manifestworkReconciler) applyManifests(
 	owner metav1.OwnerReference,
 	existingResults []applyResult) []applyResult {
 
-	for index, manifest := range manifests {
-		switch {
-		case existingResults[index].Result == nil:
-			// Apply if there is no result.
-			existingResults[index] = m.applyOneManifest(ctx, index, manifest, workSpec, workStatus, recorder, owner)
-		case apierrors.IsConflict(existingResults[index].Error):
-			// Apply if there is a resource conflict error.
-			existingResults[index] = m.applyOneManifest(ctx, index, manifest, workSpec, workStatus, recorder, owner)
+	ordered := m.parseAndSortManifests(manifests)
+
+	for _, om := range ordered {
+		needsApply := existingResults[om.specIndex].Result == nil || apierrors.IsConflict(existingResults[om.specIndex].Error)
+		if !needsApply {
+			continue
+		}
+		if om.err != nil {
+			existingResults[om.specIndex] = applyResult{Error: om.err, resourceMeta: om.resourceMeta}
+		} else {
+			existingResults[om.specIndex] = m.applyOneManifest(ctx, om, workSpec, workStatus, recorder, owner)
 		}
 	}
 
@@ -156,49 +265,34 @@ func (m *manifestworkReconciler) applyManifests(
 
 func (m *manifestworkReconciler) applyOneManifest(
 	ctx context.Context,
-	index int,
-	manifest workapiv1.Manifest,
+	om orderedManifest,
 	workSpec workapiv1.ManifestWorkSpec,
 	workStatus workapiv1.ManifestWorkStatus,
 	recorder events.Recorder,
 	owner metav1.OwnerReference) applyResult {
 	logger := klog.FromContext(ctx)
-	result := applyResult{}
-
-	// parse the required and set resource meta
-	required := &unstructured.Unstructured{}
-	if err := required.UnmarshalJSON(manifest.Raw); err != nil {
-		result.Error = err
-		return result
-	}
+	result := applyResult{resourceMeta: om.resourceMeta}
 
 	// ignore the required object UID to avoid UID precondition failed error
-	if len(required.GetUID()) != 0 {
-		logger.Info("Ignore the UID for the manifest index", "uid", required.GetUID(), "index", index)
-		required.SetUID("")
-	}
-
-	resMeta, gvr, err := helper.BuildResourceMeta(index, required, m.restMapper)
-	result.resourceMeta = resMeta
-	if err != nil {
-		result.Error = err
-		return result
+	if len(om.obj.GetUID()) != 0 {
+		logger.Info("Ignore the UID for the manifest index", "uid", om.obj.GetUID(), "index", om.specIndex)
+		om.obj.SetUID("")
 	}
 
 	// manifests with the Complete condition are not updated
-	manifestCondition := helper.FindManifestCondition(resMeta, workStatus.ResourceStatus.Manifests)
+	manifestCondition := helper.FindManifestCondition(om.resourceMeta, workStatus.ResourceStatus.Manifests)
 	if manifestCondition != nil {
 		if meta.IsStatusConditionTrue(manifestCondition.Conditions, workapiv1.ManifestComplete) {
-			result.Result = required
+			result.Result = om.obj
 			return result
 		}
 	}
 
 	// check if the resource to be applied should be owned by the manifest work
-	ownedByTheWork := helper.OwnedByTheWork(gvr, resMeta.Namespace, resMeta.Name, workSpec.DeleteOption)
+	ownedByTheWork := helper.OwnedByTheWork(om.gvr, om.resourceMeta.Namespace, om.resourceMeta.Name, workSpec.DeleteOption)
 
 	// check the Executor subject permission before applying
-	err = m.validator.Validate(ctx, workSpec.Executor, gvr, resMeta.Namespace, resMeta.Name, ownedByTheWork, required)
+	err := m.validator.Validate(ctx, workSpec.Executor, om.gvr, om.resourceMeta.Namespace, om.resourceMeta.Name, ownedByTheWork, om.obj)
 	if err != nil {
 		result.Error = err
 		return result
@@ -208,7 +302,7 @@ func (m *manifestworkReconciler) applyOneManifest(
 	requiredOwner := manageOwnerRef(ownedByTheWork, owner)
 
 	// find update strategy option.
-	option := helper.FindManifestConfiguration(resMeta, workSpec.ManifestConfigs)
+	option := helper.FindManifestConfiguration(om.resourceMeta, workSpec.ManifestConfigs)
 	// strategy is updated by default
 	strategy := workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeUpdate}
 	if option != nil && option.UpdateStrategy != nil {
@@ -216,7 +310,7 @@ func (m *manifestworkReconciler) applyOneManifest(
 	}
 
 	applier := m.appliers.GetApplier(strategy.Type)
-	result.Result, result.Error = applier.Apply(ctx, gvr, required, requiredOwner, option, recorder)
+	result.Result, result.Error = applier.Apply(ctx, om.gvr, om.obj, requiredOwner, option, recorder)
 
 	return result
 }
