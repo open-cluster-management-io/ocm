@@ -177,6 +177,11 @@ func clusterInfoNotChanged(ctx context.Context, secret *corev1.Secret, templateK
 			"before", cluster.InsecureSkipTLSVerify, "after", templateCluster.InsecureSkipTLSVerify)
 		return false
 	}
+	if cluster.TLSServerName != templateCluster.TLSServerName {
+		logger.Info("Cluster tls-server-name changed",
+			"before", cluster.TLSServerName, "after", templateCluster.TLSServerName)
+		return false
+	}
 
 	return true
 }
@@ -245,11 +250,13 @@ func applyKubeconfigSecret(ctx context.Context, templateKubeconfig *rest.Config,
 }
 
 func assembleClusterConfig(templateKubeconfig *rest.Config) (*clientcmdapi.Cluster, error) {
+	tlsServerName := templateKubeconfig.ServerName
 	var c *clientcmdapi.Cluster
 	if len(templateKubeconfig.CAData) != 0 { //nolint:gocritic
 		c = &clientcmdapi.Cluster{
 			Server:                   templateKubeconfig.Host,
 			CertificateAuthorityData: templateKubeconfig.CAData,
+			TLSServerName:            tlsServerName,
 		}
 	} else if len(templateKubeconfig.CAFile) != 0 {
 		caData, err := os.ReadFile(templateKubeconfig.CAFile)
@@ -259,11 +266,13 @@ func assembleClusterConfig(templateKubeconfig *rest.Config) (*clientcmdapi.Clust
 		c = &clientcmdapi.Cluster{
 			Server:                   templateKubeconfig.Host,
 			CertificateAuthorityData: caData,
+			TLSServerName:            tlsServerName,
 		}
 	} else {
 		c = &clientcmdapi.Cluster{
 			Server:                templateKubeconfig.Host,
 			InsecureSkipTLSVerify: true,
+			TLSServerName:         tlsServerName,
 		}
 	}
 	return c, nil
