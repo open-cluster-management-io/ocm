@@ -3,6 +3,7 @@ package scheduling
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 	"time"
@@ -146,7 +147,7 @@ func (s *schedulerHandler) MetricsRecorder() *metrics.ScheduleMetrics {
 }
 
 // Initialize the default prioritizer weight.
-// Balane and Steady weight 1, others weight 0.
+// Balance and Steady weight 1, others weight 0.
 // The default weight can be replaced by each placement's PrioritizerConfigs.
 var defaultPrioritizerConfig = map[clusterapiv1beta1.ScoreCoordinate]int32{
 	{
@@ -356,13 +357,13 @@ func setRequeueAfter(requeueAfter, newRequeueAfter *time.Duration) *time.Duratio
 func getWeights(defaultWeight map[clusterapiv1beta1.ScoreCoordinate]int32,
 	placement *clusterapiv1beta1.Placement) (map[clusterapiv1beta1.ScoreCoordinate]int32, *framework.Status) {
 	mode := placement.Spec.PrioritizerPolicy.Mode
-	switch {
-	case mode == clusterapiv1beta1.PrioritizerPolicyModeExact:
+	switch mode {
+	case clusterapiv1beta1.PrioritizerPolicyModeExact:
 		return mergeWeights(nil, placement.Spec.PrioritizerPolicy.Configurations)
-	case mode == clusterapiv1beta1.PrioritizerPolicyModeAdditive || mode == "":
+	case clusterapiv1beta1.PrioritizerPolicyModeAdditive, "":
 		return mergeWeights(defaultWeight, placement.Spec.PrioritizerPolicy.Configurations)
 	default:
-		msg := fmt.Sprintf("incorrect prioritizer policy mode: %s", mode)
+		msg := fmt.Sprintf("unexpected prioritizer policy mode: %s", mode)
 		return nil, framework.NewStatus("", framework.Misconfigured, msg)
 	}
 }
@@ -373,9 +374,7 @@ func mergeWeights(defaultWeight map[clusterapiv1beta1.ScoreCoordinate]int32,
 	weights := make(map[clusterapiv1beta1.ScoreCoordinate]int32)
 	status := framework.NewStatus("", framework.Success, "")
 	// copy the default weight
-	for sc, w := range defaultWeight {
-		weights[sc] = w
-	}
+	maps.Copy(weights, defaultWeight)
 
 	// override default weight
 	for _, c := range customizedWeight {
@@ -398,15 +397,15 @@ func getPrioritizers(weights map[clusterapiv1beta1.ScoreCoordinate]int32, handle
 			continue
 		}
 		if k.Type == clusterapiv1beta1.ScoreCoordinateTypeBuiltIn {
-			switch {
-			case k.BuiltIn == PrioritizerBalance:
+			switch k.BuiltIn {
+			case PrioritizerBalance:
 				result[k] = balance.New(handle)
-			case k.BuiltIn == PrioritizerSteady:
+			case PrioritizerSteady:
 				result[k] = steady.New(handle)
-			case k.BuiltIn == PrioritizerResourceAllocatableCPU || k.BuiltIn == PrioritizerResourceAllocatableMemory:
+			case PrioritizerResourceAllocatableCPU, PrioritizerResourceAllocatableMemory:
 				result[k] = resource.NewResourcePrioritizerBuilder(handle).WithPrioritizerName(k.BuiltIn).Build()
 			default:
-				msg := fmt.Sprintf("incorrect builtin prioritizer: %s", k.BuiltIn)
+				msg := fmt.Sprintf("unexpected built-in prioritizer: %s", k.BuiltIn)
 				return nil, framework.NewStatus("", framework.Misconfigured, msg)
 			}
 		} else {

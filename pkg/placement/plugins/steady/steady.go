@@ -18,7 +18,7 @@ import (
 const (
 	placementLabel = "cluster.open-cluster-management.io/placement"
 	description    = `
-	Steady prioritizer ensure the existing decision is stabilized. The clusters that existing decisions
+	Steady prioritizer ensures the existing decisions are stabilized. The clusters that existing decisions
 	choose are given the highest score while the clusters with no existing decisions are given the lowest
 	score.
 	`
@@ -37,7 +37,7 @@ func New(handle plugins.Handle) *Steady {
 }
 
 func (s *Steady) Name() string {
-	return reflect.TypeOf(*s).Name()
+	return reflect.TypeFor[Steady]().Name()
 }
 
 func (s *Steady) Description() string {
@@ -69,7 +69,7 @@ func (s *Steady) Score(
 		)
 	}
 
-	existingDecisions := sets.String{}
+	existingDecisions := sets.New[string]()
 	for _, decision := range decisions {
 		for _, d := range decision.Status.Decisions {
 			existingDecisions.Insert(d.ClusterName)
