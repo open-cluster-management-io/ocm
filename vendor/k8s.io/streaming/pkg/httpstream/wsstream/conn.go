@@ -26,11 +26,9 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/portforward"
-	"k8s.io/apimachinery/pkg/util/remotecommand"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
+	"k8s.io/streaming/pkg/httpstream"
+	"k8s.io/streaming/pkg/runtime"
 )
 
 const WebSocketProtocolHeader = "Sec-Websocket-Protocol"
@@ -64,6 +62,8 @@ const ChannelWebSocketProtocol = "channel.k8s.io"
 //	READ  []byte{49, 67, 103, 61, 61} # receive "\n" (base64: "Cg==") on channel '1' (STDOUT)
 //	CLOSE
 const Base64ChannelWebSocketProtocol = "base64.channel.k8s.io"
+
+const streamCloseSignal = 255
 
 type codecType int
 
@@ -126,8 +126,16 @@ func IsWebSocketRequestWithTunnelingProtocol(req *http.Request) bool {
 
 // IgnoreReceives reads from a WebSocket until it is closed, then returns. If timeout is set, the
 // read and write deadlines are pushed every time a new message is received.
+//
+// Contextual logging: IgnoreReceivesWithLogger should be used instead of IgnoreReceives in code which uses contextual logging.
 func IgnoreReceives(ws *websocket.Conn, timeout time.Duration) {
-	defer runtime.HandleCrash()
+	IgnoreReceivesWithLogger(klog.Background(), ws, timeout)
+}
+
+// IgnoreReceivesWithLogger reads from a WebSocket until it is closed, then returns. If timeout is set, the
+// read and write deadlines are pushed every time a new message is received.
+func IgnoreReceivesWithLogger(logger klog.Logger, ws *websocket.Conn, timeout time.Duration) {
+	defer runtime.HandleCrashWithLogger(logger)
 	var data []byte
 	for {
 		resetTimeout(ws, timeout)
@@ -236,7 +244,7 @@ func (conn *Conn) Open(w http.ResponseWriter, req *http.Request) (string, []io.R
 	// "conn.ready" and then blocks until serving is complete.
 	select {
 	case <-conn.ready:
-		klog.V(8).Infof("websocket server initialized--serving")
+		klog.FromContext(req.Context()).V(8).Info("websocket server initialized--serving")
 	case <-serveHTTPComplete:
 		// websocket server returned before completing initialization; cleanup and return error.
 		conn.closeNonThreadSafe() //nolint:errcheck
@@ -316,13 +324,13 @@ func (conn *Conn) Close() error {
 // supports the stream close signal (currently only V5 remotecommand);
 // false otherwise.
 func protocolSupportsStreamClose(protocol string) bool {
-	return protocol == remotecommand.StreamProtocolV5Name
+	return protocol == "v5.channel.k8s.io"
 }
 
 // protocolSupportsWebsocketTunneling returns true if the passed protocol
 // is a tunneled Kubernetes spdy protocol; false otherwise.
 func protocolSupportsWebsocketTunneling(protocol string) bool {
-	return strings.HasPrefix(protocol, portforward.WebsocketsSPDYTunnelingPrefix) && strings.HasSuffix(protocol, portforward.KubernetesSuffix)
+	return strings.HasPrefix(protocol, "SPDY/3.1+") && strings.HasSuffix(protocol, ".k8s.io")
 }
 
 // handle implements a websocket handler.
@@ -330,30 +338,36 @@ func (conn *Conn) handle(ws *websocket.Conn) {
 	conn.initialize(ws)
 	defer conn.Close()
 	supportsStreamClose := protocolSupportsStreamClose(conn.selectedProtocol)
+	// conn.handle is typically used on the server-side and thus we have a request,
+	// but don't assume that and use klog.Background as fallback.
+	logger := klog.Background()
+	if req := ws.Request(); req != nil {
+		logger = klog.FromContext(req.Context())
+	}
 
 	for {
 		conn.resetTimeout()
 		var data []byte
 		if err := websocket.Message.Receive(ws, &data); err != nil {
 			if err != io.EOF {
-				klog.Errorf("Error on socket receive: %v", err)
+				logger.Error(err, "Error on socket receive")
 			}
 			break
 		}
 		if len(data) == 0 {
 			continue
 		}
-		if supportsStreamClose && data[0] == remotecommand.StreamClose {
+		if supportsStreamClose && data[0] == streamCloseSignal {
 			if len(data) != 2 {
-				klog.Errorf("Single channel byte should follow stream close signal. Got %d bytes", len(data)-1)
+				logger.Error(nil, "Single channel byte should follow stream close signal", "receivedLength", len(data)-1)
 				break
 			} else {
 				channel := data[1]
 				if int(channel) >= len(conn.channels) {
-					klog.Errorf("Close is targeted for a channel %d that is not valid, possible protocol error", channel)
+					logger.Error(nil, "Close is targeted for a channel that is not valid, possible protocol error", "channel", channel)
 					break
 				}
-				klog.V(4).Infof("Received half-close signal from client; close %d stream", channel)
+				logger.V(4).Info("Received half-close signal from client, close stream", "channel", channel)
 				conn.channels[channel].Close() // After first Close, other closes are noop.
 			}
 			continue
@@ -364,11 +378,11 @@ func (conn *Conn) handle(ws *websocket.Conn) {
 		}
 		data = data[1:]
 		if int(channel) >= len(conn.channels) {
-			klog.V(6).Infof("Frame is targeted for a reader %d that is not valid, possible protocol error", channel)
+			logger.V(6).Info("Frame is targeted for a reader that is not valid, possible protocol error", "channel", channel)
 			continue
 		}
 		if _, err := conn.channels[channel].DataFromSocket(data); err != nil {
-			klog.Errorf("Unable to write frame (%d bytes) to %d: %v", len(data), channel, err)
+			logger.Error(err, "Unable to write frame", "sendLength", len(data), "channel", channel, "err", err)
 			continue
 		}
 	}
