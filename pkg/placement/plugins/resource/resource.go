@@ -16,9 +16,9 @@ import (
 const (
 	placementLabel = clusterapiv1beta1.PlacementLabel
 	description    = `
-	ResourceAllocatableCPU and ResourceAllocatableMemory prioritizer makes the scheduling
+	ResourceAllocatableCPU and ResourceAllocatableMemory prioritizers make the scheduling
 	decisions based on the resource allocatable of managed clusters.
-	The clusters that has the most allocatable are given the highest score,
+	The clusters that have the most allocatable are given the highest score,
 	while the least is given the lowest score.
 	`
 )
