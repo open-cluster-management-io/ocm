@@ -34,4 +34,11 @@ spec:
   {{- if .Values.priorityClassName }}
   priorityClassName: "{{ .Values.priorityClassName }}"
   {{- end }}
+    {{- if .Values.klusterlet.tlsMinVersion }}
+  tlsMinVersion: "{{ .Values.klusterlet.tlsMinVersion }}"
+  {{- end }}
+  {{- if .Values.klusterlet.tlsCipherSuites }}
+  tlsCipherSuites: "{{ .Values.klusterlet.tlsCipherSuites }}"
+  {{- end }}
+  {{- with .Values.klusterlet.nodePlacement }}
 {{- end }}

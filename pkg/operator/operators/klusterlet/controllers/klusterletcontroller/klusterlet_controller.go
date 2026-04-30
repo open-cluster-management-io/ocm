@@ -57,6 +57,7 @@ type klusterletController struct {
 	deploymentReplicas            int32
 	disableAddonNamespace         bool
 	enableSyncLabels              bool
+	tlsConfigMapWatcher *configMapWatcher
 }
 
 type klusterletReconcile interface {
@@ -183,6 +184,10 @@ type klusterletConfig struct {
 	ExternalManagedKubeConfigAgentSecret        string
 	InstallMode                                 operatorapiv1.InstallMode
 
+	TLSMinVersion   string
+	TLSCipherSuites   string
+	// MaxCustomClusterClaims is the maximum number of custom cluster claims allowed. 0 means no limit.
+
 	MaxCustomClusterClaims       int
 	ReservedClusterClaimSuffixes string
 	// PriorityClassName is the name of the PriorityClass used by the deployed agents
@@ -295,6 +300,10 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 
 	config.populateBootstrap(klusterlet)
+
+	// Populate TLS configuration from klusterlet spec or ConfigMap
+    n.populateTLSConfig(ctx, klusterlet, &config)
+
 
 	config.Labels = helpers.GetKlusterletAgentLabels(klusterlet, n.enableSyncLabels)
 
@@ -503,6 +512,21 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		errs = append(errs, updatedErr)
 	}
 	return utilerrors.NewAggregate(errs)
+}
+// populateTLSConfig reads TLS configuration from klusterlet spec
+func (n *klusterletController) populateTLSConfig(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, config *klusterletConfig) {
+	logger := klog.FromContext(ctx)
+	
+	// Check if klusterlet has TLS configuration
+	if klusterlet.Spec.TLSMinVersion != "" {
+		config.TLSMinVersion = klusterlet.Spec.TLSMinVersion
+		logger.V(2).Info("Using TLS min version from klusterlet spec", "version", config.TLSMinVersion)
+	}
+	
+	if klusterlet.Spec.TLSCipherSuites != "" {
+		config.TLSCipherSuites = klusterlet.Spec.TLSCipherSuites
+		logger.V(2).Info("Using TLS cipher suites from klusterlet spec")
+	}
 }
 
 // TODO also read CABundle from ExternalServerURLs and set into registration deployment
