@@ -25,6 +25,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/placement/plugins/addon"
 	"open-cluster-management.io/ocm/pkg/placement/plugins/balance"
 	"open-cluster-management.io/ocm/pkg/placement/plugins/predicate"
+	"open-cluster-management.io/ocm/pkg/placement/plugins/random"
 	"open-cluster-management.io/ocm/pkg/placement/plugins/resource"
 	"open-cluster-management.io/ocm/pkg/placement/plugins/steady"
 	"open-cluster-management.io/ocm/pkg/placement/plugins/tainttoleration"
@@ -35,6 +36,7 @@ const (
 	PrioritizerSteady                    string = "Steady"
 	PrioritizerResourceAllocatableCPU    string = "ResourceAllocatableCPU"
 	PrioritizerResourceAllocatableMemory string = "ResourceAllocatableMemory"
+	PrioritizerRandom                    string = "Random"
 )
 
 // PrioritizerScore defines the score for each cluster
@@ -404,6 +406,8 @@ func getPrioritizers(weights map[clusterapiv1beta1.ScoreCoordinate]int32, handle
 				result[k] = steady.New(handle)
 			case PrioritizerResourceAllocatableCPU, PrioritizerResourceAllocatableMemory:
 				result[k] = resource.NewResourcePrioritizerBuilder(handle).WithPrioritizerName(k.BuiltIn).Build()
+			case PrioritizerRandom:
+				result[k] = random.New(handle)
 			default:
 				msg := fmt.Sprintf("unexpected built-in prioritizer: %s", k.BuiltIn)
 				return nil, framework.NewStatus("", framework.Misconfigured, msg)
