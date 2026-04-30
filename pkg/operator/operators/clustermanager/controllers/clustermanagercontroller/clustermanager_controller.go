@@ -227,6 +227,13 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	}
 	_, placementFeatureMsgs = helpers.ConvertToFeatureGateFlags("Placement", placementFeatureGates, ocmfeature.DefaultHubPlacementFeatureGates)
 	config.PlacementDebugServerEnabled = helpers.FeatureGateEnabled(placementFeatureGates, ocmfeature.DefaultHubPlacementFeatureGates, ocmfeature.PlacementDebugServer)
+	if config.PlacementDebugServerEnabled {
+		secretName := config.ClusterManagerName + "-placement-serving-cert"
+		config.PlacementServingCertSecret = secretName
+		config.PlacementAnnotations = map[string]string{
+			"service.beta.openshift.io/serving-cert-secret-name": secretName,
+		}
+	}
 
 	featureGateCondition := helpers.BuildFeatureCondition(registrationFeatureMsgs, workFeatureMsgs, addonFeatureMsgs, placementFeatureMsgs)
 
