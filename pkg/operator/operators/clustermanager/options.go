@@ -60,6 +60,7 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 	workSecretInformer := newOneTermInformer(helpers.WorkWebhookSecret)
 	addonSecretInformer := newOneTermInformer(helpers.AddonWebhookSecret)
 	grpcServerSecretInformer := newOneTermInformer(helpers.GRPCServerSecret)
+	placementDebugSecretInformer := newOneTermInformer(helpers.PlacementDebugServingCertSecret)
 	configmapInformer := newOneTermInformer(helpers.CaBundleConfigmap)
 
 	deploymentInformer := informers.NewSharedInformerFactoryWithOptions(kubeClient, 5*time.Minute,
@@ -76,11 +77,12 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		}))
 
 	secretInformers := map[string]corev1informers.SecretInformer{
-		helpers.SignerSecret:              signerSecretInformer.Core().V1().Secrets(),
-		helpers.RegistrationWebhookSecret: registrationSecretInformer.Core().V1().Secrets(),
-		helpers.WorkWebhookSecret:         workSecretInformer.Core().V1().Secrets(),
-		helpers.AddonWebhookSecret:        addonSecretInformer.Core().V1().Secrets(),
-		helpers.GRPCServerSecret:          grpcServerSecretInformer.Core().V1().Secrets(),
+		helpers.SignerSecret:                    signerSecretInformer.Core().V1().Secrets(),
+		helpers.RegistrationWebhookSecret:       registrationSecretInformer.Core().V1().Secrets(),
+		helpers.WorkWebhookSecret:               workSecretInformer.Core().V1().Secrets(),
+		helpers.AddonWebhookSecret:              addonSecretInformer.Core().V1().Secrets(),
+		helpers.GRPCServerSecret:                grpcServerSecretInformer.Core().V1().Secrets(),
+		helpers.PlacementDebugServingCertSecret: placementDebugSecretInformer.Core().V1().Secrets(),
 	}
 
 	// Build operator client and informer
@@ -153,6 +155,7 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 	go workSecretInformer.Start(ctx.Done())
 	go addonSecretInformer.Start(ctx.Done())
 	go grpcServerSecretInformer.Start(ctx.Done())
+	go placementDebugSecretInformer.Start(ctx.Done())
 	go configmapInformer.Start(ctx.Done())
 	go clusterManagerController.Run(ctx, 1)
 	go statusController.Run(ctx, 1)
