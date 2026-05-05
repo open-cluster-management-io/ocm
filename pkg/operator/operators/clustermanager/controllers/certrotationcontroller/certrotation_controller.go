@@ -206,7 +206,7 @@ func (c certRotationController) syncOne(ctx context.Context, clustermanager *ope
 
 		err = c.kubeClient.CoreV1().Secrets(clustermanagerNamespace).Delete(ctx, helpers.PlacementDebugServingCertSecret, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
-			return fmt.Errorf("clean up deleted cluster-manager, deleting placement debug serving secret failed, err:%s", err.Error())
+			return fmt.Errorf("failed to delete secret %q for cluster-manager %q: PlacementDebugServer feature disabled, err: %v", helpers.PlacementDebugServingCertSecret, clustermanager.Name, err)
 		}
 	}
 
@@ -218,7 +218,7 @@ func (c certRotationController) syncOne(ctx context.Context, clustermanager *ope
 
 		err = c.kubeClient.CoreV1().Secrets(clustermanagerNamespace).Delete(ctx, helpers.GRPCServerSecret, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
-			return fmt.Errorf("clean up deleted cluster-manager, deleting grpc server secret failed, err:%s", err.Error())
+			return fmt.Errorf("failed to delete secret %q for cluster-manager %q: GRPCAuth feature disabled, err: %v", helpers.GRPCServerSecret, clustermanager.Name, err)
 		}
 	}
 
