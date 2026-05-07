@@ -8,8 +8,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/utils"
@@ -18,7 +18,7 @@ import (
 // Deprecated: use AddOnDeploymentConfigGVR in package "open-cluster-management.io/addon-framework/pkg/utils" instead.
 var AddOnDeploymentConfigGVR = schema.GroupVersionResource{
 	Group:    "addon.open-cluster-management.io",
-	Version:  "v1alpha1",
+	Version:  "v1beta1",
 	Resource: "addondeploymentconfigs",
 }
 
@@ -49,7 +49,7 @@ type RegexResourceRequirements struct {
 //
 // after transformed, the Values will be:
 // map[global:map[nodeSelector:map[host:ssd]] tolerations:[map[key:test]]]
-func ToAddOnNodePlacementValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
+func ToAddOnNodePlacementValues(config addonapiv1beta1.AddOnDeploymentConfig) (Values, error) {
 	if config.Spec.NodePlacement == nil {
 		return nil, nil
 	}
@@ -86,7 +86,7 @@ func ToAddOnNodePlacementValues(config addonapiv1alpha1.AddOnDeploymentConfig) (
 //
 // after transformed, the Values will be:
 // map[global:map[proxyConfig:map[httpProxy:http://10.11.12.13:3128 httpsProxy:https://10.11.12.13:3129 noProxy:example.com]]]
-func ToAddOnProxyConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
+func ToAddOnProxyConfigValues(config addonapiv1beta1.AddOnDeploymentConfig) (Values, error) {
 	proxyConfig := map[string]string{}
 	if len(config.Spec.ProxyConfig.HTTPProxy) > 0 {
 		proxyConfig["HTTP_PROXY"] = config.Spec.ProxyConfig.HTTPProxy
@@ -137,7 +137,7 @@ func ToAddOnProxyConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Va
 // after transformed, the Values will be:
 // map[global:map[resourceRequirements:[map[containerIDRegExp:"^.+:.+:.+$" resources:map[limits:map[memory:4Gi]
 // requests:map[memory:512Mi]]]]]]
-func ToAddOnResourceRequirementsValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
+func ToAddOnResourceRequirementsValues(config addonapiv1beta1.AddOnDeploymentConfig) (Values, error) {
 	if config.Spec.ResourceRequirements == nil {
 		return nil, nil
 	}
@@ -176,7 +176,7 @@ func ToAddOnResourceRequirementsValues(config addonapiv1alpha1.AddOnDeploymentCo
 //
 // after transformed, the Values will be:
 // map[a:x b:y]
-func ToAddOnCustomizedVariableValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
+func ToAddOnCustomizedVariableValues(config addonapiv1beta1.AddOnDeploymentConfig) (Values, error) {
 	values := Values{}
 	for _, variable := range config.Spec.CustomizedVariables {
 		values[variable.Name] = variable.Value
@@ -187,11 +187,11 @@ func ToAddOnCustomizedVariableValues(config addonapiv1alpha1.AddOnDeploymentConf
 
 // AddOnDeploymentConfigToValuesFunc transform the AddOnDeploymentConfig object into Values object
 // The transformation logic depends on the definition of the addon template
-type AddOnDeploymentConfigToValuesFunc func(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error)
+type AddOnDeploymentConfigToValuesFunc func(config addonapiv1beta1.AddOnDeploymentConfig) (Values, error)
 
 // NewAddOnDeploymentConfigGetter returns a AddOnDeploymentConfigGetter with addon client
 // Deprecated: use NewAddOnDeploymentConfigGetter in pkg/utils package instead.
-func NewAddOnDeploymentConfigGetter(addonClient addonv1alpha1client.Interface) utils.AddOnDeploymentConfigGetter {
+func NewAddOnDeploymentConfigGetter(addonClient addonclient.Interface) utils.AddOnDeploymentConfigGetter {
 	return utils.NewAddOnDeploymentConfigGetter(addonClient)
 }
 
@@ -201,7 +201,7 @@ func NewAddOnDeploymentConfigGetter(addonClient addonv1alpha1client.Interface) u
 // override the one from small index
 func GetAddOnDeploymentConfigValues(
 	getter utils.AddOnDeploymentConfigGetter, toValuesFuncs ...AddOnDeploymentConfigToValuesFunc) GetValuesFunc {
-	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 		var lastValues = Values{}
 		addOnDeploymentConfig, err := utils.GetDesiredAddOnDeploymentConfig(addon, getter)
 		if err != nil {
@@ -224,7 +224,7 @@ func GetAddOnDeploymentConfigValues(
 	}
 }
 
-func GetRegexResourceRequirements(requirements []addonapiv1alpha1.ContainerResourceRequirements) ([]RegexResourceRequirements, error) {
+func GetRegexResourceRequirements(requirements []addonapiv1beta1.ContainerResourceRequirements) ([]RegexResourceRequirements, error) {
 	newRequirements := []RegexResourceRequirements{}
 	for _, item := range requirements {
 		// convert container ID to regex
@@ -272,7 +272,7 @@ func toStringResourceList(resourceList corev1.ResourceList) map[string]string {
 //
 // after transformed, the key set of Values object will be: {"Image", "ImagePullPolicy", "NodeSelector", "Tolerations",
 // "ResourceRequirements"}
-func ToAddOnDeploymentConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
+func ToAddOnDeploymentConfigValues(config addonapiv1beta1.AddOnDeploymentConfig) (Values, error) {
 	values, err := ToAddOnCustomizedVariableValues(config)
 	if err != nil {
 		return nil, err
@@ -324,22 +324,22 @@ func ToAddOnDeploymentConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig
 //     if it is not changed, then override it with the value from the cluster annotation, you can use the function
 //     GetAgentImageValues instead.
 func ToImageOverrideValuesFunc(imageKey, image string) AddOnDeploymentConfigToValuesFunc {
-	return func(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
+	return func(config addonapiv1beta1.AddOnDeploymentConfig) (Values, error) {
 		values, _, err := overrideImageWithKeyValue(imageKey, image, getRegistriesFromAddonDeploymentConfig(config))
 		return values, err
 	}
 }
 
 func getRegistriesFromAddonDeploymentConfig(
-	config addonapiv1alpha1.AddOnDeploymentConfig) func() ([]addonapiv1alpha1.ImageMirror, error) {
-	return func() ([]addonapiv1alpha1.ImageMirror, error) {
+	config addonapiv1beta1.AddOnDeploymentConfig) func() ([]addonapiv1beta1.ImageMirror, error) {
+	return func() ([]addonapiv1beta1.ImageMirror, error) {
 		return config.Spec.Registries, nil
 	}
 }
 
 func getRegistriesFromClusterAnnotation(
-	cluster *clusterv1.ManagedCluster) func() ([]addonapiv1alpha1.ImageMirror, error) {
-	return func() ([]addonapiv1alpha1.ImageMirror, error) {
+	cluster *clusterv1.ManagedCluster) func() ([]addonapiv1beta1.ImageMirror, error) {
+	return func() ([]addonapiv1beta1.ImageMirror, error) {
 		if cluster == nil {
 			return nil, nil
 		}
@@ -349,7 +349,7 @@ func getRegistriesFromClusterAnnotation(
 			return nil, nil
 		}
 		type ImageRegistries struct {
-			Registries []addonapiv1alpha1.ImageMirror `json:"registries"`
+			Registries []addonapiv1beta1.ImageMirror `json:"registries"`
 		}
 
 		imageRegistries := ImageRegistries{}
@@ -382,7 +382,7 @@ func getRegistriesFromClusterAnnotation(
 //     will be: {"global": {"imageOverrides": {"helloWorldImage": "quay.io/ocm/addon-agent:v1"}}}
 //   - Image registries configured in the addonDeploymentConfig will take precedence over the managed cluster annotation
 func GetAgentImageValues(getter utils.AddOnDeploymentConfigGetter, imageKey, image string) GetValuesFunc {
-	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 		addOnDeploymentConfig, err := utils.GetDesiredAddOnDeploymentConfig(addon, getter)
 		if err != nil {
 			return nil, err
@@ -411,7 +411,7 @@ func GetAgentImageValues(getter utils.AddOnDeploymentConfigGetter, imageKey, ima
 	}
 }
 
-func overrideImageWithKeyValue(imageKey, image string, getRegistries func() ([]addonapiv1alpha1.ImageMirror, error),
+func overrideImageWithKeyValue(imageKey, image string, getRegistries func() ([]addonapiv1beta1.ImageMirror, error),
 ) (Values, bool, error) {
 
 	if len(imageKey) == 0 {
@@ -457,7 +457,7 @@ func overrideImageWithKeyValue(imageKey, image string, getRegistries func() ([]a
 
 // OverrideImage checks whether the source configured in registries can match the imagedName, if yes will use the
 // mirror value in the registries to override the imageName
-func OverrideImage(registries []addonapiv1alpha1.ImageMirror, imageName string) string {
+func OverrideImage(registries []addonapiv1beta1.ImageMirror, imageName string) string {
 	if len(registries) == 0 {
 		return imageName
 	}

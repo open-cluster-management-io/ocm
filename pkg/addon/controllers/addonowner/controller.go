@@ -10,10 +10,10 @@ import (
 	"k8s.io/klog/v2"
 
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
@@ -25,17 +25,17 @@ const UnsupportedConfigurationType = "UnsupportedConfiguration"
 // addonOwnerController reconciles instances of managedclusteradd on the hub
 // to add related ClusterManagementAddon as the owner.
 type addonOwnerController struct {
-	addonClient                  addonv1alpha1client.Interface
-	managedClusterAddonLister    addonlisterv1alpha1.ManagedClusterAddOnLister
+	addonClient                  addonclient.Interface
+	managedClusterAddonLister    addonlisterv1beta1.ManagedClusterAddOnLister
 	managedClusterAddonIndexer   cache.Indexer
-	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
+	clusterManagementAddonLister addonlisterv1beta1.ClusterManagementAddOnLister
 	addonFilterFunc              factory.EventFilterFunc
 }
 
 func NewAddonOwnerController(
-	addonClient addonv1alpha1client.Interface,
-	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
-	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
+	addonClient addonclient.Interface,
+	addonInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
+	clusterManagementAddonInformers addoninformerv1beta1.ClusterManagementAddOnInformer,
 	addonFilterFunc factory.EventFilterFunc,
 ) factory.Controller {
 	c := &addonOwnerController{
@@ -96,13 +96,13 @@ func (c *addonOwnerController) sync(ctx context.Context, syncCtx factory.SyncCon
 	}
 
 	owner := metav1.NewControllerRef(clusterManagementAddon, schema.GroupVersionKind{
-		Group:   addonapiv1alpha1.GroupName,
-		Version: addonapiv1alpha1.GroupVersion.Version,
+		Group:   addonv1beta1.GroupName,
+		Version: addonv1beta1.GroupVersion.Version,
 		Kind:    "ClusterManagementAddOn",
 	})
 	modified = utils.MergeOwnerRefs(&addonCopy.OwnerReferences, *owner, false)
 	if modified {
-		_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Update(ctx, addonCopy, metav1.UpdateOptions{})
+		_, err = c.addonClient.AddonV1beta1().ManagedClusterAddOns(namespace).Update(ctx, addonCopy, metav1.UpdateOptions{})
 		return err
 	}
 

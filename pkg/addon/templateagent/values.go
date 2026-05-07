@@ -9,12 +9,13 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 // ToAddOnNodePlacementPrivateValues only transform the AddOnDeploymentConfig NodePlacement part into Values object
 // with a specific key, this value would be used by the addon template controller
-func ToAddOnNodePlacementPrivateValues(config addonapiv1alpha1.AddOnDeploymentConfig) (addonfactory.Values, error) {
+func ToAddOnNodePlacementPrivateValues(config addonapiv1beta1.AddOnDeploymentConfig) (addonfactory.Values, error) {
 	if config.Spec.NodePlacement == nil {
 		return nil, nil
 	}
@@ -26,7 +27,7 @@ func ToAddOnNodePlacementPrivateValues(config addonapiv1alpha1.AddOnDeploymentCo
 
 // ToAddOnRegistriesPrivateValues only transform the AddOnDeploymentConfig Registries part into Values object
 // with a specific key, this value would be used by the addon template controller
-func ToAddOnRegistriesPrivateValues(config addonapiv1alpha1.AddOnDeploymentConfig) (addonfactory.Values, error) {
+func ToAddOnRegistriesPrivateValues(config addonapiv1beta1.AddOnDeploymentConfig) (addonfactory.Values, error) {
 	if config.Spec.Registries == nil {
 		return nil, nil
 	}
@@ -36,7 +37,7 @@ func ToAddOnRegistriesPrivateValues(config addonapiv1alpha1.AddOnDeploymentConfi
 	}, nil
 }
 
-func ToAddOnInstallNamespacePrivateValues(config addonapiv1alpha1.AddOnDeploymentConfig) (addonfactory.Values, error) {
+func ToAddOnInstallNamespacePrivateValues(config addonapiv1beta1.AddOnDeploymentConfig) (addonfactory.Values, error) {
 	if len(config.Spec.AgentInstallNamespace) == 0 {
 		return nil, nil
 	}
@@ -45,7 +46,7 @@ func ToAddOnInstallNamespacePrivateValues(config addonapiv1alpha1.AddOnDeploymen
 	}, nil
 }
 
-func ToAddOnProxyPrivateValues(config addonapiv1alpha1.AddOnDeploymentConfig) (addonfactory.Values, error) {
+func ToAddOnProxyPrivateValues(config addonapiv1beta1.AddOnDeploymentConfig) (addonfactory.Values, error) {
 	proxyConfig := config.Spec.ProxyConfig
 	if len(proxyConfig.HTTPProxy) == 0 &&
 		len(proxyConfig.HTTPSProxy) == 0 &&
@@ -58,7 +59,7 @@ func ToAddOnProxyPrivateValues(config addonapiv1alpha1.AddOnDeploymentConfig) (a
 	}, nil
 }
 
-func ToAddOnResourceRequirementsPrivateValues(config addonapiv1alpha1.AddOnDeploymentConfig) (addonfactory.Values, error) {
+func ToAddOnResourceRequirementsPrivateValues(config addonapiv1beta1.AddOnDeploymentConfig) (addonfactory.Values, error) {
 	if config.Spec.ResourceRequirements == nil {
 		return nil, nil
 	}
@@ -80,7 +81,7 @@ type orderedValues []keyValuePair
 
 func (a *CRDTemplateAgentAddon) getValues(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn,
+	addon *addonapiv1beta1.ManagedClusterAddOn,
 	template *addonapiv1alpha1.AddOnTemplate,
 ) (orderedValues, map[string]interface{}, map[string]interface{}, error) {
 
@@ -144,7 +145,7 @@ func (a *CRDTemplateAgentAddon) getValues(
 
 func (a *CRDTemplateAgentAddon) getBuiltinValues(
 	cluster *clusterv1.ManagedCluster,
-	_ *addonapiv1alpha1.ManagedClusterAddOn,
+	_ *addonapiv1beta1.ManagedClusterAddOn,
 	privateValues map[string]interface{}) ([]string, addonfactory.Values, error) {
 	builtinValues := templateCRDBuiltinValues{}
 	builtinValues.ClusterName = cluster.GetName()
@@ -163,7 +164,7 @@ func (a *CRDTemplateAgentAddon) getBuiltinValues(
 
 func (a *CRDTemplateAgentAddon) getDefaultValues(
 	_ *clusterv1.ManagedCluster,
-	_ *addonapiv1alpha1.ManagedClusterAddOn,
+	_ *addonapiv1beta1.ManagedClusterAddOn,
 	template *addonapiv1alpha1.AddOnTemplate) ([]string, addonfactory.Values, error) {
 	defaultValues := templateCRDDefaultValues{}
 
@@ -196,7 +197,7 @@ func hubKubeconfigPath() string {
 func GetAddOnRegistriesPrivateValuesFromClusterAnnotation(
 	logger klog.Logger,
 	cluster *clusterv1.ManagedCluster,
-	_ *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+	_ *addonapiv1beta1.ManagedClusterAddOn) (addonfactory.Values, error) {
 	values := map[string]interface{}{}
 	annotations := cluster.GetAnnotations()
 	logger.V(4).Info("Try to get image registries from annotation",
@@ -206,7 +207,7 @@ func GetAddOnRegistriesPrivateValuesFromClusterAnnotation(
 		return values, nil
 	}
 	type ImageRegistries struct {
-		Registries []addonapiv1alpha1.ImageMirror `json:"registries"`
+		Registries []addonapiv1beta1.ImageMirror `json:"registries"`
 	}
 
 	imageRegistries := ImageRegistries{}

@@ -11,58 +11,18 @@ import (
 	"k8s.io/klog/v2/ktesting"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	fakecluster "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
-
-func TestNewAddonConfigurationController(t *testing.T) {
-	fakeAddonClient := fakeaddon.NewSimpleClientset()
-	fakeClusterClient := fakecluster.NewSimpleClientset()
-
-	addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
-	clusterInformers := clusterv1informers.NewSharedInformerFactory(fakeClusterClient, 10*time.Minute)
-
-	// Add required indexer
-	err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
-		cache.Indexers{
-			addonindex.ManagedClusterAddonByName: addonindex.IndexManagedClusterAddonByName,
-		})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	addonFilterFunc := func(obj interface{}) bool {
-		return true
-	}
-
-	controller := NewAddonConfigurationController(
-		fakeAddonClient,
-		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
-		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
-		clusterInformers.Cluster().V1beta1().Placements(),
-		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
-		addonFilterFunc,
-	)
-
-	if controller == nil {
-		t.Error("Expected controller to be created, got nil")
-	}
-
-	// Verify controller is of correct type
-	if _, ok := controller.(factory.Controller); !ok {
-		t.Error("Expected controller to implement factory.Controller interface")
-	}
-}
 
 func TestAddonConfigurationControllerSync(t *testing.T) {
 	cases := []struct {
@@ -120,8 +80,8 @@ func TestAddonConfigurationControllerSync(t *testing.T) {
 			},
 			clusterManagementAddons: []runtime.Object{
 				addontesting.NewClusterManagementAddon("test-addon", "", "").
-					WithPlacementStrategy(addonv1alpha1.PlacementStrategy{
-						PlacementRef: addonv1alpha1.PlacementRef{
+					WithPlacementStrategy(addonv1beta1.PlacementStrategy{
+						PlacementRef: addonv1beta1.PlacementRef{
 							Name:      "test-placement",
 							Namespace: "default",
 						},
@@ -129,8 +89,8 @@ func TestAddonConfigurationControllerSync(t *testing.T) {
 							Type: clusterv1alpha1.All,
 						},
 					}).
-					WithInstallProgression(addonv1alpha1.InstallProgression{
-						PlacementRef: addonv1alpha1.PlacementRef{
+					WithInstallProgression(addonv1beta1.InstallProgression{
+						PlacementRef: addonv1beta1.PlacementRef{
 							Name:      "test-placement",
 							Namespace: "default",
 						},
@@ -179,7 +139,7 @@ func TestAddonConfigurationControllerSync(t *testing.T) {
 			clusterInformers := clusterv1informers.NewSharedInformerFactory(fakeClusterClient, 10*time.Minute)
 
 			// Add required indexer
-			err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
+			err := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().AddIndexers(
 				cache.Indexers{
 					addonindex.ManagedClusterAddonByName: addonindex.IndexManagedClusterAddonByName,
 				})
@@ -189,13 +149,13 @@ func TestAddonConfigurationControllerSync(t *testing.T) {
 
 			// Populate informer stores
 			for _, obj := range c.managedClusterAddons {
-				if err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
+				if err := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			for _, obj := range c.clusterManagementAddons {
-				if err := addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetStore().Add(obj); err != nil {
+				if err := addonInformers.Addon().V1beta1().ClusterManagementAddOns().Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -219,8 +179,8 @@ func TestAddonConfigurationControllerSync(t *testing.T) {
 
 			controller := &addonConfigurationController{
 				addonClient:                  fakeAddonClient,
-				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
-				managedClusterAddonIndexer:   addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetIndexer(),
+				clusterManagementAddonLister: addonInformers.Addon().V1beta1().ClusterManagementAddOns().Lister(),
+				managedClusterAddonIndexer:   addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().GetIndexer(),
 				placementLister:              clusterInformers.Cluster().V1beta1().Placements().Lister(),
 				placementDecisionGetter: helpers.PlacementDecisionGetter{
 					Client: clusterInformers.Cluster().V1beta1().PlacementDecisions().Lister(),

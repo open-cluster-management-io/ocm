@@ -10,7 +10,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	fakecluster "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -181,7 +181,7 @@ func TestSyncAddonAnnotations(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			addon := &addonv1alpha1.ManagedClusterAddOn{
+			addon := &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "test-addon",
 					Namespace:   "cluster1",
@@ -299,10 +299,10 @@ func TestSync(t *testing.T) {
 				addontesting.NewAddon("test-addon", "cluster1"),
 			},
 			clusterManagementAddon: []runtime.Object{
-				func() *addonv1alpha1.ClusterManagementAddOn {
+				func() *addonv1beta1.ClusterManagementAddOn {
 					cma := addontesting.NewClusterManagementAddon("test-addon", "", "").Build()
-					cma.Spec.InstallStrategy = addonv1alpha1.InstallStrategy{
-						Type: addonv1alpha1.AddonInstallStrategyManual,
+					cma.Spec.InstallStrategy = addonv1beta1.InstallStrategy{
+						Type: addonv1beta1.AddonInstallStrategyManual,
 					}
 					return cma
 				}(),
@@ -354,7 +354,7 @@ func TestSync(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).GetObject()
-				addon := actual.(*addonv1alpha1.ManagedClusterAddOn)
+				addon := actual.(*addonv1beta1.ManagedClusterAddOn)
 				if len(addon.Annotations) != 2 {
 					t.Errorf("expected 2 annotations, got %d: %v", len(addon.Annotations), addon.Annotations)
 				}
@@ -383,7 +383,7 @@ func TestSync(t *testing.T) {
 				},
 			},
 			managedClusterAddons: []runtime.Object{
-				func() *addonv1alpha1.ManagedClusterAddOn {
+				func() *addonv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test-addon", "cluster1")
 					addon.Annotations = map[string]string{
 						"addon.open-cluster-management.io/key": "val",
@@ -407,7 +407,7 @@ func TestSync(t *testing.T) {
 				},
 			},
 			managedClusterAddons: []runtime.Object{
-				func() *addonv1alpha1.ManagedClusterAddOn {
+				func() *addonv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test-addon", "cluster1")
 					addon.Annotations = map[string]string{
 						"addon.open-cluster-management.io/old-key": "old-val",
@@ -422,7 +422,7 @@ func TestSync(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).GetObject()
-				addon := actual.(*addonv1alpha1.ManagedClusterAddOn)
+				addon := actual.(*addonv1beta1.ManagedClusterAddOn)
 				if len(addon.Annotations) != 1 {
 					t.Errorf("expected 1 annotation, got %d: %v", len(addon.Annotations), addon.Annotations)
 				}
@@ -478,10 +478,10 @@ func TestSync(t *testing.T) {
 			},
 			clusterManagementAddon: []runtime.Object{
 				newCMAWithPlacementStrategy("placement-addon"),
-				func() *addonv1alpha1.ClusterManagementAddOn {
+				func() *addonv1beta1.ClusterManagementAddOn {
 					cma := addontesting.NewClusterManagementAddon("manual-addon", "", "").Build()
-					cma.Spec.InstallStrategy = addonv1alpha1.InstallStrategy{
-						Type: addonv1alpha1.AddonInstallStrategyManual,
+					cma.Spec.InstallStrategy = addonv1beta1.InstallStrategy{
+						Type: addonv1beta1.AddonInstallStrategyManual,
 					}
 					return cma
 				}(),
@@ -489,7 +489,7 @@ func TestSync(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).GetObject()
-				addon := actual.(*addonv1alpha1.ManagedClusterAddOn)
+				addon := actual.(*addonv1beta1.ManagedClusterAddOn)
 				if addon.Name != "placement-addon" {
 					t.Errorf("expected placement-addon to be updated, got %s", addon.Name)
 				}
@@ -507,12 +507,12 @@ func TestSync(t *testing.T) {
 			clusterInformerFactory := clusterv1informers.NewSharedInformerFactory(fakeClusterClient, 10*time.Minute)
 
 			for _, obj := range c.managedClusterAddons {
-				if err := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
+				if err := addonInformerFactory.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
 				}
 			}
 			for _, obj := range c.clusterManagementAddon {
-				if err := addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetStore().Add(obj); err != nil {
+				if err := addonInformerFactory.Addon().V1beta1().ClusterManagementAddOns().Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -525,8 +525,8 @@ func TestSync(t *testing.T) {
 			controller := &addonAnnotationController{
 				addonClient:                  fakeAddonClient,
 				managedClusterLister:         clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				managedClusterAddonLister:    addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				clusterManagementAddonLister: addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+				managedClusterAddonLister:    addonInformerFactory.Addon().V1beta1().ManagedClusterAddOns().Lister(),
+				clusterManagementAddonLister: addonInformerFactory.Addon().V1beta1().ClusterManagementAddOns().Lister(),
 			}
 
 			syncContext := testingcommon.NewFakeSyncContext(t, c.syncKey)
@@ -542,13 +542,13 @@ func TestSync(t *testing.T) {
 	}
 }
 
-func newCMAWithPlacementStrategy(name string) *addonv1alpha1.ClusterManagementAddOn {
+func newCMAWithPlacementStrategy(name string) *addonv1beta1.ClusterManagementAddOn {
 	cma := addontesting.NewClusterManagementAddon(name, "", "").Build()
-	cma.Spec.InstallStrategy = addonv1alpha1.InstallStrategy{
-		Type: addonv1alpha1.AddonInstallStrategyPlacements,
-		Placements: []addonv1alpha1.PlacementStrategy{
+	cma.Spec.InstallStrategy = addonv1beta1.InstallStrategy{
+		Type: addonv1beta1.AddonInstallStrategyPlacements,
+		Placements: []addonv1beta1.PlacementStrategy{
 			{
-				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				PlacementRef: addonv1beta1.PlacementRef{Name: "test-placement", Namespace: "default"},
 			},
 		},
 	}

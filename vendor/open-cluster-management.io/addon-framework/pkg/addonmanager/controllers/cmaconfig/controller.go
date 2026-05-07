@@ -13,10 +13,10 @@ import (
 	"k8s.io/client-go/dynamic/dynamiclister"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/addon-framework/pkg/index"
@@ -32,21 +32,21 @@ type enqueueFunc func(obj interface{})
 
 // cmaConfigController reconciles all interested addon config types (GroupVersionResource) on the hub.
 type cmaConfigController struct {
-	addonClient                   addonv1alpha1client.Interface
-	clusterManagementAddonLister  addonlisterv1alpha1.ClusterManagementAddOnLister
+	addonClient                   addonclient.Interface
+	clusterManagementAddonLister  addonlisterv1beta1.ClusterManagementAddOnLister
 	clusterManagementAddonIndexer cache.Indexer
 	configListers                 map[schema.GroupResource]dynamiclister.Lister
 	queue                         workqueue.TypedRateLimitingInterface[string]
 	cmaFilterFunc                 factory.EventFilterFunc
 	configGVRs                    map[schema.GroupVersionResource]bool
-	addonPatcher                  patcher.Patcher[*addonapiv1alpha1.ClusterManagementAddOn,
-		addonapiv1alpha1.ClusterManagementAddOnSpec,
-		addonapiv1alpha1.ClusterManagementAddOnStatus]
+	addonPatcher                  patcher.Patcher[*addonapiv1beta1.ClusterManagementAddOn,
+		addonapiv1beta1.ClusterManagementAddOnSpec,
+		addonapiv1beta1.ClusterManagementAddOnStatus]
 }
 
 func NewCMAConfigController(
-	addonClient addonv1alpha1client.Interface,
-	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
+	addonClient addonclient.Interface,
+	clusterManagementAddonInformers addoninformerv1beta1.ClusterManagementAddOnInformer,
 	configInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	configGVRs map[schema.GroupVersionResource]bool,
 	cmaFilterFunc factory.EventFilterFunc,
@@ -61,9 +61,9 @@ func NewCMAConfigController(
 		queue:                         syncCtx.Queue(),
 		cmaFilterFunc:                 cmaFilterFunc,
 		configGVRs:                    configGVRs,
-		addonPatcher: patcher.NewPatcher[*addonapiv1alpha1.ClusterManagementAddOn,
-			addonapiv1alpha1.ClusterManagementAddOnSpec,
-			addonapiv1alpha1.ClusterManagementAddOnStatus](addonClient.AddonV1alpha1().ClusterManagementAddOns()),
+		addonPatcher: patcher.NewPatcher[*addonapiv1beta1.ClusterManagementAddOn,
+			addonapiv1beta1.ClusterManagementAddOnSpec,
+			addonapiv1beta1.ClusterManagementAddOnStatus](addonClient.AddonV1beta1().ClusterManagementAddOns()),
 	}
 
 	configInformers := c.buildConfigInformers(configInformerFactory, configGVRs)
@@ -158,7 +158,7 @@ func (c *cmaConfigController) sync(ctx context.Context, syncCtx factory.SyncCont
 	return err
 }
 
-func (c *cmaConfigController) updateConfigSpecHash(cma *addonapiv1alpha1.ClusterManagementAddOn) error {
+func (c *cmaConfigController) updateConfigSpecHash(cma *addonapiv1beta1.ClusterManagementAddOn) error {
 
 	for i, defaultConfigReference := range cma.Status.DefaultConfigReferences {
 		if !utils.ContainGR(
@@ -203,8 +203,8 @@ func (c *cmaConfigController) updateConfigSpecHash(cma *addonapiv1alpha1.Cluster
 	return nil
 }
 
-func (c *cmaConfigController) getConfigSpecHash(gr addonapiv1alpha1.ConfigGroupResource,
-	cr addonapiv1alpha1.ConfigReferent) (string, error) {
+func (c *cmaConfigController) getConfigSpecHash(gr addonapiv1beta1.ConfigGroupResource,
+	cr addonapiv1beta1.ConfigReferent) (string, error) {
 	lister, ok := c.configListers[schema.GroupResource{Group: gr.Group, Resource: gr.Resource}]
 	if !ok {
 		return "", nil

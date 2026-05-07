@@ -10,10 +10,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	clusterinformersv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
@@ -34,8 +34,8 @@ const (
 // 2. use configuration in install strategy
 // 3. use configuration in the default configuration in cma
 type addonConfigurationController struct {
-	addonClient                  addonv1alpha1client.Interface
-	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
+	addonClient                  addonclient.Interface
+	clusterManagementAddonLister addonlisterv1beta1.ClusterManagementAddOnLister
 	managedClusterAddonIndexer   cache.Indexer
 	addonFilterFunc              factory.EventFilterFunc
 	placementLister              clusterlisterv1beta1.PlacementLister
@@ -45,8 +45,8 @@ type addonConfigurationController struct {
 }
 
 type addonConfigurationReconcile interface {
-	reconcile(ctx context.Context, cma *addonv1alpha1.ClusterManagementAddOn,
-		graph *configurationGraph) (*addonv1alpha1.ClusterManagementAddOn, reconcileState, error)
+	reconcile(ctx context.Context, cma *addonv1beta1.ClusterManagementAddOn,
+		graph *configurationGraph) (*addonv1beta1.ClusterManagementAddOn, reconcileState, error)
 }
 
 type reconcileState int64
@@ -57,9 +57,9 @@ const (
 )
 
 func NewAddonConfigurationController(
-	addonClient addonv1alpha1client.Interface,
-	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
-	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
+	addonClient addonclient.Interface,
+	addonInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
+	clusterManagementAddonInformers addoninformerv1beta1.ClusterManagementAddOnInformer,
 	placementInformer clusterinformersv1beta1.PlacementInformer,
 	placementDecisionInformer clusterinformersv1beta1.PlacementDecisionInformer,
 	addonFilterFunc factory.EventFilterFunc,
@@ -79,8 +79,8 @@ func NewAddonConfigurationController(
 		},
 		&cmaProgressingReconciler{
 			patcher: patcher.NewPatcher[
-				*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus](
-				addonClient.AddonV1alpha1().ClusterManagementAddOns()),
+				*addonv1beta1.ClusterManagementAddOn, addonv1beta1.ClusterManagementAddOnSpec, addonv1beta1.ClusterManagementAddOnStatus](
+				addonClient.AddonV1beta1().ClusterManagementAddOns()),
 		},
 	}
 
@@ -114,7 +114,7 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 	}
 
 	cma = cma.DeepCopy()
-	graph, err := c.buildConfigurationGraph(logger, cma)
+	graph, err := c.buildConfigurationGraph(cma)
 	if err != nil {
 		return err
 	}
@@ -155,8 +155,8 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 	return nil
 }
 
-func (c *addonConfigurationController) buildConfigurationGraph(logger klog.Logger, cma *addonv1alpha1.ClusterManagementAddOn) (*configurationGraph, error) {
-	graph := newGraph(cma.Spec.SupportedConfigs, cma.Status.DefaultConfigReferences)
+func (c *addonConfigurationController) buildConfigurationGraph(cma *addonv1beta1.ClusterManagementAddOn) (*configurationGraph, error) {
+	graph := newGraph(cma.Spec.DefaultConfigs, cma.Status.DefaultConfigReferences)
 	addons, err := c.managedClusterAddonIndexer.ByIndex(addonindex.ManagedClusterAddonByName, cma.Name)
 	if err != nil {
 		return graph, err
@@ -164,11 +164,11 @@ func (c *addonConfigurationController) buildConfigurationGraph(logger klog.Logge
 
 	// add all existing addons to the default at first
 	for _, addonObject := range addons {
-		addon := addonObject.(*addonv1alpha1.ManagedClusterAddOn)
+		addon := addonObject.(*addonv1beta1.ManagedClusterAddOn)
 		graph.addAddonNode(addon)
 	}
 
-	if cma.Spec.InstallStrategy.Type == "" || cma.Spec.InstallStrategy.Type == addonv1alpha1.AddonInstallStrategyManual {
+	if cma.Spec.InstallStrategy.Type == "" || cma.Spec.InstallStrategy.Type == addonv1beta1.AddonInstallStrategyManual {
 		return graph, nil
 	}
 

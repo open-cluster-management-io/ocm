@@ -15,6 +15,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
 // decorator mutate the unstructured and returns an unstructured.
@@ -299,7 +300,7 @@ func (d *nodePlacementDecorator) decorate(_ string, pod *corev1.PodTemplateSpec)
 		return nil
 	}
 
-	np, ok := nodePlacement.(*addonapiv1alpha1.NodePlacement)
+	np, ok := nodePlacement.(*addonapiv1beta1.NodePlacement)
 	if !ok {
 		return fmt.Errorf("node placement value is invalid")
 	}
@@ -331,7 +332,7 @@ func (d *imageDecorator) decorate(_ string, pod *corev1.PodTemplateSpec) error {
 		return nil
 	}
 
-	ims, ok := registries.([]addonapiv1alpha1.ImageMirror)
+	ims, ok := registries.([]addonapiv1beta1.ImageMirror)
 	if !ok {
 		return fmt.Errorf("registries value is invalid")
 	}
@@ -414,16 +415,16 @@ func (d *proxyHandler) decorate(name string, pod *corev1.PodTemplateSpec) error 
 	return newCABundleDecorator(d.addonName, pc.CABundle).decorate(name, pod)
 }
 
-func (d *proxyHandler) getProxyConfig() (addonapiv1alpha1.ProxyConfig, bool) {
+func (d *proxyHandler) getProxyConfig() (addonapiv1beta1.ProxyConfig, bool) {
 	proxyConfig, ok := d.privateValues[ProxyPrivateValueKey]
 	if !ok {
-		return addonapiv1alpha1.ProxyConfig{}, false
+		return addonapiv1beta1.ProxyConfig{}, false
 	}
 
-	pc, ok := proxyConfig.(addonapiv1alpha1.ProxyConfig)
+	pc, ok := proxyConfig.(addonapiv1beta1.ProxyConfig)
 	if !ok {
 		d.logger.Error(nil, "proxy config value is invalid", "value", proxyConfig)
-		return addonapiv1alpha1.ProxyConfig{}, false
+		return addonapiv1beta1.ProxyConfig{}, false
 	}
 
 	return pc, true

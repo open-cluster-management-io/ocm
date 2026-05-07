@@ -17,10 +17,10 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
@@ -40,10 +40,10 @@ type addonTemplateController struct {
 	addonManagers map[string]context.CancelFunc
 
 	kubeConfig                 *rest.Config
-	addonClient                addonv1alpha1client.Interface
+	addonClient                addonclient.Interface
 	workClient                 workv1client.Interface
 	kubeClient                 kubernetes.Interface
-	cmaLister                  addonlisterv1alpha1.ClusterManagementAddOnLister
+	cmaLister                  addonlisterv1beta1.ClusterManagementAddOnLister
 	managedClusterAddonIndexer cache.Indexer
 	addonInformers             addoninformers.SharedInformerFactory
 	clusterInformers           clusterv1informers.SharedInformerFactory
@@ -58,7 +58,7 @@ type runController func(ctx context.Context, addonName string) error
 func NewAddonTemplateController(
 	hubKubeconfig *rest.Config,
 	hubKubeClient kubernetes.Interface,
-	addonClient addonv1alpha1client.Interface,
+	addonClient addonclient.Interface,
 	workClient workv1client.Interface,
 	addonInformers addoninformers.SharedInformerFactory,
 	clusterInformers clusterv1informers.SharedInformerFactory,
@@ -71,8 +71,8 @@ func NewAddonTemplateController(
 		kubeClient:                 hubKubeClient,
 		addonClient:                addonClient,
 		workClient:                 workClient,
-		cmaLister:                  addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
-		managedClusterAddonIndexer: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetIndexer(),
+		cmaLister:                  addonInformers.Addon().V1beta1().ClusterManagementAddOns().Lister(),
+		managedClusterAddonIndexer: addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().GetIndexer(),
 		addonManagers:              make(map[string]context.CancelFunc),
 		addonInformers:             addonInformers,
 		clusterInformers:           clusterInformers,
@@ -89,11 +89,11 @@ func NewAddonTemplateController(
 	return factory.New().
 		WithInformersQueueKeysFunc(
 			queue.QueueKeyByMetaNamespaceName,
-			addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer()).
+			addonInformers.Addon().V1beta1().ClusterManagementAddOns().Informer()).
 		WithFilteredEventsInformersQueueKeysFunc(
 			queue.QueueKeyByMetaName,
 			func(obj interface{}) bool {
-				mca, ok := obj.(*addonv1alpha1.ManagedClusterAddOn)
+				mca, ok := obj.(*addonv1beta1.ManagedClusterAddOn)
 				if !ok {
 					return false
 				}
@@ -107,7 +107,7 @@ func NewAddonTemplateController(
 				}
 				return false
 			},
-			addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer()).
+			addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer()).
 		WithBareInformers(
 			// do not need to queue, just make sure the controller reconciles after the addonTemplate cache is synced
 			// otherwise, there will be "xx-addon-template" not found" errors in the log as the controller uses the
@@ -212,7 +212,7 @@ func (c *addonTemplateController) runController(ctx context.Context, addonName s
 			selector := &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
-						Key:      addonv1alpha1.AddonLabelKey,
+						Key:      addonv1beta1.AddonLabelKey,
 						Operator: metav1.LabelSelectorOpIn,
 						Values:   []string{addonName},
 					},
@@ -221,7 +221,7 @@ func (c *addonTemplateController) runController(ctx context.Context, addonName s
 			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
 		}),
 	)
-	getValuesClosure := func(cluster *clusterv1.ManagedCluster, addon *addonv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+	getValuesClosure := func(cluster *clusterv1.ManagedCluster, addon *addonv1beta1.ManagedClusterAddOn) (addonfactory.Values, error) {
 		return templateagent.GetAddOnRegistriesPrivateValuesFromClusterAnnotation(klog.FromContext(ctx), cluster, addon)
 	}
 	agentAddon := templateagent.NewCRDTemplateAgentAddon(
@@ -261,7 +261,7 @@ func (c *addonTemplateController) runController(ctx context.Context, addonName s
 		logger.Info("Failed to list ManagedClusterAddOns by index", "error", err)
 	} else {
 		for _, mca := range mcas {
-			addon, ok := mca.(*addonv1alpha1.ManagedClusterAddOn)
+			addon, ok := mca.(*addonv1beta1.ManagedClusterAddOn)
 			if ok {
 				mgr.Trigger(addon.Namespace, addonName)
 			}

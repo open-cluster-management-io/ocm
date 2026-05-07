@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -13,10 +12,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
@@ -28,17 +27,17 @@ import (
 
 // addonRegistrationController reconciles instances of ManagedClusterAddon on the hub.
 type addonRegistrationController struct {
-	addonClient               addonv1alpha1client.Interface
+	addonClient               addonclient.Interface
 	managedClusterLister      clusterlister.ManagedClusterLister
-	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
+	managedClusterAddonLister addonlisterv1beta1.ManagedClusterAddOnLister
 	agentAddons               map[string]agent.AgentAddon
 	mcaFilterFunc             utils.ManagedClusterAddOnFilterFunc
 }
 
 func NewAddonRegistrationController(
-	addonClient addonv1alpha1client.Interface,
+	addonClient addonclient.Interface,
 	clusterInformers clusterinformers.ManagedClusterInformer,
-	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
+	addonInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
 	agentAddons map[string]agent.AgentAddon,
 	mcaFilterFunc utils.ManagedClusterAddOnFilterFunc,
 ) factory.Controller {
@@ -69,55 +68,104 @@ func NewAddonRegistrationController(
 		WithSync(c.sync).ToController("addon-registration-controller")
 }
 
+// findExistingRegistration finds matching existing registration for a config.
+// For KubeClient type, we match by index (assuming order is stable).
+// For CustomSigner type, we match by SignerName.
+func findExistingRegistration(config *addonapiv1beta1.RegistrationConfig, index int,
+	newConfigs []agent.RegistrationConfig, existingRegistrations []addonapiv1beta1.RegistrationConfig) *addonapiv1beta1.RegistrationConfig {
+	if config.Type == addonapiv1beta1.KubeClient {
+		// For KubeClient, try to match by index first
+		// Count how many KubeClient configs we've seen so far
+		kubeClientIndex := 0
+		for i := 0; i < index; i++ {
+			if _, ok := newConfigs[i].(*agent.KubeClientRegistration); ok {
+				kubeClientIndex++
+			}
+		}
+
+		// Find the corresponding KubeClient in existingRegistrations
+		currentIndex := 0
+		for j := range existingRegistrations {
+			if existingRegistrations[j].Type == addonapiv1beta1.KubeClient {
+				if currentIndex == kubeClientIndex {
+					return &existingRegistrations[j]
+				}
+				currentIndex++
+			}
+		}
+	} else if config.Type == addonapiv1beta1.CustomSigner && config.CustomSigner != nil {
+		// For CustomSigner, match by SignerName
+		for j := range existingRegistrations {
+			if existingRegistrations[j].Type == addonapiv1beta1.CustomSigner &&
+				existingRegistrations[j].CustomSigner != nil &&
+				existingRegistrations[j].CustomSigner.SignerName == config.CustomSigner.SignerName {
+				return &existingRegistrations[j]
+			}
+		}
+	}
+	return nil
+}
+
 // buildRegistrationConfigs builds registration configs from new configs and existing registrations.
-// For KubeAPIServerClientSignerName, handling depends on kubeClientDriver:
+// In v1beta1, RegistrationConfig uses Type-based structure (KubeClient or CustomSigner).
+// For KubeClient type, handling depends on kubeClientDriver:
 //   - "": uses subject from newConfigs
 //   - "token": preserves subject from existing registrations, or empty if not found
 //   - "csr": uses subject from newConfigs, or sets default if empty
 //
-// For other signer names, always uses subject from newConfigs.
-func buildRegistrationConfigs(newConfigs, existingRegistrations []addonapiv1alpha1.RegistrationConfig,
-	kubeClientDriver, clusterName, addonName string) []addonapiv1alpha1.RegistrationConfig {
-	result := []addonapiv1alpha1.RegistrationConfig{}
+// For CustomSigner type, always uses subject from newConfigs.
+func buildRegistrationConfigs(newConfigs []agent.RegistrationConfig, existingRegistrations []addonapiv1beta1.RegistrationConfig,
+	clusterName, addonName string) []addonapiv1beta1.RegistrationConfig {
+	result := []addonapiv1beta1.RegistrationConfig{}
 
 	for i := range newConfigs {
-		config := addonapiv1alpha1.RegistrationConfig{
-			SignerName: newConfigs[i].SignerName,
-			Subject:    newConfigs[i].Subject,
-		}
+		config := newConfigs[i].RegistrationAPI()
 
-		// Only apply special handling for KubeAPIServerClientSignerName
-		if config.SignerName != certificatesv1.KubeAPIServerClientSignerName {
+		// Only apply special handling for KubeClient type
+		if config.Type != addonapiv1beta1.KubeClient {
 			result = append(result, config)
 			continue
 		}
 
-		// If kubeClientDriver is not set, use subject from newConfigs as-is
-		if kubeClientDriver == "" {
+		// Ensure KubeClient config exists
+		if config.KubeClient == nil {
+			config.KubeClient = &addonapiv1beta1.KubeClientConfig{}
+		}
+
+		// Find matching existing registration
+		existingReg := findExistingRegistration(&config, i, newConfigs, existingRegistrations)
+
+		// Get driver from existing registration if available, otherwise use driver from newConfig
+		driver := config.KubeClient.Driver
+		if existingReg != nil && existingReg.KubeClient != nil && existingReg.KubeClient.Driver != "" {
+			driver = existingReg.KubeClient.Driver
+		}
+
+		// Set the driver
+		config.KubeClient.Driver = driver
+
+		// If driver is empty, use config as-is (subject from newConfigs)
+		if driver == "" {
 			result = append(result, config)
 			continue
 		}
 
-		if kubeClientDriver == "token" {
+		if driver == "token" {
 			// Token driver - preserve existing subject set by agent
-			found := false
-			for j := range existingRegistrations {
-				if existingRegistrations[j].SignerName == config.SignerName {
-					config.Subject = existingRegistrations[j].Subject
-					found = true
-					break
-				}
+			if existingReg != nil && existingReg.KubeClient != nil {
+				config.KubeClient.Subject = existingReg.KubeClient.Subject
+			} else {
+				// If no matching existing registration found, clear subject (agent will set it).
+				config.KubeClient.Subject = addonapiv1beta1.KubeClientSubject{}
 			}
-			// If no matching existing registration found, clear subject (agent will set it).
-			if !found {
-				config.Subject = addonapiv1alpha1.Subject{}
-			}
-		} else if kubeClientDriver == "csr" {
+		} else if driver == "csr" {
 			// CSR driver - use subject from newConfigs, or set default if empty
-			if equality.Semantic.DeepEqual(config.Subject, addonapiv1alpha1.Subject{}) {
-				config.Subject = addonapiv1alpha1.Subject{
-					User:   agent.DefaultUser(clusterName, addonName, addonName),
-					Groups: agent.DefaultGroups(clusterName, addonName),
+			if equality.Semantic.DeepEqual(config.KubeClient.Subject, addonapiv1beta1.KubeClientSubject{}) {
+				config.KubeClient.Subject = addonapiv1beta1.KubeClientSubject{
+					BaseSubject: addonapiv1beta1.BaseSubject{
+						User:   agent.DefaultUser(clusterName, addonName, addonName),
+						Groups: agent.DefaultGroups(clusterName, addonName),
+					},
 				}
 			}
 		}
@@ -173,14 +221,14 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 	}
 
 	addonPatcher := patcher.NewPatcher[
-		*addonapiv1alpha1.ManagedClusterAddOn,
-		addonapiv1alpha1.ManagedClusterAddOnSpec,
-		addonapiv1alpha1.ManagedClusterAddOnStatus](c.addonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName))
+		*addonapiv1beta1.ManagedClusterAddOn,
+		addonapiv1beta1.ManagedClusterAddOnSpec,
+		addonapiv1beta1.ManagedClusterAddOnStatus](c.addonClient.AddonV1beta1().ManagedClusterAddOns(clusterName))
 
 	// patch supported configs
-	var supportedConfigs []addonapiv1alpha1.ConfigGroupResource
+	var supportedConfigs []addonapiv1beta1.ConfigGroupResource
 	for _, config := range agentAddon.GetAgentAddonOptions().SupportedConfigGVRs {
-		supportedConfigs = append(supportedConfigs, addonapiv1alpha1.ConfigGroupResource{
+		supportedConfigs = append(supportedConfigs, addonapiv1beta1.ConfigGroupResource{
 			Group:    config.Group,
 			Resource: config.Resource,
 		})
@@ -199,9 +247,9 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 	registrationOption := agentAddon.GetAgentAddonOptions().Registration
 	if registrationOption == nil {
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-			Type:    addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied,
+			Type:    addonapiv1beta1.ManagedClusterAddOnRegistrationApplied,
 			Status:  metav1.ConditionTrue,
-			Reason:  addonapiv1alpha1.RegistrationAppliedNilRegistration,
+			Reason:  addonapiv1beta1.RegistrationAppliedNilRegistration,
 			Message: "Registration of the addon agent is configured",
 		})
 		_, err = addonPatcher.PatchStatus(ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status)
@@ -215,7 +263,7 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 	permissionReady := true
 
 	if registrationOption.PermissionConfig != nil {
-		err = registrationOption.PermissionConfig(managedCluster, managedClusterAddonCopy)
+		err = registrationOption.PermissionConfig(ctx, managedCluster, managedClusterAddonCopy)
 		if err != nil {
 			// Check if this is a subject not ready error
 			var subjectErr *agent.SubjectNotReadyError
@@ -225,9 +273,9 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 			} else {
 				// This is a real error, set condition to false and return immediately
 				meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-					Type:    addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied,
+					Type:    addonapiv1beta1.ManagedClusterAddOnRegistrationApplied,
 					Status:  metav1.ConditionFalse,
-					Reason:  addonapiv1alpha1.RegistrationAppliedSetPermissionFailed,
+					Reason:  addonapiv1beta1.RegistrationAppliedSetPermissionFailed,
 					Message: fmt.Sprintf("Failed to set permission for hub agent: %v", err),
 				})
 				if _, patchErr := addonPatcher.PatchStatus(
@@ -239,11 +287,11 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 		}
 	}
 
-	if registrationOption.CSRConfigurations == nil {
+	if registrationOption.Configurations == nil {
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-			Type:    addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied,
+			Type:    addonapiv1beta1.ManagedClusterAddOnRegistrationApplied,
 			Status:  metav1.ConditionTrue,
-			Reason:  addonapiv1alpha1.RegistrationAppliedNilRegistration,
+			Reason:  addonapiv1beta1.RegistrationAppliedNilRegistration,
 			Message: "Registration of the addon agent is configured",
 		})
 		_, err = addonPatcher.PatchStatus(ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status)
@@ -253,33 +301,30 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 		return nil
 	}
 
-	configs, err := registrationOption.CSRConfigurations(managedCluster, managedClusterAddonCopy)
+	configs, err := registrationOption.Configurations(ctx, managedCluster, managedClusterAddonCopy)
 	if err != nil {
 		return fmt.Errorf("failed to get csr configurations: %w", err)
 	}
 
 	managedClusterAddonCopy.Status.Registrations = buildRegistrationConfigs(configs, managedClusterAddon.Status.Registrations,
-		managedClusterAddon.Status.KubeClientDriver, clusterName, addonName)
+		clusterName, addonName)
 
 	// explicitly set the default namespace value, since the mca.spec.installNamespace is deprceated and
 	//  the addonDeploymentConfig.spec.agentInstallNamespace could be empty
+	// Priority (lowest to highest): default < annotation < registrationOption.Namespace < AgentInstallNamespace function
 	managedClusterAddonCopy.Status.Namespace = "open-cluster-management-agent-addon"
 
-	// Set the default namespace to registrationOption.Namespace
-	if len(registrationOption.Namespace) > 0 {
-		managedClusterAddonCopy.Status.Namespace = registrationOption.Namespace
+	// Override with annotation if present
+	if installNs, ok := managedClusterAddonCopy.Annotations[addonapiv1beta1.InstallNamespaceAnnotation]; ok && len(installNs) > 0 {
+		managedClusterAddonCopy.Status.Namespace = installNs
 	}
 
-	if len(managedClusterAddonCopy.Spec.InstallNamespace) > 0 {
-		managedClusterAddonCopy.Status.Namespace = managedClusterAddonCopy.Spec.InstallNamespace
-	}
-
-	if registrationOption.AgentInstallNamespace != nil {
-		ns, err := registrationOption.AgentInstallNamespace(managedClusterAddonCopy)
+	// Override with AgentInstallNamespace function if provided (highest priority)
+	if agentAddon.GetAgentAddonOptions().AgentInstallNamespace != nil {
+		ns, err := agentAddon.GetAgentAddonOptions().AgentInstallNamespace(ctx, managedClusterAddonCopy)
 		if err != nil {
 			return err
 		}
-		// Override if agentInstallNamespace or InstallNamespace is specified
 		if len(ns) > 0 {
 			managedClusterAddonCopy.Status.Namespace = ns
 		}
@@ -288,14 +333,14 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 	// Set condition based on whether permission is ready
 	if permissionReady {
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-			Type:    addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied,
+			Type:    addonapiv1beta1.ManagedClusterAddOnRegistrationApplied,
 			Status:  metav1.ConditionTrue,
-			Reason:  addonapiv1alpha1.RegistrationAppliedSetPermissionApplied,
+			Reason:  addonapiv1beta1.RegistrationAppliedSetPermissionApplied,
 			Message: "Registration of the addon agent is configured",
 		})
 	} else {
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-			Type:    addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied,
+			Type:    addonapiv1beta1.ManagedClusterAddOnRegistrationApplied,
 			Status:  metav1.ConditionFalse,
 			Reason:  "PermissionConfigPending",
 			Message: "registration subject not ready",

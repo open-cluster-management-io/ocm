@@ -16,7 +16,7 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	fakecluster "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -60,13 +60,13 @@ func TestReconcile(t *testing.T) {
 			syncKeys:            []string{"test"},
 			managedClusteraddon: []runtime.Object{},
 			clusterManagementAddon: []runtime.Object{
-				addontesting.NewClusterManagementAddon("test", "", "").WithSupportedConfigs(
-					addonv1alpha1.ConfigMeta{
-						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
+				addontesting.NewClusterManagementAddon("test", "", "").WithDefaultConfigs(
+					addonv1beta1.AddOnConfig{
+						ConfigGroupResource: addonv1beta1.ConfigGroupResource{
 							Group:    utils.AddOnTemplateGVR.Group,
 							Resource: utils.AddOnTemplateGVR.Resource,
 						},
-						DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"},
+						ConfigReferent: addonv1beta1.ConfigReferent{Name: "test"},
 					}).Build()},
 			expectedCount:   1,
 			expectedTimeout: false,
@@ -76,21 +76,21 @@ func TestReconcile(t *testing.T) {
 			syncKeys:            []string{"test", "test1"},
 			managedClusteraddon: []runtime.Object{},
 			clusterManagementAddon: []runtime.Object{
-				addontesting.NewClusterManagementAddon("test", "", "").WithSupportedConfigs(
-					addonv1alpha1.ConfigMeta{
-						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
+				addontesting.NewClusterManagementAddon("test", "", "").WithDefaultConfigs(
+					addonv1beta1.AddOnConfig{
+						ConfigGroupResource: addonv1beta1.ConfigGroupResource{
 							Group:    utils.AddOnTemplateGVR.Group,
 							Resource: utils.AddOnTemplateGVR.Resource,
 						},
-						DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"},
+						ConfigReferent: addonv1beta1.ConfigReferent{Name: "test"},
 					}).Build(),
-				addontesting.NewClusterManagementAddon("test1", "", "").WithSupportedConfigs(
-					addonv1alpha1.ConfigMeta{
-						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
+				addontesting.NewClusterManagementAddon("test1", "", "").WithDefaultConfigs(
+					addonv1beta1.AddOnConfig{
+						ConfigGroupResource: addonv1beta1.ConfigGroupResource{
 							Group:    utils.AddOnTemplateGVR.Group,
 							Resource: utils.AddOnTemplateGVR.Resource,
 						},
-						DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"},
+						ConfigReferent: addonv1beta1.ConfigReferent{Name: "test"},
 					}).Build(),
 			},
 			expectedCount:   2,
@@ -101,21 +101,21 @@ func TestReconcile(t *testing.T) {
 			syncKeys:            []string{"test", "test1", "test2"},
 			managedClusteraddon: []runtime.Object{},
 			clusterManagementAddon: []runtime.Object{
-				addontesting.NewClusterManagementAddon("test", "", "").WithSupportedConfigs(
-					addonv1alpha1.ConfigMeta{
-						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
+				addontesting.NewClusterManagementAddon("test", "", "").WithDefaultConfigs(
+					addonv1beta1.AddOnConfig{
+						ConfigGroupResource: addonv1beta1.ConfigGroupResource{
 							Group:    utils.AddOnTemplateGVR.Group,
 							Resource: utils.AddOnTemplateGVR.Resource,
 						},
-						DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"},
+						ConfigReferent: addonv1beta1.ConfigReferent{Name: "test"},
 					}).Build(),
-				addontesting.NewClusterManagementAddon("test1", "", "").WithSupportedConfigs(
-					addonv1alpha1.ConfigMeta{
-						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
+				addontesting.NewClusterManagementAddon("test1", "", "").WithDefaultConfigs(
+					addonv1beta1.AddOnConfig{
+						ConfigGroupResource: addonv1beta1.ConfigGroupResource{
 							Group:    utils.AddOnTemplateGVR.Group,
 							Resource: utils.AddOnTemplateGVR.Resource,
 						},
-						DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"},
+						ConfigReferent: addonv1beta1.ConfigReferent{Name: "test"},
 					}).Build(),
 				addontesting.NewClusterManagementAddon("test2", "", "").Build(),
 			},
@@ -153,7 +153,7 @@ func TestReconcile(t *testing.T) {
 		addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
 
 		// Add the index for ManagedClusterAddonByName
-		err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
+		err := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().AddIndexers(
 			cache.Indexers{
 				addonindex.ManagedClusterAddonByName: addonindex.IndexManagedClusterAddonByName,
 			})
@@ -162,12 +162,12 @@ func TestReconcile(t *testing.T) {
 		}
 
 		for _, obj := range c.managedClusteraddon {
-			if err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
+			if err := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
 				t.Fatal(err)
 			}
 		}
 		for _, obj := range c.clusterManagementAddon {
-			if err := addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetStore().Add(obj); err != nil {
+			if err := addonInformers.Addon().V1beta1().ClusterManagementAddOns().Informer().GetStore().Add(obj); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -241,9 +241,8 @@ func TestRunController(t *testing.T) {
 			expectedErr: "addon name should be set",
 		},
 		{
-			name:        "fake kubeconfig",
-			addonName:   "test",
-			expectedErr: `connect: connection refused`,
+			name:      "fake kubeconfig",
+			addonName: "test",
 		},
 	}
 
@@ -261,8 +260,8 @@ func TestRunController(t *testing.T) {
 			kubeConfig:                 &rest.Config{},
 			kubeClient:                 hubKubeClient,
 			addonClient:                fakeAddonClient,
-			cmaLister:                  addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
-			managedClusterAddonIndexer: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetIndexer(),
+			cmaLister:                  addonInformers.Addon().V1beta1().ClusterManagementAddOns().Lister(),
+			managedClusterAddonIndexer: addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().GetIndexer(),
 			addonManagers:              make(map[string]context.CancelFunc),
 			addonInformers:             addonInformers,
 			clusterInformers:           clusterInformers,
@@ -361,7 +360,7 @@ func TestStopUnusedManagers(t *testing.T) {
 			}
 
 			// Add the index for ManagedClusterAddonByName
-			err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
+			err := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().AddIndexers(
 				cache.Indexers{
 					addonindex.ManagedClusterAddonByName: addonindex.IndexManagedClusterAddonByName,
 				})
@@ -374,8 +373,8 @@ func TestStopUnusedManagers(t *testing.T) {
 				kubeClient:                 hubKubeClient,
 				addonClient:                fakeAddonClient,
 				workClient:                 fakeWorkClient,
-				cmaLister:                  addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
-				managedClusterAddonIndexer: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetIndexer(),
+				cmaLister:                  addonInformers.Addon().V1beta1().ClusterManagementAddOns().Lister(),
+				managedClusterAddonIndexer: addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().GetIndexer(),
 				addonManagers:              existingManagers,
 				addonInformers:             addonInformers,
 				clusterInformers:           clusterInformers,

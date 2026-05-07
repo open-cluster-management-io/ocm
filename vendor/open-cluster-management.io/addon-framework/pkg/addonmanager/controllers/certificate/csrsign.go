@@ -14,9 +14,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	certificateslisters "k8s.io/client-go/listers/certificates/v1"
 	"k8s.io/klog/v2"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -31,7 +31,7 @@ type csrSignController struct {
 	kubeClient                kubernetes.Interface
 	agentAddons               map[string]agent.AgentAddon
 	managedClusterLister      clusterlister.ManagedClusterLister
-	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
+	managedClusterAddonLister addonlisterv1beta1.ManagedClusterAddOnLister
 	csrLister                 certificateslisters.CertificateSigningRequestLister
 	mcaFilterFunc             utils.ManagedClusterAddOnFilterFunc
 }
@@ -41,7 +41,7 @@ func NewCSRSignController(
 	kubeClient kubernetes.Interface,
 	clusterInformers clusterinformers.ManagedClusterInformer,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
-	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
+	addonInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
 	agentAddons map[string]agent.AgentAddon,
 	mcaFilterFunc utils.ManagedClusterAddOnFilterFunc,
 ) factory.Controller {
@@ -67,7 +67,7 @@ func NewCSRSignController(
 				if len(accessor.GetLabels()) == 0 {
 					return false
 				}
-				addonName := accessor.GetLabels()[addonapiv1alpha1.AddonLabelKey]
+				addonName := accessor.GetLabels()[addonapiv1beta1.AddonLabelKey]
 				if _, ok := agentAddons[addonName]; !ok {
 					return false
 				}
@@ -104,7 +104,7 @@ func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContex
 		return nil
 	}
 
-	addonName := csr.Labels[addonapiv1alpha1.AddonLabelKey]
+	addonName := csr.Labels[addonapiv1beta1.AddonLabelKey]
 	agentAddon, ok := c.agentAddons[addonName]
 	if !ok {
 		return nil
@@ -143,7 +143,7 @@ func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContex
 		return nil
 	}
 
-	csr.Status.Certificate, err = registrationOption.CSRSign(cluster, addon, csr)
+	csr.Status.Certificate, err = registrationOption.CSRSign(ctx, cluster, addon, csr)
 	if err != nil {
 		return fmt.Errorf("failed to sign addon csr %q: %v", csr.Name, err)
 	}

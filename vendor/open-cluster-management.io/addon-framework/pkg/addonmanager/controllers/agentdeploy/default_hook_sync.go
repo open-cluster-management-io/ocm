@@ -6,7 +6,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
@@ -17,27 +17,27 @@ import (
 type defaultHookSyncer struct {
 	buildWorks buildDeployHookFunc
 	applyWork  func(ctx context.Context, appliedType string,
-		work *workapiv1.ManifestWork, addon *addonapiv1alpha1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
+		work *workapiv1.ManifestWork, addon *addonapiv1beta1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
 	agentAddon agent.AgentAddon
 }
 
 func (s *defaultHookSyncer) sync(ctx context.Context,
 	syncCtx factory.SyncContext,
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.ManagedClusterAddOn, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) (*addonapiv1beta1.ManagedClusterAddOn, error) {
 	deployWorkNamespace := addon.Namespace
 
-	hookWork, err := s.buildWorks(deployWorkNamespace, cluster, addon)
+	hookWork, err := s.buildWorks(ctx, deployWorkNamespace, cluster, addon)
 	if err != nil {
 		return addon, err
 	}
 
 	if hookWork == nil {
-		addonRemoveFinalizer(addon, addonapiv1alpha1.AddonPreDeleteHookFinalizer)
+		addonRemoveFinalizer(addon, addonapiv1beta1.AddonPreDeleteHookFinalizer)
 		return addon, nil
 	}
 
-	if addonAddFinalizer(addon, addonapiv1alpha1.AddonPreDeleteHookFinalizer) {
+	if addonAddFinalizer(addon, addonapiv1beta1.AddonPreDeleteHookFinalizer) {
 		return addon, nil
 	}
 
@@ -46,7 +46,7 @@ func (s *defaultHookSyncer) sync(ctx context.Context,
 	}
 
 	// will deploy the pre-delete hook manifestWork when the addon is deleting
-	hookWork, err = s.applyWork(ctx, addonapiv1alpha1.ManagedClusterAddOnManifestApplied, hookWork, addon)
+	hookWork, err = s.applyWork(ctx, addonapiv1beta1.ManagedClusterAddOnManifestApplied, hookWork, addon)
 	if err != nil {
 		return addon, err
 	}
@@ -54,18 +54,18 @@ func (s *defaultHookSyncer) sync(ctx context.Context,
 	// TODO: will surface more message here
 	if hookWorkIsCompleted(hookWork) {
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-			Type:    addonapiv1alpha1.ManagedClusterAddOnHookManifestCompleted,
+			Type:    addonapiv1beta1.ManagedClusterAddOnHookManifestCompleted,
 			Status:  metav1.ConditionTrue,
 			Reason:  "HookManifestIsCompleted",
 			Message: fmt.Sprintf("hook manifestWork %v is completed.", hookWork.Name),
 		})
 
-		addonRemoveFinalizer(addon, addonapiv1alpha1.AddonPreDeleteHookFinalizer)
+		addonRemoveFinalizer(addon, addonapiv1beta1.AddonPreDeleteHookFinalizer)
 		return addon, nil
 	}
 
 	meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-		Type:    addonapiv1alpha1.ManagedClusterAddOnHookManifestCompleted,
+		Type:    addonapiv1beta1.ManagedClusterAddOnHookManifestCompleted,
 		Status:  metav1.ConditionFalse,
 		Reason:  "HookManifestIsNotCompleted",
 		Message: fmt.Sprintf("hook manifestWork %v is not completed.", hookWork.Name),

@@ -57,7 +57,7 @@ var _ = ginkgo.Describe("Cluster deleting", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		addon1 := testinghelpers.NewManagedClusterAddons("addon1", managedCluster.Name, []string{"hold"}, nil)
-		_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Create(context.Background(),
+		_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedCluster.Name).Create(context.Background(),
 			addon1, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		manifestWork1 := testinghelpers.NewManifestWork(managedCluster.Name, "work1", []string{"hold"}, nil, nil, nil)
@@ -127,7 +127,7 @@ var _ = ginkgo.Describe("Cluster deleting", func() {
 
 		// addons should be deleting and manifestworks should not be deleting
 		gomega.Eventually(func() error {
-			addon, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(context.Background(),
+			addon, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(managedCluster.Name).Get(context.Background(),
 				"addon1", metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -150,7 +150,7 @@ var _ = ginkgo.Describe("Cluster deleting", func() {
 
 		// remove finalizer on addon1
 		gomega.Eventually(func() error {
-			addon, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(context.Background(),
+			addon, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(managedCluster.Name).Get(context.Background(),
 				"addon1", metav1.GetOptions{})
 			if errors.IsNotFound(err) {
 				return nil
@@ -160,14 +160,14 @@ var _ = ginkgo.Describe("Cluster deleting", func() {
 			}
 
 			addon.Finalizers = []string{}
-			_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Update(context.Background(),
+			_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedCluster.Name).Update(context.Background(),
 				addon, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		// addon should be deleted. work1 should be deleting ,the other work should not be deleting
 		gomega.Eventually(func() bool {
-			_, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(context.Background(),
+			_, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(managedCluster.Name).Get(context.Background(),
 				"addon1", metav1.GetOptions{})
 			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
@@ -340,7 +340,7 @@ var _ = ginkgo.Describe("Cluster deleting", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		addon1 := testinghelpers.NewManagedClusterAddons("addon1", managedCluster.Name, []string{"hold"}, nil)
-		_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Create(context.Background(),
+		_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedCluster.Name).Create(context.Background(),
 			addon1, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		manifestWork1 := testinghelpers.NewManifestWork(managedCluster.Name, "work1", []string{"hold"}, nil, nil, nil)
@@ -409,7 +409,7 @@ var _ = ginkgo.Describe("Cluster deleting", func() {
 
 		// addons should be deleting and manifestworks should not be deleting
 		gomega.Eventually(func() error {
-			addon, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(context.Background(),
+			addon, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(managedCluster.Name).Get(context.Background(),
 				"addon1", metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -432,7 +432,7 @@ var _ = ginkgo.Describe("Cluster deleting", func() {
 
 		// remove finalizer on addon1
 		gomega.Eventually(func() error {
-			addon, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(context.Background(),
+			addon, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(managedCluster.Name).Get(context.Background(),
 				"addon1", metav1.GetOptions{})
 			if errors.IsNotFound(err) {
 				return nil
@@ -442,7 +442,7 @@ var _ = ginkgo.Describe("Cluster deleting", func() {
 			}
 
 			addon.Finalizers = []string{}
-			_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Update(context.Background(),
+			_, err = addOnClient.AddonV1beta1().ManagedClusterAddOns(managedCluster.Name).Update(context.Background(),
 				addon, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
@@ -466,7 +466,7 @@ var _ = ginkgo.Describe("Cluster deleting", func() {
 
 		// addon and work should be deleted
 		gomega.Eventually(func() bool {
-			_, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(context.Background(),
+			_, err := addOnClient.AddonV1beta1().ManagedClusterAddOns(managedCluster.Name).Get(context.Background(),
 				"addon1", metav1.GetOptions{})
 			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())

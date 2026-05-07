@@ -8,27 +8,27 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 )
 
 // AddOnDeploymentConfigGetter has a method to return a AddOnDeploymentConfig object
 type AddOnDeploymentConfigGetter interface {
-	Get(ctx context.Context, namespace, name string) (*addonapiv1alpha1.AddOnDeploymentConfig, error)
+	Get(ctx context.Context, namespace, name string) (*addonapiv1beta1.AddOnDeploymentConfig, error)
 }
 
 type defaultAddOnDeploymentConfigGetter struct {
-	addonClient addonv1alpha1client.Interface
+	addonClient addonclient.Interface
 }
 
 // NewAddOnDeploymentConfigGetter returns a AddOnDeploymentConfigGetter with addon client
-func NewAddOnDeploymentConfigGetter(addonClient addonv1alpha1client.Interface) AddOnDeploymentConfigGetter {
+func NewAddOnDeploymentConfigGetter(addonClient addonclient.Interface) AddOnDeploymentConfigGetter {
 	return &defaultAddOnDeploymentConfigGetter{addonClient: addonClient}
 }
 
 func (g *defaultAddOnDeploymentConfigGetter) Get(
-	ctx context.Context, namespace, name string) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
-	return g.addonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(ctx, name, metav1.GetOptions{})
+	ctx context.Context, namespace, name string) (*addonapiv1beta1.AddOnDeploymentConfig, error) {
+	return g.addonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
 // AgentInstallNamespaceFromDeploymentConfigFunc returns an agent install namespace helper function which will get the
@@ -36,8 +36,8 @@ func (g *defaultAddOnDeploymentConfigGetter) Get(
 // matched addon deployment config, it will return an empty string.
 func AgentInstallNamespaceFromDeploymentConfigFunc(
 	adcgetter AddOnDeploymentConfigGetter,
-) func(*addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
-	return func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
+) func(ctx context.Context, addon *addonapiv1beta1.ManagedClusterAddOn) (string, error) {
+	return func(ctx context.Context, addon *addonapiv1beta1.ManagedClusterAddOn) (string, error) {
 		if addon == nil {
 			return "", fmt.Errorf("failed to get addon install namespace, addon is nil")
 		}
@@ -64,9 +64,9 @@ func AgentInstallNamespaceFromDeploymentConfigFunc(
 
 // GetDesiredAddOnDeployment returns the desired addonDeploymentConfig of the addon
 func GetDesiredAddOnDeploymentConfig(
-	addon *addonapiv1alpha1.ManagedClusterAddOn,
+	addon *addonapiv1beta1.ManagedClusterAddOn,
 	adcgetter AddOnDeploymentConfigGetter,
-) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
+) (*addonapiv1beta1.AddOnDeploymentConfig, error) {
 
 	ok, configRef := GetAddOnConfigRef(addon.Status.ConfigReferences,
 		AddOnDeploymentConfigGVR.Group, AddOnDeploymentConfigGVR.Resource)
@@ -106,7 +106,7 @@ func GetDesiredAddOnDeploymentConfig(
 }
 
 // GetAddOnDeploymentConfigSpecHash returns the sha256 hash of the spec field of the addon deployment config
-func GetAddOnDeploymentConfigSpecHash(config *addonapiv1alpha1.AddOnDeploymentConfig) (string, error) {
+func GetAddOnDeploymentConfigSpecHash(config *addonapiv1beta1.AddOnDeploymentConfig) (string, error) {
 	if config == nil {
 		return "", fmt.Errorf("addon deployment config is nil")
 	}
@@ -123,8 +123,8 @@ func GetAddOnDeploymentConfigSpecHash(config *addonapiv1alpha1.AddOnDeploymentCo
 // have one config for each GK.
 // (TODO) this needs to be reconcidered if we support multiple same GK in the config referencese.
 func GetAddOnConfigRef(
-	configReferences []addonapiv1alpha1.ConfigReference,
-	group, resource string) (bool, addonapiv1alpha1.ConfigReference) {
+	configReferences []addonapiv1beta1.ConfigReference,
+	group, resource string) (bool, addonapiv1beta1.ConfigReference) {
 
 	for _, config := range configReferences {
 		if config.Group == group && config.Resource == resource {
@@ -132,5 +132,5 @@ func GetAddOnConfigRef(
 		}
 	}
 
-	return false, addonapiv1alpha1.ConfigReference{}
+	return false, addonapiv1beta1.ConfigReference{}
 }

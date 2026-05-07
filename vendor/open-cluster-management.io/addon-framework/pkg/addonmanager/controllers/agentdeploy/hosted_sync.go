@@ -8,7 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
@@ -21,7 +21,7 @@ type hostedSyncer struct {
 	buildWorks buildDeployWorkFunc
 
 	applyWork func(ctx context.Context, appliedType string,
-		work *workapiv1.ManifestWork, addon *addonapiv1alpha1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
+		work *workapiv1.ManifestWork, addon *addonapiv1beta1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
 
 	deleteWork func(ctx context.Context, workNamespace, workName string) error
 
@@ -35,7 +35,7 @@ type hostedSyncer struct {
 func (s *hostedSyncer) sync(ctx context.Context,
 	syncCtx factory.SyncContext,
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.ManagedClusterAddOn, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) (*addonapiv1beta1.ManagedClusterAddOn, error) {
 	// Hosted mode is not enabled, will not deploy any resource on the hosting cluster
 	if !s.agentAddon.GetAgentAddonOptions().HostedModeEnabled {
 		return addon, nil
@@ -50,7 +50,7 @@ func (s *hostedSyncer) sync(ctx context.Context,
 		if err := s.cleanupDeployWork(ctx, addon); err != nil {
 			return addon, err
 		}
-		addonRemoveFinalizer(addon, addonapiv1alpha1.AddonHostingManifestFinalizer)
+		addonRemoveFinalizer(addon, addonapiv1beta1.AddonHostingManifestFinalizer)
 		return addon, nil
 	}
 
@@ -63,33 +63,33 @@ func (s *hostedSyncer) sync(ctx context.Context,
 		}
 
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-			Type:    addonapiv1alpha1.ManagedClusterAddOnHostingClusterValidity,
+			Type:    addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity,
 			Status:  metav1.ConditionFalse,
-			Reason:  addonapiv1alpha1.HostingClusterValidityReasonInvalid,
+			Reason:  addonapiv1beta1.HostingClusterValidityReasonInvalid,
 			Message: fmt.Sprintf("hosting cluster %s is not a managed cluster of the hub", hostingClusterName),
 		})
 
-		addonRemoveFinalizer(addon, addonapiv1alpha1.AddonHostingManifestFinalizer)
+		addonRemoveFinalizer(addon, addonapiv1beta1.AddonHostingManifestFinalizer)
 		return addon, nil
 	}
 	if err != nil {
 		return addon, err
 	}
 	meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-		Type:    addonapiv1alpha1.ManagedClusterAddOnHostingClusterValidity,
+		Type:    addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity,
 		Status:  metav1.ConditionTrue,
-		Reason:  addonapiv1alpha1.HostingClusterValidityReasonValid,
+		Reason:  addonapiv1beta1.HostingClusterValidityReasonValid,
 		Message: fmt.Sprintf("hosting cluster %s is a managed cluster of the hub", hostingClusterName),
 	})
 
 	// Don't skip syncing if the addon is deleting and there is a predelete hook, since the deployment manifests may
 	// need to be updated during the uninstall.
-	if !addonHasFinalizer(addon, addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer) {
+	if !addonHasFinalizer(addon, addonapiv1beta1.AddonHostingPreDeleteHookFinalizer) {
 		if !hostingCluster.DeletionTimestamp.IsZero() {
 			if err = s.cleanupDeployWork(ctx, addon); err != nil {
 				return addon, err
 			}
-			addonRemoveFinalizer(addon, addonapiv1alpha1.AddonHostingManifestFinalizer)
+			addonRemoveFinalizer(addon, addonapiv1beta1.AddonHostingManifestFinalizer)
 			return addon, nil
 		}
 
@@ -97,7 +97,7 @@ func (s *hostedSyncer) sync(ctx context.Context,
 			if err = s.cleanupDeployWork(ctx, addon); err != nil {
 				return addon, err
 			}
-			addonRemoveFinalizer(addon, addonapiv1alpha1.AddonHostingManifestFinalizer)
+			addonRemoveFinalizer(addon, addonapiv1beta1.AddonHostingManifestFinalizer)
 			return addon, nil
 		}
 
@@ -108,7 +108,7 @@ func (s *hostedSyncer) sync(ctx context.Context,
 		}
 	}
 
-	if addonAddFinalizer(addon, addonapiv1alpha1.AddonHostingManifestFinalizer) {
+	if addonAddFinalizer(addon, addonapiv1beta1.AddonHostingManifestFinalizer) {
 		return addon, nil
 	}
 
@@ -117,7 +117,7 @@ func (s *hostedSyncer) sync(ctx context.Context,
 		return addon, err
 	}
 
-	deployWorks, deleteWorks, err := s.buildWorks(hostingClusterName, cluster, currentWorks, addon)
+	deployWorks, deleteWorks, err := s.buildWorks(ctx, hostingClusterName, cluster, currentWorks, addon)
 	if err != nil {
 		return addon, err
 	}
@@ -131,7 +131,7 @@ func (s *hostedSyncer) sync(ctx context.Context,
 	}
 
 	for _, deployWork := range deployWorks {
-		_, err = s.applyWork(ctx, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied, deployWork, addon)
+		_, err = s.applyWork(ctx, addonapiv1beta1.ManagedClusterAddOnHostingManifestApplied, deployWork, addon)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -143,8 +143,8 @@ func (s *hostedSyncer) sync(ctx context.Context,
 // cleanupDeployWork will delete the hosting manifestWork and cache. if the hostingClusterName is empty, will try
 // to find out the hosting cluster by manifestWork labels and do the cleanup.
 func (s *hostedSyncer) cleanupDeployWork(ctx context.Context,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (err error) {
-	if !addonHasFinalizer(addon, addonapiv1alpha1.AddonHostingManifestFinalizer) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) (err error) {
+	if !addonHasFinalizer(addon, addonapiv1beta1.AddonHostingManifestFinalizer) {
 		return nil
 	}
 
