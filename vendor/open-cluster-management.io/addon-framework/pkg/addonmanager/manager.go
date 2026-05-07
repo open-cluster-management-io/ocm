@@ -11,8 +11,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
@@ -44,7 +44,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 		return err
 	}
 
-	addonClient, err := addonv1alpha1client.NewForConfig(a.GetConfig())
+	addonClient, err := addonclient.NewForConfig(a.GetConfig())
 	if err != nil {
 		return err
 	}
@@ -67,7 +67,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 			selector := &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
-						Key:      addonv1alpha1.AddonLabelKey,
+						Key:      addonv1beta1.AddonLabelKey,
 						Operator: metav1.LabelSelectorOpIn,
 						Values:   addonNames,
 					},
@@ -82,7 +82,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 			selector := &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
-						Key:      addonv1alpha1.AddonLabelKey,
+						Key:      addonv1beta1.AddonLabelKey,
 						Operator: metav1.LabelSelectorOpIn,
 						Values:   addonNames,
 					},
@@ -104,7 +104,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 		return err
 	}
 
-	err = addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
+	err = addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().AddIndexers(
 		cache.Indexers{
 			index.ManagedClusterAddonByNamespace: index.IndexManagedClusterAddonByNamespace, // agentDeployController
 			index.AddonByConfig:                  index.IndexAddonByConfig,                  // addonConfigController
@@ -114,7 +114,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 		return err
 	}
 
-	err = addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
+	err = addonInformers.Addon().V1beta1().ClusterManagementAddOns().Informer().AddIndexers(
 		cache.Indexers{
 			index.ClusterManagementAddonByConfig: index.IndexClusterManagementAddonByConfig, // cmaConfigController
 		})

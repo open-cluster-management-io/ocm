@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
@@ -60,26 +60,26 @@ func NewHostingUnstructured(apiVersion, kind, namespace, name string) *unstructu
 		},
 	}
 	u.SetAnnotations(map[string]string{
-		addonapiv1alpha1.HostedManifestLocationAnnotationKey: addonapiv1alpha1.HostedManifestLocationHostingValue,
+		addonapiv1beta1.HostedManifestLocationAnnotationKey: addonapiv1beta1.HostedManifestLocationHostingValue,
 	})
 	return u
 }
 
 func NewHookJob(name, namespace string) *unstructured.Unstructured {
 	job := NewUnstructured("batch/v1", "Job", namespace, name)
-	job.SetAnnotations(map[string]string{addonapiv1alpha1.AddonPreDeleteHookAnnotationKey: ""})
+	job.SetAnnotations(map[string]string{addonapiv1beta1.AddonPreDeleteHookAnnotationKey: ""})
 	return job
 }
 
 func NewHostedHookJob(name, namespace string) *unstructured.Unstructured {
 	job := NewUnstructured("batch/v1", "Job", namespace, name)
-	job.SetAnnotations(map[string]string{addonapiv1alpha1.AddonPreDeleteHookAnnotationKey: "",
-		addonapiv1alpha1.HostedManifestLocationAnnotationKey: addonapiv1alpha1.HostedManifestLocationHostingValue})
+	job.SetAnnotations(map[string]string{addonapiv1beta1.AddonPreDeleteHookAnnotationKey: "",
+		addonapiv1beta1.HostedManifestLocationAnnotationKey: addonapiv1beta1.HostedManifestLocationHostingValue})
 	return job
 }
 
-func NewAddon(name, namespace string, owners ...metav1.OwnerReference) *addonapiv1alpha1.ManagedClusterAddOn {
-	return &addonapiv1alpha1.ManagedClusterAddOn{
+func NewAddon(name, namespace string, owners ...metav1.OwnerReference) *addonapiv1beta1.ManagedClusterAddOn {
+	return &addonapiv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
 			Namespace:       namespace,
@@ -87,98 +87,94 @@ func NewAddon(name, namespace string, owners ...metav1.OwnerReference) *addonapi
 		},
 	}
 }
-func NewAddonWithConditions(name, namespace string, conditions ...metav1.Condition) *addonapiv1alpha1.ManagedClusterAddOn {
-	return &addonapiv1alpha1.ManagedClusterAddOn{
+func NewAddonWithConditions(name, namespace string, conditions ...metav1.Condition) *addonapiv1beta1.ManagedClusterAddOn {
+	return &addonapiv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
-		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+		Status: addonapiv1beta1.ManagedClusterAddOnStatus{
 			Conditions: conditions,
 		},
 	}
 }
 
 func NewHostedModeAddon(name, namespace string, hostingCluster string,
-	conditions ...metav1.Condition) *addonapiv1alpha1.ManagedClusterAddOn {
-	return &addonapiv1alpha1.ManagedClusterAddOn{
+	conditions ...metav1.Condition) *addonapiv1beta1.ManagedClusterAddOn {
+	return &addonapiv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Namespace:   namespace,
-			Annotations: map[string]string{addonapiv1alpha1.HostingClusterNameAnnotationKey: hostingCluster},
+			Annotations: map[string]string{addonapiv1beta1.HostingClusterNameAnnotationKey: hostingCluster},
 		},
-		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+		Status: addonapiv1beta1.ManagedClusterAddOnStatus{
 			Conditions: conditions,
 		},
 	}
 }
 
 func NewHostedModeAddonWithFinalizer(name, namespace string, hostingCluster string,
-	conditions ...metav1.Condition) *addonapiv1alpha1.ManagedClusterAddOn {
+	conditions ...metav1.Condition) *addonapiv1beta1.ManagedClusterAddOn {
 	addon := NewHostedModeAddon(name, namespace, hostingCluster)
-	addon.SetFinalizers([]string{addonapiv1alpha1.AddonHostingManifestFinalizer})
+	addon.SetFinalizers([]string{addonapiv1beta1.AddonHostingManifestFinalizer})
 	addon.Status.Conditions = conditions
 	return addon
 }
 
-func SetAddonDeletionTimestamp(addon *addonapiv1alpha1.ManagedClusterAddOn,
-	deletionTimestamp time.Time) *addonapiv1alpha1.ManagedClusterAddOn {
+func SetAddonDeletionTimestamp(addon *addonapiv1beta1.ManagedClusterAddOn,
+	deletionTimestamp time.Time) *addonapiv1beta1.ManagedClusterAddOn {
 	addon.DeletionTimestamp = &metav1.Time{Time: deletionTimestamp}
 	return addon
 }
 
-func SetAddonFinalizers(addon *addonapiv1alpha1.ManagedClusterAddOn, finalizers ...string) *addonapiv1alpha1.ManagedClusterAddOn {
+func SetAddonFinalizers(addon *addonapiv1beta1.ManagedClusterAddOn, finalizers ...string) *addonapiv1beta1.ManagedClusterAddOn {
 	addon.SetFinalizers(finalizers)
 	return addon
 }
 
 type clusterManagementAddonBuilder struct {
-	clusterManagementAddOn *addonapiv1alpha1.ClusterManagementAddOn
+	clusterManagementAddOn *addonapiv1beta1.ClusterManagementAddOn
 }
 
 func NewClusterManagementAddon(name, crd, cr string) *clusterManagementAddonBuilder {
 	return &clusterManagementAddonBuilder{
-		&addonapiv1alpha1.ClusterManagementAddOn{
+		&addonapiv1beta1.ClusterManagementAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
-			Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
-				AddOnConfiguration: addonapiv1alpha1.ConfigCoordinates{
-					CRDName: crd,
-					CRName:  cr,
-				},
-				InstallStrategy: addonapiv1alpha1.InstallStrategy{
-					Type: addonapiv1alpha1.AddonInstallStrategyManual,
+			Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+				InstallStrategy: addonapiv1beta1.InstallStrategy{
+					Type: addonapiv1beta1.AddonInstallStrategyManual,
 				},
 			},
 		},
 	}
 }
 
-func (b *clusterManagementAddonBuilder) WithSupportedConfigs(supportedConfigs ...addonapiv1alpha1.ConfigMeta) *clusterManagementAddonBuilder {
-	b.clusterManagementAddOn.Spec.SupportedConfigs = supportedConfigs
+func (b *clusterManagementAddonBuilder) WithDefaultConfigs(defaultConfigs ...addonapiv1beta1.AddOnConfig) *clusterManagementAddonBuilder {
+	b.clusterManagementAddOn.Spec.DefaultConfigs = defaultConfigs
 	return b
 }
 
-func (b *clusterManagementAddonBuilder) WithPlacementStrategy(placements ...addonapiv1alpha1.PlacementStrategy) *clusterManagementAddonBuilder {
-	b.clusterManagementAddOn.Spec.InstallStrategy.Type = addonapiv1alpha1.AddonInstallStrategyPlacements
+func (b *clusterManagementAddonBuilder) WithPlacementStrategy(placements ...addonapiv1beta1.PlacementStrategy) *clusterManagementAddonBuilder {
+	b.clusterManagementAddOn.Spec.InstallStrategy.Type = addonapiv1beta1.AddonInstallStrategyPlacements
 	b.clusterManagementAddOn.Spec.InstallStrategy.Placements = placements
 	return b
 }
 
 func (b *clusterManagementAddonBuilder) WithDefaultConfigReferences(
-	defaultConfigReferences ...addonapiv1alpha1.DefaultConfigReference,
+	defaultConfigReferences ...addonapiv1beta1.DefaultConfigReference,
 ) *clusterManagementAddonBuilder {
 	b.clusterManagementAddOn.Status.DefaultConfigReferences = defaultConfigReferences
 	return b
 }
 
-func (b *clusterManagementAddonBuilder) WithInstallProgression(installProgressions ...addonapiv1alpha1.InstallProgression) *clusterManagementAddonBuilder {
+func (b *clusterManagementAddonBuilder) WithInstallProgression(installProgressions ...addonapiv1beta1.InstallProgression) *clusterManagementAddonBuilder {
 	b.clusterManagementAddOn.Status.InstallProgressions = installProgressions
 	return b
 }
 
-func (b *clusterManagementAddonBuilder) Build() *addonapiv1alpha1.ClusterManagementAddOn {
+func (b *clusterManagementAddonBuilder) Build() *addonapiv1beta1.ClusterManagementAddOn {
 	return b.clusterManagementAddOn
 }
 

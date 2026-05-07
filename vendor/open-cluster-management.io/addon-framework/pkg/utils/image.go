@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"k8s.io/klog/v2"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -23,7 +23,7 @@ func OverrideImageByAnnotation(annotations map[string]string, imageName string) 
 	}
 
 	type ImageRegistries struct {
-		Registries []addonapiv1alpha1.ImageMirror `json:"registries"`
+		Registries []addonapiv1beta1.ImageMirror `json:"registries"`
 	}
 
 	imageRegistries := ImageRegistries{}

@@ -1,6 +1,7 @@
 package addonfactory
 
 import (
+	"context"
 	"embed"
 	"fmt"
 
@@ -10,7 +11,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
@@ -25,7 +26,7 @@ const AnnotationValuesName string = "addon.open-cluster-management.io/values"
 type Values map[string]interface{}
 
 type GetValuesFunc func(cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error)
+	addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error)
 
 // AgentAddonFactory includes the common fields for building different agentAddon instances.
 type AgentAddonFactory struct {
@@ -36,11 +37,8 @@ type AgentAddonFactory struct {
 	agentAddonOptions agent.AgentAddonOptions
 	// trimCRDDescription flag is used to trim the description of CRDs in manifestWork. disabled by default.
 	trimCRDDescription bool
-	// Deprecated: use clusterClient to get the hosting cluster.
-	hostingCluster        *clusterv1.ManagedCluster
-	clusterClient         clusterclientset.Interface
-	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error)
-	helmEngineStrict      bool
+	clusterClient      clusterclientset.Interface
+	helmEngineStrict   bool
 }
 
 // NewAgentAddonFactory builds an addonAgentFactory instance with addon name and fs.
@@ -102,7 +100,7 @@ func (f *AgentAddonFactory) WithAgentHostedModeEnabledOption() *AgentAddonFactor
 
 // WithAgentHostedInfoFn sets the function to get the hosting cluster of an addon in the hosted mode.
 func (f *AgentAddonFactory) WithAgentHostedInfoFn(
-	infoFn func(*addonapiv1alpha1.ManagedClusterAddOn, *clusterv1.ManagedCluster) (string, string)) *AgentAddonFactory {
+	infoFn func(*addonapiv1beta1.ManagedClusterAddOn, *clusterv1.ManagedCluster) (string, string)) *AgentAddonFactory {
 	f.agentAddonOptions.HostedModeInfoFunc = infoFn
 	return f
 }
@@ -131,23 +129,9 @@ func (f *AgentAddonFactory) WithConfigGVRs(gvrs ...schema.GroupVersionResource) 
 	return f
 }
 
-// WithHostingCluster defines the hosting cluster used in hosted mode. An AgentAddon may use this to provide
-// additional metadata.
-// Deprecated: use WithManagedClusterClient to set a cluster client that can get the hosting cluster.
-func (f *AgentAddonFactory) WithHostingCluster(cluster *clusterv1.ManagedCluster) *AgentAddonFactory {
-	f.hostingCluster = cluster
-	return f
-}
-
 // WithManagedClusterClient defines the cluster client that can get the hosting cluster used in hosted mode.
 func (f *AgentAddonFactory) WithManagedClusterClient(c clusterclientset.Interface) *AgentAddonFactory {
 	f.clusterClient = c
-	return f
-}
-
-// WithUpdaters defines which type of update opration should by used for specific resources.
-func (f *AgentAddonFactory) WithUpdaters(updater []agent.Updater) *AgentAddonFactory {
-	f.agentAddonOptions.Updaters = updater
 	return f
 }
 
@@ -173,25 +157,14 @@ func (f *AgentAddonFactory) WithAgentDeployTriggerClusterFilter(
 // override the default built-in namespace value; And if the registrationOption is not nil but the
 // registrationOption.AgentInstallNamespace is nil, this will also set it to this.
 func (f *AgentAddonFactory) WithAgentInstallNamespace(
-	nsFunc func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error),
+	nsFunc func(ctx context.Context, addon *addonapiv1beta1.ManagedClusterAddOn) (string, error),
 ) *AgentAddonFactory {
-	f.agentInstallNamespace = nsFunc
+	f.agentAddonOptions.AgentInstallNamespace = nsFunc
 	return f
-}
-
-// preBuildAddon sets the default values for the agentAddonOptions.
-func (f *AgentAddonFactory) preBuildAddon() {
-	if f.agentInstallNamespace != nil {
-		if f.agentAddonOptions.Registration != nil && f.agentAddonOptions.Registration.AgentInstallNamespace == nil {
-			f.agentAddonOptions.Registration.AgentInstallNamespace = f.agentInstallNamespace
-		}
-	}
 }
 
 // BuildHelmAgentAddon builds a helm agentAddon instance.
 func (f *AgentAddonFactory) BuildHelmAgentAddon() (agent.AgentAddon, error) {
-	f.preBuildAddon()
-
 	if err := validateSupportedConfigGVRs(f.agentAddonOptions.SupportedConfigGVRs); err != nil {
 		return nil, err
 	}
@@ -208,8 +181,6 @@ func (f *AgentAddonFactory) BuildHelmAgentAddon() (agent.AgentAddon, error) {
 
 // BuildTemplateAgentAddon builds a template agentAddon instance.
 func (f *AgentAddonFactory) BuildTemplateAgentAddon() (agent.AgentAddon, error) {
-	f.preBuildAddon()
-
 	if err := validateSupportedConfigGVRs(f.agentAddonOptions.SupportedConfigGVRs); err != nil {
 		return nil, err
 	}

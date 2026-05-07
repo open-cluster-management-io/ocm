@@ -1,6 +1,7 @@
 package agentdeploy
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -11,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	workbuilder "open-cluster-management.io/sdk-go/pkg/apis/work/v1/builder"
@@ -20,7 +22,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
-func addonHasFinalizer(addon *addonapiv1alpha1.ManagedClusterAddOn, finalizer string) bool {
+func addonHasFinalizer(addon *addonapiv1beta1.ManagedClusterAddOn, finalizer string) bool {
 	for _, f := range addon.Finalizers {
 		if f == finalizer {
 			return true
@@ -29,7 +31,7 @@ func addonHasFinalizer(addon *addonapiv1alpha1.ManagedClusterAddOn, finalizer st
 	return false
 }
 
-func addonRemoveFinalizer(addon *addonapiv1alpha1.ManagedClusterAddOn, finalizer string) bool {
+func addonRemoveFinalizer(addon *addonapiv1beta1.ManagedClusterAddOn, finalizer string) bool {
 	var rst []string
 	for _, f := range addon.Finalizers {
 		if f == finalizer {
@@ -50,7 +52,7 @@ func addonRemoveFinalizer(addon *addonapiv1alpha1.ManagedClusterAddOn, finalizer
 	return false
 }
 
-func addonAddFinalizer(addon *addonapiv1alpha1.ManagedClusterAddOn, finalizer string) bool {
+func addonAddFinalizer(addon *addonapiv1beta1.ManagedClusterAddOn, finalizer string) bool {
 	if addon.Finalizers == nil {
 		addon.SetFinalizers([]string{finalizer})
 		return true
@@ -89,7 +91,7 @@ func newManifestWork(addonNamespace, addonName, clusterName string, manifests []
 			Name:      manifestWorkNameFunc(addonNamespace, addonName),
 			Namespace: clusterName,
 			Labels: map[string]string{
-				addonapiv1alpha1.AddonLabelKey: addonName,
+				addonapiv1beta1.AddonLabelKey: addonName,
 			},
 		},
 		Spec: workapiv1.ManifestWorkSpec{
@@ -101,7 +103,7 @@ func newManifestWork(addonNamespace, addonName, clusterName string, manifests []
 
 	// if the addon namespace is not equal with the manifestwork namespace(cluster name), add the addon namespace label
 	if addonNamespace != clusterName {
-		work.Labels[addonapiv1alpha1.AddonNamespaceLabelKey] = addonNamespace
+		work.Labels[addonapiv1beta1.AddonNamespaceLabelKey] = addonNamespace
 	}
 	return work
 }
@@ -130,8 +132,8 @@ func (b *addonWorksBuilder) isPreDeleteHookObject(obj runtime.Object) (bool, *wo
 	annotations := accessor.GetAnnotations()
 
 	// TODO: deprecate PreDeleteHookLabel in the future release.
-	_, hasPreDeleteLabel := labels[addonapiv1alpha1.AddonPreDeleteHookLabelKey]
-	_, hasPreDeleteAnnotation := annotations[addonapiv1alpha1.AddonPreDeleteHookAnnotationKey]
+	_, hasPreDeleteLabel := labels[addonapiv1beta1.AddonPreDeleteHookAnnotationKey]
+	_, hasPreDeleteAnnotation := annotations[addonapiv1beta1.AddonPreDeleteHookAnnotationKey]
 	if !hasPreDeleteLabel && !hasPreDeleteAnnotation {
 		return false, nil
 	}
@@ -201,7 +203,7 @@ func (m *hostingManifest) deployable(hostedModeEnabled bool, installMode string,
 		return false, nil
 	}
 
-	if exist && location == addonapiv1alpha1.HostedManifestLocationHostingValue {
+	if exist && location == addonapiv1beta1.HostedManifestLocationHostingValue {
 		klog.V(4).Infof("will deploy the manifest %s/%s on the hosting cluster in Hosted mode",
 			accessor.GetNamespace(), accessor.GetName())
 		return true, nil
@@ -242,7 +244,7 @@ func (m *managedManifest) deployable(hostedModeEnabled bool, installMode string,
 		return true, nil
 	}
 
-	if !exist || location == addonapiv1alpha1.HostedManifestLocationManagedValue {
+	if !exist || location == addonapiv1beta1.HostedManifestLocationManagedValue {
 		klog.V(4).Infof("will deploy the manifest %s/%s on the managed cluster in Hosted mode",
 			accessor.GetNamespace(), accessor.GetName())
 		return true, nil
@@ -262,7 +264,7 @@ func (m *managedManifest) preDeleteHookManifestWorkName(addonNamespace, addonNam
 // BuildDeployWorks returns the deploy manifestWorks. if there is no manifest need
 // to deploy, will return nil.
 func (b *addonWorksBuilder) BuildDeployWorks(installMode, addonWorkNamespace string,
-	addon *addonapiv1alpha1.ManagedClusterAddOn,
+	addon *addonapiv1beta1.ManagedClusterAddOn,
 	existingWorks []workapiv1.ManifestWork,
 	objects []runtime.Object,
 	manifestOptions []workapiv1.ManifestConfigOption) (deployWorks, deleteWorks []*workapiv1.ManifestWork, err error) {
@@ -271,8 +273,8 @@ func (b *addonWorksBuilder) BuildDeployWorks(installMode, addonWorkNamespace str
 	// the manifestWork in managed cluster ns is cleaned up via the addon ownerRef, so need to add the owner.
 	// the manifestWork in hosting cluster ns is cleaned up by its controller since it and its addon cross ns.
 	owner := metav1.NewControllerRef(addon, schema.GroupVersionKind{
-		Group:   addonapiv1alpha1.GroupName,
-		Version: addonapiv1alpha1.GroupVersion.Version,
+		Group:   addonapiv1beta1.GroupName,
+		Version: addonapiv1beta1.GroupVersion.Version,
 		Kind:    "ManagedClusterAddOn",
 	})
 
@@ -331,14 +333,14 @@ func (b *addonWorksBuilder) BuildDeployWorks(installMode, addonWorkNamespace str
 // BuildHookWork returns the preDelete manifestWork, if there is no manifest need
 // to deploy, will return nil.
 func (b *addonWorksBuilder) BuildHookWork(installMode, addonWorkNamespace string,
-	addon *addonapiv1alpha1.ManagedClusterAddOn,
+	addon *addonapiv1beta1.ManagedClusterAddOn,
 	objects []runtime.Object) (hookWork *workapiv1.ManifestWork, err error) {
 	var hookManifests []workapiv1.Manifest
 	var hookManifestConfigs []workapiv1.ManifestConfigOption
 
 	owner := metav1.NewControllerRef(addon, schema.GroupVersionKind{
-		Group:   addonapiv1alpha1.GroupName,
-		Version: addonapiv1alpha1.GroupVersion.Version,
+		Group:   addonapiv1beta1.GroupName,
+		Version: addonapiv1beta1.GroupVersion.Version,
 		Kind:    "ManagedClusterAddOn",
 	})
 
@@ -375,7 +377,7 @@ func (b *addonWorksBuilder) BuildHookWork(installMode, addonWorkNamespace string
 	}
 	hookWork.Spec.ManifestConfigs = hookManifestConfigs
 	if addon.Namespace != addonWorkNamespace {
-		hookWork.Labels[addonapiv1alpha1.AddonNamespaceLabelKey] = addon.Namespace
+		hookWork.Labels[addonapiv1beta1.AddonNamespaceLabelKey] = addon.Namespace
 	}
 	return hookWork, nil
 }
@@ -461,7 +463,7 @@ func newAddonWorkObjectMeta(namePrefix, addonName, addonNamespace, workNamespace
 			Name:      fmt.Sprintf("%s-%d", namePrefix, index),
 			Namespace: workNamespace,
 			Labels: map[string]string{
-				addonapiv1alpha1.AddonLabelKey: addonName,
+				addonapiv1beta1.AddonLabelKey: addonName,
 			},
 		}
 		// This owner is only added to the manifestWork deployed in managed cluster ns.
@@ -472,15 +474,15 @@ func newAddonWorkObjectMeta(namePrefix, addonName, addonNamespace, workNamespace
 		}
 		// if the addon namespace is not equal with the manifestwork namespace(cluster name), add the addon namespace label
 		if addonNamespace != workNamespace {
-			objectMeta.Labels[addonapiv1alpha1.AddonNamespaceLabelKey] = addonNamespace
+			objectMeta.Labels[addonapiv1beta1.AddonNamespaceLabelKey] = addonNamespace
 		}
 		return objectMeta
 	}
 }
 
-func getManifestConfigOption(agentAddon agent.AgentAddon,
+func getManifestConfigOption(ctx context.Context, agentAddon agent.AgentAddon,
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]workapiv1.ManifestConfigOption, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) ([]workapiv1.ManifestConfigOption, error) {
 	manifestConfigs := []workapiv1.ManifestConfigOption{}
 
 	if agentAddon.GetAgentAddonOptions().HealthProber != nil &&
@@ -498,7 +500,7 @@ func getManifestConfigOption(agentAddon agent.AgentAddon,
 	if agentAddon.GetAgentAddonOptions().HealthProber != nil &&
 		agentAddon.GetAgentAddonOptions().HealthProber.Type == agent.HealthProberTypeDeploymentAvailability {
 
-		manifests, err := agentAddon.Manifests(cluster, addon)
+		manifests, err := agentAddon.Manifests(ctx, cluster, addon)
 		if err != nil {
 			return manifestConfigs, fmt.Errorf("get all deployments error: %v", err)
 		}
@@ -513,7 +515,7 @@ func getManifestConfigOption(agentAddon agent.AgentAddon,
 	if agentAddon.GetAgentAddonOptions().HealthProber != nil &&
 		agentAddon.GetAgentAddonOptions().HealthProber.Type == agent.HealthProberTypeWorkloadAvailability {
 
-		manifests, err := agentAddon.Manifests(cluster, addon)
+		manifests, err := agentAddon.Manifests(ctx, cluster, addon)
 		if err != nil {
 			return manifestConfigs, fmt.Errorf("get all workloads error: %v", err)
 		}
@@ -522,16 +524,6 @@ func getManifestConfigOption(agentAddon agent.AgentAddon,
 			manifestConfig := utils.WellKnowManifestConfig(workload.Group, workload.Resource,
 				workload.Namespace, workload.Name)
 			manifestConfigs = append(manifestConfigs, manifestConfig)
-		}
-	}
-
-	if updaters := agentAddon.GetAgentAddonOptions().Updaters; updaters != nil {
-		for _, updater := range updaters {
-			strategy := updater.UpdateStrategy
-			manifestConfigs = append(manifestConfigs, workapiv1.ManifestConfigOption{
-				ResourceIdentifier: updater.ResourceIdentifier,
-				UpdateStrategy:     &strategy,
-			})
 		}
 	}
 
@@ -621,7 +613,7 @@ func getDeletionOrphaningRule(obj runtime.Object) (*workapiv1.OrphaningRule, err
 		return nil, err
 	}
 	annotations := accessor.GetAnnotations()
-	if _, ok := annotations[addonapiv1alpha1.DeletionOrphanAnnotationKey]; !ok {
+	if _, ok := annotations[addonapiv1beta1.DeletionOrphanAnnotationKey]; !ok {
 		return nil, nil
 	}
 
@@ -638,7 +630,7 @@ func getDeletionOrphaningRule(obj runtime.Object) (*workapiv1.OrphaningRule, err
 }
 
 // convert config reference to annotations.
-func configsToAnnotations(configReference []addonapiv1alpha1.ConfigReference) (map[string]string, error) {
+func configsToAnnotations(configReference []addonapiv1beta1.ConfigReference) (map[string]string, error) {
 	if len(configReference) == 0 {
 		return nil, nil
 	}
@@ -662,7 +654,7 @@ func configsToAnnotations(configReference []addonapiv1alpha1.ConfigReference) (m
 }
 
 // configsToMap returns a map stores the config name as the key and config spec hash as the value.
-func ConfigsToMap(configReference []addonapiv1alpha1.ConfigReference) map[string]string {
+func ConfigsToMap(configReference []addonapiv1beta1.ConfigReference) map[string]string {
 	// config name follows the format of <resource>.<group>/<namespace>/<name>, for example,
 	// addondeploymentconfigs.addon.open-cluster-management.io/open-cluster-management/default.
 	// for a cluster scoped resource, the namespace would be empty, for example,

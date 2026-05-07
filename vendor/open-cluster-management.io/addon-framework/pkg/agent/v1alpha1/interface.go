@@ -1,13 +1,12 @@
-package agent
+package v1alpha1
 
 import (
-	"context"
 	"fmt"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
@@ -40,7 +39,7 @@ type AgentAddon interface {
 	//   - the RBAC permission bond to the addon agents *in the managed cluster*. (the hub cluster's RBAC
 	//     setup shall be done at GetAgentAddonOptions below.)
 	// NB for dispatching namespaced resources, it's recommended to include the namespace in the list.
-	Manifests(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error)
+	Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error)
 
 	// GetAgentAddonOptions returns the agent options for advanced agent customization.
 	// A minimal option is merely setting a unique addon name in the AgentAddonOptions.
@@ -58,6 +57,11 @@ type AgentAddonOptions struct {
 	// +optional
 	Registration *RegistrationOption
 
+	// Updaters select a set of resources and define the strategies to update them.
+	// UpdateStrategy is Update if no Updater is defined for a resource.
+	// +optional
+	Updaters []Updater
+
 	// HealthProber defines how is the healthiness status of the ManagedClusterAddon probed.
 	// Note that the prescribed prober type here only applies to the automatically installed
 	// addons configured via InstallStrategy.
@@ -65,20 +69,13 @@ type AgentAddonOptions struct {
 	// +optional
 	HealthProber *HealthProber
 
-	// AgentInstallNamespace returns the namespace where registration credential will be put on the managed cluster.
-	// It will override the installNamespace on ManagedClusterAddon spec if set and the returned value is not empty.
-	// Note: Set this very carefully. If this is set, the addon agent must be deployed in the same namespace, which
-	// means when implementing Manifests function in AgentAddon interface, the namespace of the addon agent manifest
-	// must be set to the same value returned by this function.
-	AgentInstallNamespace AgentInstallNamespaceFunc
-
 	// HostedModeEnabled defines whether the Hosted deploying mode for the addon agent is enabled
 	// If not set, will be defaulted to false.
 	// +optional
 	HostedModeEnabled bool
 
 	// HostedModeInfoFunc returns whether an addon is in hosted mode, and its hosting cluster.
-	HostedModeInfoFunc func(addon *addonapiv1beta1.ManagedClusterAddOn, cluster *clusterv1.ManagedCluster) (string, string)
+	HostedModeInfoFunc func(addon *addonapiv1alpha1.ManagedClusterAddOn, cluster *clusterv1.ManagedCluster) (string, string)
 
 	// SupportedConfigGVRs is a list of addon supported configuration GroupVersionResource
 	// each configuration GroupVersionResource should be unique
@@ -112,18 +109,18 @@ type AgentAddonOptions struct {
 	ConfigCheckEnabled bool
 }
 
-type RegistrationConfigurationsFunc func(ctx context.Context, cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1beta1.ManagedClusterAddOn) ([]RegistrationConfig, error)
+type CSRConfigurationsFunc func(cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]addonapiv1alpha1.RegistrationConfig, error)
 
-type CSRSignerFunc func(ctx context.Context, cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1beta1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) ([]byte, error)
+type CSRSignerFunc func(cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) ([]byte, error)
 
-type CSRApproveFunc func(ctx context.Context, cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1beta1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool
+type CSRApproveFunc func(cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool
 
-type PermissionConfigFunc func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error
+type PermissionConfigFunc func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error
 
-type AgentInstallNamespaceFunc func(ctx context.Context, addon *addonapiv1beta1.ManagedClusterAddOn) (string, error)
+type AgentInstallNamespaceFunc func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error)
 
 // RegistrationOption defines how agent is registered to the hub cluster. It needs to define:
 // 1. csr with what subject/signer should be created
@@ -131,11 +128,22 @@ type AgentInstallNamespaceFunc func(ctx context.Context, addon *addonapiv1beta1.
 // 3. the RBAC setting of agent on the hub
 // 4. how csr is signed if the customized signer is used.
 type RegistrationOption struct {
-	// Configurations returns a list of csr configuration for the addon agent in a managed cluster.
+	// CSRConfigurations returns a list of csr configuration for the adddon agent in a managed cluster.
 	// A csr will be created from the managed cluster for addon agent with each CSRConfiguration.
-	// This replaces the previous CSRConfigurations field from RegistrationOption.
 	// +required
-	Configurations RegistrationConfigurationsFunc
+	CSRConfigurations CSRConfigurationsFunc
+
+	// Namespace is the namespace where registraiton credential will be put on the managed cluster. It
+	// will be overridden by installNamespace on ManagedClusterAddon spec if set
+	// Deprecated: use AgentInstallNamespace instead
+	Namespace string
+
+	// AgentInstallNamespace returns the namespace where registration credential will be put on the managed cluster.
+	// It will override the installNamespace on ManagedClusterAddon spec if set and the returned value is not empty.
+	// Note: Set this very carefully. If this is set, the addon agent must be deployed in the same namespace, which
+	// means when implementing Manifests function in AgentAddon interface, the namespace of the addon agent manifest
+	// must be set to the same value returned by this function.
+	AgentInstallNamespace AgentInstallNamespaceFunc
 
 	// CSRApproveCheck checks whether the addon agent registration should be approved by the hub.
 	// Addon hub controller can implement this func to auto-approve all the CSRs. A better CSR check is
@@ -178,11 +186,18 @@ type HealthProber struct {
 	WorkProber *WorkHealthProber
 }
 
-type AddonHealthCheckerFunc func([]FieldResult, *clusterv1.ManagedCluster, *addonapiv1beta1.ManagedClusterAddOn) error
+type AddonHealthCheckFunc func(workapiv1.ResourceIdentifier, workapiv1.StatusFeedbackResult) error
+type AddonHealthCheckerFunc func([]FieldResult, *clusterv1.ManagedCluster, *addonapiv1alpha1.ManagedClusterAddOn) error
 
 type WorkHealthProber struct {
 	// ProbeFields tells addon framework what field to probe
 	ProbeFields []ProbeField
+
+	// HealthCheck is deprecated and will be removed in the future. please use HealthChecker instead.
+	// HealthCheck will be ignored if HealthChecker is set.
+	// HealthCheck check status of the addon based on each probeField result.
+	// Deprecated: use HealthChecker instead.
+	HealthCheck AddonHealthCheckFunc
 
 	// HealthChecker check status of the addon based of all results of probeFields
 	HealthChecker AddonHealthCheckerFunc
@@ -234,13 +249,16 @@ const (
 	HealthProberTypeWorkloadAvailability HealthProberType = "WorkloadAvailability"
 )
 
-func KubeClientSignerConfigurations(addonName, agentName string) RegistrationConfigurationsFunc {
-	return func(ctx context.Context, cluster *clusterv1.ManagedCluster,
-		addon *addonapiv1beta1.ManagedClusterAddOn) ([]RegistrationConfig, error) {
-		return []RegistrationConfig{
-			&KubeClientRegistration{
-				User:   DefaultUser(cluster.Name, addonName, agentName),
-				Groups: DefaultGroups(cluster.Name, addonName),
+func KubeClientSignerConfigurations(addonName, agentName string) CSRConfigurationsFunc {
+	return func(cluster *clusterv1.ManagedCluster,
+		addon *addonapiv1alpha1.ManagedClusterAddOn) ([]addonapiv1alpha1.RegistrationConfig, error) {
+		return []addonapiv1alpha1.RegistrationConfig{
+			{
+				SignerName: certificatesv1.KubeAPIServerClientSignerName,
+				Subject: addonapiv1alpha1.Subject{
+					User:   DefaultUser(cluster.Name, addonName, agentName),
+					Groups: DefaultGroups(cluster.Name, addonName),
+				},
 			},
 		}, nil
 	}
@@ -257,4 +275,9 @@ func DefaultGroups(clusterName, addonName string) []string {
 		fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", clusterName, addonName),
 		fmt.Sprintf("system:open-cluster-management:addon:%s", addonName),
 	}
+}
+
+// ApprovalAllCSRs returns true for all csrs.
+func ApprovalAllCSRs(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
+	return true
 }
