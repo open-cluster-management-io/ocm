@@ -100,8 +100,8 @@ func (c *ExecutorCaches) Get(executor string, dimension Dimension) (allowed *boo
 	return oldDimensionCaches.get(dimension.Hash())
 }
 
-// RemoveByHash removes an cache item by dimension hash
-func (c *ExecutorCaches) RemoveByHash(executor string, hash string) {
+// removeByHash removes an cache item by dimension hash
+func (c *ExecutorCaches) removeByHash(executor string, hash string) {
 	oldDimensionCaches, ok := c.getDimensionCaches(executor)
 	if !ok {
 		return
@@ -126,7 +126,7 @@ func (c *ExecutorCaches) CleanupUnnecessaryCaches(necessaryCaches *ExecutorCache
 
 		for hash := range caches.getCacheItems() {
 			if _, ok := necessaryCaches.getByHash(key, hash); !ok {
-				c.RemoveByHash(key, hash)
+				c.removeByHash(key, hash)
 				klog.V(4).Infof("Remove cache item executor %s dimension %s", key, hash)
 			}
 		}
