@@ -165,10 +165,10 @@ func (c *CacheController) clusterRoleEnqueueFu(
 		ret := make([]string, 0)
 
 		clusterRoleKey := accessor.GetName()
-		items, err := rbIndexer.ByIndex(byRole, clusterRoleKey)
+		items, err := rbIndexer.ByIndex(byClusterRole, clusterRoleKey)
 		if err != nil {
 			klog.V(4).Infof("RoleBinding indexer get RoleBinding by %s index %s error: %v",
-				byRole, clusterRoleKey, err)
+				byClusterRole, clusterRoleKey, err)
 		} else {
 			for _, item := range items {
 				if rb, ok := item.(*rbacapiv1.RoleBinding); ok {

@@ -100,8 +100,8 @@ func (c *ExecutorCaches) Get(executor string, dimension Dimension) (allowed *boo
 	return oldDimensionCaches.get(dimension.Hash())
 }
 
-// RemoveByHash removes an cache item by dimension hash
-func (c *ExecutorCaches) RemoveByHash(executor string, hash string) {
+// removeByHash removes an cache item by dimension hash
+func (c *ExecutorCaches) removeByHash(executor string, hash string) {
 	oldDimensionCaches, ok := c.getDimensionCaches(executor)
 	if !ok {
 		return
@@ -110,7 +110,7 @@ func (c *ExecutorCaches) RemoveByHash(executor string, hash string) {
 	oldDimensionCaches.remove(hash)
 
 	// if the deleted cache is the last element, delete the upper level dimension caches
-	if len(oldDimensionCaches.items) == 0 {
+	if oldDimensionCaches.len() == 0 {
 		c.removeDimensionCaches(executor)
 	}
 }
@@ -126,7 +126,7 @@ func (c *ExecutorCaches) CleanupUnnecessaryCaches(necessaryCaches *ExecutorCache
 
 		for hash := range caches.getCacheItems() {
 			if _, ok := necessaryCaches.getByHash(key, hash); !ok {
-				c.RemoveByHash(key, hash)
+				c.removeByHash(key, hash)
 				klog.V(4).Infof("Remove cache item executor %s dimension %s", key, hash)
 			}
 		}
@@ -197,9 +197,13 @@ func (c *ExecutorCaches) removeDimensionCaches(executor string) {
 }
 
 func (c *ExecutorCaches) getCacheItems() map[string]*DimensionCaches {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	return c.items
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	copied := make(map[string]*DimensionCaches, len(c.items))
+	for k, v := range c.items {
+		copied[k] = v
+	}
+	return copied
 }
 
 // getByHash gets a cache item value and existence by the dimension hash
@@ -213,15 +217,16 @@ func (c *ExecutorCaches) getByHash(executor string, hash string) (*bool, bool) {
 }
 
 func (c *DimensionCaches) remove(hash string) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
-	_, ok := c.items[hash]
-	if !ok {
-		return
-	}
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	delete(c.items, hash)
+}
+
+func (c *DimensionCaches) len() int {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return len(c.items)
 }
 
 func (c *DimensionCaches) get(hash string) (*bool, bool) {
@@ -248,7 +253,11 @@ func (c *DimensionCaches) upsert(dimension Dimension, allowed *bool) {
 func (c *DimensionCaches) getCacheItems() map[string]CacheValue {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	return c.items
+	copied := make(map[string]CacheValue, len(c.items))
+	for k, v := range c.items {
+		copied[k] = v
+	}
+	return copied
 }
 
 func (d *Dimension) Hash() string {

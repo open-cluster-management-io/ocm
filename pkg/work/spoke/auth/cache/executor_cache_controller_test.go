@@ -288,6 +288,128 @@ func countSARRequests(kubeClientActions []clienttesting.Action) int {
 	return len(actualSARActions)
 }
 
+// TestCacheControllerClusterRoleWithRoleBindingOnly verifies that when a ClusterRole changes,
+// the controller finds RoleBindings referencing it via the byClusterRole index (not byRole).
+func TestCacheControllerClusterRoleWithRoleBindingOnly(t *testing.T) {
+	executor := &workapiv1.ManifestWorkExecutor{
+		Subject: workapiv1.ManifestWorkExecutorSubject{
+			Type: workapiv1.ExecutorSubjectTypeServiceAccount,
+			ServiceAccount: &workapiv1.ManifestWorkSubjectServiceAccount{
+				Namespace: "test-ns",
+				Name:      "test-name",
+			},
+		},
+	}
+
+	clusterRoleName := "test-cluster-role"
+	rbNamespace := "test-ns"
+
+	clusterRole := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: clusterRoleName,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:     []string{"create", "update", "patch", "get", "list", "delete"},
+				APIGroups: []string{""},
+				Resources: []string{"configmaps"},
+			},
+		},
+	}
+
+	roleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rb-for-cluster-role",
+			Namespace: rbNamespace,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Namespace: executor.Subject.ServiceAccount.Namespace,
+				Name:      executor.Subject.ServiceAccount.Name,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     clusterRoleName,
+		},
+	}
+
+	kubeClient := fakekube.NewSimpleClientset(clusterRole, roleBinding)
+	kubeClient.PrependReactor("create", "subjectaccessreviews",
+		func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+			obj := action.(clienttesting.CreateActionImpl).Object.(*v1.SubjectAccessReview)
+
+			if obj.Spec.ResourceAttributes.Namespace == allowNS {
+				return true, &v1.SubjectAccessReview{
+					Status: v1.SubjectAccessReviewStatus{
+						Allowed: true,
+					},
+				}, nil
+			}
+
+			if obj.Spec.ResourceAttributes.Namespace == denyNS {
+				return true, &v1.SubjectAccessReview{
+					Status: v1.SubjectAccessReviewStatus{
+						Denied: true,
+					},
+				}, nil
+			}
+			return false, nil, nil
+		},
+	)
+
+	ctx := context.TODO()
+
+	work, _ := spoketesting.NewManifestWork(0,
+		testingcommon.NewUnstructured("v1", "Secret", allowNS, "test"),
+		testingcommon.NewUnstructured("v1", "Secret", denyNS, "test"),
+	)
+	work.Spec.Executor = executor
+	work.Spec.DeleteOption = &workapiv1.DeleteOption{
+		PropagationPolicy: workapiv1.DeletePropagationPolicyTypeSelectivelyOrphan,
+		SelectivelyOrphan: &workapiv1.SelectivelyOrphan{
+			OrphaningRules: []workapiv1.OrphaningRule{
+				{
+					Group:     "",
+					Resource:  "secrets",
+					Namespace: allowNS,
+					Name:      "test",
+				},
+			},
+		},
+	}
+
+	initialized := make(chan struct{})
+	cacheController := newExecutorCacheController(t, ctx, clusterName, kubeClient, initialized, work)
+	<-initialized
+
+	err := checkSARCount(kubeClient, 5)
+	if err != nil {
+		t.Error(err)
+	}
+
+	executorKey := fmt.Sprintf("%s/%s",
+		executor.Subject.ServiceAccount.Namespace, executor.Subject.ServiceAccount.Name)
+	actualMapCount := cacheController.bindingExecutorsMapper.count()
+	if actualMapCount != 1 {
+		t.Errorf("Expected 1 map item (RoleBinding only) but got %d", actualMapCount)
+	}
+	checkBindingExecutorMapperInitialized(t, cacheController.bindingExecutorsMapper,
+		fmt.Sprintf("%s/%s", rbNamespace, "rb-for-cluster-role"), executorKey)
+
+	err = kubeClient.RbacV1().ClusterRoles().Delete(ctx, clusterRoleName, metav1.DeleteOptions{})
+	if err != nil {
+		t.Errorf("Expected no error, but got %v", err)
+	}
+
+	err = checkSARCount(kubeClient, 2*5)
+	if err != nil {
+		t.Errorf("ClusterRole deletion did not trigger cache refresh through RoleBinding path: %v", err)
+	}
+}
+
 func checkBindingExecutorMapperInitialized(t *testing.T, m *safeMap, roleKey, executorKey string) {
 	actualExecutors := m.get(roleKey)
 	if len(actualExecutors) != 1 {
