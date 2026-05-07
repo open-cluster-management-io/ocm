@@ -145,6 +145,7 @@ func updateSARCheckResultToCache(executorCaches *store.ExecutorCaches, executorK
 	dimension store.Dimension, result error) {
 	if result == nil {
 		executorCaches.Upsert(executorKey, dimension, pointer.Bool(true))
+		return
 	}
 
 	var authError *basic.NotAllowedError
