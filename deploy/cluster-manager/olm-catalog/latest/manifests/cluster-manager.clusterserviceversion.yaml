@@ -59,7 +59,7 @@ metadata:
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
     containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2026-04-01T09:36:58Z"
+    createdAt: "2026-05-08T03:00:13Z"
     description: Manages the installation and upgrade of the ClusterManager.
     operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -658,12 +658,14 @@ spec:
   - name: Registration Operator
     url: https://github.com/open-cluster-management-io/ocm
   maintainers:
-  - email: zyin@redhat.com
+  - email: gothicqiujian@gmail.com
+    name: Jian Qiu
+  - email: ming@redhat.com
+    name: Mike Ng
+  - email: zhiweiyin@hotmail.com
     name: Zhiwei Yin
   - email: deads@redhat.com
     name: David Eads
-  - email: jqiu@redhat.com
-    name: Jian Qiu
   maturity: alpha
   provider:
     name: Open Cluster Management Community

@@ -72,12 +72,14 @@ spec:
   - name: Registration Operator
     url: https://github.com/open-cluster-management-io/ocm
   maintainers:
-  - email: zyin@redhat.com
+  - email: gothicqiujian@gmail.com
+    name: Jian Qiu
+  - email: ming@redhat.com
+    name: Mike Ng
+  - email: zhiweiyin@hotmail.com
     name: Zhiwei Yin
   - email: deads@redhat.com
     name: David Eads
-  - email: jqiu@redhat.com
-    name: Jian Qiu
   maturity: alpha
   provider:
     name: Open Cluster Management Community
