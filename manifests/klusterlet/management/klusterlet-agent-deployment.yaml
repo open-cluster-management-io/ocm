@@ -147,7 +147,7 @@ spec:
           - "--grpc-bootstrap-config=/spoke/bootstrap/config.yaml"
           - "--grpc-config=/spoke/hub-kubeconfig/config.yaml"
           {{end}}
-                    {{if .TLSMinVersion}}
+          {{if .TLSMinVersion}}
           - "--tls-min-version={{ .TLSMinVersion }}"
           {{end}}
           {{if .TLSCipherSuites}}

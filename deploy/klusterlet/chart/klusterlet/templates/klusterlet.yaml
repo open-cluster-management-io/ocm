@@ -21,7 +21,7 @@ spec:
   {{- end }}
   {{- with .Values.klusterlet.nodePlacement }}
   nodePlacement:
-  {{- toYaml . | nindent 4 }}
+    {{- toYaml . | nindent 4 }}
   {{- end }}
   {{- with .Values.klusterlet.registrationConfiguration }}
   registrationConfiguration:
@@ -31,14 +31,13 @@ spec:
   workConfiguration:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  {{- if .Values.priorityClassName }}
-  priorityClassName: "{{ .Values.priorityClassName }}"
-  {{- end }}
-    {{- if .Values.klusterlet.tlsMinVersion }}
+  {{- if .Values.klusterlet.tlsMinVersion }}
   tlsMinVersion: "{{ .Values.klusterlet.tlsMinVersion }}"
   {{- end }}
   {{- if .Values.klusterlet.tlsCipherSuites }}
   tlsCipherSuites: "{{ .Values.klusterlet.tlsCipherSuites }}"
   {{- end }}
-  {{- with .Values.klusterlet.nodePlacement }}
+  {{- if .Values.priorityClassName }}
+  priorityClassName: "{{ .Values.priorityClassName }}"
+  {{- end }}
 {{- end }}

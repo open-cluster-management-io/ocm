@@ -34,6 +34,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
+	sdktls "open-cluster-management.io/sdk-go/pkg/tls"
 )
 
 const (
@@ -57,7 +58,6 @@ type klusterletController struct {
 	deploymentReplicas            int32
 	disableAddonNamespace         bool
 	enableSyncLabels              bool
-	tlsConfigMapWatcher *configMapWatcher
 }
 
 type klusterletReconcile interface {
@@ -302,7 +302,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	config.populateBootstrap(klusterlet)
 
 	// Populate TLS configuration from klusterlet spec or ConfigMap
-    n.populateTLSConfig(ctx, klusterlet, &config)
+    n.populateTLSConfig(ctx, &config)
 
 
 	config.Labels = helpers.GetKlusterletAgentLabels(klusterlet, n.enableSyncLabels)
@@ -513,20 +513,31 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 	return utilerrors.NewAggregate(errs)
 }
-// populateTLSConfig reads TLS configuration from klusterlet spec
-func (n *klusterletController) populateTLSConfig(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, config *klusterletConfig) {
+// populateTLSConfig reads TLS configuration from ocm-tls-profile ConfigMap
+// in the operator namespace and injects it into the klusterletConfig
+// for deployment template rendering (Use Case #3 from sdk-go/pkg/tls README)
+func (n *klusterletController) populateTLSConfig(ctx context.Context, config *klusterletConfig) {
 	logger := klog.FromContext(ctx)
-	
-	// Check if klusterlet has TLS configuration
-	if klusterlet.Spec.TLSMinVersion != "" {
-		config.TLSMinVersion = klusterlet.Spec.TLSMinVersion
-		logger.V(2).Info("Using TLS min version from klusterlet spec", "version", config.TLSMinVersion)
+
+	// Load TLS config from ocm-tls-profile ConfigMap
+	tlsCfg, err := sdktls.LoadTLSConfigFromConfigMap(ctx, n.kubeClient, n.operatorNamespace)
+	if err != nil {
+		logger.Error(err, "Failed to load TLS config from ConfigMap, using defaults")
+		tlsCfg = sdktls.GetDefaultTLSConfig()
 	}
-	
-	if klusterlet.Spec.TLSCipherSuites != "" {
-		config.TLSCipherSuites = klusterlet.Spec.TLSCipherSuites
-		logger.V(2).Info("Using TLS cipher suites from klusterlet spec")
+	if tlsCfg == nil {
+		tlsCfg = sdktls.GetDefaultTLSConfig()
 	}
+
+	// Convert TLS config to flag format and inject into klusterletConfig
+	config.TLSMinVersion = sdktls.VersionToString(tlsCfg.MinVersion)
+	if len(tlsCfg.CipherSuites) > 0 {
+		config.TLSCipherSuites = sdktls.CipherSuitesToString(tlsCfg.CipherSuites)
+	}
+
+	logger.V(2).Info("Loaded TLS configuration from ConfigMap",
+		"tlsMinVersion", config.TLSMinVersion,
+		"tlsCipherSuites", config.TLSCipherSuites)
 }
 
 // TODO also read CABundle from ExternalServerURLs and set into registration deployment
