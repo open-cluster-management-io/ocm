@@ -31,12 +31,6 @@ spec:
   workConfiguration:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  {{- if .Values.klusterlet.tlsMinVersion }}
-  tlsMinVersion: "{{ .Values.klusterlet.tlsMinVersion }}"
-  {{- end }}
-  {{- if .Values.klusterlet.tlsCipherSuites }}
-  tlsCipherSuites: "{{ .Values.klusterlet.tlsCipherSuites }}"
-  {{- end }}
   {{- if .Values.priorityClassName }}
   priorityClassName: "{{ .Values.priorityClassName }}"
   {{- end }}

@@ -185,7 +185,7 @@ type klusterletConfig struct {
 	InstallMode                                 operatorapiv1.InstallMode
 
 	TLSMinVersion   string
-	TLSCipherSuites   string
+	TLSCipherSuites string
 	// MaxCustomClusterClaims is the maximum number of custom cluster claims allowed. 0 means no limit.
 
 	MaxCustomClusterClaims       int
@@ -302,8 +302,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	config.populateBootstrap(klusterlet)
 
 	// Populate TLS configuration from klusterlet spec or ConfigMap
-    n.populateTLSConfig(ctx, &config)
-
+	n.populateTLSConfig(ctx, &config)
 
 	config.Labels = helpers.GetKlusterletAgentLabels(klusterlet, n.enableSyncLabels)
 
@@ -513,6 +512,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 	return utilerrors.NewAggregate(errs)
 }
+
 // populateTLSConfig reads TLS configuration from ocm-tls-profile ConfigMap
 // in the operator namespace and injects it into the klusterletConfig
 // for deployment template rendering (Use Case #3 from sdk-go/pkg/tls README)
@@ -522,14 +522,16 @@ func (n *klusterletController) populateTLSConfig(ctx context.Context, config *kl
 	// Load TLS config from ocm-tls-profile ConfigMap
 	tlsCfg, err := sdktls.LoadTLSConfigFromConfigMap(ctx, n.kubeClient, n.operatorNamespace)
 	if err != nil {
-		logger.Error(err, "Failed to load TLS config from ConfigMap, using defaults")
-		tlsCfg = sdktls.GetDefaultTLSConfig()
+		logger.V(4).Info("Failed to load TLS config from ConfigMap, skipping TLS injection", "err", err)
+		return
 	}
 	if tlsCfg == nil {
-		tlsCfg = sdktls.GetDefaultTLSConfig()
+		// ConfigMap not found - don't set defaults, let deployments use agent defaults
+		logger.V(4).Info("TLS ConfigMap not found, using agent defaults")
+		return
 	}
 
-	// Convert TLS config to flag format and inject into klusterletConfig
+	// ConfigMap found - inject TLS config
 	config.TLSMinVersion = sdktls.VersionToString(tlsCfg.MinVersion)
 	if len(tlsCfg.CipherSuites) > 0 {
 		config.TLSCipherSuites = sdktls.CipherSuitesToString(tlsCfg.CipherSuites)
