@@ -608,11 +608,11 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 
 				// Print actual args for debugging
 				actualArgs := actual.Spec.Template.Spec.Containers[0].Args
-				if len(actualArgs) != 8 {
-					fmt.Fprintf(ginkgo.GinkgoWriter, "should get 8 args, actual got %v\n", actualArgs)
+				if len(actualArgs) != 7 {
+					fmt.Fprintf(ginkgo.GinkgoWriter, "should get 7 args, actual got %v\n", actualArgs)
 				}
 
-				gomega.Expect(len(actualArgs)).Should(gomega.Equal(8))
+				gomega.Expect(len(actualArgs)).Should(gomega.Equal(7))
 				return actual.Spec.Template.Spec.Containers[0].Args[2] != "--spoke-cluster-name=cluster2"
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
