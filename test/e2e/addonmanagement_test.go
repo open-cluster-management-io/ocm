@@ -39,8 +39,8 @@ const (
 	namespaceOverrideConfigName              = "namespace-override-config"
 	proxyDeploymentConfigName                = "proxy-deploy-config"
 	resourceRequirementsDeploymentConfigName = "resource-requirements-deploy-config"
-	originalImageValue                       = "quay.io/open-cluster-management/addon-examples:latest"
-	overrideImageValue                       = "quay.io/ocm/addon-examples:latest"
+	addonExampleImageRepo                    = "quay.io/open-cluster-management/addon-examples"
+	overrideImageRepo                        = "quay.io/ocm/addon-examples"
 	customSignerName                         = "example.com/signer-name"
 	// #nosec G101
 	customSignerSecretName = "addon-signer-secret"
@@ -74,6 +74,7 @@ var (
 )
 
 var _ = ginkgo.Describe("Addon management", ginkgo.Ordered, ginkgo.Label("addon-manager"), func() {
+	addonExampleImage := addonExampleImageRepo + ":" + addonExampleImageTag
 	addOnName := "hello-template"
 	addonInstallNamespace := "test-addon-template"
 
@@ -120,6 +121,7 @@ var _ = ginkgo.Describe("Addon management", ginkgo.Ordered, ginkgo.Label("addon-
 			defaultAddonTemplateReaderManifestsFunc(manifests.AddonManifestFiles, map[string]interface{}{
 				"Namespace":                   universalClusterName,
 				"AddonInstallNamespace":       addonInstallNamespace,
+				"AddonExampleImage":           addonExampleImage,
 				"CustomSignerName":            customSignerName,
 				"AddonManagerNamespace":       templateagent.AddonManagerNamespace(),
 				"CustomSignerSecretName":      customSignerSecretName,
@@ -177,6 +179,7 @@ var _ = ginkgo.Describe("Addon management", ginkgo.Ordered, ginkgo.Label("addon-
 			defaultAddonTemplateReaderManifestsFunc(manifests.AddonManifestFiles, map[string]interface{}{
 				"Namespace":                   universalClusterName,
 				"AddonInstallNamespace":       addonInstallNamespace,
+				"AddonExampleImage":           addonExampleImage,
 				"CustomSignerName":            customSignerName,
 				"AddonManagerNamespace":       templateagent.AddonManagerNamespace(),
 				"CustomSignerSecretName":      customSignerSecretName,
@@ -433,7 +436,7 @@ var _ = ginkgo.Describe("Addon management", ginkgo.Ordered, ginkgo.Label("addon-
 				return fmt.Errorf("expect one container, but %v", containers)
 			}
 
-			if containers[0].Image != overrideImageValue {
+			if containers[0].Image != overrideImageRepo+":"+addonExampleImageTag {
 				return fmt.Errorf("unexpected image %s", containers[0].Image)
 			}
 
@@ -487,7 +490,7 @@ var _ = ginkgo.Describe("Addon management", ginkgo.Ordered, ginkgo.Label("addon-
 				return fmt.Errorf("expect one container, but %v", containers)
 			}
 
-			if containers[0].Image != originalImageValue {
+			if containers[0].Image != addonExampleImage {
 				return fmt.Errorf("unexpected image %s", containers[0].Image)
 			}
 
@@ -640,7 +643,7 @@ var _ = ginkgo.Describe("Addon management", ginkgo.Ordered, ginkgo.Label("addon-
 				return fmt.Errorf("expect one container, but %v", containers)
 			}
 
-			if containers[0].Image != overrideImageValue {
+			if containers[0].Image != overrideImageRepo+":"+addonExampleImageTag {
 				return fmt.Errorf("unexpected image %s", containers[0].Image)
 			}
 
@@ -677,7 +680,7 @@ var _ = ginkgo.Describe("Addon management", ginkgo.Ordered, ginkgo.Label("addon-
 				return fmt.Errorf("expect one container, but %v", containers)
 			}
 
-			if containers[0].Image != originalImageValue {
+			if containers[0].Image != addonExampleImage {
 				return fmt.Errorf("unexpected image %s", containers[0].Image)
 			}
 

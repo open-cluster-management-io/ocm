@@ -40,7 +40,7 @@ spec:
                   serviceAccountName: hello-template-agent-sa
                   containers:
                     - name: helloworld-agent
-                      image: quay.io/open-cluster-management/addon-examples:latest
+                      image: << AddonExampleImage >>
                       imagePullPolicy: IfNotPresent
                       args:
                         - "/helloworld_helm"
@@ -72,7 +72,7 @@ spec:
                   serviceAccountName: hello-template-agent-sa
                   containers:
                     - name: helloworld-agent
-                      image: quay.io/open-cluster-management/addon-examples:latest
+                      image: << AddonExampleImage >>
                       imagePullPolicy: IfNotPresent
                       args:
                         - "/helloworld_helm"
@@ -124,7 +124,7 @@ spec:
                   restartPolicy: Never
                   containers:
                   - name: hello-template-agent
-                    image: quay.io/open-cluster-management/addon-examples:latest
+                    image: << AddonExampleImage >>
                     imagePullPolicy: IfNotPresent
                     args:
                       - "/helloworld_helm"

@@ -34,8 +34,9 @@ do
     kind load docker-image --name=e2e quay.io/open-cluster-management/addon-manager:$IMAGE_TAG
 
     # This is for addon-manager test: /workspaces/OCM/test/e2e/manifests/addon/addon_template.yaml
-    docker pull quay.io/open-cluster-management/addon-examples:latest
-    kind load docker-image --name=e2e quay.io/open-cluster-management/addon-examples:latest
+    ADDON_EXAMPLE_IMAGE_TAG=$(go list -m -mod=readonly -f '{{ .Version }}' open-cluster-management.io/addon-framework | cut -d'-' -f1)
+    docker pull "quay.io/open-cluster-management/addon-examples:${ADDON_EXAMPLE_IMAGE_TAG}"
+    kind load docker-image --name=e2e "quay.io/open-cluster-management/addon-examples:${ADDON_EXAMPLE_IMAGE_TAG}"
 
     kind get kubeconfig --name=e2e > .kubeconfig
 
@@ -51,7 +52,7 @@ do
     else
         echo "Test $i failed"
         timestamp=$(date +"%Y%m%d-%H%M%S")
-        output_file="_output/flaky-error-test/e2e_test_$timestamp_${i}.output"
+        output_file="_output/flaky-error-test/e2e_test_${timestamp}_${i}.output"
         echo "$test_output" > "$output_file"
         echo "Exiting due to failure."
         exit 1

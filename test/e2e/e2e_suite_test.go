@@ -34,10 +34,11 @@ var (
 	nilExecutorValidating bool
 
 	// images
-	registrationImage string
-	workImage         string
-	singletonImage    string
-	images            framework.Images
+	registrationImage    string
+	workImage            string
+	singletonImage       string
+	addonExampleImageTag string
+	images               framework.Images
 
 	// expected image tag for validation
 	expectedImageTag string
@@ -70,6 +71,7 @@ func init() {
 	flag.StringVar(&singletonImage, "singleton-image", "", "The image of the klusterlet agent")
 	flag.StringVar(&expectedImageTag, "expected-image-tag", "", "The expected image tag for all OCM components (e.g., 'e2e')")
 	flag.StringVar(&registrationDriver, "registration-driver", "csr", "The registration driver (csr or grpc)")
+	flag.StringVar(&addonExampleImageTag, "addon-example-image-tag", "latest", "The tag of the addon example image")
 }
 
 var hub *framework.Hub

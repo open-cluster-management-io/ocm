@@ -11,6 +11,7 @@ KLUSTERLET_DEPLOY_MODE?=Default
 REGISTRATION_DRIVER?=csr
 MANAGED_CLUSTER_NAME?=cluster1
 KLUSTERLET_NAME?=klusterlet
+ADDON_EXAMPLE_IMAGE_TAG?=$(shell go list -m -mod=readonly -f '{{ .Version }}' open-cluster-management.io/addon-framework | cut -d'-' -f1)
 
 SED_CMD:=sed
 ifeq ($(GOHOSTOS),darwin)
@@ -79,6 +80,7 @@ run-e2e:
 	-expected-image-tag=$(IMAGE_TAG) \
 	-klusterlet-deploy-mode=$(KLUSTERLET_DEPLOY_MODE) \
 	-registration-driver=$(REGISTRATION_DRIVER) \
+	-addon-example-image-tag=$(ADDON_EXAMPLE_IMAGE_TAG) \
 	${ARGS}
 
 clean-hub: clean-hub-cr clean-hub-operator

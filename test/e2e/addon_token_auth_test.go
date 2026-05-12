@@ -24,6 +24,7 @@ import (
 )
 
 var _ = ginkgo.Describe("Template addon with token-based authentication", ginkgo.Ordered, ginkgo.Label("addon-manager", "addon-token-auth"), func() {
+	addonExampleImage := addonExampleImageRepo + ":" + addonExampleImageTag
 	addOnName := "hello-template"
 	addonInstallNamespace := "test-addon-template-token"
 	var signerSecretNamespace string
@@ -224,6 +225,7 @@ var _ = ginkgo.Describe("Template addon with token-based authentication", ginkgo
 			defaultAddonTemplateReaderManifestsFunc(manifests.AddonManifestFiles, map[string]interface{}{
 				"Namespace":                   universalClusterName,
 				"AddonInstallNamespace":       addonInstallNamespace,
+				"AddonExampleImage":           addonExampleImage,
 				"CustomSignerName":            customSignerName,
 				"AddonManagerNamespace":       templateagent.AddonManagerNamespace(),
 				"CustomSignerSecretName":      customSignerSecretName,
@@ -325,6 +327,7 @@ var _ = ginkgo.Describe("Template addon with token-based authentication", ginkgo
 			defaultAddonTemplateReaderManifestsFunc(manifests.AddonManifestFiles, map[string]interface{}{
 				"Namespace":                   universalClusterName,
 				"AddonInstallNamespace":       addonInstallNamespace,
+				"AddonExampleImage":           addonExampleImage,
 				"CustomSignerName":            customSignerName,
 				"AddonManagerNamespace":       templateagent.AddonManagerNamespace(),
 				"CustomSignerSecretName":      customSignerSecretName,
