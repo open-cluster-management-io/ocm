@@ -301,7 +301,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 	config.populateBootstrap(klusterlet)
 	// Populate TLS configuration from ConfigMap.
-    // Fail reconciliation on real errors (API/RBAC failures), but skip gracefully when ConfigMap is not found.
+	// Fail reconciliation on real errors (API/RBAC failures), but skip gracefully when ConfigMap is not found.
 	if err := n.populateTLSConfig(ctx, &config); err != nil {
 		return err
 	}
