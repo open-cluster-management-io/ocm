@@ -36,6 +36,7 @@ rules:
     - "work-driver-config"
     - "open-cluster-management-image-pull-credentials"
     - "grpc-server-serving-cert"
+    - "placement-debug-serving-cert"
     - "cluster-import-config"
 - apiGroups: [""]
   resources: ["secrets"]

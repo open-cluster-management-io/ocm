@@ -49,8 +49,8 @@ const (
 
 	GRPCServerSecret = "grpc-server-serving-cert" //#nosec G101
 
-	PlacementDebugServingCertSecret  = "placement-debug-serving-cert" //#nosec G101
-	PlacementDebugService            = "cluster-manager-placement"
+	PlacementDebugServingCertSecret = "placement-debug-serving-cert" //#nosec G101
+	PlacementDebugService           = "cluster-manager-placement"
 )
 
 func ClusterManagerNamespace(clustermanagername string, mode operatorapiv1.InstallMode) string {
