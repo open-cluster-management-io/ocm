@@ -866,7 +866,7 @@ func TestSyncDeployHostedCreateAgentNamespace(t *testing.T) {
 	}
 
 	kubeActions := controller.kubeClient.Actions()
-	testingcommon.AssertGet(t, kubeActions[0], "", "v1", "configmaps") // get agent namespace will get configmap to check if the namespace exists 
+	testingcommon.AssertGet(t, kubeActions[0], "", "v1", "configmaps") // get agent namespace will get configmap to check if the namespace exists
 	testingcommon.AssertGet(t, kubeActions[1], "", "v1", "namespaces")
 	testingcommon.AssertAction(t, kubeActions[2], createVerb)
 	if kubeActions[2].GetResource().Resource != "namespaces" {
