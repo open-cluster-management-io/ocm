@@ -227,6 +227,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	}
 	_, placementFeatureMsgs = helpers.ConvertToFeatureGateFlags("Placement", placementFeatureGates, ocmfeature.DefaultHubPlacementFeatureGates)
 	config.PlacementDebugServerEnabled = helpers.FeatureGateEnabled(placementFeatureGates, ocmfeature.DefaultHubPlacementFeatureGates, ocmfeature.PlacementDebugServer)
+	if config.PlacementDebugServerEnabled {
+		config.PlacementServingCertSecret = helpers.PlacementDebugServingCertSecret
+	}
 
 	featureGateCondition := helpers.BuildFeatureCondition(registrationFeatureMsgs, workFeatureMsgs, addonFeatureMsgs, placementFeatureMsgs)
 

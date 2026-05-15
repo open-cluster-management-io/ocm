@@ -39,6 +39,7 @@ import (
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
+	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
@@ -913,6 +914,17 @@ func AddLabelsToYaml(objData []byte, cmLabels map[string]string) ([]byte, error)
 	}
 
 	return modifiedYAML, nil
+}
+
+func PlacementDebugServerEnabled(cm *operatorapiv1.ClusterManager) bool {
+	if cm.Spec.PlacementConfiguration == nil {
+		return false
+	}
+	return FeatureGateEnabled(
+		cm.Spec.PlacementConfiguration.FeatureGates,
+		ocmfeature.DefaultHubPlacementFeatureGates,
+		ocmfeature.PlacementDebugServer,
+	)
 }
 
 func GRPCAuthEnabled(cm *operatorapiv1.ClusterManager) bool {

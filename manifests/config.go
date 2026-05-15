@@ -14,6 +14,7 @@ type HubConfig struct {
 	WorkAPIServiceCABundle         string
 	PlacementImage                 string
 	PlacementDebugServerEnabled    bool
+	PlacementServingCertSecret     string
 	AddonAPIServiceCABundle        string
 	Replica                        int32
 	HostedMode                     bool

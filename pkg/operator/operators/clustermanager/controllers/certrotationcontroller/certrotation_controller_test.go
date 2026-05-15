@@ -172,11 +172,12 @@ func TestCertRotation(t *testing.T) {
 			}
 
 			secretInformers := map[string]corev1informers.SecretInformer{
-				helpers.SignerSecret:              newOnTermInformer(helpers.SignerSecret).Core().V1().Secrets(),
-				helpers.RegistrationWebhookSecret: newOnTermInformer(helpers.RegistrationWebhookSecret).Core().V1().Secrets(),
-				helpers.WorkWebhookSecret:         newOnTermInformer(helpers.WorkWebhookSecret).Core().V1().Secrets(),
-				helpers.AddonWebhookSecret:        newOnTermInformer(helpers.AddonWebhookSecret).Core().V1().Secrets(),
-				helpers.GRPCServerSecret:          newOnTermInformer(helpers.GRPCServerSecret).Core().V1().Secrets(),
+				helpers.SignerSecret:                    newOnTermInformer(helpers.SignerSecret).Core().V1().Secrets(),
+				helpers.RegistrationWebhookSecret:       newOnTermInformer(helpers.RegistrationWebhookSecret).Core().V1().Secrets(),
+				helpers.WorkWebhookSecret:               newOnTermInformer(helpers.WorkWebhookSecret).Core().V1().Secrets(),
+				helpers.AddonWebhookSecret:              newOnTermInformer(helpers.AddonWebhookSecret).Core().V1().Secrets(),
+				helpers.GRPCServerSecret:                newOnTermInformer(helpers.GRPCServerSecret).Core().V1().Secrets(),
+				helpers.PlacementDebugServingCertSecret: newOnTermInformer(helpers.PlacementDebugServingCertSecret).Core().V1().Secrets(),
 			}
 
 			configmapInformer := newOnTermInformer(helpers.CaBundleConfigmap).Core().V1().ConfigMaps()
@@ -316,11 +317,12 @@ func TestCertRotationGRPCAuth(t *testing.T) {
 			}
 
 			secretInformers := map[string]corev1informers.SecretInformer{
-				helpers.SignerSecret:              newOnTermInformer(helpers.SignerSecret).Core().V1().Secrets(),
-				helpers.RegistrationWebhookSecret: newOnTermInformer(helpers.RegistrationWebhookSecret).Core().V1().Secrets(),
-				helpers.WorkWebhookSecret:         newOnTermInformer(helpers.WorkWebhookSecret).Core().V1().Secrets(),
-				helpers.AddonWebhookSecret:        newOnTermInformer(helpers.AddonWebhookSecret).Core().V1().Secrets(),
-				helpers.GRPCServerSecret:          newOnTermInformer(helpers.GRPCServerSecret).Core().V1().Secrets(),
+				helpers.SignerSecret:                    newOnTermInformer(helpers.SignerSecret).Core().V1().Secrets(),
+				helpers.RegistrationWebhookSecret:       newOnTermInformer(helpers.RegistrationWebhookSecret).Core().V1().Secrets(),
+				helpers.WorkWebhookSecret:               newOnTermInformer(helpers.WorkWebhookSecret).Core().V1().Secrets(),
+				helpers.AddonWebhookSecret:              newOnTermInformer(helpers.AddonWebhookSecret).Core().V1().Secrets(),
+				helpers.GRPCServerSecret:                newOnTermInformer(helpers.GRPCServerSecret).Core().V1().Secrets(),
+				helpers.PlacementDebugServingCertSecret: newOnTermInformer(helpers.PlacementDebugServingCertSecret).Core().V1().Secrets(),
 			}
 
 			configmapInformer := newOnTermInformer(helpers.CaBundleConfigmap).Core().V1().ConfigMaps()
@@ -672,11 +674,12 @@ func TestCertRotationGRPCServerHostNames(t *testing.T) {
 			}
 
 			secretInformers := map[string]corev1informers.SecretInformer{
-				helpers.SignerSecret:              newOnTermInformer(helpers.SignerSecret).Core().V1().Secrets(),
-				helpers.RegistrationWebhookSecret: newOnTermInformer(helpers.RegistrationWebhookSecret).Core().V1().Secrets(),
-				helpers.WorkWebhookSecret:         newOnTermInformer(helpers.WorkWebhookSecret).Core().V1().Secrets(),
-				helpers.AddonWebhookSecret:        newOnTermInformer(helpers.AddonWebhookSecret).Core().V1().Secrets(),
-				helpers.GRPCServerSecret:          newOnTermInformer(helpers.GRPCServerSecret).Core().V1().Secrets(),
+				helpers.SignerSecret:                    newOnTermInformer(helpers.SignerSecret).Core().V1().Secrets(),
+				helpers.RegistrationWebhookSecret:       newOnTermInformer(helpers.RegistrationWebhookSecret).Core().V1().Secrets(),
+				helpers.WorkWebhookSecret:               newOnTermInformer(helpers.WorkWebhookSecret).Core().V1().Secrets(),
+				helpers.AddonWebhookSecret:              newOnTermInformer(helpers.AddonWebhookSecret).Core().V1().Secrets(),
+				helpers.GRPCServerSecret:                newOnTermInformer(helpers.GRPCServerSecret).Core().V1().Secrets(),
+				helpers.PlacementDebugServingCertSecret: newOnTermInformer(helpers.PlacementDebugServingCertSecret).Core().V1().Secrets(),
 			}
 
 			configmapInformer := newOnTermInformer(helpers.CaBundleConfigmap).Core().V1().ConfigMaps()
@@ -709,6 +712,162 @@ func TestCertRotationGRPCServerHostNames(t *testing.T) {
 				if !strings.Contains(err.Error(), c.expectedErrorSubstr) {
 					t.Fatalf("expected error containing %q, but got: %v", c.expectedErrorSubstr, err)
 				}
+			}
+
+			c.validate(t, kubeClient, controller)
+		})
+	}
+}
+
+func TestCertRotationPlacementDebug(t *testing.T) {
+	namespace := helpers.ClusterManagerNamespace(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault)
+
+	cases := []struct {
+		name                  string
+		clusterManager        *operatorapiv1.ClusterManager
+		updatedClusterManager *operatorapiv1.ClusterManager
+		existingObjects       []runtime.Object
+		validate              func(t *testing.T, kubeClient kubernetes.Interface, controller *certRotationController)
+	}{
+		{
+			name: "Enable PlacementDebugServer",
+			clusterManager: func() *operatorapiv1.ClusterManager {
+				cm := newClusterManager(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault)
+				cm.Spec.PlacementConfiguration = nil
+				return cm
+			}(),
+			updatedClusterManager: func() *operatorapiv1.ClusterManager {
+				cm := newClusterManager(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault)
+				cm.Spec.PlacementConfiguration = &operatorapiv1.PlacementConfiguration{
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{
+							Feature: "PlacementDebugServer",
+							Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+						},
+					},
+				}
+				return cm
+			}(),
+			existingObjects: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: namespace,
+					},
+				},
+			},
+			validate: func(t *testing.T, kubeClient kubernetes.Interface, controller *certRotationController) {
+				secret, err := kubeClient.CoreV1().Secrets(namespace).Get(context.Background(), helpers.PlacementDebugServingCertSecret, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("expected placement debug serving cert secret to be created after update, but got error: %v", err)
+				}
+
+				if _, ok := secret.Data["tls.crt"]; !ok {
+					t.Fatalf("expected tls.crt in secret data")
+				}
+				if _, ok := secret.Data["tls.key"]; !ok {
+					t.Fatalf("expected tls.key in secret data")
+				}
+
+				cmRotations, ok := controller.rotationMap[testClusterManagerNameDefault]
+				if !ok {
+					t.Fatalf("expected rotations to exist in map")
+				}
+				if _, ok := cmRotations.targetRotations[helpers.PlacementDebugServingCertSecret]; !ok {
+					t.Fatalf("expected placement debug serving cert rotation to be added after update, %v", cmRotations)
+				}
+			},
+		},
+		{
+			name: "Disable PlacementDebugServer",
+			clusterManager: func() *operatorapiv1.ClusterManager {
+				cm := newClusterManager(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault)
+				cm.Spec.PlacementConfiguration = &operatorapiv1.PlacementConfiguration{
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{
+							Feature: "PlacementDebugServer",
+							Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+						},
+					},
+				}
+				return cm
+			}(),
+			updatedClusterManager: func() *operatorapiv1.ClusterManager {
+				cm := newClusterManager(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault)
+				cm.Spec.PlacementConfiguration = nil
+				return cm
+			}(),
+			existingObjects: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: namespace,
+					},
+				},
+			},
+			validate: func(t *testing.T, kubeClient kubernetes.Interface, controller *certRotationController) {
+				_, err := kubeClient.CoreV1().Secrets(namespace).Get(context.Background(), helpers.PlacementDebugServingCertSecret, metav1.GetOptions{})
+				if !errors.IsNotFound(err) {
+					t.Fatalf("expected placement debug serving cert secret to be deleted after update, but got error: %v", err)
+				}
+
+				cmRotations, ok := controller.rotationMap[testClusterManagerNameDefault]
+				if !ok {
+					t.Fatalf("expected rotations to exist in map")
+				}
+				if _, ok := cmRotations.targetRotations[helpers.PlacementDebugServingCertSecret]; ok {
+					t.Fatalf("expected placement debug serving cert rotation to be removed after update, %v", cmRotations)
+				}
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			kubeClient := fakekube.NewSimpleClientset(c.existingObjects...)
+
+			newOnTermInformer := func(name string) kubeinformers.SharedInformerFactory {
+				return kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, 5*time.Minute,
+					kubeinformers.WithTweakListOptions(func(options *metav1.ListOptions) {
+						options.FieldSelector = fields.OneTermEqualSelector("metadata.name", name).String()
+					}))
+			}
+
+			secretInformers := map[string]corev1informers.SecretInformer{
+				helpers.SignerSecret:                    newOnTermInformer(helpers.SignerSecret).Core().V1().Secrets(),
+				helpers.RegistrationWebhookSecret:       newOnTermInformer(helpers.RegistrationWebhookSecret).Core().V1().Secrets(),
+				helpers.WorkWebhookSecret:               newOnTermInformer(helpers.WorkWebhookSecret).Core().V1().Secrets(),
+				helpers.AddonWebhookSecret:              newOnTermInformer(helpers.AddonWebhookSecret).Core().V1().Secrets(),
+				helpers.GRPCServerSecret:                newOnTermInformer(helpers.GRPCServerSecret).Core().V1().Secrets(),
+				helpers.PlacementDebugServingCertSecret: newOnTermInformer(helpers.PlacementDebugServingCertSecret).Core().V1().Secrets(),
+			}
+
+			configmapInformer := newOnTermInformer(helpers.CaBundleConfigmap).Core().V1().ConfigMaps()
+
+			operatorClient := fakeoperatorclient.NewSimpleClientset(c.clusterManager)
+			operatorInformers := operatorinformers.NewSharedInformerFactory(operatorClient, 5*time.Minute)
+			clusterManagerStore := operatorInformers.Operator().V1().ClusterManagers().Informer().GetStore()
+			if err := clusterManagerStore.Add(c.clusterManager); err != nil {
+				t.Fatal(err)
+			}
+
+			syncContext := testingcommon.NewFakeSyncContext(t, testClusterManagerNameDefault)
+
+			controller := &certRotationController{
+				rotationMap:          make(map[string]rotations),
+				kubeClient:           kubeClient,
+				secretInformers:      secretInformers,
+				configMapInformer:    configmapInformer,
+				clusterManagerLister: operatorInformers.Operator().V1().ClusterManagers().Lister(),
+			}
+
+			if err := controller.sync(context.TODO(), syncContext, testClusterManagerNameDefault); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := clusterManagerStore.Update(c.updatedClusterManager); err != nil {
+				t.Fatal(err)
+			}
+			if err := controller.sync(context.TODO(), syncContext, testClusterManagerNameDefault); err != nil {
+				t.Fatal(err)
 			}
 
 			c.validate(t, kubeClient, controller)
