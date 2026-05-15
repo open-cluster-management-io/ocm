@@ -86,6 +86,56 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: addontesting.AssertNoActions,
 		},
 		{
+			name:                "update clustermanagementaddon status filters out sentinel value",
+			syncKey:             "test",
+			managedClusteraddon: []runtime.Object{},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").WithDefaultConfigs(
+				addonv1beta1.AddOnConfig{
+					ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+						Group:    "addon.open-cluster-management.io",
+						Resource: "addondeploymentconfigs",
+					},
+					ConfigReferent: addonv1beta1.ConfigReferent{
+						Name: addonv1beta1.ReservedNoDefaultConfigName,
+					},
+				},
+				addonv1beta1.AddOnConfig{
+					ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+						Group:    "proxy.open-cluster-management.io",
+						Resource: "managedproxyconfigurations",
+					},
+					ConfigReferent: addonv1beta1.ConfigReferent{
+						Name:      "cluster-proxy",
+						Namespace: "open-cluster-management",
+					},
+				}).Build()},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				actual := actions[0].(clienttesting.PatchActionImpl).Patch
+				cma := &addonv1beta1.ClusterManagementAddOn{}
+				err := json.Unmarshal(actual, cma)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// Should only have 1 DefaultConfigReference (the valid one), sentinel should be filtered out
+				if len(cma.Status.DefaultConfigReferences) != 1 {
+					t.Errorf("DefaultConfigReferences should have 1 entry (sentinel filtered), got: %d", len(cma.Status.DefaultConfigReferences))
+				}
+				if len(cma.Status.DefaultConfigReferences) > 0 {
+					if cma.Status.DefaultConfigReferences[0].DesiredConfig.Name == addonv1beta1.ReservedNoDefaultConfigName {
+						t.Errorf("Sentinel value should have been filtered out but was found in DefaultConfigReferences")
+					}
+					if cma.Status.DefaultConfigReferences[0].DesiredConfig.Name != "cluster-proxy" {
+						t.Errorf("DefaultConfigReferences[0].Name = %v, want cluster-proxy", cma.Status.DefaultConfigReferences[0].DesiredConfig.Name)
+					}
+				}
+				if len(cma.Status.InstallProgressions) != 0 {
+					t.Errorf("InstallProgressions object is not correct: %v", cma.Status.InstallProgressions)
+				}
+			},
+		},
+		{
 			name:                "update clustermanagementaddon status with type placements with multiple same-GVK",
 			syncKey:             "test",
 			managedClusteraddon: []runtime.Object{},
@@ -316,6 +366,75 @@ func TestReconcile(t *testing.T) {
 				}
 				if len(cma.Status.InstallProgressions[2].ConfigReferences) != 3 {
 					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
+				}
+			},
+		},
+		{
+			name:                "update clustermanagementaddon InstallProgressions filters out sentinel value",
+			syncKey:             "test",
+			managedClusteraddon: []runtime.Object{},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").WithPlacementStrategy(
+				addonv1beta1.PlacementStrategy{
+					PlacementRef: addonv1beta1.PlacementRef{
+						Name:      "placement1",
+						Namespace: "test",
+					},
+				},
+			).WithDefaultConfigs(
+				addonv1beta1.AddOnConfig{
+					ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+						Group:    "addon.open-cluster-management.io",
+						Resource: "addondeploymentconfigs",
+					},
+					ConfigReferent: addonv1beta1.ConfigReferent{
+						Name: addonv1beta1.ReservedNoDefaultConfigName,
+					},
+				},
+				addonv1beta1.AddOnConfig{
+					ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+						Group:    "proxy.open-cluster-management.io",
+						Resource: "managedproxyconfigurations",
+					},
+					ConfigReferent: addonv1beta1.ConfigReferent{
+						Name:      "cluster-proxy",
+						Namespace: "open-cluster-management",
+					},
+				}).Build()},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				actual := actions[0].(clienttesting.PatchActionImpl).Patch
+				cma := &addonv1beta1.ClusterManagementAddOn{}
+				err := json.Unmarshal(actual, cma)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// DefaultConfigReferences should only have the valid config, sentinel filtered
+				if len(cma.Status.DefaultConfigReferences) != 1 {
+					t.Errorf("DefaultConfigReferences should have 1 entry (sentinel filtered), got: %d", len(cma.Status.DefaultConfigReferences))
+				}
+				if len(cma.Status.DefaultConfigReferences) > 0 && cma.Status.DefaultConfigReferences[0].DesiredConfig.Name == addonv1beta1.ReservedNoDefaultConfigName {
+					t.Errorf("Sentinel value should have been filtered from DefaultConfigReferences")
+				}
+
+				// InstallProgressions should exist
+				if len(cma.Status.InstallProgressions) != 1 {
+					t.Errorf("InstallProgressions should have 1 entry, got: %d", len(cma.Status.InstallProgressions))
+				}
+
+				// InstallProgressions[0].ConfigReferences should only have valid config, sentinel filtered
+				if len(cma.Status.InstallProgressions) > 0 {
+					if len(cma.Status.InstallProgressions[0].ConfigReferences) != 1 {
+						t.Errorf("InstallProgressions[0].ConfigReferences should have 1 entry (sentinel filtered), got: %d", len(cma.Status.InstallProgressions[0].ConfigReferences))
+					}
+					if len(cma.Status.InstallProgressions[0].ConfigReferences) > 0 {
+						if cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig.Name == addonv1beta1.ReservedNoDefaultConfigName {
+							t.Errorf("Sentinel value should have been filtered from InstallProgressions ConfigReferences")
+						}
+						if cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig.Name != "cluster-proxy" {
+							t.Errorf("InstallProgressions[0].ConfigReferences[0].Name = %v, want cluster-proxy", cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig.Name)
+						}
+					}
 				}
 			},
 		},
