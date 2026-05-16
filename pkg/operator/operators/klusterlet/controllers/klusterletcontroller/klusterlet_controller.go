@@ -521,10 +521,13 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 func (n *klusterletController) populateTLSConfig(ctx context.Context, config *klusterletConfig) error {
 	logger := klog.FromContext(ctx)
 
-	// Load TLS config from ocm-tls-profile ConfigMap
 	tlsCfg, err := sdktls.LoadTLSConfigFromConfigMap(ctx, n.kubeClient, n.operatorNamespace)
 	if err != nil {
-		// Fail on real errors (API/RBAC failures) to avoid silently losing TLS configuration
+		// Only fail on real errors, not "not found"
+		if errors.IsNotFound(err) {
+			logger.V(4).Info("TLS ConfigMap not found, using agent defaults")
+			return nil
+		}
 		return fmt.Errorf("failed to load TLS config from ConfigMap: %w", err)
 	}
 
