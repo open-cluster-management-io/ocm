@@ -21,7 +21,7 @@ spec:
   {{- end }}
   {{- with .Values.klusterlet.nodePlacement }}
   nodePlacement:
-    {{- toYaml . | nindent 4 }}
+  {{- toYaml . | nindent 4 }}
   {{- end }}
   {{- with .Values.klusterlet.registrationConfiguration }}
   registrationConfiguration:

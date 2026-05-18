@@ -185,7 +185,6 @@ type klusterletConfig struct {
 	InstallMode                                 operatorapiv1.InstallMode
 
 	// MaxCustomClusterClaims is the maximum number of custom cluster claims allowed. 0 means no limit.
-
 	MaxCustomClusterClaims       int
 	ReservedClusterClaimSuffixes string
 	// PriorityClassName is the name of the PriorityClass used by the deployed agents
@@ -530,13 +529,6 @@ func (n *klusterletController) populateTLSConfig(ctx context.Context, config *kl
 		}
 		return fmt.Errorf("failed to load TLS config from ConfigMap: %w", err)
 	}
-
-	// Only skip when ConfigMap is not found (expected case when no TLS is configured)
-	if tlsCfg == nil {
-		logger.V(4).Info("TLS ConfigMap not found, using agent defaults")
-		return nil
-	}
-
 	// ConfigMap found - inject TLS config
 	config.TLSMinVersion = sdktls.VersionToString(tlsCfg.MinVersion)
 	if len(tlsCfg.CipherSuites) > 0 {
