@@ -529,6 +529,11 @@ func (n *klusterletController) populateTLSConfig(ctx context.Context, config *kl
 		}
 		return fmt.Errorf("failed to load TLS config from ConfigMap: %w", err)
 	}
+	// ConfigMap not found or empty - skip TLS configuration and use agent defaults
+	if tlsCfg == nil {
+		logger.V(4).Info("TLS ConfigMap is empty, using agent defaults")
+		return nil
+	}
 	// ConfigMap found - inject TLS config
 	config.TLSMinVersion = sdktls.VersionToString(tlsCfg.MinVersion)
 	if len(tlsCfg.CipherSuites) > 0 {
