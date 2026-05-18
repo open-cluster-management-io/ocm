@@ -90,7 +90,7 @@ func setDefaultConfigReference(supportedConfigs []addonv1beta1.AddOnConfig,
 	existDefaultConfigReferences []addonv1beta1.DefaultConfigReference) []addonv1beta1.DefaultConfigReference {
 	newDefaultConfigReferences := []addonv1beta1.DefaultConfigReference{}
 	for _, config := range supportedConfigs {
-		if config.ConfigReferent.Name == "" {
+		if config.ConfigReferent.Name == "" || config.ConfigReferent.Name == addonv1beta1.ReservedNoDefaultConfigName {
 			continue
 		}
 		configRef := addonv1beta1.DefaultConfigReference{
@@ -132,7 +132,7 @@ func setInstallProgression(supportedConfigs []addonv1beta1.AddOnConfig, placemen
 		// set config references as default configuration
 		installConfigReferencesMap := map[addonv1beta1.ConfigGroupResource]sets.Set[addonv1beta1.ConfigReferent]{}
 		for _, config := range supportedConfigs {
-			if config.ConfigReferent.Name == "" || config.ConfigReferent.Namespace == addonv1beta1.ReservedNoDefaultConfigName {
+			if config.ConfigReferent.Name == "" || config.ConfigReferent.Name == addonv1beta1.ReservedNoDefaultConfigName {
 				continue
 			}
 			refs, ok := installConfigReferencesMap[config.ConfigGroupResource]
