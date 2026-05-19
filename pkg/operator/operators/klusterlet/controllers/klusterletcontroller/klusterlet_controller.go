@@ -522,11 +522,6 @@ func (n *klusterletController) populateTLSConfig(ctx context.Context, config *kl
 
 	tlsCfg, err := sdktls.LoadTLSConfigFromConfigMap(ctx, n.kubeClient, n.operatorNamespace)
 	if err != nil {
-		// Only fail on real errors, not "not found"
-		if errors.IsNotFound(err) {
-			logger.V(4).Info("TLS ConfigMap not found, using agent defaults")
-			return nil
-		}
 		return fmt.Errorf("failed to load TLS config from ConfigMap: %w", err)
 	}
 	// ConfigMap not found or empty - skip TLS configuration and use agent defaults
