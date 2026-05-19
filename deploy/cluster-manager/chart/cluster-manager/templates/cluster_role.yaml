@@ -40,7 +40,7 @@ rules:
     - "cluster-import-config"
 - apiGroups: [""]
   resources: ["secrets"]
-  verbs: ["create"]
+  verbs: ["create", "list", "watch"]
 - apiGroups: ["coordination.k8s.io"]
   resources: ["leases"]
   verbs: ["create", "get", "list", "update", "watch", "patch", "delete"]
