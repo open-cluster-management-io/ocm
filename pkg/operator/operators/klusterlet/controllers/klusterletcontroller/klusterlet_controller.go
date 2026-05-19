@@ -29,6 +29,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
+	sdktls "open-cluster-management.io/sdk-go/pkg/tls"
 
 	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -183,6 +184,7 @@ type klusterletConfig struct {
 	ExternalManagedKubeConfigAgentSecret        string
 	InstallMode                                 operatorapiv1.InstallMode
 
+	// MaxCustomClusterClaims is the maximum number of custom cluster claims allowed. 0 means no limit.
 	MaxCustomClusterClaims       int
 	ReservedClusterClaimSuffixes string
 	// PriorityClassName is the name of the PriorityClass used by the deployed agents
@@ -217,6 +219,8 @@ type klusterletConfig struct {
 
 	// flag to enable about about-api
 	AboutAPIEnabled bool
+	TLSMinVersion   string
+	TLSCipherSuites string
 }
 
 // If multiplehubs feature gate is enabled, using the bootstrapkubeconfigs from klusterlet CR.
@@ -295,6 +299,11 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 
 	config.populateBootstrap(klusterlet)
+	// Populate TLS configuration from ConfigMap.
+	// Fail reconciliation on real errors (API/RBAC failures), but skip gracefully when ConfigMap is not found.
+	if err := n.populateTLSConfig(ctx, &config); err != nil {
+		return err
+	}
 
 	config.Labels = helpers.GetKlusterletAgentLabels(klusterlet, n.enableSyncLabels)
 
@@ -503,6 +512,33 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		errs = append(errs, updatedErr)
 	}
 	return utilerrors.NewAggregate(errs)
+}
+
+// populateTLSConfig reads TLS configuration from ocm-tls-profile ConfigMap
+// in the operator namespace and injects it into the klusterletConfig
+// for deployment template rendering (Use Case #3 from sdk-go/pkg/tls README)
+func (n *klusterletController) populateTLSConfig(ctx context.Context, config *klusterletConfig) error {
+	logger := klog.FromContext(ctx)
+
+	tlsCfg, err := sdktls.LoadTLSConfigFromConfigMap(ctx, n.kubeClient, n.operatorNamespace)
+	if err != nil {
+		return fmt.Errorf("failed to load TLS config from ConfigMap: %w", err)
+	}
+	// ConfigMap not found or empty - skip TLS configuration and use agent defaults
+	if tlsCfg == nil {
+		logger.V(4).Info("TLS ConfigMap is empty, using agent defaults")
+		return nil
+	}
+	// ConfigMap found - inject TLS config
+	config.TLSMinVersion = sdktls.VersionToString(tlsCfg.MinVersion)
+	if len(tlsCfg.CipherSuites) > 0 {
+		config.TLSCipherSuites = sdktls.CipherSuitesToString(tlsCfg.CipherSuites)
+	}
+
+	logger.V(2).Info("Loaded TLS configuration from ConfigMap",
+		"tlsMinVersion", config.TLSMinVersion,
+		"tlsCipherSuites", config.TLSCipherSuites)
+	return nil
 }
 
 // TODO also read CABundle from ExternalServerURLs and set into registration deployment

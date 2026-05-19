@@ -866,9 +866,10 @@ func TestSyncDeployHostedCreateAgentNamespace(t *testing.T) {
 	}
 
 	kubeActions := controller.kubeClient.Actions()
-	testingcommon.AssertGet(t, kubeActions[0], "", "v1", "namespaces")
-	testingcommon.AssertAction(t, kubeActions[1], createVerb)
-	if kubeActions[1].GetResource().Resource != "namespaces" {
+	testingcommon.AssertGet(t, kubeActions[0], "", "v1", "configmaps") //sync now reads ocm-tls-profile ConfigMap before namespace operations
+	testingcommon.AssertGet(t, kubeActions[1], "", "v1", "namespaces")
+	testingcommon.AssertAction(t, kubeActions[2], createVerb)
+	if kubeActions[2].GetResource().Resource != "namespaces" {
 		t.Errorf("expect object namespaces, but got %v", kubeActions[2].GetResource().Resource)
 	}
 }
