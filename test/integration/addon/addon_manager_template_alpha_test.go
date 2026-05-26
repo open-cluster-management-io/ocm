@@ -22,7 +22,7 @@ import (
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
-var _ = ginkgo.Describe("Template deploy", func() {
+var _ = ginkgo.Describe("Template deploy Alpha", func() {
 	var (
 		clusterNames               []string
 		numberOfClusters           int
