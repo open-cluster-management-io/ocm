@@ -210,9 +210,17 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 					},
 					LastObservedGeneration: 1,
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: configDefaultNamespace,
+							Name:      configDefaultName,
+						},
 						SpecHash: addOnDefaultConfigSpecHash,
 					},
 					LastAppliedConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: configDefaultNamespace,
+							Name:      configDefaultName,
+						},
 						SpecHash: addOnDefaultConfigSpecHash,
 					},
 				})
@@ -283,9 +291,17 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 					},
 					LastObservedGeneration: 2,
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: configDefaultNamespace,
+							Name:      configDefaultName,
+						},
 						SpecHash: addOnTest1ConfigSpecHash,
 					},
 					LastAppliedConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: configDefaultNamespace,
+							Name:      configDefaultName,
+						},
 						SpecHash: addOnTest1ConfigSpecHash,
 					},
 				})
@@ -374,6 +390,10 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 					},
 					LastObservedGeneration: 1,
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: configDefaultNamespace,
+							Name:      configUpdateName,
+						},
 						SpecHash: addOnTest2ConfigSpecHash,
 					},
 				})
@@ -398,9 +418,17 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 					},
 					LastObservedGeneration: 2,
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: configDefaultNamespace,
+							Name:      configDefaultName,
+						},
 						SpecHash: addOnTest1ConfigSpecHash,
 					},
 					LastAppliedConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: configDefaultNamespace,
+							Name:      configDefaultName,
+						},
 						SpecHash: addOnTest1ConfigSpecHash,
 					},
 				})
@@ -475,9 +503,17 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 					},
 					LastObservedGeneration: 1,
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: configDefaultNamespace,
+							Name:      configUpdateName,
+						},
 						SpecHash: addOnTest2ConfigSpecHash,
 					},
 					LastAppliedConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: configDefaultNamespace,
+							Name:      configUpdateName,
+						},
 						SpecHash: addOnTest2ConfigSpecHash,
 					},
 				})
@@ -517,9 +553,17 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 					},
 					LastObservedGeneration: 1,
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: configDefaultNamespace,
+							Name:      configUpdateName,
+						},
 						SpecHash: addOnTest2ConfigSpecHash,
 					},
 					LastAppliedConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: configDefaultNamespace,
+							Name:      configUpdateName,
+						},
 						SpecHash: addOnTest2ConfigSpecHash,
 					},
 				})
@@ -608,9 +652,17 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 					},
 					LastObservedGeneration: 2,
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: configDefaultNamespace,
+							Name:      configUpdateName,
+						},
 						SpecHash: addOnTest3ConfigSpecHash,
 					},
 					LastAppliedConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: configDefaultNamespace,
+							Name:      configUpdateName,
+						},
 						SpecHash: addOnTest2ConfigSpecHash,
 					},
 				})
@@ -635,9 +687,17 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 					},
 					LastObservedGeneration: 2,
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: configDefaultNamespace,
+							Name:      configUpdateName,
+						},
 						SpecHash: addOnTest2ConfigSpecHash,
 					},
 					LastAppliedConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: configDefaultNamespace,
+							Name:      configUpdateName,
+						},
 						SpecHash: addOnTest2ConfigSpecHash,
 					},
 				})
@@ -725,9 +785,17 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 					},
 					LastObservedGeneration: 2,
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: configDefaultNamespace,
+							Name:      configUpdateName,
+						},
 						SpecHash: addOnTest3ConfigSpecHash,
 					},
 					LastAppliedConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: configDefaultNamespace,
+							Name:      configUpdateName,
+						},
 						SpecHash: addOnTest3ConfigSpecHash,
 					},
 				})

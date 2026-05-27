@@ -164,6 +164,10 @@ func createClusterManagementAddOnBeta(name, defaultConfigNamespace, defaultConfi
 								Group:    addOnDeploymentConfigGVR.Group,
 								Resource: addOnDeploymentConfigGVR.Resource,
 							},
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
+								Name:      defaultConfigName,
+								Namespace: defaultConfigNamespace,
+							},
 						},
 					},
 					InstallStrategy: addonapiv1beta1.InstallStrategy{

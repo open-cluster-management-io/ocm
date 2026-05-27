@@ -138,6 +138,10 @@ var _ = ginkgo.Describe("AddConfigs Beta", func() {
 								Group:    addOnDeploymentConfigGVR.Group,
 								Resource: addOnDeploymentConfigGVR.Resource,
 							},
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
+								Namespace: configDefaultNamespace,
+								Name:      "another-config",
+							},
 						},
 					},
 					RolloutStrategy: clusterv1alpha1.RolloutStrategy{
@@ -244,6 +248,10 @@ var _ = ginkgo.Describe("AddConfigs Beta", func() {
 							Group:    addOnDeploymentConfigGVR.Group,
 							Resource: addOnDeploymentConfigGVR.Resource,
 						},
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Name:      addOnConfig.Name,
+							Namespace: addOnConfig.Namespace,
+						},
 					},
 				},
 			},
@@ -317,6 +325,10 @@ var _ = ginkgo.Describe("AddConfigs Beta", func() {
 							Group:    addOnDeploymentConfigGVR.Group,
 							Resource: addOnDeploymentConfigGVR.Resource,
 						},
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Name:      addOnConfig.Name,
+							Namespace: addOnConfig.Namespace,
+						},
 					},
 				},
 			},
@@ -387,6 +399,10 @@ var _ = ginkgo.Describe("AddConfigs Beta", func() {
 						ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 							Group:    addOnDeploymentConfigGVR.Group + "test",
 							Resource: addOnDeploymentConfigGVR.Resource + "test",
+						},
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Name:      "addon-config-test",
+							Namespace: managedClusterName,
 						},
 					},
 				},
