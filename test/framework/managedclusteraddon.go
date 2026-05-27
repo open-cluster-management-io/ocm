@@ -15,7 +15,8 @@ import (
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
-func (hub *Hub) CreateManagedClusterAddOn(managedClusterNamespace, addOnName, installNamespace string) error {
+// CreateManagedClusterAddOnV1Alpha1 creates a ManagedClusterAddOn using v1alpha1 API
+func (hub *Hub) CreateManagedClusterAddOnV1Alpha1(managedClusterNamespace, addOnName, installNamespace string) error {
 	_, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterNamespace).Create(
 		context.TODO(),
 		&addonv1alpha1.ManagedClusterAddOn{
@@ -78,8 +79,28 @@ func (hub *Hub) CreateManagedClusterAddOnLease(addOnInstallNamespace, addOnName 
 	return err
 }
 
-func (hub *Hub) CheckManagedClusterAddOnStatus(managedClusterNamespace, addOnName string) error {
+// CheckManagedClusterAddOnStatusV1Alpha1 checks the status of a ManagedClusterAddOn using v1alpha1 API
+func (hub *Hub) CheckManagedClusterAddOnStatusV1Alpha1(managedClusterNamespace, addOnName string) error {
 	addOn, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterNamespace).Get(context.TODO(), addOnName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	if addOn.Status.Conditions == nil {
+		return fmt.Errorf("there is no conditions in addon %v/%v", managedClusterNamespace, addOnName)
+	}
+
+	if !meta.IsStatusConditionTrue(addOn.Status.Conditions, "Available") {
+		return fmt.Errorf("the addon %v/%v available condition is not true, %v",
+			managedClusterNamespace, addOnName, addOn.Status.Conditions)
+	}
+
+	return nil
+}
+
+// CheckManagedClusterAddOnStatusV1Beta1 checks the status of a ManagedClusterAddOn using v1beta1 API
+func (hub *Hub) CheckManagedClusterAddOnStatusV1Beta1(managedClusterNamespace, addOnName string) error {
+	addOn, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterNamespace).Get(context.TODO(), addOnName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

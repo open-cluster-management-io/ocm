@@ -234,14 +234,14 @@ var _ = ginkgo.Describe("Template addon with token-based authentication", ginkgo
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By("Step 2: Create the template addon")
-		err = hub.CreateManagedClusterAddOn(universalClusterName, addOnName, addonInstallNamespace)
+		err = hub.CreateManagedClusterAddOnV1Alpha1(universalClusterName, addOnName, addonInstallNamespace)
 		if err != nil {
 			gomega.Expect(errors.IsAlreadyExists(err)).To(gomega.BeTrue())
 		}
 
 		ginkgo.By("Step 3: Wait for addon to become available with token authentication")
 		gomega.Eventually(func() error {
-			return hub.CheckManagedClusterAddOnStatus(universalClusterName, addOnName)
+			return hub.CheckManagedClusterAddOnStatusV1Alpha1(universalClusterName, addOnName)
 		}, "5m", "10s").Should(gomega.Succeed())
 
 		ginkgo.By("Step 4: Verify hub kubeconfig secret is created with token authentication")

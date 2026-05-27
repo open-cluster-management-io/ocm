@@ -11,14 +11,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 
-	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
-var _ = ginkgo.Describe("Addon install with install strategy (v1beta1)", ginkgo.Ordered, ginkgo.Label("addon-install"), func() {
+var _ = ginkgo.Describe("Addon install with install strategy (v1alpha1)", ginkgo.Ordered, ginkgo.Label("addon-install"), func() {
 	var addOnName string
 	var clusterNames []string
 
@@ -87,16 +87,16 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1beta1)", ginkgo.
 		}
 
 		ginkgo.By(fmt.Sprintf("create ClusterManagementAddOn %s with install strategy", addOnName))
-		cma := &addonapiv1beta1.ClusterManagementAddOn{
+		cma := &addonapiv1alpha1.ClusterManagementAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: addOnName,
 			},
-			Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
-				InstallStrategy: addonapiv1beta1.InstallStrategy{
-					Type: addonapiv1beta1.AddonInstallStrategyPlacements,
-					Placements: []addonapiv1beta1.PlacementStrategy{
+			Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
+				InstallStrategy: addonapiv1alpha1.InstallStrategy{
+					Type: addonapiv1alpha1.AddonInstallStrategyPlacements,
+					Placements: []addonapiv1alpha1.PlacementStrategy{
 						{
-							PlacementRef: addonapiv1beta1.PlacementRef{
+							PlacementRef: addonapiv1alpha1.PlacementRef{
 								Name:      "global",
 								Namespace: "open-cluster-management-global-set",
 							},
@@ -108,14 +108,14 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1beta1)", ginkgo.
 				},
 			},
 		}
-		_, err = hub.AddonClient.AddonV1beta1().ClusterManagementAddOns().Create(
+		_, err = hub.AddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(
 			context.TODO(), cma, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.AfterAll(func() {
 		ginkgo.By(fmt.Sprintf("delete ClusterManagementAddOn %s", addOnName))
-		err := hub.AddonClient.AddonV1beta1().ClusterManagementAddOns().Delete(
+		err := hub.AddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(
 			context.TODO(), addOnName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -161,21 +161,14 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1beta1)", ginkgo.
 
 		ginkgo.By(fmt.Sprintf("check ManagedClusterAddOn %s is created in cluster namespace %s", addOnName, clusterName))
 		gomega.Eventually(func() error {
-			addon, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).Get(
+			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 
-			// In v1beta1, the installNamespace annotation is expected because:
-			// - v1alpha1 is the storage version
-			// - installNamespace field was removed from v1beta1 spec
-			// - It's preserved as an annotation during v1alpha1->v1beta1 conversion
-			// We only check that no *user* annotations are present (non-system annotations)
-			for key := range addon.Annotations {
-				if key != addonapiv1beta1.InstallNamespaceAnnotation {
-					return fmt.Errorf("expected no user annotations on ManagedClusterAddOn, got %v", addon.Annotations)
-				}
+			if len(addon.Annotations) != 0 {
+				return fmt.Errorf("expected no annotations on ManagedClusterAddOn, got %v", addon.Annotations)
 			}
 			return nil
 		}).Should(gomega.Succeed())
@@ -206,7 +199,7 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1beta1)", ginkgo.
 
 		ginkgo.By(fmt.Sprintf("check ManagedClusterAddOn %s is created with synced annotations", addOnName))
 		gomega.Eventually(func() error {
-			addon, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).Get(
+			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -239,7 +232,7 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1beta1)", ginkgo.
 
 		ginkgo.By(fmt.Sprintf("check updated annotation is synced to ManagedClusterAddOn %s", addOnName))
 		gomega.Eventually(func() error {
-			addon, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).Get(
+			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
