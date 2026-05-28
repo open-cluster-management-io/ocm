@@ -48,6 +48,29 @@ This can be done with the `--signoff` option to `git commit`. See the [Git docum
 
 The Open Cluster Management project has adopted the CNCF Code of Conduct. Refer to our [Community Code of Conduct](CODE_OF_CONDUCT.md) for details.
 
+## AI Policy and Guidance
+
+### AI-Assisted Contributions
+
+AI tools are welcome in this project. We use them ourselves. What matters is the quality of what you submit and your ownership of it.
+
+**You are responsible for everything you submit.** If you used AI to help write code, documentation, or a commit message, you must understand, review, and test it before opening a PR.
+
+**Respond to reviewers yourself.** When engaging with maintainers during review, do not use AI to generate your responses.
+
+**Disclose AI usage** in your PR description if AI tools played a significant role.
+
+**Please note:** We reserve the right to close low-quality or unreviewed AI-generated submissions without extensive feedback.
+
+*This guidance was shaped by the practices of the OCM community and other open source projects (thank you!) and will evolve. Contributions and suggestions are always welcome.*
+
+*This section was drafted with the assistance of AI, in keeping with the very guidance it describes.*
+
+*This project follows the Linux Foundation's policy on generative AI contributions: [https://www.linuxfoundation.org/legal/generative-ai](https://www.linuxfoundation.org/legal/generative-ai)*
+
+**We continue reviewing legal requirements and always have alignment with the CNCF rules and guidelines; this is an evolving space and may change without notice.**
+
+
 ## Contributing a patch
 
 1. Submit an issue describing your proposed change to the repository in question. The repository owners will respond to your issue promptly.
