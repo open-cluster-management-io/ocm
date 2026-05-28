@@ -303,7 +303,13 @@ func (c certRotationController) syncOne(ctx context.Context, clustermanager *ope
 
 	if helpers.PlacementDebugServerEnabled(clustermanager) {
 		placementServiceName := fmt.Sprintf("%s-placement", clustermanager.Name)
-		hostNames := []string{fmt.Sprintf("%s.%s.svc", placementServiceName, clustermanagerNamespace)}
+		hostNames := []string{
+			fmt.Sprintf("%s.%s.svc", placementServiceName, clustermanagerNamespace),
+			// TODO(cluster-domain): cluster.local is the default but can be customized
+			// via kubelet --cluster-domain. Consider making this configurable on the
+			// ClusterManager CR and updating all service cert SANs to use it.
+			fmt.Sprintf("%s.%s.svc.cluster.local", placementServiceName, clustermanagerNamespace),
+		}
 
 		if _, ok := cmRotations.targetRotations[helpers.PlacementDebugServingCertSecret]; !ok {
 			c.rotationMap[clustermanagerName].targetRotations[helpers.PlacementDebugServingCertSecret] = certrotation.TargetRotation{
