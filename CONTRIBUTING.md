@@ -5,6 +5,7 @@
   - [Certificate of Origin](#certificate-of-origin)
   - [DCO Sign Off](#dco-sign-off)
   - [Code of Conduct](#code-of-conduct)
+  - [AI Policy and Guidance](#ai-policy-and-guidance)
   - [Contributing a patch](#contributing-a-patch)
   - [Setting up your dev environment, coding, and debugging](#setting-up-your-dev-environment-coding-and-debugging)
     - [Prerequisites](#prerequisites)
