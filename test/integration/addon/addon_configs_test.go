@@ -48,7 +48,7 @@ var _ = ginkgo.Describe("AddConfigs Beta", func() {
 		_, err = createClusterManagementAddOnBeta(testAddOnConfigsImpl.name, configDefaultNamespace, configDefaultName)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		assertClusterManagementAddOnAnnotations(testAddOnConfigsImpl.name)
+		assertClusterManagementAddOnAnnotationsBeta(testAddOnConfigsImpl.name)
 
 		// prepare default config
 		configDefaultNS := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: configDefaultNamespace}}

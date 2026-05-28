@@ -32,7 +32,7 @@ var _ = ginkgo.Describe("Addon install Beta", func() {
 		_, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Create(context.Background(), cma, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		assertClusterManagementAddOnAnnotations(cma.Name)
+		assertClusterManagementAddOnAnnotationsBeta(cma.Name)
 
 		placementNamespace = fmt.Sprintf("ns-%s", suffix)
 		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: placementNamespace}}

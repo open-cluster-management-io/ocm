@@ -84,7 +84,7 @@ var _ = ginkgo.Describe("Template deploy Alpha", func() {
 		_, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(), cma, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		assertClusterManagementAddOnAnnotations(addonName)
+		assertClusterManagementAddOnAnnotationsAlpha(addonName)
 
 		// prepare addon template
 		addonTemplateData, err := os.ReadFile("./test/integration/addon/testmanifests/addontemplate.yaml")
@@ -210,14 +210,14 @@ var _ = ginkgo.Describe("Template deploy Alpha", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By("check mca condition")
-		assertManagedClusterAddOnConditions(addonName, clusterNames[0], metav1.Condition{
+		assertManagedClusterAddOnConditionsAlpha(addonName, clusterNames[0], metav1.Condition{
 			Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
 			Status:  metav1.ConditionTrue,
 			Reason:  "ConfigurationsConfigured",
 			Message: "Configurations configured",
 		})
 		for i := 1; i < numberOfClusters; i++ {
-			assertManagedClusterAddOnConditions(addonName, clusterNames[i], metav1.Condition{
+			assertManagedClusterAddOnConditionsAlpha(addonName, clusterNames[i], metav1.Condition{
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
 				Status:  metav1.ConditionFalse,
 				Reason:  "ConfigurationsNotConfigured",
@@ -235,14 +235,14 @@ var _ = ginkgo.Describe("Template deploy Alpha", func() {
 		updateManifestWorkStatus(hubWorkClient, clusterNames[0], manifestWorkName, metav1.ConditionTrue)
 
 		ginkgo.By("check mca condition")
-		assertManagedClusterAddOnConditions(addonName, clusterNames[1], metav1.Condition{
+		assertManagedClusterAddOnConditionsAlpha(addonName, clusterNames[1], metav1.Condition{
 			Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
 			Status:  metav1.ConditionTrue,
 			Reason:  "ConfigurationsConfigured",
 			Message: "Configurations configured",
 		})
 		for i := 2; i < numberOfClusters; i++ {
-			assertManagedClusterAddOnConditions(addonName, clusterNames[i], metav1.Condition{
+			assertManagedClusterAddOnConditionsAlpha(addonName, clusterNames[i], metav1.Condition{
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
 				Status:  metav1.ConditionFalse,
 				Reason:  "ConfigurationsNotConfigured",

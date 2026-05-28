@@ -494,8 +494,8 @@ func assertManagedClusterAddOnConfigReferencesBeta(name, namespace string, expec
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
-func assertClusterManagementAddOnAnnotations(name string) {
-	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %v Annotations", name))
+func assertClusterManagementAddOnAnnotationsAlpha(name string) {
+	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %v Annotations (Alpha)", name))
 
 	gomega.Eventually(func() error {
 		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
@@ -510,6 +510,18 @@ func assertClusterManagementAddOnAnnotations(name string) {
 		}
 
 		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
+
+func assertClusterManagementAddOnAnnotationsBeta(name string) {
+	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %v Annotations (Beta)", name))
+
+	// Note: The AddonLifecycleAnnotationKey was removed in v1beta1, so this assertion
+	// is a no-op for backward compatibility with test structure. In v1beta1, addon
+	// lifecycle management is always handled by the addon-manager.
+	gomega.Eventually(func() error {
+		_, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		return err
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
@@ -584,8 +596,8 @@ func createPlacementDecision(hubClusterClient clusterv1client.Interface, placeme
 	return nil
 }
 
-func assertClusterManagementAddOnConditions(name string, expect ...metav1.Condition) {
-	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s Conditions", name))
+func assertClusterManagementAddOnConditionsAlpha(name string, expect ...metav1.Condition) {
+	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s Conditions (Alpha)", name))
 
 	gomega.Eventually(func() error {
 		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
@@ -594,6 +606,9 @@ func assertClusterManagementAddOnConditions(name string, expect ...metav1.Condit
 		}
 
 		for i, ec := range expect {
+			if i >= len(actual.Status.InstallProgressions) {
+				return fmt.Errorf("expected %d install progressions, actual: %d", i+1, len(actual.Status.InstallProgressions))
+			}
 			cond := meta.FindStatusCondition(actual.Status.InstallProgressions[i].Conditions, ec.Type)
 			if cond == nil ||
 				cond.Status != ec.Status ||
@@ -607,8 +622,34 @@ func assertClusterManagementAddOnConditions(name string, expect ...metav1.Condit
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
-func assertClusterManagementAddOnNoConditions(name string, start metav1.Time, duration time.Duration, expect ...metav1.Condition) {
-	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s no conditions in duration %v", name, duration))
+func assertClusterManagementAddOnConditionsBeta(name string, expect ...metav1.Condition) {
+	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s Conditions (Beta)", name))
+
+	gomega.Eventually(func() error {
+		actual, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		for i, ec := range expect {
+			if i >= len(actual.Status.InstallProgressions) {
+				return fmt.Errorf("expected %d install progressions, actual: %d", i+1, len(actual.Status.InstallProgressions))
+			}
+			cond := meta.FindStatusCondition(actual.Status.InstallProgressions[i].Conditions, ec.Type)
+			if cond == nil ||
+				cond.Status != ec.Status ||
+				cond.Reason != ec.Reason ||
+				cond.Message != ec.Message {
+				return fmt.Errorf("expected cma progressing condition is %v, actual: %v", ec, cond)
+			}
+		}
+
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
+
+func assertClusterManagementAddOnNoConditionsAlpha(name string, start metav1.Time, duration time.Duration, expect ...metav1.Condition) {
+	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s no conditions in duration %v (Alpha)", name, duration))
 
 	gomega.Consistently(func() error {
 		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
@@ -621,6 +662,9 @@ func assertClusterManagementAddOnNoConditions(name string, start metav1.Time, du
 		// Only check if we haven't reached the expected timeout duration yet
 		if elapsedTime < duration {
 			for i, ec := range expect {
+				if i >= len(actual.Status.InstallProgressions) {
+					return fmt.Errorf("expected %d install progressions, actual: %d", i+1, len(actual.Status.InstallProgressions))
+				}
 				cond := meta.FindStatusCondition(actual.Status.InstallProgressions[i].Conditions, ec.Type)
 
 				// The expected timeout condition should NOT appear before the duration
@@ -637,11 +681,67 @@ func assertClusterManagementAddOnNoConditions(name string, start metav1.Time, du
 	}, duration+2*time.Second, eventuallyInterval).Should(gomega.BeNil())
 }
 
-func assertManagedClusterAddOnConditions(name, namespace string, expect ...metav1.Condition) {
-	ginkgo.By(fmt.Sprintf("Check ManagedClusterAddOn %s/%s Conditions", namespace, name))
+func assertClusterManagementAddOnNoConditionsBeta(name string, start metav1.Time, duration time.Duration, expect ...metav1.Condition) {
+	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s no conditions in duration %v (Beta)", name, duration))
+
+	gomega.Consistently(func() error {
+		actual, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		elapsedTime := metav1.Now().Sub(start.Time)
+
+		// Only check if we haven't reached the expected timeout duration yet
+		if elapsedTime < duration {
+			for i, ec := range expect {
+				if i >= len(actual.Status.InstallProgressions) {
+					return fmt.Errorf("expected %d install progressions, actual: %d", i+1, len(actual.Status.InstallProgressions))
+				}
+				cond := meta.FindStatusCondition(actual.Status.InstallProgressions[i].Conditions, ec.Type)
+
+				// The expected timeout condition should NOT appear before the duration
+				if cond != nil &&
+					cond.Status == ec.Status &&
+					cond.Reason == ec.Reason &&
+					cond.Message == ec.Message {
+					return fmt.Errorf("unexpected condition matches before duration (elapsed: %v, expected: %v)", elapsedTime, duration)
+				}
+			}
+		}
+
+		return nil
+	}, duration+2*time.Second, eventuallyInterval).Should(gomega.BeNil())
+}
+
+func assertManagedClusterAddOnConditionsAlpha(name, namespace string, expect ...metav1.Condition) {
+	ginkgo.By(fmt.Sprintf("Check ManagedClusterAddOn %s/%s Conditions (Alpha)", namespace, name))
 
 	gomega.Eventually(func() error {
 		actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		for _, ec := range expect {
+			cond := meta.FindStatusCondition(actual.Status.Conditions, ec.Type)
+			if cond == nil ||
+				cond.Status != ec.Status ||
+				cond.Reason != ec.Reason ||
+				cond.Message != ec.Message {
+				return fmt.Errorf("expected addon progressing condition is %v, actual: %v", ec, cond)
+			}
+		}
+
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
+
+func assertManagedClusterAddOnConditionsBeta(name, namespace string, expect ...metav1.Condition) {
+	ginkgo.By(fmt.Sprintf("Check ManagedClusterAddOn %s/%s Conditions (Beta)", namespace, name))
+
+	gomega.Eventually(func() error {
+		actual, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(namespace).Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}

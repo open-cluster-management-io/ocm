@@ -74,6 +74,7 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 	var cma *addonapiv1beta1.ClusterManagementAddOn
 
 	ginkgo.BeforeEach(func() {
+		clusterNames = nil
 		suffix = rand.String(5)
 		configDefaultNamespace = fmt.Sprintf("default-config-%s", suffix)
 		configDefaultName = fmt.Sprintf("default-config-%s", suffix)
@@ -116,7 +117,7 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 		_, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Create(context.Background(), cma, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		assertClusterManagementAddOnAnnotations(testAddOnConfigsImpl.name)
+		assertClusterManagementAddOnAnnotationsBeta(testAddOnConfigsImpl.name)
 
 		// prepare cluster
 		for i := 0; i < 4; i++ {
@@ -224,13 +225,13 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 						SpecHash: addOnDefaultConfigSpecHash,
 					},
 				})
-				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+				assertManagedClusterAddOnConditionsBeta(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 					Status:  metav1.ConditionFalse,
 					Reason:  addonapiv1beta1.ProgressingReasonCompleted,
 					Message: "completed with no errors.",
 				})
-				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+				assertManagedClusterAddOnConditionsBeta(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1beta1.ManagedClusterAddOnConditionConfigured,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ConfigurationsConfigured",
@@ -271,7 +272,7 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 					},
 				},
 			})
-			assertClusterManagementAddOnConditions(testAddOnConfigsImpl.name, metav1.Condition{
+			assertClusterManagementAddOnConditionsBeta(testAddOnConfigsImpl.name, metav1.Condition{
 				Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionFalse,
 				Reason:  addonapiv1beta1.ProgressingReasonCompleted,
@@ -305,13 +306,13 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 						SpecHash: addOnTest1ConfigSpecHash,
 					},
 				})
-				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+				assertManagedClusterAddOnConditionsBeta(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 					Status:  metav1.ConditionFalse,
 					Reason:  addonapiv1beta1.ProgressingReasonCompleted,
 					Message: "completed with no errors.",
 				})
-				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+				assertManagedClusterAddOnConditionsBeta(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1beta1.ManagedClusterAddOnConditionConfigured,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ConfigurationsConfigured",
@@ -352,7 +353,7 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 					},
 				},
 			})
-			assertClusterManagementAddOnConditions(testAddOnConfigsImpl.name, metav1.Condition{
+			assertClusterManagementAddOnConditionsBeta(testAddOnConfigsImpl.name, metav1.Condition{
 				Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionFalse,
 				Reason:  addonapiv1beta1.ProgressingReasonCompleted,
@@ -397,13 +398,13 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 						SpecHash: addOnTest2ConfigSpecHash,
 					},
 				})
-				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+				assertManagedClusterAddOnConditionsBeta(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 					Status:  metav1.ConditionTrue,
 					Reason:  addonapiv1beta1.ProgressingReasonProgressing,
 					Message: "progressing... work is not ready",
 				})
-				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+				assertManagedClusterAddOnConditionsBeta(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1beta1.ManagedClusterAddOnConditionConfigured,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ConfigurationsConfigured",
@@ -432,13 +433,13 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 						SpecHash: addOnTest1ConfigSpecHash,
 					},
 				})
-				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+				assertManagedClusterAddOnConditionsBeta(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 					Status:  metav1.ConditionFalse,
 					Reason:  addonapiv1beta1.ProgressingReasonCompleted,
 					Message: "completed with no errors.",
 				})
-				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+				assertManagedClusterAddOnConditionsBeta(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1beta1.ManagedClusterAddOnConditionConfigured,
 					Status:  metav1.ConditionFalse,
 					Reason:  "ConfigurationsNotConfigured",
@@ -465,7 +466,7 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 					},
 				},
 			})
-			assertClusterManagementAddOnConditions(testAddOnConfigsImpl.name, metav1.Condition{
+			assertClusterManagementAddOnConditionsBeta(testAddOnConfigsImpl.name, metav1.Condition{
 				Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionTrue,
 				Reason:  addonapiv1beta1.ProgressingReasonProgressing,
@@ -473,13 +474,13 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 			})
 
 			ginkgo.By("timeout after ProgressDeadline 5s and stop rollout since breach MaxFailures 1")
-			assertClusterManagementAddOnNoConditions(testAddOnConfigsImpl.name, start, 5*time.Second, metav1.Condition{
+			assertClusterManagementAddOnNoConditionsBeta(testAddOnConfigsImpl.name, start, 5*time.Second, metav1.Condition{
 				Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionTrue,
 				Reason:  addonapiv1beta1.ProgressingReasonProgressing,
 				Message: "selected clusters 4. configured addons 0/4 progressing..., 0 failed 2 timeout.",
 			})
-			assertClusterManagementAddOnConditions(testAddOnConfigsImpl.name, metav1.Condition{
+			assertClusterManagementAddOnConditionsBeta(testAddOnConfigsImpl.name, metav1.Condition{
 				Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionTrue,
 				Reason:  addonapiv1beta1.ProgressingReasonProgressing,
@@ -517,13 +518,13 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 						SpecHash: addOnTest2ConfigSpecHash,
 					},
 				})
-				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+				assertManagedClusterAddOnConditionsBeta(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 					Status:  metav1.ConditionFalse,
 					Reason:  addonapiv1beta1.ProgressingReasonCompleted,
 					Message: "completed with no errors.",
 				})
-				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+				assertManagedClusterAddOnConditionsBeta(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1beta1.ManagedClusterAddOnConditionConfigured,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ConfigurationsConfigured",
@@ -532,7 +533,7 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 			}
 
 			ginkgo.By("check cma status")
-			assertClusterManagementAddOnConditions(testAddOnConfigsImpl.name, metav1.Condition{
+			assertClusterManagementAddOnConditionsBeta(testAddOnConfigsImpl.name, metav1.Condition{
 				Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionTrue,
 				Reason:  addonapiv1beta1.ProgressingReasonProgressing,
@@ -567,13 +568,13 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 						SpecHash: addOnTest2ConfigSpecHash,
 					},
 				})
-				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+				assertManagedClusterAddOnConditionsBeta(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 					Status:  metav1.ConditionFalse,
 					Reason:  addonapiv1beta1.ProgressingReasonCompleted,
 					Message: "completed with no errors.",
 				})
-				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+				assertManagedClusterAddOnConditionsBeta(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1beta1.ManagedClusterAddOnConditionConfigured,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ConfigurationsConfigured",
@@ -613,7 +614,7 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 					},
 				},
 			})
-			assertClusterManagementAddOnConditions(testAddOnConfigsImpl.name, metav1.Condition{
+			assertClusterManagementAddOnConditionsBeta(testAddOnConfigsImpl.name, metav1.Condition{
 				Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionFalse,
 				Reason:  addonapiv1beta1.ProgressingReasonCompleted,
@@ -666,13 +667,13 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 						SpecHash: addOnTest2ConfigSpecHash,
 					},
 				})
-				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+				assertManagedClusterAddOnConditionsBeta(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 					Status:  metav1.ConditionTrue,
 					Reason:  addonapiv1beta1.ProgressingReasonProgressing,
 					Message: "progressing... work is not ready",
 				})
-				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+				assertManagedClusterAddOnConditionsBeta(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1beta1.ManagedClusterAddOnConditionConfigured,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ConfigurationsConfigured",
@@ -701,13 +702,13 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 						SpecHash: addOnTest2ConfigSpecHash,
 					},
 				})
-				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+				assertManagedClusterAddOnConditionsBeta(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 					Status:  metav1.ConditionFalse,
 					Reason:  addonapiv1beta1.ProgressingReasonCompleted,
 					Message: "completed with no errors.",
 				})
-				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+				assertManagedClusterAddOnConditionsBeta(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1beta1.ManagedClusterAddOnConditionConfigured,
 					Status:  metav1.ConditionFalse,
 					Reason:  "ConfigurationsNotConfigured",
@@ -748,7 +749,7 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 					},
 				},
 			})
-			assertClusterManagementAddOnConditions(testAddOnConfigsImpl.name, metav1.Condition{
+			assertClusterManagementAddOnConditionsBeta(testAddOnConfigsImpl.name, metav1.Condition{
 				Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionTrue,
 				Reason:  addonapiv1beta1.ProgressingReasonProgressing,
@@ -763,13 +764,13 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 			for i := 2; i < 4; i++ {
 				updateManifestWorkStatus(hubWorkClient, clusterNames[i], manifestWorkName, metav1.ConditionFalse)
 			}
-			assertClusterManagementAddOnNoConditions(testAddOnConfigsImpl.name, start, 3*time.Second, metav1.Condition{
+			assertClusterManagementAddOnNoConditionsBeta(testAddOnConfigsImpl.name, start, 3*time.Second, metav1.Condition{
 				Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionTrue,
 				Reason:  addonapiv1beta1.ProgressingReasonProgressing,
 				Message: "selected clusters 4. configured addons 4/4 progressing..., 0 failed 0 timeout.",
 			})
-			assertClusterManagementAddOnConditions(testAddOnConfigsImpl.name, metav1.Condition{
+			assertClusterManagementAddOnConditionsBeta(testAddOnConfigsImpl.name, metav1.Condition{
 				Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionTrue,
 				Reason:  addonapiv1beta1.ProgressingReasonProgressing,
@@ -799,13 +800,13 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 						SpecHash: addOnTest3ConfigSpecHash,
 					},
 				})
-				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+				assertManagedClusterAddOnConditionsBeta(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 					Status:  metav1.ConditionFalse,
 					Reason:  addonapiv1beta1.ProgressingReasonCompleted,
 					Message: "completed with no errors.",
 				})
-				assertManagedClusterAddOnConditions(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
+				assertManagedClusterAddOnConditionsBeta(testAddOnConfigsImpl.name, clusterNames[i], metav1.Condition{
 					Type:    addonapiv1beta1.ManagedClusterAddOnConditionConfigured,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ConfigurationsConfigured",
@@ -852,13 +853,13 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 			for i := 2; i < 4; i++ {
 				updateManifestWorkStatus(hubWorkClient, clusterNames[i], manifestWorkName, metav1.ConditionTrue)
 			}
-			assertClusterManagementAddOnNoConditions(testAddOnConfigsImpl.name, start, 3*time.Second, metav1.Condition{
+			assertClusterManagementAddOnNoConditionsBeta(testAddOnConfigsImpl.name, start, 3*time.Second, metav1.Condition{
 				Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionFalse,
 				Reason:  addonapiv1beta1.ProgressingReasonCompleted,
 				Message: "selected clusters 4. configured addons 4/4 completed with no errors, 0 failed 0 timeout.",
 			})
-			assertClusterManagementAddOnConditions(testAddOnConfigsImpl.name, metav1.Condition{
+			assertClusterManagementAddOnConditionsBeta(testAddOnConfigsImpl.name, metav1.Condition{
 				Type:    addonapiv1beta1.ManagedClusterAddOnConditionProgressing,
 				Status:  metav1.ConditionFalse,
 				Reason:  addonapiv1beta1.ProgressingReasonCompleted,

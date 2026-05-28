@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -92,7 +93,7 @@ var _ = ginkgo.Describe("Agent deploy Beta", func() {
 			cma, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		assertClusterManagementAddOnAnnotations(testAddonImpl.name)
+		assertClusterManagementAddOnAnnotationsBeta(testAddonImpl.name)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -134,8 +135,16 @@ var _ = ginkgo.Describe("Agent deploy Beta", func() {
 				return fmt.Errorf("unexpected number of work manifests")
 			}
 
-			if apiequality.Semantic.DeepEqual(work.Spec.Workload.Manifests[0].Raw, []byte(deploymentJsonBeta)) {
-				return fmt.Errorf("expected manifest is no correct, get %v", work.Spec.Workload.Manifests[0].Raw)
+			// Unmarshal both JSONs and compare semantically (not byte-for-byte)
+			var expected, actual map[string]interface{}
+			if err := json.Unmarshal([]byte(deploymentJsonBeta), &expected); err != nil {
+				return fmt.Errorf("failed to unmarshal expected JSON: %v", err)
+			}
+			if err := json.Unmarshal(work.Spec.Workload.Manifests[0].Raw, &actual); err != nil {
+				return fmt.Errorf("failed to unmarshal actual JSON: %v", err)
+			}
+			if !apiequality.Semantic.DeepEqual(expected, actual) {
+				return fmt.Errorf("expected manifest does not match actual, got %v", string(work.Spec.Workload.Manifests[0].Raw))
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
