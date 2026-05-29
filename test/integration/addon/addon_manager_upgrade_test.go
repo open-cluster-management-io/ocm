@@ -361,6 +361,12 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 			})
 
 			ginkgo.By("update work status to avoid addon status update")
+			// Capture start BEFORE updating work status. When the work status changes to False,
+			// the controller will set the addon Progressing condition with a LastTransitionTime.
+			// The rollout SDK uses that LastTransitionTime (not the CMA patch time) as the base
+			// for ProgressDeadline timeout calculation. If we capture start after the work update,
+			// the controller's timeout can fire before our expected 5s duration from start.
+			start := metav1.Now()
 			for i := 0; i < 2; i++ {
 				updateManifestWorkStatus(hubWorkClient, clusterNames[i], manifestWorkName, metav1.ConditionFalse)
 			}
@@ -379,7 +385,6 @@ var _ = ginkgo.Describe("Addon upgrade Beta", func() {
 					}},
 			}
 			cma.Spec.InstallStrategy.Placements[0].Configs[0].ConfigReferent = addonapiv1beta1.ConfigReferent{Namespace: configDefaultNamespace, Name: configUpdateName}
-			start := metav1.Now()
 			patchClusterManagementAddOnBeta(context.Background(), cma)
 
 			ginkgo.By("check mca status")
