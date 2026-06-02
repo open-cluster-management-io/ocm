@@ -21,7 +21,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -44,7 +44,7 @@ var addOnDeploymentConfigGVR = schema.GroupVersionResource{
 var testEnv *envtest.Environment
 var hubWorkClient workclientset.Interface
 var hubClusterClient clusterv1client.Interface
-var hubAddonClient addonv1alpha1client.Interface
+var hubAddonClient addonclient.Interface
 var hubKubeClient kubernetes.Interface
 var testAddonImpl *testAddon
 var testAddOnConfigsImpl *testAddon
@@ -105,7 +105,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	hubClusterClient, err = clusterv1client.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	hubAddonClient, err = addonv1alpha1client.NewForConfig(cfg)
+	hubAddonClient, err = addonclient.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	hubKubeClient, err = kubernetes.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -204,7 +204,7 @@ func (t *testAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 	return option
 }
 
-func newClusterManagementAddon(name string) *addonapiv1alpha1.ClusterManagementAddOn {
+func newClusterManagementAddonAlpha(name string) *addonapiv1alpha1.ClusterManagementAddOn {
 	return &addonapiv1alpha1.ClusterManagementAddOn{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
@@ -213,6 +213,20 @@ func newClusterManagementAddon(name string) *addonapiv1alpha1.ClusterManagementA
 		Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
 			InstallStrategy: addonapiv1alpha1.InstallStrategy{
 				Type: addonapiv1alpha1.AddonInstallStrategyManual,
+			},
+		},
+	}
+}
+
+func newClusterManagementAddonBeta(name string) *addonv1beta1.ClusterManagementAddOn {
+	return &addonv1beta1.ClusterManagementAddOn{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: addonv1beta1.ClusterManagementAddOnSpec{
+			InstallStrategy: addonv1beta1.InstallStrategy{
+				Type: addonv1beta1.AddonInstallStrategyManual,
 			},
 		},
 	}

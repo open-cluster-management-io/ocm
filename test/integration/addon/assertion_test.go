@@ -14,7 +14,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -25,12 +26,14 @@ import (
 
 // TODO: The spec hash is hardcoded here and will break the test once the API changes.
 // We need a better way to handle the spec hash.
+// Config spec hashes (same for both v1alpha1 and v1beta1 since structure is identical)
 const addOnDefaultConfigSpecHash = "ea4e6089e8b2f584c1cd8b86e16a15df3186b30744f433ede7436091c93a4cc7" //nolint:gosec
 const addOnTest1ConfigSpecHash = "b746cc98936955dd2168640f0011a14f2a74be306c747bc8ba829328cc772690"   //nolint:gosec
 const addOnTest2ConfigSpecHash = "3e6348b0c0f0a341ce28d0a2f99bc41fc63fb17d947eb5a45284729fbeb63b32"   //nolint:gosec
 const addOnTest3ConfigSpecHash = "9b3c6d09731ed254589fa4fc2936e6fb00537de92da5e035183da313eb98d27e"   //nolint:gosec
 
-var addOnDefaultConfigSpec = addonapiv1alpha1.AddOnDeploymentConfigSpec{
+// v1alpha1 config specs
+var addOnDefaultConfigSpecAlpha = addonapiv1alpha1.AddOnDeploymentConfigSpec{
 	CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
 		{
 			Name:  "test",
@@ -38,7 +41,8 @@ var addOnDefaultConfigSpec = addonapiv1alpha1.AddOnDeploymentConfigSpec{
 		},
 	},
 }
-var addOnTest1ConfigSpec = addonapiv1alpha1.AddOnDeploymentConfigSpec{
+
+var addOnTest1ConfigSpecAlpha = addonapiv1alpha1.AddOnDeploymentConfigSpec{
 	CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
 		{
 			Name:  "test1",
@@ -46,7 +50,8 @@ var addOnTest1ConfigSpec = addonapiv1alpha1.AddOnDeploymentConfigSpec{
 		},
 	},
 }
-var addOnTest2ConfigSpec = addonapiv1alpha1.AddOnDeploymentConfigSpec{
+
+var addOnTest2ConfigSpecAlpha = addonapiv1alpha1.AddOnDeploymentConfigSpec{
 	CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
 		{
 			Name:  "test2",
@@ -55,7 +60,7 @@ var addOnTest2ConfigSpec = addonapiv1alpha1.AddOnDeploymentConfigSpec{
 	},
 }
 
-var addOnTest3ConfigSpec = addonapiv1alpha1.AddOnDeploymentConfigSpec{
+var addOnTest3ConfigSpecAlpha = addonapiv1alpha1.AddOnDeploymentConfigSpec{
 	CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
 		{
 			Name:  "test3",
@@ -64,7 +69,44 @@ var addOnTest3ConfigSpec = addonapiv1alpha1.AddOnDeploymentConfigSpec{
 	},
 }
 
-func createClusterManagementAddOn(name, defaultConfigNamespace, defaultConfigName string) (*addonapiv1alpha1.ClusterManagementAddOn, error) {
+// v1beta1 config specs (structure is identical to v1alpha1)
+var addOnDefaultConfigSpecBeta = addonapiv1beta1.AddOnDeploymentConfigSpec{
+	CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+		{
+			Name:  "test",
+			Value: "test",
+		},
+	},
+}
+
+var addOnTest1ConfigSpecBeta = addonapiv1beta1.AddOnDeploymentConfigSpec{
+	CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+		{
+			Name:  "test1",
+			Value: "test1",
+		},
+	},
+}
+
+var addOnTest2ConfigSpecBeta = addonapiv1beta1.AddOnDeploymentConfigSpec{
+	CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+		{
+			Name:  "test2",
+			Value: "test2",
+		},
+	},
+}
+
+var addOnTest3ConfigSpecBeta = addonapiv1beta1.AddOnDeploymentConfigSpec{
+	CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+		{
+			Name:  "test3",
+			Value: "test3",
+		},
+	},
+}
+
+func createClusterManagementAddOnAlpha(name, defaultConfigNamespace, defaultConfigName string) (*addonapiv1alpha1.ClusterManagementAddOn, error) {
 	clusterManagementAddon, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		clusterManagementAddon, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(
@@ -106,7 +148,49 @@ func createClusterManagementAddOn(name, defaultConfigNamespace, defaultConfigNam
 	return clusterManagementAddon, nil
 }
 
-func patchClusterManagementAddOn(_ context.Context, newaddon *addonapiv1alpha1.ClusterManagementAddOn) {
+func createClusterManagementAddOnBeta(name, defaultConfigNamespace, defaultConfigName string) (*addonapiv1beta1.ClusterManagementAddOn, error) {
+	clusterManagementAddon, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		clusterManagementAddon, err = hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Create(
+			context.Background(),
+			&addonapiv1beta1.ClusterManagementAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+				},
+				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+					DefaultConfigs: []addonapiv1beta1.AddOnConfig{
+						{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+								Group:    addOnDeploymentConfigGVR.Group,
+								Resource: addOnDeploymentConfigGVR.Resource,
+							},
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
+								Name:      defaultConfigName,
+								Namespace: defaultConfigNamespace,
+							},
+						},
+					},
+					InstallStrategy: addonapiv1beta1.InstallStrategy{
+						Type: addonapiv1beta1.AddonInstallStrategyManual,
+					},
+				},
+			},
+			metav1.CreateOptions{},
+		)
+		if err != nil {
+			return nil, err
+		}
+		return clusterManagementAddon, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return clusterManagementAddon, nil
+}
+
+func patchClusterManagementAddOnAlpha(_ context.Context, newaddon *addonapiv1alpha1.ClusterManagementAddOn) {
 	gomega.Eventually(func() error {
 		old, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), newaddon.Name, metav1.GetOptions{})
 		if err != nil {
@@ -129,7 +213,22 @@ func patchClusterManagementAddOn(_ context.Context, newaddon *addonapiv1alpha1.C
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 }
 
-func updateManagedClusterAddOnStatus(_ context.Context, new *addonapiv1alpha1.ManagedClusterAddOn) {
+func patchClusterManagementAddOnBeta(_ context.Context, newaddon *addonapiv1beta1.ClusterManagementAddOn) {
+	gomega.Eventually(func() error {
+		old, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), newaddon.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		new := old.DeepCopy()
+		new.Spec = *newaddon.Spec.DeepCopy()
+		new.Annotations = newaddon.Annotations
+
+		_, err = hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Update(context.Background(), new, metav1.UpdateOptions{})
+		return err
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+}
+
+func updateManagedClusterAddOnStatusAlpha(_ context.Context, new *addonapiv1alpha1.ManagedClusterAddOn) {
 	gomega.Eventually(func() error {
 		old, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Get(context.Background(), new.Name, metav1.GetOptions{})
 		if err != nil {
@@ -141,27 +240,20 @@ func updateManagedClusterAddOnStatus(_ context.Context, new *addonapiv1alpha1.Ma
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 }
 
-func assertClusterManagementAddOnAnnotations(name string) {
-	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %v Annotations", name))
-
+func updateManagedClusterAddOnStatusBeta(_ context.Context, new *addonapiv1beta1.ManagedClusterAddOn) {
 	gomega.Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		old, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(new.Namespace).Get(context.Background(), new.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-
-		if _, ok := actual.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey]; ok {
-			return fmt.Errorf("expected annotation %v to be empty, actual: %v",
-				addonapiv1alpha1.AddonLifecycleAnnotationKey,
-				actual.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey])
-		}
-
-		return nil
-	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		old.Status = new.Status
+		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(old.Namespace).UpdateStatus(context.Background(), old, metav1.UpdateOptions{})
+		return err
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 }
 
-func assertClusterManagementAddOnDefaultConfigReferences(name string, expect ...addonapiv1alpha1.DefaultConfigReference) {
-	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s DefaultConfigReferences", name))
+func assertClusterManagementAddOnDefaultConfigReferencesAlpha(name string, expect ...addonapiv1alpha1.DefaultConfigReference) {
+	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s DefaultConfigReferences (Alpha)", name))
 
 	gomega.Eventually(func() error {
 		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
@@ -185,27 +277,33 @@ func assertClusterManagementAddOnDefaultConfigReferences(name string, expect ...
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
-func updateManifestWorkStatus(client workclientset.Interface, clusterName string, manifestWorkName string, status metav1.ConditionStatus) {
+func assertClusterManagementAddOnDefaultConfigReferencesBeta(name string, expect ...addonapiv1beta1.DefaultConfigReference) {
+	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s DefaultConfigReferences (Beta)", name))
+
 	gomega.Eventually(func() error {
-		work, err := client.WorkV1().ManifestWorks(clusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 
-		meta.SetStatusCondition(
-			&work.Status.Conditions,
-			metav1.Condition{Type: workapiv1.WorkApplied, Status: status, Reason: "WorkApplied", ObservedGeneration: work.Generation})
-		meta.SetStatusCondition(
-			&work.Status.Conditions,
-			metav1.Condition{Type: workapiv1.WorkAvailable, Status: status, Reason: "WorkAvailable", ObservedGeneration: work.Generation})
+		if len(actual.Status.DefaultConfigReferences) != len(expect) {
+			return fmt.Errorf("expected %v default config reference, actual: %v", len(expect), len(actual.Status.DefaultConfigReferences))
+		}
 
-		_, err = client.WorkV1().ManifestWorks(clusterName).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
-		return err
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		for i, e := range expect {
+			actualConfigReference := actual.Status.DefaultConfigReferences[i]
+
+			if !apiequality.Semantic.DeepEqual(actualConfigReference, e) {
+				return fmt.Errorf("expected default config is %v, actual: %v", e, actualConfigReference)
+			}
+		}
+
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
-func createAddOnDeploymentConfig(
-	hubAddonClient addonv1alpha1client.Interface,
+func createAddOnDeploymentConfigAlpha(
+	hubAddonClient addonclient.Interface,
 	configNamespace string,
 	configName string,
 	configSpec addonapiv1alpha1.AddOnDeploymentConfigSpec,
@@ -222,8 +320,26 @@ func createAddOnDeploymentConfig(
 	return err
 }
 
-func updateAddOnDeploymentConfigSpec(
-	hubAddonClient addonv1alpha1client.Interface,
+func createAddOnDeploymentConfigBeta(
+	hubAddonClient addonclient.Interface,
+	configNamespace string,
+	configName string,
+	configSpec addonapiv1beta1.AddOnDeploymentConfigSpec,
+) error {
+	config := &addonapiv1beta1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      configName,
+			Namespace: configNamespace,
+		},
+		Spec: configSpec,
+	}
+	_, err := hubAddonClient.AddonV1beta1().AddOnDeploymentConfigs(configNamespace).Create(
+		context.Background(), config, metav1.CreateOptions{})
+	return err
+}
+
+func updateAddOnDeploymentConfigSpecAlpha(
+	hubAddonClient addonclient.Interface,
 	configNamespace string,
 	configName string,
 	newConfigSpec addonapiv1alpha1.AddOnDeploymentConfigSpec,
@@ -242,6 +358,189 @@ func updateAddOnDeploymentConfigSpec(
 			return err
 		}
 		return nil
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+}
+
+func updateAddOnDeploymentConfigSpecBeta(
+	hubAddonClient addonclient.Interface,
+	configNamespace string,
+	configName string,
+	newConfigSpec addonapiv1beta1.AddOnDeploymentConfigSpec,
+) {
+	gomega.Eventually(func() error {
+		addOnConfig, err := hubAddonClient.AddonV1beta1().AddOnDeploymentConfigs(configNamespace).Get(
+			context.Background(), configName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		addOnConfig.Spec = newConfigSpec
+		_, err = hubAddonClient.AddonV1beta1().AddOnDeploymentConfigs(configNamespace).Update(
+			context.Background(), addOnConfig, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+}
+
+func assertClusterManagementAddOnInstallProgressionAlpha(name string, expect ...addonapiv1alpha1.InstallProgression) {
+	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s InstallProgression", name))
+
+	gomega.Eventually(func() error {
+		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if len(actual.Status.InstallProgressions) != len(expect) {
+			return fmt.Errorf("expected %v install progression, actual: %v", len(expect), len(actual.Status.InstallProgressions))
+		}
+
+		for i, e := range expect {
+			actualInstallProgression := actual.Status.InstallProgressions[i]
+
+			if !apiequality.Semantic.DeepEqual(actualInstallProgression.ConfigReferences, e.ConfigReferences) {
+				return fmt.Errorf("expected InstallProgression.ConfigReferences is %v, actual: %v", e.ConfigReferences, actualInstallProgression.ConfigReferences)
+			}
+		}
+
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
+
+func assertClusterManagementAddOnInstallProgressionBeta(name string, expect ...addonapiv1beta1.InstallProgression) {
+	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s InstallProgression (v1beta1)", name))
+
+	gomega.Eventually(func() error {
+		actual, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if len(actual.Status.InstallProgressions) != len(expect) {
+			return fmt.Errorf("expected %v install progression, actual: %v", len(expect), len(actual.Status.InstallProgressions))
+		}
+
+		for i, e := range expect {
+			actualInstallProgression := actual.Status.InstallProgressions[i]
+
+			if !apiequality.Semantic.DeepEqual(actualInstallProgression.ConfigReferences, e.ConfigReferences) {
+				return fmt.Errorf("expected InstallProgression.ConfigReferences is %v, actual: %v", e.ConfigReferences, actualInstallProgression.ConfigReferences)
+			}
+		}
+
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
+
+func assertManagedClusterAddOnConfigReferencesAlpha(name, namespace string, expect ...addonapiv1alpha1.ConfigReference) {
+	ginkgo.By(fmt.Sprintf("Check ManagedClusterAddOn %s/%s ConfigReferences", namespace, name))
+
+	gomega.Eventually(func() error {
+		actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if len(actual.Status.ConfigReferences) != len(expect) {
+			return fmt.Errorf("expected %v config reference, actual: %v", len(expect), len(actual.Status.ConfigReferences))
+		}
+
+		for i, e := range expect {
+			actualConfigReference := actual.Status.ConfigReferences[i]
+
+			if !apiequality.Semantic.DeepEqual(actualConfigReference, e) {
+				return fmt.Errorf("expected mca config reference is %v %v, actual: %v %v",
+					e.DesiredConfig,
+					e.LastAppliedConfig,
+					actualConfigReference.DesiredConfig,
+					actualConfigReference.LastAppliedConfig,
+				)
+			}
+		}
+
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
+
+func assertManagedClusterAddOnConfigReferencesBeta(name, namespace string, expect ...addonapiv1beta1.ConfigReference) {
+	ginkgo.By(fmt.Sprintf("Check ManagedClusterAddOn %s/%s ConfigReferences (v1beta1)", namespace, name))
+
+	gomega.Eventually(func() error {
+		actual, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if len(actual.Status.ConfigReferences) != len(expect) {
+			return fmt.Errorf("expected %v config reference, actual: %v", len(expect), len(actual.Status.ConfigReferences))
+		}
+
+		for i, e := range expect {
+			actualConfigReference := actual.Status.ConfigReferences[i]
+
+			if !apiequality.Semantic.DeepEqual(actualConfigReference, e) {
+				return fmt.Errorf("expected mca config reference is %v %v, actual: %v %v",
+					e.DesiredConfig,
+					e.LastAppliedConfig,
+					actualConfigReference.DesiredConfig,
+					actualConfigReference.LastAppliedConfig,
+				)
+			}
+		}
+
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
+
+func assertClusterManagementAddOnAnnotationsAlpha(name string) {
+	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %v Annotations (Alpha)", name))
+
+	gomega.Eventually(func() error {
+		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if _, ok := actual.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey]; ok {
+			return fmt.Errorf("expected annotation %v to be empty, actual: %v",
+				addonapiv1alpha1.AddonLifecycleAnnotationKey,
+				actual.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey])
+		}
+
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
+
+func assertClusterManagementAddOnAnnotationsBeta(name string) {
+	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %v Annotations (Beta)", name))
+
+	// Note: The AddonLifecycleAnnotationKey was removed in v1beta1, so this assertion
+	// is a no-op for backward compatibility with test structure. In v1beta1, addon
+	// lifecycle management is always handled by the addon-manager.
+	gomega.Eventually(func() error {
+		_, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		return err
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
+
+func updateManifestWorkStatus(client workclientset.Interface, clusterName string, manifestWorkName string, status metav1.ConditionStatus) {
+	gomega.Eventually(func() error {
+		work, err := client.WorkV1().ManifestWorks(clusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		meta.SetStatusCondition(
+			&work.Status.Conditions,
+			metav1.Condition{Type: workapiv1.WorkApplied, Status: status, Reason: "WorkApplied", ObservedGeneration: work.Generation})
+		meta.SetStatusCondition(
+			&work.Status.Conditions,
+			metav1.Condition{Type: workapiv1.WorkAvailable, Status: status, Reason: "WorkAvailable", ObservedGeneration: work.Generation})
+
+		_, err = client.WorkV1().ManifestWorks(clusterName).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
+		return err
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 }
 
@@ -297,33 +596,8 @@ func createPlacementDecision(hubClusterClient clusterv1client.Interface, placeme
 	return nil
 }
 
-func assertClusterManagementAddOnInstallProgression(name string, expect ...addonapiv1alpha1.InstallProgression) {
-	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s InstallProgression", name))
-
-	gomega.Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		if len(actual.Status.InstallProgressions) != len(expect) {
-			return fmt.Errorf("expected %v install progression, actual: %v", len(expect), len(actual.Status.InstallProgressions))
-		}
-
-		for i, e := range expect {
-			actualInstallProgression := actual.Status.InstallProgressions[i]
-
-			if !apiequality.Semantic.DeepEqual(actualInstallProgression.ConfigReferences, e.ConfigReferences) {
-				return fmt.Errorf("expected InstallProgression.ConfigReferences is %v, actual: %v", e.ConfigReferences, actualInstallProgression.ConfigReferences)
-			}
-		}
-
-		return nil
-	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
-}
-
-func assertClusterManagementAddOnConditions(name string, expect ...metav1.Condition) {
-	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s Conditions", name))
+func assertClusterManagementAddOnConditionsAlpha(name string, expect ...metav1.Condition) {
+	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s Conditions (Alpha)", name))
 
 	gomega.Eventually(func() error {
 		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
@@ -332,6 +606,9 @@ func assertClusterManagementAddOnConditions(name string, expect ...metav1.Condit
 		}
 
 		for i, ec := range expect {
+			if i >= len(actual.Status.InstallProgressions) {
+				return fmt.Errorf("expected %d install progressions, actual: %d", i+1, len(actual.Status.InstallProgressions))
+			}
 			cond := meta.FindStatusCondition(actual.Status.InstallProgressions[i].Conditions, ec.Type)
 			if cond == nil ||
 				cond.Status != ec.Status ||
@@ -345,8 +622,34 @@ func assertClusterManagementAddOnConditions(name string, expect ...metav1.Condit
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
-func assertClusterManagementAddOnNoConditions(name string, start metav1.Time, duration time.Duration, expect ...metav1.Condition) {
-	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s no conditions in duration %v", name, duration))
+func assertClusterManagementAddOnConditionsBeta(name string, expect ...metav1.Condition) {
+	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s Conditions (Beta)", name))
+
+	gomega.Eventually(func() error {
+		actual, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		for i, ec := range expect {
+			if i >= len(actual.Status.InstallProgressions) {
+				return fmt.Errorf("expected %d install progressions, actual: %d", i+1, len(actual.Status.InstallProgressions))
+			}
+			cond := meta.FindStatusCondition(actual.Status.InstallProgressions[i].Conditions, ec.Type)
+			if cond == nil ||
+				cond.Status != ec.Status ||
+				cond.Reason != ec.Reason ||
+				cond.Message != ec.Message {
+				return fmt.Errorf("expected cma progressing condition is %v, actual: %v", ec, cond)
+			}
+		}
+
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
+
+func assertClusterManagementAddOnNoConditionsAlpha(name string, start metav1.Time, duration time.Duration, expect ...metav1.Condition) {
+	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s no conditions in duration %v (Alpha)", name, duration))
 
 	gomega.Consistently(func() error {
 		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
@@ -359,6 +662,9 @@ func assertClusterManagementAddOnNoConditions(name string, start metav1.Time, du
 		// Only check if we haven't reached the expected timeout duration yet
 		if elapsedTime < duration {
 			for i, ec := range expect {
+				if i >= len(actual.Status.InstallProgressions) {
+					return fmt.Errorf("expected %d install progressions, actual: %d", i+1, len(actual.Status.InstallProgressions))
+				}
 				cond := meta.FindStatusCondition(actual.Status.InstallProgressions[i].Conditions, ec.Type)
 
 				// The expected timeout condition should NOT appear before the duration
@@ -375,8 +681,41 @@ func assertClusterManagementAddOnNoConditions(name string, start metav1.Time, du
 	}, duration+2*time.Second, eventuallyInterval).Should(gomega.BeNil())
 }
 
-func assertManagedClusterAddOnConfigReferences(name, namespace string, expect ...addonapiv1alpha1.ConfigReference) {
-	ginkgo.By(fmt.Sprintf("Check ManagedClusterAddOn %s/%s ConfigReferences", namespace, name))
+func assertClusterManagementAddOnNoConditionsBeta(name string, start metav1.Time, duration time.Duration, expect ...metav1.Condition) {
+	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s no conditions in duration %v (Beta)", name, duration))
+
+	gomega.Consistently(func() error {
+		actual, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		elapsedTime := metav1.Now().Sub(start.Time)
+
+		// Only check if we haven't reached the expected timeout duration yet
+		if elapsedTime < duration {
+			for i, ec := range expect {
+				if i >= len(actual.Status.InstallProgressions) {
+					return fmt.Errorf("expected %d install progressions, actual: %d", i+1, len(actual.Status.InstallProgressions))
+				}
+				cond := meta.FindStatusCondition(actual.Status.InstallProgressions[i].Conditions, ec.Type)
+
+				// The expected timeout condition should NOT appear before the duration
+				if cond != nil &&
+					cond.Status == ec.Status &&
+					cond.Reason == ec.Reason &&
+					cond.Message == ec.Message {
+					return fmt.Errorf("unexpected condition matches before duration (elapsed: %v, expected: %v)", elapsedTime, duration)
+				}
+			}
+		}
+
+		return nil
+	}, duration+2*time.Second, eventuallyInterval).Should(gomega.BeNil())
+}
+
+func assertManagedClusterAddOnConditionsAlpha(name, namespace string, expect ...metav1.Condition) {
+	ginkgo.By(fmt.Sprintf("Check ManagedClusterAddOn %s/%s Conditions (Alpha)", namespace, name))
 
 	gomega.Eventually(func() error {
 		actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Get(context.Background(), name, metav1.GetOptions{})
@@ -384,20 +723,13 @@ func assertManagedClusterAddOnConfigReferences(name, namespace string, expect ..
 			return err
 		}
 
-		if len(actual.Status.ConfigReferences) != len(expect) {
-			return fmt.Errorf("expected %v config reference, actual: %v", len(expect), len(actual.Status.ConfigReferences))
-		}
-
-		for i, e := range expect {
-			actualConfigReference := actual.Status.ConfigReferences[i]
-
-			if !apiequality.Semantic.DeepEqual(actualConfigReference, e) {
-				return fmt.Errorf("expected mca config reference is %v %v, actual: %v %v",
-					e.DesiredConfig,
-					e.LastAppliedConfig,
-					actualConfigReference.DesiredConfig,
-					actualConfigReference.LastAppliedConfig,
-				)
+		for _, ec := range expect {
+			cond := meta.FindStatusCondition(actual.Status.Conditions, ec.Type)
+			if cond == nil ||
+				cond.Status != ec.Status ||
+				cond.Reason != ec.Reason ||
+				cond.Message != ec.Message {
+				return fmt.Errorf("expected addon progressing condition is %v, actual: %v", ec, cond)
 			}
 		}
 
@@ -405,11 +737,11 @@ func assertManagedClusterAddOnConfigReferences(name, namespace string, expect ..
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
-func assertManagedClusterAddOnConditions(name, namespace string, expect ...metav1.Condition) {
-	ginkgo.By(fmt.Sprintf("Check ManagedClusterAddOn %s/%s Conditions", namespace, name))
+func assertManagedClusterAddOnConditionsBeta(name, namespace string, expect ...metav1.Condition) {
+	ginkgo.By(fmt.Sprintf("Check ManagedClusterAddOn %s/%s Conditions (Beta)", namespace, name))
 
 	gomega.Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(namespace).Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
