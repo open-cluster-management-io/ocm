@@ -55,6 +55,10 @@ var (
 		// clusterprofile crd
 		"cluster-manager/hub/crds/0000_00_multicluster.x-k8s.io_clusterprofiles.crd.yaml",
 	}
+
+	hubSIGPlacementDecisionCRDResourceFiles = []string{
+		"cluster-manager/hub/crds/0000_00_multicluster.x-k8s.io_placementdecisions.crd.yaml",
+	}
 )
 
 type crdReconcile struct {
@@ -81,6 +85,10 @@ func (c *crdReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 	// and will not be cleaned when ClusterManager is deleting since the CRD might be used by other projects.
 	if config.ClusterProfileEnabled {
 		hubDeployCRDResources = append(hubDeployCRDResources, hubClusterProfileCRDResourceFiles...)
+	}
+
+	if config.SIGPlacementDecisionEnabled {
+		hubDeployCRDResources = append(hubDeployCRDResources, hubSIGPlacementDecisionCRDResourceFiles...)
 	}
 
 	if err := crdManager.Apply(ctx,

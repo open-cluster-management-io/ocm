@@ -13,14 +13,19 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
+	cpclientset "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned"
+	cpinformers "sigs.k8s.io/cluster-inventory-api/client/informers/externalversions"
 
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	ocmfeature "open-cluster-management.io/api/feature"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/scheduling"
+	"open-cluster-management.io/ocm/pkg/placement/controllers/sigplacementdecision"
 	"open-cluster-management.io/ocm/pkg/placement/debugger"
 )
 
@@ -48,7 +53,17 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 
 	clusterInformers := clusterinformers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
 
-	return RunControllerManagerWithInformers(ctx, controllerContext, kubeClient, clusterClient, clusterInformers)
+	var sigPDClient cpclientset.Interface
+	var cpInformers cpinformers.SharedInformerFactory
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.SIGPlacementDecision) {
+		sigPDClient, err = cpclientset.NewForConfig(controllerContext.KubeConfig)
+		if err != nil {
+			return err
+		}
+		cpInformers = cpinformers.NewSharedInformerFactory(sigPDClient, 10*time.Minute)
+	}
+
+	return RunControllerManagerWithInformers(ctx, controllerContext, kubeClient, clusterClient, clusterInformers, sigPDClient, cpInformers)
 }
 
 func RunControllerManagerWithInformers(
@@ -57,6 +72,8 @@ func RunControllerManagerWithInformers(
 	kubeClient kubernetes.Interface,
 	clusterClient clusterclient.Interface,
 	clusterInformers clusterinformers.SharedInformerFactory,
+	sigPDClient cpclientset.Interface,
+	cpInformers cpinformers.SharedInformerFactory,
 ) error {
 	recorder, err := events.NewEventRecorder(ctx, clusterscheme.Scheme, kubeClient.EventsV1(), "placement-controller")
 	if err != nil {
@@ -86,6 +103,17 @@ func RunControllerManagerWithInformers(
 		scheduler,
 		recorder, metrics,
 	)
+
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.SIGPlacementDecision) && sigPDClient != nil && cpInformers != nil {
+		sigPDController := sigplacementdecision.NewSIGPlacementDecisionController(
+			clusterInformers.Cluster().V1beta1().PlacementDecisions(),
+			sigPDClient,
+			cpInformers.Apis().V1alpha1().PlacementDecisions(),
+		)
+
+		go cpInformers.Start(ctx.Done())
+		go sigPDController.Run(ctx, 1)
+	}
 
 	go clusterInformers.Start(ctx.Done())
 
