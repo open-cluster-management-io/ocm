@@ -15,7 +15,9 @@ import (
 
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+	ocmfeature "open-cluster-management.io/api/feature"
 
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
@@ -29,6 +31,7 @@ var CRDPaths = []string{
 	"../../../vendor/open-cluster-management.io/api/cluster/v1beta2/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml",
 	"../../../vendor/open-cluster-management.io/api/cluster/v1beta1/0000_02_clusters.open-cluster-management.io_placements.crd.yaml",
 	"../../../vendor/open-cluster-management.io/api/cluster/v1beta1/0000_03_clusters.open-cluster-management.io_placementdecisions.crd.yaml",
+	"../../../manifests/cluster-manager/hub/crds/0000_00_multicluster.x-k8s.io_placementdecisions.crd.yaml",
 }
 
 func TestPlacementManager(t *testing.T) {
@@ -39,7 +42,9 @@ func TestPlacementManager(t *testing.T) {
 var _ = ginkgo.BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
 	ginkgo.By("bootstrapping test environment")
-	var err error
+
+	err := features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubPlacementFeatureGates)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	// start a kube-apiserver
 	testEnv = &envtest.Environment{

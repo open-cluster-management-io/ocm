@@ -225,8 +225,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	if clusterManager.Spec.PlacementConfiguration != nil {
 		placementFeatureGates = clusterManager.Spec.PlacementConfiguration.FeatureGates
 	}
-	_, placementFeatureMsgs = helpers.ConvertToFeatureGateFlags("Placement", placementFeatureGates, ocmfeature.DefaultHubPlacementFeatureGates)
+	config.PlacementFeatureGates, placementFeatureMsgs = helpers.ConvertToFeatureGateFlags("Placement", placementFeatureGates, ocmfeature.DefaultHubPlacementFeatureGates)
 	config.PlacementDebugServerEnabled = helpers.FeatureGateEnabled(placementFeatureGates, ocmfeature.DefaultHubPlacementFeatureGates, ocmfeature.PlacementDebugServer)
+	config.SIGPlacementDecisionEnabled = helpers.FeatureGateEnabled(placementFeatureGates, ocmfeature.DefaultHubPlacementFeatureGates, ocmfeature.SIGPlacementDecision)
 	if config.PlacementDebugServerEnabled {
 		config.PlacementServingCertSecret = helpers.PlacementDebugServingCertSecret
 	}
