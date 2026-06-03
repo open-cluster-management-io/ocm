@@ -5,7 +5,7 @@
 # Auto-detect container runtime (docker or podman)
 # Only check when actually needed (not during container builds)
 CONTAINER_CLI ?= $(shell command -v docker 2>/dev/null || command -v podman 2>/dev/null)
-ifdef CONTAINER_CLI
+ifneq ($(CONTAINER_CLI),)
 CONTAINER_RUNTIME := $(notdir $(CONTAINER_CLI))
 endif
 
@@ -35,7 +35,7 @@ endef
 
 # Build all images with correct architecture for kind
 images-kind:
-ifndef CONTAINER_CLI
+ifeq ($(CONTAINER_CLI),)
 	$(error Neither docker nor podman found. Please install one of them.)
 endif
 	@echo "Building images for kind cluster..."
@@ -63,7 +63,7 @@ images-and-load-kind: images-kind load-images-kind
 
 # Display detected settings
 show-kind-config:
-ifndef CONTAINER_CLI
+ifeq ($(CONTAINER_CLI),)
 	$(error Neither docker nor podman found. Please install one of them.)
 endif
 	@echo "Container runtime: $(CONTAINER_RUNTIME)"
