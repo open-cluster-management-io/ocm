@@ -64,6 +64,7 @@ apply-hub-cr:
 
 # E2E test target
 # Set SKIP_IMAGE_BUILD=true to skip image building and loading (useful when only test code changes)
+SKIP_IMAGE_BUILD?=false
 ifeq ($(SKIP_IMAGE_BUILD),true)
 test-e2e: deploy-hub deploy-spoke-operator-helm run-e2e
 else
