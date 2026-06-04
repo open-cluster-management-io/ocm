@@ -1,3 +1,20 @@
+# v1.54.2 (2026-06-03)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.54.1 (2026-06-02)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.54.0 (2026-06-01)
+
+* **Feature**: Adding new BDD representation of endpoint ruleset
+
+# v1.53.12 (2026-05-29)
+
+* **Dependency Update**: Update to smithy-go v1.26.0.
+* **Dependency Update**: Updated to the latest SDK module versions
+
 # v1.53.11 (2026-05-28)
 
 * **Dependency Update**: Updated to the latest SDK module versions
