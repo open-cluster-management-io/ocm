@@ -15,7 +15,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 
-	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
@@ -23,7 +23,7 @@ import (
 	"open-cluster-management.io/ocm/test/e2e/manifests"
 )
 
-var _ = ginkgo.Describe("Template addon with token-based authentication (v1beta1)", ginkgo.Ordered, ginkgo.Label("addon-manager", "addon-token-auth"), func() {
+var _ = ginkgo.Describe("Template addon with token-based authentication (v1alpha1)", ginkgo.Ordered, ginkgo.Label("addon-manager", "addon-token-auth"), func() {
 	addOnName := "hello-template"
 	addonInstallNamespace := "test-addon-template-token"
 	var signerSecretNamespace string
@@ -33,7 +33,7 @@ var _ = ginkgo.Describe("Template addon with token-based authentication (v1beta1
 	var agentNamespace string
 	s := runtime.NewScheme()
 	_ = scheme.AddToScheme(s)
-	_ = addonapiv1beta1.Install(s)
+	_ = addonapiv1alpha1.Install(s)
 	_ = clusterv1.Install(s)
 
 	templateResources := []string{
@@ -234,14 +234,14 @@ var _ = ginkgo.Describe("Template addon with token-based authentication (v1beta1
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By("Step 2: Create the template addon")
-		err = hub.CreateManagedClusterAddOnV1Beta1(universalClusterName, addOnName, addonInstallNamespace)
+		err = hub.CreateManagedClusterAddOnV1Alpha1(universalClusterName, addOnName, addonInstallNamespace)
 		if err != nil {
 			gomega.Expect(errors.IsAlreadyExists(err)).To(gomega.BeTrue())
 		}
 
 		ginkgo.By("Step 3: Wait for addon to become available with token authentication")
 		gomega.Eventually(func() error {
-			return hub.CheckManagedClusterAddOnStatusV1Beta1(universalClusterName, addOnName)
+			return hub.CheckManagedClusterAddOnStatusV1Alpha1(universalClusterName, addOnName)
 		}, "5m", "10s").Should(gomega.Succeed())
 
 		ginkgo.By("Step 4: Verify hub kubeconfig secret is created with token authentication")
@@ -304,12 +304,12 @@ var _ = ginkgo.Describe("Template addon with token-based authentication (v1beta1
 		}, "2m", "5s").ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Step 8: Cleanup - Delete the addon")
-		err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Delete(
+		err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Delete(
 			context.TODO(), addOnName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			_, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
+			_, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err == nil {
 				return fmt.Errorf("the managedClusterAddon %s should be deleted", addOnName)
@@ -338,7 +338,7 @@ var _ = ginkgo.Describe("Template addon with token-based authentication (v1beta1
 		gomega.Eventually(func() error {
 			csrs, err := hub.KubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(),
 				metav1.ListOptions{
-					LabelSelector: fmt.Sprintf("%s=%s,%s=%s", addonapiv1beta1.AddonLabelKey, addOnName,
+					LabelSelector: fmt.Sprintf("%s=%s,%s=%s", addonapiv1alpha1.AddonLabelKey, addOnName,
 						clusterv1.ClusterNameLabelKey, universalClusterName),
 				})
 			if err != nil {

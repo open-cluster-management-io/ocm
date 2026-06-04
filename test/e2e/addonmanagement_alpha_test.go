@@ -2,30 +2,22 @@ package e2e
 
 import (
 	"context"
-	"embed"
 	"encoding/json"
 	"fmt"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/valyala/fasttemplate"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 
-	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
@@ -33,35 +25,20 @@ import (
 	"open-cluster-management.io/ocm/test/e2e/manifests"
 )
 
-const (
-	nodePlacementDeploymentConfigName        = "node-placement-deploy-config"
-	imageOverrideDeploymentConfigName        = "image-override-deploy-config"
-	namespaceOverrideConfigName              = "namespace-override-config"
-	proxyDeploymentConfigName                = "proxy-deploy-config"
-	resourceRequirementsDeploymentConfigName = "resource-requirements-deploy-config"
-	originalImageValue                       = "quay.io/open-cluster-management/addon-examples:latest"
-	overrideImageValue                       = "quay.io/ocm/addon-examples:latest"
-	customSignerName                         = "example.com/signer-name"
-	// #nosec G101
-	customSignerSecretName = "addon-signer-secret"
-)
-
 var (
-	nodeSelector = map[string]string{"kubernetes.io/os": "linux"}
-	tolerations  = []corev1.Toleration{{Key: "foo", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoExecute}}
-	registries   = []addonapiv1beta1.ImageMirror{
+	registriesAlpha = []addonapiv1alpha1.ImageMirror{
 		{
 			Source: "quay.io/open-cluster-management/addon-examples",
 			Mirror: "quay.io/ocm/addon-examples",
 		},
 	}
-	proxyConfig = addonapiv1beta1.ProxyConfig{
+	proxyConfigAlpha = addonapiv1alpha1.ProxyConfig{
 		HTTPProxy:  "http://proxy.example.com",
 		HTTPSProxy: "http://proxy.example.com",
 		NoProxy:    "localhost",
 		CABundle:   []byte("test-ca-bundle"),
 	}
-	resourceRequirementsConfig = []addonapiv1beta1.ContainerResourceRequirements{
+	resourceRequirementsConfigAlpha = []addonapiv1alpha1.ContainerResourceRequirements{
 		{
 			ContainerID: "*:*:helloworld-agent",
 			Resources: corev1.ResourceRequirements{
@@ -73,14 +50,14 @@ var (
 	}
 )
 
-var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Label("addon-manager"), func() {
+var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.Label("addon-manager"), func() {
 	addOnName := "hello-template"
 	addonInstallNamespace := "test-addon-template"
 
 	s := runtime.NewScheme()
 	_ = scheme.AddToScheme(s)
 	_ = clusterv1.Install(s)
-	_ = addonapiv1beta1.Install(s)
+	_ = addonapiv1alpha1.Install(s)
 
 	templateResources := []string{
 		"addon/addon_template.yaml",
@@ -130,7 +107,7 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By(fmt.Sprintf("create the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
-		err = hub.CreateManagedClusterAddOnV1Beta1(universalClusterName, addOnName, addonInstallNamespace)
+		err = hub.CreateManagedClusterAddOnV1Alpha1(universalClusterName, addOnName, addonInstallNamespace)
 		if err != nil {
 			klog.Errorf("failed to create managed cluster addon %v on the managed cluster namespace %v: %v", addOnName, universalClusterName, err)
 			gomega.Expect(errors.IsAlreadyExists(err)).To(gomega.BeTrue())
@@ -138,20 +115,20 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 
 		ginkgo.By(fmt.Sprintf("wait the addon %v/%v available condition to be true", universalClusterName, addOnName))
 		gomega.Eventually(func() error {
-			return hub.CheckManagedClusterAddOnStatusV1Beta1(universalClusterName, addOnName)
+			return hub.CheckManagedClusterAddOnStatusV1Alpha1(universalClusterName, addOnName)
 		}).Should(gomega.Succeed())
 	})
 
 	ginkgo.AfterEach(func() {
 		ginkgo.By(fmt.Sprintf("delete the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
-		err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Delete(
+		err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Delete(
 			context.TODO(), addOnName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			ginkgo.Fail(fmt.Sprintf("failed to delete managed cluster addon %v on cluster %v: %v", addOnName, universalClusterName, err))
 		}
 
 		gomega.Eventually(func() error {
-			_, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
+			_, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err == nil {
 				return fmt.Errorf("the managedClusterAddon %s should be deleted", addOnName)
@@ -205,7 +182,7 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 		ginkgo.By(fmt.Sprintf("delete CSRs for addon %v on cluster %v", addOnName, universalClusterName))
 		gomega.Eventually(func() error {
 			listOpts := metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s,%s=%s", addonapiv1beta1.AddonLabelKey, addOnName,
+				LabelSelector: fmt.Sprintf("%s=%s,%s=%s", addonapiv1alpha1.AddonLabelKey, addOnName,
 					clusterv1.ClusterNameLabelKey, universalClusterName),
 			}
 
@@ -306,7 +283,7 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 		}
 
 		ginkgo.By(fmt.Sprintf("delete the addon %v on the managed cluster namespace %v", addOnName, universalClusterName))
-		err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Delete(
+		err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Delete(
 			context.TODO(), addOnName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -325,7 +302,7 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 		}).ShouldNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			_, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
+			_, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
@@ -355,9 +332,9 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 	ginkgo.It("Template type addon should be configured by addon deployment config for image override"+
 		"even there are cluster annotation config", func() {
 		ginkgo.By("Prepare cluster annotation for addon image override config")
-		overrideRegistries := addonapiv1beta1.AddOnDeploymentConfigSpec{
+		overrideRegistries := addonapiv1alpha1.AddOnDeploymentConfigSpec{
 			// should be different from the registries in the addonDeploymentConfig
-			Registries: []addonapiv1beta1.ImageMirror{
+			Registries: []addonapiv1alpha1.ImageMirror{
 				{
 					Source: "quay.io/open-cluster-management/addon-examples",
 					Mirror: "quay.io/ocm/addon-examples-test",
@@ -389,30 +366,30 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 
 		ginkgo.By("Prepare a AddOnDeploymentConfig for addon image override config")
 		gomega.Eventually(func() error {
-			return prepareImageOverrideAddOnDeploymentConfig(universalClusterName, addonInstallNamespace)
+			return prepareImageOverrideAddOnDeploymentConfigAlpha(universalClusterName, addonInstallNamespace)
 		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
+			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			newAddon := addon.DeepCopy()
-			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
+			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
 				{
-					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1beta1.ConfigReferent{
+					ConfigReferent: addonapiv1alpha1.ConfigReferent{
 						Namespace: universalClusterName,
 						Name:      imageOverrideDeploymentConfigName,
 					},
 				},
 			}
-			_, err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Update(
+			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
 				context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
@@ -459,14 +436,14 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 		// but it is needed by the pre-delete job
 		ginkgo.By("Restore the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
+			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			newAddon := addon.DeepCopy()
-			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{}
-			_, err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Update(
+			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{}
+			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
 				context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
@@ -498,30 +475,30 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 	ginkgo.It("Template type addon should be configured by addon deployment config for node placement", func() {
 		ginkgo.By("Prepare a AddOnDeploymentConfig for addon image override config")
 		gomega.Eventually(func() error {
-			return prepareNodePlacementAddOnDeploymentConfig(universalClusterName, addonInstallNamespace)
+			return prepareNodePlacementAddOnDeploymentConfigAlpha(universalClusterName, addonInstallNamespace)
 		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
+			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			newAddon := addon.DeepCopy()
-			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
+			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
 				{
-					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1beta1.ConfigReferent{
+					ConfigReferent: addonapiv1alpha1.ConfigReferent{
 						Namespace: universalClusterName,
 						Name:      nodePlacementDeploymentConfigName,
 					},
 				},
 			}
-			_, err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Update(
+			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
 				context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
@@ -560,30 +537,30 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 		_, err := spoke.KubeClient.CoreV1().Namespaces().Create(context.TODO(), overrideNamespace, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		gomega.Eventually(func() error {
-			return prepareInstallNamespace(universalClusterName, overrideNamespace.Name)
+			return prepareInstallNamespaceAlpha(universalClusterName, overrideNamespace.Name)
 		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
+			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			newAddon := addon.DeepCopy()
-			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
+			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
 				{
-					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1beta1.ConfigReferent{
+					ConfigReferent: addonapiv1alpha1.ConfigReferent{
 						Namespace: universalClusterName,
 						Name:      namespaceOverrideConfigName,
 					},
 				},
 			}
-			_, err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Update(
+			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
 				context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
@@ -601,8 +578,8 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 
 	ginkgo.It("Template type addon's image should be overrode by cluster annotation", func() {
 		ginkgo.By("Prepare cluster annotation for addon image override config")
-		overrideRegistries := addonapiv1beta1.AddOnDeploymentConfigSpec{
-			Registries: registries,
+		overrideRegistries := addonapiv1alpha1.AddOnDeploymentConfigSpec{
+			Registries: registriesAlpha,
 		}
 		registriesJson, err := json.Marshal(overrideRegistries)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -688,30 +665,30 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 	ginkgo.It("Template type addon should be configured by addon deployment config for proxy", func() {
 		ginkgo.By("Prepare a AddOnDeploymentConfig for addon proxy config")
 		gomega.Eventually(func() error {
-			return prepareProxyAddOnDeploymentConfig(universalClusterName, addonInstallNamespace)
+			return prepareProxyAddOnDeploymentConfigAlpha(universalClusterName, addonInstallNamespace)
 		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
+			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			newAddon := addon.DeepCopy()
-			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
+			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
 				{
-					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1beta1.ConfigReferent{
+					ConfigReferent: addonapiv1alpha1.ConfigReferent{
 						Namespace: universalClusterName,
 						Name:      proxyDeploymentConfigName,
 					},
 				},
 			}
-			_, err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Update(
+			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
 				context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
@@ -731,19 +708,19 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 				found := 0
 				for _, env := range container.Env {
 					if env.Name == "HTTP_PROXY" || env.Name == "http_proxy" {
-						if env.Value != proxyConfig.HTTPProxy {
+						if env.Value != proxyConfigAlpha.HTTPProxy {
 							return fmt.Errorf("unexpected HTTP_PROXY %s", env.Value)
 						}
 						found++
 					}
 					if env.Name == "HTTPS_PROXY" || env.Name == "https_proxy" {
-						if env.Value != proxyConfig.HTTPSProxy {
+						if env.Value != proxyConfigAlpha.HTTPSProxy {
 							return fmt.Errorf("unexpected HTTPS_PROXY %s", env.Value)
 						}
 						found++
 					}
 					if env.Name == "NO_PROXY" || env.Name == "no_proxy" {
-						if env.Value != proxyConfig.NoProxy {
+						if env.Value != proxyConfigAlpha.NoProxy {
 							return fmt.Errorf("unexpected NO_PROXY %s", env.Value)
 						}
 						found++
@@ -767,36 +744,36 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 			fmt.Sprintf("%s-proxy-ca", addOnName), metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		gomega.Expect(cm.Data).To(gomega.HaveKey("ca-bundle.crt"))
-		gomega.Expect(cm.Data["ca-bundle.crt"]).To(gomega.Equal(string(proxyConfig.CABundle)))
+		gomega.Expect(cm.Data["ca-bundle.crt"]).To(gomega.Equal(string(proxyConfigAlpha.CABundle)))
 	})
 
 	ginkgo.It("Template type addon should be configured by addon deployment config for resource requirement", func() {
 		ginkgo.By("Prepare a AddOnDeploymentConfig for addon resource requirement config")
 		gomega.Eventually(func() error {
-			return prepareResourceRequirementsAddOnDeploymentConfig(universalClusterName, addonInstallNamespace)
+			return prepareResourceRequirementsAddOnDeploymentConfigAlpha(universalClusterName, addonInstallNamespace)
 		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
+			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.Background(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			newAddon := addon.DeepCopy()
-			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
+			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
 				{
-					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1beta1.ConfigReferent{
+					ConfigReferent: addonapiv1alpha1.ConfigReferent{
 						Namespace: universalClusterName,
 						Name:      resourceRequirementsDeploymentConfigName,
 					},
 				},
 			}
-			_, err = hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Update(
+			_, err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Update(
 				context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
@@ -814,7 +791,7 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 
 			for _, container := range agentDeploy.Spec.Template.Spec.Containers {
 				if container.Name == "helloworld-agent" {
-					if !equality.Semantic.DeepEqual(container.Resources, resourceRequirementsConfig[0].Resources) {
+					if !equality.Semantic.DeepEqual(container.Resources, resourceRequirementsConfigAlpha[0].Resources) {
 						return fmt.Errorf("unexpected resource requirements for deployment: %v", container.Resources)
 					}
 				}
@@ -827,7 +804,7 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 			}
 			for _, container := range agentDaemonset.Spec.Template.Spec.Containers {
 				if container.Name == "helloworld-agent" {
-					if !equality.Semantic.DeepEqual(container.Resources, resourceRequirementsConfig[0].Resources) {
+					if !equality.Semantic.DeepEqual(container.Resources, resourceRequirementsConfigAlpha[0].Resources) {
 						return fmt.Errorf("unexpected resource requirements for daemonset: %v", container.Resources)
 					}
 				}
@@ -867,7 +844,7 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 		}).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Delete the ClusterManagementAddon to trigger cascading deletion")
-		err = hub.AddonClient.AddonV1beta1().ClusterManagementAddOns().Delete(
+		err = hub.AddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(
 			context.TODO(), addOnName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -886,7 +863,7 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 
 		ginkgo.By("ManagedClusterAddon should eventually be deleted after pre-delete job completes")
 		gomega.Eventually(func() error {
-			_, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(universalClusterName).Get(
+			_, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
@@ -912,7 +889,7 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 
 		ginkgo.By("Verify ClusterManagementAddon is deleted")
 		gomega.Eventually(func() error {
-			_, err := hub.AddonClient.AddonV1beta1().ClusterManagementAddOns().Get(
+			_, err := hub.AddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
@@ -925,18 +902,18 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 	})
 })
 
-func prepareInstallNamespace(namespace, installNamespace string) error {
-	_, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Get(
+func prepareInstallNamespaceAlpha(namespace, installNamespace string) error {
+	_, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
 		context.Background(), namespaceOverrideConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		if _, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Create(
+		if _, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Create(
 			context.Background(),
-			&addonapiv1beta1.AddOnDeploymentConfig{
+			&addonapiv1alpha1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      namespaceOverrideConfigName,
 					Namespace: namespace,
 				},
-				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
 					AgentInstallNamespace: installNamespace,
 				},
 			},
@@ -951,19 +928,19 @@ func prepareInstallNamespace(namespace, installNamespace string) error {
 	return err
 }
 
-func prepareImageOverrideAddOnDeploymentConfig(namespace, installNamespace string) error {
-	_, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Get(
+func prepareImageOverrideAddOnDeploymentConfigAlpha(namespace, installNamespace string) error {
+	_, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
 		context.Background(), imageOverrideDeploymentConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		if _, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Create(
+		if _, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Create(
 			context.Background(),
-			&addonapiv1beta1.AddOnDeploymentConfig{
+			&addonapiv1alpha1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      imageOverrideDeploymentConfigName,
 					Namespace: namespace,
 				},
-				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					Registries:            registries,
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					Registries:            registriesAlpha,
 					AgentInstallNamespace: installNamespace,
 				},
 			},
@@ -978,19 +955,19 @@ func prepareImageOverrideAddOnDeploymentConfig(namespace, installNamespace strin
 	return err
 }
 
-func prepareNodePlacementAddOnDeploymentConfig(namespace, installNamespace string) error {
-	_, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Get(
+func prepareNodePlacementAddOnDeploymentConfigAlpha(namespace, installNamespace string) error {
+	_, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
 		context.Background(), nodePlacementDeploymentConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		if _, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Create(
+		if _, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Create(
 			context.Background(),
-			&addonapiv1beta1.AddOnDeploymentConfig{
+			&addonapiv1alpha1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      nodePlacementDeploymentConfigName,
 					Namespace: namespace,
 				},
-				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					NodePlacement: &addonapiv1beta1.NodePlacement{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					NodePlacement: &addonapiv1alpha1.NodePlacement{
 						NodeSelector: nodeSelector,
 						Tolerations:  tolerations,
 					},
@@ -1008,24 +985,24 @@ func prepareNodePlacementAddOnDeploymentConfig(namespace, installNamespace strin
 	return err
 }
 
-func prepareProxyAddOnDeploymentConfig(namespace, installNamespace string) error {
-	_, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Get(
+func prepareProxyAddOnDeploymentConfigAlpha(namespace, installNamespace string) error {
+	_, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
 		context.Background(), proxyDeploymentConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		if _, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Create(
+		if _, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Create(
 			context.Background(),
-			&addonapiv1beta1.AddOnDeploymentConfig{
+			&addonapiv1alpha1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      proxyDeploymentConfigName,
 					Namespace: namespace,
 				},
-				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					NodePlacement: &addonapiv1beta1.NodePlacement{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					NodePlacement: &addonapiv1alpha1.NodePlacement{
 						NodeSelector: nodeSelector,
 						Tolerations:  tolerations,
 					},
 					AgentInstallNamespace: installNamespace,
-					ProxyConfig:           proxyConfig,
+					ProxyConfig:           proxyConfigAlpha,
 				},
 			},
 			metav1.CreateOptions{},
@@ -1039,21 +1016,21 @@ func prepareProxyAddOnDeploymentConfig(namespace, installNamespace string) error
 	return err
 }
 
-func prepareResourceRequirementsAddOnDeploymentConfig(namespace, installNamespace string) error {
-	_, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Get(
+func prepareResourceRequirementsAddOnDeploymentConfigAlpha(namespace, installNamespace string) error {
+	_, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
 		context.Background(), resourceRequirementsDeploymentConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		if _, err := hub.AddonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Create(
+		if _, err := hub.AddonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Create(
 			context.Background(),
-			&addonapiv1beta1.AddOnDeploymentConfig{
+			&addonapiv1alpha1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceRequirementsDeploymentConfigName,
 					Namespace: namespace,
 				},
-				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
 					AgentInstallNamespace: installNamespace,
-					ProxyConfig:           proxyConfig,
-					ResourceRequirements:  resourceRequirementsConfig,
+					ProxyConfig:           proxyConfigAlpha,
+					ResourceRequirements:  resourceRequirementsConfigAlpha,
 				},
 			},
 			metav1.CreateOptions{},
@@ -1065,125 +1042,4 @@ func prepareResourceRequirementsAddOnDeploymentConfig(namespace, installNamespac
 	}
 
 	return err
-}
-
-func copySignerSecret(ctx context.Context, kubeClient kubernetes.Interface, srcNs, srcName, dstNs, dstName string) error {
-	src, err := kubeClient.CoreV1().Secrets(srcNs).Get(context.Background(), srcName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	dst := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      dstName,
-			Namespace: dstNs,
-		},
-		Data:       src.Data,
-		StringData: src.StringData,
-		Type:       src.Type,
-	}
-
-	_, err = kubeClient.CoreV1().Secrets(dstNs).Create(ctx, dst, metav1.CreateOptions{})
-	if err != nil && !errors.IsAlreadyExists(err) {
-		return err
-	}
-	return nil
-}
-
-func createResourcesFromYamlFiles(
-	ctx context.Context,
-	dynamicClient dynamic.Interface,
-	restMapper meta.RESTMapper,
-	scheme *runtime.Scheme,
-	manifests func(name string) ([]byte, error),
-	resourceFiles []string) error {
-
-	var appliedErrs []error
-
-	decoder := serializer.NewCodecFactory(scheme).UniversalDeserializer()
-	for _, fileName := range resourceFiles {
-		objData, err := manifests(fileName)
-		if err != nil {
-			return err
-		}
-		required := unstructured.Unstructured{}
-		_, gvk, err := decoder.Decode(objData, nil, &required)
-		if err != nil {
-			return err
-		}
-
-		mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-		if err != nil {
-			return err
-		}
-
-		_, err = dynamicClient.Resource(mapping.Resource).Namespace(required.GetNamespace()).Create(
-			ctx, &required, metav1.CreateOptions{})
-		if errors.IsAlreadyExists(err) {
-			continue
-		}
-		if err != nil {
-			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", fileName, mapping.Resource, err))
-		}
-	}
-
-	return utilerrors.NewAggregate(appliedErrs)
-}
-
-func deleteResourcesFromYamlFiles(
-	ctx context.Context,
-	dynamicClient dynamic.Interface,
-	restMapper meta.RESTMapper,
-	scheme *runtime.Scheme,
-	manifests func(name string) ([]byte, error),
-	resourceFiles []string) error {
-
-	var appliedErrs []error
-
-	decoder := serializer.NewCodecFactory(scheme).UniversalDeserializer()
-	for _, fileName := range resourceFiles {
-		objData, err := manifests(fileName)
-		if err != nil {
-			return err
-		}
-		required := unstructured.Unstructured{}
-		_, gvk, err := decoder.Decode(objData, nil, &required)
-		if err != nil {
-			return err
-		}
-
-		mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-		if err != nil {
-			return err
-		}
-
-		err = dynamicClient.Resource(mapping.Resource).Namespace(required.GetNamespace()).Delete(
-			ctx, required.GetName(), metav1.DeleteOptions{})
-		if errors.IsNotFound(err) {
-			continue
-		}
-		if err != nil {
-			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", fileName, mapping.Resource, err))
-		}
-	}
-
-	return utilerrors.NewAggregate(appliedErrs)
-}
-
-// defaultAddonTemplateReaderManifestsFunc returns a function that reads the addon template from the embed.FS,
-// and replaces the placeholder in format of "<< placeholder >>" with the value in configValues.
-func defaultAddonTemplateReaderManifestsFunc(
-	fs embed.FS,
-	configValues map[string]interface{},
-) func(string) ([]byte, error) {
-
-	return func(fileName string) ([]byte, error) {
-		template, err := fs.ReadFile(fileName)
-		if err != nil {
-			return nil, err
-		}
-
-		t := fasttemplate.New(string(template), "<< ", " >>")
-		objData := t.ExecuteString(configValues)
-		return []byte(objData), nil
-	}
 }
