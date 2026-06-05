@@ -1,6 +1,7 @@
 package spoke
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -34,13 +35,13 @@ type WorkloadAgentOptions struct {
 // NewWorkloadAgentOptions returns the flags with default value set
 func NewWorkloadAgentOptions() *WorkloadAgentOptions {
 	return &WorkloadAgentOptions{
-		MaxJSONRawLength:                       1024,
-		StatusSyncInterval:                     10 * time.Second,
-		AppliedManifestWorkEvictionGracePeriod: 60 * time.Minute,
-		WorkloadSourceDriver:                   "kube",
-		WorkloadSourceConfig:                   "/spoke/hub-kubeconfig/kubeconfig",
-		DefaultUserAgent:                       defaultUserAgent,
-		ObjectReaderOption:                     objectreader.NewOptions(),
+		MaxJSONRawLength:                             1024,
+		StatusSyncInterval:                           10 * time.Second,
+		AppliedManifestWorkEvictionGracePeriod:       60 * time.Minute,
+		WorkloadSourceDriver:                         "kube",
+		WorkloadSourceConfig:                         "/spoke/hub-kubeconfig/kubeconfig",
+		DefaultUserAgent:                             defaultUserAgent,
+		ObjectReaderOption:                           objectreader.NewOptions(),
 		AppliedManifestWorkFinalizeControllerWorkers: 10,
 		ManifestWorkFinalizeControllerWorkers:        10,
 		AvailableStatusControllerWorkers:             10,
@@ -75,4 +76,21 @@ func (o *WorkloadAgentOptions) AddFlags(fs *pflag.FlagSet) {
 		o.ManifestWorkAgentWorkers, "The number of workers for the manifestwork agent")
 
 	o.ObjectReaderOption.AddFlags(fs)
+}
+
+// Validate checks if the options are valid
+func (o *WorkloadAgentOptions) Validate() error {
+	if o.AppliedManifestWorkFinalizeControllerWorkers < 1 {
+		return fmt.Errorf("appliedmanifestwork-finalize-controller-workers must be >= 1, got %d", o.AppliedManifestWorkFinalizeControllerWorkers)
+	}
+	if o.ManifestWorkFinalizeControllerWorkers < 1 {
+		return fmt.Errorf("manifestwork-finalize-controller-workers must be >= 1, got %d", o.ManifestWorkFinalizeControllerWorkers)
+	}
+	if o.AvailableStatusControllerWorkers < 1 {
+		return fmt.Errorf("available-status-controller-workers must be >= 1, got %d", o.AvailableStatusControllerWorkers)
+	}
+	if o.ManifestWorkAgentWorkers < 1 {
+		return fmt.Errorf("manifestwork-agent-workers must be >= 1, got %d", o.ManifestWorkAgentWorkers)
+	}
+	return nil
 }

@@ -35,8 +35,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/statuscontroller"
 )
 
-
-
 type WorkAgentConfig struct {
 	agentOptions *options.AgentOptions
 	workOptions  *WorkloadAgentOptions
@@ -52,6 +50,10 @@ func NewWorkAgentConfig(commonOpts *options.AgentOptions, opts *WorkloadAgentOpt
 
 // RunWorkloadAgent starts the controllers on agent to process work from hub.
 func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+	if err := o.workOptions.Validate(); err != nil {
+		return err
+	}
+
 	// setting up contextual logger
 	logger := klog.NewKlogr()
 	podName := os.Getenv("POD_NAME")
