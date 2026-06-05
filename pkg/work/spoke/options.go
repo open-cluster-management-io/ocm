@@ -23,6 +23,11 @@ type WorkloadAgentOptions struct {
 	CloudEventsClientCodecs                []string
 	DefaultUserAgent                       string
 
+	AppliedManifestWorkFinalizeControllerWorkers int
+	ManifestWorkFinalizeControllerWorkers        int
+	AvailableStatusControllerWorkers             int
+	ManifestWorkAgentWorkers                     int
+
 	ObjectReaderOption *objectreader.Options
 }
 
@@ -36,6 +41,10 @@ func NewWorkloadAgentOptions() *WorkloadAgentOptions {
 		WorkloadSourceConfig:                   "/spoke/hub-kubeconfig/kubeconfig",
 		DefaultUserAgent:                       defaultUserAgent,
 		ObjectReaderOption:                     objectreader.NewOptions(),
+		AppliedManifestWorkFinalizeControllerWorkers: 10,
+		ManifestWorkFinalizeControllerWorkers:        10,
+		AvailableStatusControllerWorkers:             10,
+		ManifestWorkAgentWorkers:                     10,
 	}
 }
 
@@ -55,6 +64,15 @@ func (o *WorkloadAgentOptions) AddFlags(fs *pflag.FlagSet) {
 		o.CloudEventsClientID, "The ID of the cloudevents client when workload source source is based on cloudevents")
 	fs.StringSliceVar(&o.CloudEventsClientCodecs, "cloudevents-client-codecs", o.CloudEventsClientCodecs,
 		"The codecs for cloudevents client when workload source source is based on cloudevents, the valid codecs: manifest or manifestbundle")
+
+	fs.IntVar(&o.AppliedManifestWorkFinalizeControllerWorkers, "appliedmanifestwork-finalize-controller-workers",
+		o.AppliedManifestWorkFinalizeControllerWorkers, "The number of workers for the appliedmanifestwork finalize controller")
+	fs.IntVar(&o.ManifestWorkFinalizeControllerWorkers, "manifestwork-finalize-controller-workers",
+		o.ManifestWorkFinalizeControllerWorkers, "The number of workers for the manifestwork finalize controller")
+	fs.IntVar(&o.AvailableStatusControllerWorkers, "available-status-controller-workers",
+		o.AvailableStatusControllerWorkers, "The number of workers for the available status controller")
+	fs.IntVar(&o.ManifestWorkAgentWorkers, "manifestwork-agent-workers",
+		o.ManifestWorkAgentWorkers, "The number of workers for the manifestwork agent")
 
 	o.ObjectReaderOption.AddFlags(fs)
 }

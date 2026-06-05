@@ -35,18 +35,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/statuscontroller"
 )
 
-const (
-	// If a controller queue size is too large (>500), the processing speed of the controller will drop significantly
-	// with one worker, increasing the work numbers can improve the processing speed.
-	// We compared the two situations where the worker is set to 1 and 10, when the worker is 10, the resource
-	// utilization of the kubeapi-server and work agent do not increase significantly.
-	//
-	// TODO expose a flag to set the worker for each controller
-	appliedManifestWorkFinalizeControllerWorkers = 10
-	manifestWorkFinalizeControllerWorkers        = 10
-	availableStatusControllerWorkers             = 10
-	manifestWorkAgentWorkers                     = 10
-)
+
 
 type WorkAgentConfig struct {
 	agentOptions *options.AgentOptions
@@ -199,11 +188,11 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 	go hubWorkInformer.Informer().Run(ctx.Done())
 
 	go addFinalizerController.Run(ctx, 1)
-	go appliedManifestWorkFinalizeController.Run(ctx, appliedManifestWorkFinalizeControllerWorkers)
+	go appliedManifestWorkFinalizeController.Run(ctx, o.workOptions.AppliedManifestWorkFinalizeControllerWorkers)
 	go unmanagedAppliedManifestWorkController.Run(ctx, 1)
-	go manifestWorkController.Run(ctx, manifestWorkAgentWorkers)
-	go manifestWorkFinalizeController.Run(ctx, manifestWorkFinalizeControllerWorkers)
-	go availableStatusController.Run(ctx, availableStatusControllerWorkers)
+	go manifestWorkController.Run(ctx, o.workOptions.ManifestWorkAgentWorkers)
+	go manifestWorkFinalizeController.Run(ctx, o.workOptions.ManifestWorkFinalizeControllerWorkers)
+	go availableStatusController.Run(ctx, o.workOptions.AvailableStatusControllerWorkers)
 
 	<-ctx.Done()
 
