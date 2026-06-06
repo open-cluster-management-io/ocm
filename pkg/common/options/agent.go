@@ -1,6 +1,7 @@
 package options
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -8,8 +9,12 @@ import (
 
 	"github.com/spf13/pflag"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -128,18 +133,34 @@ func (o *AgentOptions) getOrGenerateClusterAgentID() (string, string) {
 	clusterName := o.SpokeClusterName
 	// if cluster name is not specified with input argument, try to load it from file
 	if clusterName == "" {
-		// TODO, read cluster name from openshift struct if the spoke agent is running in an openshift cluster
+		// read cluster name from openshift struct if the spoke agent is running in an openshift cluster
+		config, err := clientcmd.BuildConfigFromFlags("", o.SpokeKubeconfigFile)
+		if err == nil {
+			if dynamicClient, err := dynamic.NewForConfig(config); err == nil {
+				if infra, err := dynamicClient.Resource(schema.GroupVersionResource{
+					Group:    "config.openshift.io",
+					Version:  "v1",
+					Resource: "infrastructures",
+				}).Get(context.TODO(), "cluster", metav1.GetOptions{}); err == nil {
+					if infraName, found, err := unstructured.NestedString(infra.Object, "status", "infrastructureName"); found && err == nil && infraName != "" {
+						clusterName = infraName
+					}
+				}
+			}
+		}
 
-		// and then load the cluster name from the mounted secret
-		clusterNameFilePath := path.Join(o.HubKubeconfigDir, register.ClusterNameFile)
-		clusterNameBytes, err := os.ReadFile(path.Clean(clusterNameFilePath))
-		switch {
-		case err == nil:
-			// use cluster name load from the mounted secret
-			clusterName = string(clusterNameBytes)
-		default:
-			// generate random cluster name
-			clusterName = generateClusterName()
+		if clusterName == "" {
+			// and then load the cluster name from the mounted secret
+			clusterNameFilePath := path.Join(o.HubKubeconfigDir, register.ClusterNameFile)
+			clusterNameBytes, err := os.ReadFile(path.Clean(clusterNameFilePath))
+			switch {
+			case err == nil:
+				// use cluster name load from the mounted secret
+				clusterName = string(clusterNameBytes)
+			default:
+				// generate random cluster name
+				clusterName = generateClusterName()
+			}
 		}
 	}
 
