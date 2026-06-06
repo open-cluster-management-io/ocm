@@ -117,7 +117,7 @@ func (o *AgentOptions) Complete() error {
 //   1. Use cluster name from input arguments if 'spoke-cluster-name' is specified;
 //   2. Parse cluster name from the common name of the certification subject if the certification exists;
 //   3. Fallback to cluster name in the mounted secret if it exists;
-//   4. TODO: Read cluster name from openshift struct if the agent is running in an openshift cluster;
+//   4. ClusterName is populated from OpenShift cluster info during AgentOptions initialization;
 //   5. Generate a random cluster name then;
 
 // Rules for picking up agent id:
@@ -134,19 +134,8 @@ func (o *AgentOptions) getOrGenerateClusterAgentID() (string, string) {
 	// if cluster name is not specified with input argument, try to load it from file
 	if clusterName == "" {
 		// read cluster name from openshift struct if the spoke agent is running in an openshift cluster
-		config, err := clientcmd.BuildConfigFromFlags("", o.SpokeKubeconfigFile)
-		if err == nil {
-			if dynamicClient, err := dynamic.NewForConfig(config); err == nil {
-				if infra, err := dynamicClient.Resource(schema.GroupVersionResource{
-					Group:    "config.openshift.io",
-					Version:  "v1",
-					Resource: "infrastructures",
-				}).Get(context.TODO(), "cluster", metav1.GetOptions{}); err == nil {
-					if infraName, found, err := unstructured.NestedString(infra.Object, "status", "infrastructureName"); found && err == nil && infraName != "" {
-						clusterName = infraName
-					}
-				}
-			}
+		if name := o.tryReadOpenShiftClusterName(); name != "" {
+			clusterName = name
 		}
 
 		if clusterName == "" {
@@ -190,4 +179,33 @@ func generateClusterName() string {
 // generateAgentName generates a random name for spoke cluster agent
 func generateAgentName() string {
 	return utilrand.String(spokeAgentNameLength)
+}
+
+func (o *AgentOptions) tryReadOpenShiftClusterName() string {
+	config, err := clientcmd.BuildConfigFromFlags("", o.SpokeKubeconfigFile)
+	if err != nil {
+		return ""
+	}
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return ""
+	}
+	return detectOpenShiftClusterName(dynamicClient)
+}
+
+func detectOpenShiftClusterName(client dynamic.Interface) string {
+	infra, err := client.Resource(schema.GroupVersionResource{
+		Group:    "config.openshift.io",
+		Version:  "v1",
+		Resource: "infrastructures",
+	}).Get(context.TODO(), "cluster", metav1.GetOptions{})
+	if err != nil {
+		return ""
+	}
+
+	infraName, found, err := unstructured.NestedString(infra.Object, "status", "infrastructureName")
+	if err != nil || !found {
+		return ""
+	}
+	return infraName
 }
