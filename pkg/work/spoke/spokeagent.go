@@ -190,11 +190,11 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 	go hubWorkInformer.Informer().Run(ctx.Done())
 
 	go addFinalizerController.Run(ctx, 1)
-	go appliedManifestWorkFinalizeController.Run(ctx, o.workOptions.AppliedManifestWorkFinalizeControllerWorkers)
+	go appliedManifestWorkFinalizeController.Run(ctx, o.workOptions.WorkloadAgentWorkers)
 	go unmanagedAppliedManifestWorkController.Run(ctx, 1)
-	go manifestWorkController.Run(ctx, o.workOptions.ManifestWorkAgentWorkers)
-	go manifestWorkFinalizeController.Run(ctx, o.workOptions.ManifestWorkFinalizeControllerWorkers)
-	go availableStatusController.Run(ctx, o.workOptions.AvailableStatusControllerWorkers)
+	go manifestWorkController.Run(ctx, o.workOptions.WorkloadAgentWorkers)
+	go manifestWorkFinalizeController.Run(ctx, o.workOptions.WorkloadAgentWorkers)
+	go availableStatusController.Run(ctx, o.workOptions.WorkloadAgentWorkers)
 
 	<-ctx.Done()
 

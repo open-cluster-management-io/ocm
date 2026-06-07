@@ -24,10 +24,7 @@ type WorkloadAgentOptions struct {
 	CloudEventsClientCodecs                []string
 	DefaultUserAgent                       string
 
-	AppliedManifestWorkFinalizeControllerWorkers int
-	ManifestWorkFinalizeControllerWorkers        int
-	AvailableStatusControllerWorkers             int
-	ManifestWorkAgentWorkers                     int
+	WorkloadAgentWorkers int
 
 	ObjectReaderOption *objectreader.Options
 }
@@ -35,17 +32,14 @@ type WorkloadAgentOptions struct {
 // NewWorkloadAgentOptions returns the flags with default value set
 func NewWorkloadAgentOptions() *WorkloadAgentOptions {
 	return &WorkloadAgentOptions{
-		MaxJSONRawLength:                             1024,
-		StatusSyncInterval:                           10 * time.Second,
-		AppliedManifestWorkEvictionGracePeriod:       60 * time.Minute,
-		WorkloadSourceDriver:                         "kube",
-		WorkloadSourceConfig:                         "/spoke/hub-kubeconfig/kubeconfig",
-		DefaultUserAgent:                             defaultUserAgent,
-		ObjectReaderOption:                           objectreader.NewOptions(),
-		AppliedManifestWorkFinalizeControllerWorkers: 10,
-		ManifestWorkFinalizeControllerWorkers:        10,
-		AvailableStatusControllerWorkers:             10,
-		ManifestWorkAgentWorkers:                     10,
+		MaxJSONRawLength:                       1024,
+		StatusSyncInterval:                     10 * time.Second,
+		AppliedManifestWorkEvictionGracePeriod: 60 * time.Minute,
+		WorkloadSourceDriver:                   "kube",
+		WorkloadSourceConfig:                   "/spoke/hub-kubeconfig/kubeconfig",
+		DefaultUserAgent:                       defaultUserAgent,
+		ObjectReaderOption:                     objectreader.NewOptions(),
+		WorkloadAgentWorkers:                   10,
 	}
 }
 
@@ -66,31 +60,16 @@ func (o *WorkloadAgentOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&o.CloudEventsClientCodecs, "cloudevents-client-codecs", o.CloudEventsClientCodecs,
 		"The codecs for cloudevents client when workload source source is based on cloudevents, the valid codecs: manifest or manifestbundle")
 
-	fs.IntVar(&o.AppliedManifestWorkFinalizeControllerWorkers, "appliedmanifestwork-finalize-controller-workers",
-		o.AppliedManifestWorkFinalizeControllerWorkers, "The number of workers for the appliedmanifestwork finalize controller")
-	fs.IntVar(&o.ManifestWorkFinalizeControllerWorkers, "manifestwork-finalize-controller-workers",
-		o.ManifestWorkFinalizeControllerWorkers, "The number of workers for the manifestwork finalize controller")
-	fs.IntVar(&o.AvailableStatusControllerWorkers, "available-status-controller-workers",
-		o.AvailableStatusControllerWorkers, "The number of workers for the available status controller")
-	fs.IntVar(&o.ManifestWorkAgentWorkers, "manifestwork-agent-workers",
-		o.ManifestWorkAgentWorkers, "The number of workers for the manifestwork agent")
+	fs.IntVar(&o.WorkloadAgentWorkers, "workload-agent-workers",
+		o.WorkloadAgentWorkers, "The number of workers for the workload agent controllers")
 
 	o.ObjectReaderOption.AddFlags(fs)
 }
 
 // Validate checks if the options are valid
 func (o *WorkloadAgentOptions) Validate() error {
-	if o.AppliedManifestWorkFinalizeControllerWorkers < 1 {
-		return fmt.Errorf("appliedmanifestwork-finalize-controller-workers must be >= 1, got %d", o.AppliedManifestWorkFinalizeControllerWorkers)
-	}
-	if o.ManifestWorkFinalizeControllerWorkers < 1 {
-		return fmt.Errorf("manifestwork-finalize-controller-workers must be >= 1, got %d", o.ManifestWorkFinalizeControllerWorkers)
-	}
-	if o.AvailableStatusControllerWorkers < 1 {
-		return fmt.Errorf("available-status-controller-workers must be >= 1, got %d", o.AvailableStatusControllerWorkers)
-	}
-	if o.ManifestWorkAgentWorkers < 1 {
-		return fmt.Errorf("manifestwork-agent-workers must be >= 1, got %d", o.ManifestWorkAgentWorkers)
+	if o.WorkloadAgentWorkers < 1 {
+		return fmt.Errorf("workload-agent-workers must be >= 1, got %d", o.WorkloadAgentWorkers)
 	}
 	return nil
 }
