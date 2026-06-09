@@ -83,6 +83,9 @@ test-unit: envtest-setup
 update-csv: ensure-operator-sdk ensure-helm
 	bash -x hack/update-csv.sh
 
+verify-csv:
+	bash hack/verify-csv.sh
+
 verify-crds: ensure-yaml-patch
 	bash -x hack/verify-crds.sh $(YAML_PATCH)
 
