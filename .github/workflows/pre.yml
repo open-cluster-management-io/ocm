@@ -36,6 +36,8 @@ jobs:
         run: make verify-deps
       - name: verify-fmt-imports
         run: make verify-fmt-imports
+      - name: verify-csv
+        run: make verify-csv </dev/null
 
   build:
     name: build
