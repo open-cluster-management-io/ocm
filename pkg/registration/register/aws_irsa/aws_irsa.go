@@ -154,6 +154,11 @@ func (c *AWSIRSADriver) BuildClients(ctx context.Context, secretOption register.
 			return nil, fmt.Errorf("failed to create CSR control: %w", err)
 		}
 		c.csrControl = csrControl
+
+		// Start the informer factory to sync the csr informer. The csr informer is
+		// consumed by the drivers forked for addon registration, while the
+		// InformerHandler of this driver only exposes the awsIRSAControl informer.
+		go kubeInformerFactory.Start(ctx.Done())
 	}
 
 	return clients, nil
