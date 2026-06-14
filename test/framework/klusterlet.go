@@ -276,11 +276,15 @@ func (spoke *Spoke) RemoveRegistrationFeature(klusterletName string, feature str
 	return err
 }
 
-// CleanKlusterletRelatedResources needs both hub side and spoke side operations
+// CleanKlusterletRelatedResources needs both hub side and spoke side operations.
 func CleanKlusterletRelatedResources(
 	hub *Hub, spoke *Spoke,
 	klusterletName, managedClusterName string) {
 	Expect(klusterletName).NotTo(Equal(""))
+
+	// Remove addons and manifest works first; leftover ManifestWorks (e.g. pre-delete hooks) block ManagedCluster deletion.
+	hub.DeleteAllManagedClusterAddOnsInCluster(managedClusterName)
+	hub.WaitUntilNoManifestWorks(managedClusterName)
 
 	// clean the managed clusters at first.
 	err := hub.ClusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(), managedClusterName, metav1.DeleteOptions{})
