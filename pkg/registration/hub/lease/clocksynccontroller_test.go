@@ -82,6 +82,38 @@ func TestClockSyncController(t *testing.T) {
 				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expected)
 			},
 		},
+		{
+			name: "hub and agent clock is not close but the skip-clock-sync-check annotation is set",
+			clusters: []runtime.Object{
+				func() *clusterv1.ManagedCluster {
+					cluster := testinghelpers.NewManagedCluster()
+					cluster.Annotations = map[string]string{
+						SkipClockSyncCheckAnnotation: "true",
+					}
+					return cluster
+				}(),
+			},
+			leases: []runtime.Object{
+				testinghelpers.NewManagedClusterLease("managed-cluster-lease", now.Add(301*time.Second)),
+			},
+			validateActions: func(t *testing.T, leaseActions, clusterActions []clienttesting.Action) {
+				// even though the clocks are out of sync, the annotation forces the condition to True
+				expected := metav1.Condition{
+					Type:    clusterv1.ManagedClusterConditionClockSynced,
+					Status:  metav1.ConditionTrue,
+					Reason:  "ManagedClusterClockSynced",
+					Message: "The clock of the managed cluster is synced with the hub.",
+				}
+				testingcommon.AssertActions(t, clusterActions, "patch")
+				patch := clusterActions[0].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &v1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expected)
+			},
+		},
 	}
 
 	for _, c := range cases {
