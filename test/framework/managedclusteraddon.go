@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	. "github.com/onsi/gomega"
 	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -206,4 +207,19 @@ func (hub *Hub) DeleteAllManagedClusterAddOnsInCluster(clusterName string) {
 			}
 		}
 	}
+
+	Eventually(func() error {
+		addonsV1Beta1, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).List(context.TODO(), metav1.ListOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		addonsV1Alpha1, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).List(context.TODO(), metav1.ListOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		if len(addonsV1Beta1.Items)+len(addonsV1Alpha1.Items) > 0 {
+			return fmt.Errorf("managed cluster addons still exist in %s", clusterName)
+		}
+		return nil
+	}).Should(Succeed())
 }
