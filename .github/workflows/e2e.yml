@@ -15,7 +15,7 @@ on:
       - release-*
 
 env:
-  GO_VERSION: '1.25'
+  GO_VERSION: '1.26'
   GO_REQUIRED_MIN_VERSION: ''
   USE_EXISTING_CLUSTER: false # set to true to use an existing kind cluster for debugging with act
 
@@ -36,7 +36,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup kind
-        uses: engineerd/setup-kind@v0.6.2
+        uses: engineerd/setup-kind@ecfad61750951586a9ef973db567df1d28671bdc # v0.6.2
         with:
           version: v0.22.0
           skipClusterCreation: ${{ env.USE_EXISTING_CLUSTER }}
@@ -63,7 +63,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup kind
-        uses: engineerd/setup-kind@v0.6.2
+        uses: engineerd/setup-kind@ecfad61750951586a9ef973db567df1d28671bdc # v0.6.2
         with:
           version: v0.22.0
           skipClusterCreation: ${{ env.USE_EXISTING_CLUSTER }}
@@ -90,7 +90,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup kind
-        uses: engineerd/setup-kind@v0.6.2
+        uses: engineerd/setup-kind@ecfad61750951586a9ef973db567df1d28671bdc # v0.6.2
         with:
           version: v0.22.0
           skipClusterCreation: ${{ env.USE_EXISTING_CLUSTER }}
@@ -117,7 +117,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup kind
-        uses: engineerd/setup-kind@v0.6.2
+        uses: engineerd/setup-kind@ecfad61750951586a9ef973db567df1d28671bdc # v0.6.2
         with:
           version: v0.22.0
           skipClusterCreation: ${{ env.USE_EXISTING_CLUSTER }}
