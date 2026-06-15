@@ -2,6 +2,9 @@ package aws_irsa
 
 import (
 	"context"
+	"encoding/pem"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path"
 	"strings"
@@ -15,8 +18,10 @@ import (
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
+	ocmfeature "open-cluster-management.io/api/feature"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
+	"open-cluster-management.io/ocm/pkg/features"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
@@ -210,6 +215,67 @@ func TestIsHubKubeConfigValidFunc(t *testing.T) {
 				t.Errorf("expect %t, but %t", c.isValid, valid)
 			}
 		})
+	}
+}
+
+func TestAWSIRSADriver_BuildClients_StartsCSRInformer(t *testing.T) {
+	err := features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeRegistrationFeatureGates)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// start a fake hub apiserver returning an empty csr list, so the csr informer
+	// is able to sync once it is started
+	apiServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"kind":"CertificateSigningRequestList","apiVersion":"certificates.k8s.io/v1","metadata":{"resourceVersion":"1"},"items":[]}`))
+	}))
+	defer apiServer.Close()
+	caData := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: apiServer.Certificate().Raw})
+
+	tempDir, err := os.MkdirTemp("", "testbuildclients")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	cert1 := testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second)
+	testinghelpers.WriteFile(path.Join(tempDir, "kubeconfig"),
+		testinghelpers.NewKubeconfig("c1", apiServer.URL, "", "", caData, cert1.Key, cert1.Cert))
+
+	secretOption := register.SecretOption{
+		ClusterName:       "cluster1",
+		AgentName:         "agent1",
+		HubKubeconfigFile: path.Join(tempDir, "kubeconfig"),
+	}
+	driver := NewAWSIRSADriver(NewAWSOption(), secretOption).(*AWSIRSADriver)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if _, err := driver.BuildClients(ctx, secretOption, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !cache.WaitForCacheSync(ctx.Done(), driver.csrControl.Informer().HasSynced) {
+		t.Errorf("csr informer is not started, the informer cache never syncs")
+	}
+
+	// the drivers forked for addon registration share the csr control, and the
+	// addon client cert controllers wait on its informer cache before starting
+	forkedDriver, err := driver.Fork("addon1", &registertesting.TestAddonAuthConfig{
+		KubeClientAuth: "csr",
+		CSROption:      csr.NewCSROption(),
+	}, register.SecretOption{
+		ClusterName: "cluster1",
+		Signer:      "custom.signer.io/custom",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	forkedInformer, _ := forkedDriver.InformerHandler()
+	if !cache.WaitForCacheSync(ctx.Done(), forkedInformer.HasSynced) {
+		t.Errorf("the informer cache of the forked addon driver never syncs")
 	}
 }
 
