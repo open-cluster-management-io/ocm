@@ -17,6 +17,7 @@ The list includes but is not limited to:
 | End user | Xiao Hong Shu | 2022 | [Link](xiaohongshu.com) | Xiao Hong Shu (also known as Xiaohongshu or Little Red Book) is a Chinese social media and e-commerce platform. They were very early adopters of OCM and have contributed to the growth of the multi-cluster space. |
 | End user | Guidewire Software Inc. | 2025 | [Link](https://www.guidewire.com/) | Guidewire Software Inc. uses OCM in their Cloud platform for their P&C Insurance customers. To utilize OCM on their platform, they have contributed to the OCM project with implementation of enabling AWS IAM-based registration mechanism on EKS clusters.
 | Integration | KubeStellar Console | 2025 | [Link](https://console.kubestellar.io) | KubeStellar Console is a standalone multi-cluster Kubernetes dashboard with 30+ dashboards, 150+ monitoring cards, AI-guided install missions, and a marketplace. It includes a guided install mission for OCM that walks users through installation with pre-flight checks, validation, troubleshooting, and rollback. |
+| End user, Contributor | VESSL AI | 2025 | [Link](https://vessl.ai) | VESSL AI uses OCM for multi-cluster management in VESSL Cloud, its managed GPU cloud for AI training and inference. GPU clusters across multiple cloud providers register to a central OCM hub, which VESSL AI uses to onboard clusters and place workloads across the fleet. |
 
 Additional non-public adopters exist as well.
 
