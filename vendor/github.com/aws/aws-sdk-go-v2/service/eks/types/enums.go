@@ -923,6 +923,25 @@ func (ResolveConflicts) Values() []ResolveConflicts {
 	}
 }
 
+type SpreadLevel string
+
+// Enum values for SpreadLevel
+const (
+	SpreadLevelHost SpreadLevel = "host"
+	SpreadLevelRack SpreadLevel = "rack"
+)
+
+// Values returns all known values for SpreadLevel. Note that this can be expanded
+// in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (SpreadLevel) Values() []SpreadLevel {
+	return []SpreadLevel{
+		"host",
+		"rack",
+	}
+}
+
 type SsoIdentityType string
 
 // Enum values for SsoIdentityType
@@ -1024,6 +1043,10 @@ const (
 	UpdateParamTypeRemoteNetworkConfig              UpdateParamType = "RemoteNetworkConfig"
 	UpdateParamTypeDeletionProtection               UpdateParamType = "DeletionProtection"
 	UpdateParamTypeNodeRepairConfig                 UpdateParamType = "NodeRepairConfig"
+	UpdateParamTypeRoleArn                          UpdateParamType = "RoleArn"
+	UpdateParamTypeRoleMappingsToAddOrUpdate        UpdateParamType = "RoleMappingsToAddOrUpdate"
+	UpdateParamTypeRoleMappingsToRemove             UpdateParamType = "RoleMappingsToRemove"
+	UpdateParamTypeNetworkAccess                    UpdateParamType = "NetworkAccess"
 	UpdateParamTypeVendedLogs                       UpdateParamType = "VendedLogs"
 	UpdateParamTypeUpdatedTier                      UpdateParamType = "UpdatedTier"
 	UpdateParamTypePreviousTier                     UpdateParamType = "PreviousTier"
@@ -1078,6 +1101,10 @@ func (UpdateParamType) Values() []UpdateParamType {
 		"RemoteNetworkConfig",
 		"DeletionProtection",
 		"NodeRepairConfig",
+		"RoleArn",
+		"RoleMappingsToAddOrUpdate",
+		"RoleMappingsToRemove",
+		"NetworkAccess",
 		"VendedLogs",
 		"UpdatedTier",
 		"PreviousTier",
@@ -1131,6 +1158,7 @@ const (
 	UpdateTypeAutoModeUpdate                     UpdateType = "AutoModeUpdate"
 	UpdateTypeRemoteNetworkConfigUpdate          UpdateType = "RemoteNetworkConfigUpdate"
 	UpdateTypeDeletionProtectionUpdate           UpdateType = "DeletionProtectionUpdate"
+	UpdateTypeCapabilityUpdate                   UpdateType = "CapabilityUpdate"
 	UpdateTypeControlPlaneScalingConfigUpdate    UpdateType = "ControlPlaneScalingConfigUpdate"
 	UpdateTypeVendedLogsUpdate                   UpdateType = "VendedLogsUpdate"
 )
@@ -1156,6 +1184,7 @@ func (UpdateType) Values() []UpdateType {
 		"AutoModeUpdate",
 		"RemoteNetworkConfigUpdate",
 		"DeletionProtectionUpdate",
+		"CapabilityUpdate",
 		"ControlPlaneScalingConfigUpdate",
 		"VendedLogsUpdate",
 	}
