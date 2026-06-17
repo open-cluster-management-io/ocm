@@ -6,7 +6,7 @@ on:
       - 'v*.*.*'
 env:
   # Common versions
-  GO_VERSION: '1.25'
+  GO_VERSION: '1.26'
   GO_REQUIRED_MIN_VERSION: ''
   GOPATH: '/home/runner/work/ocm/ocm/go'
   GITHUB_REF: ${{ github.ref }}
@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 1
           path: go/src/open-cluster-management.io/ocm
@@ -50,18 +50,19 @@ jobs:
         image-name: [ registration-operator, registration, work, placement, addon-manager ]
     steps:
       - name: checkout code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 1
           path: go/src/open-cluster-management.io/ocm
       - name: install Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: false
       - name: install imagebuilder
         run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
       - name: pull base image
-        run: docker pull registry.access.redhat.com/ubi9/ubi-minimal:latest --platform=linux/${{ matrix.arch }}
+        run: docker pull registry.access.redhat.com/ubi9/ubi-micro:latest --platform=linux/${{ matrix.arch }}
       - name: images
         run: |
           IMAGE_TAG=${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }} \
@@ -75,14 +76,14 @@ jobs:
           image_digest=$(docker inspect --format='{{index .RepoDigests 0}}' "quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }}" | cut -d'@' -f2)
           echo "IMAGE_DIGEST=${image_digest}" >> $GITHUB_ENV
       - name: Generate SBOM
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
           image: quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }}
           format: 'spdx-json'
           output-file: 'sbom.spdx.json'
           upload-release-assets: false # disable uploading SBOM to release assets for images
       - name: Attest
-        uses: actions/attest-sbom@v4
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4
         id: attest
         with:
           subject-name: quay.io/open-cluster-management/${{ matrix.image-name }}
@@ -98,7 +99,7 @@ jobs:
     needs: [ env, images ]
     steps:
       - name: checkout code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 1
           path: go/src/open-cluster-management.io/ocm
@@ -125,14 +126,14 @@ jobs:
           image_digest_release=$(skopeo inspect docker://quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }} | jq -r '.Digest')
           echo "IMAGE_DIGEST_RELEASE=${image_digest_release}" >> $GITHUB_ENV
       - name: Generate SBOM
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
           image: quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }}
           format: 'spdx-json'
           output-file: 'sbom.spdx.json'
           upload-release-assets: false # disable uploading SBOM to release assets for images
       - name: Attest
-        uses: actions/attest-sbom@v4
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4
         id: attest
         with:
           subject-name: quay.io/open-cluster-management/${{ matrix.image-name }}

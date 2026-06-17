@@ -591,7 +591,7 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 	clusterDecisions := placementDecision.Status.Decisions
 
 	if len(clusterDecisions) > maxNumOfClusterDecisions {
-		return fmt.Errorf("the number of clusterdecisions %q exceeds the max limitation %q", len(clusterDecisions), maxNumOfClusterDecisions)
+		return fmt.Errorf("the number of clusterdecisions %d exceeds the max limitation %d", len(clusterDecisions), maxNumOfClusterDecisions)
 	}
 
 	existPlacementDecision, err := c.placementDecisionLister.PlacementDecisions(placementDecision.Namespace).Get(placementDecisionName)

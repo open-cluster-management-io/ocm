@@ -14,7 +14,7 @@ on:
       - release-*
 
 env:
-  GO_VERSION: '1.25'
+  GO_VERSION: '1.26'
   GO_REQUIRED_MIN_VERSION: ''
 
 permissions:
@@ -26,9 +26,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: install Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: integration
