@@ -30,6 +30,7 @@ type Options struct {
 	ControlPlaneNodeLabelSelector string
 	DeploymentReplicas            int32
 	EnableSyncLabels              bool
+	ImagePullSecretName           string
 }
 
 // RunClusterManagerOperator starts a new cluster manager operator
@@ -122,6 +123,7 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		o.DeploymentReplicas,
 		controllerContext.OperatorNamespace,
 		o.EnableSyncLabels,
+		imagePullSecretNameFromOptions(o),
 		tlsMinVersion,
 		tlsCipherSuites,
 	)
@@ -165,4 +167,8 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 
 	<-ctx.Done()
 	return nil
+}
+
+func imagePullSecretNameFromOptions(o *Options) string {
+	return helpers.NormalizeImagePullSecretName(o.ImagePullSecretName)
 }

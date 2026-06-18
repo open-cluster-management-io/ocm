@@ -34,7 +34,7 @@ rules:
     - "addon-webhook-sa-kubeconfig"
     - "external-hub-kubeconfig"
     - "work-driver-config"
-    - "open-cluster-management-image-pull-credentials"
+    - {{ include "clusterManager.imagePullSecretName" . | quote }}
     - "grpc-server-serving-cert"
     - "placement-debug-serving-cert"
     - "cluster-import-config"

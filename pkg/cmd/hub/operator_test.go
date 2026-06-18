@@ -43,6 +43,7 @@ func TestHubOperatorFlags(t *testing.T) {
 		"control-plane-node-label-selector": "string",
 		"deployment-replicas":               "int32",
 		"enable-sync-labels":                "bool",
+		"image-pull-secret-name":            "string",
 	}
 
 	for flagName, flagType := range expectedFlags {
@@ -82,6 +83,7 @@ func TestHubOperatorFlagDefaults(t *testing.T) {
 		{"control-plane-node-label-selector", "node-role.kubernetes.io/master="},
 		{"deployment-replicas", "0"},
 		{"enable-sync-labels", "false"},
+		{"image-pull-secret-name", "open-cluster-management-image-pull-credentials"},
 	}
 
 	for _, test := range tests {

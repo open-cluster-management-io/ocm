@@ -818,6 +818,14 @@ func GetOperatorNamespace() string {
 	return operatorNamespace
 }
 
+// NormalizeImagePullSecretName returns the default image pull secret name when name is empty.
+func NormalizeImagePullSecretName(name string) string {
+	if name == "" {
+		return ImagePullSecret
+	}
+	return name
+}
+
 // filterLabels removes reserved label keys from the input map
 func filterLabels(labels map[string]string) map[string]string {
 	filtered := map[string]string{}
