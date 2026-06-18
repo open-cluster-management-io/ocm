@@ -1,3 +1,16 @@
+# v1.54.5 (2026-06-12)
+
+* **Documentation**: Updating documentation for select service-specific credential APIs
+
+# v1.54.4 (2026-06-08)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.54.3 (2026-06-04)
+
+* **Dependency Update**: Update to smithy-go v1.27.1 to fix several union-related deserialization bugs in schema-serde-enabled services.
+* **Dependency Update**: Updated to the latest SDK module versions
+
 # v1.54.2 (2026-06-03)
 
 * **Dependency Update**: Updated to the latest SDK module versions
