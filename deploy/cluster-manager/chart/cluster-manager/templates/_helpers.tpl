@@ -1,7 +1,13 @@
 {{/* The name of the image pull secret created by the chart or referenced by default. */}}
 {{- define "clusterManager.imagePullSecretName" -}}
+{{- define "clusterManager.imagePullSecretName" -}}
 {{- if .Values.images.imagePullSecrets -}}
-{{- (index .Values.images.imagePullSecrets 0).name -}}
+{{- $name := (index .Values.images.imagePullSecrets 0).name | default "" -}}
+{{- required "images.imagePullSecrets[0].name must be set when imagePullSecrets is provided" $name -}}
+{{- else -}}
+open-cluster-management-image-pull-credentials
+{{- end -}}
+{{- end }}
 {{- else -}}
 open-cluster-management-image-pull-credentials
 {{- end -}}
