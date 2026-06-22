@@ -155,6 +155,10 @@ func TestDebuggerGETMethod(t *testing.T) {
 			}
 			defer res.Body.Close()
 
+			if res.StatusCode != http.StatusOK {
+				t.Errorf("Expected status code %d, got %d", http.StatusOK, res.StatusCode)
+			}
+
 			responseBody, err := io.ReadAll(res.Body)
 			if err != nil {
 				t.Errorf("Unexpected error reading response body: %v", err)
@@ -183,6 +187,87 @@ func TestDebuggerGETMethod(t *testing.T) {
 				t.Errorf("Expect aggregatedScores to be: %v, but got: %v", expectedScores, result.AggregatedScores)
 			}
 		})
+	}
+}
+
+func TestDebuggerGETNotFound(t *testing.T) {
+	placementNamespace := "default"
+
+	// Create test objects WITHOUT the placement we will query
+	initObjs := []runtime.Object{
+		testinghelpers.NewManagedCluster("cluster1").WithLabel("clusterset", "test-set").Build(),
+		testinghelpers.NewClusterSet("test-set").WithClusterSelector(clusterapiv1beta2.ManagedClusterSelector{
+			SelectorType: clusterapiv1beta2.LabelSelector,
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"clusterset": "test-set"},
+			},
+		}).Build(),
+		testinghelpers.NewClusterSetBinding(placementNamespace, "test-set"),
+	}
+
+	clusterClient := clusterfake.NewSimpleClientset(initObjs...)
+	clusterInformerFactory := testinghelpers.NewClusterInformerFactory(clusterClient, initObjs...)
+	kubeClient := kubefake.NewClientset()
+
+	// Mock SAR for authorization
+	kubeClient.PrependReactor("create", "subjectaccessreviews", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		createAction := action.(k8stesting.CreateAction)
+		sar := createAction.GetObject().(*authorizationv1.SubjectAccessReview)
+		sar.Status.Allowed = true
+		return true, sar, nil
+	})
+
+	debugger := NewDebugger(
+		&testScheduler{result: &testResult{}},
+		kubeClient,
+		clusterInformerFactory.Cluster().V1beta1().Placements(),
+		clusterInformerFactory.Cluster().V1().ManagedClusters(),
+		clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets(),
+		clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings(),
+	)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userInfo := &user.DefaultInfo{
+			Name:   "test-user",
+			Groups: []string{"system:authenticated"},
+		}
+		ctx := request.WithUser(r.Context(), userInfo)
+		r = r.WithContext(ctx)
+		debugger.Handler(w, r)
+	})
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	// Query a non-existent placement
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s%s%s/%s", server.URL, DebugPath, placementNamespace, "does-not-exist"), nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer res.Body.Close()
+
+	// Verify HTTP status code is 404
+	if res.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected status code %d for non-existent placement, got %d", http.StatusNotFound, res.StatusCode)
+	}
+
+	// Verify response body contains error
+	var result DebugResult
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if result.Error == "" {
+		t.Errorf("Expected error in response body for non-existent placement")
+	}
+
+	if !strings.Contains(result.Error, "not found") {
+		t.Errorf("Expected error to contain 'not found', got: %s", result.Error)
 	}
 }
 
@@ -470,44 +555,50 @@ func TestDebuggerPermissionCheck(t *testing.T) {
 	}
 
 	cases := []struct {
-		name             string
-		injectUser       bool
-		userInfo         *user.DefaultInfo
-		sarAllowed       bool
-		sarError         error
-		expectError      bool
-		errorContains    string
-		verifySARRequest func(t *testing.T, sar *authorizationv1.SubjectAccessReview)
+		name               string
+		injectUser         bool
+		userInfo           *user.DefaultInfo
+		sarAllowed         bool
+		sarError           error
+		expectError        bool
+		errorContains      string
+		expectedStatusCode int
+		verifySARRequest   func(t *testing.T, sar *authorizationv1.SubjectAccessReview)
 	}{
 		{
-			name:          "No user in context - should reject",
-			injectUser:    false,
-			expectError:   true,
-			errorContains: "user information not found in request context",
+			name:               "No user in context - should reject",
+			injectUser:         false,
+			expectError:        true,
+			errorContains:      "user information not found in request context",
+			expectedStatusCode: http.StatusForbidden,
 		},
 		{
-			name:        "User with permission - should allow",
-			injectUser:  true,
-			sarAllowed:  true,
-			expectError: false,
+			name:               "User with permission - should allow",
+			injectUser:         true,
+			sarAllowed:         true,
+			expectError:        false,
+			expectedStatusCode: http.StatusOK,
 		},
 		{
-			name:          "User without permission - should reject",
-			injectUser:    true,
-			sarAllowed:    false,
-			expectError:   true,
-			errorContains: "does not have permission",
+			name:               "User without permission - should reject",
+			injectUser:         true,
+			sarAllowed:         false,
+			expectError:        true,
+			errorContains:      "does not have permission",
+			expectedStatusCode: http.StatusForbidden,
 		},
 		{
-			name:          "SAR API call fails",
-			injectUser:    true,
-			sarError:      fmt.Errorf("API server error"),
-			expectError:   true,
-			errorContains: "failed to check permissions",
+			name:               "SAR API call fails",
+			injectUser:         true,
+			sarError:           fmt.Errorf("API server error"),
+			expectError:        true,
+			errorContains:      "failed to check permissions",
+			expectedStatusCode: http.StatusForbidden,
 		},
 		{
-			name:       "User with Extra fields - should pass all fields to SAR",
-			injectUser: true,
+			name:               "User with Extra fields - should pass all fields to SAR",
+			injectUser:         true,
+			expectedStatusCode: http.StatusOK,
 			userInfo: &user.DefaultInfo{
 				Name:   "test-user",
 				Groups: []string{"system:authenticated", "developers"},
@@ -601,6 +692,11 @@ func TestDebuggerPermissionCheck(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 			defer res.Body.Close()
+
+			// Verify HTTP status code
+			if c.expectedStatusCode != 0 && res.StatusCode != c.expectedStatusCode {
+				t.Errorf("Expected status code %d, got %d", c.expectedStatusCode, res.StatusCode)
+			}
 
 			// Parse response
 			var result DebugResult
