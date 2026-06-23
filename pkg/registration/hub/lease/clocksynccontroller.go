@@ -32,6 +32,13 @@ type clockSyncController struct {
 
 const (
 	clockSyncControllerName = "ClockSyncController"
+
+	// SkipClockSyncCheckAnnotation, when set to "true" on a ManagedCluster, indicates the hub
+	// should not mark the cluster's clock as out of sync. This is useful for clusters that are
+	// expected to have a clock offset from the hub (e.g. spokes in distant regions), so they are
+	// not stuck in an Unknown status.
+	// See https://github.com/open-cluster-management-io/ocm/issues/1509
+	SkipClockSyncCheckAnnotation = "registration.open-cluster-management.io/skip-clock-sync-check"
 )
 
 func NewClockSyncController(
@@ -104,8 +111,18 @@ func (c *clockSyncController) sync(ctx context.Context, syncCtx factory.SyncCont
 		leaseDuration = time.Duration(LeaseDurationSeconds*leaseDurationTimes) * time.Second
 	}
 
-	if err := c.updateClusterStatusClockSynced(ctx, syncCtx, cluster,
-		now.Sub(observedLease.Spec.RenewTime.Time) < leaseDuration && observedLease.Spec.RenewTime.Time.Sub(now) < leaseDuration); err != nil {
+	// the clock is considered synced when the hub's "now" and the agent's lease RenewTime are
+	// within the lease duration of each other.
+	clockSynced := now.Sub(observedLease.Spec.RenewTime.Time) < leaseDuration &&
+		observedLease.Spec.RenewTime.Time.Sub(now) < leaseDuration
+
+	// allow opting out of the clock sync check per cluster: if the cluster is annotated to skip
+	// the check, always treat its clock as synced so the agent is not blocked from updating status.
+	if cluster.Annotations[SkipClockSyncCheckAnnotation] == "true" {
+		clockSynced = true
+	}
+
+	if err := c.updateClusterStatusClockSynced(ctx, syncCtx, cluster, clockSynced); err != nil {
 		return err
 	}
 	return nil
