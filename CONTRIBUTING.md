@@ -116,7 +116,7 @@ open-cluster-management         cluster-manager                           # watc
 open-cluster-management         klusterlet                                # watch managedcluster and deploy the managed cluster components
 ```
 
-Note: if klustelet is deployed in Singleton mode(`clusteradm join --hub-token <hub-token> --hub-apiserver <hub-apiserver> --wait --cluster-name cluster1 --force-internal-endpoint-lookup --bundle-version="latest" --singleton=true`), the `klusterlet-registration-agent`
+Note: if klusterlet is deployed in Singleton mode(`clusteradm join --hub-token <hub-token> --hub-apiserver <hub-apiserver> --wait --cluster-name cluster1 --force-internal-endpoint-lookup --bundle-version="latest" --singleton=true`), the `klusterlet-registration-agent`
  and `klusterlet-work-agent` will be replaced by one deployment `klusterlet-agent`.
 
 Once the Open Cluster Management components are deployed, you can start developing and testing your changes.
