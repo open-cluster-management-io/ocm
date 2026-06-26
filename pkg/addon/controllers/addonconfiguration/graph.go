@@ -153,16 +153,13 @@ func (m addonConfigMap) containsConfig(expectConfigGr addonv1beta1.ConfigGroupRe
 	return -1, false
 }
 
-// orderMatchesStatus returns true if, for every ConfigGroupResource that has
-// multiple entries, the relative ordering of those entries in statusRefs
-// matches the slice order in the desired map.  Cross-GR ordering is ignored
-// because it has no semantic significance — only within-GR ordering affects
-// behaviour such as last-match-wins precedence.
+// orderMatchesStatus returns true if, for every ConfigGroupResource, the
+// entries in statusRefs match the desired slice in both count and order.
+// Cross-GR ordering is ignored because it has no semantic significance —
+// only within-GR count and ordering affects behaviour such as last-match-wins
+// precedence.
 func (m addonConfigMap) orderMatchesStatus(statusRefs []addonv1beta1.ConfigReference) bool {
 	for gr, desired := range m {
-		if len(desired) <= 1 {
-			continue
-		}
 		// Collect the sub-sequence of statusRefs that belong to this GR,
 		// preserving their relative order.
 		var statusOrder []addonv1beta1.ConfigReferent
