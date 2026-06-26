@@ -88,7 +88,7 @@ kind create cluster
     ```bash
     clusteradm join --hub-token <hub-token> --hub-apiserver <hub-apiserver> --wait --cluster-name cluster1 --force-internal-endpoint-lookup --bundle-version="latest"
     ```
-    4. Access the hub cluster:
+    4. Accept the hub cluster as a managed cluster:
     ```bash
     clusteradm accept --clusters cluster1
     ```
