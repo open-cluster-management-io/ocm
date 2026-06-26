@@ -1128,6 +1128,11 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 					"foo":                                  "bar", // should be ignored
 					"agent.open-cluster-management.io/foo": "bar",
 				},
+				ClusterLabels: map[string]string{
+					"env":  "prod",
+					"team": "blue",
+					"cluster.open-cluster-management.io/clusterset": "should-be-dropped", // reserved, should be filtered out
+				},
 			}
 			klusterlet.Spec.WorkConfiguration = &operatorapiv1.WorkAgentConfiguration{
 				FeatureGates: []operatorapiv1.FeatureGate{
@@ -1189,6 +1194,10 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			ginkgo.By("Check the registration-agent has the expected cluster-annotations")
 			gomega.Expect(registrationDeployment.Spec.Template.Spec.Containers[0].Args).Should(
 				gomega.ContainElement("--cluster-annotations=agent.open-cluster-management.io/foo=bar"))
+
+			ginkgo.By("Check the registration-agent has the expected cluster-labels: reserved keys filtered out and keys sorted")
+			gomega.Expect(registrationDeployment.Spec.Template.Spec.Containers[0].Args).Should(
+				gomega.ContainElement("--cluster-labels=env=prod,team=blue"))
 
 			ginkgo.By("Check the work-agent has the expected feature gates")
 			workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(

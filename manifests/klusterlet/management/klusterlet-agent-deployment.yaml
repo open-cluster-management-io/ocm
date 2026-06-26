@@ -103,6 +103,9 @@ spec:
           {{if .ClusterAnnotationsString}}
           - "--cluster-annotations={{ .ClusterAnnotationsString }}"
           {{end}}
+          {{if .ClusterLabelsString}}
+          - "--cluster-labels={{ .ClusterLabelsString }}"
+          {{end}}
           {{if eq .InstallMode "SingletonHosted"}}
           - "--spoke-kubeconfig=/spoke/config/kubeconfig"
           - "--terminate-on-files=/spoke/config/kubeconfig"
