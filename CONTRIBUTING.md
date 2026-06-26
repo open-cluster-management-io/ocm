@@ -74,7 +74,7 @@ create a local Kubernetes cluster and deploy the Open Cluster Management compone
 kind create cluster
 ```
 
-2. Deploy the Open Cluster Management components referring to the [Setup hub and managed clusters](https://open-cluster-management.io/getting-started/quick-start) guide on the kind cluster created in the previous step. Summary the key steps are:
+2. Deploy the Open Cluster Management components referring to the [Setup hub and managed clusters](https://open-cluster-management.io/docs/getting-started/quick-start/) guide on the kind cluster created in the previous step. Summary the key steps are:
 
     1. Install the clusteradm CLI tool:
     ```bash
