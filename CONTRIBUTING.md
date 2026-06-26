@@ -78,7 +78,7 @@ kind create cluster
 
     1. Install the clusteradm CLI tool:
     ```bash
-    curl -sL https://raw.githubusercontent.com/open-cluster-management/clusteradm/main/hack/install.sh | bash
+    curl -L https://raw.githubusercontent.com/open-cluster-management-io/clusteradm/main/install.sh | bash
     ```
     2. Init the control plane:
     ```bash
