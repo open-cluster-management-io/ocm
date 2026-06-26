@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -1748,5 +1749,67 @@ func TestIsConditionReady(t *testing.T) {
 			result := isConditionReady(tt.condition, tt.generation, tt.requireTrue)
 			assert.Equal(t, tt.expected, result, tt.description)
 		})
+	}
+}
+
+func TestDeployReconcileOwnerLabelTooLong(t *testing.T) {
+	// "default." + longName exceeds the 63-char label-value limit, so the owner
+	// label value is invalid and the reconciler should report it on status.
+	longName := "mwrset-" + strings.Repeat("x", 60)
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet(longName, "default", "place-test")
+
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet)
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
+	if err := workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetStore().Add(mwrSet); err != nil {
+		t.Fatal(err)
+	}
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	placement, placementDecision := helpertest.CreateTestPlacement("place-test", "default", "cls1")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placement, placementDecision)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Second)
+	if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision); err != nil {
+		t.Fatal(err)
+	}
+
+	pmwDeployController := deployReconciler{
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
+		placementLister:     clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
+	}
+
+	mwrSet, state, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	if err != nil {
+		t.Fatal("expected no error so the invalid name is reported via status, got ", err)
+	}
+	if state != reconcileStop {
+		t.Fatal("expected reconcileStop for a permanently invalid owner label, got ", state)
+	}
+
+	cond := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionManifestworkApplied)
+	if cond == nil {
+		t.Fatal("ManifestworkApplied condition not found ", mwrSet.Status.Conditions)
+	}
+	if cond.Status != metav1.ConditionFalse {
+		t.Fatal("expected ManifestworkApplied=False, got ", cond)
+	}
+	if cond.Reason != ReasonInvalidManifestWorkName {
+		t.Fatal("expected Reason ReasonInvalidManifestWorkName, got ", cond.Reason)
+	}
+	if !strings.Contains(cond.Message, "63") {
+		t.Fatal("expected message to reference the 63-char limit, got ", cond.Message)
+	}
+
+	// No ManifestWork should have been applied for the invalid owner value.
+	works, err := fWorkClient.WorkV1().ManifestWorks("cls1").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(works.Items) != 0 {
+		t.Fatal("expected no ManifestWork to be applied, got ", len(works.Items))
 	}
 }

@@ -3,12 +3,14 @@ package manifestworkreplicasetcontroller
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 
 	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	worklisterv1 "open-cluster-management.io/api/client/work/listers/work/v1"
@@ -20,6 +22,9 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 )
+
+// ReasonInvalidManifestWorkName indicates an invalid ManifestWork owner label.
+const ReasonInvalidManifestWorkName = "InvalidManifestWorkName"
 
 // deployReconciler is to manage ManifestWork based on the placement.
 type deployReconciler struct {
@@ -36,6 +41,16 @@ func (d *deployReconciler) reconcile(
 	var plcsSummary []workapiv1alpha1.PlacementSummary
 	minRequeue := maxRequeueTime
 	count, total, succeededCount := 0, 0, 0
+
+	// Report invalid ManifestWork owner labels in status.
+	ownerValue := manifestWorkReplicaSetKey(mwrSet)
+	if verrs := validation.IsValidLabelValue(ownerValue); len(verrs) > 0 {
+		message := fmt.Sprintf("ManifestWork owner reference %q (namespace.name) is not a valid label value: %s; "+
+			"recreate the ManifestWorkReplicaSet with a shorter namespace and/or name so the combined length is at most 63 characters",
+			ownerValue, strings.Join(verrs, "; "))
+		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getManifestworkApplied(ReasonInvalidManifestWorkName, message))
+		return mwrSet, reconcileStop, nil
+	}
 
 	// Clean up ManifestWorks from placements no longer in the spec
 	currentPlacementNames := sets.New[string]()
