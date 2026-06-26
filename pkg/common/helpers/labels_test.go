@@ -84,6 +84,35 @@ func TestFilterClusterLabels(t *testing.T) {
 			},
 		},
 		{
+			name: "invalid label key is dropped",
+			labels: map[string]string{
+				"not a valid key": "x",
+				"env":             "prod",
+			},
+			want: map[string]string{
+				"env": "prod",
+			},
+		},
+		{
+			name: "invalid label value is dropped",
+			labels: map[string]string{
+				"team": "not a valid value!",
+				"env":  "prod",
+			},
+			want: map[string]string{
+				"env": "prod",
+			},
+		},
+		{
+			name: "empty label value is kept",
+			labels: map[string]string{
+				"env": "",
+			},
+			want: map[string]string{
+				"env": "",
+			},
+		},
+		{
 			name: "other vendor domains are kept",
 			labels: map[string]string{
 				"example.com/team": "blue",

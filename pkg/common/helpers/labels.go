@@ -3,6 +3,7 @@ package helpers
 import (
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/klog/v2"
 )
 
@@ -21,6 +22,16 @@ func FilterClusterLabels(labels map[string]string) map[string]string {
 	for k, v := range labels {
 		if isReservedLabelKey(k) {
 			klog.Warningf("label %q is reserved by open-cluster-management and will be ignored", k)
+			continue
+		}
+		// Drop labels that are not valid Kubernetes labels so a single bad entry
+		// cannot block the ManagedCluster creation during bootstrap.
+		if errs := validation.IsQualifiedName(k); len(errs) > 0 {
+			klog.Warningf("label key %q is not a valid label key and will be ignored: %s", k, strings.Join(errs, "; "))
+			continue
+		}
+		if errs := validation.IsValidLabelValue(v); len(errs) > 0 {
+			klog.Warningf("label value of %q is not a valid label value and will be ignored: %s", k, strings.Join(errs, "; "))
 			continue
 		}
 		clusterLabels[k] = v
