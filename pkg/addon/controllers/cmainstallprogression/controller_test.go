@@ -243,7 +243,7 @@ func TestReconcile(t *testing.T) {
 					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
 				}
 				if len(cma.Status.InstallProgressions[2].ConfigReferences) != 2 {
-					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
+					t.Fatalf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
 				}
 				// Verify ordering matches the spec order: test/test first, then test1/test
 				if cma.Status.InstallProgressions[2].ConfigReferences[0].DesiredConfig.Namespace != "test" ||
@@ -371,7 +371,7 @@ func TestReconcile(t *testing.T) {
 					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig.Name)
 				}
 				if len(cma.Status.InstallProgressions[1].ConfigReferences) != 2 {
-					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
+					t.Fatalf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
 				}
 				// Verify ordering matches the spec order: test1 first, then test2
 				if cma.Status.InstallProgressions[1].ConfigReferences[0].DesiredConfig.Name != "test1" {
