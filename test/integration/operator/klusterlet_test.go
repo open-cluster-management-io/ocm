@@ -606,14 +606,13 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				// klusterlet has no condition, replica is 0
 				gomega.Expect(actual.Status.Replicas).Should(gomega.Equal(int32(0)))
 
-				// Print actual args for debugging
 				actualArgs := actual.Spec.Template.Spec.Containers[0].Args
 				if len(actualArgs) != 8 {
+					// the work deployment may still be mid-reconcile; keep polling instead of failing
 					fmt.Fprintf(ginkgo.GinkgoWriter, "should get 8 args, actual got %v\n", actualArgs)
+					return false
 				}
-
-				gomega.Expect(len(actualArgs)).Should(gomega.Equal(8))
-				return actual.Spec.Template.Spec.Containers[0].Args[2] != "--spoke-cluster-name=cluster2"
+				return actualArgs[2] == "--spoke-cluster-name=cluster2"
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			gomega.Eventually(func() bool {
