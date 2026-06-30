@@ -245,6 +245,15 @@ func TestReconcile(t *testing.T) {
 				if len(cma.Status.InstallProgressions[2].ConfigReferences) != 2 {
 					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
 				}
+				// Verify ordering matches the spec order: test/test first, then test1/test
+				if cma.Status.InstallProgressions[2].ConfigReferences[0].DesiredConfig.Namespace != "test" ||
+					cma.Status.InstallProgressions[2].ConfigReferences[0].DesiredConfig.Name != "test" {
+					t.Errorf("InstallProgressions ConfigReferences[0] ordering is not correct: %v", cma.Status.InstallProgressions[2].ConfigReferences[0].DesiredConfig)
+				}
+				if cma.Status.InstallProgressions[2].ConfigReferences[1].DesiredConfig.Namespace != "test1" ||
+					cma.Status.InstallProgressions[2].ConfigReferences[1].DesiredConfig.Name != "test" {
+					t.Errorf("InstallProgressions ConfigReferences[1] ordering is not correct: %v", cma.Status.InstallProgressions[2].ConfigReferences[1].DesiredConfig)
+				}
 				if len(cma.Status.InstallProgressions[3].ConfigReferences) != 1 {
 					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
 				}
@@ -363,6 +372,13 @@ func TestReconcile(t *testing.T) {
 				}
 				if len(cma.Status.InstallProgressions[1].ConfigReferences) != 2 {
 					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
+				}
+				// Verify ordering matches the spec order: test1 first, then test2
+				if cma.Status.InstallProgressions[1].ConfigReferences[0].DesiredConfig.Name != "test1" {
+					t.Errorf("InstallProgressions ConfigReferences[0] ordering is not correct: %v", cma.Status.InstallProgressions[1].ConfigReferences[0].DesiredConfig)
+				}
+				if cma.Status.InstallProgressions[1].ConfigReferences[1].DesiredConfig.Name != "test2" {
+					t.Errorf("InstallProgressions ConfigReferences[1] ordering is not correct: %v", cma.Status.InstallProgressions[1].ConfigReferences[1].DesiredConfig)
 				}
 				if len(cma.Status.InstallProgressions[2].ConfigReferences) != 3 {
 					t.Errorf("InstallProgressions ConfigReferences object is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences)
