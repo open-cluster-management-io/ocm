@@ -24,7 +24,7 @@ var TolerationClock = clock.Clock(clock.RealClock{})
 
 const (
 	placementLabel = "cluster.open-cluster-management.io/placement"
-	description    = "TaintToleration is a plugin that checks if a placement tolerates a managed cluster's taints"
+	description    = "TaintToleration filters the clusters based on whether the placement tolerates the managed cluster's taints."
 )
 
 type TaintToleration struct {
@@ -38,7 +38,7 @@ func New(handle plugins.Handle) *TaintToleration {
 }
 
 func (p *TaintToleration) Name() string {
-	return reflect.TypeOf(*p).Name()
+	return reflect.TypeFor[TaintToleration]().Name()
 }
 
 func (pl *TaintToleration) Description() string {
