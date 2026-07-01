@@ -94,6 +94,12 @@ const (
 	// time-to-live duration to prevent accumulation of old completed resources.
 	CleanUpCompletedManifestWork featuregate.Feature = "CleanUpCompletedManifestWork"
 
+	// SIGPlacementDecision will start a new controller in the placement controller to sync
+	// PlacementDecision to the SIG Multicluster ClusterInventory PlacementDecision.
+	// API definition: https://github.com/kubernetes-sigs/cluster-inventory-api/blob/main/apis/v1alpha1/placementdecision_types.go
+	// KEP: https://github.com/kubernetes/enhancements/tree/master/keps/sig-multicluster/5313-placement-decision-api
+	SIGPlacementDecision featuregate.Feature = "SIGPlacementDecision"
+
 	// PlacementDebugServer enables the debug server sidecar container in placement controller pod.
 	// When enabled, a debug-server container will be added to the placement pod, providing
 	// /debug/placements/* endpoints for placement scheduling simulation and debugging.
@@ -130,6 +136,7 @@ var DefaultHubAddonManagerFeatureGates = map[featuregate.Feature]featuregate.Fea
 // DefaultHubPlacementFeatureGates consists of all known placement feature keys.
 // To add a new feature, define a key for it above and add it here.
 var DefaultHubPlacementFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	SIGPlacementDecision: {Default: false, PreRelease: featuregate.Alpha},
 	PlacementDebugServer: {Default: false, PreRelease: featuregate.Alpha},
 }
 

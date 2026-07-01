@@ -544,6 +544,18 @@ spec:
           - update
           - patch
         - apiGroups:
+          - multicluster.x-k8s.io
+          resources:
+          - placementdecisions
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
           - cluster.x-k8s.io
           resources:
           - clusters
