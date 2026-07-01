@@ -461,6 +461,109 @@ func TestAddonConfigReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "reordering spec.configs triggers status update",
+			managedClusteraddon: []runtime.Object{
+				// spec.configs has test3 before test2 (reversed from status)
+				newManagedClusterAddon("test", "cluster1", []addonv1beta1.AddOnConfig{
+					{
+						ConfigGroupResource: addonv1beta1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1beta1.ConfigReferent{Name: "test3"},
+					},
+					{
+						ConfigGroupResource: addonv1beta1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1beta1.ConfigReferent{Name: "test2"},
+					},
+				}, []addonv1beta1.ConfigReference{
+					// status has test2 before test3 (old order)
+					{
+						ConfigGroupResource: addonv1beta1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &addonv1beta1.ConfigSpecHash{
+							ConfigReferent: addonv1beta1.ConfigReferent{Name: "test2"},
+							SpecHash:       "",
+						},
+						LastAppliedConfig: &addonv1beta1.ConfigSpecHash{
+							ConfigReferent: addonv1beta1.ConfigReferent{Name: "test2"},
+							SpecHash:       "",
+						},
+						LastObservedGeneration: 1,
+					},
+					{
+						ConfigGroupResource: addonv1beta1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &addonv1beta1.ConfigSpecHash{
+							ConfigReferent: addonv1beta1.ConfigReferent{Name: "test3"},
+							SpecHash:       "",
+						},
+						LastAppliedConfig: &addonv1beta1.ConfigSpecHash{
+							ConfigReferent: addonv1beta1.ConfigReferent{Name: "test3"},
+							SpecHash:       "",
+						},
+						LastObservedGeneration: 1,
+					},
+				}, []metav1.Condition{
+					{
+						Type:   addonv1beta1.ManagedClusterAddOnConditionProgressing,
+						Reason: addonv1beta1.ProgressingReasonCompleted,
+					},
+				}),
+			},
+			placements: []runtime.Object{
+				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
+			},
+			placementDecisions: []runtime.Object{
+				&clusterv1beta1.PlacementDecision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-placement",
+						Namespace: "default",
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "test-placement",
+							clusterv1beta1.DecisionGroupIndexLabel: "0",
+						},
+					},
+					Status: clusterv1beta1.PlacementDecisionStatus{
+						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}},
+					},
+				},
+			},
+			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", "").WithPlacementStrategy(addonv1beta1.PlacementStrategy{
+				PlacementRef:    addonv1beta1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All},
+			}).WithInstallProgression(addonv1beta1.InstallProgression{
+				PlacementRef: addonv1beta1.PlacementRef{Name: "test-placement", Namespace: "default"},
+			}).Build(),
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				// Status should be reordered to match spec: test3 first, then test2.
+				// LastAppliedConfig and LastObservedGeneration are preserved.
+				expectPatchConfigurationAction(t, actions[0], []addonv1beta1.ConfigReference{
+					{
+						ConfigGroupResource: addonv1beta1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &addonv1beta1.ConfigSpecHash{
+							ConfigReferent: addonv1beta1.ConfigReferent{Name: "test3"},
+							SpecHash:       "",
+						},
+						LastAppliedConfig: &addonv1beta1.ConfigSpecHash{
+							ConfigReferent: addonv1beta1.ConfigReferent{Name: "test3"},
+							SpecHash:       "",
+						},
+						LastObservedGeneration: 1,
+					},
+					{
+						ConfigGroupResource: addonv1beta1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &addonv1beta1.ConfigSpecHash{
+							ConfigReferent: addonv1beta1.ConfigReferent{Name: "test2"},
+							SpecHash:       "",
+						},
+						LastAppliedConfig: &addonv1beta1.ConfigSpecHash{
+							ConfigReferent: addonv1beta1.ConfigReferent{Name: "test2"},
+							SpecHash:       "",
+						},
+						LastObservedGeneration: 1,
+					},
+				})
+				expectPatchConditionAction(t, actions[0], metav1.ConditionTrue)
+			},
+		},
+		{
 			name: "duplicate configs",
 			managedClusteraddon: []runtime.Object{
 				newManagedClusterAddon("test", "cluster1", []addonv1beta1.AddOnConfig{
@@ -1289,5 +1392,256 @@ func expectPatchConditionAction(t *testing.T, action clienttesting.Action, expec
 	actualCond := meta.FindStatusCondition(mca.Status.Conditions, addonv1beta1.ManagedClusterAddOnConditionConfigured)
 	if actualCond == nil || actualCond.Status != expected {
 		t.Errorf("Condition not correctly patched, expected %v, actual %v", expected, mca.Status.Conditions)
+	}
+}
+
+func TestMergeAddonConfig(t *testing.T) {
+	fooGR := addonv1beta1.ConfigGroupResource{Group: "core", Resource: "Foo"}
+	barGR := addonv1beta1.ConfigGroupResource{Group: "core", Resource: "Bar"}
+
+	cases := []struct {
+		name             string
+		mca              *addonv1beta1.ManagedClusterAddOn
+		desiredConfigMap addonConfigMap
+		expected         []addonv1beta1.ConfigReference
+	}{
+		{
+			name: "reordering same-GR configs updates status order",
+			mca: &addonv1beta1.ManagedClusterAddOn{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonv1beta1.ConfigReference{
+						{
+							ConfigGroupResource: fooGR,
+							DesiredConfig: &addonv1beta1.ConfigSpecHash{
+								ConfigReferent: addonv1beta1.ConfigReferent{Name: "alpha"},
+								SpecHash:       "hash-alpha",
+							},
+							LastAppliedConfig: &addonv1beta1.ConfigSpecHash{
+								ConfigReferent: addonv1beta1.ConfigReferent{Name: "alpha"},
+								SpecHash:       "hash-alpha",
+							},
+							LastObservedGeneration: 3,
+						},
+						{
+							ConfigGroupResource: fooGR,
+							DesiredConfig: &addonv1beta1.ConfigSpecHash{
+								ConfigReferent: addonv1beta1.ConfigReferent{Name: "beta"},
+								SpecHash:       "hash-beta",
+							},
+							LastAppliedConfig: &addonv1beta1.ConfigSpecHash{
+								ConfigReferent: addonv1beta1.ConfigReferent{Name: "beta"},
+								SpecHash:       "hash-beta",
+							},
+							LastObservedGeneration: 2,
+						},
+					},
+				},
+			},
+			desiredConfigMap: addonConfigMap{
+				fooGR: {
+					{
+						ConfigGroupResource: fooGR,
+						DesiredConfig: &addonv1beta1.ConfigSpecHash{
+							ConfigReferent: addonv1beta1.ConfigReferent{Name: "beta"},
+							SpecHash:       "hash-beta-new",
+						},
+					},
+					{
+						ConfigGroupResource: fooGR,
+						DesiredConfig: &addonv1beta1.ConfigSpecHash{
+							ConfigReferent: addonv1beta1.ConfigReferent{Name: "alpha"},
+							SpecHash:       "hash-alpha-new",
+						},
+					},
+				},
+			},
+			expected: []addonv1beta1.ConfigReference{
+				{
+					ConfigGroupResource: fooGR,
+					DesiredConfig: &addonv1beta1.ConfigSpecHash{
+						ConfigReferent: addonv1beta1.ConfigReferent{Name: "beta"},
+						SpecHash:       "hash-beta-new",
+					},
+					LastAppliedConfig: &addonv1beta1.ConfigSpecHash{
+						ConfigReferent: addonv1beta1.ConfigReferent{Name: "beta"},
+						SpecHash:       "hash-beta",
+					},
+					LastObservedGeneration: 2,
+				},
+				{
+					ConfigGroupResource: fooGR,
+					DesiredConfig: &addonv1beta1.ConfigSpecHash{
+						ConfigReferent: addonv1beta1.ConfigReferent{Name: "alpha"},
+						SpecHash:       "hash-alpha-new",
+					},
+					LastAppliedConfig: &addonv1beta1.ConfigSpecHash{
+						ConfigReferent: addonv1beta1.ConfigReferent{Name: "alpha"},
+						SpecHash:       "hash-alpha",
+					},
+					LastObservedGeneration: 3,
+				},
+			},
+		},
+		{
+			name: "new entry is appended without old status fields",
+			mca: &addonv1beta1.ManagedClusterAddOn{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonv1beta1.ConfigReference{
+						{
+							ConfigGroupResource: fooGR,
+							DesiredConfig: &addonv1beta1.ConfigSpecHash{
+								ConfigReferent: addonv1beta1.ConfigReferent{Name: "existing"},
+								SpecHash:       "hash1",
+							},
+							LastAppliedConfig: &addonv1beta1.ConfigSpecHash{
+								ConfigReferent: addonv1beta1.ConfigReferent{Name: "existing"},
+								SpecHash:       "hash1",
+							},
+							LastObservedGeneration: 5,
+						},
+					},
+				},
+			},
+			desiredConfigMap: addonConfigMap{
+				fooGR: {
+					{
+						ConfigGroupResource: fooGR,
+						DesiredConfig: &addonv1beta1.ConfigSpecHash{
+							ConfigReferent: addonv1beta1.ConfigReferent{Name: "existing"},
+							SpecHash:       "hash1",
+						},
+					},
+					{
+						ConfigGroupResource: fooGR,
+						DesiredConfig: &addonv1beta1.ConfigSpecHash{
+							ConfigReferent: addonv1beta1.ConfigReferent{Name: "brand-new"},
+							SpecHash:       "hash-new",
+						},
+					},
+				},
+			},
+			expected: []addonv1beta1.ConfigReference{
+				{
+					ConfigGroupResource: fooGR,
+					DesiredConfig: &addonv1beta1.ConfigSpecHash{
+						ConfigReferent: addonv1beta1.ConfigReferent{Name: "existing"},
+						SpecHash:       "hash1",
+					},
+					LastAppliedConfig: &addonv1beta1.ConfigSpecHash{
+						ConfigReferent: addonv1beta1.ConfigReferent{Name: "existing"},
+						SpecHash:       "hash1",
+					},
+					LastObservedGeneration: 5,
+				},
+				{
+					ConfigGroupResource: fooGR,
+					DesiredConfig: &addonv1beta1.ConfigSpecHash{
+						ConfigReferent: addonv1beta1.ConfigReferent{Name: "brand-new"},
+						SpecHash:       "hash-new",
+					},
+				},
+			},
+		},
+		{
+			name: "removed entry is dropped from status",
+			mca: &addonv1beta1.ManagedClusterAddOn{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonv1beta1.ConfigReference{
+						{
+							ConfigGroupResource: fooGR,
+							DesiredConfig: &addonv1beta1.ConfigSpecHash{
+								ConfigReferent: addonv1beta1.ConfigReferent{Name: "keep"},
+								SpecHash:       "hash-keep",
+							},
+							LastObservedGeneration: 1,
+						},
+						{
+							ConfigGroupResource: fooGR,
+							DesiredConfig: &addonv1beta1.ConfigSpecHash{
+								ConfigReferent: addonv1beta1.ConfigReferent{Name: "remove"},
+								SpecHash:       "hash-remove",
+							},
+							LastObservedGeneration: 1,
+						},
+					},
+				},
+			},
+			desiredConfigMap: addonConfigMap{
+				fooGR: {
+					{
+						ConfigGroupResource: fooGR,
+						DesiredConfig: &addonv1beta1.ConfigSpecHash{
+							ConfigReferent: addonv1beta1.ConfigReferent{Name: "keep"},
+							SpecHash:       "hash-keep",
+						},
+					},
+				},
+			},
+			expected: []addonv1beta1.ConfigReference{
+				{
+					ConfigGroupResource: fooGR,
+					DesiredConfig: &addonv1beta1.ConfigSpecHash{
+						ConfigReferent: addonv1beta1.ConfigReferent{Name: "keep"},
+						SpecHash:       "hash-keep",
+					},
+					LastObservedGeneration: 1,
+				},
+			},
+		},
+		{
+			name: "cross-GR ordering follows sorted GR keys",
+			mca: &addonv1beta1.ManagedClusterAddOn{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonv1beta1.ConfigReference{},
+				},
+			},
+			desiredConfigMap: addonConfigMap{
+				fooGR: {
+					{
+						ConfigGroupResource: fooGR,
+						DesiredConfig: &addonv1beta1.ConfigSpecHash{
+							ConfigReferent: addonv1beta1.ConfigReferent{Name: "foo-config"},
+							SpecHash:       "hash-foo",
+						},
+					},
+				},
+				barGR: {
+					{
+						ConfigGroupResource: barGR,
+						DesiredConfig: &addonv1beta1.ConfigSpecHash{
+							ConfigReferent: addonv1beta1.ConfigReferent{Name: "bar-config"},
+							SpecHash:       "hash-bar",
+						},
+					},
+				},
+			},
+			expected: []addonv1beta1.ConfigReference{
+				{
+					ConfigGroupResource: barGR,
+					DesiredConfig: &addonv1beta1.ConfigSpecHash{
+						ConfigReferent: addonv1beta1.ConfigReferent{Name: "bar-config"},
+						SpecHash:       "hash-bar",
+					},
+				},
+				{
+					ConfigGroupResource: fooGR,
+					DesiredConfig: &addonv1beta1.ConfigSpecHash{
+						ConfigReferent: addonv1beta1.ConfigReferent{Name: "foo-config"},
+						SpecHash:       "hash-foo",
+					},
+				},
+			},
+		},
+	}
+
+	reconciler := &managedClusterAddonConfigurationReconciler{}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := reconciler.mergeAddonConfig(c.mca, c.desiredConfigMap)
+			if !apiequality.Semantic.DeepEqual(result.Status.ConfigReferences, c.expected) {
+				t.Errorf("mergeAddonConfig result mismatch\nexpected: %v\n  actual: %v",
+					c.expected, result.Status.ConfigReferences)
+			}
+		})
 	}
 }

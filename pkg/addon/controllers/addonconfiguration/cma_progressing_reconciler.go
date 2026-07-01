@@ -62,6 +62,9 @@ func setAddOnInstallProgressionsAndLastApplied(
 		condition.Message = fmt.Sprintf("selected clusters %d. configured addons %d/%d progressing..., %d failed %d timeout.", total, progressing+done, configuredTotal, failed, timeout)
 	} else {
 		for i, configRef := range installProgression.ConfigReferences {
+			if configRef.DesiredConfig == nil {
+				continue
+			}
 			installProgression.ConfigReferences[i].LastAppliedConfig = configRef.DesiredConfig.DeepCopy()
 			installProgression.ConfigReferences[i].LastKnownGoodConfig = configRef.DesiredConfig.DeepCopy()
 		}
