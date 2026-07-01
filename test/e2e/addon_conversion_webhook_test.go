@@ -8,6 +8,7 @@ import (
 	"github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/client-go/util/retry"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
@@ -464,49 +465,52 @@ var _ = ginkgo.Describe("Create v1alpha1 ClusterManagementAddOn", ginkgo.Label("
 		_, err := hub.CreateClusterManagementAddOnV1Alpha1(addonName, addon)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		ginkgo.By("Update v1alpha1 ClusterManagementAddOn status using v1alpha1 client")
+		ginkgo.By("Update v1alpha1 ClusterManagementAddOn status and verify v1beta1 conversion")
 		gomega.Eventually(func() error {
-			addon, err = hub.GetClusterManagementAddOnV1Alpha1(addonName)
+			err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				addon, err := hub.GetClusterManagementAddOnV1Alpha1(addonName)
+				if err != nil {
+					return err
+				}
+				addon.Status.DefaultConfigReferences = []addonv1alpha1.DefaultConfigReference{
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
+							Group:    "addon.open-cluster-management.io",
+							Resource: "addondeploymentconfigs",
+						},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{
+								Name: "test-config",
+							},
+						},
+					},
+				}
+				_, err = hub.AddonClient.AddonV1alpha1().ClusterManagementAddOns().UpdateStatus(
+					context.Background(), addon, metav1.UpdateOptions{})
+				return err
+			})
 			if err != nil {
 				return err
 			}
-			addon.Status.DefaultConfigReferences = []addonv1alpha1.DefaultConfigReference{
-				{
-					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
-						Group:    "addon.open-cluster-management.io",
-						Resource: "addondeploymentconfigs",
-					},
-					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-						ConfigReferent: addonv1alpha1.ConfigReferent{
-							Name: "test-config",
-						},
-					},
-				},
-			}
-			_, err = hub.AddonClient.AddonV1alpha1().ClusterManagementAddOns().UpdateStatus(
-				context.Background(), addon, metav1.UpdateOptions{})
-			return err
-		}).Should(gomega.Succeed())
 
-		ginkgo.By("Get v1alpha1 ClusterManagementAddOn using v1beta1 client and verify conversion")
-		gomega.Eventually(func() error {
 			v1beta1Addon, err := hub.GetClusterManagementAddOnV1Beta1(addonName)
 			if err != nil {
 				return err
 			}
-			// Verify spec.supportedConfigs → spec.defaultConfigs conversion
 			if len(v1beta1Addon.Spec.DefaultConfigs) != 1 {
-				return fmt.Errorf("expected 1 default config but got %v", len(v1beta1Addon.Spec.DefaultConfigs))
+				return fmt.Errorf("expected 1 default config but got %d", len(v1beta1Addon.Spec.DefaultConfigs))
 			}
 			if v1beta1Addon.Spec.DefaultConfigs[0].Name != "test-config" {
-				return fmt.Errorf("expected test-config but got %v", v1beta1Addon.Spec.DefaultConfigs[0].Name)
+				return fmt.Errorf("expected test-config but got %s", v1beta1Addon.Spec.DefaultConfigs[0].Name)
 			}
-			// Verify status.DefaultConfigReferences conversion
 			if len(v1beta1Addon.Status.DefaultConfigReferences) != 1 {
-				return fmt.Errorf("expected 1 default config but got %v", len(v1beta1Addon.Status.DefaultConfigReferences))
+				return fmt.Errorf("expected 1 default config reference but got %d", len(v1beta1Addon.Status.DefaultConfigReferences))
+			}
+			if v1beta1Addon.Status.DefaultConfigReferences[0].DesiredConfig == nil {
+				return fmt.Errorf("expected desired config in status")
 			}
 			if v1beta1Addon.Status.DefaultConfigReferences[0].DesiredConfig.Name != "test-config" {
-				return fmt.Errorf("expected status-config but got %v", v1beta1Addon.Status.DefaultConfigReferences[0].DesiredConfig.Name)
+				return fmt.Errorf("expected test-config in status but got %s", v1beta1Addon.Status.DefaultConfigReferences[0].DesiredConfig.Name)
 			}
 			return nil
 		}).Should(gomega.Succeed())
