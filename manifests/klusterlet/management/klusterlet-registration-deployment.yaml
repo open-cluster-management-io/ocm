@@ -88,6 +88,9 @@ spec:
           {{if .ClusterAnnotationsString}}
           - "--cluster-annotations={{ .ClusterAnnotationsString }}"
           {{end}}
+          {{if .ClusterLabelsString}}
+          - "--cluster-labels={{ .ClusterLabelsString }}"
+          {{end}}
           {{if gt .RegistrationKubeAPIQPS 0.0}}
           - "--kube-api-qps={{ .RegistrationKubeAPIQPS }}"
           {{end}}

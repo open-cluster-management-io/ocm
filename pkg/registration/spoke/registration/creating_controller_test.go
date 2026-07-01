@@ -2,6 +2,7 @@ package registration
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -9,6 +10,7 @@ import (
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
@@ -75,6 +77,56 @@ func TestCreateSpokeCluster(t *testing.T) {
 			}
 
 			c.validateActions(t, clusterClient.Actions())
+		})
+	}
+}
+
+func TestLabelDecorator(t *testing.T) {
+	cases := []struct {
+		name     string
+		existing map[string]string
+		input    map[string]string
+		want     map[string]string
+	}{
+		{
+			name:  "apply user labels on a cluster without labels",
+			input: map[string]string{"env": "prod"},
+			want:  map[string]string{"env": "prod"},
+		},
+		{
+			name:  "reserved labels are dropped",
+			input: map[string]string{"env": "prod", clusterv1beta2.ClusterSetLabel: "team-a"},
+			want:  map[string]string{"env": "prod"},
+		},
+		{
+			name:     "existing labels are not overwritten",
+			existing: map[string]string{"env": "staging"},
+			input:    map[string]string{"env": "prod", "tier": "gold"},
+			want:     map[string]string{"env": "staging", "tier": "gold"},
+		},
+		{
+			name:     "existing reserved label is preserved and injected reserved value is ignored",
+			existing: map[string]string{clusterv1beta2.ClusterSetLabel: "keep-me"},
+			input:    map[string]string{clusterv1beta2.ClusterSetLabel: "attacker", "env": "prod"},
+			want:     map[string]string{clusterv1beta2.ClusterSetLabel: "keep-me", "env": "prod"},
+		},
+		{
+			name:  "nil input is safe",
+			input: nil,
+			want:  map[string]string{},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cluster := &clusterv1.ManagedCluster{}
+			if c.existing != nil {
+				cluster.Labels = c.existing
+			}
+			got := LabelDecorator(c.input)(cluster)
+			if !reflect.DeepEqual(got.Labels, c.want) {
+				t.Errorf("LabelDecorator() labels = %v, want %v", got.Labels, c.want)
+			}
 		})
 	}
 }
