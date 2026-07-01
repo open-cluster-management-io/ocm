@@ -20,7 +20,6 @@ import (
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
-	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
@@ -62,81 +61,6 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		func() {
 			cancel()
 		})
-
-	assertSuccessClusterBootstrap := func() {
-		// the spoke cluster and csr should be created after bootstrap
-		ginkgo.By("Check existence of ManagedCluster & CSR")
-		gomega.Eventually(func() error {
-			if _, err := util.GetManagedCluster(clusterClient, managedClusterName); err != nil {
-				return err
-			}
-			return nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
-
-		gomega.Eventually(func() error {
-			if _, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName); err != nil {
-				return err
-			}
-			return nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
-
-		// the spoke cluster should has finalizer that is added by hub controller
-		gomega.Eventually(func() bool {
-			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
-			if err != nil {
-				return false
-			}
-
-			if !commonhelpers.HasFinalizer(spokeCluster.Finalizers, clusterv1.ManagedClusterFinalizer) {
-				return false
-			}
-
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
-		ginkgo.By("Accept and approve the ManagedCluster")
-		// simulate hub cluster admin to accept the managedcluster and approve the csr
-		err = util.AcceptManagedCluster(clusterClient, managedClusterName)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-		err = authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-		// the managed cluster should have accepted condition after it is accepted
-		gomega.Eventually(func() bool {
-			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
-			if err != nil {
-				return false
-			}
-			accepted := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
-			return accepted != nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
-		// the hub kubeconfig secret should be filled after the csr is approved
-		gomega.Eventually(func() bool {
-			if _, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret); err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
-		ginkgo.By("ManagedCluster joins the hub")
-		// the spoke cluster should have joined condition finally
-		gomega.Eventually(func() bool {
-			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
-			if err != nil {
-				return false
-			}
-			joined := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
-			return joined != nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
-		// ensure cluster namespace is in place
-		gomega.Eventually(func() bool {
-			_, err := kubeClient.CoreV1().Namespaces().Get(context.TODO(), managedClusterName, metav1.GetOptions{})
-			return err == nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-	}
 
 	assertSuccessCSRApproval := func() {
 		ginkgo.By("Approve bootstrap csr")
@@ -187,21 +111,6 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
-	}
-
-	assertAddonLabel := func(clusterName, addonName, status string) {
-		ginkgo.By("Check addon status label on managed cluster")
-		gomega.Eventually(func() bool {
-			cluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
-			if err != nil {
-				return false
-			}
-			if len(cluster.Labels) == 0 {
-				return false
-			}
-			key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addonName)
-			return cluster.Labels[key] == status
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	}
 
 	assertClientCertCondition := func(clusterName, addonName string) {
@@ -306,7 +215,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 
 	assertRegistrationSucceed := func() {
 		ginkgo.It("should register addon successfully", func() {
-			assertSuccessClusterBootstrap()
+			assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
 			assertSuccessAddOnBootstrap(addonv1beta1.KubeClient, "")
 
 			ginkgo.By("Delete the addon and check if secret is gone")
@@ -326,7 +235,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		assertRegistrationSucceed()
 
 		ginkgo.It("should register addon successfully even when the install namespace is not available at the beginning", func() {
-			assertSuccessClusterBootstrap()
+			assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
 
 			ginkgo.By("Create ManagedClusterAddOn cr with required annotations")
 
@@ -390,13 +299,13 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		})
 
 		ginkgo.It("should register addon with custom signer successfully", func() {
-			assertSuccessClusterBootstrap()
+			assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
 			signerName := "example.com/signer1"
 			assertSuccessAddOnBootstrap(addonv1beta1.CustomSigner, signerName)
 		})
 
 		ginkgo.It("should addon registration config updated successfully", func() {
-			assertSuccessClusterBootstrap()
+			assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
 			assertSuccessAddOnBootstrap(addonv1beta1.KubeClient, "")
 
 			// update registration config and change the signer
@@ -424,7 +333,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		})
 
 		ginkgo.It("should rotate addon client cert successfully", func() {
-			assertSuccessClusterBootstrap()
+			assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
 			assertSuccessAddOnBootstrap(addonv1beta1.KubeClient, "")
 
 			secretName := getSecretName(addonv1beta1.KubeClient, addOnName, "")
@@ -443,7 +352,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		})
 
 		ginkgo.It("should stop addon client cert update if too frequent", func() {
-			assertSuccessClusterBootstrap()
+			assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
 			assertSuccessAddOnBootstrap(addonv1beta1.KubeClient, "")
 
 			// update subject for 15 times
