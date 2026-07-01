@@ -33,6 +33,10 @@ spec:
     registrationDrivers:
       {{- toYaml . | nindent 6 }}
     {{- end }}
+    {{- with .Values.clusterManager.registrationConfiguration.importerConfiguration }}
+    importerConfiguration:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
   {{- with .Values.clusterManager.workConfiguration }}
   workConfiguration:
     {{- toYaml . | nindent 4 }}
