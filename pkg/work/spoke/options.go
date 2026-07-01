@@ -1,6 +1,7 @@
 package spoke
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -23,6 +24,8 @@ type WorkloadAgentOptions struct {
 	CloudEventsClientCodecs                []string
 	DefaultUserAgent                       string
 
+	WorkloadAgentWorkers int
+
 	ObjectReaderOption *objectreader.Options
 }
 
@@ -36,6 +39,7 @@ func NewWorkloadAgentOptions() *WorkloadAgentOptions {
 		WorkloadSourceConfig:                   "/spoke/hub-kubeconfig/kubeconfig",
 		DefaultUserAgent:                       defaultUserAgent,
 		ObjectReaderOption:                     objectreader.NewOptions(),
+		WorkloadAgentWorkers:                   10,
 	}
 }
 
@@ -56,5 +60,16 @@ func (o *WorkloadAgentOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&o.CloudEventsClientCodecs, "cloudevents-client-codecs", o.CloudEventsClientCodecs,
 		"The codecs for cloudevents client when workload source source is based on cloudevents, the valid codecs: manifest or manifestbundle")
 
+	fs.IntVar(&o.WorkloadAgentWorkers, "workload-agent-workers",
+		o.WorkloadAgentWorkers, "The number of workers for the workload agent controllers")
+
 	o.ObjectReaderOption.AddFlags(fs)
+}
+
+// Validate checks if the options are valid
+func (o *WorkloadAgentOptions) Validate() error {
+	if o.WorkloadAgentWorkers < 1 {
+		return fmt.Errorf("workload-agent-workers must be >= 1, got %d", o.WorkloadAgentWorkers)
+	}
+	return nil
 }
