@@ -43,6 +43,8 @@ func (d *deployReconciler) reconcile(
 	count, total, succeededCount := 0, 0, 0
 
 	// Report invalid ManifestWork owner labels in status.
+	// TODO: remove this once the owner label uses a hash value instead of
+	// namespace.name (#1596); the 63-char label limit no longer applies then.
 	ownerValue := manifestWorkReplicaSetKey(mwrSet)
 	if verrs := validation.IsValidLabelValue(ownerValue); len(verrs) > 0 {
 		message := fmt.Sprintf("ManifestWork owner reference %q (namespace.name) is not a valid label value: %s; "+
