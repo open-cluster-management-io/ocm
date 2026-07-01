@@ -1,3 +1,27 @@
+{{/* The name of the image pull secret created by the chart or referenced by default. */}}
+{{- define "clusterManager.imagePullSecretName" -}}
+{{- define "clusterManager.imagePullSecretName" -}}
+{{- if .Values.images.imagePullSecrets -}}
+{{- $name := (index .Values.images.imagePullSecrets 0).name | default "" -}}
+{{- required "images.imagePullSecrets[0].name must be set when imagePullSecrets is provided" $name -}}
+{{- else -}}
+open-cluster-management-image-pull-credentials
+{{- end -}}
+{{- end }}
+{{- else -}}
+open-cluster-management-image-pull-credentials
+{{- end -}}
+{{- end }}
+
+{{/* Image pull secrets for operator pods and service account. */}}
+{{- define "clusterManager.imagePullSecrets" -}}
+{{- if .Values.images.imagePullSecrets -}}
+{{ .Values.images.imagePullSecrets | toYaml }}
+{{- else -}}
+- name: {{ include "clusterManager.imagePullSecretName" . }}
+{{- end -}}
+{{- end }}
+
 {{/* Create secret to access docker registry */}}
 {{- define "imagePullSecret" }}
 {{- with .Values.images }}

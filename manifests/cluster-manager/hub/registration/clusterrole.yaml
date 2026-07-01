@@ -121,7 +121,7 @@ rules:
   resources: ["secrets"]
   verbs: ["get"]
   resourceNames:
-    - "open-cluster-management-image-pull-credentials"
+    - "{{ .ImagePullSecretName }}"
     - "cluster-import-config"
 {{end}}
 {{if .ClusterProfileEnabled}}

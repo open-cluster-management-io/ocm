@@ -7,6 +7,7 @@ import (
 	"k8s.io/utils/clock"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager"
 	"open-cluster-management.io/ocm/pkg/version"
 )
@@ -30,6 +31,8 @@ func NewHubOperatorCmd() *cobra.Command {
 		"Number of deployment replicas, operator will automatically determine replicas if not set")
 	flags.BoolVar(&cmOptions.EnableSyncLabels, "enable-sync-labels", false,
 		"If set, will sync the labels of ClusterManager CR to all hub resources")
+	flags.StringVar(&cmOptions.ImagePullSecretName, "image-pull-secret-name", helpers.ImagePullSecret,
+		"The name of the image pull secret in the operator namespace to sync to hub components")
 	opts.AddFlags(flags)
 	return cmd
 }

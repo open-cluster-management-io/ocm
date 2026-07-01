@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/ghodss/yaml"
@@ -2402,5 +2403,49 @@ func TestGRPCServerEndpointType(t *testing.T) {
 				t.Errorf("expected endpoint type %s, but got %s", tc.expectedType, endpointType)
 			}
 		})
+	}
+}
+
+func TestNormalizeImagePullSecretName(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "default when empty",
+			expected: ImagePullSecret,
+		},
+		{
+			name:     "custom secret name",
+			input:    "my-registry-secret",
+			expected: "my-registry-secret",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := NormalizeImagePullSecretName(c.input); got != c.expected {
+				t.Fatalf("expected %q, got %q", c.expected, got)
+			}
+		})
+	}
+}
+
+func TestRegistrationClusterRoleImagePullSecretName(t *testing.T) {
+	template, err := manifests.ClusterManagerManifestFiles.ReadFile("cluster-manager/hub/registration/clusterrole.yaml")
+	if err != nil {
+		t.Fatalf("failed to read manifest: %v", err)
+	}
+
+	objData := assets.MustCreateAssetFromTemplate("cluster-manager/hub/registration/clusterrole.yaml", template, manifests.HubConfig{
+		ClusterManagerName:     "test",
+		ClusterImporterEnabled: true,
+		ImagePullSecretName:    "my-registry-secret",
+		Replica:                1,
+	}).Data
+
+	if !strings.Contains(string(objData), "my-registry-secret") {
+		t.Fatalf("expected clusterrole to reference custom image pull secret, got:\n%s", string(objData))
 	}
 }
