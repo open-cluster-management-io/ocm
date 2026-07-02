@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/kubernetes"
@@ -84,34 +85,42 @@ func (d *Debugger) Handler(w http.ResponseWriter, r *http.Request) {
 		// POST: Parse Placement from request body
 		placement, err = d.parsePlacementFromBody(r)
 		if err != nil {
-			d.reportErr(w, err)
+			d.reportErr(w, http.StatusBadRequest, err)
 			return
 		}
 	} else {
 		// GET: Fetch Placement from API (original behavior)
 		namespace, name, err := d.parsePath(r.URL.Path)
 		if err != nil {
-			d.reportErr(w, err)
+			d.reportErr(w, http.StatusBadRequest, err)
+			return
+		}
+		if namespace == "" {
+			d.reportErr(w, http.StatusBadRequest, fmt.Errorf("invalid debug path: namespace and name required"))
 			return
 		}
 
 		placement, err = d.placementLister.Placements(namespace).Get(name)
 		if err != nil {
-			d.reportErr(w, err)
+			if apierrors.IsNotFound(err) {
+				d.reportErr(w, http.StatusNotFound, fmt.Errorf("placement '%s' not found", name))
+			} else {
+				d.reportErr(w, http.StatusInternalServerError, err)
+			}
 			return
 		}
 	}
 
 	// Check if user has permission to create placements in this namespace
 	if err := d.checkPermission(r, placement.Namespace); err != nil {
-		d.reportErr(w, err)
+		d.reportPermissionErr(w, err)
 		return
 	}
 
 	// Get valid clustersetbindings in the placement namespace
 	bindings, err := scheduling.GetValidManagedClusterSetBindings(placement.Namespace, d.clusterSetBindingLister, d.clusterSetLister)
 	if err != nil {
-		d.reportErr(w, err)
+		d.reportErr(w, http.StatusInternalServerError, err)
 		return
 	}
 
@@ -121,7 +130,7 @@ func (d *Debugger) Handler(w http.ResponseWriter, r *http.Request) {
 	// Get available clusters for the placement
 	clusters, err := scheduling.GetAvailableClusters(clusterSetNames, d.clusterSetLister, d.clusterLister)
 	if err != nil {
-		d.reportErr(w, err)
+		d.reportErr(w, http.StatusInternalServerError, err)
 		return
 	}
 
@@ -182,12 +191,26 @@ func (d *Debugger) parsePlacementFromBody(r *http.Request) (*clusterv1beta1.Plac
 	return &placement, nil
 }
 
-func (d *Debugger) reportErr(w http.ResponseWriter, err error) {
+func (d *Debugger) reportErr(w http.ResponseWriter, statusCode int, err error) {
 	result := &DebugResult{Error: err.Error()}
 
 	resultByte, _ := json.Marshal(result)
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
 	_, _ = w.Write(resultByte)
+}
+
+func (d *Debugger) reportPermissionErr(w http.ResponseWriter, err error) {
+	statusCode := http.StatusInternalServerError
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "user information not found"):
+		statusCode = http.StatusUnauthorized
+	case strings.Contains(msg, "does not have permission"):
+		statusCode = http.StatusForbidden
+	}
+	d.reportErr(w, statusCode, err)
 }
 
 // checkPermission checks if the user has permission to create placements in the namespace using SAR

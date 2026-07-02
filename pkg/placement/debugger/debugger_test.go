@@ -15,6 +15,7 @@ import (
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -22,6 +23,8 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
+	clusterlisterv1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
@@ -70,6 +73,301 @@ func (s *testScheduler) Schedule(ctx context.Context,
 
 func (r *testResult) RequeueAfter() *time.Duration {
 	return nil
+}
+
+func assertErrorResponse(t *testing.T, res *http.Response, expectStatus int, errorContains string) {
+	t.Helper()
+
+	if res.StatusCode != expectStatus {
+		t.Errorf("Expected HTTP status %d, got %d", expectStatus, res.StatusCode)
+	}
+	if ct := res.Header.Get("Content-Type"); ct != "application/json" {
+		t.Errorf("Expected Content-Type application/json, got %q", ct)
+	}
+
+	var result DebugResult
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+	if result.Error == "" {
+		t.Fatal("Expected error in response body")
+	}
+	if errorContains != "" && !strings.Contains(result.Error, errorContains) {
+		t.Errorf("Expected error to contain %q, got: %s", errorContains, result.Error)
+	}
+}
+
+func newAuthenticatedDebuggerServer(t *testing.T, initObjs []runtime.Object, mutate func(*Debugger)) (*httptest.Server, func()) {
+	t.Helper()
+
+	clusterClient := clusterfake.NewSimpleClientset(initObjs...)
+	clusterInformerFactory := testinghelpers.NewClusterInformerFactory(clusterClient, initObjs...)
+	kubeClient := kubefake.NewClientset()
+	kubeClient.PrependReactor("create", "subjectaccessreviews", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		sar := action.(k8stesting.CreateAction).GetObject().(*authorizationv1.SubjectAccessReview)
+		sar.Status.Allowed = true
+		return true, sar, nil
+	})
+
+	debugger := NewDebugger(
+		&testScheduler{result: &testResult{}},
+		kubeClient,
+		clusterInformerFactory.Cluster().V1beta1().Placements(),
+		clusterInformerFactory.Cluster().V1().ManagedClusters(),
+		clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets(),
+		clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings(),
+	)
+	if mutate != nil {
+		mutate(debugger)
+	}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userInfo := &user.DefaultInfo{
+			Name:   "test-user",
+			Groups: []string{"system:authenticated"},
+		}
+		ctx := request.WithUser(r.Context(), userInfo)
+		debugger.Handler(w, r.WithContext(ctx))
+	})
+
+	server := httptest.NewServer(handler)
+	return server, server.Close
+}
+
+type fakePlacementLister struct {
+	getErr error
+}
+
+func (f *fakePlacementLister) List(labels.Selector) ([]*clusterapiv1beta1.Placement, error) {
+	return nil, nil
+}
+
+func (f *fakePlacementLister) Placements(string) clusterlisterv1beta1.PlacementNamespaceLister {
+	return fakePlacementNamespaceLister{getErr: f.getErr}
+}
+
+type fakePlacementNamespaceLister struct {
+	getErr error
+}
+
+func (f fakePlacementNamespaceLister) List(labels.Selector) ([]*clusterapiv1beta1.Placement, error) {
+	return nil, nil
+}
+
+func (f fakePlacementNamespaceLister) Get(string) (*clusterapiv1beta1.Placement, error) {
+	return nil, f.getErr
+}
+
+type fakeClusterSetBindingLister struct {
+	listErr error
+}
+
+func (f *fakeClusterSetBindingLister) List(labels.Selector) ([]*clusterapiv1beta2.ManagedClusterSetBinding, error) {
+	return nil, nil
+}
+
+func (f *fakeClusterSetBindingLister) ManagedClusterSetBindings(string) clusterlisterv1beta2.ManagedClusterSetBindingNamespaceLister {
+	return fakeClusterSetBindingNamespaceLister{listErr: f.listErr}
+}
+
+type fakeClusterSetBindingNamespaceLister struct {
+	listErr error
+}
+
+func (f fakeClusterSetBindingNamespaceLister) List(labels.Selector) ([]*clusterapiv1beta2.ManagedClusterSetBinding, error) {
+	return nil, f.listErr
+}
+
+func (f fakeClusterSetBindingNamespaceLister) Get(string) (*clusterapiv1beta2.ManagedClusterSetBinding, error) {
+	return nil, nil
+}
+
+type fakeManagedClusterLister struct {
+	listErr error
+}
+
+func (f *fakeManagedClusterLister) List(labels.Selector) ([]*clusterapiv1.ManagedCluster, error) {
+	return nil, f.listErr
+}
+
+func (f *fakeManagedClusterLister) Get(string) (*clusterapiv1.ManagedCluster, error) {
+	return nil, nil
+}
+
+func TestReportErr(t *testing.T) {
+	debugger := &Debugger{}
+	rec := httptest.NewRecorder()
+
+	debugger.reportErr(rec, http.StatusBadRequest, fmt.Errorf("test error"))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected HTTP status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
+		t.Errorf("Expected Content-Type application/json, got %q", ct)
+	}
+
+	var result DebugResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+	if result.Error != "test error" {
+		t.Errorf("Expected error %q, got %q", "test error", result.Error)
+	}
+}
+
+func TestReportPermissionErr(t *testing.T) {
+	debugger := &Debugger{}
+
+	cases := []struct {
+		name         string
+		err          error
+		expectStatus int
+	}{
+		{
+			name:         "missing user",
+			err:          fmt.Errorf("user information not found in request context"),
+			expectStatus: http.StatusUnauthorized,
+		},
+		{
+			name:         "forbidden",
+			err:          fmt.Errorf("user does not have permission to create placements in namespace test: denied"),
+			expectStatus: http.StatusForbidden,
+		},
+		{
+			name:         "internal",
+			err:          fmt.Errorf("failed to check permissions: boom"),
+			expectStatus: http.StatusInternalServerError,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			debugger.reportPermissionErr(rec, c.err)
+			if rec.Code != c.expectStatus {
+				t.Errorf("Expected HTTP status %d, got %d", c.expectStatus, rec.Code)
+			}
+		})
+	}
+}
+
+func TestDebuggerHandlerReportErr(t *testing.T) {
+	const (
+		placementNamespace = "test-ns"
+		placementName      = "test-placement"
+	)
+
+	validObjs := []runtime.Object{
+		testinghelpers.NewPlacement(placementNamespace, placementName).WithClusterSets("test-set").Build(),
+		testinghelpers.NewManagedCluster("cluster1").WithLabel("clusterset", "test-set").Build(),
+		testinghelpers.NewClusterSet("test-set").WithClusterSelector(clusterapiv1beta2.ManagedClusterSelector{
+			SelectorType: clusterapiv1beta2.LabelSelector,
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"clusterset": "test-set"},
+			},
+		}).Build(),
+		testinghelpers.NewClusterSetBinding(placementNamespace, "test-set"),
+	}
+
+	cases := []struct {
+		name          string
+		initObjs      []runtime.Object
+		method        string
+		pathSuffix    string
+		body          []byte
+		mutate        func(*Debugger)
+		expectStatus  int
+		errorContains string
+	}{
+		{
+			name:          "POST invalid JSON",
+			method:        http.MethodPost,
+			body:          []byte("{"),
+			expectStatus:  http.StatusBadRequest,
+			errorContains: "failed to unmarshal placement JSON",
+		},
+		{
+			name:          "GET incomplete path",
+			method:        http.MethodGet,
+			pathSuffix:    "placement-only",
+			expectStatus:  http.StatusBadRequest,
+			errorContains: "namespace and name required",
+		},
+		{
+			name:          "GET placement not found",
+			method:        http.MethodGet,
+			pathSuffix:    placementNamespace + "/does-not-exist",
+			expectStatus:  http.StatusNotFound,
+			errorContains: "does-not-exist",
+		},
+		{
+			name:       "GET placement lister failure",
+			initObjs:   validObjs,
+			method:     http.MethodGet,
+			pathSuffix: placementNamespace + "/" + placementName,
+			mutate: func(d *Debugger) {
+				d.placementLister = &fakePlacementLister{getErr: fmt.Errorf("lister unavailable")}
+			},
+			expectStatus:  http.StatusInternalServerError,
+			errorContains: "lister unavailable",
+		},
+		{
+			name:       "GET clusterset binding list failure",
+			initObjs:   validObjs,
+			method:     http.MethodGet,
+			pathSuffix: placementNamespace + "/" + placementName,
+			mutate: func(d *Debugger) {
+				d.clusterSetBindingLister = &fakeClusterSetBindingLister{listErr: fmt.Errorf("binding lister unavailable")}
+			},
+			expectStatus:  http.StatusInternalServerError,
+			errorContains: "binding lister unavailable",
+		},
+		{
+			name:       "GET managed cluster list failure",
+			initObjs:   validObjs,
+			method:     http.MethodGet,
+			pathSuffix: placementNamespace + "/" + placementName,
+			mutate: func(d *Debugger) {
+				d.clusterLister = &fakeManagedClusterLister{listErr: fmt.Errorf("cluster lister unavailable")}
+			},
+			expectStatus:  http.StatusInternalServerError,
+			errorContains: "cluster lister unavailable",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			server, closeServer := newAuthenticatedDebuggerServer(t, c.initObjs, c.mutate)
+			defer closeServer()
+
+			method := c.method
+			if method == "" {
+				method = http.MethodGet
+			}
+
+			var body io.Reader
+			if len(c.body) > 0 {
+				body = bytes.NewBuffer(c.body)
+			}
+
+			req, err := http.NewRequest(method, fmt.Sprintf("%s%s%s", server.URL, DebugPath, c.pathSuffix), body)
+			if err != nil {
+				t.Fatalf("Failed to create request: %v", err)
+			}
+			if method == http.MethodPost {
+				req.Header.Set("Content-Type", "application/json")
+			}
+
+			res, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			defer res.Body.Close()
+
+			assertErrorResponse(t, res, c.expectStatus, c.errorContains)
+		})
+	}
 }
 
 func TestDebuggerGETMethod(t *testing.T) {
@@ -476,34 +774,39 @@ func TestDebuggerPermissionCheck(t *testing.T) {
 		sarAllowed       bool
 		sarError         error
 		expectError      bool
+		expectStatusCode int
 		errorContains    string
 		verifySARRequest func(t *testing.T, sar *authorizationv1.SubjectAccessReview)
 	}{
 		{
-			name:          "No user in context - should reject",
-			injectUser:    false,
-			expectError:   true,
-			errorContains: "user information not found in request context",
+			name:             "No user in context - should reject",
+			injectUser:       false,
+			expectError:      true,
+			expectStatusCode: http.StatusUnauthorized,
+			errorContains:    "user information not found in request context",
 		},
 		{
-			name:        "User with permission - should allow",
-			injectUser:  true,
-			sarAllowed:  true,
-			expectError: false,
+			name:             "User with permission - should allow",
+			injectUser:       true,
+			sarAllowed:       true,
+			expectError:      false,
+			expectStatusCode: http.StatusOK,
 		},
 		{
-			name:          "User without permission - should reject",
-			injectUser:    true,
-			sarAllowed:    false,
-			expectError:   true,
-			errorContains: "does not have permission",
+			name:             "User without permission - should reject",
+			injectUser:       true,
+			sarAllowed:       false,
+			expectError:      true,
+			expectStatusCode: http.StatusForbidden,
+			errorContains:    "does not have permission",
 		},
 		{
-			name:          "SAR API call fails",
-			injectUser:    true,
-			sarError:      fmt.Errorf("API server error"),
-			expectError:   true,
-			errorContains: "failed to check permissions",
+			name:             "SAR API call fails",
+			injectUser:       true,
+			sarError:         fmt.Errorf("API server error"),
+			expectError:      true,
+			expectStatusCode: http.StatusInternalServerError,
+			errorContains:    "failed to check permissions",
 		},
 		{
 			name:       "User with Extra fields - should pass all fields to SAR",
@@ -516,8 +819,9 @@ func TestDebuggerPermissionCheck(t *testing.T) {
 					"custom.example.com/department":       {"engineering"},
 				},
 			},
-			sarAllowed:  true,
-			expectError: false,
+			sarAllowed:       true,
+			expectError:      false,
+			expectStatusCode: http.StatusOK,
 			verifySARRequest: func(t *testing.T, sar *authorizationv1.SubjectAccessReview) {
 				expected := map[string]authorizationv1.ExtraValue{
 					"authentication.kubernetes.io/scopes": {"read", "write"},
@@ -609,6 +913,9 @@ func TestDebuggerPermissionCheck(t *testing.T) {
 			}
 
 			// Verify result
+			if res.StatusCode != c.expectStatusCode {
+				t.Errorf("Expected HTTP status %d, got %d", c.expectStatusCode, res.StatusCode)
+			}
 			if c.expectError {
 				if result.Error == "" {
 					t.Errorf("Expected error but got none")

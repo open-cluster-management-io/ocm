@@ -74,11 +74,11 @@ create a local Kubernetes cluster and deploy the Open Cluster Management compone
 kind create cluster
 ```
 
-2. Deploy the Open Cluster Management components referring to the [Setup hub and managed clusters](https://open-cluster-management.io/getting-started/quick-start) guide on the kind cluster created in the previous step. Summary the key steps are:
+2. Deploy the Open Cluster Management components referring to the [Setup hub and managed clusters](https://open-cluster-management.io/docs/getting-started/quick-start/) guide on the kind cluster created in the previous step. Summary the key steps are:
 
     1. Install the clusteradm CLI tool:
     ```bash
-    curl -sL https://raw.githubusercontent.com/open-cluster-management/clusteradm/main/hack/install.sh | bash
+    curl -L https://raw.githubusercontent.com/open-cluster-management-io/clusteradm/main/install.sh | bash
     ```
     2. Init the control plane:
     ```bash
@@ -88,7 +88,7 @@ kind create cluster
     ```bash
     clusteradm join --hub-token <hub-token> --hub-apiserver <hub-apiserver> --wait --cluster-name cluster1 --force-internal-endpoint-lookup --bundle-version="latest"
     ```
-    4. Access the hub cluster:
+    4. Accept the hub cluster as a managed cluster:
     ```bash
     clusteradm accept --clusters cluster1
     ```
@@ -116,7 +116,7 @@ open-cluster-management         cluster-manager                           # watc
 open-cluster-management         klusterlet                                # watch managedcluster and deploy the managed cluster components
 ```
 
-Note: if klustelet is deployed in Singleton mode(`clusteradm join --hub-token <hub-token> --hub-apiserver <hub-apiserver> --wait --cluster-name cluster1 --force-internal-endpoint-lookup --bundle-version="latest" --singleton=true`), the `klusterlet-registration-agent`
+Note: if klusterlet is deployed in Singleton mode(`clusteradm join --hub-token <hub-token> --hub-apiserver <hub-apiserver> --wait --cluster-name cluster1 --force-internal-endpoint-lookup --bundle-version="latest" --singleton=true`), the `klusterlet-registration-agent`
  and `klusterlet-work-agent` will be replaced by one deployment `klusterlet-agent`.
 
 Once the Open Cluster Management components are deployed, you can start developing and testing your changes.

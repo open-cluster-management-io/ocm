@@ -15,9 +15,10 @@ on:
       - release-*
 
 env:
-  GO_VERSION: '1.25'
+  GO_VERSION: '1.26'
   GO_REQUIRED_MIN_VERSION: ''
   USE_EXISTING_CLUSTER: false # set to true to use an existing kind cluster for debugging with act
+  KUBERNETES_VERSION: 'v1.29.2'
 
 permissions:
   contents: read
@@ -30,21 +31,19 @@ jobs:
         run: sudo chown runner:docker /var/run/docker.sock
         if: ${{ env.ACT }} # this step only runs locally when using the https://github.com/nektos/act to debug the e2e
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup kind
-        uses: engineerd/setup-kind@v0.6.2
-        with:
-          version: v0.22.0
-          skipClusterCreation: ${{ env.USE_EXISTING_CLUSTER }}
+        if: ${{ env.USE_EXISTING_CLUSTER != 'true' }}
+        run: kind create cluster --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
       - name: Set KUBECONFIG
         run: |
           mkdir -p /home/runner/.kube
           kind get kubeconfig > /home/runner/.kube/config
-        if: ${{ env.USE_EXISTING_CLUSTER }}
+        if: ${{ env.USE_EXISTING_CLUSTER == 'true' }}
       - name: Test E2E
         run: |
           IMAGE_TAG=e2e make test-e2e
@@ -57,21 +56,19 @@ jobs:
         run: sudo chown runner:docker /var/run/docker.sock
         if: ${{ env.ACT }} # this step only runs locally when using the https://github.com/nektos/act to debug the e2e
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup kind
-        uses: engineerd/setup-kind@v0.6.2
-        with:
-          version: v0.22.0
-          skipClusterCreation: ${{ env.USE_EXISTING_CLUSTER }}
+        if: ${{ env.USE_EXISTING_CLUSTER != 'true' }}
+        run: kind create cluster --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
       - name: Set KUBECONFIG
         run: |
           mkdir -p /home/runner/.kube
           kind get kubeconfig > /home/runner/.kube/config
-        if: ${{ env.USE_EXISTING_CLUSTER }}
+        if: ${{ env.USE_EXISTING_CLUSTER == 'true' }}
       - name: Test E2E
         run: |
           IMAGE_TAG=e2e KLUSTERLET_DEPLOY_MODE=SingletonHosted make test-e2e
@@ -84,21 +81,19 @@ jobs:
         run: sudo chown runner:docker /var/run/docker.sock
         if: ${{ env.ACT }} # this step only runs locally when using the https://github.com/nektos/act to debug the e2e
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup kind
-        uses: engineerd/setup-kind@v0.6.2
-        with:
-          version: v0.22.0
-          skipClusterCreation: ${{ env.USE_EXISTING_CLUSTER }}
+        if: ${{ env.USE_EXISTING_CLUSTER != 'true' }}
+        run: kind create cluster --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
       - name: Set KUBECONFIG
         run: |
           mkdir -p /home/runner/.kube
           kind get kubeconfig > /home/runner/.kube/config
-        if: ${{ env.USE_EXISTING_CLUSTER }}
+        if: ${{ env.USE_EXISTING_CLUSTER == 'true' }}
       - name: Test E2E
         run: |
           IMAGE_TAG=e2e KLUSTERLET_DEPLOY_MODE=Singleton make test-e2e
@@ -111,21 +106,19 @@ jobs:
         run: sudo chown runner:docker /var/run/docker.sock
         if: ${{ env.ACT }} # this step only runs locally when using the https://github.com/nektos/act to debug the e2e
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup kind
-        uses: engineerd/setup-kind@v0.6.2
-        with:
-          version: v0.22.0
-          skipClusterCreation: ${{ env.USE_EXISTING_CLUSTER }}
+        if: ${{ env.USE_EXISTING_CLUSTER != 'true' }}
+        run: kind create cluster --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
       - name: Set KUBECONFIG
         run: |
           mkdir -p /home/runner/.kube
           kind get kubeconfig > /home/runner/.kube/config
-        if: ${{ env.USE_EXISTING_CLUSTER }}
+        if: ${{ env.USE_EXISTING_CLUSTER == 'true' }}
       - name: Test E2E
         run: |
           IMAGE_TAG=e2e REGISTRATION_DRIVER=grpc make test-e2e
