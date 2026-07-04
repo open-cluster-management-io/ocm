@@ -167,3 +167,8 @@ klusterlet:
 #   featureGates:
 #     - feature: ""
 #       mode: ""
+
+# extra volumes to be mounted in the operator deployment
+extraVolumes: []
+# extra volume mounts to be mounted in the operator deployment
+extraVolumeMounts: []
