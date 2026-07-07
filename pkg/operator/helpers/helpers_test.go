@@ -2417,8 +2417,18 @@ func TestNormalizeImagePullSecretName(t *testing.T) {
 			expected: ImagePullSecret,
 		},
 		{
+			name:     "default when whitespace only",
+			input:    "   ",
+			expected: ImagePullSecret,
+		},
+		{
 			name:     "custom secret name",
 			input:    "my-registry-secret",
+			expected: "my-registry-secret",
+		},
+		{
+			name:     "trim whitespace from secret name",
+			input:    " my-registry-secret ",
 			expected: "my-registry-secret",
 		},
 	}

@@ -820,10 +820,11 @@ func GetOperatorNamespace() string {
 
 // NormalizeImagePullSecretName returns the default image pull secret name when name is empty.
 func NormalizeImagePullSecretName(name string) string {
-	if name == "" {
+	normalized := strings.TrimSpace(name)
+	if normalized == "" {
 		return ImagePullSecret
 	}
-	return name
+	return normalized
 }
 
 // filterLabels removes reserved label keys from the input map
