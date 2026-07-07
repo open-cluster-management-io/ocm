@@ -40,6 +40,8 @@ spec:
             weight: 30
       securityContext:
         runAsNonRoot: true
+      imagePullSecrets:
+        - name: open-cluster-management-image-pull-credentials
       serviceAccountName: cluster-manager
       containers:
       - name: registration-operator
@@ -48,6 +50,7 @@ spec:
         args:
           - "/registration-operator"
           - "hub"
+          - --image-pull-secret-name=open-cluster-management-image-pull-credentials
         env:
         - name: POD_NAME
           valueFrom:
