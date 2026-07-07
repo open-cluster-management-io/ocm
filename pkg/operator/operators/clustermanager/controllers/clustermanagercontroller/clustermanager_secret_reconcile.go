@@ -18,30 +18,30 @@ import (
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
-var (
-	// secretNames is the slice of secrets to be synced from operator namespace to the clusterManager namespace
-	secretNames = []string{helpers.ImagePullSecret, helpers.WorkDriverConfigSecret}
-)
-
 type secretReconcile struct {
-	operatorKubeClient kubernetes.Interface
-	hubKubeClient      kubernetes.Interface
-	operatorNamespace  string
-	cache              resourceapply.ResourceCache
-	recorder           events.Recorder
-	enableSyncLabels   bool
+	operatorKubeClient  kubernetes.Interface
+	hubKubeClient       kubernetes.Interface
+	operatorNamespace   string
+	imagePullSecretName string
+	cache               resourceapply.ResourceCache
+	recorder            events.Recorder
+	enableSyncLabels    bool
+}
+
+func (c *secretReconcile) secretNames(config manifests.HubConfig) []string {
+	names := []string{c.imagePullSecretName}
+	isWorkDriver := config.CloudEventsDriverEnabled && config.WorkDriver != string(operatorapiv1.WorkDriverTypeKube)
+	if isWorkDriver {
+		names = append(names, helpers.WorkDriverConfigSecret)
+	}
+	return names
 }
 
 func (c *secretReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager,
 	config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
 	var syncedErrs []error
-	isWorkDriver := config.CloudEventsDriverEnabled && config.WorkDriver != string(operatorapiv1.WorkDriverTypeKube)
 
-	for _, secretName := range secretNames {
-		if secretName == helpers.WorkDriverConfigSecret && !isWorkDriver {
-			continue
-		}
-
+	for _, secretName := range c.secretNames(config) {
 		// sync the secret to target namespace
 		// will delete the secret in the target ns if the secret is not found in the source ns
 		if _, _, err := helpers.SyncSecret(
@@ -74,7 +74,7 @@ func (c *secretReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clust
 
 func (c *secretReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterManager,
 	config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
-	for _, secretName := range secretNames {
+	for _, secretName := range []string{c.imagePullSecretName, helpers.WorkDriverConfigSecret} {
 		if err := c.hubKubeClient.CoreV1().Secrets(config.ClusterManagerNamespace).Delete(ctx,
 			secretName, metav1.DeleteOptions{}); err != nil {
 			if errors.IsNotFound(err) {

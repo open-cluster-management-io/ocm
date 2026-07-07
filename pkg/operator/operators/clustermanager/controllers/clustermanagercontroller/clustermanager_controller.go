@@ -67,6 +67,7 @@ type clusterManagerController struct {
 	deploymentReplicas            int32
 	operatorNamespace             string
 	enableSyncLabels              bool
+	imagePullSecretName           string
 	tlsMinVersion                 string
 	tlsCipherSuites               string
 }
@@ -96,6 +97,7 @@ func NewClusterManagerController(
 	deploymentReplicas int32,
 	operatorNamespace string,
 	enableSyncLabels bool,
+	imagePullSecretName string,
 	tlsMinVersion string,
 	tlsCipherSuites string,
 ) factory.Controller {
@@ -115,6 +117,7 @@ func NewClusterManagerController(
 		deploymentReplicas:            deploymentReplicas,
 		operatorNamespace:             operatorNamespace,
 		enableSyncLabels:              enableSyncLabels,
+		imagePullSecretName:           imagePullSecretName,
 		tlsMinVersion:                 tlsMinVersion,
 		tlsCipherSuites:               tlsCipherSuites,
 	}
@@ -169,6 +172,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		ClusterManagerName:              clusterManager.Name,
 		ClusterManagerNamespace:         clusterManagerNamespace,
 		OperatorNamespace:               n.operatorNamespace,
+		ImagePullSecretName:             n.imagePullSecretName,
 		RegistrationImage:               clusterManager.Spec.RegistrationImagePullSpec,
 		WorkImage:                       clusterManager.Spec.WorkImagePullSpec,
 		PlacementImage:                  clusterManager.Spec.PlacementImagePullSpec,
@@ -278,7 +282,8 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		&crdReconcile{cache: n.cache, recorder: controllerContext.Recorder(), hubAPIExtensionClient: hubApiExtensionClient,
 			hubMigrationClient: hubMigrationClient, skipRemoveCRDs: n.skipRemoveCRDs},
 		&secretReconcile{cache: n.cache, recorder: controllerContext.Recorder(), operatorKubeClient: n.operatorKubeClient,
-			hubKubeClient: hubClient, operatorNamespace: n.operatorNamespace, enableSyncLabels: n.enableSyncLabels},
+			hubKubeClient: hubClient, operatorNamespace: n.operatorNamespace, imagePullSecretName: n.imagePullSecretName,
+			enableSyncLabels: n.enableSyncLabels},
 		&hubReconcile{cache: n.cache, recorder: controllerContext.Recorder(), hubKubeClient: hubClient},
 		&runtimeReconcile{cache: n.cache, recorder: controllerContext.Recorder(), hubKubeConfig: hubKubeConfig, hubKubeClient: hubClient,
 			kubeClient: managementClient, ensureSAKubeconfigs: n.ensureSAKubeconfigs},
@@ -551,7 +556,7 @@ func cleanResources(ctx context.Context, kubeClient kubernetes.Interface, cm *op
 }
 
 func (n *clusterManagerController) getImagePullSecret(ctx context.Context) (string, error) {
-	_, err := n.operatorKubeClient.CoreV1().Secrets(n.operatorNamespace).Get(ctx, helpers.ImagePullSecret, metav1.GetOptions{})
+	_, err := n.operatorKubeClient.CoreV1().Secrets(n.operatorNamespace).Get(ctx, n.imagePullSecretName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		return "", nil
 	}
@@ -559,7 +564,7 @@ func (n *clusterManagerController) getImagePullSecret(ctx context.Context) (stri
 		return "", err
 	}
 
-	return helpers.ImagePullSecret, nil
+	return n.imagePullSecretName, nil
 }
 
 func getIdentityCreatorRoleAndTags(cm operatorapiv1.ClusterManager) string {

@@ -70,6 +70,7 @@ spec:
           {{if .ClusterImporterEnabled}}
           - "--agent-image={{ .AgentImage }}"
           - "--bootstrap-serviceaccount={{ .OperatorNamespace }}/agent-registration-bootstrap"
+          - "--image-pull-secret-name={{ .ImagePullSecretName }}"
           {{if .ImporterRenderers}}
           - "--import-renderers={{ .ImporterRenderers }}"
           {{end}}

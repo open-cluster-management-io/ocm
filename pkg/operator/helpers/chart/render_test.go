@@ -112,6 +112,18 @@ func TestClusterManagerConfig(t *testing.T) {
 			expectedObjCnt: 6,
 		},
 		{
+			name:      "use existing imagePullSecrets",
+			namespace: "ocm",
+			chartConfig: func() *ClusterManagerChartConfig {
+				config := NewDefaultClusterManagerChartConfig()
+				config.Images.ImagePullSecrets = []corev1.LocalObjectReference{
+					{Name: "my-existing-secret"},
+				}
+				return config
+			},
+			expectedObjCnt: 5,
+		},
+		{
 			name:      "create namespace",
 			namespace: "multicluster-engine",
 			chartConfig: func() *ClusterManagerChartConfig {

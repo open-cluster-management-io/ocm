@@ -16,6 +16,7 @@ import (
 
 	v1 "open-cluster-management.io/api/cluster/v1"
 
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
 )
 
@@ -136,20 +137,23 @@ func TestRenderImage(t *testing.T) {
 
 func TestRenderImagePullSecret(t *testing.T) {
 	cases := []struct {
-		name     string
-		secrets  []runtime.Object
-		expected string
+		name       string
+		secretName string
+		secrets    []runtime.Object
+		expected   string
 	}{
 		{
-			name:    "not image secret",
-			secrets: []runtime.Object{},
+			name:       "not image secret",
+			secretName: helpers.ImagePullSecret,
+			secrets:    []runtime.Object{},
 		},
 		{
-			name: "secret has not correct key",
+			name:       "secret has not correct key",
+			secretName: helpers.ImagePullSecret,
 			secrets: []runtime.Object{
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      imagePullSecretName,
+						Name:      helpers.ImagePullSecret,
 						Namespace: "test",
 					},
 					Data: map[string][]byte{
@@ -159,11 +163,12 @@ func TestRenderImagePullSecret(t *testing.T) {
 			},
 		},
 		{
-			name: "secrets has correct key",
+			name:       "secrets has correct key",
+			secretName: helpers.ImagePullSecret,
 			secrets: []runtime.Object{
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      imagePullSecretName,
+						Name:      helpers.ImagePullSecret,
 						Namespace: "test",
 					},
 					Data: map[string][]byte{
@@ -173,13 +178,29 @@ func TestRenderImagePullSecret(t *testing.T) {
 			},
 			expected: "test",
 		},
+		{
+			name:       "custom secret name",
+			secretName: "my-registry-secret",
+			secrets: []runtime.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-registry-secret",
+						Namespace: "test",
+					},
+					Data: map[string][]byte{
+						corev1.DockerConfigJsonKey: []byte("custom"),
+					},
+				},
+			},
+			expected: "custom",
+		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			client := kubefake.NewClientset(c.secrets...)
 			config := &chart.KlusterletChartConfig{}
-			render := RenderImagePullSecret(client, "test")
+			render := RenderImagePullSecret(client, "test", c.secretName)
 			config, err := render(context.TODO(), nil, config)
 			if err != nil {
 				t.Fatalf("failed to render image: %v", err)

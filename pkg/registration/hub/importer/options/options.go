@@ -6,14 +6,16 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/client-go/kubernetes"
 
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/importer"
 )
 
 type Options struct {
-	APIServerURL      string
-	AgentImage        string
-	BootstrapSA       string
-	ImporterRenderers []string
+	APIServerURL        string
+	AgentImage          string
+	BootstrapSA         string
+	ImagePullSecretName string
+	ImporterRenderers   []string
 }
 
 const (
@@ -25,8 +27,9 @@ const (
 
 func New() *Options {
 	return &Options{
-		BootstrapSA:       "open-cluster-management/agent-registration-bootstrap",
-		ImporterRenderers: []string{RenderFromConfigSecret},
+		BootstrapSA:         "open-cluster-management/agent-registration-bootstrap",
+		ImagePullSecretName: helpers.ImagePullSecret,
+		ImporterRenderers:   []string{RenderFromConfigSecret},
 	}
 }
 
@@ -42,16 +45,19 @@ func (m *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&m.ImporterRenderers, "import-renderers", m.ImporterRenderers,
 		"Ordered list of import renderers applied sequentially to render klusterlet manifests. "+
 			"Allowed: render-auto, render-from-config-secret. Later renderers may override earlier values.")
+	fs.StringVar(&m.ImagePullSecretName, "image-pull-secret-name", m.ImagePullSecretName,
+		"Name of the image pull secret in the operator namespace used by the cluster importer.")
 }
 
 func GetImporterRenderers(options *Options, kubeClient kubernetes.Interface,
 	operatorNamespace string) ([]importer.KlusterletConfigRenderer, error) {
+	imagePullSecretName := helpers.NormalizeImagePullSecretName(options.ImagePullSecretName)
 	var renderers []importer.KlusterletConfigRenderer
 	if len(options.ImporterRenderers) == 0 {
 		renderers = append(renderers,
 			importer.RenderBootstrapHubKubeConfig(kubeClient, options.APIServerURL, options.BootstrapSA),
 			importer.RenderImage(options.AgentImage),
-			importer.RenderImagePullSecret(kubeClient, operatorNamespace),
+			importer.RenderImagePullSecret(kubeClient, operatorNamespace, imagePullSecretName),
 		)
 		return renderers, nil
 	}
@@ -62,7 +68,7 @@ func GetImporterRenderers(options *Options, kubeClient kubernetes.Interface,
 			renderers = append(renderers,
 				importer.RenderBootstrapHubKubeConfig(kubeClient, options.APIServerURL, options.BootstrapSA),
 				importer.RenderImage(options.AgentImage),
-				importer.RenderImagePullSecret(kubeClient, operatorNamespace),
+				importer.RenderImagePullSecret(kubeClient, operatorNamespace, imagePullSecretName),
 			)
 		case RenderFromConfigSecret:
 			renderers = append(renderers,

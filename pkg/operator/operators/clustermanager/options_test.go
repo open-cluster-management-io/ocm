@@ -60,7 +60,7 @@ var _ = ginkgo.Describe("start cluster manager", func() {
 		// start hub controller
 		go func() {
 			defer ginkgo.GinkgoRecover()
-			o := &Options{}
+			o := &Options{ImagePullSecretName: "my-registry-secret"}
 			err := o.RunClusterManagerOperator(ctx, &controllercmd.ControllerContext{
 				KubeConfig:        cfg,
 				EventRecorder:     util.NewIntegrationTestEventRecorder("integration"),

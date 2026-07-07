@@ -20,8 +20,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
 )
 
-const imagePullSecretName = "open-cluster-management-image-pull-credentials"
-
 func RenderBootstrapHubKubeConfig(
 	kubeClient kubernetes.Interface, apiServerURL, bootstrapSA string) KlusterletConfigRenderer {
 	return func(ctx context.Context, _ *v1.ManagedCluster, config *chart.KlusterletChartConfig) (*chart.KlusterletChartConfig, error) {
@@ -114,9 +112,9 @@ func RenderImage(image string) KlusterletConfigRenderer {
 	}
 }
 
-func RenderImagePullSecret(kubeClient kubernetes.Interface, namespace string) KlusterletConfigRenderer {
+func RenderImagePullSecret(kubeClient kubernetes.Interface, namespace, secretName string) KlusterletConfigRenderer {
 	return func(ctx context.Context, _ *v1.ManagedCluster, config *chart.KlusterletChartConfig) (*chart.KlusterletChartConfig, error) {
-		secret, err := kubeClient.CoreV1().Secrets(namespace).Get(ctx, imagePullSecretName, metav1.GetOptions{})
+		secret, err := kubeClient.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
 		switch {
 		case errors.IsNotFound(err):
 			return config, nil

@@ -1,3 +1,23 @@
+{{/* Name of the image pull secret synced to hub namespaces and passed to the operator.
+     When imagePullSecrets lists multiple secrets, only the first name is used here;
+     the full list is still applied to operator pods via clusterManager.imagePullSecrets. */}}
+{{- define "clusterManager.imagePullSecretName" -}}
+{{- if .Values.images.imagePullSecrets -}}
+{{- (index .Values.images.imagePullSecrets 0).name -}}
+{{- else -}}
+open-cluster-management-image-pull-credentials
+{{- end -}}
+{{- end }}
+
+{{/* Image pull secrets for operator pods and service account. */}}
+{{- define "clusterManager.imagePullSecrets" -}}
+{{- if .Values.images.imagePullSecrets -}}
+{{ .Values.images.imagePullSecrets | toYaml }}
+{{- else -}}
+- name: {{ include "clusterManager.imagePullSecretName" . }}
+{{- end -}}
+{{- end }}
+
 {{/* Create secret to access docker registry */}}
 {{- define "imagePullSecret" }}
 {{- with .Values.images }}
