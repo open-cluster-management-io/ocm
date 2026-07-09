@@ -17,13 +17,22 @@ images:
   # The image tag is the appVersion by default, can be replaced by this version.
   tag: ""
   imagePullPolicy: IfNotPresent
-  # The image pull secret name is open-cluster-management-image-pull-credentials.
-  # Please set the userName/password or the dockerConfigJson if you use a private image registry.
+  # imagePullSecrets references existing secrets in the release namespace for pulling images.
+  # All entries are applied to the operator service account and deployment.
+  # The first entry's name is also used to sync the secret to hub components
+  # (registration, work, placement, addon-manager) and for operator RBAC.
+  # Example:
+  # imagePullSecrets:
+  #   - name: my-registry-secret
+  imagePullSecrets: []
+  # The image pull secret name is open-cluster-management-image-pull-credentials by default.
+  # Please set the userName/password or the dockerConfigJson if you use a private image registry
+  # and want the chart to create the pull secret.
   # The registry will be set in the generated credential if you set userName/password.
   # Suggest to use dockerConfigJson if you set overrides here.
-  # For example: 
+  # For example:
   # --set-file images.imageCredentials.dockerConfigJson=<your dockerConfigJson file> ,
-  # or set the json context in values.yaml file 
+  # or set the json context in values.yaml file
   # dockerConfigJson: |
   #   {
   #     "auths": {
@@ -34,8 +43,9 @@ images:
   #   }
   # }
   #
-  # The image pull secret is fixed into the serviceAccount, you can also set
-  # `createImageCredentials` to `false` and create the pull secret manually.
+  # To use an existing pull secret without embedding credentials in values, set
+  # `createImageCredentials` to `false` and either leave `imagePullSecrets` empty
+  # (default name) or set it to reference your existing secret.
   imageCredentials:
     createImageCredentials: false
     userName: ""

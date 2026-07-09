@@ -110,6 +110,7 @@ func newTestControllerWithoutCaBundle(t *testing.T, clustermanager *operatorapiv
 		clusterManagerLister: operatorInformers.Operator().V1().ClusterManagers().Lister(),
 		configMapLister:      kubeInfomers.Core().V1().ConfigMaps().Lister(),
 		cache:                resourceapply.NewResourceCache(),
+		imagePullSecretName:  helpers.ImagePullSecret,
 	}
 
 	store := operatorInformers.Operator().V1().ClusterManagers().Informer().GetStore()
@@ -142,6 +143,7 @@ func newTestController(t *testing.T, clustermanager *operatorapiv1.ClusterManage
 		clusterManagerLister: operatorInformers.Operator().V1().ClusterManagers().Lister(),
 		configMapLister:      kubeInfomers.Core().V1().ConfigMaps().Lister(),
 		cache:                resourceapply.NewResourceCache(),
+		imagePullSecretName:  helpers.ImagePullSecret,
 	}
 
 	store := operatorInformers.Operator().V1().ClusterManagers().Informer().GetStore()
@@ -495,6 +497,7 @@ func TestSyncSecret(t *testing.T) {
 	tests := []struct {
 		name                                    string
 		clusterManager                          func() *operatorapiv1.ClusterManager
+		imagePullSecretName                     string
 		imagePullSecret, workDriverConfigSecret *corev1.Secret
 	}{
 		{
@@ -527,6 +530,14 @@ func TestSyncSecret(t *testing.T) {
 			imagePullSecret: newSecret(helpers.ImagePullSecret, operatorNamespace),
 		},
 		{
+			name: "sync custom imagePullSecret",
+			clusterManager: func() *operatorapiv1.ClusterManager {
+				return newClusterManager("testhub")
+			},
+			imagePullSecretName: "my-registry-secret",
+			imagePullSecret:     newSecret("my-registry-secret", operatorNamespace),
+		},
+		{
 			name: "sync workDriverConfigSecret",
 			clusterManager: func() *operatorapiv1.ClusterManager {
 				clusterManager := newClusterManager("testhub")
@@ -552,6 +563,10 @@ func TestSyncSecret(t *testing.T) {
 		cm := c.clusterManager()
 		tc := newTestController(t, cm)
 		tc.clusterManagerController.operatorNamespace = operatorNamespace
+		if c.imagePullSecretName != "" {
+			tc.clusterManagerController.imagePullSecretName = c.imagePullSecretName
+		}
+		expectedImagePullSecretName := tc.clusterManagerController.imagePullSecretName
 		clusterManagerNamespace := helpers.ClusterManagerNamespace(cm.Name, cm.Spec.DeployOption.Mode)
 		setup(t, tc, nil)
 
@@ -588,9 +603,9 @@ func TestSyncSecret(t *testing.T) {
 			}
 		}
 
-		_, err = tc.hubKubeClient.CoreV1().Secrets(clusterManagerNamespace).Get(ctx, helpers.ImagePullSecret, metav1.GetOptions{})
+		_, err = tc.hubKubeClient.CoreV1().Secrets(clusterManagerNamespace).Get(ctx, expectedImagePullSecretName, metav1.GetOptions{})
 		if c.imagePullSecret == nil && !errors.IsNotFound(err) {
-			t.Fatalf("excpected no secret %v but got: %v", helpers.ImagePullSecret, err)
+			t.Fatalf("excpected no secret %v but got: %v", expectedImagePullSecretName, err)
 		}
 		if c.imagePullSecret != nil && err != nil {
 			t.Fatalf("Failed to get synced image pull secret: %v", err)
@@ -609,7 +624,7 @@ func TestSyncSecret(t *testing.T) {
 				t.Fatalf("Expected image pull secret in deployment. %v", deployment.Name)
 			}
 
-			if c.imagePullSecret != nil && deployment.Spec.Template.Spec.ImagePullSecrets[0].Name != helpers.ImagePullSecret {
+			if c.imagePullSecret != nil && deployment.Spec.Template.Spec.ImagePullSecrets[0].Name != expectedImagePullSecretName {
 				t.Fatalf("Expected correct image pull secret name in deployment. %v", deployment.Name)
 			}
 		}
@@ -1055,6 +1070,76 @@ func TestGRPCServiceLoadBalancerType(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestImagePullSecretNameOnHubResources(t *testing.T) {
+	clusterManager := newClusterManager("testhub")
+	clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+		FeatureGates: []operatorapiv1.FeatureGate{
+			{Feature: string(ocmfeature.ClusterImporter), Mode: operatorapiv1.FeatureGateModeTypeEnable},
+		},
+	}
+
+	tc := newTestController(t, clusterManager)
+	tc.clusterManagerController.operatorNamespace = helpers.DefaultComponentNamespace
+	tc.clusterManagerController.imagePullSecretName = "my-registry-secret"
+	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
+	setup(t, tc, setDeployment(clusterManager.Name, clusterManagerNamespace))
+
+	if _, err := tc.managementKubeClient.CoreV1().Secrets(helpers.DefaultComponentNamespace).Create(
+		ctx, newSecret("my-registry-secret", helpers.DefaultComponentNamespace), metav1.CreateOptions{},
+	); err != nil {
+		t.Fatalf("failed to create image pull secret: %v", err)
+	}
+
+	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
+	if err := tc.clusterManagerController.sync(ctx, syncContext, "testhub"); err != nil {
+		t.Fatalf("expected no error when sync, %v", err)
+	}
+
+	clusterRoleName := "open-cluster-management:testhub-registration:controller"
+	clusterRole, err := tc.hubKubeClient.RbacV1().ClusterRoles().Get(ctx, clusterRoleName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get registration clusterrole: %v", err)
+	}
+
+	registrationDeploymentName := clusterManager.Name + "-registration-controller"
+	var imagePullSecretNameArg string
+	kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...)
+	for _, action := range kubeActions {
+		if action.GetVerb() != createVerb && action.GetVerb() != "update" {
+			continue
+		}
+		var deployment *appsv1.Deployment
+		if action.GetVerb() == createVerb {
+			deployment, _ = action.(clienttesting.CreateActionImpl).Object.(*appsv1.Deployment)
+		} else {
+			deployment, _ = action.(clienttesting.UpdateActionImpl).Object.(*appsv1.Deployment)
+		}
+		if deployment == nil || deployment.Name != registrationDeploymentName || deployment.Namespace != clusterManagerNamespace {
+			continue
+		}
+		for _, arg := range deployment.Spec.Template.Spec.Containers[0].Args {
+			if after, ok := strings.CutPrefix(arg, "--image-pull-secret-name="); ok {
+				imagePullSecretNameArg = after
+				break
+			}
+		}
+		break
+	}
+	if imagePullSecretNameArg != "my-registry-secret" {
+		t.Fatalf("expected registration deployment to pass --image-pull-secret-name=my-registry-secret, got %q", imagePullSecretNameArg)
+	}
+
+	for _, rule := range clusterRole.Rules {
+		for _, resourceName := range rule.ResourceNames {
+			if resourceName == "my-registry-secret" {
+				return
+			}
+		}
+	}
+
+	t.Fatalf("expected registration clusterrole %q to reference my-registry-secret", clusterRoleName)
 }
 
 // TestImporterRenderersConfiguration tests that importer renderers are correctly rendered in the registration deployment

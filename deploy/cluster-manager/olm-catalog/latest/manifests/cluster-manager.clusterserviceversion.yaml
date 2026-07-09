@@ -598,6 +598,7 @@ spec:
               - args:
                 - /registration-operator
                 - hub
+                - --image-pull-secret-name=open-cluster-management-image-pull-credentials
                 env:
                 - name: POD_NAME
                   valueFrom:
@@ -636,6 +637,8 @@ spec:
                 volumeMounts:
                 - mountPath: /tmp
                   name: tmpdir
+              imagePullSecrets:
+              - name: open-cluster-management-image-pull-credentials
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: cluster-manager

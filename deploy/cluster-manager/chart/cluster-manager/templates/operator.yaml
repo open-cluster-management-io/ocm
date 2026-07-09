@@ -29,6 +29,7 @@ spec:
       {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      imagePullSecrets: {{- include "clusterManager.imagePullSecrets" . | nindent 8 }}
       serviceAccountName: cluster-manager
       containers:
       - name: registration-operator
@@ -37,6 +38,7 @@ spec:
         args:
           - "/registration-operator"
           - "hub"
+          - --image-pull-secret-name={{ include "clusterManager.imagePullSecretName" . }}
           {{- if .Values.enableSyncLabels }}
           - --enable-sync-labels
           {{- end }}

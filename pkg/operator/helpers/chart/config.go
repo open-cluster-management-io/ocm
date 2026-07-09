@@ -95,6 +95,8 @@ type ImagesConfig struct {
 	Tag string `json:"tag,omitempty"`
 	// ImagePullPolicy is the image pull policy of operator image. Default is IfNotPresent.
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+	// ImagePullSecrets references existing secrets for pulling images.
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 	// The image pull secret name is open-cluster-management-image-pull-credentials.
 	// Please set the userName and password if you use a private image registry.
 	ImageCredentials ImageCredentials `json:"imageCredentials,omitempty"`

@@ -34,6 +34,7 @@ type HubConfig struct {
 	WorkDriver                     string
 	AutoApproveUsers               string
 	ImagePullSecret                string
+	ImagePullSecretName            string
 	// ResourceRequirementResourceType is the resource requirement resource type for the cluster manager managed containers.
 	ResourceRequirementResourceType operatorapiv1.ResourceQosClass
 	// ResourceRequirements is the resource requirements for the cluster manager managed containers.
