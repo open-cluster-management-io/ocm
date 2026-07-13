@@ -32,6 +32,26 @@ func (in AddOnMeta) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in AddOnTemplate) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.addon.v1beta1.AddOnTemplate"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in AddOnTemplateList) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.addon.v1beta1.AddOnTemplateList"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in AddOnTemplateSpec) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.addon.v1beta1.AddOnTemplateSpec"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in AddOnTemplateSubject) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.addon.v1beta1.AddOnTemplateSubject"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in BaseSubject) OpenAPIModelName() string {
 	return "io.open-cluster-management.api.addon.v1beta1.BaseSubject"
 }
@@ -82,8 +102,18 @@ func (in ContainerResourceRequirements) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CurrentClusterBindingConfig) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.addon.v1beta1.CurrentClusterBindingConfig"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CustomSignerConfig) OpenAPIModelName() string {
 	return "io.open-cluster-management.api.addon.v1beta1.CustomSignerConfig"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CustomSignerRegistrationConfig) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.addon.v1beta1.CustomSignerRegistrationConfig"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -99,6 +129,11 @@ func (in DefaultConfigReference) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in HealthCheck) OpenAPIModelName() string {
 	return "io.open-cluster-management.api.addon.v1beta1.HealthCheck"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in HubPermissionConfig) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.addon.v1beta1.HubPermissionConfig"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -124,6 +159,11 @@ func (in InstallStrategy) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in KubeClientConfig) OpenAPIModelName() string {
 	return "io.open-cluster-management.api.addon.v1beta1.KubeClientConfig"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in KubeClientRegistrationConfig) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.addon.v1beta1.KubeClientRegistrationConfig"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -179,6 +219,21 @@ func (in ProxyConfig) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in RegistrationConfig) OpenAPIModelName() string {
 	return "io.open-cluster-management.api.addon.v1beta1.RegistrationConfig"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in RegistrationSpec) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.addon.v1beta1.RegistrationSpec"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in SigningCARef) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.addon.v1beta1.SigningCARef"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in SingleNamespaceBindingConfig) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.addon.v1beta1.SingleNamespaceBindingConfig"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

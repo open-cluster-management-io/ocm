@@ -14,6 +14,7 @@ import (
 type AddonV1beta1Interface interface {
 	RESTClient() rest.Interface
 	AddOnDeploymentConfigsGetter
+	AddOnTemplatesGetter
 	ClusterManagementAddOnsGetter
 	ManagedClusterAddOnsGetter
 }
@@ -25,6 +26,10 @@ type AddonV1beta1Client struct {
 
 func (c *AddonV1beta1Client) AddOnDeploymentConfigs(namespace string) AddOnDeploymentConfigInterface {
 	return newAddOnDeploymentConfigs(c, namespace)
+}
+
+func (c *AddonV1beta1Client) AddOnTemplates() AddOnTemplateInterface {
+	return newAddOnTemplates(c)
 }
 
 func (c *AddonV1beta1Client) ClusterManagementAddOns() ClusterManagementAddOnInterface {

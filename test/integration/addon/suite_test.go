@@ -75,7 +75,6 @@ var _ = ginkgo.BeforeSuite(func() {
 			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "cluster", "v1"),
 			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "cluster", "v1beta1"),
 			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "addon", "v1beta1"),
-			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "addon", "v1alpha1", "0000_03_addon.open-cluster-management.io_addontemplates.crd.yaml"),
 		},
 		WebhookInstallOptions: envtest.WebhookInstallOptions{},
 	}

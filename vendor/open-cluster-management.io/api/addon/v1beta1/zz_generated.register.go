@@ -49,6 +49,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&AddOnDeploymentConfig{},
 		&AddOnDeploymentConfigList{},
+		&AddOnTemplate{},
+		&AddOnTemplateList{},
 		&ClusterManagementAddOn{},
 		&ClusterManagementAddOnList{},
 		&ManagedClusterAddOn{},

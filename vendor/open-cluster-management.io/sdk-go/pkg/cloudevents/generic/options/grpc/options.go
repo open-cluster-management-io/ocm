@@ -32,6 +32,7 @@ type GRPCDialer struct {
 	KeepAliveOptions KeepAliveOptions
 	TLSConfig        *tls.Config
 	Token            string
+	ExtraDialOpts    []grpc.DialOption
 	mu               sync.Mutex       // Mutex to protect the connection.
 	conn             *grpc.ClientConn // Cached gRPC client connection.
 }
@@ -71,12 +72,14 @@ func (d *GRPCDialer) Dial() (*grpc.ClientConn, error) {
 			perRPCCred := oauth.TokenSource{
 				TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
 					AccessToken: d.Token,
-				})}
+				}),
+			}
 			// Add per-RPC credentials to the dial options.
 			dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(perRPCCred))
 		}
 
 		// Establish a TLS connection to the gRPC server.
+		dialOpts = append(dialOpts, d.ExtraDialOpts...)
 		conn, err := grpc.NewClient(d.URL, dialOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to grpc server %s, %v", d.URL, err)
@@ -89,8 +92,8 @@ func (d *GRPCDialer) Dial() (*grpc.ClientConn, error) {
 
 	// Insecure connection option; should not be used in production.
 	dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	dialOpts = append(dialOpts, d.ExtraDialOpts...)
 	conn, err := grpc.NewClient(d.URL, dialOpts...)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to grpc server %s, %v", d.URL, err)
 	}
