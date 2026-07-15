@@ -73,6 +73,36 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*AddOnTemplate)(nil), (*v1alpha1.AddOnTemplate)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_AddOnTemplate_To_v1alpha1_AddOnTemplate(a.(*AddOnTemplate), b.(*v1alpha1.AddOnTemplate), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.AddOnTemplate)(nil), (*AddOnTemplate)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_AddOnTemplate_To_v1beta1_AddOnTemplate(a.(*v1alpha1.AddOnTemplate), b.(*AddOnTemplate), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*AddOnTemplateList)(nil), (*v1alpha1.AddOnTemplateList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_AddOnTemplateList_To_v1alpha1_AddOnTemplateList(a.(*AddOnTemplateList), b.(*v1alpha1.AddOnTemplateList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.AddOnTemplateList)(nil), (*AddOnTemplateList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_AddOnTemplateList_To_v1beta1_AddOnTemplateList(a.(*v1alpha1.AddOnTemplateList), b.(*AddOnTemplateList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*AddOnTemplateSpec)(nil), (*v1alpha1.AddOnTemplateSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_AddOnTemplateSpec_To_v1alpha1_AddOnTemplateSpec(a.(*AddOnTemplateSpec), b.(*v1alpha1.AddOnTemplateSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.AddOnTemplateSpec)(nil), (*AddOnTemplateSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_AddOnTemplateSpec_To_v1beta1_AddOnTemplateSpec(a.(*v1alpha1.AddOnTemplateSpec), b.(*AddOnTemplateSpec), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*ClusterManagementAddOn)(nil), (*v1alpha1.ClusterManagementAddOn)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_ClusterManagementAddOn_To_v1alpha1_ClusterManagementAddOn(a.(*ClusterManagementAddOn), b.(*v1alpha1.ClusterManagementAddOn), scope)
 	}); err != nil {
@@ -148,6 +178,26 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*CurrentClusterBindingConfig)(nil), (*v1alpha1.CurrentClusterBindingConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CurrentClusterBindingConfig_To_v1alpha1_CurrentClusterBindingConfig(a.(*CurrentClusterBindingConfig), b.(*v1alpha1.CurrentClusterBindingConfig), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.CurrentClusterBindingConfig)(nil), (*CurrentClusterBindingConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_CurrentClusterBindingConfig_To_v1beta1_CurrentClusterBindingConfig(a.(*v1alpha1.CurrentClusterBindingConfig), b.(*CurrentClusterBindingConfig), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*CustomSignerRegistrationConfig)(nil), (*v1alpha1.CustomSignerRegistrationConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CustomSignerRegistrationConfig_To_v1alpha1_CustomSignerRegistrationConfig(a.(*CustomSignerRegistrationConfig), b.(*v1alpha1.CustomSignerRegistrationConfig), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.CustomSignerRegistrationConfig)(nil), (*CustomSignerRegistrationConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_CustomSignerRegistrationConfig_To_v1beta1_CustomSignerRegistrationConfig(a.(*v1alpha1.CustomSignerRegistrationConfig), b.(*CustomSignerRegistrationConfig), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*CustomizedVariable)(nil), (*v1alpha1.CustomizedVariable)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_CustomizedVariable_To_v1alpha1_CustomizedVariable(a.(*CustomizedVariable), b.(*v1alpha1.CustomizedVariable), scope)
 	}); err != nil {
@@ -175,6 +225,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha1.HealthCheck)(nil), (*HealthCheck)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_HealthCheck_To_v1beta1_HealthCheck(a.(*v1alpha1.HealthCheck), b.(*HealthCheck), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*HubPermissionConfig)(nil), (*v1alpha1.HubPermissionConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_HubPermissionConfig_To_v1alpha1_HubPermissionConfig(a.(*HubPermissionConfig), b.(*v1alpha1.HubPermissionConfig), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.HubPermissionConfig)(nil), (*HubPermissionConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_HubPermissionConfig_To_v1beta1_HubPermissionConfig(a.(*v1alpha1.HubPermissionConfig), b.(*HubPermissionConfig), scope)
 	}); err != nil {
 		return err
 	}
@@ -215,6 +275,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha1.InstallStrategy)(nil), (*InstallStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_InstallStrategy_To_v1beta1_InstallStrategy(a.(*v1alpha1.InstallStrategy), b.(*InstallStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*KubeClientRegistrationConfig)(nil), (*v1alpha1.KubeClientRegistrationConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_KubeClientRegistrationConfig_To_v1alpha1_KubeClientRegistrationConfig(a.(*KubeClientRegistrationConfig), b.(*v1alpha1.KubeClientRegistrationConfig), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.KubeClientRegistrationConfig)(nil), (*KubeClientRegistrationConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_KubeClientRegistrationConfig_To_v1beta1_KubeClientRegistrationConfig(a.(*v1alpha1.KubeClientRegistrationConfig), b.(*KubeClientRegistrationConfig), scope)
 	}); err != nil {
 		return err
 	}
@@ -290,6 +360,36 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha1.ProxyConfig)(nil), (*ProxyConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_ProxyConfig_To_v1beta1_ProxyConfig(a.(*v1alpha1.ProxyConfig), b.(*ProxyConfig), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*RegistrationSpec)(nil), (*v1alpha1.RegistrationSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_RegistrationSpec_To_v1alpha1_RegistrationSpec(a.(*RegistrationSpec), b.(*v1alpha1.RegistrationSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.RegistrationSpec)(nil), (*RegistrationSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_RegistrationSpec_To_v1beta1_RegistrationSpec(a.(*v1alpha1.RegistrationSpec), b.(*RegistrationSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*SigningCARef)(nil), (*v1alpha1.SigningCARef)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_SigningCARef_To_v1alpha1_SigningCARef(a.(*SigningCARef), b.(*v1alpha1.SigningCARef), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.SigningCARef)(nil), (*SigningCARef)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_SigningCARef_To_v1beta1_SigningCARef(a.(*v1alpha1.SigningCARef), b.(*SigningCARef), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*SingleNamespaceBindingConfig)(nil), (*v1alpha1.SingleNamespaceBindingConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_SingleNamespaceBindingConfig_To_v1alpha1_SingleNamespaceBindingConfig(a.(*SingleNamespaceBindingConfig), b.(*v1alpha1.SingleNamespaceBindingConfig), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.SingleNamespaceBindingConfig)(nil), (*SingleNamespaceBindingConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_SingleNamespaceBindingConfig_To_v1beta1_SingleNamespaceBindingConfig(a.(*v1alpha1.SingleNamespaceBindingConfig), b.(*SingleNamespaceBindingConfig), scope)
 	}); err != nil {
 		return err
 	}
@@ -478,6 +578,78 @@ func autoConvert_v1alpha1_AddOnMeta_To_v1beta1_AddOnMeta(in *v1alpha1.AddOnMeta,
 // Convert_v1alpha1_AddOnMeta_To_v1beta1_AddOnMeta is an autogenerated conversion function.
 func Convert_v1alpha1_AddOnMeta_To_v1beta1_AddOnMeta(in *v1alpha1.AddOnMeta, out *AddOnMeta, s conversion.Scope) error {
 	return autoConvert_v1alpha1_AddOnMeta_To_v1beta1_AddOnMeta(in, out, s)
+}
+
+func autoConvert_v1beta1_AddOnTemplate_To_v1alpha1_AddOnTemplate(in *AddOnTemplate, out *v1alpha1.AddOnTemplate, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1beta1_AddOnTemplateSpec_To_v1alpha1_AddOnTemplateSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1beta1_AddOnTemplate_To_v1alpha1_AddOnTemplate is an autogenerated conversion function.
+func Convert_v1beta1_AddOnTemplate_To_v1alpha1_AddOnTemplate(in *AddOnTemplate, out *v1alpha1.AddOnTemplate, s conversion.Scope) error {
+	return autoConvert_v1beta1_AddOnTemplate_To_v1alpha1_AddOnTemplate(in, out, s)
+}
+
+func autoConvert_v1alpha1_AddOnTemplate_To_v1beta1_AddOnTemplate(in *v1alpha1.AddOnTemplate, out *AddOnTemplate, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1alpha1_AddOnTemplateSpec_To_v1beta1_AddOnTemplateSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha1_AddOnTemplate_To_v1beta1_AddOnTemplate is an autogenerated conversion function.
+func Convert_v1alpha1_AddOnTemplate_To_v1beta1_AddOnTemplate(in *v1alpha1.AddOnTemplate, out *AddOnTemplate, s conversion.Scope) error {
+	return autoConvert_v1alpha1_AddOnTemplate_To_v1beta1_AddOnTemplate(in, out, s)
+}
+
+func autoConvert_v1beta1_AddOnTemplateList_To_v1alpha1_AddOnTemplateList(in *AddOnTemplateList, out *v1alpha1.AddOnTemplateList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]v1alpha1.AddOnTemplate)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1beta1_AddOnTemplateList_To_v1alpha1_AddOnTemplateList is an autogenerated conversion function.
+func Convert_v1beta1_AddOnTemplateList_To_v1alpha1_AddOnTemplateList(in *AddOnTemplateList, out *v1alpha1.AddOnTemplateList, s conversion.Scope) error {
+	return autoConvert_v1beta1_AddOnTemplateList_To_v1alpha1_AddOnTemplateList(in, out, s)
+}
+
+func autoConvert_v1alpha1_AddOnTemplateList_To_v1beta1_AddOnTemplateList(in *v1alpha1.AddOnTemplateList, out *AddOnTemplateList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]AddOnTemplate)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1alpha1_AddOnTemplateList_To_v1beta1_AddOnTemplateList is an autogenerated conversion function.
+func Convert_v1alpha1_AddOnTemplateList_To_v1beta1_AddOnTemplateList(in *v1alpha1.AddOnTemplateList, out *AddOnTemplateList, s conversion.Scope) error {
+	return autoConvert_v1alpha1_AddOnTemplateList_To_v1beta1_AddOnTemplateList(in, out, s)
+}
+
+func autoConvert_v1beta1_AddOnTemplateSpec_To_v1alpha1_AddOnTemplateSpec(in *AddOnTemplateSpec, out *v1alpha1.AddOnTemplateSpec, s conversion.Scope) error {
+	out.AddonName = in.AddonName
+	out.AgentSpec = in.AgentSpec
+	out.Registration = *(*[]v1alpha1.RegistrationSpec)(unsafe.Pointer(&in.Registration))
+	return nil
+}
+
+// Convert_v1beta1_AddOnTemplateSpec_To_v1alpha1_AddOnTemplateSpec is an autogenerated conversion function.
+func Convert_v1beta1_AddOnTemplateSpec_To_v1alpha1_AddOnTemplateSpec(in *AddOnTemplateSpec, out *v1alpha1.AddOnTemplateSpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_AddOnTemplateSpec_To_v1alpha1_AddOnTemplateSpec(in, out, s)
+}
+
+func autoConvert_v1alpha1_AddOnTemplateSpec_To_v1beta1_AddOnTemplateSpec(in *v1alpha1.AddOnTemplateSpec, out *AddOnTemplateSpec, s conversion.Scope) error {
+	out.AddonName = in.AddonName
+	out.AgentSpec = in.AgentSpec
+	out.Registration = *(*[]RegistrationSpec)(unsafe.Pointer(&in.Registration))
+	return nil
+}
+
+// Convert_v1alpha1_AddOnTemplateSpec_To_v1beta1_AddOnTemplateSpec is an autogenerated conversion function.
+func Convert_v1alpha1_AddOnTemplateSpec_To_v1beta1_AddOnTemplateSpec(in *v1alpha1.AddOnTemplateSpec, out *AddOnTemplateSpec, s conversion.Scope) error {
+	return autoConvert_v1alpha1_AddOnTemplateSpec_To_v1beta1_AddOnTemplateSpec(in, out, s)
 }
 
 func autoConvert_v1beta1_ClusterManagementAddOn_To_v1alpha1_ClusterManagementAddOn(in *ClusterManagementAddOn, out *v1alpha1.ClusterManagementAddOn, s conversion.Scope) error {
@@ -717,6 +889,54 @@ func Convert_v1alpha1_ContainerResourceRequirements_To_v1beta1_ContainerResource
 	return autoConvert_v1alpha1_ContainerResourceRequirements_To_v1beta1_ContainerResourceRequirements(in, out, s)
 }
 
+func autoConvert_v1beta1_CurrentClusterBindingConfig_To_v1alpha1_CurrentClusterBindingConfig(in *CurrentClusterBindingConfig, out *v1alpha1.CurrentClusterBindingConfig, s conversion.Scope) error {
+	out.ClusterRoleName = in.ClusterRoleName
+	return nil
+}
+
+// Convert_v1beta1_CurrentClusterBindingConfig_To_v1alpha1_CurrentClusterBindingConfig is an autogenerated conversion function.
+func Convert_v1beta1_CurrentClusterBindingConfig_To_v1alpha1_CurrentClusterBindingConfig(in *CurrentClusterBindingConfig, out *v1alpha1.CurrentClusterBindingConfig, s conversion.Scope) error {
+	return autoConvert_v1beta1_CurrentClusterBindingConfig_To_v1alpha1_CurrentClusterBindingConfig(in, out, s)
+}
+
+func autoConvert_v1alpha1_CurrentClusterBindingConfig_To_v1beta1_CurrentClusterBindingConfig(in *v1alpha1.CurrentClusterBindingConfig, out *CurrentClusterBindingConfig, s conversion.Scope) error {
+	out.ClusterRoleName = in.ClusterRoleName
+	return nil
+}
+
+// Convert_v1alpha1_CurrentClusterBindingConfig_To_v1beta1_CurrentClusterBindingConfig is an autogenerated conversion function.
+func Convert_v1alpha1_CurrentClusterBindingConfig_To_v1beta1_CurrentClusterBindingConfig(in *v1alpha1.CurrentClusterBindingConfig, out *CurrentClusterBindingConfig, s conversion.Scope) error {
+	return autoConvert_v1alpha1_CurrentClusterBindingConfig_To_v1beta1_CurrentClusterBindingConfig(in, out, s)
+}
+
+func autoConvert_v1beta1_CustomSignerRegistrationConfig_To_v1alpha1_CustomSignerRegistrationConfig(in *CustomSignerRegistrationConfig, out *v1alpha1.CustomSignerRegistrationConfig, s conversion.Scope) error {
+	out.SignerName = in.SignerName
+	out.Subject = (*v1alpha1.Subject)(unsafe.Pointer(in.Subject))
+	if err := Convert_v1beta1_SigningCARef_To_v1alpha1_SigningCARef(&in.SigningCA, &out.SigningCA, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1beta1_CustomSignerRegistrationConfig_To_v1alpha1_CustomSignerRegistrationConfig is an autogenerated conversion function.
+func Convert_v1beta1_CustomSignerRegistrationConfig_To_v1alpha1_CustomSignerRegistrationConfig(in *CustomSignerRegistrationConfig, out *v1alpha1.CustomSignerRegistrationConfig, s conversion.Scope) error {
+	return autoConvert_v1beta1_CustomSignerRegistrationConfig_To_v1alpha1_CustomSignerRegistrationConfig(in, out, s)
+}
+
+func autoConvert_v1alpha1_CustomSignerRegistrationConfig_To_v1beta1_CustomSignerRegistrationConfig(in *v1alpha1.CustomSignerRegistrationConfig, out *CustomSignerRegistrationConfig, s conversion.Scope) error {
+	out.SignerName = in.SignerName
+	out.Subject = (*AddOnTemplateSubject)(unsafe.Pointer(in.Subject))
+	if err := Convert_v1alpha1_SigningCARef_To_v1beta1_SigningCARef(&in.SigningCA, &out.SigningCA, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha1_CustomSignerRegistrationConfig_To_v1beta1_CustomSignerRegistrationConfig is an autogenerated conversion function.
+func Convert_v1alpha1_CustomSignerRegistrationConfig_To_v1beta1_CustomSignerRegistrationConfig(in *v1alpha1.CustomSignerRegistrationConfig, out *CustomSignerRegistrationConfig, s conversion.Scope) error {
+	return autoConvert_v1alpha1_CustomSignerRegistrationConfig_To_v1beta1_CustomSignerRegistrationConfig(in, out, s)
+}
+
 func autoConvert_v1beta1_CustomizedVariable_To_v1alpha1_CustomizedVariable(in *CustomizedVariable, out *v1alpha1.CustomizedVariable, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Value = in.Value
@@ -783,6 +1003,30 @@ func autoConvert_v1alpha1_HealthCheck_To_v1beta1_HealthCheck(in *v1alpha1.Health
 // Convert_v1alpha1_HealthCheck_To_v1beta1_HealthCheck is an autogenerated conversion function.
 func Convert_v1alpha1_HealthCheck_To_v1beta1_HealthCheck(in *v1alpha1.HealthCheck, out *HealthCheck, s conversion.Scope) error {
 	return autoConvert_v1alpha1_HealthCheck_To_v1beta1_HealthCheck(in, out, s)
+}
+
+func autoConvert_v1beta1_HubPermissionConfig_To_v1alpha1_HubPermissionConfig(in *HubPermissionConfig, out *v1alpha1.HubPermissionConfig, s conversion.Scope) error {
+	out.Type = v1alpha1.HubPermissionsBindingType(in.Type)
+	out.CurrentCluster = (*v1alpha1.CurrentClusterBindingConfig)(unsafe.Pointer(in.CurrentCluster))
+	out.SingleNamespace = (*v1alpha1.SingleNamespaceBindingConfig)(unsafe.Pointer(in.SingleNamespace))
+	return nil
+}
+
+// Convert_v1beta1_HubPermissionConfig_To_v1alpha1_HubPermissionConfig is an autogenerated conversion function.
+func Convert_v1beta1_HubPermissionConfig_To_v1alpha1_HubPermissionConfig(in *HubPermissionConfig, out *v1alpha1.HubPermissionConfig, s conversion.Scope) error {
+	return autoConvert_v1beta1_HubPermissionConfig_To_v1alpha1_HubPermissionConfig(in, out, s)
+}
+
+func autoConvert_v1alpha1_HubPermissionConfig_To_v1beta1_HubPermissionConfig(in *v1alpha1.HubPermissionConfig, out *HubPermissionConfig, s conversion.Scope) error {
+	out.Type = HubPermissionsBindingType(in.Type)
+	out.CurrentCluster = (*CurrentClusterBindingConfig)(unsafe.Pointer(in.CurrentCluster))
+	out.SingleNamespace = (*SingleNamespaceBindingConfig)(unsafe.Pointer(in.SingleNamespace))
+	return nil
+}
+
+// Convert_v1alpha1_HubPermissionConfig_To_v1beta1_HubPermissionConfig is an autogenerated conversion function.
+func Convert_v1alpha1_HubPermissionConfig_To_v1beta1_HubPermissionConfig(in *v1alpha1.HubPermissionConfig, out *HubPermissionConfig, s conversion.Scope) error {
+	return autoConvert_v1alpha1_HubPermissionConfig_To_v1beta1_HubPermissionConfig(in, out, s)
 }
 
 func autoConvert_v1beta1_ImageMirror_To_v1alpha1_ImageMirror(in *ImageMirror, out *v1alpha1.ImageMirror, s conversion.Scope) error {
@@ -885,6 +1129,26 @@ func autoConvert_v1alpha1_InstallStrategy_To_v1beta1_InstallStrategy(in *v1alpha
 // Convert_v1alpha1_InstallStrategy_To_v1beta1_InstallStrategy is an autogenerated conversion function.
 func Convert_v1alpha1_InstallStrategy_To_v1beta1_InstallStrategy(in *v1alpha1.InstallStrategy, out *InstallStrategy, s conversion.Scope) error {
 	return autoConvert_v1alpha1_InstallStrategy_To_v1beta1_InstallStrategy(in, out, s)
+}
+
+func autoConvert_v1beta1_KubeClientRegistrationConfig_To_v1alpha1_KubeClientRegistrationConfig(in *KubeClientRegistrationConfig, out *v1alpha1.KubeClientRegistrationConfig, s conversion.Scope) error {
+	out.HubPermissions = *(*[]v1alpha1.HubPermissionConfig)(unsafe.Pointer(&in.HubPermissions))
+	return nil
+}
+
+// Convert_v1beta1_KubeClientRegistrationConfig_To_v1alpha1_KubeClientRegistrationConfig is an autogenerated conversion function.
+func Convert_v1beta1_KubeClientRegistrationConfig_To_v1alpha1_KubeClientRegistrationConfig(in *KubeClientRegistrationConfig, out *v1alpha1.KubeClientRegistrationConfig, s conversion.Scope) error {
+	return autoConvert_v1beta1_KubeClientRegistrationConfig_To_v1alpha1_KubeClientRegistrationConfig(in, out, s)
+}
+
+func autoConvert_v1alpha1_KubeClientRegistrationConfig_To_v1beta1_KubeClientRegistrationConfig(in *v1alpha1.KubeClientRegistrationConfig, out *KubeClientRegistrationConfig, s conversion.Scope) error {
+	out.HubPermissions = *(*[]HubPermissionConfig)(unsafe.Pointer(&in.HubPermissions))
+	return nil
+}
+
+// Convert_v1alpha1_KubeClientRegistrationConfig_To_v1beta1_KubeClientRegistrationConfig is an autogenerated conversion function.
+func Convert_v1alpha1_KubeClientRegistrationConfig_To_v1beta1_KubeClientRegistrationConfig(in *v1alpha1.KubeClientRegistrationConfig, out *KubeClientRegistrationConfig, s conversion.Scope) error {
+	return autoConvert_v1alpha1_KubeClientRegistrationConfig_To_v1beta1_KubeClientRegistrationConfig(in, out, s)
 }
 
 func autoConvert_v1beta1_ManagedClusterAddOn_To_v1alpha1_ManagedClusterAddOn(in *ManagedClusterAddOn, out *v1alpha1.ManagedClusterAddOn, s conversion.Scope) error {
@@ -1186,6 +1450,74 @@ func autoConvert_v1alpha1_RegistrationConfig_To_v1beta1_RegistrationConfig(in *v
 	// WARNING: in.SignerName requires manual conversion: does not exist in peer-type
 	// WARNING: in.Subject requires manual conversion: does not exist in peer-type
 	return nil
+}
+
+func autoConvert_v1beta1_RegistrationSpec_To_v1alpha1_RegistrationSpec(in *RegistrationSpec, out *v1alpha1.RegistrationSpec, s conversion.Scope) error {
+	out.Type = v1alpha1.RegistrationType(in.Type)
+	out.KubeClient = (*v1alpha1.KubeClientRegistrationConfig)(unsafe.Pointer(in.KubeClient))
+	out.CustomSigner = (*v1alpha1.CustomSignerRegistrationConfig)(unsafe.Pointer(in.CustomSigner))
+	return nil
+}
+
+// Convert_v1beta1_RegistrationSpec_To_v1alpha1_RegistrationSpec is an autogenerated conversion function.
+func Convert_v1beta1_RegistrationSpec_To_v1alpha1_RegistrationSpec(in *RegistrationSpec, out *v1alpha1.RegistrationSpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_RegistrationSpec_To_v1alpha1_RegistrationSpec(in, out, s)
+}
+
+func autoConvert_v1alpha1_RegistrationSpec_To_v1beta1_RegistrationSpec(in *v1alpha1.RegistrationSpec, out *RegistrationSpec, s conversion.Scope) error {
+	out.Type = AddOnTemplateRegistrationType(in.Type)
+	out.KubeClient = (*KubeClientRegistrationConfig)(unsafe.Pointer(in.KubeClient))
+	out.CustomSigner = (*CustomSignerRegistrationConfig)(unsafe.Pointer(in.CustomSigner))
+	return nil
+}
+
+// Convert_v1alpha1_RegistrationSpec_To_v1beta1_RegistrationSpec is an autogenerated conversion function.
+func Convert_v1alpha1_RegistrationSpec_To_v1beta1_RegistrationSpec(in *v1alpha1.RegistrationSpec, out *RegistrationSpec, s conversion.Scope) error {
+	return autoConvert_v1alpha1_RegistrationSpec_To_v1beta1_RegistrationSpec(in, out, s)
+}
+
+func autoConvert_v1beta1_SigningCARef_To_v1alpha1_SigningCARef(in *SigningCARef, out *v1alpha1.SigningCARef, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Namespace = in.Namespace
+	return nil
+}
+
+// Convert_v1beta1_SigningCARef_To_v1alpha1_SigningCARef is an autogenerated conversion function.
+func Convert_v1beta1_SigningCARef_To_v1alpha1_SigningCARef(in *SigningCARef, out *v1alpha1.SigningCARef, s conversion.Scope) error {
+	return autoConvert_v1beta1_SigningCARef_To_v1alpha1_SigningCARef(in, out, s)
+}
+
+func autoConvert_v1alpha1_SigningCARef_To_v1beta1_SigningCARef(in *v1alpha1.SigningCARef, out *SigningCARef, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Namespace = in.Namespace
+	return nil
+}
+
+// Convert_v1alpha1_SigningCARef_To_v1beta1_SigningCARef is an autogenerated conversion function.
+func Convert_v1alpha1_SigningCARef_To_v1beta1_SigningCARef(in *v1alpha1.SigningCARef, out *SigningCARef, s conversion.Scope) error {
+	return autoConvert_v1alpha1_SigningCARef_To_v1beta1_SigningCARef(in, out, s)
+}
+
+func autoConvert_v1beta1_SingleNamespaceBindingConfig_To_v1alpha1_SingleNamespaceBindingConfig(in *SingleNamespaceBindingConfig, out *v1alpha1.SingleNamespaceBindingConfig, s conversion.Scope) error {
+	out.Namespace = in.Namespace
+	out.RoleRef = in.RoleRef
+	return nil
+}
+
+// Convert_v1beta1_SingleNamespaceBindingConfig_To_v1alpha1_SingleNamespaceBindingConfig is an autogenerated conversion function.
+func Convert_v1beta1_SingleNamespaceBindingConfig_To_v1alpha1_SingleNamespaceBindingConfig(in *SingleNamespaceBindingConfig, out *v1alpha1.SingleNamespaceBindingConfig, s conversion.Scope) error {
+	return autoConvert_v1beta1_SingleNamespaceBindingConfig_To_v1alpha1_SingleNamespaceBindingConfig(in, out, s)
+}
+
+func autoConvert_v1alpha1_SingleNamespaceBindingConfig_To_v1beta1_SingleNamespaceBindingConfig(in *v1alpha1.SingleNamespaceBindingConfig, out *SingleNamespaceBindingConfig, s conversion.Scope) error {
+	out.Namespace = in.Namespace
+	out.RoleRef = in.RoleRef
+	return nil
+}
+
+// Convert_v1alpha1_SingleNamespaceBindingConfig_To_v1beta1_SingleNamespaceBindingConfig is an autogenerated conversion function.
+func Convert_v1alpha1_SingleNamespaceBindingConfig_To_v1beta1_SingleNamespaceBindingConfig(in *v1alpha1.SingleNamespaceBindingConfig, out *SingleNamespaceBindingConfig, s conversion.Scope) error {
+	return autoConvert_v1alpha1_SingleNamespaceBindingConfig_To_v1beta1_SingleNamespaceBindingConfig(in, out, s)
 }
 
 func autoConvert_v1beta1_Subject_To_v1alpha1_Subject(in *Subject, out *v1alpha1.Subject, s conversion.Scope) error {

@@ -182,3 +182,7 @@ func (c *AddonClientWrapper) ManagedClusterAddOns(namespace string) addonv1beta1
 func (c *AddonClientWrapper) AddOnDeploymentConfigs(namespace string) addonv1beta1client.AddOnDeploymentConfigInterface {
 	panic("AddOnDeploymentConfigs is unsupported")
 }
+
+func (c *AddonClientWrapper) AddOnTemplates() addonv1beta1client.AddOnTemplateInterface {
+	panic("AddOnTemplates is unsupported")
+}
