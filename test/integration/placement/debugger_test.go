@@ -92,7 +92,7 @@ var _ = ginkgo.Describe("DebugService", func() {
 			_, err := kubeClient.CoreV1().ServiceAccounts(namespace).Create(context.Background(), sa, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			// Create Role with permission to create placements
+			// Create Role with permission to get placements (GET debug endpoint checks get verb)
 			role := &rbacv1.Role{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      roleName,
@@ -102,7 +102,7 @@ var _ = ginkgo.Describe("DebugService", func() {
 					{
 						APIGroups: []string{"cluster.open-cluster-management.io"},
 						Resources: []string{"placements"},
-						Verbs:     []string{"create"},
+						Verbs:     []string{"get"},
 					},
 				},
 			}
@@ -258,8 +258,9 @@ var _ = ginkgo.Describe("DebugService", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			ginkgo.By("Verify request was rejected due to lack of permission")
+			gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusForbidden))
 			gomega.Expect(result.Error).ToNot(gomega.BeEmpty(), "Should have permission error")
-			gomega.Expect(result.Error).To(gomega.ContainSubstring("does not have permission"))
+			gomega.Expect(result.Error).To(gomega.ContainSubstring("does not have permission to get placements"))
 		})
 
 		ginkgo.It("Should accept POST request with placement JSON and valid token", func() {
