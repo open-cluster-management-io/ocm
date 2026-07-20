@@ -80,16 +80,15 @@ func (d *Debugger) Handler(w http.ResponseWriter, r *http.Request) {
 	var placement *clusterv1beta1.Placement
 	var err error
 
-	// Support both GET (fetch from API) and POST (accept JSON body)
-	if r.Method == http.MethodPost {
+	switch r.Method {
+	case http.MethodPost:
 		// POST: Parse Placement from request body
 		placement, err = d.parsePlacementFromBody(r)
 		if err != nil {
 			d.reportErr(w, http.StatusBadRequest, err)
 			return
 		}
-	} else {
-		// GET: Fetch Placement from API (original behavior)
+	case http.MethodGet:
 		namespace, name, err := d.parsePath(r.URL.Path)
 		if err != nil {
 			d.reportErr(w, http.StatusBadRequest, err)
@@ -109,9 +108,12 @@ func (d *Debugger) Handler(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
+	default:
+		d.reportErr(w, http.StatusMethodNotAllowed, fmt.Errorf("method %s not allowed", r.Method))
+		return
 	}
 
-	// Check if user has permission to create placements in this namespace
+	// Check if user has permission to access placements in this namespace
 	if err := d.checkPermission(r, placement.Namespace); err != nil {
 		d.reportPermissionErr(w, err)
 		return
@@ -209,11 +211,24 @@ func (d *Debugger) reportPermissionErr(w http.ResponseWriter, err error) {
 		statusCode = http.StatusUnauthorized
 	case strings.Contains(msg, "does not have permission"):
 		statusCode = http.StatusForbidden
+	case strings.Contains(msg, "unsupported method"):
+		statusCode = http.StatusMethodNotAllowed
 	}
 	d.reportErr(w, statusCode, err)
 }
 
-// checkPermission checks if the user has permission to create placements in the namespace using SAR
+func placementPermissionVerb(r *http.Request) (string, error) {
+	switch r.Method {
+	case http.MethodPost:
+		return "create", nil
+	case http.MethodGet:
+		return "get", nil
+	default:
+		return "", fmt.Errorf("unsupported method %s", r.Method)
+	}
+}
+
+// checkPermission checks if the user has permission to access placements in the namespace using SAR
 func (d *Debugger) checkPermission(r *http.Request, namespace string) error {
 	// Get user from request context (authenticated by GenericAPIServer)
 	ctx := r.Context()
@@ -229,7 +244,12 @@ func (d *Debugger) checkPermission(r *http.Request, namespace string) error {
 		extra[k] = authorizationv1.ExtraValue(v)
 	}
 
-	// Create SubjectAccessReview to check if user can create placements
+	verb, err := placementPermissionVerb(r)
+	if err != nil {
+		return err
+	}
+
+	// Create SubjectAccessReview to check if user can access placements
 	sar := &authorizationv1.SubjectAccessReview{
 		Spec: authorizationv1.SubjectAccessReviewSpec{
 			User:   username,
@@ -237,7 +257,7 @@ func (d *Debugger) checkPermission(r *http.Request, namespace string) error {
 			Extra:  extra,
 			ResourceAttributes: &authorizationv1.ResourceAttributes{
 				Namespace: namespace,
-				Verb:      "create",
+				Verb:      verb,
 				Group:     "cluster.open-cluster-management.io",
 				Version:   "v1beta1",
 				Resource:  "placements",
@@ -254,8 +274,8 @@ func (d *Debugger) checkPermission(r *http.Request, namespace string) error {
 	}
 
 	if !result.Status.Allowed {
-		return fmt.Errorf("user does not have permission to create placements in namespace %s: %s",
-			namespace, result.Status.Reason)
+		return fmt.Errorf("user does not have permission to %s placements in namespace %s: %s",
+			verb, namespace, result.Status.Reason)
 	}
 
 	return nil

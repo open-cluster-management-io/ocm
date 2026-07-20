@@ -230,9 +230,19 @@ func TestReportPermissionErr(t *testing.T) {
 			expectStatus: http.StatusUnauthorized,
 		},
 		{
-			name:         "forbidden",
+			name:         "forbidden create",
 			err:          fmt.Errorf("user does not have permission to create placements in namespace test: denied"),
 			expectStatus: http.StatusForbidden,
+		},
+		{
+			name:         "forbidden get",
+			err:          fmt.Errorf("user does not have permission to get placements in namespace test: denied"),
+			expectStatus: http.StatusForbidden,
+		},
+		{
+			name:         "unsupported method",
+			err:          fmt.Errorf("unsupported method DELETE"),
+			expectStatus: http.StatusMethodNotAllowed,
 		},
 		{
 			name:         "internal",
@@ -300,6 +310,27 @@ func TestDebuggerHandlerReportErr(t *testing.T) {
 			pathSuffix:    placementNamespace + "/does-not-exist",
 			expectStatus:  http.StatusNotFound,
 			errorContains: "does-not-exist",
+		},
+		{
+			name:          "DELETE method not allowed",
+			method:        http.MethodDelete,
+			pathSuffix:    placementNamespace + "/" + placementName,
+			expectStatus:  http.StatusMethodNotAllowed,
+			errorContains: "method DELETE not allowed",
+		},
+		{
+			name:          "PUT method not allowed",
+			method:        http.MethodPut,
+			pathSuffix:    placementNamespace + "/" + placementName,
+			expectStatus:  http.StatusMethodNotAllowed,
+			errorContains: "method PUT not allowed",
+		},
+		{
+			name:          "PATCH method not allowed",
+			method:        http.MethodPatch,
+			pathSuffix:    placementNamespace + "/" + placementName,
+			expectStatus:  http.StatusMethodNotAllowed,
+			errorContains: "method PATCH not allowed",
 		},
 		{
 			name:       "GET placement lister failure",
@@ -769,6 +800,8 @@ func TestDebuggerPermissionCheck(t *testing.T) {
 
 	cases := []struct {
 		name             string
+		method           string
+		body             []byte
 		injectUser       bool
 		userInfo         *user.DefaultInfo
 		sarAllowed       bool
@@ -793,12 +826,33 @@ func TestDebuggerPermissionCheck(t *testing.T) {
 			expectStatusCode: http.StatusOK,
 		},
 		{
-			name:             "User without permission - should reject",
+			name:             "GET user without permission - should reject with get verb",
+			method:           http.MethodGet,
 			injectUser:       true,
 			sarAllowed:       false,
 			expectError:      true,
 			expectStatusCode: http.StatusForbidden,
-			errorContains:    "does not have permission",
+			errorContains:    "does not have permission to get placements",
+			verifySARRequest: func(t *testing.T, sar *authorizationv1.SubjectAccessReview) {
+				if sar.Spec.ResourceAttributes.Verb != "get" {
+					t.Errorf("Expected SAR verb get, got %s", sar.Spec.ResourceAttributes.Verb)
+				}
+			},
+		},
+		{
+			name:             "POST user without permission - should reject with create verb",
+			method:           http.MethodPost,
+			body:             []byte(`{"apiVersion":"cluster.open-cluster-management.io/v1beta1","kind":"Placement","metadata":{"name":"test-placement","namespace":"test-ns"},"spec":{"numberOfClusters":1}}`),
+			injectUser:       true,
+			sarAllowed:       false,
+			expectError:      true,
+			expectStatusCode: http.StatusForbidden,
+			errorContains:    "does not have permission to create placements",
+			verifySARRequest: func(t *testing.T, sar *authorizationv1.SubjectAccessReview) {
+				if sar.Spec.ResourceAttributes.Verb != "create" {
+					t.Errorf("Expected SAR verb create, got %s", sar.Spec.ResourceAttributes.Verb)
+				}
+			},
 		},
 		{
 			name:             "SAR API call fails",
@@ -899,8 +953,31 @@ func TestDebuggerPermissionCheck(t *testing.T) {
 			defer server.Close()
 
 			// Send request
-			url := fmt.Sprintf("%s%s%s/%s", server.URL, DebugPath, placementNamespace, placementName)
-			res, err := http.Get(url)
+			method := c.method
+			if method == "" {
+				method = http.MethodGet
+			}
+
+			var url string
+			var body io.Reader
+			if method == http.MethodPost {
+				url = fmt.Sprintf("%s%s", server.URL, DebugPath)
+				if len(c.body) > 0 {
+					body = bytes.NewBuffer(c.body)
+				}
+			} else {
+				url = fmt.Sprintf("%s%s%s/%s", server.URL, DebugPath, placementNamespace, placementName)
+			}
+
+			req, err := http.NewRequest(method, url, body)
+			if err != nil {
+				t.Fatalf("Failed to create request: %v", err)
+			}
+			if method == http.MethodPost {
+				req.Header.Set("Content-Type", "application/json")
+			}
+
+			res, err := http.DefaultClient.Do(req)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
