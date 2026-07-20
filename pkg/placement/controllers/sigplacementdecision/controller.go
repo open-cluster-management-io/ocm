@@ -6,7 +6,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	cpv1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
@@ -17,8 +16,9 @@ import (
 	informerv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
 	listerv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	v1beta1 "open-cluster-management.io/api/cluster/v1beta1"
-	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
+
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 const (
@@ -46,21 +46,12 @@ func NewSIGPlacementDecisionController(
 
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaNamespaceName, ocmPDInformer.Informer()).
-		WithInformersQueueKeysFunc(c.sigPDToQueueKey, sigPDInformer.Informer()).
+		WithFilteredEventsInformersQueueKeysFunc(
+			queue.QueueKeyByMetaNamespaceName,
+			queue.FileterByLabelKeyValue(cpv1alpha1.LabelClusterManagerKey, SchedulerName),
+			sigPDInformer.Informer()).
 		WithSync(c.sync).
 		ToController("SIGPlacementDecisionController")
-}
-
-func (c *sigPlacementDecisionController) sigPDToQueueKey(obj runtime.Object) []string {
-	sigPD, ok := obj.(*cpv1alpha1.PlacementDecision)
-	if !ok {
-		return nil
-	}
-	if sigPD.Labels[cpv1alpha1.LabelClusterManagerKey] != SchedulerName {
-		return nil
-	}
-	key, _ := cache.MetaNamespaceKeyFunc(sigPD)
-	return []string{key}
 }
 
 func (c *sigPlacementDecisionController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
@@ -176,7 +167,8 @@ func buildSIGPlacementDecision(ocmPD *v1beta1.PlacementDecision) *cpv1alpha1.Pla
 	for _, d := range ocmPD.Status.Decisions {
 		decisions = append(decisions, cpv1alpha1.ClusterDecision{
 			ClusterProfileRef: cpv1alpha1.ClusterProfileReference{
-				Name: d.ClusterName,
+				Name:      d.ClusterName,
+				Namespace: ocmPD.Namespace,
 			},
 			Reason: d.Reason,
 		})

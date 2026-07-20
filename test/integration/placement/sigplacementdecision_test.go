@@ -18,11 +18,10 @@ import (
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	ocmfeature "open-cluster-management.io/api/feature"
 
+	"open-cluster-management.io/ocm/pkg/features"
 	controllers "open-cluster-management.io/ocm/pkg/placement/controllers"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/sigplacementdecision"
 	testinghelpers "open-cluster-management.io/ocm/pkg/placement/helpers/testing"
-
-	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
@@ -56,10 +55,14 @@ var _ = ginkgo.Describe("SIGPlacementDecision", func() {
 
 		var ctx context.Context
 		ctx, cancel = context.WithCancel(context.Background())
-		go controllers.RunControllerManager(ctx, &controllercmd.ControllerContext{
-			KubeConfig:    restConfig,
-			EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
-		})
+		go func() {
+			defer ginkgo.GinkgoRecover()
+			err := controllers.RunControllerManager(ctx, &controllercmd.ControllerContext{
+				KubeConfig:    restConfig,
+				EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		}()
 	})
 
 	ginkgo.AfterEach(func() {
@@ -109,7 +112,7 @@ var _ = ginkgo.Describe("SIGPlacementDecision", func() {
 			}
 			for _, name := range clusterNames {
 				cluster := testinghelpers.NewManagedCluster(name).WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSet1Name).Build()
-				_, err = clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
+				cluster, err = clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				cluster.Status = clusterapiv1.ManagedClusterStatus{
@@ -187,6 +190,10 @@ var _ = ginkgo.Describe("SIGPlacementDecision", func() {
 			for _, d := range sigPD.Decisions {
 				gomega.Expect(d.ClusterProfileRef.Name).ToNot(gomega.BeEmpty())
 			}
+
+			ginkgo.By("Delete the Placement so the scheduling controller does not regenerate the OCM PlacementDecision")
+			err = clusterClient.ClusterV1beta1().Placements(namespace).Delete(context.Background(), placementName, metav1.DeleteOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Delete the OCM PlacementDecision and verify SIG MC PD is cleaned up")
 			ocmPDList, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{

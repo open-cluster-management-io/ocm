@@ -87,6 +87,9 @@ func (c *crdReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 		hubDeployCRDResources = append(hubDeployCRDResources, hubClusterProfileCRDResourceFiles...)
 	}
 
+	// If featuregate SIGPlacementDecision is enabled, include the SIG MC PlacementDecision CRD.
+	// The CRD will not be removed when featuregate is disabled (same behavior as other crds)
+	// and will not be cleaned when ClusterManager is deleting since the CRD might be used by other projects.
 	if config.SIGPlacementDecisionEnabled {
 		hubDeployCRDResources = append(hubDeployCRDResources, hubSIGPlacementDecisionCRDResourceFiles...)
 	}

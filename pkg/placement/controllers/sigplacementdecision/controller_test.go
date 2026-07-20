@@ -14,6 +14,7 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	v1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
@@ -196,7 +197,7 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 					cpv1alpha1.DecisionKeyLabel:       "my-placement",
 					cpv1alpha1.DecisionIndexLabel:     "0",
 				}, []cpv1alpha1.ClusterDecision{
-					{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "cluster1"}, Reason: "score"},
+					{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "cluster1", Namespace: "ns1"}, Reason: "score"},
 				}, SchedulerName),
 			},
 			expectedUpdates: 0,
@@ -330,6 +331,9 @@ func TestBuildSIGPlacementDecision(t *testing.T) {
 	if result.Decisions[0].ClusterProfileRef.Name != "cluster-a" {
 		t.Errorf("expected cluster-a, got %s", result.Decisions[0].ClusterProfileRef.Name)
 	}
+	if result.Decisions[0].ClusterProfileRef.Namespace != "ns1" {
+		t.Errorf("expected namespace ns1, got %s", result.Decisions[0].ClusterProfileRef.Namespace)
+	}
 	if result.Decisions[0].Reason != "top-score" {
 		t.Errorf("expected reason 'top-score', got %s", result.Decisions[0].Reason)
 	}
@@ -418,45 +422,6 @@ func TestSigPDEqual(t *testing.T) {
 			result := sigPDEqual(c.existing, c.desired)
 			if result != c.expected {
 				t.Errorf("expected %v, got %v", c.expected, result)
-			}
-		})
-	}
-}
-
-func TestSigPDToQueueKey(t *testing.T) {
-	ctrl := &sigPlacementDecisionController{}
-
-	cases := []struct {
-		name        string
-		obj         *cpv1alpha1.PlacementDecision
-		expectedLen int
-	}{
-		{
-			name: "owned by us",
-			obj: newSIGPlacementDecision("ns1", "pd-1", map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: SchedulerName,
-			}, nil, SchedulerName),
-			expectedLen: 1,
-		},
-		{
-			name: "not owned by us",
-			obj: newSIGPlacementDecision("ns1", "pd-1", map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: "other",
-			}, nil, "other"),
-			expectedLen: 0,
-		},
-		{
-			name:        "no labels",
-			obj:         newSIGPlacementDecision("ns1", "pd-1", nil, nil, ""),
-			expectedLen: 0,
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			keys := ctrl.sigPDToQueueKey(c.obj)
-			if len(keys) != c.expectedLen {
-				t.Errorf("expected %d keys, got %d: %v", c.expectedLen, len(keys), keys)
 			}
 		})
 	}
