@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	cpv1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
@@ -17,8 +17,9 @@ import (
 	informerv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
 	listerv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	v1beta1 "open-cluster-management.io/api/cluster/v1beta1"
-	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
+
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 const (
@@ -46,21 +47,12 @@ func NewSIGPlacementDecisionController(
 
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaNamespaceName, ocmPDInformer.Informer()).
-		WithInformersQueueKeysFunc(c.sigPDToQueueKey, sigPDInformer.Informer()).
+		WithFilteredEventsInformersQueueKeysFunc(
+			queue.QueueKeyByMetaNamespaceName,
+			queue.FileterByLabelKeyValue(cpv1alpha1.LabelClusterManagerKey, SchedulerName),
+			sigPDInformer.Informer()).
 		WithSync(c.sync).
 		ToController("SIGPlacementDecisionController")
-}
-
-func (c *sigPlacementDecisionController) sigPDToQueueKey(obj runtime.Object) []string {
-	sigPD, ok := obj.(*cpv1alpha1.PlacementDecision)
-	if !ok {
-		return nil
-	}
-	if sigPD.Labels[cpv1alpha1.LabelClusterManagerKey] != SchedulerName {
-		return nil
-	}
-	key, _ := cache.MetaNamespaceKeyFunc(sigPD)
-	return []string{key}
 }
 
 func (c *sigPlacementDecisionController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
@@ -74,36 +66,13 @@ func (c *sigPlacementDecisionController) sync(ctx context.Context, syncCtx facto
 
 	ocmPD, err := c.ocmPDLister.PlacementDecisions(namespace).Get(name)
 	if errors.IsNotFound(err) {
-		return c.deleteSIGPlacementDecision(ctx, logger, namespace, name)
+		return nil
 	}
 	if err != nil {
 		return err
 	}
 
 	return c.syncSIGPlacementDecision(ctx, logger, syncCtx, ocmPD)
-}
-
-func (c *sigPlacementDecisionController) deleteSIGPlacementDecision(
-	ctx context.Context, logger klog.Logger, namespace, name string) error {
-	existing, err := c.sigPDLister.PlacementDecisions(namespace).Get(name)
-	if errors.IsNotFound(err) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-
-	if existing.Labels[cpv1alpha1.LabelClusterManagerKey] != SchedulerName {
-		return nil
-	}
-
-	err = c.sigPDClient.ApisV1alpha1().PlacementDecisions(namespace).Delete(ctx, name, metav1.DeleteOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
-	logger.V(2).Info("Deleted SIG PlacementDecision")
-	return nil
 }
 
 func (c *sigPlacementDecisionController) syncSIGPlacementDecision(
@@ -138,14 +107,15 @@ func (c *sigPlacementDecisionController) updateSIGPlacementDecision(
 	ctx context.Context, logger klog.Logger, syncCtx factory.SyncContext,
 	existing *cpv1alpha1.PlacementDecision, desired *cpv1alpha1.PlacementDecision) error {
 
-	if sigPDEqual(existing, desired) {
-		return nil
-	}
-
 	updated := existing.DeepCopy()
 	updated.Labels = desired.Labels
+	updated.OwnerReferences = desired.OwnerReferences
 	updated.Decisions = desired.Decisions
 	updated.SchedulerName = desired.SchedulerName
+
+	if equality.Semantic.DeepEqual(existing, updated) {
+		return nil
+	}
 
 	_, err := c.sigPDClient.ApisV1alpha1().PlacementDecisions(updated.Namespace).Update(ctx, updated, metav1.UpdateOptions{})
 	if err != nil {
@@ -176,7 +146,8 @@ func buildSIGPlacementDecision(ocmPD *v1beta1.PlacementDecision) *cpv1alpha1.Pla
 	for _, d := range ocmPD.Status.Decisions {
 		decisions = append(decisions, cpv1alpha1.ClusterDecision{
 			ClusterProfileRef: cpv1alpha1.ClusterProfileReference{
-				Name: d.ClusterName,
+				Name:      d.ClusterName,
+				Namespace: ocmPD.Namespace,
 			},
 			Reason: d.Reason,
 		})
@@ -187,33 +158,11 @@ func buildSIGPlacementDecision(ocmPD *v1beta1.PlacementDecision) *cpv1alpha1.Pla
 			Name:      ocmPD.Name,
 			Namespace: ocmPD.Namespace,
 			Labels:    labels,
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(ocmPD, v1beta1.SchemeGroupVersion.WithKind("PlacementDecision")),
+			},
 		},
 		Decisions:     decisions,
 		SchedulerName: SchedulerName,
 	}
-}
-
-func sigPDEqual(existing *cpv1alpha1.PlacementDecision, desired *cpv1alpha1.PlacementDecision) bool {
-	if existing.SchedulerName != desired.SchedulerName {
-		return false
-	}
-
-	if len(existing.Decisions) != len(desired.Decisions) {
-		return false
-	}
-	for i := range existing.Decisions {
-		if existing.Decisions[i].ClusterProfileRef.Name != desired.Decisions[i].ClusterProfileRef.Name ||
-			existing.Decisions[i].ClusterProfileRef.Namespace != desired.Decisions[i].ClusterProfileRef.Namespace ||
-			existing.Decisions[i].Reason != desired.Decisions[i].Reason {
-			return false
-		}
-	}
-
-	for key, desiredVal := range desired.Labels {
-		if existingVal, ok := existing.Labels[key]; !ok || existingVal != desiredVal {
-			return false
-		}
-	}
-
-	return true
 }

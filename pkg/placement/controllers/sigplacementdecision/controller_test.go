@@ -14,6 +14,7 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	v1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
@@ -39,15 +40,25 @@ func newOCMPlacementDecision(namespace, name, placementName string, groupIndex s
 }
 
 func newSIGPlacementDecision(namespace, name string, labels map[string]string, decisions []cpv1alpha1.ClusterDecision, schedulerName string) *cpv1alpha1.PlacementDecision {
+	return newSIGPlacementDecisionWithOwnerRefs(namespace, name, labels, nil, decisions, schedulerName)
+}
+
+func newSIGPlacementDecisionWithOwnerRefs(namespace, name string, labels map[string]string,
+	ownerRefs []metav1.OwnerReference, decisions []cpv1alpha1.ClusterDecision, schedulerName string) *cpv1alpha1.PlacementDecision {
 	return &cpv1alpha1.PlacementDecision{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-			Labels:    labels,
+			Name:            name,
+			Namespace:       namespace,
+			Labels:          labels,
+			OwnerReferences: ownerRefs,
 		},
 		Decisions:     decisions,
 		SchedulerName: schedulerName,
 	}
+}
+
+func ownerRefFor(ocmPD *v1beta1.PlacementDecision) metav1.OwnerReference {
+	return *metav1.NewControllerRef(ocmPD, v1beta1.SchemeGroupVersion.WithKind("PlacementDecision"))
 }
 
 func TestSIGPlacementDecisionControllerSync(t *testing.T) {
@@ -107,6 +118,16 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 				if created.Labels[cpv1alpha1.DecisionIndexLabel] != "0" {
 					t.Errorf("expected decision-index label '0', got %s", created.Labels[cpv1alpha1.DecisionIndexLabel])
 				}
+				if len(created.OwnerReferences) != 1 {
+					t.Fatalf("expected 1 owner reference, got %d", len(created.OwnerReferences))
+				}
+				ownerRef := created.OwnerReferences[0]
+				if ownerRef.Name != "pd-1" || ownerRef.Kind != "PlacementDecision" {
+					t.Errorf("expected owner reference to point to OCM PlacementDecision pd-1, got %+v", ownerRef)
+				}
+				if ownerRef.Controller == nil || !*ownerRef.Controller {
+					t.Errorf("expected owner reference to be a controller reference")
+				}
 			},
 		},
 		{
@@ -125,7 +146,7 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 			},
 		},
 		{
-			name:   "delete SIG PD when OCM PD is removed",
+			name:   "no-op when OCM PD is removed since garbage collection handles cleanup",
 			key:    "ns1/pd-deleted",
 			ocmPDs: nil,
 			existingSIGPDs: []runtime.Object{
@@ -135,20 +156,9 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 					{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "cluster1"}},
 				}, SchedulerName),
 			},
-			expectedDeletes: 1,
-		},
-		{
-			name:   "skip delete of SIG PD not owned by us",
-			key:    "ns1/pd-foreign",
-			ocmPDs: nil,
-			existingSIGPDs: []runtime.Object{
-				newSIGPlacementDecision("ns1", "pd-foreign", map[string]string{
-					cpv1alpha1.LabelClusterManagerKey: "other-scheduler",
-				}, []cpv1alpha1.ClusterDecision{
-					{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "cluster1"}},
-				}, "other-scheduler"),
-			},
 			expectedDeletes: 0,
+			expectedUpdates: 0,
+			expectedCreates: 0,
 		},
 		{
 			name: "update SIG PD when decisions change",
@@ -160,15 +170,16 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 				}),
 			},
 			existingSIGPDs: []runtime.Object{
-				newSIGPlacementDecision("ns1", "pd-update", map[string]string{
+				newSIGPlacementDecisionWithOwnerRefs("ns1", "pd-update", map[string]string{
 					cpv1alpha1.LabelClusterManagerKey: SchedulerName,
 					cpv1alpha1.PlacementKeyLabel:      "my-placement",
 					cpv1alpha1.DecisionKeyLabel:       "my-placement",
 					cpv1alpha1.DecisionIndexLabel:     "0",
-				}, []cpv1alpha1.ClusterDecision{
-					{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "cluster1"}, Reason: "score"},
-					{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "cluster2"}, Reason: "old"},
-				}, SchedulerName),
+				}, []metav1.OwnerReference{ownerRefFor(newOCMPlacementDecision("ns1", "pd-update", "my-placement", "0", nil))},
+					[]cpv1alpha1.ClusterDecision{
+						{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "cluster1", Namespace: "ns1"}, Reason: "score"},
+						{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "cluster2", Namespace: "ns1"}, Reason: "old"},
+					}, SchedulerName),
 			},
 			expectedUpdates: 1,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -178,6 +189,9 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 				}
 				if updated.Decisions[1].ClusterProfileRef.Name != "cluster3" {
 					t.Errorf("expected cluster3, got %s", updated.Decisions[1].ClusterProfileRef.Name)
+				}
+				if len(updated.OwnerReferences) != 1 {
+					t.Fatalf("expected 1 owner reference, got %d", len(updated.OwnerReferences))
 				}
 			},
 		},
@@ -190,14 +204,15 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 				}),
 			},
 			existingSIGPDs: []runtime.Object{
-				newSIGPlacementDecision("ns1", "pd-noop", map[string]string{
+				newSIGPlacementDecisionWithOwnerRefs("ns1", "pd-noop", map[string]string{
 					cpv1alpha1.LabelClusterManagerKey: SchedulerName,
 					cpv1alpha1.PlacementKeyLabel:      "my-placement",
 					cpv1alpha1.DecisionKeyLabel:       "my-placement",
 					cpv1alpha1.DecisionIndexLabel:     "0",
-				}, []cpv1alpha1.ClusterDecision{
-					{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "cluster1"}, Reason: "score"},
-				}, SchedulerName),
+				}, []metav1.OwnerReference{ownerRefFor(newOCMPlacementDecision("ns1", "pd-noop", "my-placement", "0", nil))},
+					[]cpv1alpha1.ClusterDecision{
+						{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "cluster1", Namespace: "ns1"}, Reason: "score"},
+					}, SchedulerName),
 			},
 			expectedUpdates: 0,
 			expectedCreates: 0,
@@ -209,6 +224,46 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 			existingSIGPDs:  nil,
 			expectedDeletes: 0,
 			expectedCreates: 0,
+		},
+		{
+			name: "update SIG PD when existing has extra labels beyond desired",
+			key:  "ns1/pd-extra-label",
+			ocmPDs: []runtime.Object{
+				newOCMPlacementDecision("ns1", "pd-extra-label", "", "", nil),
+			},
+			existingSIGPDs: []runtime.Object{
+				newSIGPlacementDecisionWithOwnerRefs("ns1", "pd-extra-label", map[string]string{
+					cpv1alpha1.LabelClusterManagerKey: SchedulerName,
+					"extra-label":                     "value",
+				}, []metav1.OwnerReference{ownerRefFor(newOCMPlacementDecision("ns1", "pd-extra-label", "", "", nil))},
+					[]cpv1alpha1.ClusterDecision{}, SchedulerName),
+			},
+			expectedUpdates: 1,
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				updated := actions[0].(clienttesting.UpdateAction).GetObject().(*cpv1alpha1.PlacementDecision)
+				if _, ok := updated.Labels["extra-label"]; ok {
+					t.Errorf("expected extra-label to be dropped from updated labels")
+				}
+			},
+		},
+		{
+			name: "update SIG PD when owner reference is missing",
+			key:  "ns1/pd-missing-ownerref",
+			ocmPDs: []runtime.Object{
+				newOCMPlacementDecision("ns1", "pd-missing-ownerref", "", "", nil),
+			},
+			existingSIGPDs: []runtime.Object{
+				newSIGPlacementDecision("ns1", "pd-missing-ownerref", map[string]string{
+					cpv1alpha1.LabelClusterManagerKey: SchedulerName,
+				}, []cpv1alpha1.ClusterDecision{}, SchedulerName),
+			},
+			expectedUpdates: 1,
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				updated := actions[0].(clienttesting.UpdateAction).GetObject().(*cpv1alpha1.PlacementDecision)
+				if len(updated.OwnerReferences) != 1 {
+					t.Fatalf("expected the update to backfill 1 owner reference, got %d", len(updated.OwnerReferences))
+				}
+			},
 		},
 		{
 			name: "skip update of SIG PD not owned by us",
@@ -330,134 +385,32 @@ func TestBuildSIGPlacementDecision(t *testing.T) {
 	if result.Decisions[0].ClusterProfileRef.Name != "cluster-a" {
 		t.Errorf("expected cluster-a, got %s", result.Decisions[0].ClusterProfileRef.Name)
 	}
+	if result.Decisions[0].ClusterProfileRef.Namespace != "ns1" {
+		t.Errorf("expected namespace ns1, got %s", result.Decisions[0].ClusterProfileRef.Namespace)
+	}
 	if result.Decisions[0].Reason != "top-score" {
 		t.Errorf("expected reason 'top-score', got %s", result.Decisions[0].Reason)
 	}
 	if result.Decisions[1].ClusterProfileRef.Name != "cluster-b" {
 		t.Errorf("expected cluster-b, got %s", result.Decisions[1].ClusterProfileRef.Name)
 	}
-}
-
-func TestSigPDEqual(t *testing.T) {
-	cases := []struct {
-		name     string
-		existing *cpv1alpha1.PlacementDecision
-		desired  *cpv1alpha1.PlacementDecision
-		expected bool
-	}{
-		{
-			name: "equal",
-			existing: newSIGPlacementDecision("ns1", "pd-1", map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: SchedulerName,
-				cpv1alpha1.PlacementKeyLabel:      "p1",
-			}, []cpv1alpha1.ClusterDecision{
-				{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "c1"}, Reason: "r1"},
-			}, SchedulerName),
-			desired: newSIGPlacementDecision("ns1", "pd-1", map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: SchedulerName,
-				cpv1alpha1.PlacementKeyLabel:      "p1",
-			}, []cpv1alpha1.ClusterDecision{
-				{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "c1"}, Reason: "r1"},
-			}, SchedulerName),
-			expected: true,
-		},
-		{
-			name: "different decisions",
-			existing: newSIGPlacementDecision("ns1", "pd-1", map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: SchedulerName,
-			}, []cpv1alpha1.ClusterDecision{
-				{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "c1"}},
-			}, SchedulerName),
-			desired: newSIGPlacementDecision("ns1", "pd-1", map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: SchedulerName,
-			}, []cpv1alpha1.ClusterDecision{
-				{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "c2"}},
-			}, SchedulerName),
-			expected: false,
-		},
-		{
-			name: "different scheduler name",
-			existing: newSIGPlacementDecision("ns1", "pd-1", map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: SchedulerName,
-			}, []cpv1alpha1.ClusterDecision{}, SchedulerName),
-			desired: newSIGPlacementDecision("ns1", "pd-1", map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: SchedulerName,
-			}, []cpv1alpha1.ClusterDecision{}, "other"),
-			expected: false,
-		},
-		{
-			name: "different labels",
-			existing: newSIGPlacementDecision("ns1", "pd-1", map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: SchedulerName,
-			}, []cpv1alpha1.ClusterDecision{}, SchedulerName),
-			desired: newSIGPlacementDecision("ns1", "pd-1", map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: SchedulerName,
-				cpv1alpha1.PlacementKeyLabel:      "new",
-			}, []cpv1alpha1.ClusterDecision{}, SchedulerName),
-			expected: false,
-		},
-		{
-			name: "different decision count",
-			existing: newSIGPlacementDecision("ns1", "pd-1", map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: SchedulerName,
-			}, []cpv1alpha1.ClusterDecision{
-				{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "c1"}},
-			}, SchedulerName),
-			desired: newSIGPlacementDecision("ns1", "pd-1", map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: SchedulerName,
-			}, []cpv1alpha1.ClusterDecision{
-				{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "c1"}},
-				{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "c2"}},
-			}, SchedulerName),
-			expected: false,
-		},
+	if len(result.OwnerReferences) != 1 {
+		t.Fatalf("expected 1 owner reference, got %d", len(result.OwnerReferences))
 	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			result := sigPDEqual(c.existing, c.desired)
-			if result != c.expected {
-				t.Errorf("expected %v, got %v", c.expected, result)
-			}
-		})
+	ownerRef := result.OwnerReferences[0]
+	if ownerRef.Name != ocmPD.Name {
+		t.Errorf("expected owner reference name %s, got %s", ocmPD.Name, ownerRef.Name)
 	}
-}
-
-func TestSigPDToQueueKey(t *testing.T) {
-	ctrl := &sigPlacementDecisionController{}
-
-	cases := []struct {
-		name        string
-		obj         *cpv1alpha1.PlacementDecision
-		expectedLen int
-	}{
-		{
-			name: "owned by us",
-			obj: newSIGPlacementDecision("ns1", "pd-1", map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: SchedulerName,
-			}, nil, SchedulerName),
-			expectedLen: 1,
-		},
-		{
-			name: "not owned by us",
-			obj: newSIGPlacementDecision("ns1", "pd-1", map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: "other",
-			}, nil, "other"),
-			expectedLen: 0,
-		},
-		{
-			name:        "no labels",
-			obj:         newSIGPlacementDecision("ns1", "pd-1", nil, nil, ""),
-			expectedLen: 0,
-		},
+	if ownerRef.Kind != "PlacementDecision" {
+		t.Errorf("expected owner reference kind PlacementDecision, got %s", ownerRef.Kind)
 	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			keys := ctrl.sigPDToQueueKey(c.obj)
-			if len(keys) != c.expectedLen {
-				t.Errorf("expected %d keys, got %d: %v", c.expectedLen, len(keys), keys)
-			}
-		})
+	if ownerRef.APIVersion != v1beta1.SchemeGroupVersion.String() {
+		t.Errorf("expected owner reference apiVersion %s, got %s", v1beta1.SchemeGroupVersion.String(), ownerRef.APIVersion)
+	}
+	if ownerRef.Controller == nil || !*ownerRef.Controller {
+		t.Errorf("expected owner reference to be a controller reference")
+	}
+	if ownerRef.BlockOwnerDeletion == nil || !*ownerRef.BlockOwnerDeletion {
+		t.Errorf("expected owner reference to block owner deletion")
 	}
 }

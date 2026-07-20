@@ -12,6 +12,7 @@ import (
 	"k8s.io/component-base/logs"
 
 	ocmfeature "open-cluster-management.io/api/feature"
+
 	"open-cluster-management.io/ocm/pkg/cmd/hub"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/version"
