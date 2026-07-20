@@ -50,7 +50,7 @@ jobs:
           fetch-depth: 1
           path: go/src/open-cluster-management.io/ocm
       - name: set up Python 3.x
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           # Semantic version range syntax or exact version of a Python version
           python-version: '3.x'
@@ -74,7 +74,7 @@ jobs:
           popd
       - name: publish release
         if: github.event_name != 'pull_request'
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
