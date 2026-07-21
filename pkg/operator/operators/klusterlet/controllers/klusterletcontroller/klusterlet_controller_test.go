@@ -627,9 +627,9 @@ func TestSyncDeploy(t *testing.T) {
 			}
 
 			// Check if resources are created as expected
-			// 11 managed static manifests + 12 management static manifests - 2 duplicated service account manifests + 1 addon namespace + 2 deployments
-			if len(createObjects) != 24 {
-				t.Errorf("Expect 24 objects created in the sync loop, actual %d", len(createObjects))
+			// 11 managed static manifests + 16 management static manifests - 2 duplicated service account manifests + 1 addon namespace + 2 deployments
+			if len(createObjects) != 28 {
+				t.Errorf("Expect 28 objects created in the sync loop, actual %d", len(createObjects))
 			}
 			for _, object := range createObjects {
 				ensureObject(t, object, klusterlet, false)
@@ -709,9 +709,9 @@ func TestSyncDeploySingleton(t *testing.T) {
 			}
 
 			// Check if resources are created as expected
-			// 10 managed static manifests + 11 management static manifests - 1 service account manifests + 1 addon namespace + 1 deployments
-			if len(createObjects) != 22 {
-				t.Errorf("Expect 21 objects created in the sync loop, actual %d", len(createObjects))
+			// 10 managed static manifests + 15 management static manifests - 1 service account manifests + 1 addon namespace + 1 deployments
+			if len(createObjects) != 26 {
+				t.Errorf("Expect 26 objects created in the sync loop, actual %d", len(createObjects))
 			}
 			for _, object := range createObjects {
 				ensureObject(t, object, klusterlet, false)
@@ -781,10 +781,10 @@ func TestSyncDeployHosted(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected on the management cluster
-	// 11 static manifests + 2 secrets(external-managed-kubeconfig-registration,external-managed-kubeconfig-work) +
+	// 15 static manifests + 2 secrets(external-managed-kubeconfig-registration,external-managed-kubeconfig-work) +
 	// 2 deployments(registration-agent,work-agent) + 1 pull secret
-	if len(createObjectsManagement) != 16 {
-		t.Errorf("Expect 16 objects created in the sync loop, actual %d", len(createObjectsManagement))
+	if len(createObjectsManagement) != 20 {
+		t.Errorf("Expect 20 objects created in the sync loop, actual %d", len(createObjectsManagement))
 	}
 	for _, object := range createObjectsManagement {
 		ensureObject(t, object, klusterlet, false)

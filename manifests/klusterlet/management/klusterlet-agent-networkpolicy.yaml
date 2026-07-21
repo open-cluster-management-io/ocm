@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: klusterlet-agent
+  namespace: {{ .AgentNamespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: klusterlet-agent
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: default
+    ports:
+    - protocol: TCP
+      port: 443
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: open-cluster-management-hub
+    ports:
+    - protocol: TCP
+      port: 9443
+  - to:
+    - podSelector: {}

@@ -50,9 +50,9 @@ func TestSyncDelete(t *testing.T) {
 		}
 	}
 
-	// 11 managed static manifests + 12 management static manifests + 1 hub kubeconfig + 2 namespaces + 2 deployments
-	if len(deleteActions) != 28 {
-		t.Errorf("Expected 28 delete actions, but got %d", len(deleteActions))
+	// 11 managed static manifests + 16 management static manifests + 1 hub kubeconfig + 2 namespaces + 2 deployments
+	if len(deleteActions) != 32 {
+		t.Errorf("Expected 32 delete actions, but got %d", len(deleteActions))
 	}
 
 	var updateWorkActions []clienttesting.PatchActionImpl
@@ -108,10 +108,10 @@ func TestSyncDeleteHosted(t *testing.T) {
 		}
 	}
 
-	// 11 static manifests + 3 secrets(hub-kubeconfig-secret, external-managed-kubeconfig-registration,external-managed-kubeconfig-work)
+	// 15 static manifests + 3 secrets(hub-kubeconfig-secret, external-managed-kubeconfig-registration,external-managed-kubeconfig-work)
 	// + 2 deployments(registration-agent,work-agent) + 1 namespace
-	if len(deleteActionsManagement) != 17 {
-		t.Errorf("Expected 17 delete actions, but got %d", len(deleteActionsManagement))
+	if len(deleteActionsManagement) != 21 {
+		t.Errorf("Expected 21 delete actions, but got %d", len(deleteActionsManagement))
 	}
 
 	var deleteActionsManaged []clienttesting.DeleteActionImpl

@@ -69,5 +69,8 @@ rules:
 - apiGroups: ["work.open-cluster-management.io"]
   resources: ["appliedmanifestworks"]
   verbs: ["list", "update", "patch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["create", "get", "list", "update", "watch", "patch", "delete"]
 {{- end }}
 {{- end }}
