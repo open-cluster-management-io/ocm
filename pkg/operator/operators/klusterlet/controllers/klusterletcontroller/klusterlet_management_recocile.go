@@ -36,6 +36,9 @@ var (
 		"klusterlet/management/klusterlet-work-role.yaml",
 		"klusterlet/management/klusterlet-work-rolebinding.yaml",
 		"klusterlet/management/klusterlet-work-rolebinding-extension-apiserver.yaml",
+	}
+
+	networkPolicyFiles = []string{
 		"klusterlet/management/klusterlet-default-deny-all-networkpolicy.yaml",
 		"klusterlet/management/klusterlet-allow-dns-networkpolicy.yaml",
 		"klusterlet/management/klusterlet-networkpolicy.yaml",
@@ -67,6 +70,11 @@ func (r *managementReconcile) reconcile(ctx context.Context, klusterlet *operato
 		return klusterlet, reconcileStop, err
 	}
 
+	files := managementStaticResourceFiles
+	if config.NetworkPoliciesEnabled {
+		files = append(files, networkPolicyFiles...)
+	}
+
 	resourceResults := helpers.ApplyDirectly(
 		ctx,
 		r.kubeClient,
@@ -82,7 +90,7 @@ func (r *managementReconcile) reconcile(ctx context.Context, klusterlet *operato
 			helpers.SetRelatedResourcesStatusesWithObj(ctx, &klusterlet.Status.RelatedResources, objData)
 			return objData, nil
 		},
-		managementStaticResourceFiles...,
+		files...,
 	)
 
 	var errs []error
@@ -121,7 +129,11 @@ func (r *managementReconcile) clean(ctx context.Context, klusterlet *operatorapi
 	}
 
 	// remove static file on the management cluster
-	err := removeStaticResources(ctx, r.kubeClient, nil, managementStaticResourceFiles, config)
+	files := managementStaticResourceFiles
+	if config.NetworkPoliciesEnabled {
+		files = append(files, networkPolicyFiles...)
+	}
+	err := removeStaticResources(ctx, r.kubeClient, nil, files, config)
 	if err != nil {
 		return klusterlet, reconcileStop, err
 	}

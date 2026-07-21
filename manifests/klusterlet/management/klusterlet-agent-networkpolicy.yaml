@@ -8,7 +8,11 @@ spec:
     matchLabels:
       app: klusterlet-agent
   policyTypes:
+  - Ingress
   - Egress
+  ingress:
+  - from:
+    - podSelector: {}
   egress:
   - to:
     - namespaceSelector:
