@@ -14,11 +14,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/component-base/featuregate"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
 	coreinformer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
@@ -243,8 +243,8 @@ type klusterletConfig struct {
 	AboutAPIEnabled bool
 	// flag to enable network policies in the agent namespace
 	NetworkPoliciesEnabled bool
-	TLSMinVersion   string
-	TLSCipherSuites string
+	TLSMinVersion          string
+	TLSCipherSuites        string
 }
 
 // If multiplehubs feature gate is enabled, using the bootstrapkubeconfigs from klusterlet CR.

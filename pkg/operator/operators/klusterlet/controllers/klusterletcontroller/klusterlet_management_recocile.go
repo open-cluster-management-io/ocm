@@ -70,7 +70,8 @@ func (r *managementReconcile) reconcile(ctx context.Context, klusterlet *operato
 		return klusterlet, reconcileStop, err
 	}
 
-	files := managementStaticResourceFiles
+	var files []string
+	files = append(files, managementStaticResourceFiles...)
 	if config.NetworkPoliciesEnabled {
 		files = append(files, networkPolicyFiles...)
 	}
@@ -129,7 +130,8 @@ func (r *managementReconcile) clean(ctx context.Context, klusterlet *operatorapi
 	}
 
 	// remove static file on the management cluster
-	files := managementStaticResourceFiles
+	var files []string
+	files = append(files, managementStaticResourceFiles...)
 	if config.NetworkPoliciesEnabled {
 		files = append(files, networkPolicyFiles...)
 	}
