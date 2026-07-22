@@ -87,6 +87,27 @@ var (
 		"cluster-manager/hub/grpc-server/serviceaccount.yaml",
 		"cluster-manager/hub/grpc-server/service.yaml",
 	}
+
+	// hubNetworkPolicyBaseFiles are always-on NetworkPolicy resources for open-cluster-management-hub.
+	// Applied as part of ClusterManager CR reconciliation.
+	hubNetworkPolicyBaseFiles = []string{
+		"cluster-manager/hub/networkpolicies/01-hub-ns-default-deny.yaml",
+		"cluster-manager/hub/networkpolicies/02-hub-ns-egress.yaml",    // DNS + apiserver egress combined
+		"cluster-manager/hub/networkpolicies/04-hub-ns-intra-namespace.yaml",
+	}
+
+	// hubKubeletProbeNPFile is applied only when NodeCIDRs is non-empty.
+	// Skipped when node InternalIPs cannot be resolved at reconcile time.
+	hubKubeletProbeNPFile = "cluster-manager/hub/networkpolicies/03-hub-ns-kubelet-probe.yaml"
+
+	// hubWebhookNPFile is applied only when APIServerNamespace is set in
+	// ClusterManagerSpec.NetworkPolicyConfiguration. OCM does not detect the platform.
+	// Covers registration, work and addon webhooks in a single policy using matchExpressions.
+	hubWebhookNPFile = "cluster-manager/hub/networkpolicies/05-hub-ns-webhook-ingress.yaml"
+
+	// hubPrometheusNPFile is applied only when MonitoringNamespace is set in
+	// ClusterManagerSpec.NetworkPolicyConfiguration. OCM does not assume a monitoring stack.
+	hubPrometheusNPFile = "cluster-manager/hub/networkpolicies/06-hub-ns-prometheus.yaml"
 )
 
 type hubReconcile struct {
@@ -142,6 +163,41 @@ func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 		hubResources...,
 	)
 	for _, result := range resourceResults {
+		if result.Error != nil {
+			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
+		}
+	}
+
+	// Apply NetworkPolicies for open-cluster-management and open-cluster-management-hub namespaces.
+	// Opt-in files added only when operator supplies relevant config — OCM does not detect platform.
+	npFiles := append([]string{}, hubNetworkPolicyBaseFiles...)
+	if len(config.NodeCIDRs) > 0 {
+		npFiles = append(npFiles, hubKubeletProbeNPFile)
+	}
+	if config.APIServerNamespace != "" {
+		npFiles = append(npFiles, hubWebhookNPFile)
+	}
+	if config.MonitoringNamespace != "" {
+		npFiles = append(npFiles, hubPrometheusNPFile)
+	}
+	npResults := helpers.ApplyDirectly(
+		ctx,
+		c.hubKubeClient,
+		nil,
+		c.recorder,
+		c.cache,
+		func(name string) ([]byte, error) {
+			template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
+			if err != nil {
+				return nil, err
+			}
+			objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
+			helpers.SetRelatedResourcesStatusesWithObj(ctx, &cm.Status.RelatedResources, objData)
+			return objData, nil
+		},
+		npFiles...,
+	)
+	for _, result := range npResults {
 		if result.Error != nil {
 			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
 		}

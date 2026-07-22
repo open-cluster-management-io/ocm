@@ -17,6 +17,7 @@ import (
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -503,6 +504,8 @@ func GenerateRelatedResource(objBytes []byte) (operatorapiv1.RelatedResourceMeta
 		relatedResource = newRelatedResource(rbacv1.SchemeGroupVersion.WithResource("rolebindings"), requiredObj)
 	case *apiextensionsv1.CustomResourceDefinition:
 		relatedResource = newRelatedResource(apiextensionsv1.SchemeGroupVersion.WithResource("customresourcedefinitions"), requiredObj)
+	case *networkingv1.NetworkPolicy:
+		relatedResource = newRelatedResource(networkingv1.SchemeGroupVersion.WithResource("networkpolicies"), requiredObj)
 	default:
 		return relatedResource, fmt.Errorf("unhandled type %T", requiredObj)
 	}
@@ -1028,3 +1031,23 @@ func GRPCServerEndpointType(cm *operatorapiv1.ClusterManager) string {
 
 	return string(operatorapiv1.EndpointTypeHostname)
 }
+
+// GetNodeInternalIPs returns each node's InternalIP as a /32 CIDR string.
+// Used to populate NetworkPolicy ipBlock entries for kubelet probe ingress policies,
+// since kubelet probes originate from the node IP rather than a pod IP.
+func GetNodeInternalIPs(ctx context.Context, kubeClient kubernetes.Interface) ([]string, error) {
+	nodes, err := kubeClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	var cidrs []string
+	for _, node := range nodes.Items {
+		for _, addr := range node.Status.Addresses {
+			if addr.Type == corev1.NodeInternalIP {
+				cidrs = append(cidrs, addr.Address+"/32")
+			}
+		}
+	}
+	return cidrs, nil
+}
+

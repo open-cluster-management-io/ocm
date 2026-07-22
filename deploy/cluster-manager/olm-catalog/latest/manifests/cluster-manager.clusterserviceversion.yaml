@@ -201,6 +201,18 @@ spec:
           - list
           - watch
         - apiGroups:
+          - networking.k8s.io
+          resources:
+          - networkpolicies
+          verbs:
+          - create
+          - get
+          - list
+          - watch
+          - update
+          - patch
+          - delete
+        - apiGroups:
           - authorization.k8s.io
           resources:
           - subjectaccessreviews

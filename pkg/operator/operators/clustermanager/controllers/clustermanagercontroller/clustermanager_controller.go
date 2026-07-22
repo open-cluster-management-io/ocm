@@ -187,6 +187,19 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		WorkDriver:                      string(workDriver),
 	}
 
+	// Resolve NetworkPolicy template variables from hub cluster APIs.
+	// NodeCIDRs: one /32 per hub node InternalIP — used for kubelet probe ingress ipBlock entries.
+	// APIServerNamespace: "openshift-kube-apiserver" on OpenShift, "kube-system" on vanilla K8s — used to restrict webhook ingress.
+	if nodeCIDRs, err := helpers.GetNodeInternalIPs(ctx, n.operatorKubeClient); err != nil {
+		klog.V(4).Infof("Failed to list hub node IPs for NetworkPolicy, kubelet probe ingress will be empty: %v", err)
+	} else {
+		config.NodeCIDRs = nodeCIDRs
+	}
+	if clusterManager.Spec.NetworkPolicyConfiguration != nil {
+		config.MonitoringNamespace = clusterManager.Spec.NetworkPolicyConfiguration.MonitoringNamespace
+		config.APIServerNamespace = clusterManager.Spec.NetworkPolicyConfiguration.APIServerNamespace
+	}
+
 	var registrationFeatureMsgs, workFeatureMsgs, addonFeatureMsgs string
 	// If there are some invalid feature gates of registration or work, will output
 	// condition `ValidFeatureGates` False in ClusterManager.

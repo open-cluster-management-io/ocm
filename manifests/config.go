@@ -55,6 +55,17 @@ type HubConfig struct {
 	// TLS configuration injected into all managed hub component deployments
 	TLSMinVersion   string
 	TLSCipherSuites string
+
+	// NetworkPolicy fields — resolved at reconcile time from cluster APIs
+	// NodeCIDRs holds each hub node's InternalIP as a /32 CIDR string.
+	// Used to populate ipBlock entries in kubelet probe ingress policies.
+	NodeCIDRs []string
+	// APIServerNamespace is the namespace from which kube-apiserver originates
+	// webhook calls: "kube-system" on vanilla K8s, "openshift-kube-apiserver" on OpenShift.
+	APIServerNamespace string
+	// MonitoringNamespace is the namespace where the Prometheus scraper runs.
+	// Defaults to "openshift-monitoring"; set to "monitoring" for vanilla K8s Prometheus stacks.
+	MonitoringNamespace string
 }
 
 type Webhook struct {

@@ -85,6 +85,28 @@ type ClusterManagerSpec struct {
 	// It applies to all the containers in the deployments.
 	// +optional
 	ResourceRequirement *ResourceRequirement `json:"resourceRequirement,omitempty"`
+
+	// networkPolicyConfiguration contains configuration for NetworkPolicies applied to OCM hub namespaces.
+	// +optional
+	NetworkPolicyConfiguration *NetworkPolicyConfiguration `json:"networkPolicyConfiguration,omitempty"`
+}
+
+// NetworkPolicyConfiguration holds configuration for NetworkPolicies applied to OCM hub namespaces.
+type NetworkPolicyConfiguration struct {
+	// monitoringNamespace is the namespace where the Prometheus scraper runs.
+	// When set, an ingress NetworkPolicy is created allowing Prometheus to scrape OCM component metrics.
+	// Leave unset to skip the Prometheus ingress policy entirely.
+	// Common values: "openshift-monitoring" (OpenShift), "monitoring" (kube-prometheus-stack),
+	// "cattle-monitoring-system" (Rancher).
+	// +optional
+	MonitoringNamespace string `json:"monitoringNamespace,omitempty"`
+
+	// apiServerNamespace is the namespace from which kube-apiserver originates webhook calls.
+	// Used to restrict ingress on registration, work, and addon webhook pods to only accept
+	// requests from the API server. Leave unset to skip namespace-scoped webhook ingress restriction.
+	// Common values: "kube-system" (vanilla Kubernetes), "default" (OpenShift).
+	// +optional
+	APIServerNamespace string `json:"apiServerNamespace,omitempty"`
 }
 
 // NodePlacement describes node scheduling configuration for the pods.

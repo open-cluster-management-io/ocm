@@ -637,7 +637,7 @@ func TestSyncDeploy(t *testing.T) {
 		"open-cluster-management.io/cluster-name": "test"}
 	clusterManager := newClusterManager("testhub")
 	clusterManager.SetLabels(labels)
-	assertDeployments(t, clusterManager, 30, 12)
+	assertDeployments(t, clusterManager, 33, 12) // +3 NetworkPolicy objects from hub NP files (deny-all, egress, intra-namespace)
 }
 
 func TestSyncDeployWithGRPCAuthEnabled(t *testing.T) {
@@ -655,7 +655,7 @@ func TestSyncDeployWithGRPCAuthEnabled(t *testing.T) {
 			},
 		},
 	}
-	assertDeployments(t, clusterManager, 34, 12)
+	assertDeployments(t, clusterManager, 37, 12) // +3 NetworkPolicy objects from hub NP files (deny-all, egress, intra-namespace)
 }
 
 func TestSyncDeployNoWebhook(t *testing.T) {
@@ -681,7 +681,7 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 
 	// Check if resources are created as expected
 	// We expect create the namespace twice respectively in the management cluster and the hub cluster.
-	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 33)
+	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 36) // +3 NetworkPolicy objects from hub NP files (deny-all, egress, intra-namespace)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager, false)
 	}
@@ -1709,3 +1709,96 @@ func containsArg(args []string, prefix string) bool {
 	}
 	return false
 }
+
+// TestNetworkPolicyOptInFiles verifies that 02a (webhook) and 02b (prometheus) NP files
+// are included in the apply list only when the operator supplies the corresponding config.
+func TestNetworkPolicyOptInFiles(t *testing.T) {
+	cases := []struct {
+		name                string
+		networkPolicyCfg    *operatorapiv1.NetworkPolicyConfiguration
+		expectWebhookNP     bool
+		expectPrometheusNP  bool
+	}{
+		{
+			name:               "no NetworkPolicyConfiguration — only base files applied",
+			networkPolicyCfg:   nil,
+			expectWebhookNP:    false,
+			expectPrometheusNP: false,
+		},
+		{
+			name: "APIServerNamespace set — webhook NP applied",
+			networkPolicyCfg: &operatorapiv1.NetworkPolicyConfiguration{
+				APIServerNamespace: "kube-system",
+			},
+			expectWebhookNP:    true,
+			expectPrometheusNP: false,
+		},
+		{
+			name: "MonitoringNamespace set — prometheus NP applied",
+			networkPolicyCfg: &operatorapiv1.NetworkPolicyConfiguration{
+				MonitoringNamespace: "monitoring",
+			},
+			expectWebhookNP:    false,
+			expectPrometheusNP: true,
+		},
+		{
+			name: "both set — both opt-in NPs applied",
+			networkPolicyCfg: &operatorapiv1.NetworkPolicyConfiguration{
+				APIServerNamespace:  "default",
+				MonitoringNamespace: "openshift-monitoring",
+			},
+			expectWebhookNP:    true,
+			expectPrometheusNP: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			clusterManager := newClusterManager("testhub")
+			clusterManager.Spec.NetworkPolicyConfiguration = c.networkPolicyCfg
+
+			tc := newTestController(t, clusterManager)
+			clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
+			setup(t, tc, setDeployment(clusterManager.Name, clusterManagerNamespace))
+
+			syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
+			if err := tc.clusterManagerController.sync(ctx, syncContext, "testhub"); err != nil {
+				t.Fatalf("unexpected sync error: %v", err)
+			}
+
+			var npNames []string
+			for _, action := range tc.hubKubeClient.Actions() {
+				if action.GetVerb() != createVerb {
+					continue
+				}
+				obj := action.(clienttesting.CreateActionImpl).Object
+				if np, ok := obj.(interface{ GetName() string }); ok {
+					name := np.GetName()
+					if name == "allow-webhook-ingress" ||
+						name == "allow-prometheus-ingress" {
+						npNames = append(npNames, name)
+					}
+				}
+			}
+
+			hasWebhook := false
+			hasPrometheus := false
+			for _, name := range npNames {
+				if name == "allow-webhook-ingress" {
+					hasWebhook = true
+				}
+				if name == "allow-prometheus-ingress" {
+					hasPrometheus = true
+				}
+			}
+
+			if hasWebhook != c.expectWebhookNP {
+				t.Errorf("expectWebhookNP=%v but hasWebhookNP=%v", c.expectWebhookNP, hasWebhook)
+			}
+			if hasPrometheus != c.expectPrometheusNP {
+				t.Errorf("expectPrometheusNP=%v but hasPrometheusNP=%v", c.expectPrometheusNP, hasPrometheus)
+			}
+		})
+	}
+}
+
