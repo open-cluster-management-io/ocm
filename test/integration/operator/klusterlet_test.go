@@ -151,9 +151,9 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 					return err
 				}
 
-				// 11 managed static manifests + 11 management static manifests + 2CRDs + 2 deployments(2 duplicated SAs)
-				if len(actual.Status.RelatedResources) != 24 {
-					return fmt.Errorf("should get 26 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				// 11 managed static manifests + 11 management static manifests + 4 networkpolicies + 2CRDs + 2 deployments(2 duplicated SAs)
+				if len(actual.Status.RelatedResources) != 28 {
+					return fmt.Errorf("should get 28 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())

@@ -115,10 +115,10 @@ var _ = Describe("Deploy Klusterlet with Multiplehubs enabled", func() {
 				return err
 			}
 
-			// 10 managed static manifests + 9 management static manifests + 2CRDs + 1 deployments
+			// 10 managed static manifests + 9 management static manifests + 4 networkpolicies + 2CRDs + 1 deployments
 			// The number is the same as the singletone mode.
-			if len(actual.Status.RelatedResources) != 22 {
-				return fmt.Errorf("should get 22 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+			if len(actual.Status.RelatedResources) != 26 {
+				return fmt.Errorf("should get 26 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
