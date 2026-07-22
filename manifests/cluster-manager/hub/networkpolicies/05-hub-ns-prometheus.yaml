@@ -9,7 +9,18 @@ metadata:
   name: allow-prometheus-ingress
   namespace: {{ .ClusterManagerNamespace }}
 spec:
-  podSelector: {}
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - "{{ .ClusterManagerName }}-registration-controller"
+          - "{{ .ClusterManagerName }}-registration-webhook"
+          - "{{ .ClusterManagerName }}-work-controller"
+          - "{{ .ClusterManagerName }}-work-webhook"
+          - "{{ .ClusterManagerName }}-placement-controller"
+          - "{{ .ClusterManagerName }}-addon-manager-controller"
+          - "{{ .ClusterManagerName }}-addon-webhook"
   policyTypes:
     - Ingress
   ingress:
@@ -21,4 +32,4 @@ spec:
       from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: {{ .MonitoringNamespace }}
+              kubernetes.io/metadata.name: "{{ .MonitoringNamespace }}"

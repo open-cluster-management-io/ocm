@@ -164,14 +164,23 @@ func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 		}
 	}
 
-	// Apply NetworkPolicies for open-cluster-management and open-cluster-management-hub namespaces.
+	// Apply NetworkPolicies for open-cluster-management-hub namespace.
 	// Opt-in files added only when operator supplies relevant config — OCM does not detect platform.
+	// When an optional field is cleared, the corresponding policy is explicitly deleted.
 	npFiles := append([]string{}, hubNetworkPolicyBaseFiles...)
 	if config.APIServerNamespace != "" {
 		npFiles = append(npFiles, hubWebhookNPFile)
+	} else {
+		if _, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, hubWebhookNPFile); err != nil {
+			return cm, reconcileStop, err
+		}
 	}
 	if config.MonitoringNamespace != "" {
 		npFiles = append(npFiles, hubPrometheusNPFile)
+	} else {
+		if _, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, hubPrometheusNPFile); err != nil {
+			return cm, reconcileStop, err
+		}
 	}
 	npResults := helpers.ApplyDirectly(
 		ctx,

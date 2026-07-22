@@ -15,9 +15,9 @@ spec:
       - key: app
         operator: In
         values:
-          - {{ .ClusterManagerName }}-registration-webhook
-          - {{ .ClusterManagerName }}-work-webhook
-          - {{ .ClusterManagerName }}-addon-webhook
+          - "{{ .ClusterManagerName }}-registration-webhook"
+          - "{{ .ClusterManagerName }}-work-webhook"
+          - "{{ .ClusterManagerName }}-addon-webhook"
   policyTypes:
     - Ingress
   ingress:

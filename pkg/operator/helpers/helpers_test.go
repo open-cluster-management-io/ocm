@@ -2486,13 +2486,19 @@ func TestNetworkPolicyTemplateRendering(t *testing.T) {
 			},
 		},
 		{
-			name: "prometheus NP uses MonitoringNamespace var",
+			name: "prometheus NP uses MonitoringNamespace and ClusterManagerName vars",
 			config: manifests.HubConfig{
 				ClusterManagerNamespace: "open-cluster-management-hub",
+				ClusterManagerName:      "cluster-manager",
 				MonitoringNamespace:     "openshift-monitoring",
 			},
 			manifestFile:   "cluster-manager/hub/networkpolicies/05-hub-ns-prometheus.yaml",
-			expectContains: []string{"kubernetes.io/metadata.name: openshift-monitoring"},
+			expectContains: []string{
+				"kubernetes.io/metadata.name: \"openshift-monitoring\"",
+				"cluster-manager-registration-controller",
+				"cluster-manager-work-controller",
+				"cluster-manager-placement-controller",
+			},
 		},
 	}
 

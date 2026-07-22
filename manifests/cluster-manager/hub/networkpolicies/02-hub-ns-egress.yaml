@@ -1,7 +1,12 @@
 # Combined egress policy for all hub controller and webhook pods.
-# Rule 1: DNS resolution (CoreDNS port 53, openshift-dns port 5353)
+# Rule 1: DNS resolution (CoreDNS port 53, node-local-dns/openshift-dns port 5353)
 # Rule 2: kube-apiserver egress (ports 443, 6443)
-# Both rules apply to all pods (podSelector: {}) and are always needed together.
+#
+# No "to" selector is specified on either rule — egress is restricted by port only.
+# DNS and apiserver endpoints vary by platform (kube-system vs openshift-dns,
+# ClusterIP vs static pod vs external control plane), and locking "to" would
+# require platform-specific namespace or IP configuration that OCM intentionally
+# avoids. The port restriction limits the blast radius to DNS and HTTPS traffic.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

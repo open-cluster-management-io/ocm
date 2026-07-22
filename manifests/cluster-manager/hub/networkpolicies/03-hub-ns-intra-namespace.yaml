@@ -1,7 +1,7 @@
 # Intra-namespace pod-to-pod communication.
-# Required because kube-apiserver calls webhooks via ClusterIP Services
-# within open-cluster-management-hub namespace.
-# Also covers placement-controller debug server access.
+# Allows pods within open-cluster-management-hub to reach each other
+# (e.g. placement-controller debug server, inter-controller calls).
+# API-server webhook ingress is handled separately by 04-hub-ns-webhook-ingress.yaml.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
