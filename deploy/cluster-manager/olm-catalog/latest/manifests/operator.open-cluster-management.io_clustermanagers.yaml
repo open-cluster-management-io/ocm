@@ -879,12 +879,16 @@ spec:
                       Common values: "kube-system" (vanilla Kubernetes),
                       "openshift-kube-apiserver" (OpenShift). Leave unset to skip webhook
                       ingress restriction.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                     type: string
                   monitoringNamespace:
                     description: |-
                       monitoringNamespace is the namespace where the Prometheus scraper runs.
                       When set, an ingress NetworkPolicy allows Prometheus to scrape OCM metrics.
                       Leave unset to skip the Prometheus ingress policy.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                     type: string
                 type: object
             type: object
