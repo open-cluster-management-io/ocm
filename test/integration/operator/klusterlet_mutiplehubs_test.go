@@ -41,6 +41,10 @@ var _ = Describe("Deploy Klusterlet with Multiplehubs enabled", func() {
 							Feature: string(ocmfeature.MultipleHubs),
 							Mode:    operatorapiv1.FeatureGateModeTypeEnable,
 						},
+						{
+							Feature: "NetworkPolicies",
+							Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+						},
 					},
 					BootstrapKubeConfigs: operatorapiv1.BootstrapKubeConfigs{
 						Type: operatorapiv1.LocalSecrets,

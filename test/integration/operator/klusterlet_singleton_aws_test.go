@@ -49,6 +49,12 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode with aws auth", func() {
 							ManagedClusterArn: util.ManagedClusterArn,
 						},
 					},
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{
+							Feature: "NetworkPolicies",
+							Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+						},
+					},
 				},
 			},
 		}

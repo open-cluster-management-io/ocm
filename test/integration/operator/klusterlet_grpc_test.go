@@ -49,6 +49,12 @@ var _ = ginkgo.Describe("Klusterlet using grpc auth", func() {
 						RegistrationDriver: operatorapiv1.RegistrationDriver{
 							AuthType: "grpc",
 						},
+						FeatureGates: []operatorapiv1.FeatureGate{
+							{
+								Feature: "NetworkPolicies",
+								Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+							},
+						},
 					},
 				},
 			}
@@ -128,6 +134,12 @@ var _ = ginkgo.Describe("Klusterlet using grpc auth", func() {
 					RegistrationConfiguration: &operatorapiv1.RegistrationConfiguration{
 						RegistrationDriver: operatorapiv1.RegistrationDriver{
 							AuthType: "grpc",
+						},
+						FeatureGates: []operatorapiv1.FeatureGate{
+							{
+								Feature: "NetworkPolicies",
+								Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+							},
 						},
 					},
 					DeployOption: operatorapiv1.KlusterletDeployOption{

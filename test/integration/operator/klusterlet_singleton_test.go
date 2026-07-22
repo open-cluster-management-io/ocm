@@ -44,6 +44,14 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode", func() {
 				DeployOption: operatorapiv1.KlusterletDeployOption{
 					Mode: operatorapiv1.InstallModeSingleton,
 				},
+				RegistrationConfiguration: &operatorapiv1.RegistrationConfiguration{
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{
+							Feature: "NetworkPolicies",
+							Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+						},
+					},
+				},
 			},
 		}
 		agentNamespace = helpers.AgentNamespace(klusterlet)

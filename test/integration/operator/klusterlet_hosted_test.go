@@ -48,6 +48,14 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 				DeployOption: operatorapiv1.KlusterletDeployOption{
 					Mode: operatorapiv1.InstallModeHosted,
 				},
+				RegistrationConfiguration: &operatorapiv1.RegistrationConfiguration{
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{
+							Feature: "NetworkPolicies",
+							Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+						},
+					},
+				},
 			},
 		}
 		klusterletNamespace = helpers.KlusterletNamespace(klusterlet)
