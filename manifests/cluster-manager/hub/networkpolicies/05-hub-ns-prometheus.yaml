@@ -1,0 +1,24 @@
+# Prometheus scrape ingress for all hub controller and webhook pods.
+# Only applied when MonitoringNamespace is set in ClusterManagerSpec.NetworkPolicyConfiguration.
+# OCM does not assume a monitoring stack — this policy is platform-neutral and opt-in.
+# Common values: "openshift-monitoring" (OpenShift), "monitoring" (kube-prometheus-stack),
+# "cattle-monitoring-system" (Rancher).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-ingress
+  namespace: {{ .ClusterManagerNamespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - port: 8080
+          protocol: TCP
+        - port: 8443
+          protocol: TCP
+      from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .MonitoringNamespace }}

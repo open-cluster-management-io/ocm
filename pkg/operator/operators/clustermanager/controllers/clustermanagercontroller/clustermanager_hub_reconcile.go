@@ -93,21 +93,17 @@ var (
 	hubNetworkPolicyBaseFiles = []string{
 		"cluster-manager/hub/networkpolicies/01-hub-ns-default-deny.yaml",
 		"cluster-manager/hub/networkpolicies/02-hub-ns-egress.yaml",    // DNS + apiserver egress combined
-		"cluster-manager/hub/networkpolicies/04-hub-ns-intra-namespace.yaml",
+		"cluster-manager/hub/networkpolicies/03-hub-ns-intra-namespace.yaml",
 	}
-
-	// hubKubeletProbeNPFile is applied only when NodeCIDRs is non-empty.
-	// Skipped when node InternalIPs cannot be resolved at reconcile time.
-	hubKubeletProbeNPFile = "cluster-manager/hub/networkpolicies/03-hub-ns-kubelet-probe.yaml"
 
 	// hubWebhookNPFile is applied only when APIServerNamespace is set in
 	// ClusterManagerSpec.NetworkPolicyConfiguration. OCM does not detect the platform.
 	// Covers registration, work and addon webhooks in a single policy using matchExpressions.
-	hubWebhookNPFile = "cluster-manager/hub/networkpolicies/05-hub-ns-webhook-ingress.yaml"
+	hubWebhookNPFile = "cluster-manager/hub/networkpolicies/04-hub-ns-webhook-ingress.yaml"
 
 	// hubPrometheusNPFile is applied only when MonitoringNamespace is set in
 	// ClusterManagerSpec.NetworkPolicyConfiguration. OCM does not assume a monitoring stack.
-	hubPrometheusNPFile = "cluster-manager/hub/networkpolicies/06-hub-ns-prometheus.yaml"
+	hubPrometheusNPFile = "cluster-manager/hub/networkpolicies/05-hub-ns-prometheus.yaml"
 )
 
 type hubReconcile struct {
@@ -171,9 +167,6 @@ func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 	// Apply NetworkPolicies for open-cluster-management and open-cluster-management-hub namespaces.
 	// Opt-in files added only when operator supplies relevant config — OCM does not detect platform.
 	npFiles := append([]string{}, hubNetworkPolicyBaseFiles...)
-	if len(config.NodeCIDRs) > 0 {
-		npFiles = append(npFiles, hubKubeletProbeNPFile)
-	}
 	if config.APIServerNamespace != "" {
 		npFiles = append(npFiles, hubWebhookNPFile)
 	}

@@ -2442,94 +2442,6 @@ func TestNormalizeImagePullSecretName(t *testing.T) {
 	}
 }
 
-func TestGetNodeInternalIPs(t *testing.T) {
-	cases := []struct {
-		name     string
-		nodes    []runtime.Object
-		expected []string
-	}{
-		{
-			name:     "no nodes",
-			nodes:    []runtime.Object{},
-			expected: nil,
-		},
-		{
-			name: "single node with InternalIP",
-			nodes: []runtime.Object{
-				&corev1.Node{
-					ObjectMeta: metav1.ObjectMeta{Name: "node1"},
-					Status: corev1.NodeStatus{
-						Addresses: []corev1.NodeAddress{
-							{Type: corev1.NodeInternalIP, Address: "10.0.0.1"},
-						},
-					},
-				},
-			},
-			expected: []string{"10.0.0.1/32"},
-		},
-		{
-			name: "node with InternalIP and ExternalIP — only InternalIP returned",
-			nodes: []runtime.Object{
-				&corev1.Node{
-					ObjectMeta: metav1.ObjectMeta{Name: "node1"},
-					Status: corev1.NodeStatus{
-						Addresses: []corev1.NodeAddress{
-							{Type: corev1.NodeInternalIP, Address: "10.0.0.1"},
-							{Type: corev1.NodeExternalIP, Address: "1.2.3.4"},
-						},
-					},
-				},
-			},
-			expected: []string{"10.0.0.1/32"},
-		},
-		{
-			name: "multiple nodes across subnets",
-			nodes: []runtime.Object{
-				&corev1.Node{
-					ObjectMeta: metav1.ObjectMeta{Name: "node1"},
-					Status: corev1.NodeStatus{
-						Addresses: []corev1.NodeAddress{
-							{Type: corev1.NodeInternalIP, Address: "10.0.1.5"},
-						},
-					},
-				},
-				&corev1.Node{
-					ObjectMeta: metav1.ObjectMeta{Name: "node2"},
-					Status: corev1.NodeStatus{
-						Addresses: []corev1.NodeAddress{
-							{Type: corev1.NodeInternalIP, Address: "10.0.2.7"},
-						},
-					},
-				},
-			},
-			expected: []string{"10.0.1.5/32", "10.0.2.7/32"},
-		},
-		{
-			name: "node with no addresses",
-			nodes: []runtime.Object{
-				&corev1.Node{
-					ObjectMeta: metav1.ObjectMeta{Name: "node1"},
-					Status:     corev1.NodeStatus{},
-				},
-			},
-			expected: nil,
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			kubeClient := fakekube.NewSimpleClientset(c.nodes...)
-			cidrs, err := GetNodeInternalIPs(context.Background(), kubeClient)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if !reflect.DeepEqual(cidrs, c.expected) {
-				t.Errorf("expected %v, got %v", c.expected, cidrs)
-			}
-		})
-	}
-}
-
 func TestNetworkPolicyTemplateRendering(t *testing.T) {
 	cases := []struct {
 		name            string
@@ -2538,34 +2450,6 @@ func TestNetworkPolicyTemplateRendering(t *testing.T) {
 		expectContains  []string
 		expectAbsent    []string
 	}{
-		{
-			name: "kubelet probe skipped when NodeCIDRs empty",
-			config: manifests.HubConfig{
-				ClusterManagerNamespace: "open-cluster-management-hub",
-				NodeCIDRs:               nil,
-			},
-			manifestFile:   "cluster-manager/hub/networkpolicies/03-hub-ns-kubelet-probe.yaml",
-			expectAbsent:   []string{"cidr:"},
-			expectContains: []string{"allow-kubelet-probe-ingress"},
-		},
-		{
-			name: "kubelet probe rendered with single node CIDR",
-			config: manifests.HubConfig{
-				ClusterManagerNamespace: "open-cluster-management-hub",
-				NodeCIDRs:               []string{"10.0.0.1/32"},
-			},
-			manifestFile:   "cluster-manager/hub/networkpolicies/03-hub-ns-kubelet-probe.yaml",
-			expectContains: []string{"allow-kubelet-probe-ingress", "10.0.0.1/32"},
-		},
-		{
-			name: "kubelet probe rendered with multiple node CIDRs",
-			config: manifests.HubConfig{
-				ClusterManagerNamespace: "open-cluster-management-hub",
-				NodeCIDRs:               []string{"10.0.1.5/32", "10.0.2.7/32", "10.0.3.9/32"},
-			},
-			manifestFile:   "cluster-manager/hub/networkpolicies/03-hub-ns-kubelet-probe.yaml",
-			expectContains: []string{"10.0.1.5/32", "10.0.2.7/32", "10.0.3.9/32"},
-		},
 		{
 			name: "default deny uses ClusterManagerNamespace var",
 			config: manifests.HubConfig{
@@ -2592,7 +2476,7 @@ func TestNetworkPolicyTemplateRendering(t *testing.T) {
 				WorkWebhook:             manifests.Webhook{Port: 9443},
 				AddonWebhook:            manifests.Webhook{Port: 9443},
 			},
-			manifestFile:   "cluster-manager/hub/networkpolicies/05-hub-ns-webhook-ingress.yaml",
+			manifestFile:   "cluster-manager/hub/networkpolicies/04-hub-ns-webhook-ingress.yaml",
 			expectContains: []string{
 				"allow-webhook-ingress",
 				"kubernetes.io/metadata.name: openshift-kube-apiserver",
@@ -2607,7 +2491,7 @@ func TestNetworkPolicyTemplateRendering(t *testing.T) {
 				ClusterManagerNamespace: "open-cluster-management-hub",
 				MonitoringNamespace:     "openshift-monitoring",
 			},
-			manifestFile:   "cluster-manager/hub/networkpolicies/06-hub-ns-prometheus.yaml",
+			manifestFile:   "cluster-manager/hub/networkpolicies/05-hub-ns-prometheus.yaml",
 			expectContains: []string{"kubernetes.io/metadata.name: openshift-monitoring"},
 		},
 	}

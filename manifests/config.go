@@ -56,10 +56,6 @@ type HubConfig struct {
 	TLSMinVersion   string
 	TLSCipherSuites string
 
-	// NetworkPolicy fields — resolved at reconcile time from cluster APIs
-	// NodeCIDRs holds each hub node's InternalIP as a /32 CIDR string.
-	// Used to populate ipBlock entries in kubelet probe ingress policies.
-	NodeCIDRs []string
 	// APIServerNamespace is the namespace from which kube-apiserver originates
 	// webhook calls: "kube-system" on vanilla K8s, "openshift-kube-apiserver" on OpenShift.
 	APIServerNamespace string

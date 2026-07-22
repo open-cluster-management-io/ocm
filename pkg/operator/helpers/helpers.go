@@ -1032,22 +1032,4 @@ func GRPCServerEndpointType(cm *operatorapiv1.ClusterManager) string {
 	return string(operatorapiv1.EndpointTypeHostname)
 }
 
-// GetNodeInternalIPs returns each node's InternalIP as a /32 CIDR string.
-// Used to populate NetworkPolicy ipBlock entries for kubelet probe ingress policies,
-// since kubelet probes originate from the node IP rather than a pod IP.
-func GetNodeInternalIPs(ctx context.Context, kubeClient kubernetes.Interface) ([]string, error) {
-	nodes, err := kubeClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	var cidrs []string
-	for _, node := range nodes.Items {
-		for _, addr := range node.Status.Addresses {
-			if addr.Type == corev1.NodeInternalIP {
-				cidrs = append(cidrs, addr.Address+"/32")
-			}
-		}
-	}
-	return cidrs, nil
-}
 
