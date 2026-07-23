@@ -78,5 +78,6 @@ func NewKlusterletAgentCmd() *cobra.Command {
 	utilruntime.Must(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeRegistrationFeatureGates))
 	utilruntime.Must(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeWorkFeatureGates))
 	features.SpokeMutableFeatureGate.AddFlag(flags)
+	commonOptions.CommonOpts.ApplyTLSToCommand(cmd)
 	return cmd
 }

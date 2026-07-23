@@ -98,6 +98,29 @@ func TestKlusterletOperatorDeprecatedFlag(t *testing.T) {
 	}
 }
 
+func TestKlusterletAgentTLSWiring(t *testing.T) {
+	// Reset feature gate for this test
+	old := features.SpokeMutableFeatureGate
+	features.SpokeMutableFeatureGate = featuregate.NewFeatureGate()
+	t.Cleanup(func() { features.SpokeMutableFeatureGate = old })
+
+	cmd := NewKlusterletAgentCmd()
+
+	// ApplyTLSToCommand should have set PersistentPreRunE
+	if cmd.PersistentPreRunE == nil {
+		t.Error("Expected PersistentPreRunE to be set by ApplyTLSToCommand")
+	}
+
+	// TLS flags should be registered via common options
+	flags := cmd.Flags()
+	if flags.Lookup("tls-min-version") == nil {
+		t.Error("Expected --tls-min-version flag to be registered")
+	}
+	if flags.Lookup("tls-cipher-suites") == nil {
+		t.Error("Expected --tls-cipher-suites flag to be registered")
+	}
+}
+
 func TestNewKlusterletAgentCmd(t *testing.T) {
 	// Reset feature gate for this test
 	old := features.SpokeMutableFeatureGate

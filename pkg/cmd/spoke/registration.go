@@ -34,5 +34,6 @@ func NewRegistrationAgent() *cobra.Command {
 
 	utilruntime.Must(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeRegistrationFeatureGates))
 	features.SpokeMutableFeatureGate.AddFlag(flags)
+	commonOptions.CommonOpts.ApplyTLSToCommand(cmd)
 	return cmd
 }

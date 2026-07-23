@@ -32,6 +32,7 @@ func NewWorkAgent() *cobra.Command {
 	agentOption.AddFlags(flags)
 	utilruntime.Must(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeWorkFeatureGates))
 	features.SpokeMutableFeatureGate.AddFlag(flags)
+	commonOptions.CommonOpts.ApplyTLSToCommand(cmd)
 
 	return cmd
 }
