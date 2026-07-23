@@ -2480,7 +2480,7 @@ func TestNetworkPolicyTemplateRendering(t *testing.T) {
 			},
 		},
 		{
-			name: "hub ingress covers webhooks, grpc-server, and placement debug",
+			name: "hub ingress covers webhooks, grpc-server, and placement debug — all sources intentionally allowed",
 			config: manifests.HubConfig{
 				ClusterManagerNamespace: "open-cluster-management-hub",
 				ClusterManagerName:      "cluster-manager",

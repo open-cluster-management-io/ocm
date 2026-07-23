@@ -81,6 +81,10 @@ rules:
 - apiGroups: ["admissionregistration.k8s.io"]
   resources: ["validatingwebhookconfigurations", "mutatingwebhookconfigurations"]
   verbs: ["create", "get", "list", "update", "watch", "patch", "delete"]
+# Allow the registration-operator to manage NetworkPolicies
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["create", "get", "list", "update", "watch", "patch", "delete"]
 # Allow the nuclues to manage clustermanager apis.
 - apiGroups: ["operator.open-cluster-management.io"]
   resources: ["clustermanagers"]

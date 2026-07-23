@@ -1,6 +1,8 @@
 # Ingress policy for all externally-reachable hub pods.
-# Always applied — restricted by pod label and port only.
-# No source namespace filter — traffic origin varies by platform.
+# Always applied when NetworkPolicies feature gate is enabled — restricted by pod label and port only.
+# Intentionally allows ingress from all sources: webhook sources vary by platform (kube-system,
+# openshift-kube-apiserver, external control planes), and OCM cannot assume a platform-specific
+# source namespace. Port restriction limits the blast radius to webhook, gRPC, and debug ports.
 #
 # Covers:
 #   - registration/work/addon webhooks (apiserver admission calls)
