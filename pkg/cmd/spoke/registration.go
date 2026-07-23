@@ -34,6 +34,11 @@ func NewRegistrationAgent() *cobra.Command {
 
 	utilruntime.Must(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeRegistrationFeatureGates))
 	features.SpokeMutableFeatureGate.AddFlag(flags)
+	// The klusterlet operator injects --tls-min-version and --tls-cipher-suites
+	// into this agent's deployment manifest from the ocm-tls-profile ConfigMap.
+	// ApplyTLSToCommand wires those CLI flags to the library-go health/metrics
+	// server (port 8443) via a PersistentPreRunE hook so the server enforces
+	// the cluster TLS profile.
 	commonOptions.CommonOpts.ApplyTLSToCommand(cmd)
 	return cmd
 }

@@ -81,6 +81,15 @@ func TestKlusterletOperatorFlags(t *testing.T) {
 	}
 }
 
+func TestKlusterletOperatorTLSFromConfigMapWiring(t *testing.T) {
+	cmd := NewKlusterletOperatorCmd()
+
+	// ApplyTLSFromConfigMapToCommand should have set PersistentPreRunE.
+	if cmd.PersistentPreRunE == nil {
+		t.Error("Expected PersistentPreRunE to be set by ApplyTLSFromConfigMapToCommand")
+	}
+}
+
 func TestKlusterletOperatorDeprecatedFlag(t *testing.T) {
 	cmd := NewKlusterletOperatorCmd()
 	flags := cmd.Flags()
