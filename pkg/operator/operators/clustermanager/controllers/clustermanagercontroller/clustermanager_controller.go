@@ -22,6 +22,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	migrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/typed/migration/v1alpha1"
 
@@ -47,7 +48,23 @@ const (
 	defaultHealthProbePort   = int32(8000)
 	defaultMetricsPort       = int32(8080)
 	clusterManagerReSyncTime = 5 * time.Second
+
+	NetworkPolicies featuregate.Feature = "NetworkPolicies"
 )
+
+var operatorOnlyFeatureGates = map[featuregate.Feature]bool{
+	NetworkPolicies: true,
+}
+
+func filterOperatorFeatureGates(features []operatorapiv1.FeatureGate) []operatorapiv1.FeatureGate {
+	var filtered []operatorapiv1.FeatureGate
+	for _, f := range features {
+		if !operatorOnlyFeatureGates[featuregate.Feature(f.Feature)] {
+			filtered = append(filtered, f)
+		}
+	}
+	return filtered
+}
 
 type clusterManagerController struct {
 	patcher              patcher.Patcher[*operatorapiv1.ClusterManager, operatorapiv1.ClusterManagerSpec, operatorapiv1.ClusterManagerStatus]
@@ -187,11 +204,6 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		WorkDriver:                      string(workDriver),
 	}
 
-	if clusterManager.Spec.NetworkPolicyConfiguration != nil {
-		config.MonitoringNamespace = clusterManager.Spec.NetworkPolicyConfiguration.MonitoringNamespace
-		config.APIServerNamespace = clusterManager.Spec.NetworkPolicyConfiguration.APIServerNamespace
-	}
-
 	var registrationFeatureMsgs, workFeatureMsgs, addonFeatureMsgs string
 	// If there are some invalid feature gates of registration or work, will output
 	// condition `ValidFeatureGates` False in ClusterManager.
@@ -200,8 +212,12 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		registrationFeatureGates = clusterManager.Spec.RegistrationConfiguration.FeatureGates
 		config.AutoApproveUsers = strings.Join(clusterManager.Spec.RegistrationConfiguration.AutoApproveUsers, ",")
 	}
+	config.NetworkPoliciesEnabled = helpers.FeatureGateEnabled(registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates, NetworkPolicies)
+	if config.NetworkPoliciesEnabled && clusterManager.Spec.NetworkPolicyConfiguration != nil {
+		config.MonitoringNamespace = clusterManager.Spec.NetworkPolicyConfiguration.MonitoringNamespace
+	}
 	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration",
-		registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates)
+		filterOperatorFeatureGates(registrationFeatureGates), ocmfeature.DefaultHubRegistrationFeatureGates)
 	config.ClusterProfileEnabled = helpers.FeatureGateEnabled(registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates, ocmfeature.ClusterProfile)
 	// setting for cluster importer.
 	// TODO(qiujian16) since this is disabled by feature gate, the image is obtained from cluster manager's env var. Need a more elegant approach.

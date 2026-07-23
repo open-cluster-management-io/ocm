@@ -92,14 +92,10 @@ var (
 	// Applied as part of ClusterManager CR reconciliation.
 	hubNetworkPolicyBaseFiles = []string{
 		"cluster-manager/hub/networkpolicies/01-hub-ns-default-deny.yaml",
-		"cluster-manager/hub/networkpolicies/02-hub-ns-egress.yaml",    // DNS + apiserver egress combined
+		"cluster-manager/hub/networkpolicies/02-hub-ns-egress.yaml",
 		"cluster-manager/hub/networkpolicies/03-hub-ns-intra-namespace.yaml",
+		"cluster-manager/hub/networkpolicies/04-hub-ns-webhook-ingress.yaml",
 	}
-
-	// hubWebhookNPFile is applied only when APIServerNamespace is set in
-	// ClusterManagerSpec.NetworkPolicyConfiguration. OCM does not detect the platform.
-	// Covers registration, work and addon webhooks in a single policy using matchExpressions.
-	hubWebhookNPFile = "cluster-manager/hub/networkpolicies/04-hub-ns-webhook-ingress.yaml"
 
 	// hubPrometheusNPFile is applied only when MonitoringNamespace is set in
 	// ClusterManagerSpec.NetworkPolicyConfiguration. OCM does not assume a monitoring stack.
@@ -164,44 +160,36 @@ func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 		}
 	}
 
-	// Apply NetworkPolicies for open-cluster-management-hub namespace.
-	// Opt-in files added only when operator supplies relevant config — OCM does not detect platform.
-	// When an optional field is cleared, the corresponding policy is explicitly deleted.
-	npFiles := append([]string{}, hubNetworkPolicyBaseFiles...)
-	if config.APIServerNamespace != "" {
-		npFiles = append(npFiles, hubWebhookNPFile)
-	} else {
-		if _, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, hubWebhookNPFile); err != nil {
-			return cm, reconcileStop, err
-		}
-	}
-	if config.MonitoringNamespace != "" {
-		npFiles = append(npFiles, hubPrometheusNPFile)
-	} else {
-		if _, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, hubPrometheusNPFile); err != nil {
-			return cm, reconcileStop, err
-		}
-	}
-	npResults := helpers.ApplyDirectly(
-		ctx,
-		c.hubKubeClient,
-		nil,
-		c.recorder,
-		c.cache,
-		func(name string) ([]byte, error) {
-			template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
-			if err != nil {
-				return nil, err
+	if config.NetworkPoliciesEnabled {
+		npFiles := append([]string{}, hubNetworkPolicyBaseFiles...)
+		if config.MonitoringNamespace != "" {
+			npFiles = append(npFiles, hubPrometheusNPFile)
+		} else {
+			if _, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, hubPrometheusNPFile); err != nil {
+				return cm, reconcileStop, err
 			}
-			objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
-			helpers.SetRelatedResourcesStatusesWithObj(ctx, &cm.Status.RelatedResources, objData)
-			return objData, nil
-		},
-		npFiles...,
-	)
-	for _, result := range npResults {
-		if result.Error != nil {
-			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
+		}
+		npResults := helpers.ApplyDirectly(
+			ctx,
+			c.hubKubeClient,
+			nil,
+			c.recorder,
+			c.cache,
+			func(name string) ([]byte, error) {
+				template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
+				if err != nil {
+					return nil, err
+				}
+				objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
+				helpers.SetRelatedResourcesStatusesWithObj(ctx, &cm.Status.RelatedResources, objData)
+				return objData, nil
+			},
+			npFiles...,
+		)
+		for _, result := range npResults {
+			if result.Error != nil {
+				appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
+			}
 		}
 	}
 
@@ -251,6 +239,13 @@ func getHubResources(mode operatorapiv1.InstallMode, config manifests.HubConfig)
 		}
 	} else {
 		hubResources = append(hubResources, hubDefaultWebhookServiceFiles...)
+	}
+
+	if config.NetworkPoliciesEnabled {
+		hubResources = append(hubResources, hubNetworkPolicyBaseFiles...)
+		if config.MonitoringNamespace != "" {
+			hubResources = append(hubResources, hubPrometheusNPFile)
+		}
 	}
 
 	return hubResources

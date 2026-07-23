@@ -2451,39 +2451,56 @@ func TestNetworkPolicyTemplateRendering(t *testing.T) {
 		expectAbsent    []string
 	}{
 		{
-			name: "default deny uses ClusterManagerNamespace var",
-			config: manifests.HubConfig{
-				ClusterManagerNamespace: "open-cluster-management-hub",
-			},
-			manifestFile:   "cluster-manager/hub/networkpolicies/01-hub-ns-default-deny.yaml",
-			expectContains: []string{"namespace: open-cluster-management-hub"},
-		},
-		{
-			name: "egress policy contains both DNS and apiserver rules",
-			config: manifests.HubConfig{
-				ClusterManagerNamespace: "open-cluster-management-hub",
-			},
-			manifestFile:   "cluster-manager/hub/networkpolicies/02-hub-ns-egress.yaml",
-			expectContains: []string{"allow-egress", "port: 53", "port: 443", "port: 6443", "port: 5353"},
-		},
-		{
-			name: "webhook NP uses APIServerNamespace and ClusterManagerName vars",
+			name: "default deny scoped to OCM pods",
 			config: manifests.HubConfig{
 				ClusterManagerNamespace: "open-cluster-management-hub",
 				ClusterManagerName:      "cluster-manager",
-				APIServerNamespace:      "openshift-kube-apiserver",
+			},
+			manifestFile:   "cluster-manager/hub/networkpolicies/01-hub-ns-default-deny.yaml",
+			expectContains: []string{
+				"namespace: open-cluster-management-hub",
+				"clustermanager-registration-controller",
+				"cluster-manager-work-controller",
+				"clustermanager-placement-controller",
+				"clustermanager-addon-manager-controller",
+				"cluster-manager-grpc-server",
+			},
+		},
+		{
+			name: "egress policy scoped to OCM pods",
+			config: manifests.HubConfig{
+				ClusterManagerNamespace: "open-cluster-management-hub",
+				ClusterManagerName:      "cluster-manager",
+			},
+			manifestFile:   "cluster-manager/hub/networkpolicies/02-hub-ns-egress.yaml",
+			expectContains: []string{
+				"allow-egress", "port: 53", "port: 443", "port: 6443", "port: 5353",
+				"clustermanager-registration-controller",
+				"cluster-manager-grpc-server",
+			},
+		},
+		{
+			name: "hub ingress covers webhooks, grpc-server, and placement debug",
+			config: manifests.HubConfig{
+				ClusterManagerNamespace: "open-cluster-management-hub",
+				ClusterManagerName:      "cluster-manager",
 				RegistrationWebhook:     manifests.Webhook{Port: 9443},
 				WorkWebhook:             manifests.Webhook{Port: 9443},
 				AddonWebhook:            manifests.Webhook{Port: 9443},
 			},
 			manifestFile:   "cluster-manager/hub/networkpolicies/04-hub-ns-webhook-ingress.yaml",
 			expectContains: []string{
-				"allow-webhook-ingress",
-				"kubernetes.io/metadata.name: openshift-kube-apiserver",
+				"allow-hub-ingress",
 				"cluster-manager-registration-webhook",
 				"cluster-manager-work-webhook",
 				"cluster-manager-addon-webhook",
+				"cluster-manager-grpc-server",
+				"clustermanager-placement-controller",
+				"port: 9443",
+				"port: 8090",
+				"port: 443",
 			},
+			expectAbsent: []string{"namespaceSelector"},
 		},
 		{
 			name: "prometheus NP uses MonitoringNamespace and ClusterManagerName vars",
@@ -2495,9 +2512,10 @@ func TestNetworkPolicyTemplateRendering(t *testing.T) {
 			manifestFile:   "cluster-manager/hub/networkpolicies/05-hub-ns-prometheus.yaml",
 			expectContains: []string{
 				"kubernetes.io/metadata.name: \"openshift-monitoring\"",
-				"cluster-manager-registration-controller",
+				"clustermanager-registration-controller",
 				"cluster-manager-work-controller",
-				"cluster-manager-placement-controller",
+				"clustermanager-placement-controller",
+				"cluster-manager-grpc-server",
 			},
 		},
 	}

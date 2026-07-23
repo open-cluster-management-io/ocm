@@ -103,14 +103,6 @@ type NetworkPolicyConfiguration struct {
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	MonitoringNamespace string `json:"monitoringNamespace,omitempty"`
 
-	// apiServerNamespace is the namespace from which kube-apiserver originates webhook calls.
-	// Used to restrict ingress on registration, work, and addon webhook pods to only accept
-	// requests from the API server. Leave unset to skip namespace-scoped webhook ingress restriction.
-	// Common values: "kube-system" (vanilla Kubernetes), "openshift-kube-apiserver" (OpenShift).
-	// +optional
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
-	APIServerNamespace string `json:"apiServerNamespace,omitempty"`
 }
 
 // NodePlacement describes node scheduling configuration for the pods.

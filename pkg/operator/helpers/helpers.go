@@ -149,6 +149,8 @@ func CleanUpStaticObject(
 		err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(ctx, t.Name, metav1.DeleteOptions{})
 	case *admissionv1.MutatingWebhookConfiguration:
 		err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(ctx, t.Name, metav1.DeleteOptions{})
+	case *networkingv1.NetworkPolicy:
+		err = client.NetworkingV1().NetworkPolicies(t.Namespace).Delete(ctx, t.Name, metav1.DeleteOptions{})
 	default:
 		err = fmt.Errorf("unhandled type %T", object)
 	}

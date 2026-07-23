@@ -56,11 +56,10 @@ type HubConfig struct {
 	TLSMinVersion   string
 	TLSCipherSuites string
 
-	// APIServerNamespace is the namespace from which kube-apiserver originates
-	// webhook calls: "kube-system" on vanilla K8s, "openshift-kube-apiserver" on OpenShift.
-	APIServerNamespace string
+	NetworkPoliciesEnabled bool
+
 	// MonitoringNamespace is the namespace where the Prometheus scraper runs.
-	// Defaults to "openshift-monitoring"; set to "monitoring" for vanilla K8s Prometheus stacks.
+	// When set, an ingress NetworkPolicy allows Prometheus to scrape OCM metrics.
 	MonitoringNamespace string
 }
 

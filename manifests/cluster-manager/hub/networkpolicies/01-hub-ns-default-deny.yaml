@@ -4,7 +4,19 @@ metadata:
   name: default-deny-all
   namespace: {{ .ClusterManagerNamespace }}
 spec:
-  podSelector: {}
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - clustermanager-registration-controller
+          - "{{ .ClusterManagerName }}-registration-webhook"
+          - "{{ .ClusterManagerName }}-work-controller"
+          - "{{ .ClusterManagerName }}-work-webhook"
+          - clustermanager-placement-controller
+          - clustermanager-addon-manager-controller
+          - "{{ .ClusterManagerName }}-addon-webhook"
+          - "{{ .ClusterManagerName }}-grpc-server"
   policyTypes:
     - Ingress
     - Egress

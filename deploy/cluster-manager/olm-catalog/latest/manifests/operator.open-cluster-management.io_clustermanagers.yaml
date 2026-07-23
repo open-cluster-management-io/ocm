@@ -872,16 +872,6 @@ spec:
                 description: networkPolicyConfiguration contains configuration for
                   NetworkPolicies applied to OCM hub namespaces.
                 properties:
-                  apiServerNamespace:
-                    description: |-
-                      apiServerNamespace is the namespace from which kube-apiserver originates
-                      webhook calls. When set, webhook ingress is restricted to this namespace only.
-                      Common values: "kube-system" (vanilla Kubernetes),
-                      "openshift-kube-apiserver" (OpenShift). Leave unset to skip webhook
-                      ingress restriction.
-                    maxLength: 63
-                    pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
-                    type: string
                   monitoringNamespace:
                     description: |-
                       monitoringNamespace is the namespace where the Prometheus scraper runs.

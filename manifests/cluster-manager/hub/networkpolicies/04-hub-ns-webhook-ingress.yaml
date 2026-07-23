@@ -1,13 +1,15 @@
-# Combined webhook ingress policy for registration, work and addon webhooks.
-# All three webhooks are called by kube-apiserver from the same source namespace
-# on the same port — a single policy with matchExpressions covers all three.
-# Only applied when APIServerNamespace is set in ClusterManagerSpec.NetworkPolicyConfiguration.
-# OCM does not detect the platform — the operator supplies the namespace explicitly.
-# Common values: "kube-system" (vanilla K8s), "openshift-kube-apiserver" (OpenShift).
+# Ingress policy for all externally-reachable hub pods.
+# Always applied — restricted by pod label and port only.
+# No source namespace filter — traffic origin varies by platform.
+#
+# Covers:
+#   - registration/work/addon webhooks (apiserver admission calls)
+#   - grpc-server (spoke cluster connections, ports 8090/443)
+#   - placement debug server (port 9443)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-webhook-ingress
+  name: allow-hub-ingress
   namespace: {{ .ClusterManagerNamespace }}
 spec:
   podSelector:
@@ -18,6 +20,8 @@ spec:
           - "{{ .ClusterManagerName }}-registration-webhook"
           - "{{ .ClusterManagerName }}-work-webhook"
           - "{{ .ClusterManagerName }}-addon-webhook"
+          - "{{ .ClusterManagerName }}-grpc-server"
+          - clustermanager-placement-controller
   policyTypes:
     - Ingress
   ingress:
@@ -28,7 +32,9 @@ spec:
           protocol: TCP
         - port: {{ .AddonWebhook.Port }}
           protocol: TCP
-      from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: {{ .APIServerNamespace }}
+        - port: 8090
+          protocol: TCP
+        - port: 443
+          protocol: TCP
+        - port: 9443
+          protocol: TCP
