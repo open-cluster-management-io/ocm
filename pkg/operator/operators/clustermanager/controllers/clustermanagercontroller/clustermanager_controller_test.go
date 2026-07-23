@@ -1709,3 +1709,88 @@ func containsArg(args []string, prefix string) bool {
 	}
 	return false
 }
+
+func TestNetworkPolicyFeatureGate(t *testing.T) {
+	cases := []struct {
+		name               string
+		featureGates       []operatorapiv1.FeatureGate
+		networkPolicyCfg   *operatorapiv1.NetworkPolicyConfiguration
+		expectBaseNPs      bool
+		expectPrometheusNP bool
+	}{
+		{
+			name:               "feature gate disabled — no NPs",
+			featureGates:       nil,
+			networkPolicyCfg:   nil,
+			expectBaseNPs:      false,
+			expectPrometheusNP: false,
+		},
+		{
+			name: "feature gate enabled, no MonitoringNamespace — base NPs only",
+			featureGates: []operatorapiv1.FeatureGate{
+				{Feature: "NetworkPolicies", Mode: operatorapiv1.FeatureGateModeTypeEnable},
+			},
+			networkPolicyCfg:   nil,
+			expectBaseNPs:      true,
+			expectPrometheusNP: false,
+		},
+		{
+			name: "feature gate enabled + MonitoringNamespace — all NPs",
+			featureGates: []operatorapiv1.FeatureGate{
+				{Feature: "NetworkPolicies", Mode: operatorapiv1.FeatureGateModeTypeEnable},
+			},
+			networkPolicyCfg: &operatorapiv1.NetworkPolicyConfiguration{
+				MonitoringNamespace: "monitoring",
+			},
+			expectBaseNPs:      true,
+			expectPrometheusNP: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			clusterManager := newClusterManager("testhub")
+			clusterManager.Spec.NetworkPolicyConfiguration = c.networkPolicyCfg
+			if c.featureGates != nil {
+				if clusterManager.Spec.RegistrationConfiguration == nil {
+					clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{}
+				}
+				clusterManager.Spec.RegistrationConfiguration.FeatureGates = c.featureGates
+			}
+
+			tc := newTestController(t, clusterManager)
+			clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
+			setup(t, tc, setDeployment(clusterManager.Name, clusterManagerNamespace))
+
+			syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
+			if err := tc.clusterManagerController.sync(ctx, syncContext, "testhub"); err != nil {
+				t.Fatalf("unexpected sync error: %v", err)
+			}
+
+			hasBaseNP := false
+			hasPrometheus := false
+			for _, action := range tc.hubKubeClient.Actions() {
+				if action.GetVerb() != createVerb {
+					continue
+				}
+				obj := action.(clienttesting.CreateActionImpl).Object
+				if np, ok := obj.(interface{ GetName() string }); ok {
+					switch np.GetName() {
+					case "default-deny-all", "allow-egress", "allow-intra-namespace", "allow-hub-ingress":
+						hasBaseNP = true
+					case "allow-prometheus-ingress":
+						hasPrometheus = true
+					}
+				}
+			}
+
+			if hasBaseNP != c.expectBaseNPs {
+				t.Errorf("expectBaseNPs=%v but hasBaseNP=%v", c.expectBaseNPs, hasBaseNP)
+			}
+			if hasPrometheus != c.expectPrometheusNP {
+				t.Errorf("expectPrometheusNP=%v but hasPrometheusNP=%v", c.expectPrometheusNP, hasPrometheus)
+			}
+		})
+	}
+}
+

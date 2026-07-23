@@ -55,6 +55,12 @@ type HubConfig struct {
 	// TLS configuration injected into all managed hub component deployments
 	TLSMinVersion   string
 	TLSCipherSuites string
+
+	NetworkPoliciesEnabled bool
+
+	// MonitoringNamespace is the namespace where the Prometheus scraper runs.
+	// When set, an ingress NetworkPolicy allows Prometheus to scrape OCM metrics.
+	MonitoringNamespace string
 }
 
 type Webhook struct {

@@ -87,6 +87,19 @@ var (
 		"cluster-manager/hub/grpc-server/serviceaccount.yaml",
 		"cluster-manager/hub/grpc-server/service.yaml",
 	}
+
+	// hubNetworkPolicyBaseFiles are always-on NetworkPolicy resources for open-cluster-management-hub.
+	// Applied as part of ClusterManager CR reconciliation.
+	hubNetworkPolicyBaseFiles = []string{
+		"cluster-manager/hub/networkpolicies/01-hub-ns-default-deny.yaml",
+		"cluster-manager/hub/networkpolicies/02-hub-ns-egress.yaml",
+		"cluster-manager/hub/networkpolicies/03-hub-ns-intra-namespace.yaml",
+		"cluster-manager/hub/networkpolicies/04-hub-ns-webhook-ingress.yaml",
+	}
+
+	// hubPrometheusNPFile is applied only when MonitoringNamespace is set in
+	// ClusterManagerSpec.NetworkPolicyConfiguration. OCM does not assume a monitoring stack.
+	hubPrometheusNPFile = "cluster-manager/hub/networkpolicies/05-hub-ns-prometheus.yaml"
 )
 
 type hubReconcile struct {
@@ -147,6 +160,39 @@ func (c *hubReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 		}
 	}
 
+	if config.NetworkPoliciesEnabled {
+		npFiles := append([]string{}, hubNetworkPolicyBaseFiles...)
+		if config.MonitoringNamespace != "" {
+			npFiles = append(npFiles, hubPrometheusNPFile)
+		} else {
+			if _, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, hubPrometheusNPFile); err != nil {
+				return cm, reconcileStop, err
+			}
+		}
+		npResults := helpers.ApplyDirectly(
+			ctx,
+			c.hubKubeClient,
+			nil,
+			c.recorder,
+			c.cache,
+			func(name string) ([]byte, error) {
+				template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
+				if err != nil {
+					return nil, err
+				}
+				objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
+				helpers.SetRelatedResourcesStatusesWithObj(ctx, &cm.Status.RelatedResources, objData)
+				return objData, nil
+			},
+			npFiles...,
+		)
+		for _, result := range npResults {
+			if result.Error != nil {
+				appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
+			}
+		}
+	}
+
 	if len(appliedErrs) > 0 {
 		meta.SetStatusCondition(&cm.Status.Conditions, metav1.Condition{
 			Type:    operatorapiv1.ConditionClusterManagerApplied,
@@ -193,6 +239,13 @@ func getHubResources(mode operatorapiv1.InstallMode, config manifests.HubConfig)
 		}
 	} else {
 		hubResources = append(hubResources, hubDefaultWebhookServiceFiles...)
+	}
+
+	if config.NetworkPoliciesEnabled {
+		hubResources = append(hubResources, hubNetworkPolicyBaseFiles...)
+		if config.MonitoringNamespace != "" {
+			hubResources = append(hubResources, hubPrometheusNPFile)
+		}
 	}
 
 	return hubResources

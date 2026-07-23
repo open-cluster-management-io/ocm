@@ -2442,6 +2442,106 @@ func TestNormalizeImagePullSecretName(t *testing.T) {
 	}
 }
 
+func TestNetworkPolicyTemplateRendering(t *testing.T) {
+	cases := []struct {
+		name            string
+		config          manifests.HubConfig
+		manifestFile    string
+		expectContains  []string
+		expectAbsent    []string
+	}{
+		{
+			name: "default deny scoped to OCM pods",
+			config: manifests.HubConfig{
+				ClusterManagerNamespace: "open-cluster-management-hub",
+				ClusterManagerName:      "cluster-manager",
+			},
+			manifestFile:   "cluster-manager/hub/networkpolicies/01-hub-ns-default-deny.yaml",
+			expectContains: []string{
+				"namespace: open-cluster-management-hub",
+				"clustermanager-registration-controller",
+				"cluster-manager-work-controller",
+				"clustermanager-placement-controller",
+				"clustermanager-addon-manager-controller",
+				"cluster-manager-grpc-server",
+			},
+		},
+		{
+			name: "egress policy scoped to OCM pods",
+			config: manifests.HubConfig{
+				ClusterManagerNamespace: "open-cluster-management-hub",
+				ClusterManagerName:      "cluster-manager",
+			},
+			manifestFile:   "cluster-manager/hub/networkpolicies/02-hub-ns-egress.yaml",
+			expectContains: []string{
+				"allow-egress", "port: 53", "port: 443", "port: 6443", "port: 5353",
+				"clustermanager-registration-controller",
+				"cluster-manager-grpc-server",
+			},
+		},
+		{
+			name: "hub ingress covers webhooks, grpc-server, and placement debug — all sources intentionally allowed",
+			config: manifests.HubConfig{
+				ClusterManagerNamespace: "open-cluster-management-hub",
+				ClusterManagerName:      "cluster-manager",
+				RegistrationWebhook:     manifests.Webhook{Port: 9443},
+				WorkWebhook:             manifests.Webhook{Port: 9443},
+				AddonWebhook:            manifests.Webhook{Port: 9443},
+			},
+			manifestFile:   "cluster-manager/hub/networkpolicies/04-hub-ns-webhook-ingress.yaml",
+			expectContains: []string{
+				"allow-hub-ingress",
+				"cluster-manager-registration-webhook",
+				"cluster-manager-work-webhook",
+				"cluster-manager-addon-webhook",
+				"cluster-manager-grpc-server",
+				"clustermanager-placement-controller",
+				"port: 9443",
+				"port: 8090",
+				"port: 443",
+			},
+			expectAbsent: []string{"namespaceSelector"},
+		},
+		{
+			name: "prometheus NP uses MonitoringNamespace and ClusterManagerName vars",
+			config: manifests.HubConfig{
+				ClusterManagerNamespace: "open-cluster-management-hub",
+				ClusterManagerName:      "cluster-manager",
+				MonitoringNamespace:     "openshift-monitoring",
+			},
+			manifestFile:   "cluster-manager/hub/networkpolicies/05-hub-ns-prometheus.yaml",
+			expectContains: []string{
+				"kubernetes.io/metadata.name: \"openshift-monitoring\"",
+				"clustermanager-registration-controller",
+				"cluster-manager-work-controller",
+				"clustermanager-placement-controller",
+				"cluster-manager-grpc-server",
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			template, err := manifests.ClusterManagerManifestFiles.ReadFile(c.manifestFile)
+			if err != nil {
+				t.Fatalf("failed to read manifest %s: %v", c.manifestFile, err)
+			}
+			rendered := string(assets.MustCreateAssetFromTemplate(c.manifestFile, template, c.config).Data)
+
+			for _, want := range c.expectContains {
+				if !strings.Contains(rendered, want) {
+					t.Errorf("expected rendered manifest to contain %q\ngot:\n%s", want, rendered)
+				}
+			}
+			for _, absent := range c.expectAbsent {
+				if strings.Contains(rendered, absent) {
+					t.Errorf("expected rendered manifest NOT to contain %q\ngot:\n%s", absent, rendered)
+				}
+			}
+		})
+	}
+}
+
 func TestRegistrationClusterRoleImagePullSecretName(t *testing.T) {
 	template, err := manifests.ClusterManagerManifestFiles.ReadFile("cluster-manager/hub/registration/clusterrole.yaml")
 	if err != nil {

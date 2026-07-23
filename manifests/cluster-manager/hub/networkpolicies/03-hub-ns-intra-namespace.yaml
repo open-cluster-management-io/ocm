@@ -1,0 +1,32 @@
+# Intra-namespace pod-to-pod communication.
+# Allows pods within open-cluster-management-hub to reach each other
+# (e.g. placement-controller debug server, inter-controller calls).
+# API-server webhook ingress is handled separately by 04-hub-ns-webhook-ingress.yaml.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: {{ .ClusterManagerNamespace }}
+spec:
+  podSelector: &ocmPods
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - clustermanager-registration-controller
+          - "{{ .ClusterManagerName }}-registration-webhook"
+          - "{{ .ClusterManagerName }}-work-controller"
+          - "{{ .ClusterManagerName }}-work-webhook"
+          - clustermanager-placement-controller
+          - clustermanager-addon-manager-controller
+          - "{{ .ClusterManagerName }}-addon-webhook"
+          - "{{ .ClusterManagerName }}-grpc-server"
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: *ocmPods
+  egress:
+    - to:
+        - podSelector: *ocmPods

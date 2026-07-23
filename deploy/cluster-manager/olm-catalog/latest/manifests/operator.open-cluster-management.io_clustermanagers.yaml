@@ -868,6 +868,19 @@ spec:
                 description: workImagePullSpec represents the desired image configuration
                   of work controller/webhook installed on hub.
                 type: string
+              networkPolicyConfiguration:
+                description: networkPolicyConfiguration contains configuration for
+                  NetworkPolicies applied to OCM hub namespaces.
+                properties:
+                  monitoringNamespace:
+                    description: |-
+                      monitoringNamespace is the namespace where the Prometheus scraper runs.
+                      When set, an ingress NetworkPolicy allows Prometheus to scrape OCM metrics.
+                      Leave unset to skip the Prometheus ingress policy.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                    type: string
+                type: object
             type: object
           status:
             description: Status represents the current status of controllers that

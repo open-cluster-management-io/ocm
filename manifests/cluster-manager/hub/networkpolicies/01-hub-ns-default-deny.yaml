@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: {{ .ClusterManagerNamespace }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - clustermanager-registration-controller
+          - "{{ .ClusterManagerName }}-registration-webhook"
+          - "{{ .ClusterManagerName }}-work-controller"
+          - "{{ .ClusterManagerName }}-work-webhook"
+          - clustermanager-placement-controller
+          - clustermanager-addon-manager-controller
+          - "{{ .ClusterManagerName }}-addon-webhook"
+          - "{{ .ClusterManagerName }}-grpc-server"
+  policyTypes:
+    - Ingress
+    - Egress
