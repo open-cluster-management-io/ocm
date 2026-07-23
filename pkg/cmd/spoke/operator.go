@@ -50,6 +50,17 @@ func NewKlusterletOperatorCmd() *cobra.Command {
 		"If set, will sync the labels of Klusterlet CR to all agent resources")
 
 	opts.AddFlags(flags)
+	// The klusterlet operator does not receive --tls-min-version /
+	// --tls-cipher-suites flags from its deployment manifest (unlike the spoke
+	// agent deployments it manages). Instead, the ocm-tls-profile ConfigMap is
+	// written by the tls-profile-sync sidecar running in the same pod.
+	// ApplyTLSFromConfigMapToCommand installs a PersistentPreRunE hook that
+	// reads that ConfigMap once before library-go's StartController starts the
+	// health/metrics server (port 8443), so the server uses the cluster TLS
+	// profile from the first request.
+	// When the ConfigMap changes the tls-profile-sync sidecar causes the pod
+	// to restart, and this hook re-reads the updated ConfigMap on the next startup.
+	opts.ApplyTLSFromConfigMapToCommand(cmd)
 
 	return cmd
 }
@@ -78,5 +89,11 @@ func NewKlusterletAgentCmd() *cobra.Command {
 	utilruntime.Must(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeRegistrationFeatureGates))
 	utilruntime.Must(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeWorkFeatureGates))
 	features.SpokeMutableFeatureGate.AddFlag(flags)
+	// The klusterlet operator injects --tls-min-version and --tls-cipher-suites
+	// into this agent's deployment manifest from the ocm-tls-profile ConfigMap.
+	// ApplyTLSToCommand wires those CLI flags to the library-go health/metrics
+	// server (port 8443) via a PersistentPreRunE hook so the server enforces
+	// the cluster TLS profile.
+	commonOptions.CommonOpts.ApplyTLSToCommand(cmd)
 	return cmd
 }

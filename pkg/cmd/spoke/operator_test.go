@@ -81,6 +81,15 @@ func TestKlusterletOperatorFlags(t *testing.T) {
 	}
 }
 
+func TestKlusterletOperatorTLSFromConfigMapWiring(t *testing.T) {
+	cmd := NewKlusterletOperatorCmd()
+
+	// ApplyTLSFromConfigMapToCommand should have set PersistentPreRunE.
+	if cmd.PersistentPreRunE == nil {
+		t.Error("Expected PersistentPreRunE to be set by ApplyTLSFromConfigMapToCommand")
+	}
+}
+
 func TestKlusterletOperatorDeprecatedFlag(t *testing.T) {
 	cmd := NewKlusterletOperatorCmd()
 	flags := cmd.Flags()
@@ -95,6 +104,29 @@ func TestKlusterletOperatorDeprecatedFlag(t *testing.T) {
 	// In cobra, deprecated flags are still present but marked
 	if flag.Deprecated == "" {
 		t.Error("Expected 'skip-placeholder-hub-secret' flag to be marked as deprecated")
+	}
+}
+
+func TestKlusterletAgentTLSWiring(t *testing.T) {
+	// Reset feature gate for this test
+	old := features.SpokeMutableFeatureGate
+	features.SpokeMutableFeatureGate = featuregate.NewFeatureGate()
+	t.Cleanup(func() { features.SpokeMutableFeatureGate = old })
+
+	cmd := NewKlusterletAgentCmd()
+
+	// ApplyTLSToCommand should have set PersistentPreRunE
+	if cmd.PersistentPreRunE == nil {
+		t.Error("Expected PersistentPreRunE to be set by ApplyTLSToCommand")
+	}
+
+	// TLS flags should be registered via common options
+	flags := cmd.Flags()
+	if flags.Lookup("tls-min-version") == nil {
+		t.Error("Expected --tls-min-version flag to be registered")
+	}
+	if flags.Lookup("tls-cipher-suites") == nil {
+		t.Error("Expected --tls-cipher-suites flag to be registered")
 	}
 }
 
