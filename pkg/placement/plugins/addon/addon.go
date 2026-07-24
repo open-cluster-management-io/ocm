@@ -15,11 +15,10 @@ import (
 )
 
 const (
-	placementLabel = clusterapiv1beta1.PlacementLabel
-	description    = `
-	Customize prioritizer get cluster scores from AddOnPlacementScores with sepcific
-	resource name and score name. The clusters which doesn't have corresponding
-	AddOnPlacementScores resource or has expired score is given score 0.
+	description = `
+	Add-on prioritizer gets cluster scores from AddOnPlacementScores with a specific
+	resource name and score name. The clusters that don't have corresponding
+	AddOnPlacementScores resource or have expired scores are given a score of 0.
 	`
 )
 
