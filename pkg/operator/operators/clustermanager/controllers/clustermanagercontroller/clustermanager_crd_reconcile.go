@@ -55,6 +55,10 @@ var (
 		// clusterprofile crd
 		"cluster-manager/hub/crds/0000_00_multicluster.x-k8s.io_clusterprofiles.crd.yaml",
 	}
+
+	hubSIGPlacementDecisionCRDResourceFiles = []string{
+		"cluster-manager/hub/crds/0000_00_multicluster.x-k8s.io_placementdecisions.crd.yaml",
+	}
 )
 
 type crdReconcile struct {
@@ -81,6 +85,13 @@ func (c *crdReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 	// and will not be cleaned when ClusterManager is deleting since the CRD might be used by other projects.
 	if config.ClusterProfileEnabled {
 		hubDeployCRDResources = append(hubDeployCRDResources, hubClusterProfileCRDResourceFiles...)
+	}
+
+	// If featuregate SIGPlacementDecision is enabled, include the SIG MC PlacementDecision CRD.
+	// The CRD will not be removed when featuregate is disabled (same behavior as other crds)
+	// and will not be cleaned when ClusterManager is deleting since the CRD might be used by other projects.
+	if config.SIGPlacementDecisionEnabled {
+		hubDeployCRDResources = append(hubDeployCRDResources, hubSIGPlacementDecisionCRDResourceFiles...)
 	}
 
 	if err := crdManager.Apply(ctx,
