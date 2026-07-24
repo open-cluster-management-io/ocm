@@ -44,6 +44,14 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode", func() {
 				DeployOption: operatorapiv1.KlusterletDeployOption{
 					Mode: operatorapiv1.InstallModeSingleton,
 				},
+				RegistrationConfiguration: &operatorapiv1.RegistrationConfiguration{
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{
+							Feature: "NetworkPolicies",
+							Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+						},
+					},
+				},
 			},
 		}
 		agentNamespace = helpers.AgentNamespace(klusterlet)
@@ -93,9 +101,9 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode", func() {
 					return err
 				}
 
-				// 10 managed static manifests + 9 management static manifests + 2CRDs + 1 deployments
-				if len(actual.Status.RelatedResources) != 22 {
-					return fmt.Errorf("should get 22 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				// 10 managed static manifests + 9 management static manifests + 4 networkpolicies + 2CRDs + 1 deployments
+				if len(actual.Status.RelatedResources) != 26 {
+					return fmt.Errorf("should get 26 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())

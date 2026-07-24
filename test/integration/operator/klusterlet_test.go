@@ -77,6 +77,14 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				},
 				ClusterName: "testcluster",
 				Namespace:   klusterletNamespace,
+				RegistrationConfiguration: &operatorapiv1.RegistrationConfiguration{
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{
+							Feature: "NetworkPolicies",
+							Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+						},
+					},
+				},
 			},
 		}
 
@@ -143,9 +151,10 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 					return err
 				}
 
-				// 11 managed static manifests + 11 management static manifests + 2CRDs + 2 deployments(2 duplicated SAs)
-				if len(actual.Status.RelatedResources) != 24 {
-					return fmt.Errorf("should get 26 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				// 11 managed static manifests + 11 management static manifests + 4 networkpolicies +
+				// 2 CRDs + 2 deployments - 2 duplicated SAs = 28
+				if len(actual.Status.RelatedResources) != 28 {
+					return fmt.Errorf("should get 28 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -622,7 +631,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 					return false
 				}
 				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
-				gomega.Expect(len(actual.Spec.Template.Spec.Containers[0].Args)).Should(gomega.Equal(5))
+				gomega.Expect(len(actual.Spec.Template.Spec.Containers[0].Args)).Should(gomega.Equal(7))
 				return actual.Spec.Template.Spec.Containers[0].Args[2] == "--spoke-cluster-name=cluster2"
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 

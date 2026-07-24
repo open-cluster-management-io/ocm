@@ -664,6 +664,42 @@ func TestSyncDeploy(t *testing.T) {
 	}
 }
 
+func TestSyncDeployWithNetworkPolicies(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	klusterlet.Spec.RegistrationConfiguration.FeatureGates = append(
+		klusterlet.Spec.RegistrationConfiguration.FeatureGates,
+		operatorapiv1.FeatureGate{Feature: string(NetworkPolicies), Mode: operatorapiv1.FeatureGateModeTypeEnable},
+	)
+	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
+	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
+	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	namespace := newNamespace("testns")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
+		bootStrapSecret, hubKubeConfigSecret, namespace)
+
+	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	var createObjects []runtime.Object
+	kubeActions := controller.kubeClient.Actions()
+	for _, action := range kubeActions {
+		if action.GetVerb() == createVerb {
+			object := action.(clienttesting.CreateActionImpl).Object
+			createObjects = append(createObjects, object)
+		}
+	}
+
+	// 11 managed static manifests + 12 management static manifests + 4 network policies
+	// - 2 duplicated service account manifests + 1 addon namespace + 2 deployments
+	if len(createObjects) != 28 {
+		t.Errorf("Expect 28 objects created in the sync loop, actual %d", len(createObjects))
+	}
+}
+
 func TestSyncDeploySingleton(t *testing.T) {
 	cases := []struct {
 		name             string

@@ -18,6 +18,7 @@ import (
 	coreinformer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
@@ -44,7 +45,28 @@ const (
 	klusterletFinalizer                   = "operator.open-cluster-management.io/klusterlet-cleanup"
 	managedResourcesEvictionTimestampAnno = "operator.open-cluster-management.io/managed-resources-eviction-timestamp"
 	klusterletNamespaceLabelKey           = "operator.open-cluster-management.io/klusterlet"
+
+	// NetworkPolicies is an operator-internal feature gate that controls whether NetworkPolicy
+	// manifests are applied to the agent namespace. Disabled by default; enable via the Klusterlet
+	// CR's registrationConfiguration.featureGates.
+	NetworkPolicies featuregate.Feature = "NetworkPolicies"
 )
+
+// operatorOnlyFeatureGates are feature gates consumed by the operator itself,
+// not passed through to agent binaries as CLI flags.
+var operatorOnlyFeatureGates = map[featuregate.Feature]bool{
+	NetworkPolicies: true,
+}
+
+func filterOperatorFeatureGates(features []operatorapiv1.FeatureGate) []operatorapiv1.FeatureGate {
+	var filtered []operatorapiv1.FeatureGate
+	for _, f := range features {
+		if !operatorOnlyFeatureGates[featuregate.Feature(f.Feature)] {
+			filtered = append(filtered, f)
+		}
+	}
+	return filtered
+}
 
 type klusterletController struct {
 	patcher                       patcher.Patcher[*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus]
@@ -219,8 +241,10 @@ type klusterletConfig struct {
 
 	// flag to enable about about-api
 	AboutAPIEnabled bool
-	TLSMinVersion   string
-	TLSCipherSuites string
+	// flag to enable network policies in the agent namespace
+	NetworkPoliciesEnabled bool
+	TLSMinVersion          string
+	TLSCipherSuites        string
 }
 
 // If multiplehubs feature gate is enabled, using the bootstrapkubeconfigs from klusterlet CR.
@@ -421,8 +445,10 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 	config.AboutAPIEnabled = helpers.FeatureGateEnabled(
 		registrationFeatureGates, ocmfeature.DefaultSpokeRegistrationFeatureGates, ocmfeature.ClusterProperty)
+	config.NetworkPoliciesEnabled = helpers.FeatureGateEnabled(
+		registrationFeatureGates, ocmfeature.DefaultSpokeRegistrationFeatureGates, NetworkPolicies)
 	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration",
-		registrationFeatureGates, ocmfeature.DefaultSpokeRegistrationFeatureGates)
+		filterOperatorFeatureGates(registrationFeatureGates), ocmfeature.DefaultSpokeRegistrationFeatureGates)
 
 	var workFeatureGates []operatorapiv1.FeatureGate
 	if klusterlet.Spec.WorkConfiguration != nil {

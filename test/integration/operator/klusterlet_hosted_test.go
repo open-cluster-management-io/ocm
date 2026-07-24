@@ -48,6 +48,14 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 				DeployOption: operatorapiv1.KlusterletDeployOption{
 					Mode: operatorapiv1.InstallModeHosted,
 				},
+				RegistrationConfiguration: &operatorapiv1.RegistrationConfiguration{
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{
+							Feature: "NetworkPolicies",
+							Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+						},
+					},
+				},
 			},
 		}
 		klusterletNamespace = helpers.KlusterletNamespace(klusterlet)
@@ -114,10 +122,10 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 					return err
 				}
 
-				// 11 managed static manifests + 11 management static manifests +
+				// 11 managed static manifests + 11 management static manifests + 4 networkpolicies +
 				// 2CRDs + 2 deployments(2 duplicated CRDs, but status also recorded in the klusterlet's status)
-				if len(actual.Status.RelatedResources) != 26 {
-					return fmt.Errorf("should get 26 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 30 {
+					return fmt.Errorf("should get 30 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())

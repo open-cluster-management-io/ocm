@@ -103,6 +103,18 @@ func (spoke *Spoke) CreateKlusterlet(
 		}
 	}
 
+	// Enable NetworkPolicies feature gate
+	if klusterlet.Spec.RegistrationConfiguration == nil {
+		klusterlet.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationConfiguration{}
+	}
+	klusterlet.Spec.RegistrationConfiguration.FeatureGates = append(
+		klusterlet.Spec.RegistrationConfiguration.FeatureGates,
+		operatorapiv1.FeatureGate{
+			Feature: "NetworkPolicies",
+			Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+		},
+	)
+
 	agentNamespace := helpers.AgentNamespace(klusterlet)
 	klog.Infof("klusterlet: %s/%s, \t mode: %v, \t agent namespace: %s, \t registration driver: %s",
 		klusterlet.Name, klusterlet.Namespace, mode, agentNamespace, registrationDriver)
