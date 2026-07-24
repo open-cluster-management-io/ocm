@@ -615,14 +615,13 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				// klusterlet has no condition, replica is 0
 				gomega.Expect(actual.Status.Replicas).Should(gomega.Equal(int32(0)))
 
-				// Print actual args for debugging
 				actualArgs := actual.Spec.Template.Spec.Containers[0].Args
 				if len(actualArgs) != 8 {
+					// the work deployment may still be mid-reconcile; keep polling instead of failing
 					fmt.Fprintf(ginkgo.GinkgoWriter, "should get 8 args, actual got %v\n", actualArgs)
+					return false
 				}
-
-				gomega.Expect(len(actualArgs)).Should(gomega.Equal(8))
-				return actual.Spec.Template.Spec.Containers[0].Args[2] != "--spoke-cluster-name=cluster2"
+				return actualArgs[2] == "--spoke-cluster-name=cluster2"
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			gomega.Eventually(func() bool {
@@ -1137,6 +1136,11 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 					"foo":                                  "bar", // should be ignored
 					"agent.open-cluster-management.io/foo": "bar",
 				},
+				ClusterLabels: map[string]string{
+					"env":  "prod",
+					"team": "blue",
+					"cluster.open-cluster-management.io/clusterset": "should-be-dropped", // reserved, should be filtered out
+				},
 			}
 			klusterlet.Spec.WorkConfiguration = &operatorapiv1.WorkAgentConfiguration{
 				FeatureGates: []operatorapiv1.FeatureGate{
@@ -1198,6 +1202,10 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			ginkgo.By("Check the registration-agent has the expected cluster-annotations")
 			gomega.Expect(registrationDeployment.Spec.Template.Spec.Containers[0].Args).Should(
 				gomega.ContainElement("--cluster-annotations=agent.open-cluster-management.io/foo=bar"))
+
+			ginkgo.By("Check the registration-agent has the expected cluster-labels: reserved keys filtered out and keys sorted")
+			gomega.Expect(registrationDeployment.Spec.Template.Spec.Containers[0].Args).Should(
+				gomega.ContainElement("--cluster-labels=env=prod,team=blue"))
 
 			ginkgo.By("Check the work-agent has the expected feature gates")
 			workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
