@@ -5,6 +5,8 @@ import (
 	"sort"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
@@ -20,12 +22,15 @@ import (
 // cmaInstallProgressionController reconciles instances of clustermanagementaddon the hub
 // based to update related object and status condition.
 type cmaInstallProgressionController struct {
-	patcher patcher.Patcher[
+	addonClient addonclient.Interface
+	patcher     patcher.Patcher[
 		*addonv1beta1.ClusterManagementAddOn, addonv1beta1.ClusterManagementAddOnSpec, addonv1beta1.ClusterManagementAddOnStatus]
 	clusterManagementAddonLister addonlisterv1beta1.ClusterManagementAddOnLister
 	addonFilterFunc              factory.EventFilterFunc
 }
 
+// NewCMAInstallProgressionController creates a new controller that reconciles
+// ClusterManagementAddOn status.supportedConfigs and status.installProgressions.
 func NewCMAInstallProgressionController(
 	addonClient addonclient.Interface,
 	addonInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
@@ -33,6 +38,7 @@ func NewCMAInstallProgressionController(
 	addonFilterFunc factory.EventFilterFunc,
 ) factory.Controller {
 	c := &cmaInstallProgressionController{
+		addonClient: addonClient,
 		patcher: patcher.NewPatcher[
 			*addonv1beta1.ClusterManagementAddOn, addonv1beta1.ClusterManagementAddOnSpec, addonv1beta1.ClusterManagementAddOnStatus](
 			addonClient.AddonV1beta1().ClusterManagementAddOns()),
@@ -47,6 +53,9 @@ func NewCMAInstallProgressionController(
 
 }
 
+// sync reconciles a single ClusterManagementAddOn, updating its status based on
+// the install strategy type. It routes to the appropriate patch helper and retries
+// on 409 Conflict errors to avoid thundering-herd races on hub restart.
 func (c *cmaInstallProgressionController) sync(ctx context.Context, syncCtx factory.SyncContext, addonName string) error {
 	logger := klog.FromContext(ctx).WithValues("addonName", addonName)
 	logger.V(4).Info("Reconciling addon")
@@ -58,33 +67,105 @@ func (c *cmaInstallProgressionController) sync(ctx context.Context, syncCtx fact
 		return err
 	}
 
-	mgmtAddonCopy := mgmtAddon.DeepCopy()
-
-	// set default config reference
-	mgmtAddonCopy.Status.DefaultConfigReferences = setDefaultConfigReference(mgmtAddonCopy.Spec.DefaultConfigs, mgmtAddonCopy.Status.DefaultConfigReferences)
-
 	// update default config reference when type is manual
-	if mgmtAddonCopy.Spec.InstallStrategy.Type == "" || mgmtAddonCopy.Spec.InstallStrategy.Type == addonv1beta1.AddonInstallStrategyManual {
-		mgmtAddonCopy.Status.InstallProgressions = []addonv1beta1.InstallProgression{}
-		_, err = c.patcher.PatchStatus(ctx, mgmtAddonCopy, mgmtAddonCopy.Status, mgmtAddon.Status)
-		return err
+	if mgmtAddon.Spec.InstallStrategy.Type == "" || mgmtAddon.Spec.InstallStrategy.Type == addonv1beta1.AddonInstallStrategyManual {
+		return c.patchManualStatus(ctx, mgmtAddon)
 	}
 
 	// only update default config references and skip updating install progression for self-managed addon
 	if !c.addonFilterFunc(mgmtAddon) {
-		_, err = c.patcher.PatchStatus(ctx, mgmtAddonCopy, mgmtAddonCopy.Status, mgmtAddon.Status)
-		return err
+		return c.patchSelfManagedStatus(ctx, mgmtAddon)
 	}
 
 	// set install progression
-	mgmtAddonCopy.Status.InstallProgressions = setInstallProgression(mgmtAddonCopy.Spec.DefaultConfigs,
-		mgmtAddonCopy.Spec.InstallStrategy.Placements, mgmtAddonCopy.Status.InstallProgressions)
-
-	// update cma status
-	_, err = c.patcher.PatchStatus(ctx, mgmtAddonCopy, mgmtAddonCopy.Status, mgmtAddon.Status)
-	return err
+	return c.patchInstallProgressionStatus(ctx, mgmtAddon)
 }
 
+// patchManualStatus updates the CMA status for manual install strategy addons, retrying on conflict.
+func (c *cmaInstallProgressionController) patchManualStatus(
+	ctx context.Context,
+	seed *addonv1beta1.ClusterManagementAddOn,
+) error {
+	// needFresh tracks whether we need to re-fetch from the API server on subsequent retry iterations.
+	// The first attempt reuses the lister-cached object so no extra Get is issued on the happy path.
+	needFresh := false
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		base := seed
+		if needFresh {
+			fresh, err := c.addonClient.AddonV1beta1().ClusterManagementAddOns().
+				Get(ctx, seed.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			base = fresh
+		}
+		needFresh = true
+
+		newObj := base.DeepCopy()
+		newObj.Status.DefaultConfigReferences = setDefaultConfigReference(
+			newObj.Spec.DefaultConfigs, newObj.Status.DefaultConfigReferences)
+		newObj.Status.InstallProgressions = []addonv1beta1.InstallProgression{}
+		_, err := c.patcher.PatchStatus(ctx, newObj, newObj.Status, base.Status)
+		return err
+	})
+}
+
+// patchSelfManagedStatus updates only the default config references for self-managed addons, retrying on conflict.
+func (c *cmaInstallProgressionController) patchSelfManagedStatus(
+	ctx context.Context,
+	seed *addonv1beta1.ClusterManagementAddOn,
+) error {
+	needFresh := false
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		base := seed
+		if needFresh {
+			fresh, err := c.addonClient.AddonV1beta1().ClusterManagementAddOns().
+				Get(ctx, seed.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			base = fresh
+		}
+		needFresh = true
+
+		newObj := base.DeepCopy()
+		newObj.Status.DefaultConfigReferences = setDefaultConfigReference(
+			newObj.Spec.DefaultConfigs, newObj.Status.DefaultConfigReferences)
+		_, err := c.patcher.PatchStatus(ctx, newObj, newObj.Status, base.Status)
+		return err
+	})
+}
+
+// patchInstallProgressionStatus updates both the default config references and install progressions, retrying on conflict.
+func (c *cmaInstallProgressionController) patchInstallProgressionStatus(
+	ctx context.Context,
+	seed *addonv1beta1.ClusterManagementAddOn,
+) error {
+	needFresh := false
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		base := seed
+		if needFresh {
+			fresh, err := c.addonClient.AddonV1beta1().ClusterManagementAddOns().
+				Get(ctx, seed.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			base = fresh
+		}
+		needFresh = true
+
+		newObj := base.DeepCopy()
+		newObj.Status.DefaultConfigReferences = setDefaultConfigReference(
+			newObj.Spec.DefaultConfigs, newObj.Status.DefaultConfigReferences)
+		newObj.Status.InstallProgressions = setInstallProgression(newObj.Spec.DefaultConfigs,
+			newObj.Spec.InstallStrategy.Placements, newObj.Status.InstallProgressions)
+		_, err := c.patcher.PatchStatus(ctx, newObj, newObj.Status, base.Status)
+		return err
+	})
+}
+
+// setDefaultConfigReference builds the DefaultConfigReferences slice from the
+// supported configs, preserving existing spec hashes where the config already exists.
 func setDefaultConfigReference(supportedConfigs []addonv1beta1.AddOnConfig,
 	existDefaultConfigReferences []addonv1beta1.DefaultConfigReference) []addonv1beta1.DefaultConfigReference {
 	newDefaultConfigReferences := []addonv1beta1.DefaultConfigReference{}
@@ -107,6 +188,8 @@ func setDefaultConfigReference(supportedConfigs []addonv1beta1.AddOnConfig,
 	return newDefaultConfigReferences
 }
 
+// findDefaultConfigReference returns the existing DefaultConfigReference for the
+// given config group/resource pair, or false if none exists.
 func findDefaultConfigReference(
 	newobj *addonv1beta1.DefaultConfigReference,
 	oldobjs []addonv1beta1.DefaultConfigReference,
@@ -119,6 +202,8 @@ func findDefaultConfigReference(
 	return nil, false
 }
 
+// setInstallProgression builds the InstallProgressions slice from the placement
+// strategies, merging with any existing progression state.
 func setInstallProgression(supportedConfigs []addonv1beta1.AddOnConfig, placementStrategies []addonv1beta1.PlacementStrategy,
 	existInstallProgressions []addonv1beta1.InstallProgression) []addonv1beta1.InstallProgression {
 	newInstallProgressions := []addonv1beta1.InstallProgression{}
@@ -183,6 +268,8 @@ func setInstallProgression(supportedConfigs []addonv1beta1.AddOnConfig, placemen
 	return newInstallProgressions
 }
 
+// findInstallProgression returns the existing InstallProgression that matches the
+// placement name and namespace of newobj, or false if none exists.
 func findInstallProgression(newobj *addonv1beta1.InstallProgression, oldobjs []addonv1beta1.InstallProgression) (*addonv1beta1.InstallProgression, bool) {
 	for _, oldobj := range oldobjs {
 		if oldobj.PlacementRef == newobj.PlacementRef {
@@ -202,6 +289,8 @@ func findInstallProgression(newobj *addonv1beta1.InstallProgression, oldobjs []a
 	return nil, false
 }
 
+// mergeInstallProgression copies progression state (conditions, config references)
+// from oldobj into newobj so existing status is preserved across reconcile cycles.
 func mergeInstallProgression(newobj, oldobj *addonv1beta1.InstallProgression) {
 	// merge config reference
 	for i := range newobj.ConfigReferences {
