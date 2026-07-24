@@ -1265,21 +1265,14 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 		_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		ginkgo.By("Create ManagedClusterSet")
-		clusterSet := &clusterv1beta2.ManagedClusterSet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: clusterSetName,
-			},
-			Spec: clusterv1beta2.ManagedClusterSetSpec{
-				ClusterSelector: clusterv1beta2.ManagedClusterSelector{
-					SelectorType: clusterv1beta2.ExclusiveClusterSetLabel,
-				},
-			},
-		}
-		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterSet, metav1.CreateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		// NOTE: intentionally do NOT create the ManagedClusterSet. Without it, the
+		// ManagedClusterSetBinding controller keeps the binding unbound
+		// (condition Bound=False, reason ClusterSetNotFound), which deterministically
+		// exercises the "binding is not bound" path. If the clusterset existed the
+		// binding would become bound and a ClusterProfile would (correctly) be
+		// created, which previously made this test race against that transition.
 
-		ginkgo.By("Create ManagedCluster")
+		ginkgo.By("Create ManagedCluster labeled for the absent clusterset")
 		cluster := &clusterv1.ManagedCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: clusterName,
@@ -1294,7 +1287,7 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 		_, err = clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		ginkgo.By("Create ManagedClusterSetBinding")
+		ginkgo.By("Create ManagedClusterSetBinding referencing the absent clusterset")
 		binding := &clusterv1beta2.ManagedClusterSetBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      clusterSetName,
@@ -1307,18 +1300,17 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 		_, err = clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.Background(), binding, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		ginkgo.By("Verify ClusterProfile is NOT created while binding is not bound")
-		gomega.Consistently(func() bool {
-			binding, err := clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Get(context.Background(), clusterSetName, metav1.GetOptions{})
-			if err != nil {
-				return false
-			}
-			// If binding is not bound, profile should not exist
-			if !meta.IsStatusConditionTrue(binding.Status.Conditions, clusterv1beta2.ClusterSetBindingBoundType) {
-				_, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
-				return errors.IsNotFound(err)
-			}
-			return true
-		}, "10s", "2s").Should(gomega.BeTrue())
+		ginkgo.By("Verify the binding is reported as not bound")
+		gomega.Eventually(func(g gomega.Gomega) {
+			b, err := clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Get(context.Background(), clusterSetName, metav1.GetOptions{})
+			g.Expect(err).NotTo(gomega.HaveOccurred())
+			g.Expect(meta.IsStatusConditionTrue(b.Status.Conditions, clusterv1beta2.ClusterSetBindingBoundType)).To(gomega.BeFalse())
+		}, "10s", "1s").Should(gomega.Succeed())
+
+		ginkgo.By("Verify ClusterProfile is NOT created while the binding is not bound")
+		gomega.Consistently(func(g gomega.Gomega) {
+			_, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
+			g.Expect(errors.IsNotFound(err)).To(gomega.BeTrue(), "ClusterProfile should not be created while the binding is not bound")
+		}, "10s", "2s").Should(gomega.Succeed())
 	})
 })
