@@ -1917,3 +1917,70 @@ func TestCleanWithMultipleKlusterletAgentNamespaces(t *testing.T) {
 		})
 	}
 }
+
+// TestBuildClusterAnnotationsString verifies that the annotations flag string has consistent ordering across multiple runs.
+func TestBuildClusterAnnotationsString(t *testing.T) {
+	const prefix = "agent.open-cluster-management.io"
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		want        string
+	}{
+		{
+			name:        "nil map",
+			annotations: nil,
+			want:        "",
+		},
+		{
+			name:        "empty map",
+			annotations: map[string]string{},
+			want:        "",
+		},
+		{
+			name:        "single key",
+			annotations: map[string]string{prefix + "/foo": "bar"},
+			want:        prefix + "/foo=bar",
+		},
+		{
+			name: "keys sorted lexicographically",
+			annotations: map[string]string{
+				prefix + "/c": "3",
+				prefix + "/a": "1",
+				prefix + "/b": "2",
+			},
+			want: prefix + "/a=1," + prefix + "/b=2," + prefix + "/c=3",
+		},
+		{
+			name: "non-prefixed keys are filtered out",
+			annotations: map[string]string{
+				prefix + "/keep":     "yes",
+				"other.example/drop": "no",
+			},
+			want: prefix + "/keep=yes",
+		},
+		{
+			name: "many keys stable across many invocations",
+			annotations: map[string]string{
+				prefix + "/a": "1",
+				prefix + "/b": "2",
+				prefix + "/c": "3",
+				prefix + "/d": "4",
+				prefix + "/e": "5",
+				prefix + "/f": "6",
+			},
+			want: prefix + "/a=1," + prefix + "/b=2," + prefix + "/c=3," + prefix + "/d=4," + prefix + "/e=5," + prefix + "/f=6",
+		},
+	}
+
+	const iterations = 1000
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for i := range iterations {
+				got := buildClusterAnnotationsString(tt.annotations)
+				if got != tt.want {
+					t.Fatalf("iteration %d: got %q, want %q (non-deterministic output regresses cluster-annotations flag)", i, got, tt.want)
+				}
+			}
+		})
+	}
+}
