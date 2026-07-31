@@ -3,6 +3,7 @@ package klusterletcontroller
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -56,6 +57,19 @@ const (
 // not passed through to agent binaries as CLI flags.
 var operatorOnlyFeatureGates = map[featuregate.Feature]bool{
 	NetworkPolicies: true,
+}
+
+// buildClusterAnnotationsString renders the ClusterAnnotations map into the
+// comma-separated "key1=value1,key2=value2" form consumed by the registration
+// agent's --cluster-annotations flag. Keys are sorted deterministically.
+func buildClusterAnnotationsString(annotations map[string]string) string {
+	filtered := commonhelpers.FilterClusterAnnotations(annotations)
+	arr := make([]string, 0, len(filtered))
+	for k, v := range filtered {
+		arr = append(arr, fmt.Sprintf("%s=%s", k, v))
+	}
+	sort.Strings(arr)
+	return strings.Join(arr, ",")
 }
 
 func filterOperatorFeatureGates(features []operatorapiv1.FeatureGate) []operatorapiv1.FeatureGate {
@@ -422,12 +436,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 				klusterlet.Spec.RegistrationConfiguration.ClusterClaimConfiguration.ReservedClusterClaimSuffixes, ",")
 		}
 
-		// construct cluster annotations string, the final format is "key1=value1,key2=value2"
-		var annotationsArray []string
-		for k, v := range commonhelpers.FilterClusterAnnotations(klusterlet.Spec.RegistrationConfiguration.ClusterAnnotations) {
-			annotationsArray = append(annotationsArray, fmt.Sprintf("%s=%s", k, v))
-		}
-		config.ClusterAnnotationsString = strings.Join(annotationsArray, ",")
+		config.ClusterAnnotationsString = buildClusterAnnotationsString(klusterlet.Spec.RegistrationConfiguration.ClusterAnnotations)
 
 		// Set AddOnKubeClientRegistrationAuth from the Klusterlet spec
 		if klusterlet.Spec.RegistrationConfiguration.AddOnKubeClientRegistrationDriver != nil &&
