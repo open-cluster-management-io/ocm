@@ -14,18 +14,10 @@ spec:
   - from:
     - podSelector: {}
   egress:
-  - to:
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: default
-    ports:
+  - ports:
     - protocol: TCP
       port: 443
-  - to:
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: open-cluster-management-hub
-    ports:
+  - ports:
     - protocol: TCP
       port: 9443
   - to:

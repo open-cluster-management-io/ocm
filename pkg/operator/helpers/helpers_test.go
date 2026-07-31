@@ -17,6 +17,7 @@ import (
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	fakeapiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -2437,6 +2438,195 @@ func TestNormalizeImagePullSecretName(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			if got := NormalizeImagePullSecretName(c.input); got != c.expected {
 				t.Fatalf("expected %q, got %q", c.expected, got)
+			}
+		})
+	}
+}
+
+// networkPolicyPort is a comparable, protocol+port pair used to assert on the
+// exact ports of a specific NetworkPolicy rule (avoids ambiguous substring
+// matches on the rendered YAML, e.g. "port: 53" matching inside "port: 5353").
+type networkPolicyPort struct {
+	protocol corev1.Protocol
+	port     int32
+}
+
+func portsOf(ports []networkingv1.NetworkPolicyPort) []networkPolicyPort {
+	got := make([]networkPolicyPort, 0, len(ports))
+	for _, p := range ports {
+		var proto corev1.Protocol
+		if p.Protocol != nil {
+			proto = *p.Protocol
+		}
+		var port int32
+		if p.Port != nil {
+			port = p.Port.IntVal
+		}
+		got = append(got, networkPolicyPort{protocol: proto, port: port})
+	}
+	return got
+}
+
+func TestNetworkPolicyTemplateRendering(t *testing.T) {
+	cases := []struct {
+		name                string
+		config              manifests.HubConfig
+		manifestFile        string
+		expectContains      []string
+		expectAbsent        []string
+		expectedPolicyTypes []networkingv1.PolicyType
+		// expectedIngressPorts/expectedEgressPorts, when non-nil, must match the
+		// ports of each ingress/egress rule, in order, exactly.
+		expectedIngressPorts [][]networkPolicyPort
+		expectedEgressPorts  [][]networkPolicyPort
+	}{
+		{
+			name: "default deny scoped to OCM pods",
+			config: manifests.HubConfig{
+				ClusterManagerNamespace: "open-cluster-management-hub",
+				ClusterManagerName:      "cluster-manager",
+			},
+			manifestFile: "cluster-manager/hub/networkpolicies/01-hub-ns-default-deny.yaml",
+			expectContains: []string{
+				"namespace: open-cluster-management-hub",
+				"clustermanager-registration-controller",
+				"cluster-manager-work-controller",
+				"clustermanager-placement-controller",
+				"clustermanager-addon-manager-controller",
+				"cluster-manager-grpc-server",
+			},
+			expectedPolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress, networkingv1.PolicyTypeEgress},
+		},
+		{
+			name: "egress policy scoped to OCM pods",
+			config: manifests.HubConfig{
+				ClusterManagerNamespace: "open-cluster-management-hub",
+				ClusterManagerName:      "cluster-manager",
+			},
+			manifestFile: "cluster-manager/hub/networkpolicies/02-hub-ns-egress.yaml",
+			expectContains: []string{
+				"allow-egress",
+				"clustermanager-registration-controller",
+				"cluster-manager-grpc-server",
+			},
+			expectedPolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeEgress},
+			// Rule 0: DNS (port 53 distinct from port 5353). Rule 1: kube-apiserver.
+			expectedEgressPorts: [][]networkPolicyPort{
+				{
+					{protocol: corev1.ProtocolUDP, port: 53},
+					{protocol: corev1.ProtocolTCP, port: 53},
+					{protocol: corev1.ProtocolUDP, port: 5353},
+					{protocol: corev1.ProtocolTCP, port: 5353},
+				},
+				{
+					{protocol: corev1.ProtocolTCP, port: 443},
+					{protocol: corev1.ProtocolTCP, port: 6443},
+				},
+			},
+		},
+		{
+			name: "hub ingress covers webhooks, grpc-server, and placement debug — all sources intentionally allowed",
+			config: manifests.HubConfig{
+				ClusterManagerNamespace: "open-cluster-management-hub",
+				ClusterManagerName:      "cluster-manager",
+				RegistrationWebhook:     manifests.Webhook{Port: 9443},
+				WorkWebhook:             manifests.Webhook{Port: 9443},
+				AddonWebhook:            manifests.Webhook{Port: 9443},
+			},
+			manifestFile: "cluster-manager/hub/networkpolicies/04-hub-ns-webhook-ingress.yaml",
+			expectContains: []string{
+				"allow-hub-ingress",
+				"cluster-manager-registration-webhook",
+				"cluster-manager-work-webhook",
+				"cluster-manager-addon-webhook",
+				"cluster-manager-grpc-server",
+				"clustermanager-placement-controller",
+			},
+			expectAbsent:        []string{"namespaceSelector"},
+			expectedPolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
+			expectedIngressPorts: [][]networkPolicyPort{
+				{
+					{protocol: corev1.ProtocolTCP, port: 9443}, // RegistrationWebhook.Port
+					{protocol: corev1.ProtocolTCP, port: 9443}, // WorkWebhook.Port
+					{protocol: corev1.ProtocolTCP, port: 9443}, // AddonWebhook.Port
+					{protocol: corev1.ProtocolTCP, port: 8090}, // grpc-server
+					{protocol: corev1.ProtocolTCP, port: 443},  // grpc-server
+					{protocol: corev1.ProtocolTCP, port: 9443}, // placement debug
+				},
+			},
+		},
+		{
+			name: "prometheus NP uses ClusterManagerName vars",
+			config: manifests.HubConfig{
+				ClusterManagerNamespace: "open-cluster-management-hub",
+				ClusterManagerName:      "cluster-manager",
+			},
+			manifestFile: "cluster-manager/hub/networkpolicies/05-hub-ns-prometheus.yaml",
+			expectContains: []string{
+				"clustermanager-registration-controller",
+				"cluster-manager-work-controller",
+				"clustermanager-placement-controller",
+				"cluster-manager-grpc-server",
+			},
+			expectAbsent:        []string{"namespaceSelector"},
+			expectedPolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
+			expectedIngressPorts: [][]networkPolicyPort{
+				{
+					{protocol: corev1.ProtocolTCP, port: 8080},
+					{protocol: corev1.ProtocolTCP, port: 8443},
+				},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			template, err := manifests.ClusterManagerManifestFiles.ReadFile(c.manifestFile)
+			if err != nil {
+				t.Fatalf("failed to read manifest %s: %v", c.manifestFile, err)
+			}
+			rendered := assets.MustCreateAssetFromTemplate(c.manifestFile, template, c.config).Data
+
+			for _, want := range c.expectContains {
+				if !strings.Contains(string(rendered), want) {
+					t.Errorf("expected rendered manifest to contain %q\ngot:\n%s", want, rendered)
+				}
+			}
+			for _, absent := range c.expectAbsent {
+				if strings.Contains(string(rendered), absent) {
+					t.Errorf("expected rendered manifest NOT to contain %q\ngot:\n%s", absent, rendered)
+				}
+			}
+
+			var np networkingv1.NetworkPolicy
+			if err := yaml.Unmarshal(rendered, &np); err != nil {
+				t.Fatalf("failed to unmarshal rendered manifest into NetworkPolicy: %v\ngot:\n%s", err, rendered)
+			}
+
+			if c.expectedPolicyTypes != nil && !reflect.DeepEqual(np.Spec.PolicyTypes, c.expectedPolicyTypes) {
+				t.Errorf("expected policyTypes %v, got %v", c.expectedPolicyTypes, np.Spec.PolicyTypes)
+			}
+
+			if c.expectedIngressPorts != nil {
+				if len(np.Spec.Ingress) != len(c.expectedIngressPorts) {
+					t.Fatalf("expected %d ingress rule(s), got %d: %+v", len(c.expectedIngressPorts), len(np.Spec.Ingress), np.Spec.Ingress)
+				}
+				for i, rule := range np.Spec.Ingress {
+					if got, want := portsOf(rule.Ports), c.expectedIngressPorts[i]; !reflect.DeepEqual(got, want) {
+						t.Errorf("ingress rule %d: expected ports %+v, got %+v", i, want, got)
+					}
+				}
+			}
+
+			if c.expectedEgressPorts != nil {
+				if len(np.Spec.Egress) != len(c.expectedEgressPorts) {
+					t.Fatalf("expected %d egress rule(s), got %d: %+v", len(c.expectedEgressPorts), len(np.Spec.Egress), np.Spec.Egress)
+				}
+				for i, rule := range np.Spec.Egress {
+					if got, want := portsOf(rule.Ports), c.expectedEgressPorts[i]; !reflect.DeepEqual(got, want) {
+						t.Errorf("egress rule %d: expected ports %+v, got %+v", i, want, got)
+					}
+				}
 			}
 		})
 	}

@@ -44,19 +44,19 @@ var _ = ginkgo.Describe("ClusterManager Default Mode with aws registration", fun
 
 				if clusterManager.Spec.RegistrationConfiguration == nil {
 					clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{}
-					clusterManager.Spec.RegistrationConfiguration.RegistrationDrivers = []operatorapiv1.RegistrationDriverHub{
-						{
-							AuthType: operatorapiv1.AwsIrsaAuthType,
-							AwsIrsa: &operatorapiv1.AwsIrsaConfig{
-								HubClusterArn: hubClusterArn,
-								Tags: []string{
-									"product:v1:tenant:app-name=My-App",
-									"product:v1:tenant:created-by=Team-1",
-								},
-								AutoApprovedIdentities: []string{"arn:aws:eks:us-west-2:123456789013:cluster/.*", "arn:aws:eks:us-west-2:123456789012:cluster/.*"},
+				}
+				clusterManager.Spec.RegistrationConfiguration.RegistrationDrivers = []operatorapiv1.RegistrationDriverHub{
+					{
+						AuthType: operatorapiv1.AwsIrsaAuthType,
+						AwsIrsa: &operatorapiv1.AwsIrsaConfig{
+							HubClusterArn: hubClusterArn,
+							Tags: []string{
+								"product:v1:tenant:app-name=My-App",
+								"product:v1:tenant:created-by=Team-1",
 							},
+							AutoApprovedIdentities: []string{"arn:aws:eks:us-west-2:123456789013:cluster/.*", "arn:aws:eks:us-west-2:123456789012:cluster/.*"},
 						},
-					}
+					},
 				}
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(),
 					clusterManager, metav1.UpdateOptions{})
@@ -70,7 +70,17 @@ var _ = ginkgo.Describe("ClusterManager Default Mode with aws registration", fun
 				if err != nil {
 					return err
 				}
-				clusterManager.Spec.RegistrationConfiguration = nil
+				var featureGates []operatorapiv1.FeatureGate
+				if clusterManager.Spec.RegistrationConfiguration != nil {
+					featureGates = clusterManager.Spec.RegistrationConfiguration.FeatureGates
+				}
+				if len(featureGates) == 0 {
+					clusterManager.Spec.RegistrationConfiguration = nil
+				} else {
+					clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+						FeatureGates: featureGates,
+					}
+				}
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(),
 					clusterManager, metav1.UpdateOptions{})
 				return err
@@ -141,14 +151,14 @@ var _ = ginkgo.Describe("ClusterManager Default Mode with aws registration", fun
 
 				if clusterManager.Spec.RegistrationConfiguration == nil {
 					clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{}
-					clusterManager.Spec.RegistrationConfiguration.RegistrationDrivers = []operatorapiv1.RegistrationDriverHub{
-						{
-							AuthType: operatorapiv1.AwsIrsaAuthType,
-							AwsIrsa: &operatorapiv1.AwsIrsaConfig{
-								HubClusterArn: hubClusterArn,
-							},
+				}
+				clusterManager.Spec.RegistrationConfiguration.RegistrationDrivers = []operatorapiv1.RegistrationDriverHub{
+					{
+						AuthType: operatorapiv1.AwsIrsaAuthType,
+						AwsIrsa: &operatorapiv1.AwsIrsaConfig{
+							HubClusterArn: hubClusterArn,
 						},
-					}
+					},
 				}
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(),
 					clusterManager, metav1.UpdateOptions{})
@@ -162,7 +172,17 @@ var _ = ginkgo.Describe("ClusterManager Default Mode with aws registration", fun
 				if err != nil {
 					return err
 				}
-				clusterManager.Spec.RegistrationConfiguration = nil
+				var featureGates []operatorapiv1.FeatureGate
+				if clusterManager.Spec.RegistrationConfiguration != nil {
+					featureGates = clusterManager.Spec.RegistrationConfiguration.FeatureGates
+				}
+				if len(featureGates) == 0 {
+					clusterManager.Spec.RegistrationConfiguration = nil
+				} else {
+					clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+						FeatureGates: featureGates,
+					}
+				}
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(),
 					clusterManager, metav1.UpdateOptions{})
 				return err

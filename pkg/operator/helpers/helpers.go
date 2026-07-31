@@ -805,6 +805,28 @@ func FeatureGateEnabled(features []operatorapiv1.FeatureGate,
 	return defaultFeature.Default
 }
 
+// NetworkPolicies is an operator-internal feature gate that controls whether NetworkPolicy
+// manifests are applied to the hub/agent namespace. Not passed through to agent binaries.
+const NetworkPolicies featuregate.Feature = "NetworkPolicies"
+
+// operatorOnlyFeatureGates are feature gates consumed by the operator itself,
+// not passed through to agent binaries as CLI flags.
+var operatorOnlyFeatureGates = map[featuregate.Feature]bool{
+	NetworkPolicies: true,
+}
+
+// FilterOperatorFeatureGates removes operator-internal feature gates from the list
+// so they are not forwarded as CLI flags to hub/agent binaries.
+func FilterOperatorFeatureGates(features []operatorapiv1.FeatureGate) []operatorapiv1.FeatureGate {
+	var filtered []operatorapiv1.FeatureGate
+	for _, f := range features {
+		if !operatorOnlyFeatureGates[featuregate.Feature(f.Feature)] {
+			filtered = append(filtered, f)
+		}
+	}
+	return filtered
+}
+
 // IsSingleton returns if agent is deployed in singleton mode either hosted or not
 func IsSingleton(mode operatorapiv1.InstallMode) bool {
 	return mode == operatorapiv1.InstallModeSingleton || mode == operatorapiv1.InstallModeSingletonHosted

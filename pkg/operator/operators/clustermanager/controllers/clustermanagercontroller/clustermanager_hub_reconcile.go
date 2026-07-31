@@ -87,6 +87,17 @@ var (
 		"cluster-manager/hub/grpc-server/serviceaccount.yaml",
 		"cluster-manager/hub/grpc-server/service.yaml",
 	}
+
+	// hubNetworkPolicyBaseFiles are always-on NetworkPolicy resources for open-cluster-management-hub.
+	// Applied as part of ClusterManager CR reconciliation.
+	hubNetworkPolicyBaseFiles = []string{
+		"cluster-manager/hub/networkpolicies/01-hub-ns-default-deny.yaml",
+		"cluster-manager/hub/networkpolicies/02-hub-ns-egress.yaml",
+		"cluster-manager/hub/networkpolicies/03-hub-ns-intra-namespace.yaml",
+		"cluster-manager/hub/networkpolicies/04-hub-ns-webhook-ingress.yaml",
+	}
+
+	hubPrometheusNPFile = "cluster-manager/hub/networkpolicies/05-hub-ns-prometheus.yaml"
 )
 
 type hubReconcile struct {
@@ -193,6 +204,11 @@ func getHubResources(mode operatorapiv1.InstallMode, config manifests.HubConfig)
 		}
 	} else {
 		hubResources = append(hubResources, hubDefaultWebhookServiceFiles...)
+	}
+
+	if config.NetworkPoliciesEnabled {
+		hubResources = append(hubResources, hubNetworkPolicyBaseFiles...)
+		hubResources = append(hubResources, hubPrometheusNPFile)
 	}
 
 	return hubResources

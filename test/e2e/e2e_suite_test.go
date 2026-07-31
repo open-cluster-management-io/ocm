@@ -170,6 +170,11 @@ var _ = BeforeSuite(func() {
 		return hub.EnableHubRegistrationFeature("ClusterImporter")
 	}).Should(Succeed())
 
+	By("Enable NetworkPolicies Feature")
+	Eventually(func() error {
+		return hub.EnableHubRegistrationFeature("NetworkPolicies")
+	}).Should(Succeed())
+
 	By("Enable CleanUpCompletedManifestWork feature gate")
 	Eventually(func() error {
 		return hub.EnableHubWorkFeature("CleanUpCompletedManifestWork")
