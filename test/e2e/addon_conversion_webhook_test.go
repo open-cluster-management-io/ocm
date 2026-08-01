@@ -8,7 +8,6 @@ import (
 	"github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/client-go/util/retry"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
@@ -467,28 +466,25 @@ var _ = ginkgo.Describe("Create v1alpha1 ClusterManagementAddOn", ginkgo.Label("
 
 		ginkgo.By("Update v1alpha1 ClusterManagementAddOn status and verify v1beta1 conversion")
 		gomega.Eventually(func() error {
-			err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				addon, err := hub.GetClusterManagementAddOnV1Alpha1(addonName)
-				if err != nil {
-					return err
-				}
-				addon.Status.DefaultConfigReferences = []addonv1alpha1.DefaultConfigReference{
-					{
-						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
-							Group:    "addon.open-cluster-management.io",
-							Resource: "addondeploymentconfigs",
-						},
-						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-							ConfigReferent: addonv1alpha1.ConfigReferent{
-								Name: "test-config",
-							},
+			addon, err := hub.GetClusterManagementAddOnV1Alpha1(addonName)
+			if err != nil {
+				return err
+			}
+			addon.Status.DefaultConfigReferences = []addonv1alpha1.DefaultConfigReference{
+				{
+					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
+						Group:    "addon.open-cluster-management.io",
+						Resource: "addondeploymentconfigs",
+					},
+					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+						ConfigReferent: addonv1alpha1.ConfigReferent{
+							Name: "test-config",
 						},
 					},
-				}
-				_, err = hub.AddonClient.AddonV1alpha1().ClusterManagementAddOns().UpdateStatus(
-					context.Background(), addon, metav1.UpdateOptions{})
-				return err
-			})
+				},
+			}
+			_, err = hub.AddonClient.AddonV1alpha1().ClusterManagementAddOns().UpdateStatus(
+				context.Background(), addon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}

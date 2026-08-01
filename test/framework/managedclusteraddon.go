@@ -180,44 +180,27 @@ func (hub *Hub) UpdateManagedClusterAddOnV1Alpha1(addon *addonv1alpha1.ManagedCl
 }
 
 // DeleteAllManagedClusterAddOnsInCluster deletes every ManagedClusterAddOn in the cluster namespace.
-// Both v1alpha1 and v1beta1 clients are used so addons created via either API are removed.
+// A single API version is enough because both versions share the same storage.
 func (hub *Hub) DeleteAllManagedClusterAddOnsInCluster(clusterName string) {
-	addonsV1Beta1, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).List(context.TODO(), metav1.ListOptions{})
+	addons, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).List(context.TODO(), metav1.ListOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
-		klog.Errorf("failed to list v1beta1 managed cluster addons in %s: %v", clusterName, err)
+		klog.Errorf("failed to list managed cluster addons in %s: %v", clusterName, err)
 	} else {
-		for _, addon := range addonsV1Beta1.Items {
+		for _, addon := range addons.Items {
 			err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).Delete(
 				context.TODO(), addon.Name, metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
-				klog.Errorf("failed to delete v1beta1 managed cluster addon %s/%s: %v", clusterName, addon.Name, err)
-			}
-		}
-	}
-
-	addonsV1Alpha1, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).List(context.TODO(), metav1.ListOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		klog.Errorf("failed to list v1alpha1 managed cluster addons in %s: %v", clusterName, err)
-	} else {
-		for _, addon := range addonsV1Alpha1.Items {
-			err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Delete(
-				context.TODO(), addon.Name, metav1.DeleteOptions{})
-			if err != nil && !apierrors.IsNotFound(err) {
-				klog.Errorf("failed to delete v1alpha1 managed cluster addon %s/%s: %v", clusterName, addon.Name, err)
+				klog.Errorf("failed to delete managed cluster addon %s/%s: %v", clusterName, addon.Name, err)
 			}
 		}
 	}
 
 	Eventually(func() error {
-		addonsV1Beta1, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).List(context.TODO(), metav1.ListOptions{})
+		addons, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).List(context.TODO(), metav1.ListOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
-		addonsV1Alpha1, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).List(context.TODO(), metav1.ListOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-		if len(addonsV1Beta1.Items)+len(addonsV1Alpha1.Items) > 0 {
+		if len(addons.Items) > 0 {
 			return fmt.Errorf("managed cluster addons still exist in %s", clusterName)
 		}
 		return nil
