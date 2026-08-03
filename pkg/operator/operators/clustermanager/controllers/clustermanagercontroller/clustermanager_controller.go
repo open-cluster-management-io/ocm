@@ -195,8 +195,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		registrationFeatureGates = clusterManager.Spec.RegistrationConfiguration.FeatureGates
 		config.AutoApproveUsers = strings.Join(clusterManager.Spec.RegistrationConfiguration.AutoApproveUsers, ",")
 	}
+	config.NetworkPoliciesEnabled = helpers.FeatureGateEnabled(registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates, helpers.NetworkPolicies)
 	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration",
-		registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates)
+		helpers.FilterOperatorFeatureGates(registrationFeatureGates), ocmfeature.DefaultHubRegistrationFeatureGates)
 	config.ClusterProfileEnabled = helpers.FeatureGateEnabled(registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates, ocmfeature.ClusterProfile)
 	// setting for cluster importer.
 	// TODO(qiujian16) since this is disabled by feature gate, the image is obtained from cluster manager's env var. Need a more elegant approach.

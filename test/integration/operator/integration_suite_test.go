@@ -138,6 +138,14 @@ var _ = ginkgo.BeforeSuite(func() {
 			DeployOption: operatorapiv1.ClusterManagerDeployOption{
 				Mode: operatorapiv1.InstallModeDefault,
 			},
+			RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
+				FeatureGates: []operatorapiv1.FeatureGate{
+					{
+						Feature: "NetworkPolicies",
+						Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+					},
+				},
+			},
 			WorkConfiguration: &operatorapiv1.WorkConfiguration{
 				WorkDriver: operatorapiv1.WorkDriverTypeKube,
 				FeatureGates: []operatorapiv1.FeatureGate{
@@ -174,6 +182,14 @@ var _ = ginkgo.BeforeSuite(func() {
 					WorkWebhookConfiguration: operatorapiv1.HostedWebhookConfiguration{
 						Address: "localhost",
 						Port:    443,
+					},
+				},
+			},
+			RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
+				FeatureGates: []operatorapiv1.FeatureGate{
+					{
+						Feature: "NetworkPolicies",
+						Mode:    operatorapiv1.FeatureGateModeTypeEnable,
 					},
 				},
 			},

@@ -55,6 +55,8 @@ type HubConfig struct {
 	// TLS configuration injected into all managed hub component deployments
 	TLSMinVersion   string
 	TLSCipherSuites string
+
+	NetworkPoliciesEnabled bool
 }
 
 type Webhook struct {

@@ -327,30 +327,36 @@ func enableGRPCAuth(operatorClient operatorclient.Interface, clusterManagerName 
 		return err
 	}
 
-	clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
-		RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+	var featureGates []operatorapiv1.FeatureGate
+	if clusterManager.Spec.RegistrationConfiguration != nil {
+		featureGates = clusterManager.Spec.RegistrationConfiguration.FeatureGates
+	}
+
+	registrationDrivers := []operatorapiv1.RegistrationDriverHub{
+		{
+			AuthType: operatorapiv1.CSRAuthType,
+		},
+		{
+			AuthType: operatorapiv1.GRPCAuthType,
+		},
+	}
+	if len(autoApprovedIdentities) != 0 {
+		registrationDrivers = []operatorapiv1.RegistrationDriverHub{
 			{
 				AuthType: operatorapiv1.CSRAuthType,
 			},
 			{
 				AuthType: operatorapiv1.GRPCAuthType,
-			},
-		},
-	}
-	if len(autoApprovedIdentities) != 0 {
-		clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
-			RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
-				{
-					AuthType: operatorapiv1.CSRAuthType,
-				},
-				{
-					AuthType: operatorapiv1.GRPCAuthType,
-					GRPC: &operatorapiv1.GRPCRegistrationConfig{
-						AutoApprovedIdentities: autoApprovedIdentities,
-					},
+				GRPC: &operatorapiv1.GRPCRegistrationConfig{
+					AutoApprovedIdentities: autoApprovedIdentities,
 				},
 			},
 		}
+	}
+
+	clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+		RegistrationDrivers: registrationDrivers,
+		FeatureGates:        featureGates,
 	}
 	_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(),
 		clusterManager, metav1.UpdateOptions{})
@@ -364,7 +370,17 @@ func disableGRPCAuth(operatorClient operatorclient.Interface, clusterManagerName
 		return err
 	}
 
-	clusterManager.Spec.RegistrationConfiguration = nil
+	var featureGates []operatorapiv1.FeatureGate
+	if clusterManager.Spec.RegistrationConfiguration != nil {
+		featureGates = clusterManager.Spec.RegistrationConfiguration.FeatureGates
+	}
+	if len(featureGates) == 0 {
+		clusterManager.Spec.RegistrationConfiguration = nil
+	} else {
+		clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+			FeatureGates: featureGates,
+		}
+	}
 	_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(),
 		clusterManager, metav1.UpdateOptions{})
 	return err

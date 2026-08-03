@@ -1709,3 +1709,77 @@ func containsArg(args []string, prefix string) bool {
 	}
 	return false
 }
+
+func TestNetworkPolicyFeatureGate(t *testing.T) {
+	cases := []struct {
+		name               string
+		featureGates       []operatorapiv1.FeatureGate
+		expectBaseNPs      bool
+		expectPrometheusNP bool
+	}{
+		{
+			name:               "feature gate disabled — no NPs",
+			featureGates:       nil,
+			expectBaseNPs:      false,
+			expectPrometheusNP: false,
+		},
+		{
+			name: "feature gate enabled — all NPs applied",
+			featureGates: []operatorapiv1.FeatureGate{
+				{Feature: "NetworkPolicies", Mode: operatorapiv1.FeatureGateModeTypeEnable},
+			},
+			expectBaseNPs:      true,
+			expectPrometheusNP: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			clusterManager := newClusterManager("testhub")
+			if c.featureGates != nil {
+				if clusterManager.Spec.RegistrationConfiguration == nil {
+					clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{}
+				}
+				clusterManager.Spec.RegistrationConfiguration.FeatureGates = c.featureGates
+			}
+
+			tc := newTestController(t, clusterManager)
+			clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
+			setup(t, tc, setDeployment(clusterManager.Name, clusterManagerNamespace))
+
+			syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
+			if err := tc.clusterManagerController.sync(ctx, syncContext, "testhub"); err != nil {
+				t.Fatalf("unexpected sync error: %v", err)
+			}
+
+			baseNPNames := []string{"default-deny-all", "allow-egress", "allow-intra-namespace", "allow-hub-ingress"}
+			createdNPs := map[string]bool{}
+			for _, action := range tc.hubKubeClient.Actions() {
+				if action.GetVerb() != createVerb {
+					continue
+				}
+				obj := action.(clienttesting.CreateActionImpl).Object
+				if np, ok := obj.(interface{ GetName() string }); ok {
+					createdNPs[np.GetName()] = true
+				}
+			}
+
+			if c.expectBaseNPs {
+				for _, name := range baseNPNames {
+					if !createdNPs[name] {
+						t.Errorf("expectBaseNPs=true but NetworkPolicy %q was not created", name)
+					}
+				}
+			} else {
+				for _, name := range baseNPNames {
+					if createdNPs[name] {
+						t.Errorf("expectBaseNPs=false but NetworkPolicy %q was created", name)
+					}
+				}
+			}
+			if hasPrometheus := createdNPs["allow-prometheus-ingress"]; hasPrometheus != c.expectPrometheusNP {
+				t.Errorf("expectPrometheusNP=%v but hasPrometheusNP=%v", c.expectPrometheusNP, hasPrometheus)
+			}
+		})
+	}
+}

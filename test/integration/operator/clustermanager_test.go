@@ -424,8 +424,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 44 {
-					return fmt.Errorf("should get 44 relatedResources, actual got %v, %v",
+				if len(actual.Status.RelatedResources) != 49 {
+					return fmt.Errorf("should get 49 relatedResources, actual got %v, %v",
 						len(actual.Status.RelatedResources), actual.Status.RelatedResources)
 				}
 				return nil
@@ -503,8 +503,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 48 {
-					return fmt.Errorf("should get 48 relatedResources, actual got %v, %v",
+				if len(actual.Status.RelatedResources) != 53 {
+					return fmt.Errorf("should get 53 relatedResources, actual got %v, %v",
 						len(actual.Status.RelatedResources), actual.Status.RelatedResources)
 				}
 				return nil
@@ -715,8 +715,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 43 {
-					return fmt.Errorf("should get 43 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 48 {
+					return fmt.Errorf("should get 48 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -771,8 +771,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 48 {
-					return fmt.Errorf("should get 48 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 53 {
+					return fmt.Errorf("should get 53 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -1147,8 +1147,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 49 {
-					return fmt.Errorf("should get 49 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 54 {
+					return fmt.Errorf("should get 54 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -1659,7 +1659,8 @@ var _ = ginkgo.Describe("ClusterManager TLS Profile", func() {
 			context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		// Clean up PlacementConfiguration and RegistrationConfiguration to avoid affecting other tests
+		// Clean up PlacementConfiguration and RegistrationConfiguration to avoid affecting other tests,
+		// but keep any existing feature gates (e.g. NetworkPolicies) intact.
 		gomega.Eventually(func() error {
 			clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(
 				context.Background(), clusterManagerName, metav1.GetOptions{})
@@ -1667,7 +1668,17 @@ var _ = ginkgo.Describe("ClusterManager TLS Profile", func() {
 				return err
 			}
 			clusterManager.Spec.PlacementConfiguration = nil
-			clusterManager.Spec.RegistrationConfiguration = nil
+			var featureGates []operatorapiv1.FeatureGate
+			if clusterManager.Spec.RegistrationConfiguration != nil {
+				featureGates = clusterManager.Spec.RegistrationConfiguration.FeatureGates
+			}
+			if len(featureGates) == 0 {
+				clusterManager.Spec.RegistrationConfiguration = nil
+			} else {
+				clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{
+					FeatureGates: featureGates,
+				}
+			}
 			_, err = operatorClient.OperatorV1().ClusterManagers().Update(
 				context.Background(), clusterManager, metav1.UpdateOptions{})
 			return err

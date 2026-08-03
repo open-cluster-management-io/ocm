@@ -668,7 +668,7 @@ func TestSyncDeployWithNetworkPolicies(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	klusterlet.Spec.RegistrationConfiguration.FeatureGates = append(
 		klusterlet.Spec.RegistrationConfiguration.FeatureGates,
-		operatorapiv1.FeatureGate{Feature: string(NetworkPolicies), Mode: operatorapiv1.FeatureGateModeTypeEnable},
+		operatorapiv1.FeatureGate{Feature: string(helpers.NetworkPolicies), Mode: operatorapiv1.FeatureGateModeTypeEnable},
 	)
 	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
 	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
