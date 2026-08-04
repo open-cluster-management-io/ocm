@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"time"
 
+	. "github.com/onsi/gomega"
 	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/klog/v2"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
@@ -174,4 +177,32 @@ func (hub *Hub) GetManagedClusterAddOnV1Alpha1(managedClusterNamespace, addOnNam
 func (hub *Hub) UpdateManagedClusterAddOnV1Alpha1(addon *addonv1alpha1.ManagedClusterAddOn) (*addonv1alpha1.ManagedClusterAddOn, error) {
 	return hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(addon.Namespace).Update(
 		context.TODO(), addon, metav1.UpdateOptions{})
+}
+
+// DeleteAllManagedClusterAddOnsInCluster deletes every ManagedClusterAddOn in the cluster namespace.
+// A single API version is enough because both versions share the same storage.
+func (hub *Hub) DeleteAllManagedClusterAddOnsInCluster(clusterName string) {
+	addons, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).List(context.TODO(), metav1.ListOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		klog.Errorf("failed to list managed cluster addons in %s: %v", clusterName, err)
+	} else {
+		for _, addon := range addons.Items {
+			err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).Delete(
+				context.TODO(), addon.Name, metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				klog.Errorf("failed to delete managed cluster addon %s/%s: %v", clusterName, addon.Name, err)
+			}
+		}
+	}
+
+	Eventually(func() error {
+		addons, err := hub.AddonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).List(context.TODO(), metav1.ListOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		if len(addons.Items) > 0 {
+			return fmt.Errorf("managed cluster addons still exist in %s", clusterName)
+		}
+		return nil
+	}).Should(Succeed())
 }

@@ -2,6 +2,7 @@ package framework
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -23,4 +24,21 @@ func (hub *Hub) CleanManifestWorks(clusterName, workName string) error {
 	}).Should(BeTrue())
 
 	return nil
+}
+
+// WaitUntilNoManifestWorks waits until all ManifestWorks are removed from the managed cluster namespace.
+func (hub *Hub) WaitUntilNoManifestWorks(clusterName string) {
+	Eventually(func() error {
+		works, err := hub.WorkClient.WorkV1().ManifestWorks(clusterName).List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		if len(works.Items) != 0 {
+			return fmt.Errorf("expected no manifest works, but got %d", len(works.Items))
+		}
+		return nil
+	}).Should(Succeed())
 }
