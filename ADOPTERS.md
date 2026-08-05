@@ -38,6 +38,7 @@ The list includes but is not limited to:
 - [ICOS Meta OS](https://www.icos-project.eu/docs/Administration/ICOS%20Agent/Orchestrators/controlplane/)
 - [Istio](https://github.com/open-cluster-management-io/multicluster-mesh)
 - [Janus](https://www.npmjs.com/package/@janus-idp/backstage-plugin-ocm-backend)
+- [Krkn](https://github.com/krkn-chaos/krkn-operator/actions/workflows/ocm-setup.yml)
 - [KubeStellar](https://docs.kubestellar.io/latest/direct/start-from-ocm/)
 - [KubeVela](https://kubevela.io/docs/platform-engineers/system-operation/working-with-ocm/)
 - [Kueue](https://kueue.sigs.k8s.io/docs/tasks/manage/setup_multikueue/#optional-setup-multikueue-with-open-cluster-management)
