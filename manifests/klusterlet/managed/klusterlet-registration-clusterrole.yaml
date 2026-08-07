@@ -28,3 +28,8 @@ rules:
 - apiGroups: ["about.k8s.io"]
   resources: ["clusterproperties"]
   verbs: ["get", "list", "watch"]
+# Optional rule: Allow agent to read OpenShift infrastructures for cluster name auto-detection
+# If the agent is running in an OpenShift cluster, it will gracefully fall back if this is missing.
+- apiGroups: ["config.openshift.io"]
+  resources: ["infrastructures"]
+  verbs: ["get", "list"]
