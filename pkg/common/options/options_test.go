@@ -11,9 +11,12 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clocktesting "k8s.io/utils/clock/testing"
+
+	tlslib "open-cluster-management.io/sdk-go/pkg/tls"
 
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/register"
@@ -355,5 +358,153 @@ func TestApplyTLSToCommand(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestApplyTLSFromConfigMap(t *testing.T) {
+	cases := []struct {
+		name           string
+		configMap      *corev1.ConfigMap
+		wantConfigSet  bool
+		wantMinVersion string
+		wantCiphers    []string
+	}{
+		{
+			name:          "ConfigMap not found -- no-op",
+			configMap:     nil,
+			wantConfigSet: false,
+		},
+		{
+			name: "ConfigMap with VersionTLS13",
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      tlslib.ConfigMapName,
+					Namespace: "test-ns",
+				},
+				Data: map[string]string{
+					tlslib.ConfigMapKeyMinVersion: "VersionTLS13",
+				},
+			},
+			wantConfigSet:  true,
+			wantMinVersion: "VersionTLS13",
+		},
+		{
+			name: "ConfigMap with VersionTLS12 and cipher suites",
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      tlslib.ConfigMapName,
+					Namespace: "test-ns",
+				},
+				Data: map[string]string{
+					tlslib.ConfigMapKeyMinVersion:   "VersionTLS12",
+					tlslib.ConfigMapKeyCipherSuites: "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+				},
+			},
+			wantConfigSet:  true,
+			wantMinVersion: "VersionTLS12",
+			wantCiphers:    []string{"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256", "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"},
+		},
+		{
+			name: "empty ConfigMap data -- uses default VersionTLS12",
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      tlslib.ConfigMapName,
+					Namespace: "test-ns",
+				},
+				Data: map[string]string{},
+			},
+			wantConfigSet:  true,
+			wantMinVersion: "VersionTLS12",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var objects []runtime.Object
+			if c.configMap != nil {
+				objects = append(objects, c.configMap)
+			}
+			kubeClient := kubefake.NewSimpleClientset(objects...)
+
+			cmd := &cobra.Command{Use: "test"}
+			var configFile string
+			cmd.Flags().StringVar(&configFile, "config", "", "")
+
+			err := applyTLSFromConfigMap(context.Background(), kubeClient, "test-ns", cmd)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if !c.wantConfigSet {
+				if configFile != "" {
+					t.Errorf("expected --config to be empty, got %q", configFile)
+				}
+				return
+			}
+
+			if configFile == "" {
+				t.Fatal("expected --config to be set, but it is empty")
+			}
+			defer os.Remove(configFile)
+
+			content, err := os.ReadFile(configFile)
+			if err != nil {
+				t.Fatalf("failed to read generated config file: %v", err)
+			}
+			s := string(content)
+
+			if c.wantMinVersion != "" && !strings.Contains(s, "minTLSVersion: "+c.wantMinVersion) {
+				t.Errorf("expected config to contain minTLSVersion %q, got:\n%s", c.wantMinVersion, s)
+			}
+			for _, cipher := range c.wantCiphers {
+				if !strings.Contains(s, cipher) {
+					t.Errorf("expected config to contain cipher %q, got:\n%s", cipher, s)
+				}
+			}
+		})
+	}
+}
+
+func TestApplyTLSFromConfigMapPersistentPreRunE(t *testing.T) {
+	// Verify that ApplyTLSFromConfigMapToCommand sets PersistentPreRunE.
+	opts := NewOptions()
+	cmd := &cobra.Command{Use: "test"}
+	cmd.Flags().String("config", "", "")
+	cmd.Flags().String("namespace", "", "")
+
+	if cmd.PersistentPreRunE != nil {
+		t.Fatal("expected PersistentPreRunE to be nil before ApplyTLSFromConfigMapToCommand")
+	}
+	opts.ApplyTLSFromConfigMapToCommand(cmd)
+	if cmd.PersistentPreRunE == nil {
+		t.Error("expected PersistentPreRunE to be set by ApplyTLSFromConfigMapToCommand")
+	}
+}
+
+func TestApplyTLSFromConfigMapSkipsWhenConfigAlreadySet(t *testing.T) {
+	// When --config is already set, the hook should be a no-op even if the
+	// ConfigMap exists.  This guards against overwriting user-supplied config.
+	// We test the hook directly: without in-cluster credentials the hook
+	// exits early (no namespace) -- so set the namespace flag explicitly and
+	// run the hook with --config pre-set.  The hook should return nil without
+	// creating a new temp file.
+	opts := NewOptions()
+	cmd := &cobra.Command{Use: "test"}
+	var configFile string
+	cmd.Flags().StringVar(&configFile, "config", "/existing/config.yaml", "")
+	cmd.Flags().String("namespace", "test-ns", "")
+	if err := cmd.Flags().Set("config", "/existing/config.yaml"); err != nil {
+		t.Fatal(err)
+	}
+
+	opts.ApplyTLSFromConfigMapToCommand(cmd)
+
+	// Run the hook -- it should detect --config is already set and return immediately.
+	if err := cmd.PersistentPreRunE(cmd, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// --config must remain unchanged.
+	if configFile != "/existing/config.yaml" {
+		t.Errorf("expected --config to remain %q, got %q", "/existing/config.yaml", configFile)
 	}
 }

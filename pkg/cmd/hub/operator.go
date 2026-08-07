@@ -34,5 +34,16 @@ func NewHubOperatorCmd() *cobra.Command {
 	flags.StringVar(&cmOptions.ImagePullSecretName, "image-pull-secret-name", helpers.ImagePullSecret,
 		"The name of the image pull secret in the operator namespace to sync to hub components")
 	opts.AddFlags(flags)
+	// The cluster-manager operator does not receive --tls-min-version /
+	// --tls-cipher-suites flags from its deployment manifest (unlike the hub
+	// controllers it manages). Instead, it reads the ocm-tls-profile ConfigMap
+	// itself at runtime. ApplyTLSFromConfigMapToCommand installs a
+	// PersistentPreRunE hook that reads that ConfigMap once before
+	// library-go's StartController starts the health/metrics server (port 8443),
+	// so the server uses the cluster TLS profile from the first request.
+	// When the ConfigMap changes, RunClusterManagerOperator's watcher calls
+	// os.Exit(0), Kubernetes restarts the pod, and this hook re-reads the
+	// updated ConfigMap on the next startup.
+	opts.ApplyTLSFromConfigMapToCommand(cmd)
 	return cmd
 }

@@ -99,6 +99,15 @@ func TestHubOperatorFlagDefaults(t *testing.T) {
 	}
 }
 
+func TestHubOperatorTLSFromConfigMapWiring(t *testing.T) {
+	cmd := NewHubOperatorCmd()
+
+	// ApplyTLSFromConfigMapToCommand should have set PersistentPreRunE.
+	if cmd.PersistentPreRunE == nil {
+		t.Error("Expected PersistentPreRunE to be set by ApplyTLSFromConfigMapToCommand")
+	}
+}
+
 func TestHubOperatorCommandExecution(t *testing.T) {
 	cmd := NewHubOperatorCmd()
 
