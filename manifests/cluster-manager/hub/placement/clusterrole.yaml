@@ -58,4 +58,10 @@ rules:
 - apiGroups: ["config.openshift.io"]
   resources: ["infrastructures"]
   verbs: ["get"]
+{{if .SIGPlacementDecisionEnabled}}
+# Allow controller to manage SIG MC PlacementDecisions
+- apiGroups: ["multicluster.x-k8s.io"]
+  resources: ["placementdecisions"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+{{end}}
 
