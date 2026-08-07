@@ -193,6 +193,32 @@ var _ = ginkgo.Describe("Addon Lease Resync", func() {
 	ginkgo.It("should update addon status to unavailable after addon lease controller resync", func() {
 		assertSuccessClusterBootstrap()
 		assertAddOn()
+
+		// The addon lease is created once and is not renewed by any agent in this test.
+		// With AddOnLeaseControllerLeaseDurationSeconds=1 the lease goes stale after a
+		// ~5s grace period, so the "available" window is too short to observe reliably
+		// on a slow machine. Keep the lease fresh until we have confirmed "available",
+		// then stop renewing to exercise the transition to "unavailable".
+		renewCtx, stopRenew := context.WithCancel(context.TODO())
+		defer stopRenew()
+		go func() {
+			ticker := time.NewTicker(time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-renewCtx.Done():
+					return
+				case <-ticker.C:
+					lease, err := kubeClient.CoordinationV1().Leases(addOnName).Get(renewCtx, addOnName, metav1.GetOptions{})
+					if err != nil {
+						continue
+					}
+					lease.Spec.RenewTime = &metav1.MicroTime{Time: time.Now()}
+					_, _ = kubeClient.CoordinationV1().Leases(addOnName).Update(renewCtx, lease, metav1.UpdateOptions{})
+				}
+			}
+		}()
+
 		gomega.Eventually(func() error {
 			addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
@@ -206,6 +232,9 @@ var _ = ginkgo.Describe("Addon Lease Resync", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		assertAddonLabel(managedClusterName, addOnName, "available")
+
+		// stop renewing the lease so it goes stale and the addon becomes unavailable
+		stopRenew()
 
 		// do not update addon lease, wait resync once, the addon status should be unavailable
 		gomega.Eventually(func() error {
