@@ -135,7 +135,7 @@ func TestCreateOrUpdatePlacementDecision_EventRecording(t *testing.T) {
 				},
 			}
 
-			err := ctrl.createOrUpdatePlacementDecision(context.TODO(), placement, placementDecision, c.clusterScores, c.status)
+			_, err := ctrl.createOrUpdatePlacementDecision(context.TODO(), placement, placementDecision, c.clusterScores, c.status)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
