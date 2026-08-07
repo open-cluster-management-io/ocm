@@ -16,8 +16,8 @@ import (
 const (
 	placementLabel = "cluster.open-cluster-management.io/placement"
 	description    = `
-	Balance prioritizer balance the number of decisions among the clusters. The cluster
-	with the highest number of decision is given the lowest score, while the empty cluster is given
+	Balance prioritizer balances the number of decisions among the clusters. The cluster
+	with the highest number of decisions is given the lowest score, while the empty cluster is given
 	the highest score.
 	`
 )
@@ -35,7 +35,7 @@ func New(handle plugins.Handle) *Balance {
 }
 
 func (b *Balance) Name() string {
-	return reflect.TypeOf(*b).Name()
+	return reflect.TypeFor[Balance]().Name()
 }
 
 func (b *Balance) Description() string {
@@ -77,8 +77,8 @@ func (b *Balance) Score(ctx context.Context, placement *clusterapiv1beta1.Placem
 		if count, ok := decisionCount[clusterName]; ok {
 			usage := float64(count) / float64(maxCount)
 
-			// Negate the usage and subtracted by 0.5, then we double it and muliply by maxCount,
-			// which normalize the score to value between 100 and -100
+			// Negate the usage and subtracted by 0.5, then we double it and multiply by maxCount,
+			// which normalizes the score to a value between 100 and -100
 			scores[clusterName] = 2 * int64(float64(plugins.MaxClusterScore)*(0.5-usage))
 		}
 	}
