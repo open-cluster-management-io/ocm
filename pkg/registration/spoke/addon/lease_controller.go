@@ -125,11 +125,18 @@ func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
 	var condition metav1.Condition
 	switch {
 	case errors.IsNotFound(err):
+		message := fmt.Sprintf("The status of %s add-on is unknown.", addOn.Name)
+		if isAddonRunningOutsideManagedCluster(addOn) {
+			// No lease on the declared hosting cluster usually means it doesn't match the klusterlet's actual hosting cluster.
+			hostingCluster := addOn.Annotations[addonv1beta1.HostingClusterNameAnnotationKey]
+			message = fmt.Sprintf("%s No lease found on hosting cluster %q; verify it matches the cluster "+
+				"where this managed cluster's klusterlet actually runs.", message, hostingCluster)
+		}
 		condition = metav1.Condition{
 			Type:    addonv1beta1.ManagedClusterAddOnConditionAvailable,
 			Status:  metav1.ConditionUnknown,
 			Reason:  "ManagedClusterAddOnLeaseNotFound",
-			Message: fmt.Sprintf("The status of %s add-on is unknown.", addOn.Name),
+			Message: message,
 		}
 	case err != nil:
 		return err

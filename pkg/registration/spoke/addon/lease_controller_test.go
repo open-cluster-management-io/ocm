@@ -3,6 +3,7 @@ package addon
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -329,6 +330,45 @@ func TestSync(t *testing.T) {
 				}
 				if addOnCond.Status != metav1.ConditionTrue {
 					t.Errorf("expected addon available condition is available, but failed")
+				}
+			},
+		},
+		{
+			name:     "no addon lease on management cluster names the hosting cluster in the message",
+			queueKey: "test/test",
+			addOns: []runtime.Object{&addonv1beta1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testinghelpers.TestManagedClusterName,
+					Name:      "test",
+					Annotations: map[string]string{
+						addonv1beta1.HostingClusterNameAnnotationKey: "cluster1",
+					},
+				},
+				Spec: addonv1beta1.ManagedClusterAddOnSpec{},
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Namespace: "test",
+				},
+			}},
+			hubLeases:        []runtime.Object{},
+			managementLeases: []runtime.Object{},
+			validateActions: func(t *testing.T, ctx *testingcommon.FakeSyncContext, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				addOn := &addonv1beta1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
+				if addOnCond == nil {
+					t.Errorf("expected addon available condition, but failed")
+					return
+				}
+				if addOnCond.Status != metav1.ConditionUnknown {
+					t.Errorf("expected addon available condition is unknown, but failed")
+				}
+				if !strings.Contains(addOnCond.Message, "cluster1") {
+					t.Errorf("expected message to name the declared hosting cluster, got: %s", addOnCond.Message)
 				}
 			},
 		},
