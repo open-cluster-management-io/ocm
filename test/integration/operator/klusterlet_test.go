@@ -611,18 +611,23 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				if err != nil {
 					return false
 				}
-				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
-				// klusterlet has no condition, replica is 0
-				gomega.Expect(actual.Status.Replicas).Should(gomega.Equal(int32(0)))
+				if len(actual.Spec.Template.Spec.Containers) != 1 {
+					return false
+				}
+				// No running pods in the integration env; Status.Replicas stays 0.
+				if actual.Status.Replicas != 0 {
+					return false
+				}
 
-				// Print actual args for debugging
+				// Work agent args include --status-sync-interval=60s only when Replica==1.
+				// Replica is forced to 0 until HubConnectionDegraded is set, so retry until
+				// the condition exists and the deployment is re-rendered with 8 args.
 				actualArgs := actual.Spec.Template.Spec.Containers[0].Args
 				if len(actualArgs) != 8 {
 					fmt.Fprintf(ginkgo.GinkgoWriter, "should get 8 args, actual got %v\n", actualArgs)
+					return false
 				}
-
-				gomega.Expect(len(actualArgs)).Should(gomega.Equal(8))
-				return actual.Spec.Template.Spec.Containers[0].Args[2] != "--spoke-cluster-name=cluster2"
+				return actualArgs[2] == "--spoke-cluster-name=cluster2"
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			gomega.Eventually(func() bool {
@@ -630,8 +635,12 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				if err != nil {
 					return false
 				}
-				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
-				gomega.Expect(len(actual.Spec.Template.Spec.Containers[0].Args)).Should(gomega.Equal(7))
+				if len(actual.Spec.Template.Spec.Containers) != 1 {
+					return false
+				}
+				if len(actual.Spec.Template.Spec.Containers[0].Args) != 7 {
+					return false
+				}
 				return actual.Spec.Template.Spec.Containers[0].Args[2] == "--spoke-cluster-name=cluster2"
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
