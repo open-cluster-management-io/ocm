@@ -3,10 +3,15 @@ package cmainstallprogression
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clienttesting "k8s.io/client-go/testing"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
@@ -14,6 +19,7 @@ import (
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
+	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
@@ -489,5 +495,85 @@ func TestReconcile(t *testing.T) {
 			}
 			c.validateAddonActions(t, fakeAddonClient.Actions())
 		})
+	}
+}
+
+// TestPatchStatusRetriesOn409Conflict verifies that the sync function retries PatchStatus
+// on a 409 Conflict error. Two consecutive conflicts are injected; the third attempt must
+// succeed and leave status.defaultConfigReferences populated.
+func TestPatchStatusRetriesOn409Conflict(t *testing.T) {
+	cma := addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").WithDefaultConfigs(
+		addonv1beta1.AddOnConfig{
+			ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+				Group:    "addon.open-cluster-management.io",
+				Resource: "addonhubconfigs",
+			},
+			ConfigReferent: addonv1beta1.ConfigReferent{
+				Name:      "test-config",
+				Namespace: "test-ns",
+			},
+		},
+	).Build()
+
+	fakeAddonClient := fakeaddon.NewSimpleClientset(cma)
+
+	// Count how many times the patch reactor fires a conflict.
+	var conflictsFired atomic.Int32
+
+	fakeAddonClient.PrependReactor("patch", "clustermanagementaddons",
+		func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+			if conflictsFired.Load() < 2 {
+				conflictsFired.Add(1)
+				return true, nil, errors.NewConflict(
+					schema.GroupResource{
+						Group:    "addon.open-cluster-management.io",
+						Resource: "clustermanagementaddons",
+					},
+					"test",
+					fmt.Errorf("simulated conflict"),
+				)
+			}
+			// Fall through to the default fake reactor on the 3rd attempt.
+			return false, nil, nil
+		},
+	)
+
+	addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
+	if err := addonInformers.Addon().V1beta1().ClusterManagementAddOns().Informer().GetStore().Add(cma); err != nil {
+		t.Fatal(err)
+	}
+
+	syncContext := testingcommon.NewFakeSyncContext(t, "test")
+
+	// Construct the controller directly so we can call sync() within this test package.
+	// The CMA has manual install strategy type (set by the builder default), so it exercises
+	// the patchManualStatus retry path.
+	c := &cmaInstallProgressionController{
+		addonClient: fakeAddonClient,
+		patcher: patcher.NewPatcher[
+			*addonv1beta1.ClusterManagementAddOn,
+			addonv1beta1.ClusterManagementAddOnSpec,
+			addonv1beta1.ClusterManagementAddOnStatus](
+			fakeAddonClient.AddonV1beta1().ClusterManagementAddOns()),
+		clusterManagementAddonLister: addonInformers.Addon().V1beta1().ClusterManagementAddOns().Lister(),
+		addonFilterFunc:              utils.ManagedByAddonManager,
+	}
+
+	err := c.sync(context.TODO(), syncContext, "test")
+	if err != nil {
+		t.Fatalf("expected sync to succeed after retries, got error: %v", err)
+	}
+
+	if got := conflictsFired.Load(); got != 2 {
+		t.Errorf("expected 2 conflicts to be fired, got %d", got)
+	}
+
+	// Verify the final CMA status has defaultConfigReferences populated.
+	updatedCMA, err := fakeAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.TODO(), "test", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get CMA after sync: %v", err)
+	}
+	if len(updatedCMA.Status.DefaultConfigReferences) == 0 {
+		t.Errorf("expected status.defaultConfigReferences to be populated, got empty")
 	}
 }
