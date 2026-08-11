@@ -132,6 +132,25 @@ func AnnotationDecorator(annotations map[string]string) ManagedClusterDecorator 
 	}
 }
 
+// LabelDecorator sets user-defined labels on the ManagedCluster. Reserved labels are
+// filtered out, and a label that already exists is left untouched so the agent never
+// overwrites a label set by the user or another actor on the hub.
+func LabelDecorator(labels map[string]string) ManagedClusterDecorator {
+	return func(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
+		filteredLabels := commonhelpers.FilterClusterLabels(labels)
+		if cluster.Labels == nil {
+			cluster.Labels = make(map[string]string)
+		}
+		for key, value := range filteredLabels {
+			if _, ok := cluster.Labels[key]; ok {
+				continue
+			}
+			cluster.Labels[key] = value
+		}
+		return cluster
+	}
+}
+
 // ClientConfigDecorator merge ClientConfig
 func ClientConfigDecorator(externalServerURLs []string, caBundle []byte) ManagedClusterDecorator {
 	return func(cluster *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
