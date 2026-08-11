@@ -12,6 +12,8 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -29,6 +31,7 @@ import (
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/hub"
@@ -300,3 +303,106 @@ var _ = ginkgo.AfterSuite(func() {
 	err = os.RemoveAll(util.TestDir)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 })
+
+// Common test helper functions
+
+// assertSuccessClusterBootstrap verifies that a managed cluster successfully bootstraps to the hub
+func assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret string) {
+	// the spoke cluster and csr should be created after bootstrap
+	ginkgo.By("Check existence of ManagedCluster & CSR")
+	gomega.Eventually(func() error {
+		if _, err := util.GetManagedCluster(clusterClient, managedClusterName); err != nil {
+			return err
+		}
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+	gomega.Eventually(func() error {
+		if _, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName); err != nil {
+			return err
+		}
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+	// the spoke cluster should has finalizer that is added by hub controller
+	gomega.Eventually(func() error {
+		spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
+		if err != nil {
+			return err
+		}
+
+		if !commonhelpers.HasFinalizer(spokeCluster.Finalizers, clusterv1.ManagedClusterFinalizer) {
+			return fmt.Errorf("managed cluster does not have finalizer")
+		}
+
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+	ginkgo.By("Accept and approve the ManagedCluster")
+	// simulate hub cluster admin to accept the managedcluster and approve the csr
+	err := util.AcceptManagedCluster(clusterClient, managedClusterName)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	err = authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	// the managed cluster should have accepted condition after it is accepted
+	gomega.Eventually(func() error {
+		spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
+		if err != nil {
+			return err
+		}
+		accepted := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
+		if accepted == nil {
+			return fmt.Errorf("managed cluster is not accepted")
+		}
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+	// the hub kubeconfig secret should be filled after the csr is approved
+	gomega.Eventually(func() error {
+		if _, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret); err != nil {
+			return err
+		}
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+	ginkgo.By("ManagedCluster joins the hub")
+	// the spoke cluster should have joined condition finally
+	gomega.Eventually(func() error {
+		spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
+		if err != nil {
+			return err
+		}
+		joined := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
+		if joined == nil {
+			return fmt.Errorf("managed cluster has not joined")
+		}
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+	// ensure cluster namespace is in place
+	gomega.Eventually(func() error {
+		_, err := kubeClient.CoreV1().Namespaces().Get(context.TODO(), managedClusterName, metav1.GetOptions{})
+		return err
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+}
+
+// assertAddonLabel verifies that the addon status label exists on the managed cluster
+func assertAddonLabel(clusterName, addonName, status string) {
+	ginkgo.By("Check addon status label on managed cluster")
+	gomega.Eventually(func() error {
+		cluster, err := util.GetManagedCluster(clusterClient, clusterName)
+		if err != nil {
+			return err
+		}
+		if len(cluster.Labels) == 0 {
+			return fmt.Errorf("no labels found on managed cluster")
+		}
+		key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addonName)
+		if cluster.Labels[key] != status {
+			return fmt.Errorf("addon label %s is %q, expected %q", key, cluster.Labels[key], status)
+		}
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+}
