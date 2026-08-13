@@ -77,6 +77,13 @@ const (
 	// is not a scalar value.
 	RawFeedbackJsonString featuregate.Feature = "RawFeedbackJsonString"
 
+	// ManifestWorkApplyLatency makes the work agent emit structured spoke-apply log lines
+	// (mw_spoke_apply at reconcile start, mw_resource_spoke_apply per applied resource, and
+	// mw_spoke_apply_result at reconcile end) for measuring hub->spoke propagation latency. The lines
+	// carry the manifestwork name/namespace/generation, the applied resource identity, an apply
+	// timestamp, and the manifestwork labels. Read-only applies are a noop and do not emit.
+	ManifestWorkApplyLatency featuregate.Feature = "ManifestWorkApplyLatency"
+
 	// ResourceCleanup will start gc controller to clean up resources in cluster ns after cluster is deleted.
 	ResourceCleanup featuregate.Feature = "ResourceCleanup"
 
@@ -154,4 +161,5 @@ var DefaultHubWorkFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec
 var DefaultSpokeWorkFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	ExecutorValidatingCaches: {Default: false, PreRelease: featuregate.Alpha},
 	RawFeedbackJsonString:    {Default: false, PreRelease: featuregate.Alpha},
+	ManifestWorkApplyLatency: {Default: false, PreRelease: featuregate.Alpha},
 }

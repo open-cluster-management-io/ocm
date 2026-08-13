@@ -198,3 +198,8 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.3 // indirect
 )
+
+// Dev only: consume the local api repo so the ManifestWorkApplyLatency feature gate
+// resolves before the upstream api PR merges. Remove before merge: bump the require
+// above to the merged api revision and re-run `go mod vendor`.
+replace open-cluster-management.io/api => ../api
