@@ -17,11 +17,13 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 
+	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
@@ -33,6 +35,9 @@ type applyResult struct {
 	Error  error
 
 	resourceMeta workapiv1.ManifestResourceMeta
+	// strategy is the resolved update strategy for this manifest, used to classify the apply-latency
+	// rollup counts (read-only manifests apply nothing and are counted separately).
+	strategy workapiv1.UpdateStrategyType
 }
 
 // resourceApplyOrder defines the priority rank for applying resources by kind.
@@ -112,12 +117,32 @@ func (m *manifestworkReconciler) reconcile(
 	// We creat a ownerref instead of controller ref since multiple controller can declare the ownership of a manifests
 	owner := helper.NewAppliedManifestWorkOwner(appliedManifestWork)
 
+	// Emit apply-latency logs behind the ManifestWorkApplyLatency gate. The per-resource
+	// line is emitted deep in applyOneManifest; the two work-level rollup lines are emitted here, once
+	// per generation, gated on the persisted WorkApplied.ObservedGeneration (restart-safe).
+	wm := workMeta{
+		name:       manifestWork.Name,
+		namespace:  manifestWork.Namespace,
+		generation: manifestWork.Generation,
+		labels:     manifestWork.Labels,
+	}
+	logApply := features.SpokeMutableFeatureGate.Enabled(ocmfeature.ManifestWorkApplyLatency)
+	// emittedRollups.admit records, so it stays last: the checks before it decide whether this
+	// generation is a candidate at all, and a work they reject must not be marked as emitted.
+	emitRollup := logApply &&
+		len(manifestWork.Spec.Workload.Manifests) > 0 &&
+		priorAppliedGeneration(manifestWork) < manifestWork.Generation &&
+		emittedRollups.admit(manifestWork.Name, manifestWork.Generation)
+	if emitRollup {
+		emitApplyRollup(ctx, wm, flowSpokeApply, len(manifestWork.Spec.Workload.Manifests), nil)
+	}
+
 	var errs []error
 	// Apply resources on spoke cluster.
 	resourceResults := make([]applyResult, len(manifestWork.Spec.Workload.Manifests))
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		resourceResults = m.applyManifests(
-			ctx, manifestWork.Spec.Workload.Manifests, manifestWork.Spec, manifestWork.Status, controllerContext.Recorder(), *owner, resourceResults)
+			ctx, manifestWork.Spec.Workload.Manifests, manifestWork.Spec, manifestWork.Status, controllerContext.Recorder(), *owner, wm, logApply, emitRollup, resourceResults)
 
 		for _, result := range resourceResults {
 			if apierrors.IsConflict(result.Error) {
@@ -191,6 +216,13 @@ func (m *manifestworkReconciler) reconcile(
 		)
 	}
 
+	// Work-level rollup end line, paired with the start line above (same guard).
+	if emitRollup {
+		applied, failed, readOnly := countApplyResults(resourceResults)
+		emitApplyRollup(ctx, wm, flowSpokeApplyResult, len(resourceResults),
+			&applyCounts{applied: applied, failed: failed, readOnly: readOnly})
+	}
+
 	return manifestWork, appliedManifestWork, resourceResults, err
 }
 
@@ -244,6 +276,9 @@ func (m *manifestworkReconciler) applyManifests(
 	workStatus workapiv1.ManifestWorkStatus,
 	recorder events.Recorder,
 	owner metav1.OwnerReference,
+	wm workMeta,
+	logApply bool,
+	firstApply bool,
 	existingResults []applyResult) []applyResult {
 
 	ordered := m.parseAndSortManifests(manifests)
@@ -256,7 +291,7 @@ func (m *manifestworkReconciler) applyManifests(
 		if om.err != nil {
 			existingResults[om.specIndex] = applyResult{Error: om.err, resourceMeta: om.resourceMeta}
 		} else {
-			existingResults[om.specIndex] = m.applyOneManifest(ctx, om, workSpec, workStatus, recorder, owner)
+			existingResults[om.specIndex] = m.applyOneManifest(ctx, om, workSpec, workStatus, recorder, owner, wm, logApply, firstApply)
 		}
 	}
 
@@ -269,7 +304,10 @@ func (m *manifestworkReconciler) applyOneManifest(
 	workSpec workapiv1.ManifestWorkSpec,
 	workStatus workapiv1.ManifestWorkStatus,
 	recorder events.Recorder,
-	owner metav1.OwnerReference) applyResult {
+	owner metav1.OwnerReference,
+	wm workMeta,
+	logApply bool,
+	firstApply bool) applyResult {
 	logger := klog.FromContext(ctx)
 	result := applyResult{resourceMeta: om.resourceMeta}
 
@@ -309,8 +347,14 @@ func (m *manifestworkReconciler) applyOneManifest(
 		strategy = *option.UpdateStrategy
 	}
 
+	result.strategy = strategy.Type
 	applier := m.appliers.GetApplier(strategy.Type)
 	result.Result, result.Error = applier.Apply(ctx, om.gvr, om.obj, requiredOwner, option, recorder)
+
+	// Per-resource apply-latency line. On the first apply of a generation it emits the
+	// apply flow; on a later reconcile it emits the sync flow only when the outcome changed vs the
+	// last-persisted ManifestApplied condition. Noop when gated off or read-only.
+	emitResourceApply(ctx, logApply, firstApply, wm, om, strategy.Type, result, priorManifestOutcome(manifestCondition))
 
 	return result
 }
