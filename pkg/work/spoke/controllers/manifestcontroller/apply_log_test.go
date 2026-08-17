@@ -11,7 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/klog/v2"
 
 	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -58,10 +57,14 @@ func (s *captureSink) Info(_ int, msg string, kv ...any) {
 	*s.entries = append(*s.entries, logEntry{msg: msg, kv: m})
 }
 
+// captureContext swaps the package-level apply-latency sink for a capturing one and returns a
+// context plus the slice the emitted entries land in. The sink is package-level rather than
+// context-carried because these lines are emitted as JSON independently of the process-wide
+// klog format, so tests assert against the sink instead of a context logger.
 func captureContext() (context.Context, *[]logEntry) {
 	entries := &[]logEntry{}
-	logger := logr.New(&captureSink{entries: entries})
-	return klog.NewContext(context.Background(), logger), entries
+	applyLogSink = logr.New(&captureSink{entries: entries})
+	return context.Background(), entries
 }
 
 func TestApplyOutcome(t *testing.T) {

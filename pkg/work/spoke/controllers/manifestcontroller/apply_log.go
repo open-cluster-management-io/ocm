@@ -2,14 +2,44 @@ package manifestcontroller
 
 import (
 	"context"
+	"os"
 	"time"
 
+	"github.com/go-logr/logr"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
+	"k8s.io/component-base/logs/json"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
+
+// applyLogSink is the logger used for the apply-latency lines below.
+//
+// These lines are a machine-consumed telemetry stream, not operator-facing prose: a log
+// pipeline joins them to the hub's write-time line on {mw_namespace, mw_name, generation} to
+// derive hub->spoke propagation latency, which requires every field to arrive as a first-class
+// attribute. A collector can only do that if the whole line is JSON, and klog's format is
+// process-global — so the agent's default text output would force every consumer to re-parse
+// these fields out of a formatted string.
+//
+// This sink therefore emits the apply-latency lines as JSON regardless of the process-wide
+// logging format, while every other line in the agent keeps that format. It is built from
+// component-base's own JSON logger, so the encoding is identical to what
+// --logging-format=json produces (ts / caller / msg plus the structured key-values) rather
+// than a format private to this package. Writes are serialised by zapcore.Lock, so a JSON
+// line can never interleave with concurrent klog output on the same stream.
+//
+// Emission stays gated behind the ManifestWorkApplyLatency feature gate; when the gate is off
+// nothing is written here at all. Overridden in tests to capture the emitted key-values.
+var applyLogSink = newApplyLogSink()
+
+func newApplyLogSink() logr.Logger {
+	// verbosity 0: these lines are unconditional Info once the feature gate admits them,
+	// so they must not be filtered by -v. nil errorStream keeps everything on stdout.
+	logger, _ := json.NewJSONLogger(0, zapcore.Lock(zapcore.AddSync(os.Stdout)), nil, nil)
+	return logger
+}
 
 // Flow discriminators for the spoke apply-latency log lines. Gated behind the
 // ManifestWorkApplyLatency feature gate; paired with the hub webhook line (mw_hub_apply) for
@@ -171,7 +201,7 @@ func emitResourceApply(ctx context.Context, logApply, firstApply bool, wm workMe
 	if flow == flowResourceSpokeSync {
 		kv = append(kv, "prev_outcome", prevOutcome)
 	}
-	klog.FromContext(ctx).Info("manifestwork resource applied", kv...)
+	applyLogSink.Info("manifestwork resource applied", kv...)
 }
 
 // emitApplyRollup logs one work-level rollup line. With counts == nil it is the start line
@@ -197,5 +227,5 @@ func emitApplyRollup(ctx context.Context, wm workMeta, flow string, resourceCoun
 			"outcome", rollupOutcome(counts.applied, counts.failed),
 		)
 	}
-	klog.FromContext(ctx).Info("manifestwork apply", kv...)
+	applyLogSink.Info("manifestwork apply", kv...)
 }
