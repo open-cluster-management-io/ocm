@@ -127,9 +127,12 @@ func (m *manifestworkReconciler) reconcile(
 		labels:     manifestWork.Labels,
 	}
 	logApply := features.SpokeMutableFeatureGate.Enabled(ocmfeature.ManifestWorkApplyLatency)
+	// emittedRollups.admit records, so it stays last: the checks before it decide whether this
+	// generation is a candidate at all, and a work they reject must not be marked as emitted.
 	emitRollup := logApply &&
 		len(manifestWork.Spec.Workload.Manifests) > 0 &&
-		priorAppliedGeneration(manifestWork) < manifestWork.Generation
+		priorAppliedGeneration(manifestWork) < manifestWork.Generation &&
+		emittedRollups.admit(manifestWork.Name, manifestWork.Generation)
 	if emitRollup {
 		emitApplyRollup(ctx, wm, flowSpokeApply, len(manifestWork.Spec.Workload.Manifests), nil)
 	}
