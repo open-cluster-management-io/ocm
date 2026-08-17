@@ -126,7 +126,7 @@ Connect with the OCM community:
 - [Website](https://open-cluster-management.io)
 - [Slack](https://kubernetes.slack.com/channels/open-cluster-mgmt)
 - [Mailing group](https://groups.google.com/g/open-cluster-management)
-- [Community meetings](https://calendar.google.com/calendar/u/0/embed?src=openclustermanagement@gmail.com)
+- [Community meetings](https://zoom-lfx.platform.linuxfoundation.org/meetings/openclustermanagement?view=week)
 - [YouTube channel](https://www.youtube.com/c/OpenClusterManagement)
 
 ## License
