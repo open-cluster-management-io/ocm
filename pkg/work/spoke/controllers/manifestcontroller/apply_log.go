@@ -3,6 +3,7 @@ package manifestcontroller
 import (
 	"context"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -76,6 +77,54 @@ type applyCounts struct {
 	applied  int
 	failed   int
 	readOnly int
+}
+
+// emittedRollups records the newest generation whose rollup pair this agent process has already
+// emitted, keyed by ManifestWork name (the work informer is scoped to the agent's own cluster
+// namespace, so the name is unique within a process).
+//
+// It closes a retry window the persisted guard cannot see. priorAppliedGeneration reads
+// WorkApplied.ObservedGeneration, but that value is written by sync *after* reconcile returns.
+// When the write fails — a concurrent spec update conflicting on resourceVersion is the common
+// case — the controller requeues and reconcile runs again against a status that still names the
+// previous generation, so the persisted guard admits the same generation a second time and emits
+// a duplicate mw_spoke_apply. That line is the key the propagation-latency join groups on, so a
+// duplicate leaves the join with two candidate timestamps for one propagation event.
+//
+// This layers on top of the persisted guard rather than replacing it: a restarted agent starts
+// with an empty ledger and falls back to the status it reads from the API server, which is the
+// restart-safe behaviour D4 chose the persisted signal for.
+var emittedRollups = newRollupGenerations()
+
+// rollupGenerations is the process-local half of the once-per-generation guard.
+type rollupGenerations struct {
+	mu   sync.Mutex
+	seen map[string]int64
+}
+
+func newRollupGenerations() *rollupGenerations {
+	return &rollupGenerations{seen: map[string]int64{}}
+}
+
+// admit reports whether this process has yet to emit the rollup pair for this generation,
+// recording it when so. Because it records, callers must place it last in a short-circuiting
+// condition, so a work rejected by an earlier check is not marked as emitted.
+func (r *rollupGenerations) admit(name string, generation int64) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if seen, ok := r.seen[name]; ok && seen >= generation {
+		return false
+	}
+	r.seen[name] = generation
+	return true
+}
+
+// forget drops a ManifestWork's entry once the work is gone, so the ledger tracks live works
+// rather than every work the process has ever reconciled.
+func (r *rollupGenerations) forget(name string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.seen, name)
 }
 
 // priorAppliedGeneration returns the ObservedGeneration of the WorkApplied condition, or -1

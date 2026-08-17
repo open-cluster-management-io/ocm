@@ -334,6 +334,14 @@ func flowCounts(entries *[]logEntry) map[string]int {
 	return counts
 }
 
+// resetRollupState gives a test a clean process-local emit ledger, so generation state does not
+// leak between reconcile-level tests in either direction.
+func resetRollupState(t *testing.T) {
+	t.Helper()
+	emittedRollups = newRollupGenerations()
+	t.Cleanup(func() { emittedRollups = newRollupGenerations() })
+}
+
 func setApplyLatencyGate(t *testing.T, enabled bool) {
 	t.Helper()
 	if err := features.SpokeMutableFeatureGate.Set(
@@ -347,6 +355,7 @@ func setApplyLatencyGate(t *testing.T, enabled bool) {
 func TestReconcileEmitsApplyLatencyLines(t *testing.T) {
 	setApplyLatencyGate(t, true)
 	defer setApplyLatencyGate(t, false)
+	resetRollupState(t)
 
 	work, workKey := newTestCase("emit").
 		withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test")).
@@ -372,6 +381,7 @@ func TestReconcileEmitsApplyLatencyLines(t *testing.T) {
 func TestReconcileDedupsRollupBySameGeneration(t *testing.T) {
 	setApplyLatencyGate(t, true)
 	defer setApplyLatencyGate(t, false)
+	resetRollupState(t)
 
 	work, workKey := newTestCase("dedup").
 		withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test")).
@@ -391,10 +401,52 @@ func TestReconcileDedupsRollupBySameGeneration(t *testing.T) {
 	}
 }
 
+// TestReconcileRollupSurvivesUnpersistedStatus covers the retry window the persisted guard cannot
+// see. sync emits the rollup pair and then writes WorkApplied.ObservedGeneration; when that write
+// fails the controller requeues and reconciles the same generation again. Driving sync twice
+// against a lister that never observes the status update is that exact sequence, and the latency
+// join key must still be emitted once.
+func TestReconcileRollupSurvivesUnpersistedStatus(t *testing.T) {
+	setApplyLatencyGate(t, true)
+	defer setApplyLatencyGate(t, false)
+	resetRollupState(t)
+
+	work, workKey := newTestCase("retry").
+		withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test")).
+		newManifestWork()
+	// Seed the AppliedManifestWork the controller would otherwise create on the first sync. The
+	// fake lister is not fed by that create, so without it the second sync fails on AlreadyExists
+	// before ever reaching reconcile. The name mirrors applyAppliedManifestWork's
+	// "<hubHash>-<workName>", and the test controller's hubHash is empty.
+	appliedWork := &workapiv1.AppliedManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "-" + work.Name,
+			Finalizers: []string{workapiv1.AppliedManifestWorkFinalizer},
+		},
+		Spec: workapiv1.AppliedManifestWorkSpec{ManifestWorkName: work.Name},
+	}
+	controller := newController(t, work, appliedWork, spoketesting.NewFakeRestMapper()).
+		withKubeObject().withUnstructuredObject()
+	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
+
+	ctx, entries := captureContext()
+	for i := range 2 {
+		if err := controller.toController().sync(ctx, syncContext, work.Name); err != nil {
+			t.Fatalf("sync %d: %v", i+1, err)
+		}
+	}
+
+	got := flowCounts(entries)
+	if got[flowSpokeApply] != 1 || got[flowSpokeApplyResult] != 1 {
+		t.Errorf("flow counts = %v, want mw_spoke_apply and mw_spoke_apply_result == 1 across both syncs", got)
+	}
+}
+
 // TestReconcileNoEmitWhenGateOff confirms a full reconcile emits no apply-latency lines with the
 // gate disabled.
 func TestReconcileNoEmitWhenGateOff(t *testing.T) {
 	setApplyLatencyGate(t, false)
+	resetRollupState(t)
 
 	work, workKey := newTestCase("gate-off").
 		withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test")).
