@@ -59,6 +59,11 @@ spec:
         args:
           - "/placement"
           - "controller"
+          {{ if gt (len .PlacementFeatureGates) 0 }}
+          {{range .PlacementFeatureGates}}
+          - {{ . }}
+          {{ end }}
+          {{ end }}
           {{ if .HostedMode }}
           - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
           {{ end }}
