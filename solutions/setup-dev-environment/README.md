@@ -4,15 +4,17 @@ This script sets up an OCM developer environment on your local machine with thre
 
 ## Prerequisite
 
-[kind](https://kind.sigs.k8s.io) must be installed on your local machine. The Kubernetes version must be >= 1.19, see [kind user guide](https://kind.sigs.k8s.io/docs/user/quick-start/#creating-a-cluster) for more details.
+[kind](https://kind.sigs.k8s.io) must be installed on your local machine. The Kubernetes version must be >= 1.25, see [kind user guide](https://kind.sigs.k8s.io/docs/user/quick-start/#creating-a-cluster) for more details.
 
 Download and install [clusteradm](https://github.com/open-cluster-management-io/clusteradm/releases). For Linux OS, run the following commands:
 
-```
+```bash
 wget -qO- https://github.com/open-cluster-management-io/clusteradm/releases/latest/download/clusteradm_linux_amd64.tar.gz | sudo tar -xvz -C /usr/local/bin/
 
 sudo chmod +x /usr/local/bin/clusteradm
 ```
+
+For other platforms (macOS, arm64), download the appropriate binary from the [clusteradm releases page](https://github.com/open-cluster-management-io/clusteradm/releases).
 
 ## Setup the clusters
 
@@ -39,26 +41,25 @@ This might be caused by kernel limits such as number of open files, inotifiy wat
 To solve this, try increasing your `max_user_instances` and `max_user_watches`:
 
 * To see the current limits
-    ```
-    $ cat /proc/sys/fs/inotify/max_user_watches
-    $ cat /proc/sys/fs/inotify/max_user_instances
+    ```bash
+    cat /proc/sys/fs/inotify/max_user_watches
+    cat /proc/sys/fs/inotify/max_user_instances
     ``` 
 * To temporarily increase the limits
-    ```
-    $ sudo sysctl fs.inotify.max_user_instances=8192
-    $ sudo sysctl fs.inotify.max_user_watches=524288
-    $ sudo sysctl -p
+    ```bash
+    sudo sysctl fs.inotify.max_user_instances=8192
+    sudo sysctl fs.inotify.max_user_watches=524288
     ``` 
 * To permanently increase the limits
-    ```
-    $ sudo echo "fs.inotify.max_user_watches=1024" >> /etc/sysctl.conf
-    $ sudo echo "fs.inotify.max_user_instances=1024" >> /etc/sysctl.conf
-    $ sudo sysctl -p /etc/sysctl.conf #reloads system settings to apply changes
+    ```bash
+    echo "fs.inotify.max_user_watches=524288" | sudo tee -a /etc/sysctl.conf
+    echo "fs.inotify.max_user_instances=8192" | sudo tee -a /etc/sysctl.conf
+    sudo sysctl -p /etc/sysctl.conf
     ``` 
 Once you've increased the limits, delete the clusters already created and try again:
-```
-$ kind delete clusters hub cluster1 cluster2
-$ ./local-up.sh
+```bash
+kind delete clusters hub cluster1 cluster2
+./local-up.sh
 ```
 
 

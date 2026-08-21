@@ -10,17 +10,17 @@ clusterctx="kind-${cluster}"
 kind create cluster --name "${hub}"
 kind create cluster --name "${cluster}"
 
-kubectl config use ${hubctx}
+kubectl config use "${hubctx}"
 echo "Initialize the ocm hub cluster"
-joincmd=$(clusteradm init --use-bootstrap-token | grep clusteradm)
-kubectl wait --for=condition=HubRegistrationDegraded=false clustermanager cluster-manager --timeout=60s
+joincmd=$(clusteradm init --use-bootstrap-token | grep "clusteradm join")
+kubectl wait --for=condition=HubRegistrationDegraded=false clustermanager cluster-manager --timeout=180s
 
-kubectl config use ${clusterctx}
+kubectl config use "${clusterctx}"
 echo "Join ${cluster} to ${hub}"
-$(echo ${joincmd} --singleton --force-internal-endpoint-lookup --wait | sed "s/<cluster_name>/$cluster/g")
+$(echo "${joincmd}" --singleton --force-internal-endpoint-lookup --wait | sed "s/<cluster_name>/${cluster}/g")
 
-kubectl config use ${hubctx}
+kubectl config use "${hubctx}"
 echo "Accept join of ${cluster} on ${hub}"
-clusteradm accept --clusters ${cluster} --wait
+clusteradm accept --clusters "${cluster}" --wait
 
 kubectl get managedclusters
