@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # In this demo, we are going to use 3 clusters: hub1, hub2 and agent.
 #
 # We will enable MultipleHubs feature on agent, the agent will first be registered to hub1.
@@ -5,20 +7,22 @@
 # After that, we will observe that the agent will automatically register to hub2.
 # Next, We set the managed cluster `hubAcceptsClient` to true on hub1 and delete the hub2, we will observe that the agent will automatically register back to hub1.
 
+trap 'rm -f hub1.kubeconfig hub2.kubeconfig' EXIT
+
 kind create cluster --name hub1
 kind create cluster --name hub2
 kind create cluster --name agent
 
 # Init the hub1
-clusteradm init --wait --bundle-version=latest --context kind-hub1
-joinhub1=$(clusteradm get token --context kind-hub1 | grep clusteradm)
+clusteradm init --wait --context kind-hub1
+joinhub1=$(clusteradm get token --context kind-hub1 | grep "clusteradm join")
 
 # Join the agent into the hub1
-$(echo ${joinhub1} --bundle-version=latest --force-internal-endpoint-lookup --wait --context kind-agent | sed "s/<cluster_name>/agent/g")
+$(echo "${joinhub1}" --force-internal-endpoint-lookup --wait --context kind-agent | sed "s/<cluster_name>/agent/g")
 clusteradm accept --context kind-hub1 --clusters agent --wait
 
 # Init the hub2
-clusteradm init --wait --bundle-version=latest --context kind-hub2
+clusteradm init --wait --context kind-hub2
 
 # Prepare the hub1, hub2 bootstrap kubeconfigs
 kind get kubeconfig --name hub1 --internal > hub1.kubeconfig

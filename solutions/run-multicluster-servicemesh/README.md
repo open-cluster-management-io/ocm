@@ -1,6 +1,6 @@
 # Set up a Multicluster Service Mesh on OCM
 
-This scripts is to setup an multicluster service mesh on top of OCM. The guide will bootstrap 3 kind clusters(hub, cluster1, and cluster2) on your local machine and then deploy the [multicluster mesh addon](https://github.com/open-cluster-management-io/multicluster-mesh). After that, creating service meshes from the hub to the managed clusters and finally federating the service meshes so that microservices deployed into different managed clusters can be access each other.
+This script sets up a multicluster service mesh on top of OCM. The guide will bootstrap 3 Kind clusters (hub, cluster1, and cluster2) on your local machine and then deploy the [multicluster mesh addon](https://github.com/open-cluster-management-io/multicluster-mesh). After that, it creates service meshes from the hub to the managed clusters and finally federates the service meshes so that microservices deployed into different managed clusters can access each other.
 
 ## Prerequisite
 
@@ -11,14 +11,10 @@ Set up the dev environment in your local machine following [setup dev environmen
 1. Install the multicluster-mesh addon with helm chart:
 
 ```bash
-$ helm repo add ocm https://openclustermanagement.blob.core.windows.net/releases/
-$ helm repo update
-$ helm search repo ocm/multicluster-mesh
-NAME                 	CHART VERSION	APP VERSION	DESCRIPTION
-ocm/multicluster-mesh	0.0.1        	1.0.0      	A Helm chart for Multicluster Service Mesh OCM ...
-$ helm install \
+git clone https://github.com/open-cluster-management-io/multicluster-mesh.git
+helm install \
     -n open-cluster-management-addon --create-namespace \
-    multicluster-mesh ocm/multicluster-mesh
+    multicluster-mesh ./multicluster-mesh/charts/multicluster-mesh
 ```
 
 2. You will see that all `managedclusteraddon` are available after waiting a while:
@@ -59,14 +55,14 @@ istiod-1-16-7-67b8bf75f8-qk4rd           1/1     Running   0          32s
 
 ## Federate Service Meshes from Hub
 
-From the hub cluster, federate the serivce meshes created in last step by creating meshfederation resource:
+From the hub cluster, federate the service meshes created in the last step by creating a MeshFederation resource:
 
 ```bash
 kubectl config use-context kind-hub
 kubectl apply -f ./manifests/meshfederation.yaml
 ```
 
-## Verify Mesh Federtion with Bookinfo Application
+## Verify Mesh Federation with Bookinfo Application
 
 1. Deploy part(productpage,details,reviews-v1,reviews-v2,ratings) of the bookinfo application in cluster1:
 
@@ -119,7 +115,7 @@ export REVIEW_V3_IP=$(kubectl -n bookinfo get pod -l app=reviews -o jsonpath='{.
 cat ./manifests/serviceentry-export-cluster2.yaml | REVIEW_V3_IP=${REVIEW_V3_IP} envsubst | kubectl apply -f -
 ```
 
-5. Create the serviceentry in cluster1 to to 'import' the remote service(reviews-v3):
+5. Create the serviceentry in cluster1 to 'import' the remote service(reviews-v3):
 
 ```bash
 kubectl config use-context kind-cluster2
@@ -138,11 +134,11 @@ kubectl config use-context kind-cluster1
 kubectl apply -f ./manifests/virtualservice-cluster1.yaml
 ```
 
-7. Forward port for the producppage service in cluster1 so that we can access it from browser:
+7. Forward the port for the productpage service in cluster1 so that it can be accessed from a browser:
 
 ```bash
 kubectl config use-context kind-cluster1
 kubectl -n bookinfo port-forward svc/productpage --address 0.0.0.0 9080:9080
 ```
 
-Then access the bookinfo application with your browser via `http://localhost:9080/productpage/`. The expected result is that by refreshing the pruductpage several times, you should occasionally see traffic being routed to the `reviews-v3` service, which will produce red-colored stars on the product page, it means traffic from cluster1 be routed to cluster2.
+Then access the bookinfo application with your browser via `http://localhost:9080/productpage/`. The expected result is that by refreshing the productpage several times, you should occasionally see traffic being routed to the `reviews-v3` service, which will produce red-colored stars on the product page, which means traffic from cluster1 is routed to cluster2.
