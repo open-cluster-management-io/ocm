@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/service/eks/types"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Creates an Amazon EKS control plane.
@@ -133,6 +132,15 @@ type CreateClusterInput struct {
 	// The encryption configuration for the cluster.
 	EncryptionConfig []types.EncryptionConfig
 
+	// The Kubernetes API server configuration for the new cluster.
+	KubeApiServerConfig *types.KubeApiServerConfigRequest
+
+	// The Kubernetes controller manager configuration for the new cluster.
+	KubeControllerManagerConfig *types.KubeControllerManagerConfigRequest
+
+	// The Kubernetes scheduler configuration for the new cluster.
+	KubeSchedulerConfig *types.KubeSchedulerConfigRequest
+
 	// The Kubernetes network configuration for the cluster.
 	KubernetesNetworkConfig *types.KubernetesNetworkConfigRequest
 
@@ -222,9 +230,6 @@ func (c *Client) addOperationCreateClusterMiddlewares(stack *middleware.Stack, o
 		return err
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
 	if err = addComputeContentLength(stack); err != nil {
 		return err
 	}
@@ -237,12 +242,6 @@ func (c *Client) addOperationCreateClusterMiddlewares(stack *middleware.Stack, o
 	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
@@ -250,9 +249,6 @@ func (c *Client) addOperationCreateClusterMiddlewares(stack *middleware.Stack, o
 		return err
 	}
 	if err = addOpCreateClusterValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware(options.Region, "CreateCluster"), middleware.Before); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
