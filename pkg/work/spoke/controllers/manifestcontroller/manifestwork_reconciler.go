@@ -35,7 +35,7 @@ type applyResult struct {
 	Error  error
 
 	resourceMeta workapiv1.ManifestResourceMeta
-	// strategy is the resolved update strategy for this manifest, used to classify the apply-latency
+	// strategy is the resolved update strategy for this manifest, used to classify the apply-log
 	// rollup counts (read-only manifests apply nothing and are counted separately).
 	strategy workapiv1.UpdateStrategyType
 }
@@ -117,7 +117,7 @@ func (m *manifestworkReconciler) reconcile(
 	// We creat a ownerref instead of controller ref since multiple controller can declare the ownership of a manifests
 	owner := helper.NewAppliedManifestWorkOwner(appliedManifestWork)
 
-	// Emit apply-latency logs behind the ManifestWorkApplyLatency gate. The per-resource
+	// Emit apply logs behind the ManifestWorkApplyLogs gate. The per-resource
 	// line is emitted deep in applyOneManifest; the two work-level rollup lines are emitted here, once
 	// per generation, gated on the persisted WorkApplied.ObservedGeneration (restart-safe).
 	wm := workMeta{
@@ -126,7 +126,7 @@ func (m *manifestworkReconciler) reconcile(
 		generation: manifestWork.Generation,
 		labels:     manifestWork.Labels,
 	}
-	logApply := features.SpokeMutableFeatureGate.Enabled(ocmfeature.ManifestWorkApplyLatency)
+	logApply := features.SpokeMutableFeatureGate.Enabled(ocmfeature.ManifestWorkApplyLogs)
 	// emittedRollups.admit records, so it stays last: the checks before it decide whether this
 	// generation is a candidate at all, and a work they reject must not be marked as emitted.
 	emitRollup := logApply &&
@@ -140,6 +140,10 @@ func (m *manifestworkReconciler) reconcile(
 	var errs []error
 	// Apply resources on spoke cluster.
 	resourceResults := make([]applyResult, len(manifestWork.Spec.Workload.Manifests))
+	// A line is emitted per resource apply attempt from inside this retry loop, not once after the
+	// loop settles, so the timestamp is when the hub change first reached this cluster — that is what
+	// the hub->spoke latency is calculated from. One line per manifestwork resource apply attempt,
+	// plus the work-level line at the end of a successful apply.
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		resourceResults = m.applyManifests(
 			ctx, manifestWork.Spec.Workload.Manifests, manifestWork.Spec, manifestWork.Status, controllerContext.Recorder(), *owner, wm, logApply, emitRollup, resourceResults)
@@ -351,7 +355,7 @@ func (m *manifestworkReconciler) applyOneManifest(
 	applier := m.appliers.GetApplier(strategy.Type)
 	result.Result, result.Error = applier.Apply(ctx, om.gvr, om.obj, requiredOwner, option, recorder)
 
-	// Per-resource apply-latency line. On the first apply of a generation it emits the
+	// Per-resource apply-log line. On the first apply of a generation it emits the
 	// apply flow; on a later reconcile it emits the sync flow only when the outcome changed vs the
 	// last-persisted ManifestApplied condition. Noop when gated off or read-only.
 	emitResourceApply(ctx, logApply, firstApply, wm, om, strategy.Type, result, priorManifestOutcome(manifestCondition))

@@ -132,7 +132,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	oldManifestWork, err := m.manifestWorkLister.Get(manifestWorkName)
 	if apierrors.IsNotFound(err) {
 		// work not found, could have been deleted, do nothing.
-		// Drop any apply-latency emit state so the ledger tracks live works only.
+		// Drop any apply-log emit state so the ledger tracks live works only.
 		emittedRollups.forget(manifestWorkName)
 		return nil
 	}

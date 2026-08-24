@@ -15,7 +15,7 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
-// applyLogSink is the logger used for the apply-latency lines below.
+// applyLogSink is the logger used for the apply-log lines below.
 //
 // These lines are a machine-consumed telemetry stream, not operator-facing prose: a log
 // pipeline joins them to the hub's write-time line on {mw_namespace, mw_name, generation} to
@@ -24,14 +24,14 @@ import (
 // process-global — so the agent's default text output would force every consumer to re-parse
 // these fields out of a formatted string.
 //
-// This sink therefore emits the apply-latency lines as JSON regardless of the process-wide
+// This sink therefore emits the apply-log lines as JSON regardless of the process-wide
 // logging format, while every other line in the agent keeps that format. It is built from
 // component-base's own JSON logger, so the encoding is identical to what
 // --logging-format=json produces (ts / caller / msg plus the structured key-values) rather
 // than a format private to this package. Writes are serialised by zapcore.Lock, so a JSON
 // line can never interleave with concurrent klog output on the same stream.
 //
-// Emission stays gated behind the ManifestWorkApplyLatency feature gate; when the gate is off
+// Emission stays gated behind the ManifestWorkApplyLogs feature gate; when the gate is off
 // nothing is written here at all. Overridden in tests to capture the emitted key-values.
 var applyLogSink = newApplyLogSink()
 
@@ -42,12 +42,12 @@ func newApplyLogSink() logr.Logger {
 	return logger
 }
 
-// Flow discriminators for the spoke apply-latency log lines. Gated behind the
-// ManifestWorkApplyLatency feature gate; paired with the hub webhook line (mw_hub_apply) for
+// Flow discriminators for the spoke apply-log lines. Gated behind the
+// ManifestWorkApplyLogs feature gate; paired with the hub webhook line (mw_hub_apply) for
 // hub->spoke propagation-latency measurement in Datadog.
 const (
 	flowSpokeApply         = "mw_spoke_apply"          // rollup start, once per generation (latency join key)
-	flowResourceSpokeApply = "mw_resource_spoke_apply" // per resource, first apply of a generation (drill-down)
+	flowResourceSpokeApply = "mw_resource_spoke_apply" // per resource apply attempt, first apply of a generation (drill-down)
 	flowResourceSpokeSync  = "mw_resource_spoke_sync"  // per resource, later reconcile where the outcome changed
 	flowSpokeApplyResult   = "mw_spoke_apply_result"   // rollup end, once per generation (outcome)
 )
@@ -193,7 +193,7 @@ func rollupOutcome(applied, failed int) string {
 	}
 }
 
-// emitResourceApply logs one per-resource apply-latency line. It is a noop when the feature is
+// emitResourceApply logs one per-resource apply-log line. It is a noop when the feature is
 // disabled. Otherwise it emits:
 //   - flowResourceSpokeApply, on the first apply of a generation (firstApply), for every resource —
 //     read-only manifests get outcome=read_only (observed, not applied), others applied/failed; or

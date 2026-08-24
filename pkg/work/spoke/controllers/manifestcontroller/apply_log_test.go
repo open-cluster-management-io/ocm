@@ -21,7 +21,7 @@ import (
 )
 
 // TestMain registers the spoke-work feature gates so reconcile's
-// SpokeMutableFeatureGate.Enabled(ManifestWorkApplyLatency) check does not panic in tests.
+// SpokeMutableFeatureGate.Enabled(ManifestWorkApplyLogs) check does not panic in tests.
 func TestMain(m *testing.M) {
 	utilruntime.Must(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeWorkFeatureGates))
 	os.Exit(m.Run())
@@ -57,7 +57,7 @@ func (s *captureSink) Info(_ int, msg string, kv ...any) {
 	*s.entries = append(*s.entries, logEntry{msg: msg, kv: m})
 }
 
-// captureContext swaps the package-level apply-latency sink for a capturing one and returns a
+// captureContext swaps the package-level apply-log sink for a capturing one and returns a
 // context plus the slice the emitted entries land in. The sink is package-level rather than
 // context-carried because these lines are emitted as JSON independently of the process-wide
 // klog format, so tests assert against the sink instead of a context logger.
@@ -342,19 +342,19 @@ func resetRollupState(t *testing.T) {
 	t.Cleanup(func() { emittedRollups = newRollupGenerations() })
 }
 
-func setApplyLatencyGate(t *testing.T, enabled bool) {
+func setApplyLogsGate(t *testing.T, enabled bool) {
 	t.Helper()
 	if err := features.SpokeMutableFeatureGate.Set(
-		fmt.Sprintf("%s=%t", ocmfeature.ManifestWorkApplyLatency, enabled)); err != nil {
+		fmt.Sprintf("%s=%t", ocmfeature.ManifestWorkApplyLogs, enabled)); err != nil {
 		t.Fatal(err)
 	}
 }
 
-// TestReconcileEmitsApplyLatencyLines drives a full reconcile with the gate on for a new
+// TestReconcileEmitsApplyLogLines drives a full reconcile with the gate on for a new
 // generation and asserts all three lines fire exactly once.
-func TestReconcileEmitsApplyLatencyLines(t *testing.T) {
-	setApplyLatencyGate(t, true)
-	defer setApplyLatencyGate(t, false)
+func TestReconcileEmitsApplyLogLines(t *testing.T) {
+	setApplyLogsGate(t, true)
+	defer setApplyLogsGate(t, false)
 	resetRollupState(t)
 
 	work, workKey := newTestCase("emit").
@@ -376,11 +376,11 @@ func TestReconcileEmitsApplyLatencyLines(t *testing.T) {
 }
 
 // TestReconcileDedupsRollupBySameGeneration verifies that when the generation has already been
-// applied (WorkApplied.ObservedGeneration == generation), no apply-latency lines are emitted —
+// applied (WorkApplied.ObservedGeneration == generation), no apply-log lines are emitted —
 // the once-per-generation guard suppresses a resync.
 func TestReconcileDedupsRollupBySameGeneration(t *testing.T) {
-	setApplyLatencyGate(t, true)
-	defer setApplyLatencyGate(t, false)
+	setApplyLogsGate(t, true)
+	defer setApplyLogsGate(t, false)
 	resetRollupState(t)
 
 	work, workKey := newTestCase("dedup").
@@ -407,8 +407,8 @@ func TestReconcileDedupsRollupBySameGeneration(t *testing.T) {
 // against a lister that never observes the status update is that exact sequence, and the latency
 // join key must still be emitted once.
 func TestReconcileRollupSurvivesUnpersistedStatus(t *testing.T) {
-	setApplyLatencyGate(t, true)
-	defer setApplyLatencyGate(t, false)
+	setApplyLogsGate(t, true)
+	defer setApplyLogsGate(t, false)
 	resetRollupState(t)
 
 	work, workKey := newTestCase("retry").
@@ -442,10 +442,10 @@ func TestReconcileRollupSurvivesUnpersistedStatus(t *testing.T) {
 	}
 }
 
-// TestReconcileNoEmitWhenGateOff confirms a full reconcile emits no apply-latency lines with the
+// TestReconcileNoEmitWhenGateOff confirms a full reconcile emits no apply-log lines with the
 // gate disabled.
 func TestReconcileNoEmitWhenGateOff(t *testing.T) {
-	setApplyLatencyGate(t, false)
+	setApplyLogsGate(t, false)
 	resetRollupState(t)
 
 	work, workKey := newTestCase("gate-off").
