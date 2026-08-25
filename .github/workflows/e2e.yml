@@ -15,10 +15,7 @@ on:
       - release-*
 
 env:
-  GO_VERSION: '1.26'
-  GO_REQUIRED_MIN_VERSION: ''
   USE_EXISTING_CLUSTER: false # set to true to use an existing kind cluster for debugging with act
-  KUBERNETES_VERSION: 'v1.29.2'
 
 permissions:
   contents: read
@@ -37,10 +34,10 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
       - name: Setup kind
         if: ${{ env.USE_EXISTING_CLUSTER != 'true' }}
-        run: kind create cluster --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
+        run: kind create cluster --wait 300s
       - name: Set KUBECONFIG
         run: |
           mkdir -p /home/runner/.kube
@@ -64,10 +61,10 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
       - name: Setup kind
         if: ${{ env.USE_EXISTING_CLUSTER != 'true' }}
-        run: kind create cluster --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
+        run: kind create cluster --wait 300s
       - name: Set KUBECONFIG
         run: |
           mkdir -p /home/runner/.kube
@@ -91,10 +88,10 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
       - name: Setup kind
         if: ${{ env.USE_EXISTING_CLUSTER != 'true' }}
-        run: kind create cluster --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
+        run: kind create cluster --wait 300s
       - name: Set KUBECONFIG
         run: |
           mkdir -p /home/runner/.kube
@@ -118,10 +115,10 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
       - name: Setup kind
         if: ${{ env.USE_EXISTING_CLUSTER != 'true' }}
-        run: kind create cluster --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
+        run: kind create cluster --wait 300s
       - name: Set KUBECONFIG
         run: |
           mkdir -p /home/runner/.kube

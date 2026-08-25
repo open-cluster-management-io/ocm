@@ -5,9 +5,6 @@ on:
     tags:
       - 'v*.*.*'
 env:
-  # Common versions
-  GO_VERSION: '1.26'
-  GO_REQUIRED_MIN_VERSION: ''
   GOPATH: '/home/runner/work/ocm/ocm/go'
   GITHUB_REF: ${{ github.ref }}
 
@@ -57,7 +54,7 @@ jobs:
       - name: install Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go/src/open-cluster-management.io/ocm/go.mod
           cache: false
       - name: install imagebuilder
         run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
