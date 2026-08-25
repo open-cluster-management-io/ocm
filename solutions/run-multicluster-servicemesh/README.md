@@ -59,7 +59,7 @@ istiod-1-16-7-67b8bf75f8-qk4rd           1/1     Running   0          32s
 
 ## Federate Service Meshes from Hub
 
-From the hub cluster, federate the serivce meshes created in last step by creating meshfederation resource:
+From the hub cluster, federate the service meshes created in last step by creating meshfederation resource:
 
 ```bash
 kubectl config use-context kind-hub
