@@ -1,38 +1,43 @@
 version: 2
 updates:
-- package-ecosystem: gomod
-  directory: "/"
-  schedule:
-    interval: daily
-  commit-message:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
       prefix: ":seedling:"
-  open-pull-requests-limit: 3
-  groups:
-    k8s.io:
-      patterns:
-      - "k8s.io/*"
-      - "sigs.k8s.io/*"
-    go.opentelemetry.io:
-      patterns:
-      - "go.opentelemetry.io/*"
-    aws:
-      patterns:
-      - "github.com/aws/*"
-    open-cluster-management.io:
-      patterns:
-      - "open-cluster-management.io/*"
-- package-ecosystem: "github-actions"
-  directory: "/"
-  schedule:
-      interval: "weekly"
-  commit-message:
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 14
+    groups:
+      k8s.io:
+        patterns:
+          - k8s.io/*
+          - sigs.k8s.io/*
+      go.opentelemetry.io:
+        patterns:
+          - go.opentelemetry.io/*
+      aws:
+        patterns:
+          - github.com/aws/*
+      open-cluster-management.io:
+        patterns:
+          - open-cluster-management.io/*
+      gomod:
+        patterns:
+          - "*"
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
       prefix: ":seedling:"
-  groups:
-    github-actions:
-      patterns:
-        - "*"
-      # These actions directly influence the build process and are excluded from grouped updates
-      exclude-patterns:
-        - "actions/setup-go"
-        - "arduino/setup-protoc"
-        - "goreleaser/goreleaser-action"
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 14
+    groups:
+      github-actions:
+        patterns:
+          - "*"
