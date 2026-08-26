@@ -11,11 +11,6 @@ on:
       - main
   workflow_dispatch: {}
 
-env:
-  # Common versions
-  GO_VERSION: '1.26'
-  GO_REQUIRED_MIN_VERSION: ''
-
 permissions:
   contents: read
   id-token: write
@@ -31,7 +26,7 @@ jobs:
       - name: install Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: false
       - name: unit
         run: make test
@@ -57,7 +52,7 @@ jobs:
       - name: install Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: false
       - name: install imagebuilder
         run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
