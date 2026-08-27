@@ -71,10 +71,13 @@ If `kubectl get managedcluster` never shows `JOINED=True`, check the following, 
 
 2. **The `Klusterlet` CRD isn't `Established` yet.** The join manifest applies the
    `klusterlets.operator.open-cluster-management.io` CRD and a `Klusterlet` custom
-   resource in the same batch. If you see `no matches for kind "Klusterlet"`, apply just
-   the CRD first, wait for it, then apply the rest:
-   ```
+   resource in the same batch. If you see `no matches for kind "Klusterlet"`, extract and
+   apply just the CRD first, wait for it to be `Established`, then apply the rest of the
+   manifest (excluding that CRD, since it's already applied):
+   ```shell
+   yq eval-all 'select(.kind == "CustomResourceDefinition")' join.yaml | kubectl apply -f -
    kubectl wait --for=condition=Established crd/klusterlets.operator.open-cluster-management.io --timeout=60s
+   yq eval-all 'select(.kind != "CustomResourceDefinition")' join.yaml | kubectl apply -f -
    ```
 
 3. **`bootstrap-hub-kubeconfig` points at an unreachable address.** When the CAPI

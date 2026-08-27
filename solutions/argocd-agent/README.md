@@ -80,24 +80,33 @@ Refer to the [Quick Start guide](https://open-cluster-management.io/docs/getting
 - **The Hub cluster must have a load balancer.**
 Refer to the [Additional Resources](#additional-resources) for more details.
 
-- **The hub cluster must not already have an Argo CD instance with the application controller enabled.**
+- **The `argocd` namespace on the hub must not already contain any Argo CD resources at all.**
 The `argocd-agent` hub addon installs the [Argo CD Operator](https://github.com/argoproj-labs/argocd-operator)
 and manages its own dedicated `ArgoCD` custom resource (named `argocd`, in the `argocd` namespace) with
 `spec.controller.enabled: false` — the principal component takes the place of the application controller on the hub.
-This is **not compatible** with a pre-existing plain/community Argo CD install (e.g. from
-[`deploy-argocd-apps`](../deploy-argocd-apps) or [`deploy-argocd-apps-pull`](../deploy-argocd-apps-pull)) that has its
-application controller enabled in the same namespace — the two will collide over ownership of the same resources
-(`argocd-server`, `argocd-repo-server`, etc.). If you have an existing Argo CD install in the `argocd` namespace on
-your hub, remove it first — how depends on how it was installed:
+This is **not compatible** with any pre-existing plain/community Argo CD install in the same namespace (e.g. from
+[`deploy-argocd-apps`](../deploy-argocd-apps) or [`deploy-argocd-apps-pull`](../deploy-argocd-apps-pull)), **even one
+with its own application controller disabled** — the Operator still creates resources named `argocd-server`,
+`argocd-repo-server`, etc. regardless of `controller.enabled`, and those will collide with a pre-existing install's
+same-named resources either way. There is no supported/tested way to run this addon alongside an existing Argo CD
+instance in the same namespace; require the `argocd` namespace to be empty of Argo CD resources before installing.
+If you have an existing Argo CD install in the `argocd` namespace on your hub, remove it first — how depends on how
+it was installed:
   - Installed via `clusteradm install hub-addon --names argocd` (the [`deploy-argocd-apps-pull`](../deploy-argocd-apps-pull)
     model): run `clusteradm uninstall hub-addon --names argocd`. This only removes the addon's own
     `ClusterManagementAddOn`/controller, not the underlying plain Argo CD it was installed on top of — still
     follow up with the raw-manifest cleanup below for that part.
   - Installed via raw manifests, e.g. `kubectl apply -f .../argo-cd/stable/manifests/install.yaml` (the
     [`deploy-argocd-apps`](../deploy-argocd-apps) model): there is no `ClusterManagementAddOn` to uninstall here —
-    `clusteradm uninstall hub-addon` is a no-op for this install method. Instead, delete the same manifest you
-    applied it with, e.g. `kubectl delete -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml`,
-    or delete the leftover resources by label: `kubectl delete applications,appprojects,deployments,statefulsets,services -n argocd -l app.kubernetes.io/part-of=argocd`.
+    `clusteradm uninstall hub-addon` is a no-op for this install method. Delete the same manifest you applied it
+    with, e.g. `kubectl delete -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml`
+    — this is the safest option, since it only removes the Argo CD components themselves (`argocd-server`,
+    `argocd-repo-server`, etc.) and leaves any `Application`/`AppProject` objects you may have created untouched.
+    If you don't have the exact manifest you installed with, `kubectl delete deployments,statefulsets,services -n argocd -l app.kubernetes.io/part-of=argocd`
+    removes the same component resources without touching `Application`/`AppProject` objects. Deleting
+    `Application`/`AppProject` objects themselves is a separate, deliberate decision — don't fold it into this
+    cleanup step, since they represent your actual GitOps state; review and confirm each one is disposable before
+    running `kubectl delete application(s)/appproject(s) <name> -n argocd` individually.
 
 Deleting the whole `argocd` namespace (`kubectl delete namespace argocd`) also works for either case, but it removes
 **everything** in that namespace — including any `Application`/`AppProject` objects, credentials, and PKI
@@ -332,11 +341,13 @@ else, find the tag actually being used and check it yourself:
 # find the tag your install actually pulled
 kubectl get deployment argocd-pull-integration-controller -n argocd -o jsonpath='{.spec.template.spec.containers[0].image}'
 
-# check whether THAT tag has an arm64 variant published
-docker manifest inspect quay.io/open-cluster-management/argocd-pull-integration:<the-tag-from-above> | grep -A2 architecture
+# check whether THAT tag has a linux/arm64 variant published (not just any arm64 platform)
+docker manifest inspect quay.io/open-cluster-management/argocd-pull-integration:<the-tag-from-above> | \
+  jq -e '.manifests[]? | select(.platform.os=="linux" and .platform.architecture=="arm64")'
+# no jq? grep -B1 '"architecture": "arm64"' on the same output and check the line above it says "os": "linux"
 ```
 
-If `arm64` is missing from that output, the pod will `ImagePullBackOff` on Apple Silicon / arm64 hosts.
+If that doesn't return a match, the pod will `ImagePullBackOff` on Apple Silicon / arm64 hosts.
 `argocd-pull-integration-controller` is the component that watches the `GitOpsCluster`/`Placement` resources
 and generates the `AddOnTemplate` that tells OCM's addon framework what to actually deploy to each managed
 cluster. Without it running, `ManagedClusterAddOn`s for `argocd-agent-addon` will never progress past

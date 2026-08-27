@@ -35,10 +35,12 @@ yourself:
 # find the tag your install actually pulled
 kubectl get deployment argocd-pull-integration -n argocd -o jsonpath='{.spec.template.spec.containers[0].image}'
 
-# check whether THAT tag has an arm64 variant published
-docker manifest inspect quay.io/open-cluster-management/argocd-pull-integration:<the-tag-from-above> | grep -A2 architecture
+# check whether THAT tag has a linux/arm64 variant published (not just any arm64 platform)
+docker manifest inspect quay.io/open-cluster-management/argocd-pull-integration:<the-tag-from-above> | \
+  jq -e '.manifests[]? | select(.platform.os=="linux" and .platform.architecture=="arm64")'
+# no jq? grep -B1 '"architecture": "arm64"' on the same output and check the line above it says "os": "linux"
 ```
-If `arm64` is missing from that output, the pod will `ImagePullBackOff` on Apple Silicon / arm64 hosts.
+If that doesn't return a match, the pod will `ImagePullBackOff` on Apple Silicon / arm64 hosts.
 `argocd-pull-integration-controller` is the controller that watches for `Application`s carrying the
 pull-model labels and wraps them into `ManifestWork`; without it running, no `Application` ever gets
 delivered to any managed cluster, on any architecture where this image can't run.
