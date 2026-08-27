@@ -285,6 +285,7 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 				addonapiv1beta1.ManagedClusterAddOnManifestApplied,
 			),
 			applyWork:  c.applyWork,
+			deleteWork: c.workApplier.Delete,
 			agentAddon: agentAddon},
 		&hostedHookSyncer{
 			buildWorks: c.buildHookManifestWorkFunc(

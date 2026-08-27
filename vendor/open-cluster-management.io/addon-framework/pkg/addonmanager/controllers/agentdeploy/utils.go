@@ -11,6 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
+
+	corev1 "k8s.io/api/core/v1"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -20,6 +22,12 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
+)
+
+// Work API resource names for the pre-delete hook resource kinds we support.
+const (
+	hookResourceJobs = "jobs"
+	hookResourcePods = "pods"
 )
 
 func addonHasFinalizer(addon *addonapiv1beta1.ManagedClusterAddOn, finalizer string) bool {
@@ -116,9 +124,9 @@ func (b *addonWorksBuilder) isPreDeleteHookObject(obj runtime.Object) (bool, *wo
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	switch gvk.Kind {
 	case "Job":
-		resource = "jobs"
+		resource = hookResourceJobs
 	case "Pod":
-		resource = "pods"
+		resource = hookResourcePods
 	default:
 		return false, nil
 	}
@@ -387,19 +395,20 @@ func FindManifestValue(
 	identifier workapiv1.ResourceIdentifier,
 	valueName string) workapiv1.FieldValue {
 	for _, manifest := range resourceStatus.Manifests {
-		values := manifest.StatusFeedbacks.Values
-		if len(values) == 0 {
-			return workapiv1.FieldValue{}
-		}
+		// Match the resource first. A manifest that does not match the requested
+		// identifier - including one that has no feedback values reported yet -
+		// must not short-circuit the search, otherwise a later matching resource
+		// (e.g. a pod that reports PodPhase=Failed) would be missed.
 		resourceMeta := manifest.ResourceMeta
-		if identifier.Group == resourceMeta.Group &&
-			identifier.Resource == resourceMeta.Resource &&
-			identifier.Name == resourceMeta.Name &&
-			identifier.Namespace == resourceMeta.Namespace {
-			for _, v := range values {
-				if v.Name == valueName {
-					return v.Value
-				}
+		if identifier.Group != resourceMeta.Group ||
+			identifier.Resource != resourceMeta.Resource ||
+			identifier.Name != resourceMeta.Name ||
+			identifier.Namespace != resourceMeta.Namespace {
+			continue
+		}
+		for _, v := range manifest.StatusFeedbacks.Values {
+			if v.Name == valueName {
+				return v.Value
 			}
 		}
 	}
@@ -425,7 +434,7 @@ func hookWorkIsCompleted(hookWork *workapiv1.ManifestWork) bool {
 	}
 	for _, manifestConfig := range hookWork.Spec.ManifestConfigs {
 		switch manifestConfig.ResourceIdentifier.Resource {
-		case "jobs":
+		case hookResourceJobs:
 			value := FindManifestValue(hookWork.Status.ResourceStatus, manifestConfig.ResourceIdentifier, "JobComplete")
 			if value.Type == "" {
 				return false
@@ -433,11 +442,11 @@ func hookWorkIsCompleted(hookWork *workapiv1.ManifestWork) bool {
 			if value.String == nil {
 				return false
 			}
-			if *value.String != "True" {
+			if *value.String != string(metav1.ConditionTrue) {
 				return false
 			}
 
-		case "pods":
+		case hookResourcePods:
 			value := FindManifestValue(hookWork.Status.ResourceStatus, manifestConfig.ResourceIdentifier, "PodPhase")
 			if value.Type == "" {
 				return false
@@ -445,7 +454,7 @@ func hookWorkIsCompleted(hookWork *workapiv1.ManifestWork) bool {
 			if value.String == nil {
 				return false
 			}
-			if *value.String != "Succeeded" {
+			if *value.String != string(corev1.PodSucceeded) {
 				return false
 			}
 		default:
@@ -454,6 +463,63 @@ func hookWorkIsCompleted(hookWork *workapiv1.ManifestWork) bool {
 	}
 
 	return true
+}
+
+// hookWorkIsFailed checks whether any hook resource has reached a terminal
+// failed state and therefore should be recreated/retried.
+//
+// We deliberately treat *any* terminal, non-succeeded state as a failure that
+// warrants a retry, because a hook that never runs to completion will otherwise
+// block removal of the pre-delete hook finalizer forever (and, in turn, block
+// deletion of the ManagedClusterAddOn and its owning ManagedCluster). This
+// covers, among others:
+//   - pods evicted due to node pressure (MemoryPressure/DiskPressure), which end
+//     up in phase "Failed" with reason "Evicted";
+//   - pods whose status can no longer be determined, phase "Unknown" (e.g. the
+//     node hosting the pod became unreachable);
+//   - jobs that have exhausted their backoffLimit and report a "Failed"
+//     condition.
+//
+// A hook is only considered failed once the work-agent has reported a definitive
+// terminal state; in-progress states (Pending/Running, or no status reported
+// yet) are not treated as failures.
+func hookWorkIsFailed(hookWork *workapiv1.ManifestWork) bool {
+	if hookWork == nil {
+		return false
+	}
+	if !meta.IsStatusConditionTrue(hookWork.Status.Conditions, workapiv1.WorkAvailable) {
+		return false
+	}
+	if len(hookWork.Spec.ManifestConfigs) == 0 {
+		return false
+	}
+
+	for _, manifestConfig := range hookWork.Spec.ManifestConfigs {
+		switch manifestConfig.ResourceIdentifier.Resource {
+		case hookResourceJobs:
+			// A job reports a "Failed" condition once it has exhausted its
+			// backoffLimit (or hit an activeDeadlineSeconds/podFailurePolicy).
+			value := FindManifestValue(hookWork.Status.ResourceStatus, manifestConfig.ResourceIdentifier, "JobFailed")
+			if value.Type == workapiv1.String && value.String != nil && *value.String == string(metav1.ConditionTrue) {
+				return true
+			}
+		case hookResourcePods:
+			// A pod is terminally failed when its phase is "Failed" (this
+			// includes evicted pods) or "Unknown" (the pod's status can no
+			// longer be determined, e.g. its node is unreachable).
+			value := FindManifestValue(hookWork.Status.ResourceStatus, manifestConfig.ResourceIdentifier, "PodPhase")
+			if value.Type == workapiv1.String && value.String != nil &&
+				(*value.String == string(corev1.PodFailed) || *value.String == string(corev1.PodUnknown)) {
+				return true
+			}
+		default:
+			// Unsupported hook resource kinds cannot be evaluated for failure;
+			// leave them to hookWorkIsCompleted's handling.
+			continue
+		}
+	}
+
+	return false
 }
 
 func newAddonWorkObjectMeta(namePrefix, addonName, addonNamespace, workNamespace string,

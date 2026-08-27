@@ -18,6 +18,7 @@ type defaultHookSyncer struct {
 	buildWorks buildDeployHookFunc
 	applyWork  func(ctx context.Context, appliedType string,
 		work *workapiv1.ManifestWork, addon *addonapiv1beta1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
+	deleteWork func(ctx context.Context, workNamespace, workName string) error
 	agentAddon agent.AgentAddon
 }
 
@@ -61,6 +62,28 @@ func (s *defaultHookSyncer) sync(ctx context.Context,
 		})
 
 		addonRemoveFinalizer(addon, addonapiv1beta1.AddonPreDeleteHookFinalizer)
+		return addon, nil
+	}
+
+	// The hook has not completed. If the hook resource has reached a terminal
+	// failed state (e.g. the pod was evicted due to node pressure, its node
+	// became unreachable, or the job exhausted its backoffLimit), the work-agent
+	// will not recreate it on its own: the resource still exists with an
+	// unchanged spec, so a plain re-apply is a no-op. Delete the hook
+	// manifestWork so it is rebuilt and re-applied on a subsequent reconcile,
+	// which recreates a fresh hook pod/job. This retries indefinitely until the
+	// hook eventually succeeds, so the pre-delete hook finalizer is never left
+	// dangling because of a transient eviction.
+	if hookWorkIsFailed(hookWork) && hookWork.DeletionTimestamp.IsZero() {
+		if err = s.deleteWork(ctx, hookWork.Namespace, hookWork.Name); err != nil {
+			return addon, err
+		}
+		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+			Type:    addonapiv1beta1.ManagedClusterAddOnHookManifestCompleted,
+			Status:  metav1.ConditionFalse,
+			Reason:  "HookManifestFailedRetrying",
+			Message: fmt.Sprintf("hook manifestWork %v failed and is being recreated to retry.", hookWork.Name),
+		})
 		return addon, nil
 	}
 

@@ -103,6 +103,24 @@ const (
 		}
 	}
 	`
+	failedJobJson = `
+	{
+		"apiVersion": "batch/v1",
+		"kind": "Job",
+		"metadata": {
+			"name": "test"
+		},
+		"status": {
+			"conditions": [
+				{
+					"status": "True",
+					"type": "Failed"
+				}
+			],
+			"failed": 6
+		}
+	}
+	`
 	podJson = `
 	{
 		"apiVersion": "v1",
@@ -265,6 +283,21 @@ func TestStatusReader(t *testing.T) {
 					Value: workapiv1.FieldValue{
 						Type:    workapiv1.Integer,
 						Integer: pointer.Int64(1),
+					},
+				},
+			},
+		},
+		{
+			name:        "Failed Job values",
+			object:      unstrctureObject(failedJobJson),
+			rule:        workapiv1.FeedbackRule{Type: workapiv1.WellKnownStatusType},
+			expectError: false,
+			expectedValue: []workapiv1.FeedbackValue{
+				{
+					Name: "JobFailed",
+					Value: workapiv1.FieldValue{
+						Type:   workapiv1.String,
+						String: pointer.String("True"),
 					},
 				},
 			},
