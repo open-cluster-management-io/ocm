@@ -4,7 +4,7 @@
 
 - Set up the dev environment in your local machine following [setup dev environment](../setup-dev-environment).
 - helm is installed
-- Add ocm helm repo with `helm repo add ocm https://openclustermanagement.blob.core.windows.net/releases/`
+- Add ocm helm repo with `helm repo add ocm https://open-cluster-management.io/helm-charts`
 
 ## Install cluster-proxy and managed-serviceaccount addon on the clusters
 
@@ -27,8 +27,12 @@ Install managed-serviceaccount addon:
 ```
 helm install \
     -n open-cluster-management-addon --create-namespace \
-    managed-serviceaccount ocm/managed-serviceaccount
+    managed-serviceaccount ocm/managed-serviceaccount --take-ownership
 ```
+
+Note: `--take-ownership` is required here because this chart's `ManagedClusterSetBinding` named
+`global` conflicts with a resource of the same name already installed by the `cluster-proxy`
+chart above; without it, `helm install` fails with an ownership conflict error.
 
 Check the status of the managed-serviceaccount addon
 

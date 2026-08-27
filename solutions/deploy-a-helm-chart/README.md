@@ -1,5 +1,17 @@
 # Deploy a Helm Chart
 
+> **⚠️ Deprecated:** This solution depends on the `application-manager` addon, which is
+> backed by the [`multicloud-operators-subscription`](https://github.com/open-cluster-management-io/multicloud-operators-subscription)
+> repository. That repository was **archived by its owners on June 2, 2025**, ahead of the
+> OCM v1.0.0 release, in favor of Argo CD-based GitOps integration (see the archived repo's
+> own README for the announcement). It still installs and runs, but it is no longer
+> maintained upstream and should not be used for new work.
+>
+> For deploying Helm charts (or any application) across a fleet of clusters today, use one
+> of the Argo CD solutions instead: [`deploy-argocd-apps`](../deploy-argocd-apps) (push
+> model), [`deploy-argocd-apps-pull`](../deploy-argocd-apps-pull) (basic pull model), or
+> [`argocd-agent`](../argocd-agent) (advanced pull model).
+
 ## Prerequisite
 
 Set up the dev environment in your local machine following [setup dev environment](../setup-dev-environment).

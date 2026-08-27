@@ -5,8 +5,10 @@
 - [Overview](#overview)
 - [Benefits of Using the OCM Argo CD Agent AddOn](#benefits-of-using-the-ocm-argo-cd-agent-addon)
 - [Prerequisites](#prerequisites)
+- [PKI Setup](#pki-setup)
 - [Setup Guide](#setup-guide)
 - [Deploying Applications](#deploying-applications)
+- [Troubleshooting](#troubleshooting)
 - [Additional Resources](#additional-resources)
 
 
@@ -78,13 +80,70 @@ Refer to the [Quick Start guide](https://open-cluster-management.io/docs/getting
 - **The Hub cluster must have a load balancer.**
 Refer to the [Additional Resources](#additional-resources) for more details.
 
+- **The hub cluster must not already have an Argo CD instance with the application controller enabled.**
+The `argocd-agent` hub addon installs the [Argo CD Operator](https://github.com/argoproj-labs/argocd-operator)
+and manages its own dedicated `ArgoCD` custom resource (named `argocd`, in the `argocd` namespace) with
+`spec.controller.enabled: false` — the principal component takes the place of the application controller on the hub.
+This is **not compatible** with a pre-existing plain/community Argo CD install (e.g. from
+[`deploy-argocd-apps`](../deploy-argocd-apps) or [`deploy-argocd-apps-pull`](../deploy-argocd-apps-pull)) that has its
+application controller enabled in the same namespace — the two will collide over ownership of the same resources
+(`argocd-server`, `argocd-repo-server`, etc.). If you have an existing Argo CD install in the `argocd` namespace on
+your hub, remove it first (e.g. `clusteradm uninstall hub-addon --names argocd` followed by
+`kubectl delete namespace argocd`) before installing the `argocd-agent` addon.
+
+- **[`argocd-agentctl`](https://github.com/argoproj-labs/argocd-agent/releases) CLI** — used to bootstrap the mTLS
+PKI (CA certificate, principal TLS certificate, resource-proxy certificate, and JWT signing key) that the principal
+component requires before it can start. None of these are created automatically by the addon; see
+[PKI Setup](#pki-setup) below. Download the release binary matching your OS/arch from the
+[releases page](https://github.com/argoproj-labs/argocd-agent/releases).
+
+
+## PKI Setup
+
+> **This step is REQUIRED and is not automatic.** The "automatic certificate signing/rotation" mentioned under
+> [Secure Communication](#benefits-of-using-the-ocm-argo-cd-agent-addon) refers only to the *agent's* client
+> certificate (spoke → hub), which OCM's addon framework does handle for you via its Custom Signer registration
+> type. It does **not** cover the *principal's own* certificates below — those are a separate, upstream
+> `argocd-agent` requirement that OCM's addon framework has no part in, and nothing generates them for you.
+> See the upstream [TLS Certificates guide](https://argocd-agent.readthedocs.io/latest/configuration/tls-certificates/)
+> for full reference (this section summarizes the same steps for this OCM setup).
+
+The `argocd-agent` principal component requires four Kubernetes secrets in its namespace before it can start:
+a CA certificate, its own gRPC TLS certificate, a resource-proxy TLS certificate, and a JWT signing key. None of
+these are created automatically by the addon or the Argo CD Operator — you must generate them yourself using the
+[`argocd-agentctl`](https://github.com/argoproj-labs/argocd-agent/releases) CLI **before** installing the hub addon
+(or the principal pod will crash-loop with errors like
+`Could not read TLS secret argocd/argocd-agent-resource-proxy-tls: secrets "argocd-agent-resource-proxy-tls" not found`).
+
+```shell
+# kubectl config use-context <hub-cluster>
+#
+# Initialize the PKI (creates the CA and stores it in a secret)
+argocd-agentctl pki init --principal-context <hub-cluster> --principal-namespace argocd
+
+# Issue the principal's own TLS certificate.
+# Replace --ip with your load balancer's IP (see Additional Resources), and/or --dns with a resolvable hostname.
+argocd-agentctl pki issue principal --principal-context <hub-cluster> --principal-namespace argocd \
+  --ip <principal-external-ip> --upsert
+
+# Issue the resource-proxy's TLS certificate (same IP/DNS as above)
+argocd-agentctl pki issue resource-proxy --principal-context <hub-cluster> --principal-namespace argocd \
+  --ip <principal-external-ip> --upsert
+
+# Create the JWT signing key used by the principal to sign agent authentication tokens
+argocd-agentctl jwt create-key --principal-context <hub-cluster> --principal-namespace argocd
+```
+
+> **Note:** these commands assume the `argocd` namespace already exists (`kubectl create namespace argocd` if not).
+> The certificates generated here are for development/test use only — see the `argocd-agentctl pki` command's own
+> warning output for details.
 
 ## Setup Guide
 
 ### Deploy OCM Argo CD Agent AddOn on the Hub Cluster
 
 ```shell
-# After OCM and load balancer setup:
+# After OCM, load balancer, and PKI setup:
 #
 # kubectl config use-context <hub-cluster>
 clusteradm install hub-addon --names argocd-agent --create-namespace
@@ -142,6 +201,16 @@ argocd-agent-agent-68bdb5dc87-7zb4h                    1/1     Running   0      
 Refer to the [Argo CD Agent website](https://argocd-agent.readthedocs.io/latest/concepts/agent-modes/)
 for more details about the `managed` mode.
 
+> **Note on Application mapping:** the OCM `argocd-agent` addon configures the principal with
+> [`destinationBasedMapping: true`](https://argocd-agent.readthedocs.io/latest/concepts/agent-mapping/#destination-based-mapping).
+> In this mode, the principal routes `Application` resources to the correct agent using **`spec.destination.name`**
+> (the target managed cluster's name) — it does **not** use `spec.destination.server`, and the namespace the
+> `Application` lives in on the hub does not need to match the target cluster's name either (though the examples
+> below still use a per-cluster namespace for organizational clarity, matching the addon's own conventions).
+> Setting `destination.server` with an `?agentName=<cluster>` query string (as some older docs suggest) is silently
+> ignored by a principal running in this mode — the `Application` will never sync and the principal's logs will show
+> no activity for it at all.
+
 To deploy an Argo CD Application in `managed` mode using the Argo CD Agent,
 first propagate an AppProject from `hub` cluster to the managed cluster by creating or updating a `hub` AppProject
 
@@ -189,7 +258,7 @@ spec:
     targetRevision: HEAD
     path: guestbook
   destination:
-    server: https://172.18.255.200:443?agentName=cluster1 # Replace with https://<principal-external-ip:port>?agentName=<managed-cluster-name>
+    name: cluster1 # Replace with the managed cluster name; do NOT use `server` here, see note above
     namespace: guestbook
   syncPolicy:
     automated:
@@ -221,6 +290,57 @@ kubectl -n cluster1 get app
 NAME        SYNC STATUS   HEALTH STATUS
 guestbook   Synced        Healthy
 ```
+
+## Troubleshooting
+
+### `ImagePullBackOff` on `argocd-pull-integration-controller` (Apple Silicon / arm64)
+
+**Symptom:** the `argocd-pull-integration-controller` deployment in the hub's `argocd` namespace stays in
+`ImagePullBackOff`, and `kubectl -n argocd describe pod -l control-plane=argocd-pull-integration-controller` shows:
+
+```text
+Failed to pull image "quay.io/open-cluster-management/argocd-pull-integration:<tag>":
+rpc error: code = NotFound desc = failed to pull and unpack image "...": no match for platform in manifest: not found
+```
+
+**Root cause:** as of this writing, the published `argocd-pull-integration` image is only built for `linux/amd64`.
+This is not a cosmetic issue — `argocd-pull-integration-controller` is the component that watches the `GitOpsCluster`/
+`Placement` resources and generates the `AddOnTemplate` that tells OCM's addon framework what to actually deploy to
+each managed cluster. Without it running, `ManagedClusterAddOn`s for `argocd-agent-addon` will never progress past
+`Progressing: False / Waiting for ManifestApplied`, on any architecture where this image can't run.
+
+**Workaround:** build a native `arm64` image from source and load it into your KinD nodes so `kubelet`'s
+`IfNotPresent` pull policy uses the local image instead of pulling from the registry:
+
+```shell
+git clone https://github.com/open-cluster-management-io/argocd-pull-integration.git
+cd argocd-pull-integration
+docker build --platform linux/arm64 -t quay.io/open-cluster-management/argocd-pull-integration:<tag> .
+
+# Load into every KinD node that runs a copy of this image (hub, and any managed cluster
+# using the argocd-agent-addon), matching the tag your addon chart expects:
+kind load docker-image quay.io/open-cluster-management/argocd-pull-integration:<tag> --name <cluster-name>
+```
+
+Then restart the affected pod(s) (`kubectl -n argocd delete pod -l control-plane=argocd-pull-integration-controller`,
+and similarly for the addon's deployment on each managed cluster) so they pick up the locally-loaded image.
+
+### Principal pod crash-loops with a missing TLS/JWT secret
+
+**Symptom:** `argocd-agent-principal` is stuck in `Error`/`CrashLoopBackOff`, with logs like
+`[FATAL]: Could not load resource proxy TLS configuration` or `could not read JWT secret argocd/argocd-agent-jwt: ... not found`.
+
+**Cause and fix:** the [PKI Setup](#pki-setup) step was skipped or run after the addon was already installed — see
+that section for the required commands. After running them, delete the principal pod so it picks up the new
+secrets: `kubectl -n argocd delete pod -l app.kubernetes.io/name=argocd-agent-principal`.
+
+### `Application` never syncs, no activity in principal logs
+
+**Symptom:** an `Application` created on the hub shows no `SYNC STATUS`/`HEALTH STATUS` at all, and grepping the
+principal's logs (`kubectl -n argocd logs deploy/argocd-agent-principal`) for the application's name returns nothing.
+
+**Cause and fix:** see the [Application mapping note](#managed-mode) above — use `spec.destination.name` instead
+of `spec.destination.server`.
 
 ## Additional Resources
 

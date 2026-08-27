@@ -16,3 +16,43 @@ status:
         type: ErrorOccurred
 ```
 Despite the type `ErrorOccurred`, the status is `"False"`, which means the ApplicationSet has been reconciled successfully. If the status is `"True"`, check the error message. If needed, check the `argocd-applicationset-controller` pod logs in the `argocd` namespace.
+
+#### `ImagePullBackOff` on `argocd-pull-integration` (Apple Silicon / arm64)
+
+**Symptom:** the `argocd-pull-integration` deployment in the hub's `argocd` namespace stays in
+`ImagePullBackOff`, and `kubectl -n argocd describe pod -l app.kubernetes.io/name=argocd-pull-integration`
+shows:
+```text
+Failed to pull image "quay.io/open-cluster-management/argocd-pull-integration:<tag>":
+rpc error: code = NotFound desc = failed to pull and unpack image "...": no match for platform in manifest: not found
+```
+
+**Root cause:** as of this writing, the published `argocd-pull-integration` image is only built for
+`linux/amd64` (confirmed via `docker manifest inspect` against the current release tag - no `arm64`
+variant is published). This is not cosmetic - `argocd-pull-integration` is the controller that watches
+for `Application`s carrying the pull-model labels and wraps them into `ManifestWork`. Without it running,
+no `Application` ever gets delivered to any managed cluster, on any architecture where this image can't run
+(e.g. Apple Silicon Macs running KinD).
+
+**Workaround:** build a native `arm64` image from source and load it into your KinD nodes so `kubelet`'s
+`IfNotPresent` pull policy uses the local image instead of pulling from the registry:
+```shell
+git clone https://github.com/open-cluster-management-io/argocd-pull-integration.git
+cd argocd-pull-integration
+docker build --platform linux/arm64 -t quay.io/open-cluster-management/argocd-pull-integration:<tag> .
+
+# Load into every KinD node that runs a copy of this image (hub, and any managed cluster
+# using the argocd addon), matching the tag your addon chart expects:
+kind load docker-image quay.io/open-cluster-management/argocd-pull-integration:<tag> --name <cluster-name>
+```
+Then restart the affected pod(s) so they pick up the locally-loaded image.
+
+#### `clusteradm install hub-addon --names argocd` fails with a `ClusterRoleBinding` ownership conflict
+
+If the `argocd-agent` hub-addon was ever installed on this hub before (even if later
+removed), installing this `argocd` (pull model) hub-addon can fail because both addons'
+charts create a `ClusterRoleBinding` with the identical name
+(`argocd-pull-integration-manager-rolebinding`), and Helm/server-side-apply refuses to let
+one chart take over a resource owned by another. Delete the stale `ClusterRoleBinding`
+left over from the previous install, or do a full clean uninstall of the other addon
+first, before installing this one.

@@ -69,3 +69,15 @@ MIIC/jCCA...O62WrVM=
 MIIDDTCCA...INDFwtk=
 -----END CERTIFICATE-----
 ```
+
+3. `cluster2` (HTTPS proxy) join fails with `proxyconnect tcp: EOF`, while `curl`/`openssl` through the same proxy/CA/hub address always succeed.
+
+This is a TLS-library incompatibility, not a configuration problem: the `ubuntu/squid` image's Squid binary is built against **GnuTLS**, and this GnuTLS build's TLS server closes the connection as soon as a client's `ClientHello` offers any ECDHE (forward-secret) cipher suite. Go's `crypto/tls` - used by every OCM binary, including the klusterlet - only ever offers ECDHE cipher suites by default, with no configuration option in OCM to change that. `curl`/`openssl` also offer legacy, non-forward-secret RSA-key-exchange ciphers alongside modern ones, so they always get a suite the GnuTLS server accepts, which is why they never reproduce the failure and make the proxy/network/certs look fine.
+
+Workaround: swap the Squid binary for Ubuntu's separate `squid-openssl` package (an OpenSSL-linked build of the exact same Squid version), instead of the default GnuTLS one. For example, install it inside a container built from the same base image:
+```dockerfile
+FROM ubuntu/squid:5.2-22.04_beta
+RUN apt-get update && apt-get install -y --no-install-recommends squid-openssl \
+    && rm -rf /var/lib/apt/lists/*
+```
+With that swap, Go's default TLS client succeeds immediately (negotiating TLS 1.3), with no other changes needed to `squid.conf` or the join flow.
