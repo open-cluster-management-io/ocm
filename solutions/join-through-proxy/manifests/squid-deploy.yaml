@@ -29,6 +29,11 @@ spec:
             cpu: "50m"
           limits:
             memory: "512Mi"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
         volumeMounts:
         - name: squid-config-volume
           mountPath: /etc/squid/squid.conf

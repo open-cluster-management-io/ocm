@@ -34,7 +34,13 @@ helm install \
 
 Note: `--take-ownership` is required here because this chart's `ManagedClusterSetBinding` named
 `global` conflicts with a resource of the same name already installed by the `cluster-proxy`
-chart above; without it, `helm install` fails with an ownership conflict error.
+chart above; without it, `helm install` fails with an ownership conflict error. This only
+transfers *live* ownership of the resource to `managed-serviceaccount` — `cluster-proxy`'s own
+release manifest still lists it too, so a future `helm upgrade cluster-proxy` could try to
+reclaim it and hit the same conflict. This is a pre-existing overlap between the two upstream
+charts (both default to managing a binding named `global`), not something specific to this
+guide; if you plan to upgrade `cluster-proxy` later, re-run its install with `--take-ownership`
+as well, or track/fix the overlap upstream in the two charts themselves.
 
 Check the status of the managed-serviceaccount addon
 

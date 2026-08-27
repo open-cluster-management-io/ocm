@@ -134,9 +134,12 @@ argocd-agentctl pki init --principal-context <hub-cluster> --principal-namespace
 argocd-agentctl pki issue principal --principal-context <hub-cluster> --principal-namespace argocd \
   --ip <principal-external-ip> --upsert
 
-# Issue the resource-proxy's TLS certificate (same IP/DNS as above)
+# Issue the resource-proxy's TLS certificate. Unlike the principal's own certificate above,
+# Argo CD connects to the resource-proxy over the in-cluster Service DNS name (both run on the
+# hub) rather than the external IP, so --dns must include that Service name or TLS validation
+# will fail. Find the exact name with: kubectl get svc -n argocd | grep resource-proxy
 argocd-agentctl pki issue resource-proxy --principal-context <hub-cluster> --principal-namespace argocd \
-  --ip <principal-external-ip> --upsert
+  --ip <principal-external-ip> --dns <resource-proxy-service-name> --upsert
 
 # Create the JWT signing key used by the principal to sign agent authentication tokens.
 # --upsert lets this be rerun safely if the argocd-agent-jwt secret already exists.
