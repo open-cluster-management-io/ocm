@@ -88,9 +88,18 @@ This is **not compatible** with a pre-existing plain/community Argo CD install (
 [`deploy-argocd-apps`](../deploy-argocd-apps) or [`deploy-argocd-apps-pull`](../deploy-argocd-apps-pull)) that has its
 application controller enabled in the same namespace — the two will collide over ownership of the same resources
 (`argocd-server`, `argocd-repo-server`, etc.). If you have an existing Argo CD install in the `argocd` namespace on
-your hub, remove it first with `clusteradm uninstall hub-addon --names argocd`, then delete only the
-leftover Argo CD resources (e.g. `kubectl delete applications,appprojects,deployments,statefulsets,services -n argocd -l app.kubernetes.io/part-of=argocd`).
-Deleting the whole `argocd` namespace (`kubectl delete namespace argocd`) also works, but it removes
+your hub, remove it first — how depends on how it was installed:
+  - Installed via `clusteradm install hub-addon --names argocd` (the [`deploy-argocd-apps-pull`](../deploy-argocd-apps-pull)
+    model): run `clusteradm uninstall hub-addon --names argocd`. This only removes the addon's own
+    `ClusterManagementAddOn`/controller, not the underlying plain Argo CD it was installed on top of — still
+    follow up with the raw-manifest cleanup below for that part.
+  - Installed via raw manifests, e.g. `kubectl apply -f .../argo-cd/stable/manifests/install.yaml` (the
+    [`deploy-argocd-apps`](../deploy-argocd-apps) model): there is no `ClusterManagementAddOn` to uninstall here —
+    `clusteradm uninstall hub-addon` is a no-op for this install method. Instead, delete the same manifest you
+    applied it with, e.g. `kubectl delete -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml`,
+    or delete the leftover resources by label: `kubectl delete applications,appprojects,deployments,statefulsets,services -n argocd -l app.kubernetes.io/part-of=argocd`.
+
+Deleting the whole `argocd` namespace (`kubectl delete namespace argocd`) also works for either case, but it removes
 **everything** in that namespace — including any `Application`/`AppProject` objects, credentials, and PKI
 secrets you may still need — not just the conflicting Argo CD install. Only do this if you've confirmed
 (and backed up anything important) that the namespace is fully disposable.
@@ -315,21 +324,33 @@ Failed to pull image "quay.io/open-cluster-management/argocd-pull-integration:<t
 rpc error: code = NotFound desc = failed to pull and unpack image "...": no match for platform in manifest: not found
 ```
 
-**Root cause:** as of this writing, the published `argocd-pull-integration` image is only built for `linux/amd64`.
-This is not a cosmetic issue — `argocd-pull-integration-controller` is the component that watches the `GitOpsCluster`/
-`Placement` resources and generates the `AddOnTemplate` that tells OCM's addon framework what to actually deploy to
-each managed cluster. Without it running, `ManagedClusterAddOn`s for `argocd-agent-addon` will never progress past
+**Root cause:** this depends on the exact image tag your addon chart pins, not on the solution itself — a
+future release may add `linux/arm64` support and make this workaround unnecessary. Before doing anything
+else, find the tag actually being used and check it yourself:
+
+```shell
+# find the tag your install actually pulled
+kubectl get deployment argocd-pull-integration-controller -n argocd -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+# check whether THAT tag has an arm64 variant published
+docker manifest inspect quay.io/open-cluster-management/argocd-pull-integration:<the-tag-from-above> | grep -A2 architecture
+```
+
+If `arm64` is missing from that output, the pod will `ImagePullBackOff` on Apple Silicon / arm64 hosts.
+`argocd-pull-integration-controller` is the component that watches the `GitOpsCluster`/`Placement` resources
+and generates the `AddOnTemplate` that tells OCM's addon framework what to actually deploy to each managed
+cluster. Without it running, `ManagedClusterAddOn`s for `argocd-agent-addon` will never progress past
 `Progressing: False / Waiting for ManifestApplied`, on any architecture where this image can't run.
 
 **Workaround:** build a native `arm64` image from source and load it into your KinD nodes so `kubelet`'s
-`IfNotPresent` pull policy uses the local image instead of pulling from the registry. Check out the git
-tag matching the `<tag>` your addon chart expects (not `main`, which can be ahead of the last release and
-would otherwise get built and mislabeled as that release):
+`IfNotPresent` pull policy uses the local image instead of pulling from the registry. Replace `<tag>` below
+with the exact tag you found above (do **not** build from `main`, which can be ahead of the last release
+and would then get mislabeled as that release):
 
 ```shell
 git clone https://github.com/open-cluster-management-io/argocd-pull-integration.git
 cd argocd-pull-integration
-git checkout <tag>   # e.g. v0.28.1 - must match the <tag> used below
+git checkout <tag>   # must be the same tag you checked above and use below
 docker build --platform linux/arm64 -t quay.io/open-cluster-management/argocd-pull-integration:<tag> .
 
 # Load into every KinD node that runs a copy of this image (hub, and any managed cluster

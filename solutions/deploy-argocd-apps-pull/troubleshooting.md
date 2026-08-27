@@ -27,21 +27,30 @@ Failed to pull image "quay.io/open-cluster-management/argocd-pull-integration:<t
 rpc error: code = NotFound desc = failed to pull and unpack image "...": no match for platform in manifest: not found
 ```
 
-**Root cause:** as of this writing, the published `argocd-pull-integration` image is only built for
-`linux/amd64` (confirmed via `docker manifest inspect` against the current release tag - no `arm64`
-variant is published). This is not cosmetic - `argocd-pull-integration` is the controller that watches
-for `Application`s carrying the pull-model labels and wraps them into `ManifestWork`. Without it running,
-no `Application` ever gets delivered to any managed cluster, on any architecture where this image can't run
-(e.g. Apple Silicon Macs running KinD).
+**Root cause:** this depends on the exact image tag `clusteradm install hub-addon --names argocd` pins in
+your version of the chart, not on the solution itself — a future release may add `linux/arm64` support and
+make this workaround unnecessary. Before doing anything else, find the tag actually being used and check it
+yourself:
+```shell
+# find the tag your install actually pulled
+kubectl get deployment argocd-pull-integration -n argocd -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+# check whether THAT tag has an arm64 variant published
+docker manifest inspect quay.io/open-cluster-management/argocd-pull-integration:<the-tag-from-above> | grep -A2 architecture
+```
+If `arm64` is missing from that output, the pod will `ImagePullBackOff` on Apple Silicon / arm64 hosts.
+`argocd-pull-integration-controller` is the controller that watches for `Application`s carrying the
+pull-model labels and wraps them into `ManifestWork`; without it running, no `Application` ever gets
+delivered to any managed cluster, on any architecture where this image can't run.
 
 **Workaround:** build a native `arm64` image from source and load it into your KinD nodes so `kubelet`'s
-`IfNotPresent` pull policy uses the local image instead of pulling from the registry. Check out the git
-tag matching the `<tag>` your addon chart expects (not `main`, which can be ahead of the last release and
-would otherwise get built and mislabeled as that release):
+`IfNotPresent` pull policy uses the local image instead of pulling from the registry. Replace `<tag>` below
+with the exact tag you found above (do **not** build from `main`, which can be ahead of the last release
+and would then get mislabeled as that release):
 ```shell
 git clone https://github.com/open-cluster-management-io/argocd-pull-integration.git
 cd argocd-pull-integration
-git checkout <tag>   # e.g. v0.28.1 - must match the <tag> used below
+git checkout <tag>   # must be the same tag you checked above and use below
 docker build --platform linux/arm64 -t quay.io/open-cluster-management/argocd-pull-integration:<tag> .
 
 # Load into every KinD node that runs a copy of this image (hub, and any managed cluster

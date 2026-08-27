@@ -72,8 +72,10 @@ If `kubectl get managedcluster` never shows `JOINED=True`, check the following, 
 2. **The `Klusterlet` CRD isn't `Established` yet.** The join manifest applies the
    `klusterlets.operator.open-cluster-management.io` CRD and a `Klusterlet` custom
    resource in the same batch. If you see `no matches for kind "Klusterlet"`, apply just
-   the CRD first, wait for it (`kubectl wait --for=condition=Established crd/...`), then
-   apply the rest.
+   the CRD first, wait for it, then apply the rest:
+   ```
+   kubectl wait --for=condition=Established crd/klusterlets.operator.open-cluster-management.io --timeout=60s
+   ```
 
 3. **`bootstrap-hub-kubeconfig` points at an unreachable address.** When the CAPI
    management plane and the OCM hub run on the same local kind cluster, the join manifest
