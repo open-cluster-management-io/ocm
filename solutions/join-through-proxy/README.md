@@ -79,7 +79,7 @@ MIIDDTCCA...INDFwtk=
 
 This is a TLS-library incompatibility, not a configuration problem: the `ubuntu/squid` image's Squid binary is built against **GnuTLS**, and this GnuTLS build's TLS server closes the connection as soon as a client's `ClientHello` offers any ECDHE (forward-secret) cipher suite. Go's `crypto/tls` - used by every OCM binary, including the klusterlet - only ever offers ECDHE cipher suites by default, with no configuration option in OCM to change that. `curl`/`openssl` also offer legacy, non-forward-secret RSA-key-exchange ciphers alongside modern ones, so they always get a suite the GnuTLS server accepts, which is why they never reproduce the failure.
 
-Fix (already applied by `setup-proxy.sh` above, no action needed): swap the Squid binary for Ubuntu's separate `squid-openssl` package (an OpenSSL-linked build of the exact same Squid version), instead of the default GnuTLS one. `Dockerfile.squid-openssl` installs it on top of the same base image:
+Fix (already applied by `setup-proxy.sh` above, no action needed): swap the Squid binary for Ubuntu's separate `squid-openssl` package (an OpenSSL-linked Squid build), instead of the default GnuTLS one. `apt-get` resolves this against Ubuntu's live package repositories, so the installed version can be newer than the base image's Squid 5.2 (e.g. 5.9 as of this writing) - that's fine here, since the fix only depends on the OpenSSL TLS backend, not any particular Squid version. `Dockerfile.squid-openssl` installs it on top of the same base image:
 ```dockerfile
 FROM ubuntu/squid:5.2-22.04_beta
 RUN apt-get update && apt-get install -y --no-install-recommends squid-openssl \

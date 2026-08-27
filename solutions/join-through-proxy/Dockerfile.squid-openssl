@@ -1,7 +1,14 @@
-# Rebuilds the same Squid version as the base ubuntu/squid image, but linked against OpenSSL
-# instead of GnuTLS. This works around a TLS-library incompatibility between GnuTLS's TLS server
-# and Go's crypto/tls client (used by every OCM binary, including the klusterlet) that otherwise
-# breaks HTTPS-proxied joins - see the README's Troubleshooting section for details.
+# Installs Ubuntu's squid-openssl package (an OpenSSL-linked Squid build) on top of the same
+# base image, instead of the GnuTLS-linked Squid the base image ships with. This works around a
+# TLS-library incompatibility between GnuTLS's TLS server and Go's crypto/tls client (used by
+# every OCM binary, including the klusterlet) that otherwise breaks HTTPS-proxied joins - see the
+# README's Troubleshooting section for details.
+#
+# Note: apt-get resolves squid-openssl against Ubuntu's *live* Jammy package repositories, so the
+# installed Squid version can be newer than the base image's Squid 5.2 (e.g. 5.9 as of this
+# writing) - it will not always be an exact version match. That's fine for this solution, since we
+# only need the OpenSSL TLS backend, not any particular Squid version's behavior; nothing here
+# relies on version-specific squid.conf directives.
 FROM ubuntu/squid:5.2-22.04_beta
 
 USER root
