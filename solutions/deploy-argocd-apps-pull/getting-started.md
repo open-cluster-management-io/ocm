@@ -32,7 +32,7 @@
    `kubectl apply` stores the whole applied object in a `last-applied-configuration`
    annotation, and this particular CRD is large enough to exceed Kubernetes' annotation
    size limit. Use a server-side apply instead, which does not store that annotation:
-   ```
+   ```bash
    kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml --server-side --force-conflicts
    ```
 

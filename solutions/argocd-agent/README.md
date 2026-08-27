@@ -88,8 +88,12 @@ This is **not compatible** with a pre-existing plain/community Argo CD install (
 [`deploy-argocd-apps`](../deploy-argocd-apps) or [`deploy-argocd-apps-pull`](../deploy-argocd-apps-pull)) that has its
 application controller enabled in the same namespace — the two will collide over ownership of the same resources
 (`argocd-server`, `argocd-repo-server`, etc.). If you have an existing Argo CD install in the `argocd` namespace on
-your hub, remove it first (e.g. `clusteradm uninstall hub-addon --names argocd` followed by
-`kubectl delete namespace argocd`) before installing the `argocd-agent` addon.
+your hub, remove it first with `clusteradm uninstall hub-addon --names argocd`, then delete only the
+leftover Argo CD resources (e.g. `kubectl delete applications,appprojects,deployments,statefulsets,services -n argocd -l app.kubernetes.io/part-of=argocd`).
+Deleting the whole `argocd` namespace (`kubectl delete namespace argocd`) also works, but it removes
+**everything** in that namespace — including any `Application`/`AppProject` objects, credentials, and PKI
+secrets you may still need — not just the conflicting Argo CD install. Only do this if you've confirmed
+(and backed up anything important) that the namespace is fully disposable.
 
 - **[`argocd-agentctl`](https://github.com/argoproj-labs/argocd-agent/releases) CLI** — used to bootstrap the mTLS
 PKI (CA certificate, principal TLS certificate, resource-proxy certificate, and JWT signing key) that the principal
@@ -118,7 +122,11 @@ these are created automatically by the addon or the Argo CD Operator — you mus
 ```shell
 # kubectl config use-context <hub-cluster>
 #
-# Initialize the PKI (creates the CA and stores it in a secret)
+# Initialize the PKI (creates the CA and stores it in a secret). Only pass --force if you
+# intend to replace an existing CA — doing so invalidates every certificate already issued
+# from it, so skip this step entirely if the argocd-agent-ca secret already exists and you
+# want to keep using it:
+#   kubectl get secret argocd-agent-ca -n argocd || argocd-agentctl pki init --principal-context <hub-cluster> --principal-namespace argocd
 argocd-agentctl pki init --principal-context <hub-cluster> --principal-namespace argocd
 
 # Issue the principal's own TLS certificate.
@@ -130,8 +138,9 @@ argocd-agentctl pki issue principal --principal-context <hub-cluster> --principa
 argocd-agentctl pki issue resource-proxy --principal-context <hub-cluster> --principal-namespace argocd \
   --ip <principal-external-ip> --upsert
 
-# Create the JWT signing key used by the principal to sign agent authentication tokens
-argocd-agentctl jwt create-key --principal-context <hub-cluster> --principal-namespace argocd
+# Create the JWT signing key used by the principal to sign agent authentication tokens.
+# --upsert lets this be rerun safely if the argocd-agent-jwt secret already exists.
+argocd-agentctl jwt create-key --principal-context <hub-cluster> --principal-namespace argocd --upsert
 ```
 
 > **Note:** these commands assume the `argocd` namespace already exists (`kubectl create namespace argocd` if not).
@@ -310,11 +319,14 @@ each managed cluster. Without it running, `ManagedClusterAddOn`s for `argocd-age
 `Progressing: False / Waiting for ManifestApplied`, on any architecture where this image can't run.
 
 **Workaround:** build a native `arm64` image from source and load it into your KinD nodes so `kubelet`'s
-`IfNotPresent` pull policy uses the local image instead of pulling from the registry:
+`IfNotPresent` pull policy uses the local image instead of pulling from the registry. Check out the git
+tag matching the `<tag>` your addon chart expects (not `main`, which can be ahead of the last release and
+would otherwise get built and mislabeled as that release):
 
 ```shell
 git clone https://github.com/open-cluster-management-io/argocd-pull-integration.git
 cd argocd-pull-integration
+git checkout <tag>   # e.g. v0.28.1 - must match the <tag> used below
 docker build --platform linux/arm64 -t quay.io/open-cluster-management/argocd-pull-integration:<tag> .
 
 # Load into every KinD node that runs a copy of this image (hub, and any managed cluster

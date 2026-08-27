@@ -35,10 +35,13 @@ no `Application` ever gets delivered to any managed cluster, on any architecture
 (e.g. Apple Silicon Macs running KinD).
 
 **Workaround:** build a native `arm64` image from source and load it into your KinD nodes so `kubelet`'s
-`IfNotPresent` pull policy uses the local image instead of pulling from the registry:
+`IfNotPresent` pull policy uses the local image instead of pulling from the registry. Check out the git
+tag matching the `<tag>` your addon chart expects (not `main`, which can be ahead of the last release and
+would otherwise get built and mislabeled as that release):
 ```shell
 git clone https://github.com/open-cluster-management-io/argocd-pull-integration.git
 cd argocd-pull-integration
+git checkout <tag>   # e.g. v0.28.1 - must match the <tag> used below
 docker build --platform linux/arm64 -t quay.io/open-cluster-management/argocd-pull-integration:<tag> .
 
 # Load into every KinD node that runs a copy of this image (hub, and any managed cluster

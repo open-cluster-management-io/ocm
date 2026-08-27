@@ -57,9 +57,15 @@ If `kubectl get managedcluster` never shows `JOINED=True`, check the following, 
    manifest's Kubernetes objects concatenated together with no `---` document separators
    between them. When that happens, `kubectl apply` (or the `ClusterResourceSet` that
    delivers it) merges fields from different objects together and either errors out or
-   silently applies nothing. Inspect the generated `join.yaml`: if `grep -c '^---'
-   join.yaml` returns `0`, insert a `---` line before each object (i.e. before whichever
-   of `apiVersion:`/`kind:` comes first for that object - the `Deployment` object in this
+   silently applies nothing. A plain `grep -c '^---' join.yaml` only catches the case where
+   *zero* separators exist — it won't catch a file that has some separators but is still
+   missing one between two specific objects. Instead, verify the parsed document count
+   matches the expected object count, e.g. with `yq`:
+   ```
+   yq -N eval-all '[.] | length' join.yaml   # should equal the number of objects clusteradm generated
+   ```
+   If the count is off, insert a `---` line before each object (i.e. before whichever of
+   `apiVersion:`/`kind:` comes first for that object - the `Deployment` object in this
    manifest has `kind:` listed *before* `apiVersion:`, so don't assume ordering) before
    applying it.
 

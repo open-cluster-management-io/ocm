@@ -4,7 +4,9 @@
 
 - Set up the dev environment in your local machine following [setup dev environment](../setup-dev-environment).
 - helm is installed
-- Add ocm helm repo with `helm repo add ocm https://open-cluster-management.io/helm-charts`
+- Add ocm helm repo with `helm repo add ocm https://open-cluster-management.io/helm-charts`. If you
+  already have an `ocm` repo entry pointing at the old URL, Helm 3.3.2+ will refuse to overwrite it;
+  either run `helm repo remove ocm` first, or add `--force-update` to the command above.
 
 ## Install cluster-proxy and managed-serviceaccount addon on the clusters
 
