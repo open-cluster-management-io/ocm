@@ -1,0 +1,10 @@
+# Rebuilds the same Squid version as the base ubuntu/squid image, but linked against OpenSSL
+# instead of GnuTLS. This works around a TLS-library incompatibility between GnuTLS's TLS server
+# and Go's crypto/tls client (used by every OCM binary, including the klusterlet) that otherwise
+# breaks HTTPS-proxied joins - see the README's Troubleshooting section for details.
+FROM ubuntu/squid:5.2-22.04_beta
+
+USER root
+RUN apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends squid-openssl && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*

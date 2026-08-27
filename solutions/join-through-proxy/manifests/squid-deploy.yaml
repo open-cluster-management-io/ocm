@@ -15,7 +15,8 @@ spec:
     spec:
       containers:
       - name: squid
-        image: ubuntu/squid:5.2-22.04_beta
+        image: squid-openssl:5.2-22.04-local
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3128
           name: http

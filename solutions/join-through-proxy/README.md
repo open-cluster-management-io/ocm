@@ -18,6 +18,11 @@ This doc shows how a cluster joins an Open Cluster Management (OCM) hub cluster 
 ## Setup the proxy server
 
 Run `./setup-proxy.sh`. It creates a Kind cluster and runs an open source proxy server [squid](http://www.squid-cache.org/) on it. HTTP GET method is enabled on this proxy server and it is serving on ports 31280 and 31290 for HTTP and HTTPS service respectively.
+
+The script also builds a small custom Squid image locally (see `Dockerfile.squid-openssl`) instead
+of deploying the public `ubuntu/squid` image directly, and loads it into the Kind cluster. This is
+required for the HTTPS proxy path (`cluster2`, below) to work at all - see item 3 in
+[Troubleshooting](#troubleshooting) for why.
 ```bash
 kubectl -n squid get svc -o wide
 NAME    TYPE       CLUSTER-IP     EXTERNAL-IP   PORT(S)                         AGE     SELECTOR
@@ -70,14 +75,18 @@ MIIDDTCCA...INDFwtk=
 -----END CERTIFICATE-----
 ```
 
-3. `cluster2` (HTTPS proxy) join fails with `proxyconnect tcp: EOF`, while `curl`/`openssl` through the same proxy/CA/hub address always succeed.
+3. `cluster2` (HTTPS proxy) would fail to join with `proxyconnect tcp: EOF` if the proxy were running the plain `ubuntu/squid` image, while `curl`/`openssl` through the same proxy/CA/hub address would always succeed and make the proxy/network/certs look fine.
 
-This is a TLS-library incompatibility, not a configuration problem: the `ubuntu/squid` image's Squid binary is built against **GnuTLS**, and this GnuTLS build's TLS server closes the connection as soon as a client's `ClientHello` offers any ECDHE (forward-secret) cipher suite. Go's `crypto/tls` - used by every OCM binary, including the klusterlet - only ever offers ECDHE cipher suites by default, with no configuration option in OCM to change that. `curl`/`openssl` also offer legacy, non-forward-secret RSA-key-exchange ciphers alongside modern ones, so they always get a suite the GnuTLS server accepts, which is why they never reproduce the failure and make the proxy/network/certs look fine.
+This is a TLS-library incompatibility, not a configuration problem: the `ubuntu/squid` image's Squid binary is built against **GnuTLS**, and this GnuTLS build's TLS server closes the connection as soon as a client's `ClientHello` offers any ECDHE (forward-secret) cipher suite. Go's `crypto/tls` - used by every OCM binary, including the klusterlet - only ever offers ECDHE cipher suites by default, with no configuration option in OCM to change that. `curl`/`openssl` also offer legacy, non-forward-secret RSA-key-exchange ciphers alongside modern ones, so they always get a suite the GnuTLS server accepts, which is why they never reproduce the failure.
 
-Workaround: swap the Squid binary for Ubuntu's separate `squid-openssl` package (an OpenSSL-linked build of the exact same Squid version), instead of the default GnuTLS one. For example, install it inside a container built from the same base image:
+Fix (already applied by `setup-proxy.sh` above, no action needed): swap the Squid binary for Ubuntu's separate `squid-openssl` package (an OpenSSL-linked build of the exact same Squid version), instead of the default GnuTLS one. `Dockerfile.squid-openssl` installs it on top of the same base image:
 ```dockerfile
 FROM ubuntu/squid:5.2-22.04_beta
 RUN apt-get update && apt-get install -y --no-install-recommends squid-openssl \
     && rm -rf /var/lib/apt/lists/*
 ```
-With that swap, Go's default TLS client succeeds immediately (negotiating TLS 1.3), with no other changes needed to `squid.conf` or the join flow.
+`setup-proxy.sh` builds this image and `kind load docker-image`s it into the proxy cluster, and
+`manifests/squid-deploy.yaml` deploys that image instead of the public `ubuntu/squid` one. With
+that swap, Go's default TLS client succeeds immediately (negotiating TLS 1.3), with no other
+changes needed to `squid.conf` or the join flow. If you're deploying Squid outside of this repo's
+scripts, apply the same image swap yourself.
