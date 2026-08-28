@@ -112,14 +112,32 @@ func (s *hostedHookSyncer) sync(ctx context.Context,
 	}
 
 	// TODO: will surface more message here
-	if hookWorkIsCompleted(hookWork) {
+	switch {
+	case hookWorkIsCompleted(hookWork):
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 			Type:    addonapiv1beta1.ManagedClusterAddOnHookManifestCompleted,
 			Status:  metav1.ConditionTrue,
 			Reason:  "HookManifestIsCompleted",
 			Message: fmt.Sprintf("hook manifestWork %v is completed.", hookWork.Name),
 		})
-	} else {
+	case hookWorkIsFailed(hookWork) && hookWork.DeletionTimestamp.IsZero():
+		// The hook resource has reached a terminal failed state (e.g. the pod was
+		// evicted due to node pressure, its node became unreachable, or the job
+		// exhausted its backoffLimit). The work-agent will not recreate it on its
+		// own because the resource still exists with an unchanged spec. Delete the
+		// hook manifestWork so it is rebuilt and re-applied on a subsequent
+		// reconcile, recreating a fresh hook pod/job and retrying indefinitely
+		// until it succeeds.
+		if err = s.deleteWork(ctx, hookWork.Namespace, hookWork.Name); err != nil {
+			return addon, err
+		}
+		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+			Type:    addonapiv1beta1.ManagedClusterAddOnHookManifestCompleted,
+			Status:  metav1.ConditionFalse,
+			Reason:  "HookManifestFailedRetrying",
+			Message: fmt.Sprintf("hook manifestWork %v failed and is being recreated to retry.", hookWork.Name),
+		})
+	default:
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 			Type:    addonapiv1beta1.ManagedClusterAddOnHookManifestCompleted,
 			Status:  metav1.ConditionFalse,
