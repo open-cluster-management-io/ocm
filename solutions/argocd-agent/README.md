@@ -5,7 +5,6 @@
 - [Overview](#overview)
 - [Benefits of Using the OCM Argo CD Agent AddOn](#benefits-of-using-the-ocm-argo-cd-agent-addon)
 - [Prerequisites](#prerequisites)
-- [PKI Setup](#pki-setup)
 - [Setup Guide](#setup-guide)
 - [Deploying Applications](#deploying-applications)
 - [Troubleshooting](#troubleshooting)
@@ -113,67 +112,25 @@ Deleting the whole `argocd` namespace (`kubectl delete namespace argocd`) also w
 secrets you may still need — not just the conflicting Argo CD install. Only do this if you've confirmed
 (and backed up anything important) that the namespace is fully disposable.
 
-- **[`argocd-agentctl`](https://github.com/argoproj-labs/argocd-agent/releases) CLI** — used to bootstrap the mTLS
-PKI (CA certificate, principal TLS certificate, resource-proxy certificate, and JWT signing key) that the principal
-component requires before it can start. None of these are created automatically by the addon; see
-[PKI Setup](#pki-setup) below. Download the release binary matching your OS/arch from the
-[releases page](https://github.com/argoproj-labs/argocd-agent/releases).
-
-
-## PKI Setup
-
-> **This step is REQUIRED and is not automatic.** The "automatic certificate signing/rotation" mentioned under
-> [Secure Communication](#benefits-of-using-the-ocm-argo-cd-agent-addon) refers only to the *agent's* client
-> certificate (spoke → hub), which OCM's addon framework does handle for you via its Custom Signer registration
-> type. It does **not** cover the *principal's own* certificates below — those are a separate, upstream
-> `argocd-agent` requirement that OCM's addon framework has no part in, and nothing generates them for you.
-> See the upstream [TLS Certificates guide](https://argocd-agent.readthedocs.io/latest/configuration/tls-certificates/)
-> for full reference (this section summarizes the same steps for this OCM setup).
-
-The `argocd-agent` principal component requires four Kubernetes secrets in its namespace before it can start:
-a CA certificate, its own gRPC TLS certificate, a resource-proxy TLS certificate, and a JWT signing key. None of
-these are created automatically by the addon or the Argo CD Operator — you must generate them yourself using the
-[`argocd-agentctl`](https://github.com/argoproj-labs/argocd-agent/releases) CLI **before** installing the hub addon
-(or the principal pod will crash-loop with errors like
-`Could not read TLS secret argocd/argocd-agent-resource-proxy-tls: secrets "argocd-agent-resource-proxy-tls" not found`).
-
-```shell
-# kubectl config use-context <hub-cluster>
-#
-# Initialize the PKI (creates the CA and stores it in a secret). Only pass --force if you
-# intend to replace an existing CA — doing so invalidates every certificate already issued
-# from it, so skip this step entirely if the argocd-agent-ca secret already exists and you
-# want to keep using it:
-#   kubectl get secret argocd-agent-ca -n argocd || argocd-agentctl pki init --principal-context <hub-cluster> --principal-namespace argocd
-argocd-agentctl pki init --principal-context <hub-cluster> --principal-namespace argocd
-
-# Issue the principal's own TLS certificate.
-# Replace --ip with your load balancer's IP (see Additional Resources), and/or --dns with a resolvable hostname.
-argocd-agentctl pki issue principal --principal-context <hub-cluster> --principal-namespace argocd \
-  --ip <principal-external-ip> --upsert
-
-# Issue the resource-proxy's TLS certificate. Unlike the principal's own certificate above,
-# Argo CD connects to the resource-proxy over the in-cluster Service DNS name (both run on the
-# hub) rather than the external IP, so --dns must include that Service name or TLS validation
-# will fail. Find the exact name with: kubectl get svc -n argocd | grep resource-proxy
-argocd-agentctl pki issue resource-proxy --principal-context <hub-cluster> --principal-namespace argocd \
-  --ip <principal-external-ip> --dns <resource-proxy-service-name> --upsert
-
-# Create the JWT signing key used by the principal to sign agent authentication tokens.
-# --upsert lets this be rerun safely if the argocd-agent-jwt secret already exists.
-argocd-agentctl jwt create-key --principal-context <hub-cluster> --principal-namespace argocd --upsert
-```
-
-> **Note:** these commands assume the `argocd` namespace already exists (`kubectl create namespace argocd` if not).
-> The certificates generated here are for development/test use only — see the `argocd-agentctl pki` command's own
-> warning output for details.
+> **PKI is fully automatic — no `argocd-agentctl` needed.** The `argocd-agent` principal component requires
+> four secrets to start (a CA certificate, its own gRPC TLS certificate, a resource-proxy TLS certificate, and a
+> JWT signing key). As of the addon version installed by `clusteradm install hub-addon --names argocd-agent`
+> today (`argocd-pull-integration` v0.28.1 and later), the `GitOpsCluster` controller generates and manages all
+> four of these itself — you do **not** need to install the `argocd-agentctl` CLI or run any manual PKI commands.
+> Confirmed by re-testing end-to-end on a clean cluster with zero `argocd-agentctl` commands: the controller's
+> logs show `Successfully ensured ArgoCD agent CA certificate` / `... principal TLS certificate` / `... resource
+> proxy TLS certificate`, and `kubectl -n argocd get gitopscluster gitops-cluster -o yaml` reports
+> `CACertificateReady`, `PrincipalCertificateReady`, `ResourceProxyCertificateReady`, and `JWTSecretReady` all
+> `True`. If you see the principal crash-loop with a "secret not found" error anyway, that almost always means
+> the controller responsible for creating these secrets isn't running yet — see
+> [Troubleshooting](#principal-pod-crash-loops-with-a-missing-tlsjwt-secret) below, not a missing manual step.
 
 ## Setup Guide
 
 ### Deploy OCM Argo CD Agent AddOn on the Hub Cluster
 
 ```shell
-# After OCM, load balancer, and PKI setup:
+# After OCM and load balancer setup:
 #
 # kubectl config use-context <hub-cluster>
 clusteradm install hub-addon --names argocd-agent --create-namespace
@@ -350,8 +307,11 @@ docker manifest inspect quay.io/open-cluster-management/argocd-pull-integration:
 If that doesn't return a match, the pod will `ImagePullBackOff` on Apple Silicon / arm64 hosts.
 `argocd-pull-integration-controller` is the component that watches the `GitOpsCluster`/`Placement` resources
 and generates the `AddOnTemplate` that tells OCM's addon framework what to actually deploy to each managed
-cluster. Without it running, `ManagedClusterAddOn`s for `argocd-agent-addon` will never progress past
-`Progressing: False / Waiting for ManifestApplied`, on any architecture where this image can't run.
+cluster. It is also the component that automatically generates the principal's PKI secrets (see
+[Principal pod crash-loops with a missing TLS/JWT secret](#principal-pod-crash-loops-with-a-missing-tlsjwt-secret)
+below). Without it running, `ManagedClusterAddOn`s for `argocd-agent-addon` will never progress past
+`Progressing: False / Waiting for ManifestApplied`, and the principal pod will crash-loop on missing secrets,
+on any architecture where this image can't run.
 
 **Workaround:** build a native `arm64` image from source and load it into your KinD nodes so `kubelet`'s
 `IfNotPresent` pull policy uses the local image instead of pulling from the registry. Replace `<tag>` below
@@ -377,9 +337,24 @@ and similarly for the addon's deployment on each managed cluster) so they pick u
 **Symptom:** `argocd-agent-principal` is stuck in `Error`/`CrashLoopBackOff`, with logs like
 `[FATAL]: Could not load resource proxy TLS configuration` or `could not read JWT secret argocd/argocd-agent-jwt: ... not found`.
 
-**Cause and fix:** the [PKI Setup](#pki-setup) step was skipped or run after the addon was already installed — see
-that section for the required commands. After running them, delete the principal pod so it picks up the new
-secrets: `kubectl -n argocd delete pod -l app.kubernetes.io/name=argocd-agent-principal`.
+**Cause and fix:** these four secrets (CA, principal TLS, resource-proxy TLS, JWT) are generated automatically by
+the `argocd-pull-integration-controller` deployment in the `argocd` namespace, as part of it reconciling the
+`GitOpsCluster` resource — nothing needs to be created manually. If the principal is crash-looping on a missing
+secret, it almost always means that controller isn't running yet. Check it first:
+
+```shell
+# kubectl config use-context <hub-cluster>
+kubectl -n argocd get pod -l app.kubernetes.io/name=argocd-pull-integration-controller
+```
+
+If it's not `Running` (e.g. `ImagePullBackOff`), fix that first — see the arm64 entry above, which is the most
+common reason this happens on Apple Silicon/arm64 hosts — and the PKI secrets will appear on their own once it
+starts. If it *is* `Running`, check its logs for errors
+(`kubectl -n argocd logs deploy/argocd-pull-integration-controller`) and the `GitOpsCluster` status
+(`kubectl -n argocd get gitopscluster gitops-cluster -o yaml`) for which specific condition
+(`CACertificateReady`, `PrincipalCertificateReady`, `ResourceProxyCertificateReady`, `JWTSecretReady`) isn't
+`True`. Once the secrets exist, delete the principal pod so it picks them up:
+`kubectl -n argocd delete pod -l app.kubernetes.io/name=argocd-agent-principal`.
 
 ### `Application` never syncs, no activity in principal logs
 
