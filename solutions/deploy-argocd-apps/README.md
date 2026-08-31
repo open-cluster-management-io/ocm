@@ -82,6 +82,16 @@ Your IP address is usually next to the last entry of 'inet'. An IP address is al
 
     See more informatin from [Argo CD Getting Started](https://argo-cd.readthedocs.io/en/stable/getting_started/).
 
+    > **Troubleshooting:** the above command may fail with `metadata.annotations: Too
+    > long` on the `applicationsets.argoproj.io` CRD. This happens because kubectl's
+    > default `kubectl apply` stores the whole applied object in a
+    > `last-applied-configuration` annotation, and this particular CRD is large enough
+    > to exceed Kubernetes' annotation size limit. Use a server-side apply instead, which
+    > does not store that annotation:
+    > ```bash
+    > kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml --server-side --force-conflicts
+    > ```
+
 2. Confirm that all pods are running.
 
     ```bash

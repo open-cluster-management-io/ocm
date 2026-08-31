@@ -17,6 +17,13 @@ cat tls/squid.crt tls/squid.key >> tls/squid-cert-key.pem
 
 kind create cluster --name "${proxy}"
 
+# Build a Squid image linked against OpenSSL instead of the default GnuTLS build. This works
+# around a TLS-library incompatibility that otherwise breaks the HTTPS proxy path (cluster2) -
+# see the README's Troubleshooting section for details.
+echo "building squid-openssl image"
+docker build -t squid-openssl:5.2-22.04-local -f Dockerfile.squid-openssl .
+kind load docker-image squid-openssl:5.2-22.04-local --name "${proxy}"
+
 kubectl config use ${proxyctx}
 echo "setup proxy server - squid"
 kubectl create ns squid

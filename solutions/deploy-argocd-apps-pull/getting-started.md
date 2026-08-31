@@ -27,6 +27,15 @@
     ```
    See [Argo CD website](https://argo-cd.readthedocs.io/en/stable/getting_started/) for more details.
 
+   **Troubleshooting:** the above `kubectl apply` may fail with `metadata.annotations:
+   Too long` on the `applicationsets.argoproj.io` CRD. This happens because plain
+   `kubectl apply` stores the whole applied object in a `last-applied-configuration`
+   annotation, and this particular CRD is large enough to exceed Kubernetes' annotation
+   size limit. Use a server-side apply instead, which does not store that annotation:
+   ```bash
+   kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml --server-side --force-conflicts
+   ```
+
 1. Install the OCM Argo CD add-on on the Hub cluster:
     ```
     kubectl config use-context kind-hub

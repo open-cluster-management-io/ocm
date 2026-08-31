@@ -9,4 +9,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: test
-    namespace: open-cluster-management-managed-serviceaccount
+    namespace: open-cluster-management-agent-addon

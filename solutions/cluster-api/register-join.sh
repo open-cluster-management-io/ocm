@@ -14,7 +14,7 @@ $(echo ${joincmd} --dry-run --output-file join.yaml  | sed "s/<cluster_name>/$CL
 kubectl create secret generic import-secret-$1 --from-file=join.yaml --type=addons.cluster.x-k8s.io/resource-set
 
 cat << EOF | kubectl apply -f -
-apiVersion: addons.cluster.x-k8s.io/v1alpha3
+apiVersion: addons.cluster.x-k8s.io/v1beta1
 kind: ClusterResourceSet
 metadata:
  name: import-$CLUSTER_NAME
@@ -24,6 +24,6 @@ spec:
    matchLabels:
      cluster.x-k8s.io/cluster-name: $CLUSTER_NAME
  resources:
-   - name: import-secret
+   - name: import-secret-$CLUSTER_NAME
      kind: Secret
 EOF
