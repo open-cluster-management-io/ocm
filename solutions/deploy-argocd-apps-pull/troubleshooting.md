@@ -19,47 +19,28 @@ Despite the type `ErrorOccurred`, the status is `"False"`, which means the Appli
 
 #### `ImagePullBackOff` on `argocd-pull-integration` (Apple Silicon / arm64)
 
-**Symptom:** the `argocd-pull-integration` deployment in the hub's `argocd` namespace stays in
-`ImagePullBackOff`, and `kubectl -n argocd describe pod -l app.kubernetes.io/name=argocd-pull-integration`
-shows:
-```text
-Failed to pull image "quay.io/open-cluster-management/argocd-pull-integration:<tag>":
-rpc error: code = NotFound desc = failed to pull and unpack image "...": no match for platform in manifest: not found
-```
+**Historical issue, fixed upstream — no workaround needed on current versions.** Earlier releases of the
+`argocd-pull-integration` image were only published for `linux/amd64`, which caused `ImagePullBackOff` on
+Apple Silicon / arm64 hosts. This was fixed in
+[argocd-pull-integration#179](https://github.com/open-cluster-management-io/argocd-pull-integration/issues/179):
+as of `argocd-pull-integration` v0.29.0 (released 2026-08-31), the image is published for both `linux/amd64`
+and `linux/arm64`, and the `ocm/argocd-pull-integration` chart that `clusteradm install hub-addon --names argocd`
+installs by default already pins that tag. Confirmed on a clean arm64 (Apple Silicon) host: the
+`argocd-pull-integration` deployment pulls and runs successfully with no manual image build required.
 
-**Root cause:** this depends on the exact image tag `clusteradm install hub-addon --names argocd` pins in
-your version of the chart, not on the solution itself — a future release may add `linux/arm64` support and
-make this workaround unnecessary. Before doing anything else, find the tag actually being used and check it
-yourself:
+If you still see `ImagePullBackOff` on `argocd-pull-integration` on an arm64 host, check which tag your
+install actually pulled and whether that specific tag has a `linux/arm64` manifest published:
 ```shell
 # find the tag your install actually pulled
 kubectl get deployment argocd-pull-integration -n argocd -o jsonpath='{.spec.template.spec.containers[0].image}'
 
-# check whether THAT tag has a linux/arm64 variant published (not just any arm64 platform)
+# check whether THAT tag has a linux/arm64 variant published
 docker manifest inspect quay.io/open-cluster-management/argocd-pull-integration:<the-tag-from-above> | \
   jq -e '.manifests[]? | select(.platform.os=="linux" and .platform.architecture=="arm64")'
-# no jq? grep -B1 '"architecture": "arm64"' on the same output and check the line above it says "os": "linux"
 ```
-If that doesn't return a match, the pod will `ImagePullBackOff` on Apple Silicon / arm64 hosts.
-`argocd-pull-integration-controller` is the controller that watches for `Application`s carrying the
-pull-model labels and wraps them into `ManifestWork`; without it running, no `Application` ever gets
-delivered to any managed cluster, on any architecture where this image can't run.
-
-**Workaround:** build a native `arm64` image from source and load it into your KinD nodes so `kubelet`'s
-`IfNotPresent` pull policy uses the local image instead of pulling from the registry. Replace `<tag>` below
-with the exact tag you found above (do **not** build from `main`, which can be ahead of the last release
-and would then get mislabeled as that release):
-```shell
-git clone https://github.com/open-cluster-management-io/argocd-pull-integration.git
-cd argocd-pull-integration
-git checkout <tag>   # must be the same tag you checked above and use below
-docker build --platform linux/arm64 -t quay.io/open-cluster-management/argocd-pull-integration:<tag> .
-
-# Load into every KinD node that runs a copy of this image (hub, and any managed cluster
-# using the argocd addon), matching the tag your addon chart expects:
-kind load docker-image quay.io/open-cluster-management/argocd-pull-integration:<tag> --name <cluster-name>
-```
-Then restart the affected pod(s) so they pick up the locally-loaded image.
+If it's older than v0.29.0, upgrade the addon (`helm upgrade` the `ocm/argocd-pull-integration` chart, or
+reinstall via `clusteradm install hub-addon --names argocd` to pick up the current chart default) rather than
+building a local workaround image.
 
 #### `clusteradm install hub-addon --names argocd` fails with a `ClusterRoleBinding` ownership conflict
 

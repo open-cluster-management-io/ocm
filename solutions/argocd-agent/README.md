@@ -280,57 +280,15 @@ guestbook   Synced        Healthy
 
 ## Troubleshooting
 
-### `ImagePullBackOff` on `argocd-pull-integration-controller` (Apple Silicon / arm64)
-
-**Symptom:** the `argocd-pull-integration-controller` deployment in the hub's `argocd` namespace stays in
-`ImagePullBackOff`, and `kubectl -n argocd describe pod -l control-plane=argocd-pull-integration-controller` shows:
-
-```text
-Failed to pull image "quay.io/open-cluster-management/argocd-pull-integration:<tag>":
-rpc error: code = NotFound desc = failed to pull and unpack image "...": no match for platform in manifest: not found
-```
-
-**Root cause:** this depends on the exact image tag your addon chart pins, not on the solution itself — a
-future release may add `linux/arm64` support and make this workaround unnecessary. Before doing anything
-else, find the tag actually being used and check it yourself:
-
-```shell
-# find the tag your install actually pulled
-kubectl get deployment argocd-pull-integration-controller -n argocd -o jsonpath='{.spec.template.spec.containers[0].image}'
-
-# check whether THAT tag has a linux/arm64 variant published (not just any arm64 platform)
-docker manifest inspect quay.io/open-cluster-management/argocd-pull-integration:<the-tag-from-above> | \
-  jq -e '.manifests[]? | select(.platform.os=="linux" and .platform.architecture=="arm64")'
-# no jq? grep -B1 '"architecture": "arm64"' on the same output and check the line above it says "os": "linux"
-```
-
-If that doesn't return a match, the pod will `ImagePullBackOff` on Apple Silicon / arm64 hosts.
-`argocd-pull-integration-controller` is the component that watches the `GitOpsCluster`/`Placement` resources
-and generates the `AddOnTemplate` that tells OCM's addon framework what to actually deploy to each managed
-cluster. It is also the component that automatically generates the principal's PKI secrets (see
-[Principal pod crash-loops with a missing TLS/JWT secret](#principal-pod-crash-loops-with-a-missing-tlsjwt-secret)
-below). Without it running, `ManagedClusterAddOn`s for `argocd-agent-addon` will never progress past
-`Progressing: False / Waiting for ManifestApplied`, and the principal pod will crash-loop on missing secrets,
-on any architecture where this image can't run.
-
-**Workaround:** build a native `arm64` image from source and load it into your KinD nodes so `kubelet`'s
-`IfNotPresent` pull policy uses the local image instead of pulling from the registry. Replace `<tag>` below
-with the exact tag you found above (do **not** build from `main`, which can be ahead of the last release
-and would then get mislabeled as that release):
-
-```shell
-git clone https://github.com/open-cluster-management-io/argocd-pull-integration.git
-cd argocd-pull-integration
-git checkout <tag>   # must be the same tag you checked above and use below
-docker build --platform linux/arm64 -t quay.io/open-cluster-management/argocd-pull-integration:<tag> .
-
-# Load into every KinD node that runs a copy of this image (hub, and any managed cluster
-# using the argocd-agent-addon), matching the tag your addon chart expects:
-kind load docker-image quay.io/open-cluster-management/argocd-pull-integration:<tag> --name <cluster-name>
-```
-
-Then restart the affected pod(s) (`kubectl -n argocd delete pod -l control-plane=argocd-pull-integration-controller`,
-and similarly for the addon's deployment on each managed cluster) so they pick up the locally-loaded image.
+> **Note on Apple Silicon / arm64:** earlier versions of the `argocd-pull-integration` image (which backs
+> `argocd-pull-integration-controller` below) were only published for `linux/amd64`, causing `ImagePullBackOff`
+> on arm64 hosts. This was fixed upstream in
+> [argocd-pull-integration#179](https://github.com/open-cluster-management-io/argocd-pull-integration/issues/179):
+> as of v0.29.0 (released 2026-08-31) the image is published for `linux/arm64` too, and the addon chart that
+> `clusteradm install hub-addon --names argocd-agent` installs by default already pins that tag. Confirmed on a
+> clean arm64 host — no manual image build needed. If you still hit `ImagePullBackOff` on this deployment,
+> check the tag it actually pulled (`kubectl get deployment argocd-pull-integration-controller -n argocd -o
+> jsonpath='{.spec.template.spec.containers[0].image}'`) and upgrade the addon if it's older than v0.29.0.
 
 ### Principal pod crash-loops with a missing TLS/JWT secret
 
@@ -347,9 +305,8 @@ secret, it almost always means that controller isn't running yet. Check it first
 kubectl -n argocd get pod -l app.kubernetes.io/name=argocd-pull-integration-controller
 ```
 
-If it's not `Running` (e.g. `ImagePullBackOff`), fix that first — see the arm64 entry above, which is the most
-common reason this happens on Apple Silicon/arm64 hosts — and the PKI secrets will appear on their own once it
-starts. If it *is* `Running`, check its logs for errors
+If it's not `Running` (e.g. `ImagePullBackOff`), fix that first, then the PKI secrets will appear on their own
+once it starts. If it *is* `Running`, check its logs for errors
 (`kubectl -n argocd logs deploy/argocd-pull-integration-controller`) and the `GitOpsCluster` status
 (`kubectl -n argocd get gitopscluster gitops-cluster -o yaml`) for which specific condition
 (`CACertificateReady`, `PrincipalCertificateReady`, `ResourceProxyCertificateReady`, `JWTSecretReady`) isn't
