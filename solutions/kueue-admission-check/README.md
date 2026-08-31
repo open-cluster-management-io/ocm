@@ -6,7 +6,7 @@ This solution demonstrates the integration of [Kueue's MultiKueue](https://kueue
 
 - **Simplified MultiKueue Setup**: Automates generation of MultiKueue specific Kubeconfig, streamlines configuration of MultiKueue resources, and eliminates manual secret management
 - **Centralized Resource Management**: Manage spoke resources (ResourceFlavor, ClusterQueue, LocalQueue) from a single hub using template-based deployment
-+- **Enhanced Multicluster Scheduling**: Integrates OCM Placement with MultiKueue via an AdmissionCheck controller, generates MultiKueueConfig dynamically based on Placement decisions, and supports advanced placement strategies
+- **Enhanced Multicluster Scheduling**: Integrates OCM Placement with MultiKueue via an AdmissionCheck controller, generates MultiKueueConfig dynamically based on Placement decisions, and supports advanced placement strategies
 - **Flexible Installation Options**: Standard installation for existing Kueue setups, operator-based installation for OpenShift/OLM environments, and cluster proxy support for enhanced connectivity
 
 **For comprehensive design documentation and technical workflows, refer to the [kueue-addon](https://github.com/open-cluster-management-io/addon-contrib/blob/main/kueue-addon/README.md).**
@@ -165,7 +165,7 @@ kubectl create -f ./job-demo1.yaml
 ```bash
 kubectl get workload --context kind-cluster1
 NAME                       QUEUE              RESERVED IN           ADMITTED   AGE
-job-demo1-jobnktc6-6c5f3   user-queue-demo1   cluster-queue-demo1   True       5s
+demo1-job-nktc6-6c5f3   user-queue-demo1   cluster-queue-demo1   True       5s
 
 kubectl get workload --context kind-cluster2
 No resources found in default namespace.   # After cluster1 admitted the workload, no workload should show up here.
@@ -306,7 +306,7 @@ As an admin, I want to leverage OCM's `AddonPlacementScore` for dynamic workload
 Here in this environment, cluster1 has no GPUs, while cluster2 and cluster3 each have 3 GPUs. Check `AddonPlacementScore`—the score ranges from -100 to 100, with clusters having more resources available receiving higher scores. Here, cluster1, which has no GPUs, should have a score of -100, and the cluster running the workload (from Story 2, `kind-cluster3`) will have a lower score.
 
 ```bash
-kubectl get addonplacementscore -A -ojson | jq '.items[] | .metadata.name, .status.scores[5]'
+kubectl get addonplacementscore -A -ojson | jq '.items[] | .metadata.name, (.status.scores[] | select(.name=="gpuClusterAvailable"))'
 "resource-usage-score"
 {
   "name": "gpuClusterAvailable",

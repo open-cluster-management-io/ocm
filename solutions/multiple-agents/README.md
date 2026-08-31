@@ -4,7 +4,7 @@ The scripts provided in this document help you set up an Open Cluster Management
 
 ## Prerequisite
 
-- [kind](https://kind.sigs.k8s.io) must be installed on your local machine. The Kubernetes version must be >= 1.19, see [kind user guide](https://kind.sigs.k8s.io/docs/user/quick-start/#creating-a-cluster) for more details.
+- [kind](https://kind.sigs.k8s.io) must be installed on your local machine. The Kubernetes version must be >= 1.25, see [kind user guide](https://kind.sigs.k8s.io/docs/user/quick-start/#creating-a-cluster) for more details.
 
 - Download and install [clusteradm](https://github.com/open-cluster-management-io/clusteradm/releases). For Linux OS, run the following commands:
 
@@ -13,6 +13,10 @@ The scripts provided in this document help you set up an Open Cluster Management
 
     sudo chmod +x /usr/local/bin/clusteradm
     ```
+
+    For other platforms (macOS, arm64), download the appropriate binary from the [clusteradm releases page](https://github.com/open-cluster-management-io/clusteradm/releases).
+
+    Note: The clusteradm version must be >= 0.8.0.
 
 ## Setup the first hub cluster
 
@@ -73,4 +77,14 @@ open-cluster-management-agent              Active   18m
 open-cluster-management-agent-addon        Active   18m
 open-cluster-management-agent-hub2         Active   105s
 open-cluster-management-agent-hub2-addon   Active   105s
+```
+
+## Cleanup
+
+Delete all Kind clusters created by this demo:
+
+```bash
+kind delete cluster --name hub1
+kind delete cluster --name hub2
+kind delete cluster --name cluster1
 ```

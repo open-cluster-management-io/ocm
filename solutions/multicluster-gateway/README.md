@@ -10,7 +10,7 @@ Set up the dev environment with three Kind clusters (hub, cluster1, and cluster2
 
 ## Connect Clusters with Submariner
 
-Deploy multicluster service API and Submariner for cross-cluster traffic (from hub to managed clusters) using ServiceImport.
+Install [subctl](https://submariner.io/operations/deployment/subctl/) and deploy multicluster service API and Submariner for cross-cluster traffic (from hub to managed clusters) using ServiceImport.
 
 Correct the kubeconfig master IP address before deploying Submariner:
 
@@ -46,32 +46,26 @@ Wait for Envoy Gateway to become available:
 kubectl wait --timeout=5m -n envoy-gateway-system deployment/envoy-gateway --for=condition=Available --context kind-hub
 ```
 
-## Deploy Application from Hub:
+## Deploy Nginx Default Backend to Managed Clusters
 
-Deploy and enable the application addon:
+Deploy the nginx default-backend application to both managed clusters using [ManifestWork](https://open-cluster-management.io/docs/concepts/work-distribution/manifestwork/):
 
 ```bash
-clusteradm install hub-addon --names application-manager --context kind-hub
-clusteradm addon enable --names application-manager --clusters cluster1,cluster2 --context kind-hub
-kubectl get managedclusteraddon --all-namespaces --context kind-hub
+kubectl apply -f manifests/nginx-application --context kind-hub
 ```
 
-Deploy the nginx application to managed clusters:
+Wait for the deployments to be available on the managed clusters:
 
 ```bash
-clusteradm clusterset bind default --namespace default --context kind-hub
-kubectl label managedcluster cluster1 purpose=test --overwrite --context kind-hub
-kubectl label managedcluster cluster2 purpose=test --overwrite --context kind-hub
-kubectl apply -f manifests/nginx-application --context kind-hub
+kubectl wait --timeout=2m deployment/nginx-default-backend --for=condition=Available --context kind-cluster1
+kubectl wait --timeout=2m deployment/nginx-default-backend --for=condition=Available --context kind-cluster2
 ```
 
 Export the nginx application with subctl command:
 
 ```bash
-export NGINX_BACKEND_SERVICE_CLUSTER1=$(oc get svc -n default -l app=nginx-ingress,component=default-backend -o jsonpath='{.items[0].metadata.name}' --context kind-cluster1)
-export NGINX_BACKEND_SERVICE_CLUSTER2=$(oc get svc -n default -l app=nginx-ingress,component=default-backend -o jsonpath='{.items[0].metadata.name}' --context kind-cluster2)
-subctl export service ${NGINX_BACKEND_SERVICE_CLUSTER1} -n default --context kind-cluster1
-subctl export service ${NGINX_BACKEND_SERVICE_CLUSTER2} -n default --context kind-cluster2
+subctl export service nginx-default-backend -n default --context kind-cluster1
+subctl export service nginx-default-backend -n default --context kind-cluster2
 ```
 
 ## Create Gateway API Objects
@@ -79,16 +73,18 @@ subctl export service ${NGINX_BACKEND_SERVICE_CLUSTER2} -n default --context kin
 Create the Gateway API objects GatewayClass, Gateway and HTTPRoute in hub cluster to set up the routing:
 
 ```bash
-sed -i "s|nginx-ingress-1-default-backend|${NGINX_BACKEND_SERVICE_CLUSTER1}|g" manifests/gateway/httproute.yaml
-sed -i "s|nginx-ingress-2-default-backend|${NGINX_BACKEND_SERVICE_CLUSTER2}|g" manifests/gateway/httproute.yaml
-kubectl apply -f manifests/gateway --context kind-hub
+sed "s|nginx-ingress-1-default-backend|nginx-default-backend|g" manifests/gateway/httproute.yaml | \
+  sed "s|nginx-ingress-2-default-backend|nginx-default-backend|g" | \
+  kubectl apply --context kind-hub -f -
+kubectl apply -f manifests/gateway/gatewayclass.yaml -f manifests/gateway/gateway.yaml -f manifests/gateway/referencegrant.yaml --context kind-hub
 ```
 
 ## Verify the Multi-Cluster Gateway
 
-Get the name of the Envoy service created the by the example Gateway:
+Get the name of the Envoy service created by the example Gateway:
 
 ```bash
+kubectl wait --timeout=2m -n envoy-gateway-system svc -l gateway.envoyproxy.io/owning-gateway-name=eg --for=jsonpath='{.metadata.name}' --context kind-hub
 export ENVOY_SERVICE=$(kubectl get svc -n envoy-gateway-system --selector=gateway.envoyproxy.io/owning-gateway-namespace=default,gateway.envoyproxy.io/owning-gateway-name=eg -o jsonpath='{.items[0].metadata.name}' --context kind-hub)
 ```
 
@@ -102,4 +98,14 @@ Curl the example nginx default backend through Envoy proxy:
 
 ```bash
 curl --verbose --header "Host: www.example.com" http://localhost:8888/healthz
+```
+
+## Cleanup
+
+Delete all Kind clusters created by this demo:
+
+```bash
+kind delete cluster --name hub
+kind delete cluster --name cluster1
+kind delete cluster --name cluster2
 ```
