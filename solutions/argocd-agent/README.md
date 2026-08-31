@@ -114,14 +114,9 @@ secrets you may still need — not just the conflicting Argo CD install. Only do
 
 > **PKI is fully automatic — no `argocd-agentctl` needed.** The `argocd-agent` principal component requires
 > four secrets to start (a CA certificate, its own gRPC TLS certificate, a resource-proxy TLS certificate, and a
-> JWT signing key). As of the addon version installed by `clusteradm install hub-addon --names argocd-agent`
-> today (`argocd-pull-integration` v0.28.1 and later), the `GitOpsCluster` controller generates and manages all
-> four of these itself — you do **not** need to install the `argocd-agentctl` CLI or run any manual PKI commands.
-> Confirmed by re-testing end-to-end on a clean cluster with zero `argocd-agentctl` commands: the controller's
-> logs show `Successfully ensured ArgoCD agent CA certificate` / `... principal TLS certificate` / `... resource
-> proxy TLS certificate`, and `kubectl -n argocd get gitopscluster gitops-cluster -o yaml` reports
-> `CACertificateReady`, `PrincipalCertificateReady`, `ResourceProxyCertificateReady`, and `JWTSecretReady` all
-> `True`. If you see the principal crash-loop with a "secret not found" error anyway, that almost always means
+> JWT signing key). The `GitOpsCluster` controller (`argocd-pull-integration-controller`) generates and manages
+> all four of these itself — you do **not** need to install the `argocd-agentctl` CLI or run any manual PKI
+> commands. If you see the principal crash-loop with a "secret not found" error anyway, that almost always means
 > the controller responsible for creating these secrets isn't running yet — see
 > [Troubleshooting](#principal-pod-crash-loops-with-a-missing-tlsjwt-secret) below, not a missing manual step.
 
