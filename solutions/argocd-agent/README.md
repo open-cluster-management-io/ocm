@@ -280,16 +280,6 @@ guestbook   Synced        Healthy
 
 ## Troubleshooting
 
-> **Note on Apple Silicon / arm64:** earlier versions of the `argocd-pull-integration` image (which backs
-> `argocd-pull-integration-controller` below) were only published for `linux/amd64`, causing `ImagePullBackOff`
-> on arm64 hosts. This was fixed upstream in
-> [argocd-pull-integration#179](https://github.com/open-cluster-management-io/argocd-pull-integration/issues/179):
-> as of v0.29.0 (released 2026-08-31) the image is published for `linux/arm64` too, and the addon chart that
-> `clusteradm install hub-addon --names argocd-agent` installs by default already pins that tag. Confirmed on a
-> clean arm64 host — no manual image build needed. If you still hit `ImagePullBackOff` on this deployment,
-> check the tag it actually pulled (`kubectl get deployment argocd-pull-integration-controller -n argocd -o
-> jsonpath='{.spec.template.spec.containers[0].image}'`) and upgrade the addon if it's older than v0.29.0.
-
 ### Principal pod crash-loops with a missing TLS/JWT secret
 
 **Symptom:** `argocd-agent-principal` is stuck in `Error`/`CrashLoopBackOff`, with logs like
