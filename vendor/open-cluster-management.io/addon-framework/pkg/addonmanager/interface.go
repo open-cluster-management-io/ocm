@@ -5,6 +5,7 @@ import (
 
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	kubeinformers "k8s.io/client-go/informers"
+
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"

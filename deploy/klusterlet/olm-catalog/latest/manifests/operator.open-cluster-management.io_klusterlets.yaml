@@ -53,6 +53,18 @@ spec:
               deployOption:
                 description: DeployOption contains the options of deploying a klusterlet
                 properties:
+                  hosted:
+                    description: |-
+                      Hosted holds configuration for a mode whose controllers run on a separate management
+                      cluster rather than locally.
+                    properties:
+                      managementClusterName:
+                        description: |-
+                          ManagementClusterName is the name (as known to the hub) of the cluster where this
+                          klusterlet's controllers actually run, for a mode where that's a separate management
+                          cluster rather than the klusterlet running locally.
+                        type: string
+                    type: object
                   mode:
                     description: |-
                       Mode can be Default, Hosted, Singleton or SingletonHosted. It is Default mode if not specified
@@ -63,6 +75,18 @@ spec:
                       In Singleton mode, registration/work agent is started as a single deployment.
                       In SingletonHosted mode, agent is started as a single deployment in hosted mode.
                       Note: Do not modify the Mode field once it's applied.
+                    type: string
+                  reportHostingCluster:
+                    description: |-
+                      ReportHostingCluster, when set to Enable, makes this klusterlet self-report where its own
+                      controllers actually run - its own cluster name when they run locally, or
+                      Hosted.ManagementClusterName when they run on a separate management cluster - via a
+                      reserved ClusterClaim named "hosting-cluster.open-cluster-management.io". Disabled by
+                      default: the klusterlet-operator emits nothing and behaves exactly as it does today unless
+                      this is explicitly set to Enable.
+                    enum:
+                    - Enable
+                    - Disable
                     type: string
                 type: object
               externalServerURLs:

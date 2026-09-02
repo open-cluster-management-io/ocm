@@ -9,6 +9,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -314,8 +315,8 @@ func (s *healthCheckSyncer) analyzeWorkloadsWorkProber(
 	workloads := utils.FilterWorkloads(manifests)
 	for _, workload := range workloads {
 		// Not probe the deployment with zero replicas
-		if workload.GroupResource.Group == appsv1.GroupName &&
-			workload.GroupResource.Resource == "deployments" &&
+		if workload.Group == appsv1.GroupName &&
+			workload.Resource == "deployments" &&
 			workload.DeploymentSpec != nil &&
 			workload.DeploymentSpec.Replicas == 0 {
 			continue

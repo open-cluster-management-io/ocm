@@ -132,6 +132,11 @@ func (in HealthCheck) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in HostedModeAutoDiscoveryConfig) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.addon.v1beta1.HostedModeAutoDiscoveryConfig"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in HubPermissionConfig) OpenAPIModelName() string {
 	return "io.open-cluster-management.api.addon.v1beta1.HubPermissionConfig"
 }

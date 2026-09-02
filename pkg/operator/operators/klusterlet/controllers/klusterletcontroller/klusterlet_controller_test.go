@@ -1984,3 +1984,140 @@ func TestBuildClusterAnnotationsString(t *testing.T) {
 		})
 	}
 }
+
+// TestReportHostingClusterDisabledByDefault: opt-in unset, no self-report args rendered.
+func TestReportHostingClusterDisabledByDefault(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
+	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
+	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	namespace := newNamespace("testns")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
+		bootStrapSecret, hubKubeConfigSecret, namespace)
+
+	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	deployment := getDeployments(controller.kubeClient.Actions(), createVerb, "registration-agent")
+	if deployment == nil {
+		t.Fatal("registration deployment not found")
+	}
+	args := deployment.Spec.Template.Spec.Containers[0].Args
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--report-hosting-cluster") || strings.HasPrefix(arg, "--hosting-cluster-name") {
+			t.Errorf("expected no self-report args when reportHostingCluster is unset, got %v", args)
+		}
+	}
+}
+
+// TestReportHostingClusterDefaultMode: Default mode reports the klusterlet's own ClusterName.
+func TestReportHostingClusterDefaultMode(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	klusterlet.Spec.DeployOption.ReportHostingCluster = operatorapiv1.ReportHostingClusterModeEnable
+	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
+	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
+	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	namespace := newNamespace("testns")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
+		bootStrapSecret, hubKubeConfigSecret, namespace)
+
+	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	deployment := getDeployments(controller.kubeClient.Actions(), createVerb, "registration-agent")
+	if deployment == nil {
+		t.Fatal("registration deployment not found")
+	}
+	args := deployment.Spec.Template.Spec.Containers[0].Args
+	assert.Contains(t, args, "--report-hosting-cluster=true")
+	assert.Contains(t, args, "--hosting-cluster-name=cluster1")
+}
+
+// TestReportHostingClusterHostedMode: Hosted mode reports Hosted.ManagementClusterName.
+func TestReportHostingClusterHostedMode(t *testing.T) {
+	klusterlet := newKlusterletHosted("klusterlet", "testns", "cluster1")
+	klusterlet.Spec.DeployOption.ReportHostingCluster = operatorapiv1.ReportHostingClusterModeEnable
+	klusterlet.Spec.DeployOption.Hosted = &operatorapiv1.KlusterletHostedConfiguration{
+		ManagementClusterName: "hosting-cluster-b",
+	}
+	meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
+		Type: operatorapiv1.ConditionReadyToApply, Status: metav1.ConditionTrue, Reason: "KlusterletPrepared",
+		Message: "Klusterlet is ready to apply, the external managed kubeconfig secret was created at: " +
+			hostedKubeconfigCreationTime,
+	})
+	agentNamespace := helpers.AgentNamespace(klusterlet)
+	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, agentNamespace)
+	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, agentNamespace)
+	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	namespace := newNamespace(agentNamespace)
+	pullSecret := newSecret(helpers.ImagePullSecret, "open-cluster-management")
+
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestControllerHosted(t, klusterlet, nil, bootStrapSecret,
+		hubKubeConfigSecret, namespace, pullSecret)
+
+	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	// Hosted mode applies the registration-agent deployment to the management cluster.
+	deployment := getDeployments(controller.kubeClient.Actions(), createVerb, "registration-agent")
+	if deployment == nil {
+		t.Fatal("registration deployment not found")
+	}
+	args := deployment.Spec.Template.Spec.Containers[0].Args
+	assert.Contains(t, args, "--report-hosting-cluster=true")
+	assert.Contains(t, args, "--hosting-cluster-name=hosting-cluster-b")
+	for _, arg := range args {
+		assert.NotEqual(t, "--hosting-cluster-name=cluster1", arg,
+			"self-report must publish the hosting cluster (Hosted.ManagementClusterName), not the target's own ClusterName")
+	}
+}
+
+// TestReportHostingClusterHostedModeWithoutManagementClusterName: Hosted mode with Hosted unset
+// (or ManagementClusterName empty) must report nothing, never fall back to the target's own
+// ClusterName.
+func TestReportHostingClusterHostedModeWithoutManagementClusterName(t *testing.T) {
+	klusterlet := newKlusterletHosted("klusterlet", "testns", "cluster1")
+	klusterlet.Spec.DeployOption.ReportHostingCluster = operatorapiv1.ReportHostingClusterModeEnable
+	meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
+		Type: operatorapiv1.ConditionReadyToApply, Status: metav1.ConditionTrue, Reason: "KlusterletPrepared",
+		Message: "Klusterlet is ready to apply, the external managed kubeconfig secret was created at: " +
+			hostedKubeconfigCreationTime,
+	})
+	agentNamespace := helpers.AgentNamespace(klusterlet)
+	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, agentNamespace)
+	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, agentNamespace)
+	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	namespace := newNamespace(agentNamespace)
+	pullSecret := newSecret(helpers.ImagePullSecret, "open-cluster-management")
+
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestControllerHosted(t, klusterlet, nil, bootStrapSecret,
+		hubKubeConfigSecret, namespace, pullSecret)
+
+	err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	deployment := getDeployments(controller.kubeClient.Actions(), createVerb, "registration-agent")
+	if deployment == nil {
+		t.Fatal("registration deployment not found")
+	}
+	args := deployment.Spec.Template.Spec.Containers[0].Args
+	assert.Contains(t, args, "--hosting-cluster-name=")
+	for _, arg := range args {
+		assert.NotEqual(t, "--hosting-cluster-name=cluster1", arg,
+			"must never self-report the target's own ClusterName as its hosting cluster")
+	}
+}

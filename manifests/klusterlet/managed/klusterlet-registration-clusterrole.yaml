@@ -24,6 +24,16 @@ rules:
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["clusterclaims"]
   verbs: ["get", "list", "watch"]
+# Allow agent to create the reserved hosting-cluster claim (KEP-188). create can't be
+# scoped by resourceNames since the object doesn't exist yet.
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["clusterclaims"]
+  verbs: ["create"]
+# Allow agent to update/delete only the reserved hosting-cluster claim (KEP-188).
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["clusterclaims"]
+  resourceNames: ["hosting-cluster.open-cluster-management.io"]
+  verbs: ["update", "delete"]
   # Allow agent to list clusterproperties
 - apiGroups: ["about.k8s.io"]
   resources: ["clusterproperties"]

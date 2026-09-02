@@ -125,6 +125,10 @@ spec:
           {{if .ReservedClusterClaimSuffixes}}
           - "--reserved-cluster-claim-suffixes={{ .ReservedClusterClaimSuffixes }}"
           {{end}}
+          {{if .ReportHostingCluster}}
+          - "--report-hosting-cluster=true"
+          - "--hosting-cluster-name={{ .HostingClusterName }}"
+          {{end}}
           {{if .AddOnKubeClientRegistrationAuth}}
           - "--addon-kubeclient-registration-auth={{ .AddOnKubeClientRegistrationAuth }}"
           {{end}}

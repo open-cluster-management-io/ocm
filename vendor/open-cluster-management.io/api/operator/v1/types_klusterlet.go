@@ -371,6 +371,42 @@ type KlusterletDeployOption struct {
 	// Note: Do not modify the Mode field once it's applied.
 	// +optional
 	Mode InstallMode `json:"mode"`
+
+	// ReportHostingCluster, when set to Enable, makes this klusterlet self-report where its own
+	// controllers actually run - its own cluster name when they run locally, or
+	// Hosted.ManagementClusterName when they run on a separate management cluster - via a
+	// reserved ClusterClaim named "hosting-cluster.open-cluster-management.io". Disabled by
+	// default: the klusterlet-operator emits nothing and behaves exactly as it does today unless
+	// this is explicitly set to Enable.
+	// +optional
+	ReportHostingCluster ReportHostingClusterMode `json:"reportHostingCluster,omitempty"`
+
+	// Hosted holds configuration for a mode whose controllers run on a separate management
+	// cluster rather than locally.
+	// +optional
+	Hosted *KlusterletHostedConfiguration `json:"hosted,omitempty"`
+}
+
+// ReportHostingClusterMode is the type for KlusterletDeployOption.ReportHostingCluster. A typed
+// enum, not a bool, so a later mode can be added without a breaking change to the field's shape.
+// +kubebuilder:validation:Enum=Enable;Disable
+type ReportHostingClusterMode string
+
+const (
+	// ReportHostingClusterModeEnable enables self-reporting of the klusterlet's hosting cluster.
+	ReportHostingClusterModeEnable ReportHostingClusterMode = "Enable"
+	// ReportHostingClusterModeDisable disables self-reporting. This is the default.
+	ReportHostingClusterModeDisable ReportHostingClusterMode = "Disable"
+)
+
+// KlusterletHostedConfiguration holds configuration for a mode whose controllers run on a
+// separate management cluster rather than locally.
+type KlusterletHostedConfiguration struct {
+	// ManagementClusterName is the name (as known to the hub) of the cluster where this
+	// klusterlet's controllers actually run, for a mode where that's a separate management
+	// cluster rather than the klusterlet running locally.
+	// +optional
+	ManagementClusterName string `json:"managementClusterName,omitempty"`
 }
 
 // KlusterletStatus represents the current status of Klusterlet agent.

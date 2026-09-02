@@ -59,4 +59,7 @@ var ReservedClusterClaimNames = [...]string{
 	"platform.open-cluster-management.io",
 	// product name, like OpenShift, Anthos, EKS and GKE
 	"product.open-cluster-management.io",
+	// the cluster a klusterlet's own controllers actually run on, self-reported when
+	// KlusterletDeployOption.ReportHostingCluster is enabled
+	"hosting-cluster.open-cluster-management.io",
 }

@@ -17,11 +17,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 func MergeRelatedObjects(modified *bool, objs *[]addonapiv1beta1.ObjectReference, obj addonapiv1beta1.ObjectReference) {
@@ -246,24 +245,6 @@ func ownerRefMatched(existing, required metav1.OwnerReference) bool {
 	}
 
 	return true
-}
-
-// AddonManagementFilterFunc is to check if the addon should be managed by addon manager or self-managed
-type AddonManagementFilterFunc func(cma *addonapiv1beta1.ClusterManagementAddOn) bool
-
-func ManagedByAddonManager(obj interface{}) bool {
-	accessor, _ := meta.Accessor(obj)
-	annotations := accessor.GetAnnotations()
-	if len(annotations) == 0 {
-		return true
-	}
-
-	value, ok := annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey]
-	if !ok {
-		return true
-	}
-
-	return value == addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue
 }
 
 func FilterByAddonName(agentAddons map[string]agent.AgentAddon) func(obj interface{}) bool {

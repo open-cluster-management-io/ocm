@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"k8s.io/klog/v2"
+
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )

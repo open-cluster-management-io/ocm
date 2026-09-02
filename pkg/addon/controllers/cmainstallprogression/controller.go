@@ -23,21 +23,18 @@ type cmaInstallProgressionController struct {
 	patcher patcher.Patcher[
 		*addonv1beta1.ClusterManagementAddOn, addonv1beta1.ClusterManagementAddOnSpec, addonv1beta1.ClusterManagementAddOnStatus]
 	clusterManagementAddonLister addonlisterv1beta1.ClusterManagementAddOnLister
-	addonFilterFunc              factory.EventFilterFunc
 }
 
 func NewCMAInstallProgressionController(
 	addonClient addonclient.Interface,
 	addonInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
 	clusterManagementAddonInformers addoninformerv1beta1.ClusterManagementAddOnInformer,
-	addonFilterFunc factory.EventFilterFunc,
 ) factory.Controller {
 	c := &cmaInstallProgressionController{
 		patcher: patcher.NewPatcher[
 			*addonv1beta1.ClusterManagementAddOn, addonv1beta1.ClusterManagementAddOnSpec, addonv1beta1.ClusterManagementAddOnStatus](
 			addonClient.AddonV1beta1().ClusterManagementAddOns()),
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
-		addonFilterFunc:              addonFilterFunc,
 	}
 
 	return factory.New().WithInformersQueueKeysFunc(
@@ -66,12 +63,6 @@ func (c *cmaInstallProgressionController) sync(ctx context.Context, syncCtx fact
 	// update default config reference when type is manual
 	if mgmtAddonCopy.Spec.InstallStrategy.Type == "" || mgmtAddonCopy.Spec.InstallStrategy.Type == addonv1beta1.AddonInstallStrategyManual {
 		mgmtAddonCopy.Status.InstallProgressions = []addonv1beta1.InstallProgression{}
-		_, err = c.patcher.PatchStatus(ctx, mgmtAddonCopy, mgmtAddonCopy.Status, mgmtAddon.Status)
-		return err
-	}
-
-	// only update default config references and skip updating install progression for self-managed addon
-	if !c.addonFilterFunc(mgmtAddon) {
 		_, err = c.patcher.PatchStatus(ctx, mgmtAddonCopy, mgmtAddonCopy.Status, mgmtAddon.Status)
 		return err
 	}
