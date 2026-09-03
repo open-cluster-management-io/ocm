@@ -352,8 +352,7 @@ func assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret strin
 		if err != nil {
 			return err
 		}
-		accepted := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
-		if accepted == nil {
+		if !meta.IsStatusConditionTrue(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted) {
 			return fmt.Errorf("managed cluster is not accepted")
 		}
 		return nil
@@ -395,9 +394,6 @@ func assertAddonLabel(clusterName, addonName, status string) {
 		cluster, err := util.GetManagedCluster(clusterClient, clusterName)
 		if err != nil {
 			return err
-		}
-		if len(cluster.Labels) == 0 {
-			return fmt.Errorf("no labels found on managed cluster")
 		}
 		key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addonName)
 		if cluster.Labels[key] != status {

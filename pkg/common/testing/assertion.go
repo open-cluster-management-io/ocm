@@ -136,7 +136,8 @@ func AssertCondition(
 	t.Helper()
 	cond := meta.FindStatusCondition(actualConditions, expectedCondition.Type)
 	if cond == nil {
-		t.Errorf("expected condition %s but got: %s", expectedCondition.Type, cond.Type)
+		t.Errorf("expected condition %s but got: nil", expectedCondition.Type)
+		return
 	}
 	if cond.Status != expectedCondition.Status {
 		t.Errorf("expected status %s but got: %s", expectedCondition.Status, cond.Status)
