@@ -37,6 +37,7 @@ func (MyOperatorResource) SwaggerDoc() map[string]string {
 var map_NodeStatus = map[string]string{
 	"":                         "NodeStatus provides information about the current state of a particular node managed by this operator.",
 	"nodeName":                 "nodeName is the name of the node",
+	"nodeUID":                  "nodeUID is the UID of the node. This field is used to detect that a node has been deleted and recreated with the same name. When the UID changes, it indicates the node is a new instance and the controller should treat this status entry as stale. When omitted, UID-based node replacement detection is not available for this entry.",
 	"currentRevision":          "currentRevision is the generation of the most recently successful deployment. Can not be set on creation of a nodeStatus. Updates must only increase the value.",
 	"targetRevision":           "targetRevision is the generation of the deployment we're trying to apply. Can not be set on creation of a nodeStatus.",
 	"lastFailedRevision":       "lastFailedRevision is the generation of the deployment we tried and failed to deploy.",
@@ -118,6 +119,15 @@ func (Authentication) SwaggerDoc() map[string]string {
 	return map_Authentication
 }
 
+var map_AuthenticationConfigMapReference = map[string]string{
+	"":     "AuthenticationConfigMapReference references a ConfigMap in the openshift-config namespace.",
+	"name": "name is the metadata.name of the referenced ConfigMap. Must be a valid DNS subdomain name (RFC 1123): at most 253 characters, only lowercase alphanumeric characters, '-' or '.', starting and ending with an alphanumeric character.",
+}
+
+func (AuthenticationConfigMapReference) SwaggerDoc() map[string]string {
+	return map_AuthenticationConfigMapReference
+}
+
 var map_AuthenticationList = map[string]string{
 	"":         "AuthenticationList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
@@ -125,6 +135,26 @@ var map_AuthenticationList = map[string]string{
 
 func (AuthenticationList) SwaggerDoc() map[string]string {
 	return map_AuthenticationList
+}
+
+var map_AuthenticationProxyConfig = map[string]string{
+	"":           "AuthenticationProxyConfig holds proxy configuration scoped to authentication components (the OAuth server and the cluster authentication operator).",
+	"httpProxy":  "httpProxy is the URL of the proxy for HTTP requests. Must be a valid URL with http or https scheme, a non-empty hostname, and no path, query parameters, or fragment. Userinfo (e.g. user:password@host) is allowed for proxy authentication. Maximum length is 2048 characters.",
+	"httpsProxy": "httpsProxy is the URL of the proxy for HTTPS requests. Must be a valid URL with http or https scheme, a non-empty hostname, and no path, query parameters, or fragment. Userinfo (e.g. user:password@host) is allowed for proxy authentication. Maximum length is 2048 characters.",
+	"noProxy":    "noProxy is a list of hostnames and/or CIDRs and/or IPs for which the proxy should not be used. Must contain at least one entry when set. Each entry must be between 1 and 253 characters long and at most 64 entries are allowed. Duplicate entries are not permitted. Entries that are not valid hostnames, CIDRs, or IPs are silently ignored. Cluster-internal defaults (.cluster.local, .svc, 127.0.0.1, localhost) are always appended automatically and do not need to be included.",
+	"trustedCA":  "trustedCA is a reference to a ConfigMap in the openshift-config namespace containing a CA certificate bundle under the key \"ca-bundle.crt\". This bundle is appended to the system trust store used by authentication components for proxy TLS connections. When omitted, only the system trust store is used.",
+}
+
+func (AuthenticationProxyConfig) SwaggerDoc() map[string]string {
+	return map_AuthenticationProxyConfig
+}
+
+var map_AuthenticationSpec = map[string]string{
+	"proxy": "proxy configures proxy settings for outbound connections made by the authentication stack. When set, it replaces the cluster-wide proxy (proxy.config.openshift.io/cluster) entirely for authentication — individual fields are not inherited from the cluster-wide configuration. When omitted, the cluster-wide proxy is used if configured; otherwise no proxy is used.",
+}
+
+func (AuthenticationSpec) SwaggerDoc() map[string]string {
+	return map_AuthenticationSpec
 }
 
 var map_AuthenticationStatus = map[string]string{
@@ -137,6 +167,7 @@ func (AuthenticationStatus) SwaggerDoc() map[string]string {
 
 var map_OAuthAPIServerStatus = map[string]string{
 	"latestAvailableRevision": "latestAvailableRevision is the latest revision used as suffix of revisioned secrets like encryption-config. A new revision causes a new deployment of pods.",
+	"encryptionStatus":        "encryptionStatus contains status reports for the KMS plugin health and its key rotation.",
 }
 
 func (OAuthAPIServerStatus) SwaggerDoc() map[string]string {
@@ -210,7 +241,7 @@ func (AddPage) SwaggerDoc() map[string]string {
 
 var map_Capability = map[string]string{
 	"":           "Capabilities contains set of UI capabilities and their state in the console UI.",
-	"name":       "name is the unique name of a capability. Available capabilities are LightspeedButton and GettingStartedBanner.",
+	"name":       "name is the unique name of a capability. Available capabilities are LightspeedButton, GettingStartedBanner, and GuidedTour.",
 	"visibility": "visibility defines the visibility state of the capability.",
 }
 
@@ -259,7 +290,7 @@ func (ConsoleConfigRoute) SwaggerDoc() map[string]string {
 var map_ConsoleCustomization = map[string]string{
 	"":                     "ConsoleCustomization defines a list of optional configuration for the console UI. Ensure that Logos and CustomLogoFile cannot be set at the same time.",
 	"logos":                "logos is used to replace the OpenShift Masthead and Favicon logos in the console UI with custom logos. logos is an optional field that allows a list of logos. Only one of logos or customLogoFile can be set at a time. If logos is set, customLogoFile must be unset. When specified, there must be at least one entry and no more than 2 entries. Each type must appear only once in the list.",
-	"capabilities":         "capabilities defines an array of capabilities that can be interacted with in the console UI. Each capability defines a visual state that can be interacted with the console to render in the UI. Available capabilities are LightspeedButton and GettingStartedBanner. Each of the available capabilities may appear only once in the list.",
+	"capabilities":         "capabilities defines an array of capabilities that can be interacted with in the console UI. Each capability defines a visual state that can be interacted with the console to render in the UI. Available capabilities are LightspeedButton, GettingStartedBanner, and GuidedTour. Each of the available capabilities may appear only once in the list.",
 	"brand":                "brand is the default branding of the web console which can be overridden by providing the brand field.  There is a limited set of specific brand options. This field controls elements of the console such as the logo. Invalid value will prevent a console rollout.",
 	"documentationBaseURL": "documentationBaseURL links to external documentation are shown in various sections of the web console.  Providing documentationBaseURL will override the default documentation URL. Invalid value will prevent a console rollout.",
 	"customProductName":    "customProductName is the name that will be displayed in page titles, logo alt text, and the about dialog instead of the normal OpenShift product name.",
@@ -466,7 +497,7 @@ func (Theme) SwaggerDoc() map[string]string {
 
 var map_AWSCSIDriverConfigSpec = map[string]string{
 	"":                 "AWSCSIDriverConfigSpec defines properties that can be configured for the AWS CSI driver.",
-	"kmsKeyARN":        "kmsKeyARN sets the cluster default storage class to encrypt volumes with a user-defined KMS key, rather than the default KMS key used by AWS. The value may be either the ARN or Alias ARN of a KMS key.",
+	"kmsKeyARN":        "kmsKeyARN sets the cluster default storage class to encrypt volumes with a user-defined KMS key, rather than the default KMS key used by AWS. The value may be either the ARN or Alias ARN of a KMS key.\n\nThe ARN must follow the format: arn:<partition>:kms:<region>:<account-id>:(key|alias)/<key-id-or-alias>, where: <partition> is the AWS partition (aws, aws-cn, aws-us-gov, aws-iso, aws-iso-b, aws-iso-e, aws-iso-f, or aws-eusc), <region> is the AWS region, <account-id> is a 12-digit numeric identifier for the AWS account, <key-id-or-alias> is the KMS key ID or alias name.",
 	"efsVolumeMetrics": "efsVolumeMetrics sets the configuration for collecting metrics from EFS volumes used by the EFS CSI Driver.",
 }
 
@@ -515,13 +546,14 @@ func (AzureDiskEncryptionSet) SwaggerDoc() map[string]string {
 }
 
 var map_CSIDriverConfigSpec = map[string]string{
-	"":           "CSIDriverConfigSpec defines configuration spec that can be used to optionally configure a specific CSI Driver.",
-	"driverType": "driverType indicates type of CSI driver for which the driverConfig is being applied to. Valid values are: AWS, Azure, GCP, IBMCloud, vSphere and omitted. Consumers should treat unknown values as a NO-OP.",
-	"aws":        "aws is used to configure the AWS CSI driver.",
-	"azure":      "azure is used to configure the Azure CSI driver.",
-	"gcp":        "gcp is used to configure the GCP CSI driver.",
-	"ibmcloud":   "ibmcloud is used to configure the IBM Cloud CSI driver.",
-	"vSphere":    "vSphere is used to configure the vsphere CSI driver.",
+	"":             "CSIDriverConfigSpec defines configuration spec that can be used to optionally configure a specific CSI Driver.",
+	"driverType":   "driverType indicates type of CSI driver for which the driverConfig is being applied to. Valid values are: AWS, Azure, GCP, IBMCloud, vSphere, SecretsStore and omitted. Consumers should treat unknown values as a NO-OP.",
+	"aws":          "aws is used to configure the AWS CSI driver.",
+	"azure":        "azure is used to configure the Azure CSI driver.",
+	"gcp":          "gcp is used to configure the GCP CSI driver.",
+	"ibmcloud":     "ibmcloud is used to configure the IBM Cloud CSI driver.",
+	"vSphere":      "vSphere is used to configure the vsphere CSI driver.",
+	"secretsStore": "secretsStore is used to configure the Secrets Store CSI driver.",
 }
 
 func (CSIDriverConfigSpec) SwaggerDoc() map[string]string {
@@ -566,6 +598,15 @@ func (ClusterCSIDriverStatus) SwaggerDoc() map[string]string {
 	return map_ClusterCSIDriverStatus
 }
 
+var map_CustomSecretRotation = map[string]string{
+	"":                  "CustomSecretRotation holds configuration for custom secret rotation behavior.",
+	"minimumRefreshAge": "minimumRefreshAge is the minimum time in seconds between secret rotation attempts. Each time kubelet calls NodePublishVolume, the driver checks whether this interval has elapsed since the last successful provider call. If it has, the driver contacts the secret provider to fetch the latest secret values and updates the mounted volume. Setting this value below the kubelet syncFrequency (default: 1 minute) has no additional effect on the actual rotation cadence. Must be at least 1 second and no more than 31560000 seconds (~1 year). When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.",
+}
+
+func (CustomSecretRotation) SwaggerDoc() map[string]string {
+	return map_CustomSecretRotation
+}
+
 var map_GCPCSIDriverConfigSpec = map[string]string{
 	"":       "GCPCSIDriverConfigSpec defines properties that can be configured for the GCP CSI driver.",
 	"kmsKey": "kmsKey sets the cluster default storage class to encrypt volumes with customer-supplied encryption keys, rather than the default keys managed by GCP.",
@@ -594,6 +635,55 @@ var map_IBMCloudCSIDriverConfigSpec = map[string]string{
 
 func (IBMCloudCSIDriverConfigSpec) SwaggerDoc() map[string]string {
 	return map_IBMCloudCSIDriverConfigSpec
+}
+
+var map_ManagedTokenRequests = map[string]string{
+	"":          "ManagedTokenRequests holds the configuration for operator-managed service account token requests.",
+	"audiences": "audiences specifies service account token audiences that kubelet will provide to the CSI driver during NodePublishVolume calls. These tokens enable workload identity federation (WIF) with cloud providers such as AWS, Azure, and GCP. When empty, the operator clears all tokenRequests from the CSIDriver object.",
+}
+
+func (ManagedTokenRequests) SwaggerDoc() map[string]string {
+	return map_ManagedTokenRequests
+}
+
+var map_SecretsStoreCSIDriverConfigSpec = map[string]string{
+	"":               "SecretsStoreCSIDriverConfigSpec defines properties that can be configured for the Secrets Store CSI driver.",
+	"secretRotation": "secretRotation controls automatic secret rotation behavior. When omitted, secret rotation is enabled with a default poll interval of 2 minutes.",
+	"tokenRequests":  "tokenRequests controls service account token configuration for workload identity federation (WIF) with cloud providers. When omitted, the operator preserves any existing tokenRequests already configured on the CSIDriver object without modification.",
+}
+
+func (SecretsStoreCSIDriverConfigSpec) SwaggerDoc() map[string]string {
+	return map_SecretsStoreCSIDriverConfigSpec
+}
+
+var map_SecretsStoreSecretRotation = map[string]string{
+	"":       "SecretsStoreSecretRotation configures the automatic secret rotation behavior for the Secrets Store CSI driver.",
+	"type":   "type determines the secret rotation behavior. When \"None\", secret rotation is disabled and secrets are only fetched at initial pod mount time. When \"Custom\", secret rotation is enabled with the configuration specified in the custom field.",
+	"custom": "custom holds the custom rotation configuration. Only valid when type is \"Custom\".",
+}
+
+func (SecretsStoreSecretRotation) SwaggerDoc() map[string]string {
+	return map_SecretsStoreSecretRotation
+}
+
+var map_SecretsStoreTokenRequest = map[string]string{
+	"":                  "SecretsStoreTokenRequest specifies a service account token audience configuration for workload identity federation (WIF) with the Secrets Store CSI driver.",
+	"audience":          "audience is the intended audience of the service account token. An empty string means the issued token will use the kube-apiserver's default APIAudiences.",
+	"expirationSeconds": "expirationSeconds is the requested duration of validity of the service account token. The token issuer may return a token with a different validity duration. When omitted, the token expiration is determined by the kube-apiserver. Must be at least 600 seconds (10 minutes) and no more than 315360000 seconds (~10 years).",
+}
+
+func (SecretsStoreTokenRequest) SwaggerDoc() map[string]string {
+	return map_SecretsStoreTokenRequest
+}
+
+var map_SecretsStoreTokenRequests = map[string]string{
+	"":        "SecretsStoreTokenRequests configures how service account tokens are provided to the Secrets Store CSI driver for workload identity federation.",
+	"type":    "type determines how the operator manages tokenRequests on the CSIDriver object. When \"Unmanaged\", existing tokenRequests on the CSIDriver are preserved and the managed field is not used. When \"Managed\", the operator sets tokenRequests from the audiences specified in the managed field, replacing any previously configured values. Once set to \"Managed\", type cannot be reverted back to \"Unmanaged\".",
+	"managed": "managed holds configuration for operator-managed tokenRequests. Only valid when type is \"Managed\".",
+}
+
+func (SecretsStoreTokenRequests) SwaggerDoc() map[string]string {
+	return map_SecretsStoreTokenRequests
 }
 
 var map_VSphereCSIDriverConfigSpec = map[string]string{
@@ -798,7 +888,7 @@ func (EtcdList) SwaggerDoc() map[string]string {
 
 var map_EtcdSpec = map[string]string{
 	"controlPlaneHardwareSpeed": "HardwareSpeed allows user to change the etcd tuning profile which configures the latency parameters for heartbeat interval and leader election timeouts allowing the cluster to tolerate longer round-trip-times between etcd members. Valid values are \"\", \"Standard\" and \"Slower\".\n\t\"\" means no opinion and the platform is left to choose a reasonable default\n\twhich is subject to change without notice.",
-	"backendQuotaGiB":           "backendQuotaGiB sets the etcd backend storage size limit in gibibytes. The value should be an integer not less than 8 and not more than 32. When not specified, the default value is 8.",
+	"backendQuotaGiB":           "backendQuotaGiB sets the etcd backend storage size limit in gibibytes. The value should be an integer not less than 8 and not more than 16. When not specified, the default value is 8.",
 }
 
 func (EtcdSpec) SwaggerDoc() map[string]string {
@@ -830,6 +920,8 @@ var map_AWSNetworkLoadBalancerParameters = map[string]string{
 	"":               "AWSNetworkLoadBalancerParameters holds configuration parameters for an AWS Network load balancer. For Example: Setting AWS EIPs https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html",
 	"subnets":        "subnets specifies the subnets to which the load balancer will attach. The subnets may be specified by either their ID or name. The total number of subnets is limited to 10.\n\nIn order for the load balancer to be provisioned with subnets, each subnet must exist, each subnet must be from a different availability zone, and the load balancer service must be recreated to pick up new values.\n\nWhen omitted from the spec, the subnets will be auto-discovered for each availability zone. Auto-discovered subnets are not reported in the status of the IngressController object.",
 	"eipAllocations": "eipAllocations is a list of IDs for Elastic IP (EIP) addresses that are assigned to the Network Load Balancer. The following restrictions apply:\n\neipAllocations can only be used with external scope, not internal. An EIP can be allocated to only a single IngressController. The number of EIP allocations must match the number of subnets that are used for the load balancer. Each EIP allocation must be unique. A maximum of 10 EIP allocations are permitted.\n\nSee https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html for general information about configuration, characteristics, and limitations of Elastic IP addresses.",
+	"securityGroups": "securityGroups is a list of security group IDs to attach to the Network Load Balancer. When specified, these security groups replace the managed security group that the Cloud Controller Manager would otherwise create automatically. The user is responsible for configuring the ingress and egress rules on the specified security groups.\n\nThe specified security groups must exist in the same VPC as the cluster and must allow the necessary traffic for the IngressController to function.\n\nWhen this field is omitted, the Cloud Controller Manager automatically creates and manages a security group for the NLB.\n\nEach security group ID must be unique and must begin with \"sg-\" followed by 8 or 17 lowercase hexadecimal characters (e.g. \"sg-abcd1234\" or \"sg-abcd1234abcd12345\"). At least 1 and at most 5 security groups can be specified.",
+	"protocol":       "protocol specifies whether the Network Load Balancer uses PROXY protocol to forward connections to the IngressController.\n\nWhen set to \"TCP\", the NLB uses AWS's native client IP preservation. This may cause hairpin connection failures for internal load balancers when connections are made from pods to router pods on the same node.\n\nWhen set to \"PROXY\", the NLB disables native client IP preservation and uses PROXY protocol v2. The IngressController enables PROXY protocol on HAProxy so that it can parse PROXY protocol headers to obtain the original client IP. This avoids hairpin connection failures.\n\nThe following values are valid for this field:\n\n* \"TCP\". * \"PROXY\".\n\nWhen omitted, this means the user has no opinion and the value is left to the platform to choose a reasonable default, which is subject to change over time. The current default is \"PROXY\".\n\nNote that changing this field may cause brief connection failures during the transition as the NLB attribute change and router rollout occur independently.",
 }
 
 func (AWSNetworkLoadBalancerParameters) SwaggerDoc() map[string]string {
@@ -1082,6 +1174,7 @@ var map_IngressControllerSpec = map[string]string{
 	"httpCompression":                 "httpCompression defines a policy for HTTP traffic compression. By default, there is no HTTP compression.",
 	"idleConnectionTerminationPolicy": "idleConnectionTerminationPolicy maps directly to HAProxy's idle-close-on-response option and controls whether HAProxy keeps idle frontend connections open during a soft stop (router reload).\n\nAllowed values for this field are \"Immediate\" and \"Deferred\". The default value is \"Immediate\".\n\nWhen set to \"Immediate\", idle connections are closed immediately during router reloads. This ensures immediate propagation of route changes but may impact clients sensitive to connection resets.\n\nWhen set to \"Deferred\", HAProxy will maintain idle connections during a soft reload instead of closing them immediately. These connections remain open until any of the following occurs:\n\n  - A new request is received on the connection, in which\n    case HAProxy handles it in the old process and closes\n    the connection after sending the response.\n\n  - HAProxy's `timeout http-keep-alive` duration expires.\n    By default this is 300 seconds, but it can be changed\n    using httpKeepAliveTimeout tuning option.\n\n  - The client's keep-alive timeout expires, causing the\n    client to close the connection.\n\nSetting Deferred can help prevent errors in clients or load balancers that do not properly handle connection resets. Additionally, this option allows you to retain the pre-2.4 HAProxy behaviour: in HAProxy version 2.2 (OpenShift versions < 4.14), maintaining idle connections during a soft reload was the default behaviour, but starting with HAProxy 2.4, the default changed to closing idle connections immediately.\n\nImportant Consideration:\n\n  - Using Deferred will result in temporary inconsistencies\n    for the first request on each persistent connection\n    after a route update and router reload. This request\n    will be processed by the old HAProxy process using its\n    old configuration. Subsequent requests will use the\n    updated configuration.\n\nOperational Considerations:\n\n  - Keeping idle connections open during reloads may lead\n    to an accumulation of old HAProxy processes if\n    connections remain idle for extended periods,\n    especially in environments where frequent reloads\n    occur.\n\n  - Consider monitoring the number of HAProxy processes in\n    the router pods when Deferred is set.\n\n  - You may need to enable or adjust the\n    `ingress.operator.openshift.io/hard-stop-after`\n    duration (configured via an annotation on the\n    IngressController resource) in environments with\n    frequent reloads to prevent resource exhaustion.",
 	"closedClientConnectionPolicy":    "closedClientConnectionPolicy controls how the IngressController behaves when the client closes the TCP connection while the TLS handshake or HTTP request is in progress. This option maps directly to HAProxy’s \"abortonclose\" option.\n\nValid values are: \"Abort\" and \"Continue\". The default value is \"Continue\".\n\nWhen set to \"Abort\", the router will stop processing the TLS handshake if it is in progress, and it will not send an HTTP request to the backend server if the request has not yet been sent when the client closes the connection.\n\nWhen set to \"Continue\", the router will complete the TLS handshake if it is in progress, or send an HTTP request to the backend server and wait for the backend server's response, regardless of whether the client has closed the connection.\n\nSetting \"Abort\" can help free CPU resources otherwise spent on TLS computation for connections the client has already closed, and can reduce request queue size, thereby reducing the load on saturated backend servers.\n\nImportant Considerations:\n\n  - The default policy (\"Continue\") is HTTP-compliant, and requests\n    for aborted client connections will still be served.\n    Use the \"Continue\" policy to allow a client to send a request\n    and then immediately close its side of the connection while\n    still receiving a response on the half-closed connection.\n\n  - When clients use keep-alive connections, the most common case for premature\n    closure is when the user wants to cancel the transfer or when a timeout\n    occurs. In that case, the \"Abort\" policy may be used to reduce resource consumption.\n\n  - Using RSA keys larger than 2048 bits can significantly slow down\n    TLS computations. Consider using the \"Abort\" policy to reduce CPU usage.",
+	"haproxyVersion":                  "haproxyVersion specifies the HAProxy version to use for this IngressController.\n\nOpenShift 5.0 introduces HAProxy 3.2 as its default version and supports HAProxy 2.8 from OpenShift 4.22 for migration purposes. When an OpenShift release introduces a new default HAProxy version, that HAProxy version becomes available as a pinnable value in subsequent OpenShift releases, providing a smooth migration path for administrators who want to defer HAProxy upgrades.\n\nValid values for OpenShift 5.0: - Unset (default): Uses HAProxy 3.2 (the default for OpenShift 5.0) - \"3.2\": Explicitly pins HAProxy 3.2 for preservation during cluster\n  upgrades to future OpenShift releases\n- \"2.8\": Uses HAProxy 2.8 from OpenShift 4.22 (migration support, will\n  be dropped in the next OpenShift release)\n\nIf a specific HAProxy version is set and would become unsupported in a target cluster upgrade, a preflight check will block the cluster upgrade until this field is updated to unset or a supported version.",
 }
 
 func (IngressControllerSpec) SwaggerDoc() map[string]string {
@@ -1099,6 +1192,7 @@ var map_IngressControllerStatus = map[string]string{
 	"observedGeneration":         "observedGeneration is the most recent generation observed.",
 	"namespaceSelector":          "namespaceSelector is the actual namespaceSelector in use.",
 	"routeSelector":              "routeSelector is the actual routeSelector in use.",
+	"effectiveHAProxyVersion":    "effectiveHAProxyVersion reports the HAProxy version currently in use by this IngressController. This reflects the resolved value of the spec.haproxyVersion field. When omitted, the effective value has not yet been resolved by the operator or the feature is not enabled for this cluster.\n\nExamples for OpenShift 5.0: - \"3.2\": Using HAProxy 3.2 - \"2.8\": Using HAProxy 2.8",
 }
 
 func (IngressControllerStatus) SwaggerDoc() map[string]string {
@@ -1121,6 +1215,7 @@ var map_IngressControllerTuningOptions = map[string]string{
 	"healthCheckInterval":         "healthCheckInterval defines how long the router waits between two consecutive health checks on its configured backends.  This value is applied globally as a default for all routes, but may be overridden per-route by the route annotation \"router.openshift.io/haproxy.health.check.interval\".\n\nExpects an unsigned duration string of decimal numbers, each with optional fraction and a unit suffix, eg \"300ms\", \"1.5h\" or \"2h45m\". Valid time units are \"ns\", \"us\" (or \"µs\" U+00B5 or \"μs\" U+03BC), \"ms\", \"s\", \"m\", \"h\".\n\nSetting this to less than 5s can cause excess traffic due to too frequent TCP health checks and accompanying SYN packet storms.  Alternatively, setting this too high can result in increased latency, due to backend servers that are no longer available, but haven't yet been detected as such.\n\nAn empty or zero healthCheckInterval means no opinion and IngressController chooses a default, which is subject to change over time. Currently the default healthCheckInterval value is 5s.\n\nCurrently the minimum allowed value is 1s and the maximum allowed value is 2147483647ms (24.85 days).  Both are subject to change over time.",
 	"maxConnections":              "maxConnections defines the maximum number of simultaneous connections that can be established per HAProxy process. Increasing this value allows each ingress controller pod to handle more connections but at the cost of additional system resources being consumed.\n\nPermitted values are: empty, 0, -1, and the range 2000-2000000.\n\nIf this field is empty or 0, the IngressController will use the default value of 50000, but the default is subject to change in future releases.\n\nIf the value is -1 then HAProxy will dynamically compute a maximum value based on the available ulimits in the running container. Selecting -1 (i.e., auto) will result in a large value being computed (~520000 on OpenShift >=4.10 clusters) and therefore each HAProxy process will incur significant memory usage compared to the current default of 50000.\n\nSetting a value that is greater than the current operating system limit will prevent the HAProxy process from starting.\n\nIf you choose a discrete value (e.g., 750000) and the router pod is migrated to a new node, there's no guarantee that that new node has identical ulimits configured. In such a scenario the pod would fail to start. If you have nodes with different ulimits configured (e.g., different tuned profiles) and you choose a discrete value then the guidance is to use -1 and let the value be computed dynamically at runtime.\n\nYou can monitor memory usage for router containers with the following metric: 'container_memory_working_set_bytes{container=\"router\",namespace=\"openshift-ingress\"}'.\n\nYou can monitor memory usage of individual HAProxy processes in router containers with the following metric: 'container_memory_working_set_bytes{container=\"router\",namespace=\"openshift-ingress\"}/container_processes{container=\"router\",namespace=\"openshift-ingress\"}'.",
 	"reloadInterval":              "reloadInterval defines the minimum interval at which the router is allowed to reload to accept new changes. Increasing this value can prevent the accumulation of HAProxy processes, depending on the scenario. Increasing this interval can also lessen load imbalance on a backend's servers when using the roundrobin balancing algorithm. Alternatively, decreasing this value may decrease latency since updates to HAProxy's configuration can take effect more quickly.\n\nThe value must be a time duration value; see <https://pkg.go.dev/time#ParseDuration>. Currently, the minimum value allowed is 1s, and the maximum allowed value is 120s. Minimum and maximum allowed values may change in future versions of OpenShift. Note that if a duration outside of these bounds is provided, the value of reloadInterval will be capped/floored and not rejected (e.g. a duration of over 120s will be capped to 120s; the IngressController will not reject and replace this disallowed value with the default).\n\nA zero value for reloadInterval tells the IngressController to choose the default, which is currently 5s and subject to change without notice.\n\nThis field expects an unsigned duration string of decimal numbers, each with optional fraction and a unit suffix, e.g. \"300ms\", \"1.5h\" or \"2h45m\". Valid time units are \"ns\", \"us\" (or \"µs\" U+00B5 or \"μs\" U+03BC), \"ms\", \"s\", \"m\", \"h\".\n\nNote: Setting a value significantly larger than the default of 5s can cause latency in observing updates to routes and their endpoints. HAProxy's configuration will be reloaded less frequently, and newly created routes will not be served until the subsequent reload.",
+	"configurationManagement":     "configurationManagement specifies how OpenShift router should update the HAProxy configuration.  The following values are valid for this field:\n\n* \"ForkAndReload\". * \"Dynamic\".\n\nOmitting this field means that the user has no opinion and the platform may choose a reasonable default. This default is subject to change over time.  The current default is \"ForkAndReload\".\n\n\"ForkAndReload\" means that OpenShift router should rewrite the HAProxy configuration file and instruct HAProxy to fork and reload. This is OpenShift router's traditional approach.\n\n\"Dynamic\" means that OpenShift router may use HAProxy's control socket for some configuration updates and fall back to fork and reload for other configuration updates.  This is a newer approach, which may be less mature than ForkAndReload.  This setting can improve load-balancing fairness and metrics accuracy and reduce CPU and memory usage if HAProxy has frequent configuration updates for route and endpoints updates.\n\nNote: The \"Dynamic\" option is currently experimental and should not be enabled on production clusters.",
 }
 
 func (IngressControllerTuningOptions) SwaggerDoc() map[string]string {
@@ -1295,6 +1390,49 @@ func (InsightsReport) SwaggerDoc() map[string]string {
 	return map_InsightsReport
 }
 
+var map_KMSEncryptionStatus = map[string]string{
+	"healthReports": "healthReports contains all KMS plugin health reports. When omitted, no health reports are available. Each entry must have a unique combination of nodeName and keyID.",
+	"preflight":     "preflight contains the state of KMS preflight validation for this operator. The preflight validates the KMS provider configuration before it is used to create a new encryption key, catching configuration issues early such as incorrect login credentials or an unreachable Vault service. When omitted, no preflight validation is in progress.",
+}
+
+func (KMSEncryptionStatus) SwaggerDoc() map[string]string {
+	return map_KMSEncryptionStatus
+}
+
+var map_KMSPluginHealthReport = map[string]string{
+	"nodeName":        "nodeName is the name of the node this instance of the plugin runs on. The combination of nodeName and keyID makes this health report unique. The value must be a valid Kubernetes node name: a lowercase RFC 1123 subdomain consisting of lowercase alphanumeric characters, '-' or '.', starting and ending with an alphanumeric character, and be at most 253 characters in length.",
+	"keyID":           "keyID is the encryption-key-secret id (kms-{keyID}.sock), a unique identifier of the plugin on that node. This is not a cryptographic key used to encrypt/decrypt any resources. The value must be between 1 and 512 characters.",
+	"status":          "status contains a health indicator for the respective KMS plugin The field can have three states: healthy, unhealthy, error. With error and unhealthy containing additional information in Detail.",
+	"lastCheckedTime": "lastCheckedTime is a timestamp of when the probe was last checked.",
+	"remoteKeyID":     "remoteKeyID refers to the remote key identifier from KMS v2 StatusResponse.key_id. This is not a cryptographic key, but a unique representation of the KEK. The value must be between 1 and 1024 characters.",
+	"detail":          "detail contains additional error/health information for the respective KMS plugin. When omitted, no additional error or health information is provided. When set, the value must be between 1 and 1024 characters.",
+}
+
+func (KMSPluginHealthReport) SwaggerDoc() map[string]string {
+	return map_KMSPluginHealthReport
+}
+
+var map_KMSPreflightCheck = map[string]string{
+	"":                   "KMSPreflightCheck describes a preflight validation request and its result.",
+	"observedConfigHash": "observedConfigHash is a hash of the KMS provider configuration and its referenced resources that has been observed and requires preflight validation before a new encryption key can be created. The value must be exactly 8 characters.",
+	"result":             "result contains the outcome of the most recent preflight check. Preflight is considered passed when result.status is Succeeded and result.configHash matches observedConfigHash. When omitted, no preflight check result has been reported yet.",
+}
+
+func (KMSPreflightCheck) SwaggerDoc() map[string]string {
+	return map_KMSPreflightCheck
+}
+
+var map_KMSPreflightResult = map[string]string{
+	"":            "KMSPreflightResult contains the outcome of a preflight validation.",
+	"status":      "status indicates the outcome of the preflight check. Succeeded means the KMS plugin responded to Status, Encrypt, and Decrypt calls successfully. Failed means the validation did not pass.",
+	"configHash":  "configHash is the hash of the configuration that was validated. This is compared against observedConfigHash to confirm the result corresponds to the current configuration. The value must be exactly 8 characters.",
+	"remoteKeyID": "remoteKeyID is the remote key encryption key identifier from KMS v2 StatusResponse.key_id. This is not a cryptographic key, but a unique representation of the remote key used to encrypt data. The value must be between 1 and 1024 characters.",
+}
+
+func (KMSPreflightResult) SwaggerDoc() map[string]string {
+	return map_KMSPreflightResult
+}
+
 var map_KubeAPIServer = map[string]string{
 	"":         "KubeAPIServer provides information to configure an operator to manage kube-apiserver.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
@@ -1326,6 +1464,7 @@ func (KubeAPIServerSpec) SwaggerDoc() map[string]string {
 
 var map_KubeAPIServerStatus = map[string]string{
 	"serviceAccountIssuers": "serviceAccountIssuers tracks history of used service account issuers. The item without expiration time represents the currently used service account issuer. The other items represents service account issuers that were used previously and are still being trusted. The default expiration for the items is set by the platform and it defaults to 24h. see: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#service-account-token-volume-projection",
+	"encryptionStatus":      "encryptionStatus contains status reports for the KMS plugin health and its key rotation.",
 }
 
 func (KubeAPIServerStatus) SwaggerDoc() map[string]string {
@@ -1486,8 +1625,8 @@ func (MachineConfigurationStatus) SwaggerDoc() map[string]string {
 
 var map_MachineManager = map[string]string{
 	"":          "MachineManager describes a target machine resource that is registered for boot image updates. It stores identifying information such as the resource type and the API Group of the resource. It also provides granular control via the selection field.",
-	"resource":  "resource is the machine management resource's type. Valid values are machinesets and controlplanemachinesets. machinesets means that the machine manager will only register resources of the kind MachineSet. controlplanemachinesets means that the machine manager will only register resources of the kind ControlPlaneMachineSet.",
-	"apiGroup":  "apiGroup is name of the APIGroup that the machine management resource belongs to. The only current valid value is machine.openshift.io. machine.openshift.io means that the machine manager will only register resources that belong to OpenShift machine API group.",
+	"resource":  "resource is the machine management resource's type. Valid values are machinesets, controlplanemachinesets and machinedeployments. machinesets means that the machine manager will only register resources of the kind MachineSet. controlplanemachinesets means that the machine manager will only register resources of the kind ControlPlaneMachineSet. machinedeployments means that the machine manager will only register resources of the kind MachineDeployment.",
+	"apiGroup":  "apiGroup is name of the APIGroup that the machine management resource belongs to. Valid values are machine.openshift.io and cluster.x-k8s.io. machine.openshift.io means that the machine manager will only register resources that belong to OpenShift machine API group. cluster.x-k8s.io means that the machine manager will only register resources that belong to the Cluster API group.",
 	"selection": "selection allows granular control of the machine management resources that will be registered for boot image updates.",
 }
 
@@ -1547,7 +1686,7 @@ func (NodeDisruptionPolicySpecAction) SwaggerDoc() map[string]string {
 var map_NodeDisruptionPolicySpecFile = map[string]string{
 	"":        "NodeDisruptionPolicySpecFile is a file entry and corresponding actions to take and is used in the NodeDisruptionPolicyConfig object",
 	"path":    "path is the location of a file being managed through a MachineConfig. The Actions in the policy will apply to changes to the file at this path.",
-	"actions": "actions represents the series of commands to be executed on changes to the file at the corresponding file path. Actions will be applied in the order that they are set in this list. If there are other incoming changes to other MachineConfig entries in the same update that require a reboot, the reboot will supercede these actions. Valid actions are Reboot, Drain, Reload, DaemonReload and None. The Reboot action and the None action cannot be used in conjunction with any of the other actions. This list supports a maximum of 10 entries.",
+	"actions": "actions represents the series of commands to be executed on changes to the file at the corresponding file path. Actions will be applied in the order that they are set in this list. If there are other incoming changes to other MachineConfig entries in the same update that require a reboot, the reboot will supersede these actions. Valid actions are Reboot, Drain, Reload, DaemonReload and None. The Reboot action and the None action cannot be used in conjunction with any of the other actions. This list supports a maximum of 10 entries.",
 }
 
 func (NodeDisruptionPolicySpecFile) SwaggerDoc() map[string]string {
@@ -1556,7 +1695,7 @@ func (NodeDisruptionPolicySpecFile) SwaggerDoc() map[string]string {
 
 var map_NodeDisruptionPolicySpecSSHKey = map[string]string{
 	"":        "NodeDisruptionPolicySpecSSHKey is actions to take for any SSHKey change and is used in the NodeDisruptionPolicyConfig object",
-	"actions": "actions represents the series of commands to be executed on changes to the file at the corresponding file path. Actions will be applied in the order that they are set in this list. If there are other incoming changes to other MachineConfig entries in the same update that require a reboot, the reboot will supercede these actions. Valid actions are Reboot, Drain, Reload, DaemonReload and None. The Reboot action and the None action cannot be used in conjunction with any of the other actions. This list supports a maximum of 10 entries.",
+	"actions": "actions represents the series of commands to be executed on changes to the file at the corresponding file path. Actions will be applied in the order that they are set in this list. If there are other incoming changes to other MachineConfig entries in the same update that require a reboot, the reboot will supersede these actions. Valid actions are Reboot, Drain, Reload, DaemonReload and None. The Reboot action and the None action cannot be used in conjunction with any of the other actions. This list supports a maximum of 10 entries.",
 }
 
 func (NodeDisruptionPolicySpecSSHKey) SwaggerDoc() map[string]string {
@@ -1566,7 +1705,7 @@ func (NodeDisruptionPolicySpecSSHKey) SwaggerDoc() map[string]string {
 var map_NodeDisruptionPolicySpecUnit = map[string]string{
 	"":        "NodeDisruptionPolicySpecUnit is a systemd unit name and corresponding actions to take and is used in the NodeDisruptionPolicyConfig object",
 	"name":    "name represents the service name of a systemd service managed through a MachineConfig Actions specified will be applied for changes to the named service. Service names should be of the format ${NAME}${SERVICETYPE} and can up to 255 characters long. ${NAME} must be atleast 1 character long and can only consist of alphabets, digits, \":\", \"-\", \"_\", \".\", and \"\". ${SERVICETYPE} must be one of \".service\", \".socket\", \".device\", \".mount\", \".automount\", \".swap\", \".target\", \".path\", \".timer\", \".snapshot\", \".slice\" or \".scope\".",
-	"actions": "actions represents the series of commands to be executed on changes to the file at the corresponding file path. Actions will be applied in the order that they are set in this list. If there are other incoming changes to other MachineConfig entries in the same update that require a reboot, the reboot will supercede these actions. Valid actions are Reboot, Drain, Reload, DaemonReload and None. The Reboot action and the None action cannot be used in conjunction with any of the other actions. This list supports a maximum of 10 entries.",
+	"actions": "actions represents the series of commands to be executed on changes to the file at the corresponding file path. Actions will be applied in the order that they are set in this list. If there are other incoming changes to other MachineConfig entries in the same update that require a reboot, the reboot will supersede these actions. Valid actions are Reboot, Drain, Reload, DaemonReload and None. The Reboot action and the None action cannot be used in conjunction with any of the other actions. This list supports a maximum of 10 entries.",
 }
 
 func (NodeDisruptionPolicySpecUnit) SwaggerDoc() map[string]string {
@@ -1594,7 +1733,7 @@ func (NodeDisruptionPolicyStatusAction) SwaggerDoc() map[string]string {
 var map_NodeDisruptionPolicyStatusFile = map[string]string{
 	"":        "NodeDisruptionPolicyStatusFile is a file entry and corresponding actions to take and is used in the NodeDisruptionPolicyClusterStatus object",
 	"path":    "path is the location of a file being managed through a MachineConfig. The Actions in the policy will apply to changes to the file at this path.",
-	"actions": "actions represents the series of commands to be executed on changes to the file at the corresponding file path. Actions will be applied in the order that they are set in this list. If there are other incoming changes to other MachineConfig entries in the same update that require a reboot, the reboot will supercede these actions. Valid actions are Reboot, Drain, Reload, DaemonReload and None. The Reboot action and the None action cannot be used in conjunction with any of the other actions. This list supports a maximum of 10 entries.",
+	"actions": "actions represents the series of commands to be executed on changes to the file at the corresponding file path. Actions will be applied in the order that they are set in this list. If there are other incoming changes to other MachineConfig entries in the same update that require a reboot, the reboot will supersede these actions. Valid actions are Reboot, Drain, Reload, DaemonReload and None. The Reboot action and the None action cannot be used in conjunction with any of the other actions. This list supports a maximum of 10 entries.",
 }
 
 func (NodeDisruptionPolicyStatusFile) SwaggerDoc() map[string]string {
@@ -1603,7 +1742,7 @@ func (NodeDisruptionPolicyStatusFile) SwaggerDoc() map[string]string {
 
 var map_NodeDisruptionPolicyStatusSSHKey = map[string]string{
 	"":        "NodeDisruptionPolicyStatusSSHKey is actions to take for any SSHKey change and is used in the NodeDisruptionPolicyClusterStatus object",
-	"actions": "actions represents the series of commands to be executed on changes to the file at the corresponding file path. Actions will be applied in the order that they are set in this list. If there are other incoming changes to other MachineConfig entries in the same update that require a reboot, the reboot will supercede these actions. Valid actions are Reboot, Drain, Reload, DaemonReload and None. The Reboot action and the None action cannot be used in conjunction with any of the other actions. This list supports a maximum of 10 entries.",
+	"actions": "actions represents the series of commands to be executed on changes to the file at the corresponding file path. Actions will be applied in the order that they are set in this list. If there are other incoming changes to other MachineConfig entries in the same update that require a reboot, the reboot will supersede these actions. Valid actions are Reboot, Drain, Reload, DaemonReload and None. The Reboot action and the None action cannot be used in conjunction with any of the other actions. This list supports a maximum of 10 entries.",
 }
 
 func (NodeDisruptionPolicyStatusSSHKey) SwaggerDoc() map[string]string {
@@ -1613,7 +1752,7 @@ func (NodeDisruptionPolicyStatusSSHKey) SwaggerDoc() map[string]string {
 var map_NodeDisruptionPolicyStatusUnit = map[string]string{
 	"":        "NodeDisruptionPolicyStatusUnit is a systemd unit name and corresponding actions to take and is used in the NodeDisruptionPolicyClusterStatus object",
 	"name":    "name represents the service name of a systemd service managed through a MachineConfig Actions specified will be applied for changes to the named service. Service names should be of the format ${NAME}${SERVICETYPE} and can up to 255 characters long. ${NAME} must be atleast 1 character long and can only consist of alphabets, digits, \":\", \"-\", \"_\", \".\", and \"\". ${SERVICETYPE} must be one of \".service\", \".socket\", \".device\", \".mount\", \".automount\", \".swap\", \".target\", \".path\", \".timer\", \".snapshot\", \".slice\" or \".scope\".",
-	"actions": "actions represents the series of commands to be executed on changes to the file at the corresponding file path. Actions will be applied in the order that they are set in this list. If there are other incoming changes to other MachineConfig entries in the same update that require a reboot, the reboot will supercede these actions. Valid actions are Reboot, Drain, Reload, DaemonReload and None. The Reboot action and the None action cannot be used in conjunction with any of the other actions. This list supports a maximum of 10 entries.",
+	"actions": "actions represents the series of commands to be executed on changes to the file at the corresponding file path. Actions will be applied in the order that they are set in this list. If there are other incoming changes to other MachineConfig entries in the same update that require a reboot, the reboot will supersede these actions. Valid actions are Reboot, Drain, Reload, DaemonReload and None. The Reboot action and the None action cannot be used in conjunction with any of the other actions. This list supports a maximum of 10 entries.",
 }
 
 func (NodeDisruptionPolicyStatusUnit) SwaggerDoc() map[string]string {
@@ -1667,6 +1806,16 @@ var map_AdditionalRoutingCapabilities = map[string]string{
 
 func (AdditionalRoutingCapabilities) SwaggerDoc() map[string]string {
 	return map_AdditionalRoutingCapabilities
+}
+
+var map_BGPManagedConfig = map[string]string{
+	"":            "BGPManagedConfig contains configuration options for BGP when routing is \"Managed\".",
+	"asNumber":    "asNumber is the 2-byte or 4-byte Autonomous System Number (ASN) to be used in the generated FRR configuration. Valid values are 1 to 4294967295. When omitted, this defaults to 64512.",
+	"bgpTopology": "bgpTopology defines the BGP topology to be used. Allowed values are \"FullMesh\". When set to \"FullMesh\", every node peers directly with every other node via BGP. This field is required when BGPManagedConfig is specified.",
+}
+
+func (BGPManagedConfig) SwaggerDoc() map[string]string {
+	return map_BGPManagedConfig
 }
 
 var map_ClusterNetworkEntry = map[string]string{
@@ -1896,6 +2045,16 @@ func (NetworkStatus) SwaggerDoc() map[string]string {
 	return map_NetworkStatus
 }
 
+var map_NoOverlayConfig = map[string]string{
+	"":             "NoOverlayConfig contains configuration options for networks operating in no-overlay mode.",
+	"outboundSNAT": "outboundSNAT defines the SNAT behavior for outbound traffic from pods. Allowed values are \"Enabled\" and \"Disabled\". When set to \"Enabled\", SNAT is performed on outbound traffic from pods. When set to \"Disabled\", SNAT is not performed and pod IPs are preserved in outbound traffic. This field is required when the network operates in no-overlay mode. This field can be set to any value at installation time and can be changed afterwards.",
+	"routing":      "routing specifies whether the pod network routing is managed by OVN-Kubernetes or users. Allowed values are \"Managed\" and \"Unmanaged\". When set to \"Managed\", OVN-Kubernetes manages the pod network routing configuration through BGP. When set to \"Unmanaged\", users are responsible for configuring the pod network routing. This field is required when the network operates in no-overlay mode. This field is immutable once set.",
+}
+
+func (NoOverlayConfig) SwaggerDoc() map[string]string {
+	return map_NoOverlayConfig
+}
+
 var map_OVNKubernetesConfig = map[string]string{
 	"":                    "ovnKubernetesConfig contains the configuration parameters for networks using the ovn-kubernetes network project",
 	"mtu":                 "mtu is the MTU to use for the tunnel interface. This must be 100 bytes smaller than the uplink mtu. Default is 1400",
@@ -1910,6 +2069,9 @@ var map_OVNKubernetesConfig = map[string]string{
 	"ipv4":                "ipv4 allows users to configure IP settings for IPv4 connections. When ommitted, this means no opinions and the default configuration is used. Check individual fields within ipv4 for details of default values.",
 	"ipv6":                "ipv6 allows users to configure IP settings for IPv6 connections. When ommitted, this means no opinions and the default configuration is used. Check individual fields within ipv4 for details of default values.",
 	"routeAdvertisements": "routeAdvertisements determines if the functionality to advertise cluster network routes through a dynamic routing protocol, such as BGP, is enabled or not. This functionality is configured through the ovn-kubernetes RouteAdvertisements CRD. Requires the 'FRR' routing capability provider to be enabled as an additional routing capability. Allowed values are \"Enabled\", \"Disabled\" and ommited. When omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. The current default is \"Disabled\".",
+	"transport":           "transport sets the transport mode for pods on the default network. Allowed values are \"NoOverlay\" and \"Geneve\". \"NoOverlay\" avoids tunnel encapsulation, routing pod traffic directly between nodes. \"Geneve\" encapsulates pod traffic using Geneve tunnels between nodes. When omitted, this means the user has no opinion and the platform chooses a reasonable default which is subject to change over time. The current default is \"Geneve\". \"NoOverlay\" can only be set at installation time and cannot be changed afterwards. \"Geneve\" may be set explicitly at any time to lock in the current default.",
+	"noOverlayConfig":     "noOverlayConfig contains configuration for no-overlay mode. This configuration applies to the default network only. It is required when transport is \"NoOverlay\". When omitted, this means the user does not configure no-overlay mode options.",
+	"bgpManagedConfig":    "bgpManagedConfig configures the BGP properties for networks (default network or CUDNs) in no-overlay mode that specify routing=\"Managed\" in their noOverlayConfig. It is required when noOverlayConfig.routing is set to \"Managed\". When omitted, this means the user does not configure BGP for managed routing. This field can be set at installation time or on day 2, and can be modified at any time.",
 }
 
 func (OVNKubernetesConfig) SwaggerDoc() map[string]string {
@@ -2054,6 +2216,14 @@ var map_OpenShiftAPIServerList = map[string]string{
 
 func (OpenShiftAPIServerList) SwaggerDoc() map[string]string {
 	return map_OpenShiftAPIServerList
+}
+
+var map_OpenShiftAPIServerStatus = map[string]string{
+	"encryptionStatus": "encryptionStatus contains status reports for the KMS plugin health and its key rotation.",
+}
+
+func (OpenShiftAPIServerStatus) SwaggerDoc() map[string]string {
+	return map_OpenShiftAPIServerStatus
 }
 
 var map_OpenShiftControllerManager = map[string]string{

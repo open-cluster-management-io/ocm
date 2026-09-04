@@ -104,6 +104,8 @@ type ControllerBuilder struct {
 
 	// Allow enabling HTTP2
 	enableHTTP2 bool
+
+	skipInClusterAuthLookup bool
 }
 
 type TopologyDetector interface {
@@ -214,6 +216,13 @@ func (b *ControllerBuilder) WithHTTP2() *ControllerBuilder {
 	return b
 }
 
+// WithSkipInClusterAuthenticationLookup skips the synchronous read of the
+// extension-apiserver-authentication configmap during serving setup.
+func (b *ControllerBuilder) WithSkipInClusterAuthenticationLookup() *ControllerBuilder {
+	b.skipInClusterAuthLookup = true
+	return b
+}
+
 // WithHealthChecks adds a list of healthchecks to the server
 func (b *ControllerBuilder) WithHealthChecks(healthChecks ...healthz.HealthChecker) *ControllerBuilder {
 	b.healthChecks = append(b.healthChecks, healthChecks...)
@@ -311,7 +320,7 @@ func (b *ControllerBuilder) Run(ctx context.Context, config *unstructured.Unstru
 
 	var server *genericapiserver.GenericAPIServer
 	if b.servingInfo != nil {
-		serverConfig, err := serving.ToServerConfig(ctx, *b.servingInfo, *b.authenticationConfig, *b.authorizationConfig, kubeConfig, kubeClient, b.leaderElection, b.enableHTTP2, b.versionInfo)
+		serverConfig, err := serving.ToServerConfig(ctx, *b.servingInfo, *b.authenticationConfig, *b.authorizationConfig, kubeConfig, kubeClient, b.leaderElection, b.enableHTTP2, b.skipInClusterAuthLookup, b.versionInfo)
 		if err != nil {
 			return err
 		}

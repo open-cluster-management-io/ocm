@@ -14,7 +14,6 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // +kubebuilder:subresource:status
 // +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/2310
 // +openshift:file-pattern=cvoRunLevel=0000_10,operatorName=config-operator,operatorOrdering=01
-// +openshift:enable:FeatureGate=SigstoreImageVerification
 // +openshift:compatibility-gen:level=1
 type ClusterImagePolicy struct {
 	metav1.TypeMeta `json:",inline"`
@@ -52,7 +51,7 @@ type ClusterImagePolicySpec struct {
 	// policy is a required field that contains configuration to allow scopes to be verified, and defines how
 	// images not matching the verification policy will be treated.
 	// +required
-	Policy Policy `json:"policy"`
+	Policy ImageSigstoreVerificationPolicy `json:"policy"`
 }
 
 // +k8s:deepcopy-gen=true

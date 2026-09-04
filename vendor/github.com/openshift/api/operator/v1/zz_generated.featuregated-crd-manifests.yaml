@@ -5,7 +5,9 @@ authentications.operator.openshift.io:
   CRDName: authentications.operator.openshift.io
   Capability: ""
   Category: ""
-  FeatureGates: []
+  FeatureGates:
+  - AuthenticationComponentProxy
+  - KMSEncryption
   FilenameOperatorName: authentication
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_50"
@@ -69,6 +71,7 @@ clustercsidrivers.operator.openshift.io:
   Capability: ""
   Category: ""
   FeatureGates:
+  - AWSEuropeanSovereignCloudInstall
   - VSphereConfigurableMaxAllowedBlockVolumesPerNode
   FilenameOperatorName: csi-driver
   FilenameOperatorOrdering: "01"
@@ -175,7 +178,11 @@ ingresscontrollers.operator.openshift.io:
   CRDName: ingresscontrollers.operator.openshift.io
   Capability: Ingress
   Category: ""
-  FeatureGates: []
+  FeatureGates:
+  - IngressControllerDynamicConfigurationManager
+  - IngressControllerLBSecurityGroupsAWS
+  - IngressControllerMultipleHAProxyVersions
+  - TLSGroupPreferences
   FilenameOperatorName: ingress
   FilenameOperatorOrdering: "00"
   FilenameRunLevel: "0000_50"
@@ -219,6 +226,7 @@ kubeapiservers.operator.openshift.io:
   Category: coreoperators
   FeatureGates:
   - EventTTL
+  - KMSEncryption
   FilenameOperatorName: kube-apiserver
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_20"
@@ -305,8 +313,9 @@ machineconfigurations.operator.openshift.io:
   FeatureGates:
   - BootImageSkewEnforcement
   - IrreconcilableMachineConfig
-  - ManagedBootImages
-  - ManagedBootImages+ManagedBootImagesCPMS
+  - ManagedBootImagesAWSCAPI
+  - ManagedBootImagesCPMS
+  - ManagedBootImagesCPMS+ManagedBootImagesAWSCAPI
   FilenameOperatorName: machine-config
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_80"
@@ -328,9 +337,7 @@ networks.operator.openshift.io:
   Capability: ""
   Category: ""
   FeatureGates:
-  - AdditionalRoutingCapabilities
-  - NetworkLiveMigration
-  - RouteAdvertisements
+  - NoOverlayMode
   FilenameOperatorName: network
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_70"
@@ -376,7 +383,8 @@ openshiftapiservers.operator.openshift.io:
   CRDName: openshiftapiservers.operator.openshift.io
   Capability: ""
   Category: coreoperators
-  FeatureGates: []
+  FeatureGates:
+  - KMSEncryption
   FilenameOperatorName: openshift-apiserver
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_30"
