@@ -21,6 +21,7 @@ import (
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
+	"open-cluster-management.io/ocm/pkg/addon/hosted"
 	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
@@ -325,6 +326,65 @@ func TestAddonInstallReconcile(t *testing.T) {
 				}
 				if _, ok := addon.Annotations["non-addon-annotation"]; ok {
 					t.Errorf("non-addon annotation should not be propagated")
+				}
+			},
+		},
+		{
+			name:                "derive addon hosting annotation from import annotations at create",
+			managedClusteraddon: []runtime.Object{},
+			managedClusters: []runtime.Object{
+				&clusterv1.ManagedCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cluster1",
+						Annotations: map[string]string{
+							hosted.AnnotationKlusterletDeployMode:         "Hosted",
+							hosted.AnnotationKlusterletHostingClusterName: "local-cluster",
+							hosted.AnnotationEnableHostedModeAddons:       "true",
+						},
+					},
+				},
+			},
+			clusterManagementAddon: func() *addonv1beta1.ClusterManagementAddOn {
+				addon := addontesting.NewClusterManagementAddon("test", "", "").Build()
+				addon.Spec.InstallStrategy = addonv1beta1.InstallStrategy{
+					Type: addonv1beta1.AddonInstallStrategyPlacements,
+					Placements: []addonv1beta1.PlacementStrategy{
+						{
+							PlacementRef: addonv1beta1.PlacementRef{Name: "test-placement", Namespace: "default"},
+						},
+					},
+				}
+				return addon
+			}(),
+			placements: []runtime.Object{
+				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
+			},
+			placementDecisions: []runtime.Object{
+				&clusterv1beta1.PlacementDecision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-placement",
+						Namespace: "default",
+						Labels:    map[string]string{clusterv1beta1.PlacementLabel: "test-placement"},
+					},
+					Status: clusterv1beta1.PlacementDecisionStatus{
+						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}},
+					},
+				},
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "create")
+				actual := actions[0].(clienttesting.CreateActionImpl).GetObject()
+				addon := actual.(*addonv1beta1.ManagedClusterAddOn)
+				if addon.Annotations == nil {
+					t.Fatal("expected annotations on addon, got nil")
+				}
+				if addon.Annotations[addonv1beta1.HostingClusterNameAnnotationKey] != "local-cluster" {
+					t.Fatalf("expected hosting cluster name 'local-cluster', got '%s'",
+						addon.Annotations[addonv1beta1.HostingClusterNameAnnotationKey])
+				}
+				if addon.Annotations[hosted.AnnotationEnableHostedModeAddons] != "true" {
+					t.Fatalf("expected enable-hosted-mode-addons true, got '%s'",
+						addon.Annotations[hosted.AnnotationEnableHostedModeAddons])
 				}
 			},
 		},
