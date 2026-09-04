@@ -16,7 +16,7 @@ import (
 
 var _ plugins.Filter = &Predicate{}
 
-const description = "Predicate filter filters the clusters based on predicate defined in placement"
+const description = "Predicate filters the clusters based on predicates defined in the placement."
 
 type Predicate struct {
 	handle plugins.Handle
@@ -27,7 +27,7 @@ func New(handle plugins.Handle) *Predicate {
 }
 
 func (p *Predicate) Name() string {
-	return reflect.TypeOf(*p).Name()
+	return reflect.TypeFor[Predicate]().Name()
 }
 
 func (p *Predicate) Description() string {
