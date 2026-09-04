@@ -86,44 +86,46 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 	mca *addonv1beta1.ManagedClusterAddOn, desiredConfigMap addonConfigMap) *addonv1beta1.ManagedClusterAddOn {
 	mcaCopy := mca.DeepCopy()
 
-	mergedConfigs := make(addonConfigMap)
-	// First go through the configReferences listed in mca status,
-	// if the existing config (gvk + namespace + name) is also in the desiredConfigMap, append it to mergedConfigs,
-	// this will save the LastAppliedConfig and LastObservedGeneration from mca status.
+	type configKey struct {
+		gr      addonv1beta1.ConfigGroupResource
+		refName string
+		refNs   string
+	}
+
+	// Build a lookup from old status to preserve LastAppliedConfig and LastObservedGeneration
+	oldStatusByKey := map[configKey]addonv1beta1.ConfigReference{}
 	for _, configRef := range mcaCopy.Status.ConfigReferences {
-		gr := configRef.ConfigGroupResource
-		if _, ok := mergedConfigs[gr]; !ok {
-			mergedConfigs[gr] = []addonv1beta1.ConfigReference{}
+		if configRef.DesiredConfig == nil {
+			continue
 		}
-		if _, ok := desiredConfigMap.containsConfig(gr, configRef.DesiredConfig.ConfigReferent); ok {
-			mergedConfigs[gr] = append(mergedConfigs[gr], configRef)
+		key := configKey{
+			gr:      configRef.ConfigGroupResource,
+			refName: configRef.DesiredConfig.ConfigReferent.Name,
+			refNs:   configRef.DesiredConfig.ConfigReferent.Namespace,
 		}
+		oldStatusByKey[key] = configRef
 	}
 
-	// Then go through the desiredConfigMap, for each configReference,
-	// if the desired config (gvk + namespace + name) is aleady in the mergedConfigs,
-	// update the ConfigReferent and DesiredConfig (including desired spechash) to mergedConfigs.
-	// else just append it to the mergedConfigs.
-	for gr, configReferences := range desiredConfigMap {
-		for _, configRef := range configReferences {
-			if _, ok := mergedConfigs[gr]; !ok {
-				mergedConfigs[gr] = []addonv1beta1.ConfigReference{}
-			}
-
-			referent := configRef.DesiredConfig.ConfigReferent
-			if i, exist := mergedConfigs.containsConfig(gr, referent); exist {
-				mergedConfigs[gr][i].DesiredConfig = configRef.DesiredConfig.DeepCopy()
-			} else {
-				mergedConfigs[gr] = append(mergedConfigs[gr], configRef)
-			}
-		}
-	}
-
-	// sort by gvk and set the final config references
+	// Iterate desiredConfigMap in sorted GR order — this is the source of truth for ordering.
+	// Within each GR, the slice order from the desired config map is preserved.
 	configRefs := []addonv1beta1.ConfigReference{}
-	for _, gvk := range mergedConfigs.orderedKeys() {
-		configRefs = append(configRefs, mergedConfigs[gvk]...)
+	for _, gr := range desiredConfigMap.orderedKeys() {
+		for _, configRef := range desiredConfigMap[gr] {
+			key := configKey{
+				gr:      gr,
+				refName: configRef.DesiredConfig.ConfigReferent.Name,
+				refNs:   configRef.DesiredConfig.ConfigReferent.Namespace,
+			}
+			if old, ok := oldStatusByKey[key]; ok {
+				// Preserve rollout tracking fields, update desired config
+				old.DesiredConfig = configRef.DesiredConfig.DeepCopy()
+				configRefs = append(configRefs, old)
+			} else {
+				configRefs = append(configRefs, configRef)
+			}
+		}
 	}
+
 	mcaCopy.Status.ConfigReferences = configRefs
 	return mcaCopy
 }
