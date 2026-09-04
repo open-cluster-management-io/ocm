@@ -41,6 +41,10 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&EtcdBackupList{},
 		&ClusterVersionOperator{},
 		&ClusterVersionOperatorList{},
+		&ClusterAPI{},
+		&ClusterAPIList{},
+		&Ingress{},
+		&IngressList{},
 	)
 
 	return nil
