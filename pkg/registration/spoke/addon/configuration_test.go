@@ -1,7 +1,10 @@
 package addon
 
 import (
+	"fmt"
 	"testing"
+
+	"github.com/go-logr/logr"
 
 	certificates "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -9,6 +12,7 @@ import (
 	"k8s.io/klog/v2"
 
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
@@ -288,7 +292,7 @@ func TestGetRegistrationConfigs(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			installOption := addonInstallOption{
-				AgentRunningOutsideManagedCluster: isAddonRunningOutsideManagedCluster(c.addon),
+				AgentRunningOutsideManagedCluster: isAddonRunningOutsideManagedCluster(c.addon, nil, logr.Discard()),
 				InstallationNamespace:             getAddOnInstallationNamespace(c.addon),
 			}
 			logger := klog.NewKlogr()
@@ -305,6 +309,120 @@ func TestGetRegistrationConfigs(t *testing.T) {
 				if _, ok := configs[config.hash]; !ok {
 					t.Errorf("unexpected registrationConfig: %v, got %v", dump.Pretty(configs), dump.Pretty(c.configs))
 				}
+			}
+		})
+	}
+}
+
+func TestIsAddonRunningOutsideManagedCluster(t *testing.T) {
+	hostedAddon := &addonv1beta1.ManagedClusterAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "work-manager",
+			Namespace: testinghelpers.TestManagedClusterName,
+		},
+	}
+	hostedCluster := &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: testinghelpers.TestManagedClusterName,
+			Annotations: map[string]string{
+				annotationEnableHostedModeAddons:       "true",
+				annotationKlusterletDeployMode:         klusterletDeployModeHosted,
+				annotationKlusterletHostingClusterName: "local-cluster",
+			},
+		},
+	}
+
+	cases := []struct {
+		name           string
+		addon          *addonv1beta1.ManagedClusterAddOn
+		managedCluster *clusterv1.ManagedCluster
+		want           bool
+	}{
+		{
+			name:           "no hosting annotations",
+			addon:          hostedAddon,
+			managedCluster: &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: testinghelpers.TestManagedClusterName}},
+			want:           false,
+		},
+		{
+			name: "addon hosting annotation",
+			addon: &addonv1beta1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "work-manager",
+					Namespace: testinghelpers.TestManagedClusterName,
+					Annotations: map[string]string{
+						addonv1beta1.HostingClusterNameAnnotationKey: "local-cluster",
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "klusterlet install namespace fallback",
+			addon: &addonv1beta1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "work-manager",
+					Namespace: testinghelpers.TestManagedClusterName,
+				},
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Namespace: fmt.Sprintf("klusterlet-%s", testinghelpers.TestManagedClusterName),
+				},
+			},
+			want: true,
+		},
+		{
+			name:           "managed cluster hosted gate alone is insufficient without klusterlet install namespace",
+			addon:          hostedAddon,
+			managedCluster: hostedCluster,
+			want:           false,
+		},
+		{
+			name: "spoke addon on hosted cluster is not outside managed cluster",
+			addon: &addonv1beta1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cluster-proxy",
+					Namespace: testinghelpers.TestManagedClusterName,
+				},
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Namespace: defaultAddOnInstallationNamespace,
+				},
+			},
+			managedCluster: hostedCluster,
+			want:           false,
+		},
+		{
+			name:  "addon hosting cluster name on managed cluster alone is insufficient",
+			addon: hostedAddon,
+			managedCluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: testinghelpers.TestManagedClusterName,
+					Annotations: map[string]string{
+						addonv1beta1.HostingClusterNameAnnotationKey: "local-cluster",
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name:  "import hosting cluster name without hosted addon gate is insufficient",
+			addon: hostedAddon,
+			managedCluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: testinghelpers.TestManagedClusterName,
+					Annotations: map[string]string{
+						annotationKlusterletHostingClusterName: "local-cluster",
+					},
+				},
+			},
+			want: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := isAddonRunningOutsideManagedCluster(c.addon, c.managedCluster, logr.Discard())
+			if got != c.want {
+				t.Errorf("expected %v, got %v", c.want, got)
 			}
 		})
 	}

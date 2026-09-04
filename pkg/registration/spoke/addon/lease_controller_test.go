@@ -3,6 +3,7 @@ package addon
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +18,9 @@ import (
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
+	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
@@ -107,6 +111,7 @@ func TestSync(t *testing.T) {
 		name             string
 		queueKey         string
 		addOns           []runtime.Object
+		clusters         []runtime.Object
 		hubLeases        []runtime.Object
 		managementLeases []runtime.Object
 		spokeLeases      []runtime.Object
@@ -392,6 +397,56 @@ func TestSync(t *testing.T) {
 				testingcommon.AssertNoActions(t, actions)
 			},
 		},
+		{
+			name:     "hosted mode from klusterlet install namespace when addon annotation missing",
+			queueKey: fmt.Sprintf("klusterlet-%s/work-manager", testinghelpers.TestManagedClusterName),
+			addOns: []runtime.Object{&addonv1beta1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testinghelpers.TestManagedClusterName,
+					Name:      "work-manager",
+				},
+				Spec: addonv1beta1.ManagedClusterAddOnSpec{},
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Namespace: fmt.Sprintf("klusterlet-%s", testinghelpers.TestManagedClusterName),
+				},
+			}},
+			clusters: []runtime.Object{&clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: testinghelpers.TestManagedClusterName,
+					Annotations: map[string]string{
+						annotationEnableHostedModeAddons:       "true",
+						annotationKlusterletDeployMode:         klusterletDeployModeHosted,
+						annotationKlusterletHostingClusterName: "local-cluster",
+					},
+				},
+			}},
+			hubLeases: []runtime.Object{},
+			managementLeases: []runtime.Object{
+				testinghelpers.NewAddOnLease(
+					fmt.Sprintf("klusterlet-%s", testinghelpers.TestManagedClusterName),
+					"work-manager",
+					now,
+				),
+			},
+			spokeLeases: []runtime.Object{},
+			validateActions: func(t *testing.T, ctx *testingcommon.FakeSyncContext, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				addOn := &addonv1beta1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
+				if addOnCond == nil {
+					t.Errorf("expected addon available condition, but failed")
+					return
+				}
+				if addOnCond.Status != metav1.ConditionTrue {
+					t.Errorf("expected addon available condition is true, got %s", addOnCond.Status)
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -408,6 +463,15 @@ func TestSync(t *testing.T) {
 			managementLeaseClient := kubefake.NewClientset(c.managementLeases...)
 			spokeLeaseClient := kubefake.NewClientset(c.spokeLeases...)
 
+			clusterClient := clusterfake.NewSimpleClientset(c.clusters...)
+			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
+			clusterStore := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore()
+			for _, cluster := range c.clusters {
+				if err := clusterStore.Add(cluster); err != nil {
+					t.Fatal(err)
+				}
+			}
+
 			ctrl := &managedClusterAddOnLeaseController{
 				clusterName: testinghelpers.TestManagedClusterName,
 				clock:       clocktesting.NewFakeClock(time.Now()),
@@ -415,6 +479,7 @@ func TestSync(t *testing.T) {
 					*addonv1beta1.ManagedClusterAddOn, addonv1beta1.ManagedClusterAddOnSpec, addonv1beta1.ManagedClusterAddOnStatus](
 					addOnClient.AddonV1beta1().ManagedClusterAddOns(testinghelpers.TestManagedClusterName)),
 				addOnLister:           addOnInformerFactory.Addon().V1beta1().ManagedClusterAddOns().Lister(),
+				hubClusterLister:      clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				managementLeaseClient: managementLeaseClient.CoordinationV1(),
 				spokeLeaseClient:      spokeLeaseClient.CoordinationV1(),
 			}

@@ -17,6 +17,8 @@ import (
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
 	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
+	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
+	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
@@ -35,6 +37,7 @@ type addOnRegistrationController struct {
 	managementKubeClient kubernetes.Interface // in-cluster local management kubeClient
 	spokeKubeClient      kubernetes.Interface
 	hubAddOnLister       addonlisterv1beta1.ManagedClusterAddOnLister
+	hubClusterLister     clusterv1listers.ManagedClusterLister
 	patcher              patcher.Patcher[
 		*addonv1beta1.ManagedClusterAddOn, addonv1beta1.ManagedClusterAddOnSpec, addonv1beta1.ManagedClusterAddOnStatus]
 	addonDriverFactory register.AddonDriverFactory
@@ -60,6 +63,7 @@ func NewAddOnRegistrationController(
 	addonDriverFactory register.AddonDriverFactory,
 	addonAuthConfig register.AddonAuthConfig,
 	hubAddOnInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
+	hubClusterInformer clusterv1informers.ManagedClusterInformer,
 ) factory.Controller {
 	c := &addOnRegistrationController{
 		clusterName:          clusterName,
@@ -68,6 +72,7 @@ func NewAddOnRegistrationController(
 		managementKubeClient: managementKubeClient,
 		spokeKubeClient:      managedKubeClient,
 		hubAddOnLister:       hubAddOnInformers.Lister(),
+		hubClusterLister:     hubClusterInformer.Lister(),
 		addonDriverFactory:   addonDriverFactory,
 		addonAuthConfig:      addonAuthConfig,
 		patcher: patcher.NewPatcher[
@@ -138,8 +143,9 @@ func (c *addOnRegistrationController) syncAddOn(ctx context.Context, syncCtx fac
 	}
 
 	installOption := addonInstallOption{
-		AgentRunningOutsideManagedCluster: isAddonRunningOutsideManagedCluster(addOn),
-		InstallationNamespace:             getAddOnInstallationNamespace(addOn),
+		AgentRunningOutsideManagedCluster: isAddonRunningOutsideManagedCluster(
+			addOn, getManagedClusterFromLister(c.hubClusterLister, c.clusterName), logger),
+		InstallationNamespace: getAddOnInstallationNamespace(addOn),
 	}
 	configs, err := getRegistrationConfigs(addOnName, c.clusterName, installOption, addOn.Status.Registrations, logger)
 	if err != nil {

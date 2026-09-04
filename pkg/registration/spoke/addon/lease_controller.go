@@ -12,12 +12,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	coordv1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
 	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
+	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
+	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 )
@@ -36,6 +39,7 @@ type managedClusterAddOnLeaseController struct {
 	patcher     patcher.Patcher[
 		*addonv1beta1.ManagedClusterAddOn, addonv1beta1.ManagedClusterAddOnSpec, addonv1beta1.ManagedClusterAddOnStatus]
 	addOnLister           addonlisterv1beta1.ManagedClusterAddOnLister
+	hubClusterLister      clusterv1listers.ManagedClusterLister
 	managementLeaseClient coordv1client.CoordinationV1Interface
 	spokeLeaseClient      coordv1client.CoordinationV1Interface
 }
@@ -44,6 +48,7 @@ type managedClusterAddOnLeaseController struct {
 func NewManagedClusterAddOnLeaseController(clusterName string,
 	addOnClient addonclient.Interface,
 	addOnInformer addoninformerv1beta1.ManagedClusterAddOnInformer,
+	hubClusterInformer clusterv1informers.ManagedClusterInformer,
 	managementLeaseClient coordv1client.CoordinationV1Interface,
 	spokeLeaseClient coordv1client.CoordinationV1Interface,
 	resyncInterval time.Duration) factory.Controller {
@@ -54,6 +59,7 @@ func NewManagedClusterAddOnLeaseController(clusterName string,
 			*addonv1beta1.ManagedClusterAddOn, addonv1beta1.ManagedClusterAddOnSpec, addonv1beta1.ManagedClusterAddOnStatus](
 			addOnClient.AddonV1beta1().ManagedClusterAddOns(clusterName)),
 		addOnLister:           addOnInformer.Lister(),
+		hubClusterLister:      hubClusterInformer.Lister(),
 		managementLeaseClient: managementLeaseClient,
 		spokeLeaseClient:      spokeLeaseClient,
 	}
@@ -109,13 +115,17 @@ func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
 	syncCtx factory.SyncContext,
 	leaseNamespace string,
 	addOn *addonv1beta1.ManagedClusterAddOn) error {
+	logger := klog.FromContext(ctx).WithValues("addOnName", addOn.Name)
 	now := c.clock.Now()
 	gracePeriod := time.Duration(leaseDurationTimes*AddOnLeaseControllerLeaseDurationSeconds) * time.Second
+
+	managedCluster := getManagedClusterFromLister(c.hubClusterLister, c.clusterName)
+	outsideManagedCluster := isAddonRunningOutsideManagedCluster(addOn, managedCluster, logger)
 
 	// if the add-on agent is running on the managed cluster, try to fetch the add-on lease on the managed cluster,
 	// otherwise (running outside of the managed cluster), fetch the add-on lease on the management cluster instead.
 	leaseClient := c.spokeLeaseClient
-	if isAddonRunningOutsideManagedCluster(addOn) {
+	if outsideManagedCluster {
 		leaseClient = c.managementLeaseClient
 	}
 
@@ -126,9 +136,9 @@ func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
 	switch {
 	case errors.IsNotFound(err):
 		message := fmt.Sprintf("The status of %s add-on is unknown.", addOn.Name)
-		if isAddonRunningOutsideManagedCluster(addOn) {
+		if outsideManagedCluster {
 			// No lease on the declared hosting cluster usually means it doesn't match the klusterlet's actual hosting cluster.
-			hostingCluster := addOn.Annotations[addonv1beta1.HostingClusterNameAnnotationKey]
+			hostingCluster := hostingClusterNameForAddon(addOn, managedCluster, logger)
 			message = fmt.Sprintf("%s No lease found on hosting cluster %q; verify it matches the cluster "+
 				"where this managed cluster's klusterlet actually runs.", message, hostingCluster)
 		}
