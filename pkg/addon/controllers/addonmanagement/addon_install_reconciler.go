@@ -18,7 +18,6 @@ import (
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	addonindex "open-cluster-management.io/ocm/pkg/addon/index"
 )
@@ -29,18 +28,11 @@ type managedClusterAddonInstallReconciler struct {
 	managedClusterLister       clusterlisterv1.ManagedClusterLister
 	placementLister            clusterlisterv1beta1.PlacementLister
 	placementDecisionLister    clusterlisterv1beta1.PlacementDecisionLister
-	addonFilterFunc            factory.EventFilterFunc
 }
 
 func (d *managedClusterAddonInstallReconciler) reconcile(
 	ctx context.Context, cma *addonv1beta1.ClusterManagementAddOn) (*addonv1beta1.ClusterManagementAddOn, reconcileState, error) {
 	logger := klog.FromContext(ctx)
-	// skip apply install strategy for self-managed addon
-	// this is to avoid conflict when addon also define WithInstallStrategy()
-	// the filter will be removed after WithInstallStrategy() is removed from framework.
-	if !d.addonFilterFunc(cma) {
-		return cma, reconcileContinue, nil
-	}
 
 	if cma.Spec.InstallStrategy.Type == "" || cma.Spec.InstallStrategy.Type == addonv1beta1.AddonInstallStrategyManual {
 		return cma, reconcileContinue, nil

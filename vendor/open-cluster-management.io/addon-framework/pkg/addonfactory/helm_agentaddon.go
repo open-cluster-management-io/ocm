@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/klog/v2"
+
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -186,8 +187,15 @@ func (a *HelmAgentAddon) getValues(
 				return overrideValues, err
 			}
 
-			klog.V(4).Infof("index=%d, user values: %v", i, userValues)
-			overrideValues = MergeValues(overrideValues, userValues)
+			// MergeValues deep-merges only map[string]interface{} values, so typed Go
+			// maps and structs must be normalized to JSON-compatible types beforehand.
+			normalizedUserValues, err := JsonStructToValues(userValues)
+			if err != nil {
+				return overrideValues, fmt.Errorf("failed to normalize Helm values: %w", err)
+			}
+
+			klog.V(4).Infof("index=%d, user values: %v", i, normalizedUserValues)
+			overrideValues = MergeValues(overrideValues, normalizedUserValues)
 			klog.V(4).Infof("index=%d, override values: %v", i, overrideValues)
 		}
 	}
@@ -297,7 +305,7 @@ func (a *HelmAgentAddon) getDefaultValues(
 // only support Capabilities.KubeVersion
 func (a *HelmAgentAddon) capabilities(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1beta1.ManagedClusterAddOn) *chartutil.Capabilities {
+	_ *addonapiv1beta1.ManagedClusterAddOn) *chartutil.Capabilities {
 	return &chartutil.Capabilities{
 		KubeVersion: chartutil.KubeVersion{Version: cluster.Status.Version.Kubernetes},
 	}
@@ -334,7 +342,7 @@ func sortManifestsByKind(manifests []manifest, ordering releaseutil.KindSortOrde
 	return manifests
 }
 
-func lessByKind(a interface{}, b interface{}, kindA string, kindB string, o releaseutil.KindSortOrder) bool {
+func lessByKind(_ interface{}, _ interface{}, kindA string, kindB string, o releaseutil.KindSortOrder) bool {
 	ordering := make(map[string]int, len(o))
 	for v, k := range o {
 		ordering[k] = v

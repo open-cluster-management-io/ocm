@@ -402,6 +402,20 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		hubEventRecorder,
 	)
 
+	// KEP-188: self-report the hosting cluster, gated on the opt-in.
+	var hostingClusterClaimController factory.Controller
+	if o.registrationOption.ReportHostingCluster {
+		spokeClusterClaimClient, err := clusterv1client.NewForConfig(spokeClientConfig)
+		if err != nil {
+			return err
+		}
+		hostingClusterClaimController = managedcluster.NewHostingClusterClaimController(
+			spokeClusterClaimClient.ClusterV1alpha1().ClusterClaims(),
+			spokeClusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
+			o.registrationOption.HostingClusterName,
+		)
+	}
+
 	var addOnLeaseController factory.Controller
 	var addOnRegistrationController factory.Controller
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.AddonManagement) {
@@ -463,7 +477,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 	go spokeKubeInformerFactory.Start(ctx.Done())
 	go filteredNamespaceInformerFactory.Start(ctx.Done())
-	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
+	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) || o.registrationOption.ReportHostingCluster {
 		go spokeClusterInformerFactory.Start(ctx.Done())
 	}
 
@@ -474,6 +488,9 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	go secretController.Run(ctx, 1)
 	go managedClusterLeaseController.Run(ctx, 1)
 	go managedClusterHealthCheckController.Run(ctx, 1)
+	if o.registrationOption.ReportHostingCluster {
+		go hostingClusterClaimController.Run(ctx, 1)
+	}
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.AddonManagement) {
 		go addOnLeaseController.Run(ctx, 1)
 		// addon registration controller runs when the driver implements AddonDriverFactory

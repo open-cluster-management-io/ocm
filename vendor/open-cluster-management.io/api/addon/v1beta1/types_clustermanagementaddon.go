@@ -49,7 +49,34 @@ type ClusterManagementAddOnSpec struct {
 	// +optional
 	// +kubebuilder:default={type: Manual}
 	InstallStrategy InstallStrategy `json:"installStrategy,omitempty"`
+
+	// hostedModeAutoDiscovery, when its mode is set to Enable, lets ManagedClusterAddOns of this
+	// addon type resolve their hosting cluster automatically instead of requiring
+	// hosting-cluster-name to be set. Disabled by default.
+	// +optional
+	HostedModeAutoDiscovery *HostedModeAutoDiscoveryConfig `json:"hostedModeAutoDiscovery,omitempty"`
 }
+
+// HostedModeAutoDiscoveryConfig configures automatic hosting-cluster resolution for addon Hosted mode.
+type HostedModeAutoDiscoveryConfig struct {
+	// mode turns automatic hosting-cluster resolution on or off for ManagedClusterAddOns of this
+	// type. Disabled by default.
+	// +optional
+	// +kubebuilder:default=Disable
+	Mode HostedModeAutoDiscoveryModeType `json:"mode,omitempty"`
+}
+
+// HostedModeAutoDiscoveryModeType is the type for HostedModeAutoDiscoveryConfig.Mode. A typed
+// enum, not a bool, so a later mode can be added without a breaking change to the field's shape.
+// +kubebuilder:validation:Enum=Enable;Disable
+type HostedModeAutoDiscoveryModeType string
+
+const (
+	// HostedModeAutoDiscoveryModeEnable enables automatic hosting-cluster resolution.
+	HostedModeAutoDiscoveryModeEnable HostedModeAutoDiscoveryModeType = "Enable"
+	// HostedModeAutoDiscoveryModeDisable disables automatic hosting-cluster resolution. This is the default.
+	HostedModeAutoDiscoveryModeDisable HostedModeAutoDiscoveryModeType = "Disable"
+)
 
 // AddOnMeta represents a collection of metadata information for the add-on.
 type AddOnMeta struct {

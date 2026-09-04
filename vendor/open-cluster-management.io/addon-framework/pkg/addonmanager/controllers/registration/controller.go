@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
@@ -150,7 +151,8 @@ func buildRegistrationConfigs(newConfigs []agent.RegistrationConfig, existingReg
 			continue
 		}
 
-		if driver == "token" {
+		switch driver {
+		case "token":
 			// Token driver - preserve existing subject set by agent
 			if existingReg != nil && existingReg.KubeClient != nil {
 				config.KubeClient.Subject = existingReg.KubeClient.Subject
@@ -158,7 +160,7 @@ func buildRegistrationConfigs(newConfigs []agent.RegistrationConfig, existingReg
 				// If no matching existing registration found, clear subject (agent will set it).
 				config.KubeClient.Subject = addonapiv1beta1.KubeClientSubject{}
 			}
-		} else if driver == "csr" {
+		case "csr":
 			// CSR driver - use subject from newConfigs, or set default if empty
 			if equality.Semantic.DeepEqual(config.KubeClient.Subject, addonapiv1beta1.KubeClientSubject{}) {
 				config.KubeClient.Subject = addonapiv1beta1.KubeClientSubject{

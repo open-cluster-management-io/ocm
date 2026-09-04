@@ -262,5 +262,40 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "Applied", "KlusterletApplied", metav1.ConditionTrue)
 		})
+
+		ginkgo.It("should render self-report flags and RBAC when reportHostingCluster is enabled (KEP-188)", func() {
+			// Unique namespace: the shared default may still be terminating from the prior spec.
+			klusterlet.Spec.Namespace = fmt.Sprintf("open-cluster-management-%s", klusterlet.Name)
+			klusterlet.Spec.DeployOption.ReportHostingCluster = operatorapiv1.ReportHostingClusterModeEnable
+			klusterlet.Spec.DeployOption.Hosted = &operatorapiv1.KlusterletHostedConfiguration{
+				ManagementClusterName: "management-cluster-x",
+			}
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			gomega.Eventually(func() []string {
+				deployment, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(
+					context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				if err != nil {
+					return nil
+				}
+				return deployment.Spec.Template.Spec.Containers[0].Args
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.ContainElements(
+				"--report-hosting-cluster=true", "--hosting-cluster-name=management-cluster-x"))
+
+			gomega.Eventually(func() error {
+				role, err := hostedKubeClient.RbacV1().ClusterRoles().Get(
+					context.Background(), registrationManagedRoleName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				for _, rule := range role.Rules {
+					if len(rule.ResourceNames) == 1 && rule.ResourceNames[0] == "hosting-cluster.open-cluster-management.io" {
+						return nil
+					}
+				}
+				return fmt.Errorf("no rule scoped to the reserved hosting-cluster claim: %+v", role.Rules)
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
 	})
 })

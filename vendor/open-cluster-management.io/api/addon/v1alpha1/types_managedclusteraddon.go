@@ -272,6 +272,20 @@ const (
 	// on ManagedClusterAddon resource only.
 	HostingClusterNameAnnotationKey = "addon.open-cluster-management.io/hosting-cluster-name"
 
+	// InstallModeAnnotationKey signals that this addon should be installed in Hosted mode, with its
+	// hosting cluster resolved automatically instead of set via HostingClusterNameAnnotationKey.
+	// It should be set on ManagedClusterAddon resource only.
+	InstallModeAnnotationKey = "addon.open-cluster-management.io/install-mode"
+
+	// HostingClusterNameManagedByAnnotationKey marks a HostingClusterNameAnnotationKey value as
+	// having been written by the auto-discovery resolver, distinguishing it from a human-set value.
+	// It should be set on ManagedClusterAddon resource only.
+	HostingClusterNameManagedByAnnotationKey = "addon.open-cluster-management.io/hosting-cluster-name-managed-by"
+
+	// HostingClusterNameManagedByAutoDiscoveryValue is the value of HostingClusterNameManagedByAnnotationKey
+	// set by the auto-discovery resolver.
+	HostingClusterNameManagedByAutoDiscoveryValue = "auto-discovery"
+
 	// DeletionOrphanAnnotationKey is an annotation for the manifest of addon indicating that it will not be cleaned up
 	// after the addon is deleted.
 	DeletionOrphanAnnotationKey = "addon.open-cluster-management.io/deletion-orphan"
@@ -422,6 +436,15 @@ const (
 	// HostingClusterValidityReasonInvalid is the reason of condition HostingClusterValidity indicating the hosting
 	// cluster is invalid.
 	HostingClusterValidityReasonInvalid = "HostingClusterInvalid"
+
+	// HostingClusterValidityReasonMismatch is the reason of condition HostingClusterValidity indicating the
+	// declared hosting cluster of the addon does not match the actual hosting cluster self-reported by the
+	// target managed cluster's klusterlet.
+	HostingClusterValidityReasonMismatch = "HostingClusterMismatch"
+
+	// HostingClusterValidityReasonAutoDiscoveryPending is the reason of condition HostingClusterValidity
+	// indicating install-mode is Hosted but no hosting cluster has been resolved yet.
+	HostingClusterValidityReasonAutoDiscoveryPending = "HostingClusterAutoDiscoveryPending"
 )
 
 // the reason of condition ManagedClusterAddOnConditionProgressing

@@ -9,6 +9,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -23,6 +24,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/features"
 	registerfactory "open-cluster-management.io/ocm/pkg/registration/register/factory"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
+	"open-cluster-management.io/ocm/pkg/registration/spoke/managedcluster"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
@@ -31,8 +33,16 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 	var claims []*clusterv1alpha1.ClusterClaim
 	var maxCustomClusterClaims int
 	var reservedClusterClaimSuffixes []string
+	var reportHostingCluster bool
+	var hostingClusterName string
 	var err error
 	var cancel context.CancelFunc
+
+	ginkgo.BeforeEach(func() {
+		// reset so one spec's opt-in can't leak into the next
+		reportHostingCluster = false
+		hostingClusterName = ""
+	})
 
 	ginkgo.JustBeforeEach(func() {
 		suffix := rand.String(5)
@@ -53,6 +63,8 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 			ClusterHealthCheckPeriod:     1 * time.Minute,
 			MaxCustomClusterClaims:       maxCustomClusterClaims,
 			ReservedClusterClaimSuffixes: reservedClusterClaimSuffixes,
+			ReportHostingCluster:         reportHostingCluster,
+			HostingClusterName:           hostingClusterName,
 			RegisterDriverOption:         registerfactory.NewOptions(),
 		}
 		commOptions := commonoptions.NewAgentOptions()
@@ -237,6 +249,55 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 				}
 				return reflect.DeepEqual(clusterClaims, spokeCluster.Status.ClusterClaims)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		})
+	})
+
+	ginkgo.Context("Self-reported hosting cluster (KEP-188)", func() {
+		ginkgo.BeforeEach(func() {
+			reportHostingCluster = true
+			hostingClusterName = "hub-cluster-b"
+		})
+
+		ginkgo.It("should create, update and delete the reserved hosting-cluster claim", func() {
+			assertSuccessBootstrap()
+
+			ginkgo.By("Claim is created with the reported value")
+			gomega.Eventually(func() (string, error) {
+				claim, err := clusterClient.ClusterV1alpha1().ClusterClaims().Get(
+					context.TODO(), managedcluster.HostingClusterClaimName, metav1.GetOptions{})
+				if err != nil {
+					return "", err
+				}
+				return claim.Spec.Value, nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Equal("hub-cluster-b"))
+
+			ginkgo.By("Claim is corrected if something else changes its value")
+			claim, err := clusterClient.ClusterV1alpha1().ClusterClaims().Get(
+				context.TODO(), managedcluster.HostingClusterClaimName, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			claim.Spec.Value = "someone-else-changed-this"
+			_, err = clusterClient.ClusterV1alpha1().ClusterClaims().Update(context.TODO(), claim, metav1.UpdateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Eventually(func() (string, error) {
+				claim, err := clusterClient.ClusterV1alpha1().ClusterClaims().Get(
+					context.TODO(), managedcluster.HostingClusterClaimName, metav1.GetOptions{})
+				if err != nil {
+					return "", err
+				}
+				return claim.Spec.Value, nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Equal("hub-cluster-b"))
+		})
+	})
+
+	ginkgo.Context("Self-report disabled (default)", func() {
+		ginkgo.It("should never create the reserved hosting-cluster claim", func() {
+			assertSuccessBootstrap()
+
+			gomega.Consistently(func() bool {
+				_, err := clusterClient.ClusterV1alpha1().ClusterClaims().Get(
+					context.TODO(), managedcluster.HostingClusterClaimName, metav1.GetOptions{})
+				return errors.IsNotFound(err)
+			}, 5*time.Second, eventuallyInterval).Should(gomega.BeTrue())
 		})
 	})
 

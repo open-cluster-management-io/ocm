@@ -201,6 +201,10 @@ type klusterletConfig struct {
 	// MaxCustomClusterClaims is the maximum number of custom cluster claims allowed. 0 means no limit.
 	MaxCustomClusterClaims       int
 	ReservedClusterClaimSuffixes string
+
+	// Self-report opt-in (KEP-188). HostingClusterName is only meaningful when set.
+	ReportHostingCluster bool
+	HostingClusterName   string
 	// PriorityClassName is the name of the PriorityClass used by the deployed agents
 	PriorityClassName string
 
@@ -312,6 +316,17 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		ResourceRequirementResourceType: helpers.ResourceType(klusterlet),
 		ResourceRequirements:            resourceRequirements,
 		DisableAddonNamespace:           n.disableAddonNamespace,
+	}
+
+	if klusterlet.Spec.DeployOption.ReportHostingCluster == operatorapiv1.ReportHostingClusterModeEnable {
+		config.ReportHostingCluster = true
+		if helpers.IsHosted(klusterlet.Spec.DeployOption.Mode) {
+			if klusterlet.Spec.DeployOption.Hosted != nil {
+				config.HostingClusterName = klusterlet.Spec.DeployOption.Hosted.ManagementClusterName
+			}
+		} else {
+			config.HostingClusterName = klusterlet.Spec.ClusterName
+		}
 	}
 
 	config.populateBootstrap(klusterlet)

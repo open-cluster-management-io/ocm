@@ -142,6 +142,11 @@ func (in KlusterletDeployOption) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in KlusterletHostedConfiguration) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.operator.v1.KlusterletHostedConfiguration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in KlusterletList) OpenAPIModelName() string {
 	return "io.open-cluster-management.api.operator.v1.KlusterletList"
 }

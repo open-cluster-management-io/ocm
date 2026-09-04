@@ -65,6 +65,8 @@ func StructToValues(a interface{}) Values {
 }
 
 // JsonStructToValues converts the given json struct to a Values
+//
+//nolint:revive
 func JsonStructToValues(a interface{}) (Values, error) {
 	raw, err := json.Marshal(a)
 	if err != nil {

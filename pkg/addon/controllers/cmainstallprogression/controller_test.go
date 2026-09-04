@@ -10,7 +10,6 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
-	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
@@ -480,7 +479,6 @@ func TestReconcile(t *testing.T) {
 				fakeAddonClient,
 				addonInformers.Addon().V1beta1().ManagedClusterAddOns(),
 				addonInformers.Addon().V1beta1().ClusterManagementAddOns(),
-				utils.ManagedByAddonManager,
 			)
 
 			err := controller.Sync(context.TODO(), syncContext, c.syncKey)

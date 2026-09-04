@@ -1935,8 +1935,8 @@ k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/ptr
 k8s.io/utils/trace
-# open-cluster-management.io/addon-framework v1.3.1
-## explicit; go 1.25.0
+# open-cluster-management.io/addon-framework v1.3.1-0.20260902141743-f80fc02deef8
+## explicit; go 1.26.0
 open-cluster-management.io/addon-framework/pkg/addonfactory
 open-cluster-management.io/addon-framework/pkg/addonmanager
 open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting
@@ -1945,14 +1945,13 @@ open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addoncon
 open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/agentdeploy
 open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/certificate
 open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/cmaconfig
-open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/cmamanagedby
 open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/registration
 open-cluster-management.io/addon-framework/pkg/agent
 open-cluster-management.io/addon-framework/pkg/agent/v1alpha1
 open-cluster-management.io/addon-framework/pkg/assets
 open-cluster-management.io/addon-framework/pkg/index
 open-cluster-management.io/addon-framework/pkg/utils
-# open-cluster-management.io/api v1.3.1-0.20260824155636-3ff9ad2f868d
+# open-cluster-management.io/api v1.3.1-0.20260826151356-f3f2452d45ee
 ## explicit; go 1.26.0
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/addon/v1beta1

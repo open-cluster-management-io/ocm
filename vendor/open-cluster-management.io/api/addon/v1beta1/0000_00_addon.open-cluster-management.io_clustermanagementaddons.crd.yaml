@@ -709,6 +709,22 @@ spec:
                 - group
                 - resource
                 x-kubernetes-list-type: map
+              hostedModeAutoDiscovery:
+                description: |-
+                  hostedModeAutoDiscovery, when its mode is set to Enable, lets ManagedClusterAddOns of this
+                  addon type resolve their hosting cluster automatically instead of requiring
+                  hosting-cluster-name to be set. Disabled by default.
+                properties:
+                  mode:
+                    default: Disable
+                    description: |-
+                      mode turns automatic hosting-cluster resolution on or off for ManagedClusterAddOns of this
+                      type. Disabled by default.
+                    enum:
+                    - Enable
+                    - Disable
+                    type: string
+                type: object
               installStrategy:
                 default:
                   type: Manual
