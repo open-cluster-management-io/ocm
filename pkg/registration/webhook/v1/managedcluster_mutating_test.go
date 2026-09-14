@@ -8,9 +8,12 @@ import (
 	"time"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	kubefake "k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -23,15 +26,17 @@ import (
 func TestDefault(t *testing.T) {
 	now := time.Now()
 	cases := []struct {
-		name          string
-		cluster       *clusterv1.ManagedCluster
-		oldCluster    *clusterv1.ManagedCluster
-		expectCluster *clusterv1.ManagedCluster
-		expectedError bool
+		name                         string
+		cluster                      *clusterv1.ManagedCluster
+		oldCluster                   *clusterv1.ManagedCluster
+		allowUpdateDefaultClusterSet bool
+		expectCluster                *clusterv1.ManagedCluster
+		expectedError                bool
 	}{
 		{
-			name:          "Empty spec cluster",
-			expectedError: false,
+			name:                         "Empty spec cluster",
+			expectedError:                false,
+			allowUpdateDefaultClusterSet: true,
 			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
@@ -403,8 +408,9 @@ func TestDefault(t *testing.T) {
 			},
 		},
 		{
-			name:          "Has null clusterset label",
-			expectedError: false,
+			name:                         "Has null clusterset label",
+			expectedError:                false,
+			allowUpdateDefaultClusterSet: true,
 			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
@@ -423,8 +429,9 @@ func TestDefault(t *testing.T) {
 			},
 		},
 		{
-			name:          "Has other label",
-			expectedError: false,
+			name:                         "Has other label",
+			expectedError:                false,
+			allowUpdateDefaultClusterSet: true,
 			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
@@ -443,11 +450,77 @@ func TestDefault(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                         "Is deleting",
+			expectedError:                false,
+			allowUpdateDefaultClusterSet: true,
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "set-1",
+					Labels: map[string]string{
+						"k": "v",
+					},
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+				},
+			},
+			expectCluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "set-1",
+					Labels: map[string]string{
+						"k": "v",
+					},
+				},
+			},
+		},
+		{
+			name:          "Actor is missing clusterset permissions",
+			expectedError: false,
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "set-1",
+					Labels: map[string]string{
+						"k": "v",
+					},
+				},
+			},
+			expectCluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "set-1",
+					Labels: map[string]string{
+						"k": "v",
+					},
+				},
+			},
+		},
 	}
 	runtime.Must(features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates))
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			w := ManagedClusterWebhook{}
+			kubeClient := kubefake.NewSimpleClientset()
+			kubeClient.PrependReactor(
+				"create",
+				"subjectaccessreviews",
+				func(action clienttesting.Action) (handled bool, ret apiruntime.Object, err error) {
+					allowed := false
+
+					sar := action.(clienttesting.CreateAction).GetObject().(*authorizationv1.SubjectAccessReview)
+					if sar.Spec.ResourceAttributes.Resource == "managedclustersets" &&
+						sar.Spec.ResourceAttributes.Subresource == "join" &&
+						sar.Spec.ResourceAttributes.Name == defaultClusterSetName &&
+						sar.Spec.ResourceAttributes.Verb == "create" {
+						allowed = c.allowUpdateDefaultClusterSet
+					}
+
+					return true, &authorizationv1.SubjectAccessReview{
+						Status: authorizationv1.SubjectAccessReviewStatus{
+							Allowed: allowed,
+						},
+					}, nil
+				},
+			)
+			w := ManagedClusterWebhook{
+				kubeClient: kubeClient,
+			}
 			var oldClusterBytes []byte
 			if c.oldCluster == nil {
 				oldClusterBytes = []byte{}
@@ -477,7 +550,7 @@ func TestDefault(t *testing.T) {
 				t.Errorf("faile to decode cluster %s", string(clusterBytes))
 			}
 			err := w.Default(ctx, cluster)
-			if err != nil || c.expectCluster != nil {
+			if err != nil || c.expectedError {
 				if err != nil && !c.expectedError {
 					t.Errorf("Case:%v, Expect nil but got Error, err: %v", c.name, err)
 				}
@@ -487,7 +560,7 @@ func TestDefault(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(cluster.Labels, c.expectCluster.Labels) {
-				t.Errorf("Case:%v, Expect cluster label is not same as return cluster. expect:%v,return:%v", c.name, c.expectCluster.Labels, c.cluster.Labels)
+				t.Errorf("Case:%v, Expect cluster label is not same as return cluster. expect:%v,return:%v", c.name, c.expectCluster.Labels, cluster.Labels)
 			}
 			if !DiffTaintTime(cluster.Spec.Taints, c.expectCluster.Spec.Taints) {
 				t.Errorf("Case:%v, Expect cluster taits:%v, return cluster taints:%v", c.name, c.expectCluster.Spec.Taints, c.cluster.Spec.Taints)
