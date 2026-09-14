@@ -44,6 +44,10 @@ func TestCreateSpokeCluster(t *testing.T) {
 					t.Errorf("expected cluster annotations %#v but got: %#v", "agent.open-cluster-management.io/test",
 						clusterannotations["agent.open-cluster-management.io/test"])
 				}
+				clusterlabels := actual.(*clusterv1.ManagedCluster).Labels
+				if value, ok := clusterlabels["env"]; !ok || value != "production" {
+					t.Errorf("expected cluster label env=production but got: %#v", clusterlabels)
+				}
 			},
 		},
 		{
@@ -63,6 +67,9 @@ func TestCreateSpokeCluster(t *testing.T) {
 				clusterDecorators: []ManagedClusterDecorator{
 					AnnotationDecorator(map[string]string{
 						"agent.open-cluster-management.io/test": "true",
+					}),
+					LabelDecorator(map[string]string{
+						"env": "production",
 					}),
 					ClientConfigDecorator([]string{testSpokeExternalServerUrl}, []byte("testcabundle")),
 				},

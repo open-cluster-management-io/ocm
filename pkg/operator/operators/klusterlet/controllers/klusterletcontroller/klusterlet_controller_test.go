@@ -1985,6 +1985,51 @@ func TestBuildClusterAnnotationsString(t *testing.T) {
 	}
 }
 
+func TestBuildClusterLabelsString(t *testing.T) {
+	tests := []struct {
+		name   string
+		labels map[string]string
+		want   string
+	}{
+		{
+			name:   "nil map",
+			labels: nil,
+			want:   "",
+		},
+		{
+			name:   "empty map",
+			labels: map[string]string{},
+			want:   "",
+		},
+		{
+			name:   "single key",
+			labels: map[string]string{"env": "prod"},
+			want:   "env=prod",
+		},
+		{
+			name: "keys sorted lexicographically",
+			labels: map[string]string{
+				"region": "us-west-2",
+				"env":    "prod",
+				"tier":   "frontend",
+			},
+			want: "env=prod,region=us-west-2,tier=frontend",
+		},
+	}
+
+	const iterations = 1000
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for i := range iterations {
+				got := buildClusterLabelsString(tt.labels)
+				if got != tt.want {
+					t.Fatalf("iteration %d: got %q, want %q (non-deterministic output regresses cluster-labels flag)", i, got, tt.want)
+				}
+			}
+		})
+	}
+}
+
 // TestReportHostingClusterDisabledByDefault: opt-in unset, no self-report args rendered.
 func TestReportHostingClusterDisabledByDefault(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")

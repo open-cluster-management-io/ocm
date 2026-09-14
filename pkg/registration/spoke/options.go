@@ -36,6 +36,7 @@ type SpokeAgentOptions struct {
 	MaxCustomClusterClaims       int
 	ReservedClusterClaimSuffixes []string
 	ClusterAnnotations           map[string]string
+	ClusterLabels                map[string]string
 
 	// Self-report opt-in (KEP-188), set by the klusterlet-operator.
 	ReportHostingCluster bool
@@ -44,6 +45,7 @@ type SpokeAgentOptions struct {
 	RegisterDriverOption *registerfactory.Options
 }
 
+// NewSpokeAgentOptions returns a SpokeAgentOptions with default values.
 func NewSpokeAgentOptions() *SpokeAgentOptions {
 	options := &SpokeAgentOptions{
 		BootstrapKubeconfigSecret:   "bootstrap-hub-kubeconfig",
@@ -80,6 +82,8 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 		"A list of suffixes for reserved cluster claims.")
 	fs.StringToStringVar(&o.ClusterAnnotations, "cluster-annotations", o.ClusterAnnotations, `the annotations with the reserve
 	 prefix "agent.open-cluster-management.io" set on ManagedCluster when creating only, other actors can update it afterwards.`)
+	fs.StringToStringVar(&o.ClusterLabels, "cluster-labels", o.ClusterLabels,
+		"the labels set on ManagedCluster when creating only, other actors can update it afterwards.")
 	fs.BoolVar(&o.ReportHostingCluster, "report-hosting-cluster", o.ReportHostingCluster,
 		"Self-report the cluster this agent's own controllers actually run on via the reserved "+
 			"hosting-cluster.open-cluster-management.io ClusterClaim (KEP-188).")
