@@ -21,16 +21,17 @@ import (
 var _ = ginkgo.Describe("Addon install with install strategy (v1beta1)", ginkgo.Ordered, ginkgo.Label("addon-install"), func() {
 	var addOnName string
 	var clusterNames []string
+	const globalSetNamespace = "open-cluster-management-global-set"
 
 	ginkgo.BeforeAll(func() {
 		suffix := rand.String(6)
 		addOnName = fmt.Sprintf("addon-%s", suffix)
 		clusterNames = nil
 
-		ginkgo.By("create namespace open-cluster-management-global-set")
+		ginkgo.By("create namespace " + globalSetNamespace)
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "open-cluster-management-global-set",
+				Name: globalSetNamespace,
 			},
 		}
 		_, err := hub.KubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
@@ -38,11 +39,11 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1beta1)", ginkgo.
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		}
 
-		ginkgo.By("create Placement global in open-cluster-management-global-set")
+		ginkgo.By("create Placement global in " + globalSetNamespace)
 		placement := &clusterv1beta1.Placement{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "global",
-				Namespace: "open-cluster-management-global-set",
+				Namespace: globalSetNamespace,
 			},
 			Spec: clusterv1beta1.PlacementSpec{
 				ClusterSets: []string{"global"},
@@ -64,23 +65,23 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1beta1)", ginkgo.
 				},
 			},
 		}
-		_, err = hub.ClusterClient.ClusterV1beta1().Placements("open-cluster-management-global-set").Create(
+		_, err = hub.ClusterClient.ClusterV1beta1().Placements(globalSetNamespace).Create(
 			context.TODO(), placement, metav1.CreateOptions{})
 		if err != nil && !errors.IsAlreadyExists(err) {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		}
 
-		ginkgo.By("create ManagedClusterSetBinding global in open-cluster-management-global-set")
+		ginkgo.By("create ManagedClusterSetBinding global in " + globalSetNamespace)
 		binding := &clusterv1beta2.ManagedClusterSetBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "global",
-				Namespace: "open-cluster-management-global-set",
+				Namespace: globalSetNamespace,
 			},
 			Spec: clusterv1beta2.ManagedClusterSetBindingSpec{
 				ClusterSet: "global",
 			},
 		}
-		_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSetBindings("open-cluster-management-global-set").Create(
+		_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSetBindings(globalSetNamespace).Create(
 			context.TODO(), binding, metav1.CreateOptions{})
 		if err != nil && !errors.IsAlreadyExists(err) {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -98,7 +99,7 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1beta1)", ginkgo.
 						{
 							PlacementRef: addonapiv1beta1.PlacementRef{
 								Name:      "global",
-								Namespace: "open-cluster-management-global-set",
+								Namespace: globalSetNamespace,
 							},
 							RolloutStrategy: clusterv1alpha1.RolloutStrategy{
 								Type: clusterv1alpha1.All,
@@ -130,12 +131,24 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1beta1)", ginkgo.
 			}
 		}
 
-		ginkgo.By("delete namespace open-cluster-management-global-set")
+		ginkgo.By("delete namespace " + globalSetNamespace)
 		err = hub.KubeClient.CoreV1().Namespaces().Delete(
-			context.TODO(), "open-cluster-management-global-set", metav1.DeleteOptions{})
+			context.TODO(), globalSetNamespace, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		}
+
+		gomega.Eventually(func() error {
+			_, err := hub.KubeClient.CoreV1().Namespaces().Get(
+				context.TODO(), globalSetNamespace, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			return fmt.Errorf("namespace " + globalSetNamespace + " still exists")
+		}).Should(gomega.Succeed())
 	})
 
 	ginkgo.It("Should create addon without addon annotations when managed cluster has no addon annotations", func() {
