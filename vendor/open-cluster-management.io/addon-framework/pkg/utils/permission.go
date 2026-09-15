@@ -11,8 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	rbacclientv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
-	"k8s.io/utils/ptr"
-
+	"k8s.io/utils/pointer"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
@@ -331,7 +330,7 @@ func ensureAddonOwnerReference(metadata *metav1.ObjectMeta, addon *addonapiv1bet
 			APIVersion:         addonapiv1beta1.GroupVersion.String(),
 			Kind:               "ManagedClusterAddOn",
 			Name:               addon.Name,
-			BlockOwnerDeletion: ptr.To(true),
+			BlockOwnerDeletion: pointer.Bool(true),
 			UID:                addon.UID,
 		},
 	}

@@ -18,7 +18,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
-
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
@@ -34,23 +33,23 @@ var serialNumberLimit = new(big.Int).Lsh(big.NewInt(1), 128)
 func DefaultSignerWithExpiry(caKey, caData []byte, duration time.Duration) agent.CSRSignerFunc {
 	return func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn,
 		csr *certificatesv1.CertificateSigningRequest) ([]byte, error) {
-		blockTLSCrt, _ := pem.Decode(caData)
-		if blockTLSCrt == nil {
+		blockTlsCrt, _ := pem.Decode(caData)
+		if blockTlsCrt == nil {
 			return nil, fmt.Errorf("failed to decode cert")
 		}
-		certs, err := x509.ParseCertificates(blockTLSCrt.Bytes)
+		certs, err := x509.ParseCertificates(blockTlsCrt.Bytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse cert: %v", err)
 		}
 
-		blockTLSKey, _ := pem.Decode(caKey)
-		if blockTLSKey == nil {
+		blockTlsKey, _ := pem.Decode(caKey)
+		if blockTlsKey == nil {
 			return nil, fmt.Errorf("failed to decode key")
 		}
 
 		// For now only PKCS#1 is supported which assures the private key algorithm is RSA.
 		// TODO: Compatibility w/ PKCS#8 key e.g. EC algorithm
-		key, err := x509.ParsePKCS1PrivateKey(blockTLSKey.Bytes)
+		key, err := x509.ParsePKCS1PrivateKey(blockTlsKey.Bytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse key: %v", err)
 		}

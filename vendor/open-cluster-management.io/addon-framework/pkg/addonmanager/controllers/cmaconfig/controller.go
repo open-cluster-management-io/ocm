@@ -13,7 +13,6 @@ import (
 	"k8s.io/client-go/dynamic/dynamiclister"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
@@ -83,7 +82,7 @@ func (c *cmaConfigController) buildConfigInformers(
 	configInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	configGVRs map[schema.GroupVersionResource]bool,
 ) []factory.Informer {
-	configInformers := make([]factory.Informer, 0, len(configGVRs))
+	configInformers := []factory.Informer{}
 	for gvrRaw := range configGVRs {
 		gvr := gvrRaw // copy the value since it will be used in the closure
 		indexInformer := configInformerFactory.ForResource(gvr).Informer()
@@ -164,8 +163,8 @@ func (c *cmaConfigController) updateConfigSpecHash(cma *addonapiv1beta1.ClusterM
 	for i, defaultConfigReference := range cma.Status.DefaultConfigReferences {
 		if !utils.ContainGR(
 			c.configGVRs,
-			defaultConfigReference.Group,
-			defaultConfigReference.Resource) {
+			defaultConfigReference.ConfigGroupResource.Group,
+			defaultConfigReference.ConfigGroupResource.Resource) {
 			continue
 		}
 
@@ -188,8 +187,8 @@ func (c *cmaConfigController) updateConfigSpecHash(cma *addonapiv1beta1.ClusterM
 
 			if !utils.ContainGR(
 				c.configGVRs,
-				configReference.Group,
-				configReference.Resource) {
+				configReference.ConfigGroupResource.Group,
+				configReference.ConfigGroupResource.Resource) {
 				continue
 			}
 
