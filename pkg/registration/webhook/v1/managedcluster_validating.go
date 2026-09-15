@@ -252,7 +252,8 @@ func (r *ManagedClusterWebhook) allowUpdateClusterSet(userInfo authenticationv1.
 		return apierrors.NewForbidden(
 			v1.Resource("managedclustersets/join"),
 			clusterSetName,
-			fmt.Errorf("user %q cannot add/remove a ManagedCluster to/from ManagedClusterSet %q", userInfo.Username, clusterSetName),
+			fmt.Errorf("user %q cannot add/remove a ManagedCluster to/from ManagedClusterSet %q specified in the %s label",
+				userInfo.Username, clusterSetName, clusterv1beta2.ClusterSetLabel),
 		)
 	}
 
