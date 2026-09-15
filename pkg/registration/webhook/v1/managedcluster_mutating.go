@@ -9,6 +9,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -46,11 +47,21 @@ func (r *ManagedClusterWebhook) Default(ctx context.Context, managedCluster *clu
 		return err
 	}
 
-	// Set default clusterset label
-	if features.HubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
-		r.addDefaultClusterSetLabel(managedCluster)
+	// Set default clusterset label if:
+	// 1. the managedCluster is not being deleted
+	// 2. the DefaultClusterSet feature is enabled
+	// 3. the managedCluster has no ManagedClusterSet label
+	// 4. the user is authorized to add ManagedClusters to default ManagedClusterSet
+	if managedCluster.DeletionTimestamp.IsZero() &&
+		features.HubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) &&
+		managedCluster.Labels[clusterv1beta2.ClusterSetLabel] == "" {
+		err := r.allowUpdateClusterSet(ctx, req.UserInfo, defaultClusterSetName)
+		if err != nil {
+			klog.FromContext(ctx).Info("skipping default clusterset label update", "error", err)
+		} else {
+			r.addDefaultClusterSetLabel(managedCluster)
+		}
 	}
-
 	return nil
 }
 

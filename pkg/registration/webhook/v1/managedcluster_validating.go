@@ -54,7 +54,7 @@ func (r *ManagedClusterWebhook) ValidateCreate(ctx context.Context, managedClust
 		clusterSetName = managedCluster.Labels[clusterv1beta2.ClusterSetLabel]
 	}
 
-	return nil, r.allowSetClusterSetLabel(req.UserInfo, "", clusterSetName)
+	return nil, r.allowSetClusterSetLabel(ctx, req.UserInfo, "", clusterSetName)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
@@ -95,7 +95,7 @@ func (r *ManagedClusterWebhook) ValidateUpdate(
 		currentClusterSetName = newManagedCluster.Labels[clusterv1beta2.ClusterSetLabel]
 	}
 
-	return nil, r.allowSetClusterSetLabel(req.UserInfo, originalClusterSetName, currentClusterSetName)
+	return nil, r.allowSetClusterSetLabel(ctx, req.UserInfo, originalClusterSetName, currentClusterSetName)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
@@ -194,20 +194,20 @@ func (r *ManagedClusterWebhook) validateAcceptByClusterNamespace(clusterName str
 }
 
 // allowSetClusterSetLabel checks whether a request user has been authorized to set clusterset label
-func (r *ManagedClusterWebhook) allowSetClusterSetLabel(userInfo authenticationv1.UserInfo, originalClusterSet, newClusterSet string) error {
+func (r *ManagedClusterWebhook) allowSetClusterSetLabel(ctx context.Context, userInfo authenticationv1.UserInfo, originalClusterSet, newClusterSet string) error {
 	if originalClusterSet == newClusterSet {
 		return nil
 	}
 
 	if len(originalClusterSet) > 0 {
-		err := r.allowUpdateClusterSet(userInfo, originalClusterSet)
+		err := r.allowUpdateClusterSet(ctx, userInfo, originalClusterSet)
 		if err != nil {
 			return err
 		}
 	}
 
 	if len(newClusterSet) > 0 {
-		err := r.allowUpdateClusterSet(userInfo, newClusterSet)
+		err := r.allowUpdateClusterSet(ctx, userInfo, newClusterSet)
 		if err != nil {
 			return err
 		}
@@ -218,7 +218,7 @@ func (r *ManagedClusterWebhook) allowSetClusterSetLabel(userInfo authenticationv
 
 // allowUpdateClusterSet checks whether a request user has been authorized to add/remove a ManagedCluster
 // to/from the ManagedClusterSet
-func (r *ManagedClusterWebhook) allowUpdateClusterSet(userInfo authenticationv1.UserInfo, clusterSetName string) error {
+func (r *ManagedClusterWebhook) allowUpdateClusterSet(ctx context.Context, userInfo authenticationv1.UserInfo, clusterSetName string) error {
 	extra := make(map[string]authorizationv1.ExtraValue)
 	for k, v := range userInfo.Extra {
 		extra[k] = authorizationv1.ExtraValue(v)
@@ -239,7 +239,7 @@ func (r *ManagedClusterWebhook) allowUpdateClusterSet(userInfo authenticationv1.
 			},
 		},
 	}
-	sar, err := r.kubeClient.AuthorizationV1().SubjectAccessReviews().Create(context.TODO(), sar, metav1.CreateOptions{})
+	sar, err := r.kubeClient.AuthorizationV1().SubjectAccessReviews().Create(ctx, sar, metav1.CreateOptions{})
 	if err != nil {
 		return apierrors.NewForbidden(
 			v1.Resource("managedclustersets/join"),
@@ -252,7 +252,8 @@ func (r *ManagedClusterWebhook) allowUpdateClusterSet(userInfo authenticationv1.
 		return apierrors.NewForbidden(
 			v1.Resource("managedclustersets/join"),
 			clusterSetName,
-			fmt.Errorf("user %q cannot add/remove a ManagedCluster to/from ManagedClusterSet %q", userInfo.Username, clusterSetName),
+			fmt.Errorf("user %q cannot add/remove a ManagedCluster to/from ManagedClusterSet %q specified in the %s label",
+				userInfo.Username, clusterSetName, clusterv1beta2.ClusterSetLabel),
 		)
 	}
 

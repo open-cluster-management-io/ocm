@@ -315,13 +315,18 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					if err != nil {
 						return err
 					}
-					managedCluster.Labels = map[string]string{
-						"k": "v",
+
+					if managedCluster.Labels == nil {
+						managedCluster.Labels = make(map[string]string)
 					}
+					managedCluster.Labels["k"] = "v"
+
 					_, err = unauthorizedClient.ClusterV1().ManagedClusters().Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
 					return err
 				})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(managedCluster.Labels[clusterv1beta2.ClusterSetLabel]).To(gomega.Equal(string(defaultClusterSetName)),
+					"managedcluster labels were merged and the default clusterset label is still set")
 				gomega.Expect(hub.CleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
 			})
 
