@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import (
 	iampb "cloud.google.com/go/iam/apiv1/iampb"
 	pubsubpb "cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
 	gax "github.com/googleapis/gax-go/v2"
+	"github.com/googleapis/gax-go/v2/callctx"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/api/option/internaloption"
@@ -75,6 +76,7 @@ func defaultSubscriptionAdminGRPCClientOptions() []option.ClientOption {
 		internaloption.WithDefaultAudience("https://pubsub.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
 		internaloption.EnableJwtWithScope(),
+		internaloption.AllowHardBoundTokens("MTLS_S2A"),
 		internaloption.EnableNewAuthLibrary(),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -399,7 +401,7 @@ func defaultSubscriptionAdminRESTCallOptions() *SubscriptionAdminCallOptions {
 			}),
 		},
 		StreamingPull: []gax.CallOption{
-			gax.WithTimeout(900000 * time.Millisecond),
+			gax.WithTimeout(1800000 * time.Millisecond),
 			gax.WithRetry(func() gax.Retryer {
 				return gax.OnHTTPCodes(gax.Backoff{
 					Initial:    100 * time.Millisecond,
@@ -544,7 +546,7 @@ type SubscriptionAdminClient struct {
 
 // Wrapper methods routed to the internal client.
 
-// Close closes the connection to the API service. The user should invoke this when
+// Close closes the connection to the API service. **Always** call Close() when
 // the client is no longer required.
 func (c *SubscriptionAdminClient) Close() error {
 	return c.internalClient.Close()
@@ -555,6 +557,16 @@ func (c *SubscriptionAdminClient) Close() error {
 // use by Google-written clients.
 func (c *SubscriptionAdminClient) setGoogleClientInfo(keyval ...string) {
 	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// SetGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+//
+// SetGoogleClientInfo is not concurrency-safe and should only be invoked
+// sequentially before concurrent operations begin.
+func (c *SubscriptionAdminClient) SetGoogleClientInfo(keyval ...string) {
+	c.setGoogleClientInfo(keyval...)
 }
 
 // Connection returns a connection to the API service.
@@ -780,6 +792,16 @@ type subscriptionAdminGRPCClient struct {
 // establishing a bi-directional stream using the StreamingPull method.
 func NewSubscriptionAdminClient(ctx context.Context, opts ...option.ClientOption) (*SubscriptionAdminClient, error) {
 	clientOpts := defaultSubscriptionAdminGRPCClientOptions()
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		clientOpts = append(clientOpts, internaloption.WithTelemetryAttributes(map[string]string{
+			"gcp.client.service":  "pubsub",
+			"gcp.client.version":  getVersionClient(),
+			"gcp.client.repo":     "googleapis/google-cloud-go",
+			"gcp.client.artifact": "cloud.google.com/go/pubsub/v2/apiv1",
+			"gcp.client.language": "go",
+			"url.domain":          "pubsub.googleapis.com",
+		}))
+	}
 	if newSubscriptionAdminClientHook != nil {
 		hookOpts, err := newSubscriptionAdminClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -802,6 +824,38 @@ func NewSubscriptionAdminClient(ctx context.Context, opts ...option.ClientOption
 		iamPolicyClient:         iampb.NewIAMPolicyClient(connPool),
 	}
 	c.setGoogleClientInfo()
+	if gax.IsFeatureEnabled("METRICS") {
+		metrics := gax.NewClientMetrics(
+			gax.WithTelemetryLogger(c.logger),
+			gax.WithTelemetryAttributes(map[string]string{
+				gax.ClientService:  "pubsub",
+				gax.ClientVersion:  getVersionClient(),
+				gax.ClientArtifact: "cloud.google.com/go/pubsub/v2/apiv1",
+				gax.RPCSystem:      "grpc",
+				gax.URLDomain:      "pubsub.googleapis.com",
+			}),
+		)
+
+		client.CallOptions.CreateSubscription = append(client.CallOptions.CreateSubscription, gax.WithClientMetrics(metrics))
+		client.CallOptions.GetSubscription = append(client.CallOptions.GetSubscription, gax.WithClientMetrics(metrics))
+		client.CallOptions.UpdateSubscription = append(client.CallOptions.UpdateSubscription, gax.WithClientMetrics(metrics))
+		client.CallOptions.ListSubscriptions = append(client.CallOptions.ListSubscriptions, gax.WithClientMetrics(metrics))
+		client.CallOptions.DeleteSubscription = append(client.CallOptions.DeleteSubscription, gax.WithClientMetrics(metrics))
+		client.CallOptions.ModifyAckDeadline = append(client.CallOptions.ModifyAckDeadline, gax.WithClientMetrics(metrics))
+		client.CallOptions.Acknowledge = append(client.CallOptions.Acknowledge, gax.WithClientMetrics(metrics))
+		client.CallOptions.Pull = append(client.CallOptions.Pull, gax.WithClientMetrics(metrics))
+		client.CallOptions.StreamingPull = append(client.CallOptions.StreamingPull, gax.WithClientMetrics(metrics))
+		client.CallOptions.ModifyPushConfig = append(client.CallOptions.ModifyPushConfig, gax.WithClientMetrics(metrics))
+		client.CallOptions.GetSnapshot = append(client.CallOptions.GetSnapshot, gax.WithClientMetrics(metrics))
+		client.CallOptions.ListSnapshots = append(client.CallOptions.ListSnapshots, gax.WithClientMetrics(metrics))
+		client.CallOptions.CreateSnapshot = append(client.CallOptions.CreateSnapshot, gax.WithClientMetrics(metrics))
+		client.CallOptions.UpdateSnapshot = append(client.CallOptions.UpdateSnapshot, gax.WithClientMetrics(metrics))
+		client.CallOptions.DeleteSnapshot = append(client.CallOptions.DeleteSnapshot, gax.WithClientMetrics(metrics))
+		client.CallOptions.Seek = append(client.CallOptions.Seek, gax.WithClientMetrics(metrics))
+		client.CallOptions.GetIamPolicy = append(client.CallOptions.GetIamPolicy, gax.WithClientMetrics(metrics))
+		client.CallOptions.SetIamPolicy = append(client.CallOptions.SetIamPolicy, gax.WithClientMetrics(metrics))
+		client.CallOptions.TestIamPermissions = append(client.CallOptions.TestIamPermissions, gax.WithClientMetrics(metrics))
+	}
 
 	client.internalClient = c
 
@@ -827,7 +881,7 @@ func (c *subscriptionAdminGRPCClient) setGoogleClientInfo(keyval ...string) {
 	}
 }
 
-// Close closes the connection to the API service. The user should invoke this when
+// Close closes the connection to the API service. **Always** call Close() when
 // the client is no longer required.
 func (c *subscriptionAdminGRPCClient) Close() error {
 	return c.connPool.Close()
@@ -857,6 +911,16 @@ type subscriptionAdminRESTClient struct {
 // establishing a bi-directional stream using the StreamingPull method.
 func NewSubscriptionAdminRESTClient(ctx context.Context, opts ...option.ClientOption) (*SubscriptionAdminClient, error) {
 	clientOpts := append(defaultSubscriptionAdminRESTClientOptions(), opts...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		clientOpts = append(clientOpts, internaloption.WithTelemetryAttributes(map[string]string{
+			"gcp.client.service":  "pubsub",
+			"gcp.client.version":  getVersionClient(),
+			"gcp.client.repo":     "googleapis/google-cloud-go",
+			"gcp.client.artifact": "cloud.google.com/go/pubsub/v2/apiv1",
+			"gcp.client.language": "go",
+			"url.domain":          "pubsub.googleapis.com",
+		}))
+	}
 	httpClient, endpoint, err := httptransport.NewClient(ctx, clientOpts...)
 	if err != nil {
 		return nil, err
@@ -870,6 +934,39 @@ func NewSubscriptionAdminRESTClient(ctx context.Context, opts ...option.ClientOp
 		logger:      internaloption.GetLogger(opts),
 	}
 	c.setGoogleClientInfo()
+
+	if gax.IsFeatureEnabled("METRICS") {
+		metrics := gax.NewClientMetrics(
+			gax.WithTelemetryLogger(c.logger),
+			gax.WithTelemetryAttributes(map[string]string{
+				gax.ClientService:  "pubsub",
+				gax.ClientVersion:  getVersionClient(),
+				gax.ClientArtifact: "cloud.google.com/go/pubsub/v2/apiv1",
+				gax.RPCSystem:      "http",
+				gax.URLDomain:      "pubsub.googleapis.com",
+			}),
+		)
+
+		callOpts.CreateSubscription = append(callOpts.CreateSubscription, gax.WithClientMetrics(metrics))
+		callOpts.GetSubscription = append(callOpts.GetSubscription, gax.WithClientMetrics(metrics))
+		callOpts.UpdateSubscription = append(callOpts.UpdateSubscription, gax.WithClientMetrics(metrics))
+		callOpts.ListSubscriptions = append(callOpts.ListSubscriptions, gax.WithClientMetrics(metrics))
+		callOpts.DeleteSubscription = append(callOpts.DeleteSubscription, gax.WithClientMetrics(metrics))
+		callOpts.ModifyAckDeadline = append(callOpts.ModifyAckDeadline, gax.WithClientMetrics(metrics))
+		callOpts.Acknowledge = append(callOpts.Acknowledge, gax.WithClientMetrics(metrics))
+		callOpts.Pull = append(callOpts.Pull, gax.WithClientMetrics(metrics))
+		callOpts.StreamingPull = append(callOpts.StreamingPull, gax.WithClientMetrics(metrics))
+		callOpts.ModifyPushConfig = append(callOpts.ModifyPushConfig, gax.WithClientMetrics(metrics))
+		callOpts.GetSnapshot = append(callOpts.GetSnapshot, gax.WithClientMetrics(metrics))
+		callOpts.ListSnapshots = append(callOpts.ListSnapshots, gax.WithClientMetrics(metrics))
+		callOpts.CreateSnapshot = append(callOpts.CreateSnapshot, gax.WithClientMetrics(metrics))
+		callOpts.UpdateSnapshot = append(callOpts.UpdateSnapshot, gax.WithClientMetrics(metrics))
+		callOpts.DeleteSnapshot = append(callOpts.DeleteSnapshot, gax.WithClientMetrics(metrics))
+		callOpts.Seek = append(callOpts.Seek, gax.WithClientMetrics(metrics))
+		callOpts.GetIamPolicy = append(callOpts.GetIamPolicy, gax.WithClientMetrics(metrics))
+		callOpts.SetIamPolicy = append(callOpts.SetIamPolicy, gax.WithClientMetrics(metrics))
+		callOpts.TestIamPermissions = append(callOpts.TestIamPermissions, gax.WithClientMetrics(metrics))
+	}
 
 	return &SubscriptionAdminClient{internalClient: c, CallOptions: callOpts}, nil
 }
@@ -897,7 +994,7 @@ func (c *subscriptionAdminRESTClient) setGoogleClientInfo(keyval ...string) {
 	}
 }
 
-// Close closes the connection to the API service. The user should invoke this when
+// Close closes the connection to the API service. **Always** call Close() when
 // the client is no longer required.
 func (c *subscriptionAdminRESTClient) Close() error {
 	// Replace httpClient with nil to force cleanup.
@@ -916,6 +1013,12 @@ func (c *subscriptionAdminGRPCClient) CreateSubscription(ctx context.Context, re
 
 	hds = append(c.xGoogHeaders, hds...)
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetTopic()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/CreateSubscription")
+	}
 	opts = append((*c.CallOptions).CreateSubscription[0:len((*c.CallOptions).CreateSubscription):len((*c.CallOptions).CreateSubscription)], opts...)
 	var resp *pubsubpb.Subscription
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -934,6 +1037,12 @@ func (c *subscriptionAdminGRPCClient) GetSubscription(ctx context.Context, req *
 
 	hds = append(c.xGoogHeaders, hds...)
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetSubscription()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/GetSubscription")
+	}
 	opts = append((*c.CallOptions).GetSubscription[0:len((*c.CallOptions).GetSubscription):len((*c.CallOptions).GetSubscription)], opts...)
 	var resp *pubsubpb.Subscription
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -952,6 +1061,9 @@ func (c *subscriptionAdminGRPCClient) UpdateSubscription(ctx context.Context, re
 
 	hds = append(c.xGoogHeaders, hds...)
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/UpdateSubscription")
+	}
 	opts = append((*c.CallOptions).UpdateSubscription[0:len((*c.CallOptions).UpdateSubscription):len((*c.CallOptions).UpdateSubscription)], opts...)
 	var resp *pubsubpb.Subscription
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -970,9 +1082,15 @@ func (c *subscriptionAdminGRPCClient) ListSubscriptions(ctx context.Context, req
 
 	hds = append(c.xGoogHeaders, hds...)
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetProject()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/ListSubscriptions")
+	}
 	opts = append((*c.CallOptions).ListSubscriptions[0:len((*c.CallOptions).ListSubscriptions):len((*c.CallOptions).ListSubscriptions)], opts...)
 	it := &SubscriptionIterator{}
-	req = proto.Clone(req).(*pubsubpb.ListSubscriptionsRequest)
+	req = proto.CloneOf(req)
 	it.InternalFetch = func(pageSize int, pageToken string) ([]*pubsubpb.Subscription, string, error) {
 		resp := &pubsubpb.ListSubscriptionsResponse{}
 		if pageToken != "" {
@@ -1016,6 +1134,12 @@ func (c *subscriptionAdminGRPCClient) DeleteSubscription(ctx context.Context, re
 
 	hds = append(c.xGoogHeaders, hds...)
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetSubscription()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/DeleteSubscription")
+	}
 	opts = append((*c.CallOptions).DeleteSubscription[0:len((*c.CallOptions).DeleteSubscription):len((*c.CallOptions).DeleteSubscription)], opts...)
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -1030,6 +1154,12 @@ func (c *subscriptionAdminGRPCClient) ModifyAckDeadline(ctx context.Context, req
 
 	hds = append(c.xGoogHeaders, hds...)
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetSubscription()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/ModifyAckDeadline")
+	}
 	opts = append((*c.CallOptions).ModifyAckDeadline[0:len((*c.CallOptions).ModifyAckDeadline):len((*c.CallOptions).ModifyAckDeadline)], opts...)
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -1044,6 +1174,12 @@ func (c *subscriptionAdminGRPCClient) Acknowledge(ctx context.Context, req *pubs
 
 	hds = append(c.xGoogHeaders, hds...)
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetSubscription()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/Acknowledge")
+	}
 	opts = append((*c.CallOptions).Acknowledge[0:len((*c.CallOptions).Acknowledge):len((*c.CallOptions).Acknowledge)], opts...)
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -1058,6 +1194,12 @@ func (c *subscriptionAdminGRPCClient) Pull(ctx context.Context, req *pubsubpb.Pu
 
 	hds = append(c.xGoogHeaders, hds...)
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetSubscription()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/Pull")
+	}
 	opts = append((*c.CallOptions).Pull[0:len((*c.CallOptions).Pull):len((*c.CallOptions).Pull)], opts...)
 	var resp *pubsubpb.PullResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -1073,6 +1215,9 @@ func (c *subscriptionAdminGRPCClient) Pull(ctx context.Context, req *pubsubpb.Pu
 
 func (c *subscriptionAdminGRPCClient) StreamingPull(ctx context.Context, opts ...gax.CallOption) (pubsubpb.Subscriber_StreamingPullClient, error) {
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, c.xGoogHeaders...)
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/StreamingPull")
+	}
 	var resp pubsubpb.Subscriber_StreamingPullClient
 	opts = append((*c.CallOptions).StreamingPull[0:len((*c.CallOptions).StreamingPull):len((*c.CallOptions).StreamingPull)], opts...)
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -1093,6 +1238,12 @@ func (c *subscriptionAdminGRPCClient) ModifyPushConfig(ctx context.Context, req 
 
 	hds = append(c.xGoogHeaders, hds...)
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetSubscription()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/ModifyPushConfig")
+	}
 	opts = append((*c.CallOptions).ModifyPushConfig[0:len((*c.CallOptions).ModifyPushConfig):len((*c.CallOptions).ModifyPushConfig)], opts...)
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -1107,6 +1258,12 @@ func (c *subscriptionAdminGRPCClient) GetSnapshot(ctx context.Context, req *pubs
 
 	hds = append(c.xGoogHeaders, hds...)
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetSnapshot()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/GetSnapshot")
+	}
 	opts = append((*c.CallOptions).GetSnapshot[0:len((*c.CallOptions).GetSnapshot):len((*c.CallOptions).GetSnapshot)], opts...)
 	var resp *pubsubpb.Snapshot
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -1125,9 +1282,15 @@ func (c *subscriptionAdminGRPCClient) ListSnapshots(ctx context.Context, req *pu
 
 	hds = append(c.xGoogHeaders, hds...)
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetProject()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/ListSnapshots")
+	}
 	opts = append((*c.CallOptions).ListSnapshots[0:len((*c.CallOptions).ListSnapshots):len((*c.CallOptions).ListSnapshots)], opts...)
 	it := &SnapshotIterator{}
-	req = proto.Clone(req).(*pubsubpb.ListSnapshotsRequest)
+	req = proto.CloneOf(req)
 	it.InternalFetch = func(pageSize int, pageToken string) ([]*pubsubpb.Snapshot, string, error) {
 		resp := &pubsubpb.ListSnapshotsResponse{}
 		if pageToken != "" {
@@ -1171,6 +1334,12 @@ func (c *subscriptionAdminGRPCClient) CreateSnapshot(ctx context.Context, req *p
 
 	hds = append(c.xGoogHeaders, hds...)
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetName()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/CreateSnapshot")
+	}
 	opts = append((*c.CallOptions).CreateSnapshot[0:len((*c.CallOptions).CreateSnapshot):len((*c.CallOptions).CreateSnapshot)], opts...)
 	var resp *pubsubpb.Snapshot
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -1189,6 +1358,9 @@ func (c *subscriptionAdminGRPCClient) UpdateSnapshot(ctx context.Context, req *p
 
 	hds = append(c.xGoogHeaders, hds...)
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/UpdateSnapshot")
+	}
 	opts = append((*c.CallOptions).UpdateSnapshot[0:len((*c.CallOptions).UpdateSnapshot):len((*c.CallOptions).UpdateSnapshot)], opts...)
 	var resp *pubsubpb.Snapshot
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -1207,6 +1379,12 @@ func (c *subscriptionAdminGRPCClient) DeleteSnapshot(ctx context.Context, req *p
 
 	hds = append(c.xGoogHeaders, hds...)
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetSnapshot()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/DeleteSnapshot")
+	}
 	opts = append((*c.CallOptions).DeleteSnapshot[0:len((*c.CallOptions).DeleteSnapshot):len((*c.CallOptions).DeleteSnapshot)], opts...)
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -1221,6 +1399,12 @@ func (c *subscriptionAdminGRPCClient) Seek(ctx context.Context, req *pubsubpb.Se
 
 	hds = append(c.xGoogHeaders, hds...)
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetSubscription()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/Seek")
+	}
 	opts = append((*c.CallOptions).Seek[0:len((*c.CallOptions).Seek):len((*c.CallOptions).Seek)], opts...)
 	var resp *pubsubpb.SeekResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -1239,6 +1423,12 @@ func (c *subscriptionAdminGRPCClient) GetIamPolicy(ctx context.Context, req *iam
 
 	hds = append(c.xGoogHeaders, hds...)
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//iam-meta-api.googleapis.com/%v", req.GetResource()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.iam.v1.IAMPolicy/GetIamPolicy")
+	}
 	opts = append((*c.CallOptions).GetIamPolicy[0:len((*c.CallOptions).GetIamPolicy):len((*c.CallOptions).GetIamPolicy)], opts...)
 	var resp *iampb.Policy
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -1257,6 +1447,12 @@ func (c *subscriptionAdminGRPCClient) SetIamPolicy(ctx context.Context, req *iam
 
 	hds = append(c.xGoogHeaders, hds...)
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//iam-meta-api.googleapis.com/%v", req.GetResource()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.iam.v1.IAMPolicy/SetIamPolicy")
+	}
 	opts = append((*c.CallOptions).SetIamPolicy[0:len((*c.CallOptions).SetIamPolicy):len((*c.CallOptions).SetIamPolicy)], opts...)
 	var resp *iampb.Policy
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -1275,6 +1471,12 @@ func (c *subscriptionAdminGRPCClient) TestIamPermissions(ctx context.Context, re
 
 	hds = append(c.xGoogHeaders, hds...)
 	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//iam-meta-api.googleapis.com/%v", req.GetResource()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.iam.v1.IAMPolicy/TestIamPermissions")
+	}
 	opts = append((*c.CallOptions).TestIamPermissions[0:len((*c.CallOptions).TestIamPermissions):len((*c.CallOptions).TestIamPermissions)], opts...)
 	var resp *iampb.TestIamPermissionsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -1323,6 +1525,13 @@ func (c *subscriptionAdminRESTClient) CreateSubscription(ctx context.Context, re
 	hds = append(c.xGoogHeaders, hds...)
 	hds = append(hds, "Content-Type", "application/json")
 	headers := gax.BuildHeaders(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetTopic()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/CreateSubscription")
+		ctx = callctx.WithTelemetryContext(ctx, "url_template", "/v1/{name=projects/*/subscriptions/*}")
+	}
 	opts = append((*c.CallOptions).CreateSubscription[0:len((*c.CallOptions).CreateSubscription):len((*c.CallOptions).CreateSubscription)], opts...)
 	unm := protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}
 	resp := &pubsubpb.Subscription{}
@@ -1373,6 +1582,13 @@ func (c *subscriptionAdminRESTClient) GetSubscription(ctx context.Context, req *
 	hds = append(c.xGoogHeaders, hds...)
 	hds = append(hds, "Content-Type", "application/json")
 	headers := gax.BuildHeaders(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetSubscription()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/GetSubscription")
+		ctx = callctx.WithTelemetryContext(ctx, "url_template", "/v1/{subscription=projects/*/subscriptions/*}")
+	}
 	opts = append((*c.CallOptions).GetSubscription[0:len((*c.CallOptions).GetSubscription):len((*c.CallOptions).GetSubscription)], opts...)
 	unm := protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}
 	resp := &pubsubpb.Subscription{}
@@ -1431,6 +1647,10 @@ func (c *subscriptionAdminRESTClient) UpdateSubscription(ctx context.Context, re
 	hds = append(c.xGoogHeaders, hds...)
 	hds = append(hds, "Content-Type", "application/json")
 	headers := gax.BuildHeaders(ctx, hds...)
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/UpdateSubscription")
+		ctx = callctx.WithTelemetryContext(ctx, "url_template", "/v1/{subscription.name=projects/*/subscriptions/*}")
+	}
 	opts = append((*c.CallOptions).UpdateSubscription[0:len((*c.CallOptions).UpdateSubscription):len((*c.CallOptions).UpdateSubscription)], opts...)
 	unm := protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}
 	resp := &pubsubpb.Subscription{}
@@ -1465,7 +1685,7 @@ func (c *subscriptionAdminRESTClient) UpdateSubscription(ctx context.Context, re
 // ListSubscriptions lists matching subscriptions.
 func (c *subscriptionAdminRESTClient) ListSubscriptions(ctx context.Context, req *pubsubpb.ListSubscriptionsRequest, opts ...gax.CallOption) *SubscriptionIterator {
 	it := &SubscriptionIterator{}
-	req = proto.Clone(req).(*pubsubpb.ListSubscriptionsRequest)
+	req = proto.CloneOf(req)
 	unm := protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}
 	it.InternalFetch = func(pageSize int, pageToken string) ([]*pubsubpb.Subscription, string, error) {
 		resp := &pubsubpb.ListSubscriptionsResponse{}
@@ -1563,6 +1783,13 @@ func (c *subscriptionAdminRESTClient) DeleteSubscription(ctx context.Context, re
 	hds = append(c.xGoogHeaders, hds...)
 	hds = append(hds, "Content-Type", "application/json")
 	headers := gax.BuildHeaders(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetSubscription()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/DeleteSubscription")
+		ctx = callctx.WithTelemetryContext(ctx, "url_template", "/v1/{subscription=projects/*/subscriptions/*}")
+	}
 	return gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		if settings.Path != "" {
 			baseUrl.Path = settings.Path
@@ -1608,6 +1835,13 @@ func (c *subscriptionAdminRESTClient) ModifyAckDeadline(ctx context.Context, req
 	hds = append(c.xGoogHeaders, hds...)
 	hds = append(hds, "Content-Type", "application/json")
 	headers := gax.BuildHeaders(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetSubscription()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/ModifyAckDeadline")
+		ctx = callctx.WithTelemetryContext(ctx, "url_template", "/v1/{subscription=projects/*/subscriptions/*}:modifyAckDeadline")
+	}
 	return gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		if settings.Path != "" {
 			baseUrl.Path = settings.Path
@@ -1655,6 +1889,13 @@ func (c *subscriptionAdminRESTClient) Acknowledge(ctx context.Context, req *pubs
 	hds = append(c.xGoogHeaders, hds...)
 	hds = append(hds, "Content-Type", "application/json")
 	headers := gax.BuildHeaders(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetSubscription()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/Acknowledge")
+		ctx = callctx.WithTelemetryContext(ctx, "url_template", "/v1/{subscription=projects/*/subscriptions/*}:acknowledge")
+	}
 	return gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		if settings.Path != "" {
 			baseUrl.Path = settings.Path
@@ -1696,6 +1937,13 @@ func (c *subscriptionAdminRESTClient) Pull(ctx context.Context, req *pubsubpb.Pu
 	hds = append(c.xGoogHeaders, hds...)
 	hds = append(hds, "Content-Type", "application/json")
 	headers := gax.BuildHeaders(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetSubscription()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/Pull")
+		ctx = callctx.WithTelemetryContext(ctx, "url_template", "/v1/{subscription=projects/*/subscriptions/*}:pull")
+	}
 	opts = append((*c.CallOptions).Pull[0:len((*c.CallOptions).Pull):len((*c.CallOptions).Pull)], opts...)
 	unm := protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}
 	resp := &pubsubpb.PullResponse{}
@@ -1770,6 +2018,13 @@ func (c *subscriptionAdminRESTClient) ModifyPushConfig(ctx context.Context, req 
 	hds = append(c.xGoogHeaders, hds...)
 	hds = append(hds, "Content-Type", "application/json")
 	headers := gax.BuildHeaders(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetSubscription()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/ModifyPushConfig")
+		ctx = callctx.WithTelemetryContext(ctx, "url_template", "/v1/{subscription=projects/*/subscriptions/*}:modifyPushConfig")
+	}
 	return gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		if settings.Path != "" {
 			baseUrl.Path = settings.Path
@@ -1809,6 +2064,13 @@ func (c *subscriptionAdminRESTClient) GetSnapshot(ctx context.Context, req *pubs
 	hds = append(c.xGoogHeaders, hds...)
 	hds = append(hds, "Content-Type", "application/json")
 	headers := gax.BuildHeaders(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetSnapshot()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/GetSnapshot")
+		ctx = callctx.WithTelemetryContext(ctx, "url_template", "/v1/{snapshot=projects/*/snapshots/*}")
+	}
 	opts = append((*c.CallOptions).GetSnapshot[0:len((*c.CallOptions).GetSnapshot):len((*c.CallOptions).GetSnapshot)], opts...)
 	unm := protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}
 	resp := &pubsubpb.Snapshot{}
@@ -1846,7 +2108,7 @@ func (c *subscriptionAdminRESTClient) GetSnapshot(ctx context.Context, req *pubs
 // state captured by a snapshot.
 func (c *subscriptionAdminRESTClient) ListSnapshots(ctx context.Context, req *pubsubpb.ListSnapshotsRequest, opts ...gax.CallOption) *SnapshotIterator {
 	it := &SnapshotIterator{}
-	req = proto.Clone(req).(*pubsubpb.ListSnapshotsRequest)
+	req = proto.CloneOf(req)
 	unm := protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}
 	it.InternalFetch = func(pageSize int, pageToken string) ([]*pubsubpb.Snapshot, string, error) {
 		resp := &pubsubpb.ListSnapshotsResponse{}
@@ -1961,6 +2223,13 @@ func (c *subscriptionAdminRESTClient) CreateSnapshot(ctx context.Context, req *p
 	hds = append(c.xGoogHeaders, hds...)
 	hds = append(hds, "Content-Type", "application/json")
 	headers := gax.BuildHeaders(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetName()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/CreateSnapshot")
+		ctx = callctx.WithTelemetryContext(ctx, "url_template", "/v1/{name=projects/*/snapshots/*}")
+	}
 	opts = append((*c.CallOptions).CreateSnapshot[0:len((*c.CallOptions).CreateSnapshot):len((*c.CallOptions).CreateSnapshot)], opts...)
 	unm := protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}
 	resp := &pubsubpb.Snapshot{}
@@ -2022,6 +2291,10 @@ func (c *subscriptionAdminRESTClient) UpdateSnapshot(ctx context.Context, req *p
 	hds = append(c.xGoogHeaders, hds...)
 	hds = append(hds, "Content-Type", "application/json")
 	headers := gax.BuildHeaders(ctx, hds...)
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/UpdateSnapshot")
+		ctx = callctx.WithTelemetryContext(ctx, "url_template", "/v1/{snapshot.name=projects/*/snapshots/*}")
+	}
 	opts = append((*c.CallOptions).UpdateSnapshot[0:len((*c.CallOptions).UpdateSnapshot):len((*c.CallOptions).UpdateSnapshot)], opts...)
 	unm := protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}
 	resp := &pubsubpb.Snapshot{}
@@ -2080,6 +2353,13 @@ func (c *subscriptionAdminRESTClient) DeleteSnapshot(ctx context.Context, req *p
 	hds = append(c.xGoogHeaders, hds...)
 	hds = append(hds, "Content-Type", "application/json")
 	headers := gax.BuildHeaders(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetSnapshot()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/DeleteSnapshot")
+		ctx = callctx.WithTelemetryContext(ctx, "url_template", "/v1/{snapshot=projects/*/snapshots/*}")
+	}
 	return gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		if settings.Path != "" {
 			baseUrl.Path = settings.Path
@@ -2127,6 +2407,13 @@ func (c *subscriptionAdminRESTClient) Seek(ctx context.Context, req *pubsubpb.Se
 	hds = append(c.xGoogHeaders, hds...)
 	hds = append(hds, "Content-Type", "application/json")
 	headers := gax.BuildHeaders(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//pubsub.googleapis.com/%v", req.GetSubscription()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.pubsub.v1.Subscriber/Seek")
+		ctx = callctx.WithTelemetryContext(ctx, "url_template", "/v1/{subscription=projects/*/subscriptions/*}:seek")
+	}
 	opts = append((*c.CallOptions).Seek[0:len((*c.CallOptions).Seek):len((*c.CallOptions).Seek)], opts...)
 	unm := protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}
 	resp := &pubsubpb.SeekResponse{}
@@ -2181,6 +2468,13 @@ func (c *subscriptionAdminRESTClient) GetIamPolicy(ctx context.Context, req *iam
 	hds = append(c.xGoogHeaders, hds...)
 	hds = append(hds, "Content-Type", "application/json")
 	headers := gax.BuildHeaders(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//iam-meta-api.googleapis.com/%v", req.GetResource()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.iam.v1.IAMPolicy/GetIamPolicy")
+		ctx = callctx.WithTelemetryContext(ctx, "url_template", "/v1/{resource=projects/*/topics/*}:getIamPolicy")
+	}
 	opts = append((*c.CallOptions).GetIamPolicy[0:len((*c.CallOptions).GetIamPolicy):len((*c.CallOptions).GetIamPolicy)], opts...)
 	unm := protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}
 	resp := &iampb.Policy{}
@@ -2241,6 +2535,13 @@ func (c *subscriptionAdminRESTClient) SetIamPolicy(ctx context.Context, req *iam
 	hds = append(c.xGoogHeaders, hds...)
 	hds = append(hds, "Content-Type", "application/json")
 	headers := gax.BuildHeaders(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//iam-meta-api.googleapis.com/%v", req.GetResource()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.iam.v1.IAMPolicy/SetIamPolicy")
+		ctx = callctx.WithTelemetryContext(ctx, "url_template", "/v1/{resource=projects/*/topics/*}:setIamPolicy")
+	}
 	opts = append((*c.CallOptions).SetIamPolicy[0:len((*c.CallOptions).SetIamPolicy):len((*c.CallOptions).SetIamPolicy)], opts...)
 	unm := protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}
 	resp := &iampb.Policy{}
@@ -2303,6 +2604,13 @@ func (c *subscriptionAdminRESTClient) TestIamPermissions(ctx context.Context, re
 	hds = append(c.xGoogHeaders, hds...)
 	hds = append(hds, "Content-Type", "application/json")
 	headers := gax.BuildHeaders(ctx, hds...)
+	if gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "resource_name", fmt.Sprintf("//iam-meta-api.googleapis.com/%v", req.GetResource()))
+	}
+	if gax.IsFeatureEnabled("METRICS") || gax.IsFeatureEnabled("TRACING") || gax.IsFeatureEnabled("LOGGING") {
+		ctx = callctx.WithTelemetryContext(ctx, "rpc_method", "google.iam.v1.IAMPolicy/TestIamPermissions")
+		ctx = callctx.WithTelemetryContext(ctx, "url_template", "/v1/{resource=projects/*/subscriptions/*}:testIamPermissions")
+	}
 	opts = append((*c.CallOptions).TestIamPermissions[0:len((*c.CallOptions).TestIamPermissions):len((*c.CallOptions).TestIamPermissions)], opts...)
 	unm := protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}
 	resp := &iampb.TestIamPermissionsResponse{}

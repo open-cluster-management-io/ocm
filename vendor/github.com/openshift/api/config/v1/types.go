@@ -284,7 +284,12 @@ type ClientConnectionOverrides struct {
 }
 
 // GenericControllerConfig provides information to configure a controller
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type GenericControllerConfig struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// servingInfo is the HTTP serving information for the controller's endpoints
 	ServingInfo HTTPServingInfo `json:"servingInfo"`
 
@@ -398,7 +403,7 @@ const (
 
 // IBMCloudServiceName contains a value specifying the name of an IBM Cloud Service,
 // which are used by MAPI, CIRO, CIO, Installer, etc.
-// +kubebuilder:validation:Enum=CIS;COS;COSConfig;DNSServices;GlobalCatalog;GlobalSearch;GlobalTagging;HyperProtect;IAM;KeyProtect;ResourceController;ResourceManager;VPC
+// +kubebuilder:validation:Enum=CIS;COS;COSConfig;DNSServices;GlobalCatalog;GlobalSearch;GlobalTagging;HyperProtect;IAM;KeyProtect;ResourceController;ResourceManager;VPC;TransitGateway;PowerVS
 type IBMCloudServiceName string
 
 const (
@@ -428,4 +433,8 @@ const (
 	IBMCloudServiceResourceManager IBMCloudServiceName = "ResourceManager"
 	// IBMCloudServiceVPC is the name for IBM Cloud VPC.
 	IBMCloudServiceVPC IBMCloudServiceName = "VPC"
+	// IBMCloudServiceTransitGateway is the name for IBM Cloud Transit Gateway.
+	IBMCloudServiceTransitGateway IBMCloudServiceName = "TransitGateway"
+	// IBMCloudServicePowerVS is the name for IBM Cloud Power Virtual Server.
+	IBMCloudServicePowerVS IBMCloudServiceName = "PowerVS"
 )

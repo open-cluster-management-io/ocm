@@ -4,8 +4,20 @@ package v1
 
 // AWSCSIDriverConfigSpecApplyConfiguration represents a declarative configuration of the AWSCSIDriverConfigSpec type for use
 // with apply.
+//
+// AWSCSIDriverConfigSpec defines properties that can be configured for the AWS CSI driver.
 type AWSCSIDriverConfigSpecApplyConfiguration struct {
-	KMSKeyARN        *string                                `json:"kmsKeyARN,omitempty"`
+	// kmsKeyARN sets the cluster default storage class to encrypt volumes with a user-defined KMS key,
+	// rather than the default KMS key used by AWS.
+	// The value may be either the ARN or Alias ARN of a KMS key.
+	//
+	// The ARN must follow the format: arn:<partition>:kms:<region>:<account-id>:(key|alias)/<key-id-or-alias>, where:
+	// <partition> is the AWS partition (aws, aws-cn, aws-us-gov, aws-iso, aws-iso-b, aws-iso-e, aws-iso-f, or aws-eusc),
+	// <region> is the AWS region,
+	// <account-id> is a 12-digit numeric identifier for the AWS account,
+	// <key-id-or-alias> is the KMS key ID or alias name.
+	KMSKeyARN *string `json:"kmsKeyARN,omitempty"`
+	// efsVolumeMetrics sets the configuration for collecting metrics from EFS volumes used by the EFS CSI Driver.
 	EFSVolumeMetrics *AWSEFSVolumeMetricsApplyConfiguration `json:"efsVolumeMetrics,omitempty"`
 }
 

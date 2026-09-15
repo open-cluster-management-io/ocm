@@ -135,6 +135,100 @@ func (VersionAvailability) SwaggerDoc() map[string]string {
 	return map_VersionAvailability
 }
 
+var map_ClusterAPI = map[string]string{
+	"":         "ClusterAPI provides configuration for the capi-operator.\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec is the specification of the desired behavior of the capi-operator.",
+	"status":   "status defines the observed status of the capi-operator.",
+}
+
+func (ClusterAPI) SwaggerDoc() map[string]string {
+	return map_ClusterAPI
+}
+
+var map_ClusterAPIInstallerComponent = map[string]string{
+	"":     "ClusterAPIInstallerComponent defines a component which will be installed by this revision.",
+	"name": "name is the human-readable name of the component. The value has no effect, and will not be set if the component does not define a name in its manifests. If set it must consist of alphanumeric characters, or '-', and may not exceed 255 characters.",
+}
+
+func (ClusterAPIInstallerComponent) SwaggerDoc() map[string]string {
+	return map_ClusterAPIInstallerComponent
+}
+
+var map_ClusterAPIInstallerComponentImage = map[string]string{
+	"":        "ClusterAPIInstallerComponentImage defines an image source for a component.",
+	"ref":     "ref is an image reference to the image containing the component manifests. The reference must be a valid image digest reference in the format host[:port][/namespace]/name@sha256:<digest>. The digest must be 64 characters long, and consist only of lowercase hexadecimal characters, a-f and 0-9. The length of the field must be between 1 to 447 characters.",
+	"profile": "profile is the name of a profile to use from the image.\n\nA profile name may be up to 255 characters long. It must consist of alphanumeric characters, '-', or '_'.",
+}
+
+func (ClusterAPIInstallerComponentImage) SwaggerDoc() map[string]string {
+	return map_ClusterAPIInstallerComponentImage
+}
+
+var map_ClusterAPIInstallerComponentSource = map[string]string{
+	"":      "ClusterAPIInstallerComponentSource defines the source of a component which will be installed by this revision.",
+	"type":  "type is the source type of the component. The only valid value is Image. When set to Image, the image field must be set and will define an image source for the component.",
+	"image": "image defines an image source for a component. The image must contain a /capi-operator-installer directory containing the component manifests.",
+}
+
+func (ClusterAPIInstallerComponentSource) SwaggerDoc() map[string]string {
+	return map_ClusterAPIInstallerComponentSource
+}
+
+var map_ClusterAPIInstallerRevision = map[string]string{
+	"name":                               "name is the name of a revision.",
+	"revision":                           "revision is a monotonically increasing number that is assigned to a revision.",
+	"contentID":                          "contentID uniquely identifies the content of this revision. The contentID must be between 1 and 255 characters long.",
+	"unmanagedCustomResourceDefinitions": "unmanagedCustomResourceDefinitions is a list of the names of ClusterResourceDefinition (CRD) objects which are included in this revision, but which should not be installed or updated. If not set, all CRDs in the revision will be managed by the CAPI operator.",
+	"manifestSubstitutions":              "manifestSubstitutions is a list of envsubst style substitutions which will be applied to manifests in the revision during rendering. If defined it must not be empty, and may not contain more than 32 items. Each manifest substitution must have a unique key.",
+	"components":                         "components is a list of components which will be installed by this revision. Components will be installed in the order they are listed. If omitted no components will be installed.\n\nThe maximum number of components is 32.",
+}
+
+func (ClusterAPIInstallerRevision) SwaggerDoc() map[string]string {
+	return map_ClusterAPIInstallerRevision
+}
+
+var map_ClusterAPIInstallerRevisionManifestSubstitution = map[string]string{
+	"":      "ClusterAPIInstallerRevisionManifestSubstitution defines an envsubst style substitution which will be applied to manifests in a revision during rendering.",
+	"key":   "key is the name of the envsubst variable to substitute. It must be a valid envsubst variable name, consisting of letters, digits, and underscores, and must start with a letter or underscore. The key must not be empty, and must not exceed 255 characters.",
+	"value": "value is the value to substitute for the envsubst variable. It may be empty, in which case the variable will be substituted with an empty string. The value must not exceed 4096 characters.",
+}
+
+func (ClusterAPIInstallerRevisionManifestSubstitution) SwaggerDoc() map[string]string {
+	return map_ClusterAPIInstallerRevisionManifestSubstitution
+}
+
+var map_ClusterAPIList = map[string]string{
+	"":         "ClusterAPIList contains a list of ClusterAPI configurations\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "items contains the items",
+}
+
+func (ClusterAPIList) SwaggerDoc() map[string]string {
+	return map_ClusterAPIList
+}
+
+var map_ClusterAPISpec = map[string]string{
+	"":                                   "ClusterAPISpec defines the desired configuration of the capi-operator. The spec is required but we deliberately allow it to be empty.",
+	"unmanagedCustomResourceDefinitions": "unmanagedCustomResourceDefinitions is a list of ClusterResourceDefinition (CRD) names that should not be managed by the capi-operator installer controller. This allows external actors to own specific CRDs while capi-operator manages others.\n\nEach CRD name must be a valid DNS-1123 subdomain consisting of lowercase alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character, with a maximum length of 253 characters. CRD names must contain at least two '.' characters. Example: \"clusters.cluster.x-k8s.io\"\n\nItems cannot be removed from this list once added.\n\nThe maximum number of unmanagedCustomResourceDefinitions is 128.",
+}
+
+func (ClusterAPISpec) SwaggerDoc() map[string]string {
+	return map_ClusterAPISpec
+}
+
+var map_ClusterAPIStatus = map[string]string{
+	"":                           "ClusterAPIStatus describes the current state of the capi-operator.",
+	"currentRevision":            "currentRevision is the name of the most recently fully applied revision. It is written by the installer controller. If it is absent, it indicates that no revision has been fully applied yet. If set, currentRevision must correspond to an entry in the revisions list.",
+	"desiredRevision":            "desiredRevision is the name of the desired revision. It is written by the revision controller. It must be set to the name of the entry in the revisions list with the highest revision number.",
+	"revisions":                  "revisions is a list of all currently active revisions. A revision is active until the installer controller updates currentRevision to a later revision. It is written by the revision controller.\n\nThe maximum number of revisions is 16. All revisions must have a unique name. All revisions must have a unique revision number. When adding a revision, the revision number must be greater than the highest revision number in the list. Revisions are immutable, although they can be deleted.",
+	"observedRevisionGeneration": "observedRevisionGeneration is the generation of the ClusterAPI object that was last observed by the revision controller. If specified it must be greater than or equal to 1, and less than 2^53. It may not decrease or be unset once set.",
+}
+
+func (ClusterAPIStatus) SwaggerDoc() map[string]string {
+	return map_ClusterAPIStatus
+}
+
 var map_ClusterVersionOperator = map[string]string{
 	"":         "ClusterVersionOperator holds cluster-wide information about the Cluster Version Operator.\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
 	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
@@ -255,6 +349,55 @@ var map_RepositoryDigestMirrors = map[string]string{
 
 func (RepositoryDigestMirrors) SwaggerDoc() map[string]string {
 	return map_RepositoryDigestMirrors
+}
+
+var map_GatewayAPIIngressConfig = map[string]string{
+	"":               "GatewayAPIIngressConfig holds configuration for Gateway API integration in the Cluster Ingress Operator.",
+	"managementMode": "managementMode specifies how the Cluster Ingress Operator manages Gateway API Custom Resource Definitions (CRDs), the OpenShift Gateway API implementation, and its Gateway API controllers.\n\nAllowed values are \"Managed\" and \"Unmanaged\".\n\nWhen omitted or set to \"Managed\", the ingress operator installs, owns, and upgrades the Gateway API CRDs, protects them with a Validating Admission Policy, and deploys the OpenShift Gateway API implementation and its Gateway API controllers.\n\nWhen set to \"Unmanaged\", the ingress operator does not install or manage Gateway API CRDs and does not deploy the OpenShift Gateway API implementation or its Gateway API controllers. The cluster administrator or a third-party product is responsible for providing their own CRDs and Gateway controller. The ingress operator reports observational status only.",
+}
+
+func (GatewayAPIIngressConfig) SwaggerDoc() map[string]string {
+	return map_GatewayAPIIngressConfig
+}
+
+var map_Ingress = map[string]string{
+	"":         "Ingress contains configuration options specific to the Ingress Operator itself, including how it manages Gateway API integration.\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec holds user settable values for configuration.",
+	"status":   "status holds observed values from the cluster.",
+}
+
+func (Ingress) SwaggerDoc() map[string]string {
+	return map_Ingress
+}
+
+var map_IngressList = map[string]string{
+	"":         "IngressList is a collection of Ingresses.\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "items is a list of Ingresses.",
+}
+
+func (IngressList) SwaggerDoc() map[string]string {
+	return map_IngressList
+}
+
+var map_IngressSpec = map[string]string{
+	"":           "IngressSpec is the specification of the desired behavior of the Ingress Operator.",
+	"gatewayAPI": "gatewayAPI holds configuration for Gateway API integration, including how the ingress operator manages Gateway API CRDs, the OpenShift Gateway API implementation, and its Gateway API controllers.",
+}
+
+func (IngressSpec) SwaggerDoc() map[string]string {
+	return map_IngressSpec
+}
+
+var map_IngressStatus = map[string]string{
+	"":                   "IngressStatus defines the observed status of the Ingress Operator.",
+	"conditions":         "conditions is a list of conditions and their status.\n\nGateway API CRD management conditions are reported here with the \"GatewayAPI\" prefix:\n\n* \"GatewayAPICRDsManaged\" indicates whether the ingress operator is actively\n  managing Gateway API CRDs.\n* \"GatewayAPICRDsPresent\" indicates whether Gateway API CRDs exist on the\n  cluster.\n* \"GatewayAPICRDsCompliant\" indicates whether the installed CRDs match the\n  version expected by this ingress operator release.",
+	"observedGeneration": "observedGeneration represents the most recent generation observed by the operator and specifies the version of the spec field currently being synced.\n\nWhen omitted, the operator has not yet observed the resource.",
+}
+
+func (IngressStatus) SwaggerDoc() map[string]string {
+	return map_IngressStatus
 }
 
 var map_OLM = map[string]string{
