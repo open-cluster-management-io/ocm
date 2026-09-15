@@ -55,7 +55,7 @@ func (r *ManagedClusterWebhook) Default(ctx context.Context, managedCluster *clu
 	if managedCluster.DeletionTimestamp.IsZero() &&
 		features.HubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) &&
 		managedCluster.Labels[clusterv1beta2.ClusterSetLabel] == "" {
-		err := r.allowUpdateClusterSet(req.UserInfo, defaultClusterSetName)
+		err := r.allowUpdateClusterSet(ctx, req.UserInfo, defaultClusterSetName)
 		if err != nil {
 			klog.FromContext(ctx).Info("skipping default clusterset label update", "error", err)
 		} else {
