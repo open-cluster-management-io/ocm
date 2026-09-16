@@ -101,6 +101,15 @@ func (n *addonNode) setRolloutStatus() {
 		}
 	}
 
+	// Check that the ordering of status.configReferences matches the desired ordering.
+	// The content check above only validates that the same entries exist; if the user
+	// reordered spec.configs the status must be updated so that consumers that rely on
+	// position (e.g. last-match-wins) see the correct precedence.
+	if !n.desiredConfigs.orderMatchesStatus(n.mca.Status.ConfigReferences) {
+		n.status.Status = clustersdkv1alpha1.ToApply
+		return
+	}
+
 	// succeed
 	n.status.Status = clustersdkv1alpha1.Succeeded
 	if progressingCond.Reason == addonv1beta1.ProgressingReasonCompleted {
@@ -142,6 +151,33 @@ func (m addonConfigMap) containsConfig(expectConfigGr addonv1beta1.ConfigGroupRe
 	}
 
 	return -1, false
+}
+
+// orderMatchesStatus returns true if, for every ConfigGroupResource, the
+// entries in statusRefs match the desired slice in both count and order.
+// Cross-GR ordering is ignored because it has no semantic significance —
+// only within-GR count and ordering affects behaviour such as last-match-wins
+// precedence.
+func (m addonConfigMap) orderMatchesStatus(statusRefs []addonv1beta1.ConfigReference) bool {
+	for gr, desired := range m {
+		// Collect the sub-sequence of statusRefs that belong to this GR,
+		// preserving their relative order.
+		var statusOrder []addonv1beta1.ConfigReferent
+		for _, ref := range statusRefs {
+			if ref.ConfigGroupResource == gr && ref.DesiredConfig != nil {
+				statusOrder = append(statusOrder, ref.DesiredConfig.ConfigReferent)
+			}
+		}
+		if len(statusOrder) != len(desired) {
+			return false
+		}
+		for i, d := range desired {
+			if statusOrder[i] != d.DesiredConfig.ConfigReferent {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (m addonConfigMap) orderedKeys() []addonv1beta1.ConfigGroupResource {
