@@ -106,7 +106,10 @@ spec:
           {{end}}
           {{if .TLSCipherSuites}}
           - "--tls-cipher-suites={{ .TLSCipherSuites }}"
-          {{end}}  
+          {{end}}
+          {{if ne .HealthCheckPort 8443}}
+          - "--health-port={{ .HealthCheckPort }}"
+          {{end}}
         env:
           - name: POD_NAME
             valueFrom:
@@ -141,14 +144,14 @@ spec:
           httpGet:
             path: /healthz
             scheme: HTTPS
-            port: 8443
+            port: {{ .HealthCheckPort }}
           initialDelaySeconds: 2
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /healthz
             scheme: HTTPS
-            port: 8443
+            port: {{ .HealthCheckPort }}
           initialDelaySeconds: 2
         {{- if or (eq .ResourceRequirementResourceType "Default") (eq .ResourceRequirementResourceType "") }}
         resources:
