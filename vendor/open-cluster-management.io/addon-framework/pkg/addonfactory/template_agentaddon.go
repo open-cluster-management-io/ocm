@@ -7,7 +7,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/klog/v2"
-
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
@@ -150,7 +149,7 @@ func (a *TemplateAgentAddon) getBuiltinValues(
 }
 
 func (a *TemplateAgentAddon) getDefaultValues(
-	_ *clusterv1.ManagedCluster,
+	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1beta1.ManagedClusterAddOn) Values {
 	defaultValues := templateDefaultValues{}
 
