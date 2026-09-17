@@ -18,6 +18,7 @@ import (
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	tlslib "open-cluster-management.io/sdk-go/pkg/tls"
 
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/addonsecretcontroller"
@@ -108,6 +109,26 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 	if err != nil {
 		return err
 	}
+
+	// Load TLS config and start watching for changes. The watcher restarts the process
+	// when the ConfigMap changes so the operator's own serving endpoint (port 8443) can
+	// pick up the updated TLS settings on the next startup. Agent deployments already
+	// re-read the ConfigMap during reconcile via populateTLSConfig.
+	currentTLSConfig, err := tlslib.StartTLSConfigMapWatcher(ctx, kubeClient, helpers.GetOperatorNamespace(),
+		func() {
+			logger.Info("TLS ConfigMap changed, restarting", "component", "klusterlet operator")
+			os.Exit(0)
+		},
+	)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil
+		}
+		return err
+	}
+	logger.Info("TLS configuration loaded",
+		"minVersion", tlslib.VersionToString(currentTLSConfig.MinVersion),
+		"cipherSuites", tlslib.CipherSuitesToString(currentTLSConfig.CipherSuites))
 
 	klusterletController := klusterletcontroller.NewKlusterletController(
 		kubeClient,
