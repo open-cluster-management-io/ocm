@@ -3,8 +3,6 @@ package manifestworkreplicasetcontroller
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strings"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -12,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -32,6 +31,7 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
+	workhelper "open-cluster-management.io/ocm/pkg/work/helper"
 )
 
 // maxRequeueTime is the same as the informer resync period
@@ -59,18 +59,18 @@ type manifestWorkWithPlacements struct {
 
 func getManifestWorkInReplicaSet(mwrs *workapiv1alpha1.ManifestWorkReplicaSet,
 	manifestWorkLister worklisterv1.ManifestWorkLister) (*manifestWorkInReplicaSet, []*workapiv1.ManifestWork, error) {
-	req, err := labels.NewRequirement(
-		workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey,
-		selection.Equals, []string{manifestWorkReplicaSetKey(mwrs)})
+	hashReq, err := labels.NewRequirement(
+		workhelper.ManifestWorkReplicaSetOwnerKeyHashLabelKey,
+		selection.Equals, []string{ownerKeyHash(mwrs.Namespace, mwrs.Name)})
+	if err != nil {
+		return nil, nil, err
+	}
+	mws, err := manifestWorkLister.List(labels.NewSelector().Add(*hashReq))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	selector := labels.NewSelector().Add(*req)
-	mws, err := manifestWorkLister.List(selector)
-	if err != nil {
-		return nil, nil, err
-	}
+	mws = appendLegacyManifestWorks(mws, mwrs, manifestWorkLister)
 
 	result := &manifestWorkInReplicaSet{
 		workByCluster:   make(map[string]*manifestWorkWithPlacements),
@@ -104,6 +104,45 @@ func getManifestWorkInReplicaSet(mwrs *workapiv1alpha1.ManifestWorkReplicaSet,
 // reconcile needs to proceed.
 type ManifestWorkReplicaSetReconcile interface {
 	reconcile(ctx context.Context, pw *workapiv1alpha1.ManifestWorkReplicaSet) (*workapiv1alpha1.ManifestWorkReplicaSet, reconcileState, error)
+}
+
+// appendLegacyManifestWorks finds pre-upgrade ManifestWorks that only have the
+// deprecated label and appends them to mws, deduplicating by UID.
+func appendLegacyManifestWorks(mws []*workapiv1.ManifestWork,
+	mwrs *workapiv1alpha1.ManifestWorkReplicaSet,
+	manifestWorkLister worklisterv1.ManifestWorkLister) []*workapiv1.ManifestWork {
+	oldValue := manifestWorkReplicaSetKey(mwrs)
+	if len(oldValue) > workhelper.LabelValueMaxLength {
+		return mws
+	}
+
+	oldReq, err := labels.NewRequirement(
+		workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey,
+		selection.Equals, []string{oldValue})
+	if err != nil {
+		klog.V(4).Infof("skipping legacy label lookup: invalid requirement: %v", err)
+		return mws
+	}
+	oldMWs, err := manifestWorkLister.List(labels.NewSelector().Add(*oldReq))
+	if err != nil {
+		klog.V(4).Infof("skipping legacy label lookup: list failed: %v", err)
+		return mws
+	}
+
+	seen := sets.New[types.UID]()
+	for _, mw := range mws {
+		seen.Insert(mw.UID)
+	}
+	for _, mw := range oldMWs {
+		if seen.Has(mw.UID) {
+			continue
+		}
+		if _, hasHash := mw.Labels[workhelper.ManifestWorkReplicaSetOwnerKeyHashLabelKey]; hasHash {
+			continue
+		}
+		mws = append(mws, mw)
+	}
+	return mws
 }
 
 type reconcileState int64
@@ -141,22 +180,36 @@ func NewManifestWorkReplicaSetController(
 	return factory.New().
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaNamespaceName, manifestWorkReplicaSetInformer.Informer()).
 		WithFilteredEventsInformersQueueKeysFunc(func(obj runtime.Object) []string {
-			accessor, _ := meta.Accessor(obj)
-			labelValue, ok := accessor.GetLabels()[workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey]
-			if !ok {
-				return []string{}
+			if key := controller.manifestWorkQueueKeyFunc(obj); key != "" {
+				return []string{key}
 			}
-			keys := strings.Split(labelValue, ".")
-			if len(keys) != 2 {
-				return []string{}
-			}
-			return []string{fmt.Sprintf("%s/%s", keys[0], keys[1])}
+			return []string{}
 		},
-			queue.FileterByLabel(workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey),
+			filterByMWRSOwnership,
 			manifestWorkInformer.Informer()).
 		WithInformersQueueKeysFunc(controller.placementDecisionQueueKeysFunc, placeDecisionInformer.Informer()).
 		WithInformersQueueKeysFunc(controller.placementQueueKeysFunc, placementInformer.Informer()).
 		WithSync(controller.sync).ToController("ManifestWorkReplicaSetController")
+}
+
+// filterByMWRSOwnership returns true if the object has either the new hash
+// label or the deprecated old label, indicating it is owned by an MWRS.
+func filterByMWRSOwnership(obj interface{}) bool {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return false
+	}
+	lbls := accessor.GetLabels()
+	if len(lbls) == 0 {
+		return false
+	}
+	if len(lbls[workhelper.ManifestWorkReplicaSetOwnerKeyHashLabelKey]) > 0 {
+		return true
+	}
+	return len(lbls[workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey]) > 0
 }
 
 func newController(

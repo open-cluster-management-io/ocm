@@ -3,14 +3,12 @@ package manifestworkreplicasetcontroller
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation"
 
 	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	worklisterv1 "open-cluster-management.io/api/client/work/listers/work/v1"
@@ -22,9 +20,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 )
-
-// ReasonInvalidManifestWorkName indicates an invalid ManifestWork owner label.
-const ReasonInvalidManifestWorkName = "InvalidManifestWorkName"
 
 // deployReconciler is to manage ManifestWork based on the placement.
 type deployReconciler struct {
@@ -41,18 +36,6 @@ func (d *deployReconciler) reconcile(
 	var plcsSummary []workapiv1alpha1.PlacementSummary
 	minRequeue := maxRequeueTime
 	count, total, succeededCount := 0, 0, 0
-
-	// Report invalid ManifestWork owner labels in status.
-	// TODO: remove this once the owner label uses a hash value instead of
-	// namespace.name (#1596); the 63-char label limit no longer applies then.
-	ownerValue := manifestWorkReplicaSetKey(mwrSet)
-	if verrs := validation.IsValidLabelValue(ownerValue); len(verrs) > 0 {
-		message := fmt.Sprintf("ManifestWork owner reference %q (namespace.name) is not a valid label value: %s; "+
-			"recreate the ManifestWorkReplicaSet with a shorter namespace and/or name so the combined length is at most 63 characters",
-			ownerValue, strings.Join(verrs, "; "))
-		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getManifestworkApplied(ReasonInvalidManifestWorkName, message))
-		return mwrSet, reconcileStop, nil
-	}
 
 	// Clean up ManifestWorks from placements no longer in the spec
 	currentPlacementNames := sets.New[string]()
@@ -380,22 +363,36 @@ func buildManifestWork(
 	clusterNS string,
 	placementRefName string,
 ) *workv1.ManifestWork {
-	// Get ManifestWorkReplicaSet labels
-	labels := mwrSet.Labels
-
 	// Merge mwrSet.Labels with the required labels
 	mergedLabels := make(map[string]string)
-	for k, v := range labels {
+	for k, v := range mwrSet.Labels {
 		mergedLabels[k] = v
 	}
 
-	mergedLabels[workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey] = manifestWorkReplicaSetKey(mwrSet)
+	mergedLabels[helper.ManifestWorkReplicaSetOwnerKeyHashLabelKey] = ownerKeyHash(mwrSet.Namespace, mwrSet.Name)
 	mergedLabels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey] = placementRefName
+
+	// Deprecated: still set the old label when the value fits the 63-char limit,
+	// for backward compatibility with older controllers that select by this label.
+	oldValue := manifestWorkReplicaSetKey(mwrSet)
+	if len(oldValue) <= helper.LabelValueMaxLength {
+		mergedLabels[workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey] = oldValue
+	} else {
+		// Strip the deprecated label even if it was copied from user-supplied
+		// MWRS labels, to prevent a short-name MWRS from claiming ownership
+		// of these ManifestWorks through the deprecated-label fallback.
+		delete(mergedLabels, workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey)
+	}
+
+	annotations := map[string]string{
+		helper.ManifestWorkReplicaSetOwnerAnnotationKey: manifestWorkReplicaSetOwnerValue(mwrSet),
+	}
 
 	mw := &workv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: clusterNS,
-			Labels:    mergedLabels,
+			Namespace:   clusterNS,
+			Labels:      mergedLabels,
+			Annotations: annotations,
 		},
 		Spec: mwrSet.Spec.ManifestWorkTemplate,
 	}

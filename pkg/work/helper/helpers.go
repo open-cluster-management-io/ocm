@@ -3,6 +3,7 @@ package helper
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -36,7 +37,27 @@ const (
 	// unknownKind is returned by resourcehelper.GuessObjectGroupVersionKind() when it
 	// cannot tell the kind of the given object
 	unknownKind = "<unknown>"
+
+	// LabelValueMaxLength is the Kubernetes label-value length limit.
+	LabelValueMaxLength = 63
+
+	// ManifestWorkReplicaSetOwnerKeyHashLabelKey is a label on ManifestWork that stores a
+	// deterministic SHA-256 hash of the owning MWRS's namespace/name. Unlike the deprecated
+	// ManifestWorkReplicaSetControllerNameLabelKey, this value always fits within the
+	// label value limit.
+	ManifestWorkReplicaSetOwnerKeyHashLabelKey = "work.open-cluster-management.io/ownerkey-hash"
+
+	// ManifestWorkReplicaSetOwnerAnnotationKey is an annotation on ManifestWork that stores
+	// the owning MWRS's namespace/name in readable form for traceability.
+	ManifestWorkReplicaSetOwnerAnnotationKey = "work.open-cluster-management.io/manifestworkreplicaset-owner"
 )
+
+// OwnerKeyHash returns a deterministic SHA-256 hash of "namespace/name", encoded
+// as 32 hex characters. The result is always a valid Kubernetes label value.
+func OwnerKeyHash(namespace, name string) string {
+	h := sha256.Sum256([]byte(namespace + "/" + name))
+	return hex.EncodeToString(h[:16])
+}
 
 var (
 	genericScheme = runtime.NewScheme()
