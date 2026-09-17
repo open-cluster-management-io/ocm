@@ -14,6 +14,7 @@ import (
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	workhelper "open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
@@ -71,8 +72,15 @@ func CreateTestManifestWorks(name, namespace string, placementName string, clust
 		mw.Name = fmt.Sprintf("%s-%s", name, c)
 		mw.Namespace = c
 		mw.Labels = map[string]string{
-			"work.open-cluster-management.io/manifestworkreplicaset": fmt.Sprintf("%s.%s", namespace, name),
-			"work.open-cluster-management.io/placementname":          placementName,
+			"work.open-cluster-management.io/placementname":       placementName,
+			workhelper.ManifestWorkReplicaSetOwnerKeyHashLabelKey: workhelper.OwnerKeyHash(namespace, name),
+		}
+		oldValue := fmt.Sprintf("%s.%s", namespace, name)
+		if len(oldValue) <= workhelper.LabelValueMaxLength {
+			mw.Labels["work.open-cluster-management.io/manifestworkreplicaset"] = oldValue
+		}
+		mw.Annotations = map[string]string{
+			workhelper.ManifestWorkReplicaSetOwnerAnnotationKey: fmt.Sprintf("%s/%s", namespace, name),
 		}
 		meta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
 			Type:   workapiv1.WorkApplied,
@@ -93,8 +101,15 @@ func CreateTestManifestWork(name, namespace string, placementName string, cluste
 	mw.Name = fmt.Sprintf("%s-%s", name, clusterName)
 	mw.Namespace = clusterName
 	mw.Labels = map[string]string{
-		"work.open-cluster-management.io/manifestworkreplicaset": fmt.Sprintf("%s.%s", namespace, name),
-		"work.open-cluster-management.io/placementname":          placementName,
+		"work.open-cluster-management.io/placementname":       placementName,
+		workhelper.ManifestWorkReplicaSetOwnerKeyHashLabelKey: workhelper.OwnerKeyHash(namespace, name),
+	}
+	oldValue := fmt.Sprintf("%s.%s", namespace, name)
+	if len(oldValue) <= workhelper.LabelValueMaxLength {
+		mw.Labels["work.open-cluster-management.io/manifestworkreplicaset"] = oldValue
+	}
+	mw.Annotations = map[string]string{
+		workhelper.ManifestWorkReplicaSetOwnerAnnotationKey: fmt.Sprintf("%s/%s", namespace, name),
 	}
 	meta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
 		Type:   workapiv1.WorkApplied,
