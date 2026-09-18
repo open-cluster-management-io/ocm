@@ -4,6 +4,9 @@ import (
 	"reflect"
 	"testing"
 
+	certificatesv1 "k8s.io/api/certificates/v1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -241,6 +244,140 @@ func TestRemoveTaints(t *testing.T) {
 			}
 			if !reflect.DeepEqual(c.taints, c.resTaints) {
 				t.Errorf("taints expected %+v, but %+v", c.taints, c.resTaints)
+			}
+		})
+	}
+}
+
+func TestIsCSRInTerminalState(t *testing.T) {
+	cases := []struct {
+		name     string
+		status   *certificatesv1.CertificateSigningRequestStatus
+		expected bool
+	}{
+		{
+			name:     "no conditions",
+			status:   &certificatesv1.CertificateSigningRequestStatus{},
+			expected: false,
+		},
+		{
+			name: "approved",
+			status: &certificatesv1.CertificateSigningRequestStatus{
+				Conditions: []certificatesv1.CertificateSigningRequestCondition{
+					{Type: certificatesv1.CertificateApproved},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "denied",
+			status: &certificatesv1.CertificateSigningRequestStatus{
+				Conditions: []certificatesv1.CertificateSigningRequestCondition{
+					{Type: certificatesv1.CertificateDenied},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "pending only",
+			status: &certificatesv1.CertificateSigningRequestStatus{
+				Conditions: []certificatesv1.CertificateSigningRequestCondition{
+					{Type: certificatesv1.CertificateFailed},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual := IsCSRInTerminalState(c.status)
+			if actual != c.expected {
+				t.Errorf("expected %t, but %t", c.expected, actual)
+			}
+		})
+	}
+}
+
+func TestIsv1beta1CSRInTerminalState(t *testing.T) {
+	cases := []struct {
+		name     string
+		status   *certificatesv1beta1.CertificateSigningRequestStatus
+		expected bool
+	}{
+		{
+			name:     "no conditions",
+			status:   &certificatesv1beta1.CertificateSigningRequestStatus{},
+			expected: false,
+		},
+		{
+			name: "approved",
+			status: &certificatesv1beta1.CertificateSigningRequestStatus{
+				Conditions: []certificatesv1beta1.CertificateSigningRequestCondition{
+					{Type: certificatesv1beta1.CertificateApproved},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "denied",
+			status: &certificatesv1beta1.CertificateSigningRequestStatus{
+				Conditions: []certificatesv1beta1.CertificateSigningRequestCondition{
+					{Type: certificatesv1beta1.CertificateDenied},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "pending only",
+			status: &certificatesv1beta1.CertificateSigningRequestStatus{
+				Conditions: []certificatesv1beta1.CertificateSigningRequestCondition{
+					{Type: certificatesv1beta1.CertificateFailed},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual := Isv1beta1CSRInTerminalState(c.status)
+			if actual != c.expected {
+				t.Errorf("expected %t, but %t", c.expected, actual)
+			}
+		})
+	}
+}
+
+func TestFindTaint(t *testing.T) {
+	cases := []struct {
+		name     string
+		taints   []clusterv1.Taint
+		taint    clusterv1.Taint
+		expected *clusterv1.Taint
+	}{
+		{
+			name:  "empty taints",
+			taint: UnavailableTaint,
+		},
+		{
+			name:     "taint found",
+			taints:   []clusterv1.Taint{UnavailableTaint, UnreachableTaint},
+			taint:    UnreachableTaint,
+			expected: &UnreachableTaint,
+		},
+		{
+			name:   "taint not found",
+			taints: []clusterv1.Taint{UnavailableTaint},
+			taint:  UnreachableTaint,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual := FindTaint(c.taints, c.taint)
+			if !reflect.DeepEqual(actual, c.expected) {
+				t.Errorf("expected %v but got %v", c.expected, actual)
 			}
 		})
 	}
