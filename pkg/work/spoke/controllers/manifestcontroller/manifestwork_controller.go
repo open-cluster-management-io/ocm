@@ -60,6 +60,7 @@ type ManifestWorkController struct {
 	appliedManifestWorkLister  worklister.AppliedManifestWorkLister
 	hubHash                    string
 	agentID                    string
+	hubClusterName             string
 	reconcilers                []workReconcile
 }
 
@@ -75,6 +76,7 @@ func NewManifestWorkController(
 	appliedManifestWorkInformer workinformer.AppliedManifestWorkInformer,
 	objectReader objectreader.ObjectReader,
 	hubHash, agentID string,
+	hubClusterName string,
 	restMapper meta.RESTMapper,
 	validator auth.ExecutorValidator) factory.Controller {
 
@@ -92,11 +94,13 @@ func NewManifestWorkController(
 		appliedManifestWorkLister: appliedManifestWorkInformer.Lister(),
 		hubHash:                   hubHash,
 		agentID:                   agentID,
+		hubClusterName:            hubClusterName,
 		reconcilers: []workReconcile{
 			&manifestworkReconciler{
-				restMapper: restMapper,
-				appliers:   apply.NewAppliers(spokeDynamicClient, spokeKubeClient, spokeAPIExtensionClient),
-				validator:  validator,
+				restMapper:     restMapper,
+				appliers:       apply.NewAppliers(spokeDynamicClient, spokeKubeClient, spokeAPIExtensionClient),
+				validator:      validator,
+				hubClusterName: hubClusterName,
 			},
 			&appliedManifestWorkReconciler{
 				spokeDynamicClient: spokeDynamicClient,

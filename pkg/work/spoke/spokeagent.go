@@ -145,6 +145,7 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		spokeWorkInformerFactory.Work().V1().AppliedManifestWorks(),
 		objectReader,
 		hubHash, agentID,
+		o.workOptions.HubClusterName,
 		restMapper,
 		validator,
 	)

@@ -185,6 +185,7 @@ type klusterletConfig struct {
 	RegistrationServiceAccount                  string
 	WorkServiceAccount                          string
 	ClusterName                                 string
+	HubClusterName                              string
 	ExternalServerURL                           string
 	HubKubeConfigSecret                         string
 	MultipleHubs                                bool

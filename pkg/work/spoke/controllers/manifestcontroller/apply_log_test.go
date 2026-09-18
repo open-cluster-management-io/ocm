@@ -125,10 +125,11 @@ func TestPriorAppliedGeneration(t *testing.T) {
 
 func testWorkMeta() workMeta {
 	return workMeta{
-		name:       "demo-mw",
-		namespace:  "cluster1",
-		generation: 7,
-		labels:     map[string]string{"example.com/team": "platform"},
+		name:           "demo-mw",
+		namespace:      "cluster1",
+		generation:     7,
+		labels:         map[string]string{"example.com/team": "platform"},
+		hubClusterName: "hub-cluster1",
 	}
 }
 
