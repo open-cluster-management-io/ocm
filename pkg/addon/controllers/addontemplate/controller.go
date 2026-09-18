@@ -241,6 +241,7 @@ func (c *addonTemplateController) runController(ctx context.Context, addonName s
 			templateagent.ToAddOnInstallNamespacePrivateValues,
 			templateagent.ToAddOnProxyPrivateValues,
 			templateagent.ToAddOnResourceRequirementsPrivateValues,
+			templateagent.ToAddOnReplicaPrivateValues,
 		),
 	)
 	err = mgr.AddAgent(agentAddon)

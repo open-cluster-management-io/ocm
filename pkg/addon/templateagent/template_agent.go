@@ -34,6 +34,7 @@ const (
 	InstallNamespacePrivateValueKey     = "__INSTALL_NAMESPACE"
 	ProxyPrivateValueKey                = "__PROXY"
 	ResourceRequirementsPrivateValueKey = "__RESOURCE_REQUIREMENTS"
+	ReplicaPrivateValueKey              = "__REPLICAS"
 )
 
 var PrivateValuesKeys = map[string]struct{}{
@@ -42,6 +43,7 @@ var PrivateValuesKeys = map[string]struct{}{
 	InstallNamespacePrivateValueKey:     {},
 	ProxyPrivateValueKey:                {},
 	ResourceRequirementsPrivateValueKey: {},
+	ReplicaPrivateValueKey:              {},
 }
 
 // templateBuiltinValues includes the built-in values for crd template agentAddon.
