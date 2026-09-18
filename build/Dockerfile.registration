@@ -15,7 +15,12 @@ RUN GOOS=${OS} \
     GO_BUILD_PACKAGES=./cmd/server \
     make build --warn-undefined-variables
 
-FROM registry.access.redhat.com/ubi9/ubi-micro:latest
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+# zlib provides libz.so.1, required by the AWS CLI (mounted at /awscli via an
+# initContainer) that the awsirsa registration driver spawns as an ExecCredential
+# plugin. Without it the CLI crashes at process startup with:
+#   error while loading shared libraries: libz.so.1: cannot open shared object file
+RUN microdnf install -y zlib && microdnf clean all && rm -rf /var/cache/yum
 ENV USER_UID=10001
 
 COPY --from=builder /go/src/open-cluster-management.io/ocm/registration /
