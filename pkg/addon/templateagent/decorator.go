@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -89,8 +90,9 @@ func setUnstructuredNestedField(obj interface{}, val string, paths []string) err
 }
 
 type deploymentDecorator struct {
-	logger     klog.Logger
-	decorators []podTemplateSpecDecorator
+	logger          klog.Logger
+	replicaOverride []ParsedReplicaConfig
+	decorators      []podTemplateSpecDecorator
 }
 
 func newDeploymentDecorator(
@@ -101,7 +103,8 @@ func newDeploymentDecorator(
 	privateValues addonfactory.Values,
 ) decorator {
 	return &deploymentDecorator{
-		logger: logger,
+		logger:          logger,
+		replicaOverride: replicaOverridesFromPrivateValues(privateValues),
 		decorators: []podTemplateSpecDecorator{
 			newEnvironmentDecorator(orderedValues),
 			newVolumeDecorator(addonName, template),
@@ -125,6 +128,10 @@ func (d *deploymentDecorator) decorate(obj *unstructured.Unstructured) (*unstruc
 		if err != nil {
 			return obj, err
 		}
+	}
+
+	if err := applyReplicaOverride(deployment.Name, deployment, d.replicaOverride); err != nil {
+		return obj, err
 	}
 
 	result, err := runtime.DefaultUnstructuredConverter.ToUnstructured(deployment)
@@ -597,4 +604,39 @@ func proxyCABundleConfigMapDataKey() string {
 
 func proxyCABundleFilePath() string {
 	return path.Join(proxyCABundleConfigMapMountPath(), proxyCABundleConfigMapDataKey())
+}
+
+func replicaOverridesFromPrivateValues(privateValues addonfactory.Values) []ParsedReplicaConfig {
+	v, ok := privateValues[ReplicaPrivateValueKey]
+	if !ok {
+		return nil
+	}
+	configs, ok := v.([]ParsedReplicaConfig)
+	if !ok {
+		return nil
+	}
+	return configs
+}
+
+// applyReplicaOverride sets deployment.Spec.Replicas to the last matching ReplicaConfig.
+// workloadID format matched: {resourceType}:{resourceName}
+func applyReplicaOverride(name string, deployment *appsv1.Deployment, configs []ParsedReplicaConfig) error {
+	workloadID := fmt.Sprintf("deployments:%s", name)
+	// iterate in reverse so last match takes precedence (mirrors resourceRequirementsDecorator)
+	for i := len(configs) - 1; i >= 0; i-- {
+		matched, err := regexp.MatchString(configs[i].WorkloadIDRegex, workloadID)
+		if err != nil {
+			continue
+		}
+		if matched {
+			replicas := configs[i].Replicas
+			deployment.Spec.Replicas = &replicas
+			return nil
+		}
+	}
+	return nil
+}
+
+func int32Ptr(value int32) *int32 {
+	return &value
 }
