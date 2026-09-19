@@ -41,6 +41,12 @@ func (d *deployReconciler) reconcile(
 	var plcsSummary []workapiv1alpha1.PlacementSummary
 	minRequeue := maxRequeueTime
 	count, total, succeededCount := 0, 0, 0
+	// attemptedRollout tracks, across every placement processed this reconcile, whether any
+	// placement actually selected clusters to roll out to. It is what lets the final
+	// PlacementVerified decision below tell "nothing to do" (no placement selected any
+	// cluster) apart from "clusters were selected but something went wrong before any of
+	// them could be counted" (see the count == 0 handling at the end of this function).
+	attemptedRollout := false
 
 	// Report invalid ManifestWork owner labels in status.
 	// TODO: remove this once the owner label uses a hash value instead of
@@ -91,6 +97,10 @@ func (d *deployReconciler) reconcile(
 
 		if err != nil {
 			return mwrSet, reconcileContinue, fmt.Errorf("failed get placement %w", err)
+		}
+
+		if placement.Status.NumberOfSelectedClusters > 0 {
+			attemptedRollout = true
 		}
 
 		manifestWorks := allManifestWorks.workByPlacement[placement.Name]
@@ -206,14 +216,29 @@ func (d *deployReconciler) reconcile(
 	}
 
 	mwrSet.Status.Summary.Total = count
-	if count == 0 {
+	switch {
+	case count > 0:
+		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(workapiv1alpha1.ReasonAsExpected, ""))
+	case attemptedRollout || len(errs) > 0:
+		// count == 0 does not by itself mean the placement selected no clusters: a placement
+		// can select clusters and still end up with count == 0 if every ManifestWork
+		// create/update failed, or if computing the rollout itself failed (see the
+		// ReasonNotAsExpected sites above, e.g. a rollout-strategy error). Reporting
+		// PlacementDecisionEmpty in that case would send an operator looking at the wrong
+		// thing: the Placement/label selectors, instead of the real error, which is reported
+		// here on the condition instead.
+		mwrSet.Status.Summary.Applied = 0
+		mwrSet.Status.Summary.Available = 0
+		mwrSet.Status.Summary.Degraded = 0
+		mwrSet.Status.Summary.Progressing = 0
+		apimeta.SetStatusCondition(&mwrSet.Status.Conditions,
+			getPlacementDecisionVerified(workapiv1alpha1.ReasonNotAsExpected, aggregatedErrorMessage(errs)))
+	default:
 		mwrSet.Status.Summary.Applied = 0
 		mwrSet.Status.Summary.Available = 0
 		mwrSet.Status.Summary.Degraded = 0
 		mwrSet.Status.Summary.Progressing = 0
 		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(workapiv1alpha1.ReasonPlacementDecisionEmpty, ""))
-	} else {
-		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(workapiv1alpha1.ReasonAsExpected, ""))
 	}
 
 	if total == succeededCount {
@@ -362,6 +387,22 @@ func getPlacementRollOut(reason string, message string) metav1.Condition {
 	}
 
 	return getCondition(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementRolledOut, reason, message, metav1.ConditionFalse)
+}
+
+// maxAggregatedErrorMessageLen caps how much of the aggregated apply/rollout error text is
+// copied into a status condition message, so one reconcile touching many clusters can't blow
+// up the ManifestWorkReplicaSet's status with an unbounded amount of text.
+const maxAggregatedErrorMessageLen = 2048
+
+// aggregatedErrorMessage joins errs the same way utilerrors.NewAggregate does, but truncates
+// the result so a failure affecting many clusters at once still produces a readable condition
+// message instead of one arbitrarily long string.
+func aggregatedErrorMessage(errs []error) string {
+	msg := utilerrors.NewAggregate(errs).Error()
+	if len(msg) <= maxAggregatedErrorMessageLen {
+		return msg
+	}
+	return fmt.Sprintf("%s... (truncated; %d errors total)", msg[:maxAggregatedErrorMessageLen], len(errs))
 }
 
 func getCondition(conditionType string, reason string, message string, status metav1.ConditionStatus) metav1.Condition {
