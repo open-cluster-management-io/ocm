@@ -388,7 +388,8 @@ func aggregatedErrorMessage(errs []error) string {
 	if len(msg) <= maxAggregatedErrorMessageLen {
 		return msg
 	}
-	return fmt.Sprintf("%s... (truncated; %d errors total)", msg[:maxAggregatedErrorMessageLen], len(errs))
+	suffix := fmt.Sprintf("... (truncated; %d errors total)", len(errs))
+	return msg[:maxAggregatedErrorMessageLen-len(suffix)] + suffix
 }
 
 func getCondition(conditionType string, reason string, message string, status metav1.ConditionStatus) metav1.Condition {

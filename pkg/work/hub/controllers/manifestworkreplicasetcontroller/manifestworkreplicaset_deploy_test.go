@@ -413,15 +413,14 @@ func TestAggregatedErrorMessage(t *testing.T) {
 		longErr := errors.New(strings.Repeat("x", maxAggregatedErrorMessageLen*2))
 		msg := aggregatedErrorMessage([]error{longErr, errors.New("second")})
 
-		if len(msg) <= maxAggregatedErrorMessageLen {
-			t.Fatalf("expected message to be capped, got length %d", len(msg))
+		if len(msg) > maxAggregatedErrorMessageLen {
+			t.Fatalf("expected message to be capped at %d, got length %d", maxAggregatedErrorMessageLen, len(msg))
 		}
 		// utilerrors.NewAggregate wraps multiple distinct messages as "[msg1, msg2]", so the
-		// truncated prefix is the first maxAggregatedErrorMessageLen characters of that
-		// combined string, not necessarily of longErr alone.
+		// retained prefix comes from that combined string, not from longErr alone.
 		untruncated := utilerrors.NewAggregate([]error{longErr, errors.New("second")}).Error()
-		if !strings.HasPrefix(msg, untruncated[:maxAggregatedErrorMessageLen]) {
-			t.Fatal("expected message to start with the first maxAggregatedErrorMessageLen characters of the aggregated error")
+		if !strings.HasPrefix(untruncated, strings.TrimSuffix(msg, "... (truncated; 2 errors total)")) {
+			t.Fatal("expected message to start with a prefix of the aggregated error")
 		}
 		if !strings.Contains(msg, "2 errors total") {
 			t.Fatalf("expected message to note the total error count, got %q", msg)
