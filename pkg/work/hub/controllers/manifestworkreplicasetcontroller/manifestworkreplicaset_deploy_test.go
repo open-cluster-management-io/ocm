@@ -233,9 +233,8 @@ func TestDeployReconcileApplyFailureReportsNotAsExpected(t *testing.T) {
 
 // TestDeployReconcileMultiPlacementApplyFailuresAreAggregated is the multi-placement variant of
 // TestDeployReconcileApplyFailureReportsNotAsExpected: reconcile processes every PlacementRef in
-// one pass and only makes the PlacementVerified decision once, at the end, so the "was anything
-// attempted" and "were there errors" signals must be tracked across the whole loop rather than
-// reset for each placement.
+// one pass and only makes the PlacementVerified decision once, at the end, so the errors from
+// every placement must reach the condition message, not just the last one processed.
 func TestDeployReconcileMultiPlacementApplyFailuresAreAggregated(t *testing.T) {
 	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-a", "place-b")
 	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet)
@@ -294,8 +293,7 @@ func TestDeployReconcileMultiPlacementApplyFailuresAreAggregated(t *testing.T) {
 	if placeCondition.Reason != workapiv1alpha1.ReasonNotAsExpected {
 		t.Fatal("Placement condition Reason should be NotAsExpected, not PlacementDecisionEmpty ", placeCondition)
 	}
-	// Both placements' apply errors should have reached the condition, not just the last one
-	// processed - this is what proves the state is tracked across the whole loop.
+	// Both placements' apply errors should have reached the condition, not just the last one.
 	if !strings.Contains(placeCondition.Message, "apply rejected for cls1") ||
 		!strings.Contains(placeCondition.Message, "apply rejected for cls2") {
 		t.Fatalf("expected the aggregated message to mention both failures, got %q", placeCondition.Message)
@@ -351,7 +349,59 @@ func TestDeployReconcileInvalidRolloutStrategyReportsNotAsExpected(t *testing.T)
 	}
 }
 
+// TestDeployReconcileSelectedClustersButEmptyDecision covers the case where the Placement status
+// already reports selected clusters but the PlacementDecision has no clusters yet (for example
+// informer lag). Nothing is attempted and nothing fails, so this is still a genuine
+// PlacementDecisionEmpty and must not be reported as NotAsExpected or panic on an empty error list.
+func TestDeployReconcileSelectedClustersButEmptyDecision(t *testing.T) {
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet)
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Minute)
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	placement, _ := helpertest.CreateTestPlacement("place-test", "default", "cls1")
+	_, emptyDecision := helpertest.CreateTestPlacement("place-test", "default")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placement, emptyDecision)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Minute)
+
+	if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(emptyDecision); err != nil {
+		t.Fatal(err)
+	}
+
+	placementLister := clusterInformerFactory.Cluster().V1beta1().Placements().Lister()
+	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
+
+	pmwDeployController := deployReconciler{
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: placementDecisionLister,
+		placementLister:     placementLister,
+	}
+
+	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	placeCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified)
+	if placeCondition == nil {
+		t.Fatal("Placement condition not found ", mwrSet.Status.Conditions)
+	}
+	if placeCondition.Reason != workapiv1alpha1.ReasonPlacementDecisionEmpty {
+		t.Fatal("Placement condition Reason should be PlacementDecisionEmpty when nothing was attempted and nothing failed ", placeCondition)
+	}
+}
+
 func TestAggregatedErrorMessage(t *testing.T) {
+	t.Run("no errors yields an empty message", func(t *testing.T) {
+		if msg := aggregatedErrorMessage(nil); msg != "" {
+			t.Fatalf("got %q, want empty", msg)
+		}
+	})
+
 	t.Run("short message is returned unchanged", func(t *testing.T) {
 		msg := aggregatedErrorMessage([]error{errors.New("boom")})
 		if msg != "boom" {
