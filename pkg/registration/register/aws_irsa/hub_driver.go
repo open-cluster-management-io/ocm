@@ -72,7 +72,7 @@ func (c *AWSIRSAHubDriver) Cleanup(ctx context.Context, managedCluster *clusterv
 		return nil
 	}
 
-	roleName, roleArn, err := getRoleNameAndArn(ctx, managedCluster, c.cfg)
+	roleName, roleArn, err := getRoleNameAndArn(ctx, managedCluster, c.cfg, c.hubClusterArn)
 	if err != nil {
 		logger.V(4).Error(err, "Failed to getRoleNameAndArn")
 		return err
@@ -148,7 +148,7 @@ func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 	hubAccountId, hubClusterName = commonhelpers.GetAwsAccountIdAndClusterName(hubClusterArn)
 	managedClusterAccountId, managedClusterName = commonhelpers.GetAwsAccountIdAndClusterName(managedClusterArn)
 
-	roleName, roleArn, err := getRoleNameAndArn(ctx, managedCluster, cfg)
+	roleName, roleArn, err := getRoleNameAndArn(ctx, managedCluster, cfg, hubClusterArn)
 	if err != nil {
 		logger.V(4).Error(err, "Failed to getRoleNameAndArn")
 		return hubClusterName, roleArn, err
@@ -166,6 +166,7 @@ func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCl
 		data := map[string]interface{}{
 			"hubClusterArn":               hubClusterArn,
 			"managedClusterAccountId":     managedClusterAccountId,
+			"managedClusterPartition":     commonhelpers.GetAwsPartition(managedClusterArn),
 			"managedClusterIamRoleSuffix": managedClusterIamRoleSuffix,
 			"hubAccountId":                hubAccountId,
 			"hubClusterName":              hubClusterName,
@@ -286,7 +287,10 @@ func deleteIAMRole(ctx context.Context, cfg aws.Config, roleName string) error {
 	return nil
 }
 
-func getRoleNameAndArn(ctx context.Context, managedCluster *v1.ManagedCluster, cfg aws.Config) (string, string, error) {
+// The IAM role lives in the hub cluster's account, so its ARN has to be built in the
+// same partition as hubClusterArn.
+func getRoleNameAndArn(ctx context.Context, managedCluster *v1.ManagedCluster, cfg aws.Config,
+	hubClusterArn string) (string, string, error) {
 	logger := klog.FromContext(ctx)
 
 	managedClusterIamRoleSuffix :=
@@ -300,7 +304,7 @@ func getRoleNameAndArn(ctx context.Context, managedCluster *v1.ManagedCluster, c
 		return "", "", err
 	}
 	awsAccountId := creds.AccountID
-	roleArn := fmt.Sprintf("arn:aws:iam::%s:role/%s", awsAccountId, roleName)
+	roleArn := commonhelpers.BuildIamRoleArn(commonhelpers.GetAwsPartition(hubClusterArn), awsAccountId, roleName)
 	return roleName, roleArn, err
 }
 

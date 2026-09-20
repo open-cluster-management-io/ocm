@@ -4,7 +4,7 @@
         {
             "Effect": "Allow",
             "Principal": {
-                "AWS": "arn:aws:iam::{{.managedClusterAccountId}}:role/ocm-managed-cluster-{{.managedClusterIamRoleSuffix}}"
+                "AWS": "arn:{{.managedClusterPartition}}:iam::{{.managedClusterAccountId}}:role/ocm-managed-cluster-{{.managedClusterIamRoleSuffix}}"
             },
             "Action": "sts:AssumeRole",
             "Condition": {
