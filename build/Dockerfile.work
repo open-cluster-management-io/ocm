@@ -10,7 +10,11 @@ RUN GOOS=${OS} \
     GO_BUILD_PACKAGES=./cmd/work \
     make build --warn-undefined-variables
 
-FROM registry.access.redhat.com/ubi9/ubi-micro:latest
+# ubi-minimal ships libz.so.1 (and other common shared libraries), which the AWS CLI —
+# mounted at /awscli via an initContainer and spawned by the awsirsa registration
+# driver as an ExecCredential plugin — dynamically links against. On ubi-micro the
+# CLI crashes at startup with "libz.so.1: cannot open shared object file".
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 ENV USER_UID=10001
 
 COPY --from=builder /go/src/open-cluster-management.io/ocm/work /
