@@ -73,7 +73,7 @@ jobs:
           image_digest=$(docker inspect --format='{{index .RepoDigests 0}}' "quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }}" | cut -d'@' -f2)
           echo "IMAGE_DIGEST=${image_digest}" >> $GITHUB_ENV
       - name: Generate SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
         with:
           image: quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }}
           format: 'spdx-json'
@@ -123,7 +123,7 @@ jobs:
           image_digest_release=$(skopeo inspect docker://quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }} | jq -r '.Digest')
           echo "IMAGE_DIGEST_RELEASE=${image_digest_release}" >> $GITHUB_ENV
       - name: Generate SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
         with:
           image: quay.io/open-cluster-management/${{ matrix.image-name }}:${{ needs.env.outputs.RELEASE_VERSION }}
           format: 'spdx-json'
