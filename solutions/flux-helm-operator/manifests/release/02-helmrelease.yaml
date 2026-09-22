@@ -5,7 +5,11 @@ metadata:
   namespace: flux-system
 spec:
   interval: 5m
-  targetNamespace: podinfo
+  # Installed into flux-system (already created by the addon) to keep this
+  # demo to a single ManifestWork. Point targetNamespace elsewhere by adding
+  # that Namespace object ahead of the HelmRelease in its own, earlier-applied
+  # ManifestWork -- see the Notes section in the README.
+  targetNamespace: flux-system
   releaseName: podinfo
   chart:
     spec:

@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fluxcd-addon-manager
+  namespace: fluxcd-addon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fluxcd-addon-manager
+  template:
+    metadata:
+      labels:
+        app: fluxcd-addon-manager
+    spec:
+      serviceAccountName: fluxcd-addon-manager
+      containers:
+        - name: manager
+          # Published, unmodified image from https://github.com/kluster-manager/fluxcd-addon.
+          # Bump this alongside the CRD version referenced in deploy.sh/cleanup.sh.
+          image: ghcr.io/kluster-manager/fluxcd-addon:v0.0.10
+          args:
+            - manager
+            - --enable-leader-election=true
