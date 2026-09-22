@@ -20,9 +20,9 @@ spec:
           type: RuntimeDefault
       containers:
         - name: manager
-          # Published, unmodified image from https://github.com/kluster-manager/fluxcd-addon.
-          # Bump this alongside the CRD version referenced in deploy.sh/cleanup.sh.
-          # Image already runs as USER 65534 (non-root) per its Dockerfile.
+          # This is the published image straight from https://github.com/kluster-manager/fluxcd-addon.
+          # Bump it alongside the CRD version referenced in deploy.sh/cleanup.sh.
+          # The image already runs as USER 65534 (non-root) per its Dockerfile.
           image: ghcr.io/kluster-manager/fluxcd-addon:v0.0.10
           args:
             - manager
