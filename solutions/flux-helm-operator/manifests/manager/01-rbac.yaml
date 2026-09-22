@@ -4,10 +4,8 @@ metadata:
   name: fluxcd-addon-manager
   namespace: fluxcd-addon
 ---
-# The addon-manager reconciles ClusterManagementAddOn/ManagedClusterAddOn,
-# creates ManifestWork for the managed clusters, and approves/signs the
-# agent's registration CSR. cluster-admin is used here for simplicity;
-# scope this down before using outside a demo/dev environment.
+# cluster-admin is used here for simplicity, scope this down before using
+# outside a demo/dev environment. See the Notes section in the README.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:

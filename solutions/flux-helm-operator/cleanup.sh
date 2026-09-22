@@ -11,10 +11,7 @@ crd_url="https://raw.githubusercontent.com/kluster-manager/fluxcd-addon/${versio
 
 kubectl config use-context "${hubctx}"
 
-# Order matters: helm-controller (still running as part of the addon) needs
-# to be alive to run `helm uninstall` and release its finalizer on the
-# HelmRelease. Remove the recipe first and let it fully clear, then disable
-# the addon, then remove the manager.
+# Order matters here, see the Cleanup section in the README.
 echo "Removing the HelmRelease/HelmRepository ManifestWork from ${cluster}"
 kubectl -n "${cluster}" delete manifestwork flux-helmrelease-demo --ignore-not-found --wait --timeout=120s
 
