@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -180,6 +181,62 @@ func (d *daemonSetDecorator) decorate(obj *unstructured.Unstructured) (*unstruct
 	}
 
 	return &unstructured.Unstructured{Object: result}, nil
+}
+
+type statefulSetDecorator struct {
+	logger     klog.Logger
+	decorators []podTemplateSpecDecorator
+}
+
+func newStatefulSetDecorator(
+	logger klog.Logger,
+	addonName string,
+	template *addonapiv1alpha1.AddOnTemplate,
+	orderedValues orderedValues,
+	privateValues addonfactory.Values,
+) decorator {
+	return &statefulSetDecorator{
+		logger: logger,
+		decorators: []podTemplateSpecDecorator{
+			newEnvironmentDecorator(orderedValues),
+			newVolumeDecorator(addonName, template),
+			newNodePlacementDecorator(privateValues),
+			newImageDecorator(privateValues),
+			newProxyHandler(logger, addonName, privateValues),
+			newResourceRequirementsDecorator(logger, supportResourceStatefulset, privateValues),
+		},
+	}
+}
+
+func (d *statefulSetDecorator) decorate(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	statefulSet, err := convertToStatefulSet(obj)
+	// not a statefulset, directly return
+	if err != nil {
+		return obj, nil
+	}
+
+	for _, decorator := range d.decorators {
+		err = decorator.decorate(statefulSet.Name, &statefulSet.Spec.Template)
+		if err != nil {
+			return obj, err
+		}
+	}
+
+	result, err := runtime.DefaultUnstructuredConverter.ToUnstructured(statefulSet)
+	if err != nil {
+		return obj, err
+	}
+
+	return &unstructured.Unstructured{Object: result}, nil
+}
+
+// convertToStatefulSet converts an unstructured object to a StatefulSet.
+func convertToStatefulSet(obj runtime.Object) (*appsv1.StatefulSet, error) {
+	if statefulSet, ok := obj.(*appsv1.StatefulSet); ok {
+		return statefulSet, nil
+	}
+
+	return utils.ConvertTo[appsv1.StatefulSet](obj, appsv1.GroupName, "StatefulSet")
 }
 
 type podTemplateSpecDecorator interface {
@@ -516,8 +573,9 @@ func (d *caBundleDecorator) decorate(name string, pod *corev1.PodTemplateSpec) e
 type supportResource string
 
 const (
-	supportResourceDeployment supportResource = "deployments"
-	supportResourceDaemonset  supportResource = "daemonsets"
+	supportResourceDeployment  supportResource = "deployments"
+	supportResourceDaemonset   supportResource = "daemonsets"
+	supportResourceStatefulset supportResource = "statefulsets"
 )
 
 type resourceRequirementsDecorator struct {

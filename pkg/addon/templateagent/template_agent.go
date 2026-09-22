@@ -189,6 +189,9 @@ func (a *CRDTemplateAgentAddon) renderObjects(
 		if err := object.UnmarshalJSON([]byte(manifestStr)); err != nil {
 			return objects, err
 		}
+		if err := coerceKnownIntFields(object); err != nil {
+			return objects, err
+		}
 
 		object, err = a.decorateObject(template, object, presetValues, privateValues)
 		if err != nil {
@@ -214,6 +217,7 @@ func (a *CRDTemplateAgentAddon) decorateObject(
 	decorators := []decorator{
 		newDeploymentDecorator(a.logger, a.addonName, template, orderedValues, privateValues),
 		newDaemonSetDecorator(a.logger, a.addonName, template, orderedValues, privateValues),
+		newStatefulSetDecorator(a.logger, a.addonName, template, orderedValues, privateValues),
 		newNamespaceDecorator(privateValues),
 	}
 
