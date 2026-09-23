@@ -156,6 +156,7 @@ func TestRenderTemplate(t *testing.T) {
 	data := map[string]interface{}{
 		"hubClusterArn":               "arn:aws:iam::123456789012:cluster/hub-cluster",
 		"managedClusterAccountId":     "123456789013",
+		"managedClusterPartition":     "aws",
 		"managedClusterIamRoleSuffix": "",
 		"hubAccountId":                "123456789012",
 		"hubClusterName":              "hub-cluster",
@@ -177,6 +178,7 @@ func TestRenderTemplate(t *testing.T) {
 	contentstrust := string(TPfilebuf)
 
 	replacer := strings.NewReplacer("{{.managedClusterAccountId}}", data["managedClusterAccountId"].(string),
+		"{{.managedClusterPartition}}", data["managedClusterPartition"].(string),
 		"{{.managedClusterIamRoleSuffix}}", data["managedClusterIamRoleSuffix"].(string),
 		"{{.hubAccountId}}", data["hubAccountId"].(string),
 		"{{.hubClusterName}}", data["hubClusterName"].(string),
@@ -188,6 +190,52 @@ func TestRenderTemplate(t *testing.T) {
 	if trustPolicy != TrustPolicy {
 		t.Errorf("TrustPolicy not rendered as expected")
 		return
+	}
+}
+
+// The trust policy names the managed cluster role as the principal, so it has to be
+// rendered in the managed cluster's own partition -- IAM rejects a cross-partition principal.
+func TestRenderTrustPolicyUsesManagedClusterPartition(t *testing.T) {
+	cases := []struct {
+		name             string
+		partition        string
+		expectedTrustArn string
+	}{
+		{
+			name:             "commercial partition",
+			partition:        "aws",
+			expectedTrustArn: "arn:aws:iam::123456789013:role/ocm-managed-cluster-suffix",
+		},
+		{
+			name:             "govcloud partition",
+			partition:        "aws-us-gov",
+			expectedTrustArn: "arn:aws-us-gov:iam::123456789013:role/ocm-managed-cluster-suffix",
+		},
+		{
+			name:             "iso partition",
+			partition:        "aws-iso",
+			expectedTrustArn: "arn:aws-iso:iam::123456789013:role/ocm-managed-cluster-suffix",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			trustPolicy, err := renderTemplate(trustPolicyTemplatePath, map[string]interface{}{
+				"hubClusterArn":               "arn:" + c.partition + ":eks:us-west-2:123456789012:cluster/hub-cluster",
+				"managedClusterAccountId":     "123456789013",
+				"managedClusterPartition":     c.partition,
+				"managedClusterIamRoleSuffix": "suffix",
+				"hubAccountId":                "123456789012",
+				"hubClusterName":              "hub-cluster",
+				"managedClusterName":          "managed-cluster",
+			})
+			if err != nil {
+				t.Fatalf("failed to render trust policy: %v", err)
+			}
+			if !strings.Contains(trustPolicy, c.expectedTrustArn) {
+				t.Errorf("expected trust policy to contain principal %q, but got:\n%s", c.expectedTrustArn, trustPolicy)
+			}
+		})
 	}
 }
 
@@ -269,7 +317,7 @@ func TestDeleteIAMRoleAndPolicy(t *testing.T) {
 			managedCluster := testinghelpers.NewManagedCluster()
 			managedCluster.Annotations = tt.managedClusterAnnotations
 
-			roleName, _, err := getRoleNameAndArn(tt.args.ctx, managedCluster, cfg)
+			roleName, _, err := getRoleNameAndArn(tt.args.ctx, managedCluster, cfg, "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster")
 			if err != nil {
 				t.Errorf("Error getting role name")
 				return

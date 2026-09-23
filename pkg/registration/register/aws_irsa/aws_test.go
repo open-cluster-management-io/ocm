@@ -51,11 +51,13 @@ func TestBuildKubeconfig(t *testing.T) {
 		caData         []byte
 		clientCertFile string
 		clientKeyFile  string
+		hubClusterArn  string
 		AuthInfoExec   *clientcmdapi.ExecConfig
 	}{
 		{
-			name:   "without proxy",
-			server: "https://127.0.0.1:6443",
+			name:          "without proxy",
+			server:        "https://127.0.0.1:6443",
+			hubClusterArn: util.HubClusterArn,
 			AuthInfoExec: &clientcmdapi.ExecConfig{
 				APIVersion: "client.authentication.k8s.io/v1beta1",
 				Command:    "/awscli/dist/aws",
@@ -70,6 +72,48 @@ func TestBuildKubeconfig(t *testing.T) {
 					"json",
 					"--role",
 					fmt.Sprintf("arn:aws:iam::123456789012:role/ocm-hub-%s", ManagedClusterIAMRoleSuffix),
+				},
+			},
+		},
+		{
+			name:          "hub cluster in the aws-us-gov partition",
+			server:        "https://127.0.0.1:6443",
+			hubClusterArn: "arn:aws-us-gov:eks:us-gov-west-1:123456789012:cluster/hub-cluster1",
+			AuthInfoExec: &clientcmdapi.ExecConfig{
+				APIVersion: "client.authentication.k8s.io/v1beta1",
+				Command:    "/awscli/dist/aws",
+				Args: []string{
+					"--region",
+					"us-gov-west-1",
+					"eks",
+					"get-token",
+					"--cluster-name",
+					"hub-cluster1",
+					"--output",
+					"json",
+					"--role",
+					fmt.Sprintf("arn:aws-us-gov:iam::123456789012:role/ocm-hub-%s", ManagedClusterIAMRoleSuffix),
+				},
+			},
+		},
+		{
+			name:          "hub cluster in the aws-iso partition",
+			server:        "https://127.0.0.1:6443",
+			hubClusterArn: "arn:aws-iso:eks:us-iso-east-1:123456789012:cluster/hub-cluster1",
+			AuthInfoExec: &clientcmdapi.ExecConfig{
+				APIVersion: "client.authentication.k8s.io/v1beta1",
+				Command:    "/awscli/dist/aws",
+				Args: []string{
+					"--region",
+					"us-iso-east-1",
+					"eks",
+					"get-token",
+					"--cluster-name",
+					"hub-cluster1",
+					"--output",
+					"json",
+					"--role",
+					fmt.Sprintf("arn:aws-iso:iam::123456789012:role/ocm-hub-%s", ManagedClusterIAMRoleSuffix),
 				},
 			},
 		},
@@ -98,7 +142,7 @@ func TestBuildKubeconfig(t *testing.T) {
 			}
 
 			registerImpl := &AWSIRSADriver{}
-			registerImpl.hubClusterArn = util.HubClusterArn
+			registerImpl.hubClusterArn = c.hubClusterArn
 			registerImpl.managedClusterRoleSuffix = ManagedClusterIAMRoleSuffix
 			kubeconfig := registerImpl.BuildKubeConfigFromTemplate(bootstrapKubeconfig)
 			currentContext, ok := kubeconfig.Contexts[kubeconfig.CurrentContext]

@@ -159,8 +159,10 @@ func (managedClusterIamRole *ManagedClusterIamRole) arn() string {
 	hubClusterAccountId, hubClusterName := commonhelpers.GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.HubClusterArn)
 	md5HashUniqueIdentifier := commonhelpers.Md5HashSuffix(hubClusterAccountId, hubClusterName, managedClusterAccountId, managedClusterName)
 
-	//arn:aws:iam::<managed-cluster-account-id>:role/ocm-managed-cluster-<md5-hash-unique-identifier>
-	return "arn:aws:iam::" + managedClusterAccountId + ":role/ocm-managed-cluster-" + md5HashUniqueIdentifier
+	//arn:<partition>:iam::<managed-cluster-account-id>:role/ocm-managed-cluster-<md5-hash-unique-identifier>
+	// The role is created in the managed cluster's account, so it inherits that cluster's partition.
+	partition := commonhelpers.GetAwsPartition(managedClusterIamRole.AwsIrsa.ManagedClusterArn)
+	return commonhelpers.BuildIamRoleArn(partition, managedClusterAccountId, "ocm-managed-cluster-"+md5HashUniqueIdentifier)
 }
 
 // klusterletConfig is used to render the template of hub manifests

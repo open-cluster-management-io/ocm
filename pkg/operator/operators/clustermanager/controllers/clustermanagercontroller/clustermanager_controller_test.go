@@ -1783,3 +1783,49 @@ func TestNetworkPolicyFeatureGate(t *testing.T) {
 		})
 	}
 }
+
+func TestGetIdentityCreatorRoleAndTags(t *testing.T) {
+	cases := []struct {
+		name          string
+		hubClusterArn string
+		expected      string
+	}{
+		{
+			name:          "commercial partition",
+			hubClusterArn: "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
+			expected:      "arn:aws:iam::123456789012:role/hub-cluster_managed-cluster-identity-creator",
+		},
+		{
+			name:          "govcloud partition",
+			hubClusterArn: "arn:aws-us-gov:eks:us-gov-west-1:123456789012:cluster/hub-cluster",
+			expected:      "arn:aws-us-gov:iam::123456789012:role/hub-cluster_managed-cluster-identity-creator",
+		},
+		{
+			name:          "iso partition",
+			hubClusterArn: "arn:aws-iso:eks:us-iso-east-1:123456789012:cluster/hub-cluster",
+			expected:      "arn:aws-iso:iam::123456789012:role/hub-cluster_managed-cluster-identity-creator",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cm := operatorapiv1.ClusterManager{
+				Spec: operatorapiv1.ClusterManagerSpec{
+					RegistrationConfiguration: &operatorapiv1.RegistrationHubConfiguration{
+						RegistrationDrivers: []operatorapiv1.RegistrationDriverHub{
+							{
+								AuthType: operatorapiv1.AwsIrsaAuthType,
+								AwsIrsa: &operatorapiv1.AwsIrsaConfig{
+									HubClusterArn: c.hubClusterArn,
+								},
+							},
+						},
+					},
+				},
+			}
+			if roleArn := getIdentityCreatorRoleAndTags(cm); roleArn != c.expected {
+				t.Errorf("expected role arn %q, but got %q", c.expected, roleArn)
+			}
+		})
+	}
+}
