@@ -285,9 +285,10 @@ type CSRConfig struct {
 
 type AwsIrsaConfig struct {
 	// This represents the hub cluster ARN
-	// Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1
+	// Example - arn:aws:eks:us-west-2:123456789010:cluster/hub-cluster1
+	// Non-commercial partitions are supported too, e.g. arn:aws-us-gov:eks:us-gov-west-1:123456789010:cluster/hub-cluster1
 	// +optional
-	// +kubebuilder:validation:Pattern=`^arn:aws:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$`
+	// +kubebuilder:validation:Pattern=`^arn:aws(?:-[a-z0-9]+)*:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$`
 	HubClusterArn string `json:"hubClusterArn,omitempty"`
 
 	// AutoApprovedIdentities represent a list of approved arn patterns
