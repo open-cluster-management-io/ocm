@@ -211,9 +211,17 @@ func (d *deployReconciler) reconcile(
 		mwrSet.Status.Summary.Available = 0
 		mwrSet.Status.Summary.Degraded = 0
 		mwrSet.Status.Summary.Progressing = 0
-		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(workapiv1alpha1.ReasonPlacementDecisionEmpty, ""))
-	} else {
+	}
+	switch {
+	case count > 0:
 		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(workapiv1alpha1.ReasonAsExpected, ""))
+	case len(errs) > 0:
+		// count == 0 with errors means clusters were selected but every apply, or the rollout
+		// computation itself, failed. Report the error instead of a misleading PlacementDecisionEmpty.
+		apimeta.SetStatusCondition(&mwrSet.Status.Conditions,
+			getPlacementDecisionVerified(workapiv1alpha1.ReasonNotAsExpected, aggregatedErrorMessage(errs)))
+	default:
+		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(workapiv1alpha1.ReasonPlacementDecisionEmpty, ""))
 	}
 
 	if total == succeededCount {
@@ -362,6 +370,26 @@ func getPlacementRollOut(reason string, message string) metav1.Condition {
 	}
 
 	return getCondition(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementRolledOut, reason, message, metav1.ConditionFalse)
+}
+
+// maxAggregatedErrorMessageLen caps how much of the aggregated apply/rollout error text is
+// copied into a status condition message, so one reconcile touching many clusters can't blow
+// up the ManifestWorkReplicaSet's status with an unbounded amount of text.
+const maxAggregatedErrorMessageLen = 2048
+
+// aggregatedErrorMessage joins errs the same way utilerrors.NewAggregate does, but truncates
+// the result so a failure affecting many clusters at once still produces a readable condition
+// message instead of one arbitrarily long string.
+func aggregatedErrorMessage(errs []error) string {
+	if len(errs) == 0 {
+		return ""
+	}
+	msg := utilerrors.NewAggregate(errs).Error()
+	if len(msg) <= maxAggregatedErrorMessageLen {
+		return msg
+	}
+	suffix := fmt.Sprintf("... (truncated; %d errors total)", len(errs))
+	return msg[:maxAggregatedErrorMessageLen-len(suffix)] + suffix
 }
 
 func getCondition(conditionType string, reason string, message string, status metav1.ConditionStatus) metav1.Condition {
