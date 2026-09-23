@@ -222,17 +222,19 @@ type RegistrationDriver struct {
 
 type AwsIrsa struct {
 	// The arn of the hub cluster (ie: an EKS cluster). This will be required to pass information to hub, which hub will use to create IAM identities for this klusterlet.
-	// Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1.
+	// Example - arn:aws:eks:us-west-2:123456789010:cluster/hub-cluster1.
+	// Non-commercial partitions are supported too, e.g. arn:aws-us-gov:eks:us-gov-west-1:123456789010:cluster/hub-cluster1.
 	// +required
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Pattern=`^arn:aws:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$`
+	// +kubebuilder:validation:Pattern=`^arn:aws(?:-[a-z0-9]+)*:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$`
 	HubClusterArn string `json:"hubClusterArn"`
 	// The arn of the managed cluster (ie: an EKS cluster). This will be required to generate the md5hash which will be used as a suffix to create IAM role on hub
 	// as well as used by kluslerlet-agent, to assume role suffixed with the md5hash, on startup.
-	// Example - arn:eks:us-west-2:12345678910:cluster/managed-cluster1.
+	// Example - arn:aws:eks:us-west-2:123456789010:cluster/managed-cluster1.
+	// Non-commercial partitions are supported too, e.g. arn:aws-us-gov:eks:us-gov-west-1:123456789010:cluster/managed-cluster1.
 	// +required
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Pattern=`^arn:aws:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$`
+	// +kubebuilder:validation:Pattern=`^arn:aws(?:-[a-z0-9]+)*:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$`
 	ManagedClusterArn string `json:"managedClusterArn"`
 }
 
