@@ -1,0 +1,13 @@
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ClusterManagementAddOn
+metadata:
+  name: fluxcd-addon
+spec:
+  addOnMeta:
+    displayName: fluxcd-addon
+    description: >-
+      Delivers Flux (source-controller, helm-controller, kustomize-controller,
+      notification-controller, image-reflector-controller,
+      image-automation-controller) to managed clusters as an OCM add-on.
+  installStrategy:
+    type: Manual
