@@ -71,6 +71,9 @@ spec:
           - "--workload-source-config=/spoke/hub-kubeconfig/kubeconfig"
           {{end}}
           - "--agent-id={{ .AgentID }}"
+          {{if .HubClusterName}}
+          - "--hub-cluster-name={{ .HubClusterName }}"
+          {{end}}
           {{ if gt (len .WorkFeatureGates) 0 }}
           {{range .WorkFeatureGates}}
           - {{ . }}

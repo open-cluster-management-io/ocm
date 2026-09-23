@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -54,6 +55,7 @@ const (
 	deleteVerb                   = "delete"
 	crdResourceName              = "customresourcedefinitions"
 	hostedKubeconfigCreationTime = "2021-01-02T15:04:05Z"
+	hubClusterNameArgPrefix      = "--hub-cluster-name="
 )
 
 type testController struct {
@@ -395,7 +397,10 @@ func assertKlusterletDeployment(t *testing.T, registrationAuthType string, actio
 		"--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig",
 	}
 
-	expectedArgs = append(expectedArgs, "--agent-id=", "--workload-source-driver=kube", "--workload-source-config=/spoke/hub-kubeconfig/kubeconfig",
+	// --hub-cluster-name is rendered from the hub kubeconfig in hub-kubeconfig-secret, which every
+	// fixture here builds with newKubeConfig.
+	expectedArgs = append(expectedArgs, "--agent-id=", "--hub-cluster-name=test-cluster",
+		"--workload-source-driver=kube", "--workload-source-config=/spoke/hub-kubeconfig/kubeconfig",
 		"--status-sync-interval=60s", "--kube-api-qps=20", "--kube-api-burst=60", "--hub-kube-api-qps=40", "--hub-kube-api-burst=80")
 
 	if serverURL != "" {
@@ -510,6 +515,9 @@ func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, cl
 		"--workload-source-driver=kube",
 		"--workload-source-config=/spoke/hub-kubeconfig/kubeconfig",
 		"--agent-id=",
+		// Rendered from the hub kubeconfig in hub-kubeconfig-secret, which every fixture here
+		// builds with newKubeConfig.
+		"--hub-cluster-name=test-cluster",
 	}
 
 	if helpers.IsHosted(mode) {
@@ -604,7 +612,7 @@ func TestSyncDeploy(t *testing.T) {
 		klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 		bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
 		hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
-		hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+		hubKubeConfigSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
 		namespace := newNamespace("testns")
 		syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
@@ -672,7 +680,7 @@ func TestSyncDeployWithNetworkPolicies(t *testing.T) {
 	)
 	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
 	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
-	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubKubeConfigSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
 	namespace := newNamespace("testns")
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
@@ -721,7 +729,7 @@ func TestSyncDeploySingleton(t *testing.T) {
 		klusterlet.Spec.DeployOption.Mode = operatorapiv1.InstallModeSingleton
 		bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
 		hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
-		hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+		hubKubeConfigSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
 		namespace := newNamespace("testns")
 		syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
@@ -793,7 +801,7 @@ func TestSyncDeployHosted(t *testing.T) {
 	agentNamespace := helpers.AgentNamespace(klusterlet)
 	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, agentNamespace)
 	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, agentNamespace)
-	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubKubeConfigSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
 	// externalManagedSecret := newSecret(helpers.ExternalManagedKubeConfig, agentNamespace)
 	// externalManagedSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	namespace := newNamespace(agentNamespace)
@@ -914,7 +922,7 @@ func TestRemoveOldNamespace(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
 	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
-	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubKubeConfigSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
 	namespace := newNamespace("testns")
 	oldNamespace := newNamespace("oldns")
 	oldNamespace.Labels = map[string]string{
@@ -974,7 +982,7 @@ func TestSyncDisableAddonNamespace(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
 	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
-	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubKubeConfigSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
 	namespace := newNamespace("testns")
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
@@ -1073,7 +1081,7 @@ func TestAWSIrsaAuthInSingletonModeWithInvalidClusterArns(t *testing.T) {
 	klusterlet.Spec.RegistrationConfiguration.RegistrationDriver = awsIrsaRegistrationDriver
 	klusterlet.Spec.DeployOption.Mode = operatorapiv1.InstallModeSingleton
 	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
-	hubSecret.Data["kubeconfig"] = []byte("dummykubeconfig")
+	hubSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
 	hubSecret.Data["cluster-name"] = []byte("cluster1")
 	objects := []runtime.Object{
 		newNamespace("testns"),
@@ -1104,7 +1112,7 @@ func TestAWSIrsaAuthInSingletonMode(t *testing.T) {
 	klusterlet.Spec.RegistrationConfiguration.RegistrationDriver = awsIrsaRegistrationDriver
 	klusterlet.Spec.DeployOption.Mode = operatorapiv1.InstallModeSingleton
 	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
-	hubSecret.Data["kubeconfig"] = []byte("dummykubeconfig")
+	hubSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
 	hubSecret.Data["cluster-name"] = []byte("cluster1")
 	objects := []runtime.Object{
 		newNamespace("testns"),
@@ -1135,7 +1143,7 @@ func TestAWSIrsaAuthInNonSingletonMode(t *testing.T) {
 	}
 	klusterlet.Spec.RegistrationConfiguration.RegistrationDriver = awsIrsaRegistrationDriver
 	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
-	hubSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
 	hubSecret.Data["cluster-name"] = []byte("cluster1")
 	objects := []runtime.Object{
 		newNamespace("testns"),
@@ -1158,7 +1166,7 @@ func TestAWSIrsaAuthInNonSingletonMode(t *testing.T) {
 func TestReplica(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
-	hubSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
 	hubSecret.Data["cluster-name"] = []byte("cluster1")
 	objects := []runtime.Object{
 		newNamespace("testns"),
@@ -1248,7 +1256,7 @@ func TestWorkConfig(t *testing.T) {
 		},
 	}
 	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
-	hubSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
 	hubSecret.Data["cluster-name"] = []byte("cluster1")
 	objects := []runtime.Object{
 		newNamespace("testns"),
@@ -1276,7 +1284,7 @@ func TestClusterNameChange(t *testing.T) {
 	namespace := newNamespace("testns")
 	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
 	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
-	hubSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
 	hubSecret.Data["cluster-name"] = []byte("cluster1")
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
@@ -1364,7 +1372,7 @@ func TestSyncWithPullSecret(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
 	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
-	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubKubeConfigSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
 	namespace := newNamespace("testns")
 	pullSecret := newSecret(helpers.ImagePullSecret, "open-cluster-management")
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
@@ -1472,7 +1480,7 @@ func TestClusterClaimConfigInSingletonMode(t *testing.T) {
 
 	klusterlet.Spec.DeployOption.Mode = operatorapiv1.InstallModeSingleton
 	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
-	hubSecret.Data["kubeconfig"] = []byte("dummykubeconfig")
+	hubSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
 	hubSecret.Data["cluster-name"] = []byte("cluster1")
 	objects := []runtime.Object{
 		newNamespace("testns"),
@@ -1505,7 +1513,11 @@ func TestSyncEnableClusterProperty(t *testing.T) {
 		},
 	}
 
-	objects := []runtime.Object{}
+	// The work agent deployment needs the hub cluster name out of this secret, so the reconcile
+	// cannot get as far as the CRDs without it.
+	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
+	hubKubeConfigSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
+	objects := []runtime.Object{hubKubeConfigSecret}
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
 		objects...)
@@ -1528,13 +1540,49 @@ func TestSyncEnableClusterProperty(t *testing.T) {
 }
 
 func newKubeConfig(host string) []byte {
+	return newKubeConfigWithClusterName("test-cluster", host)
+}
+
+func hubKubeConfigSecret(namespace string, kubeconfig []byte) *corev1.Secret {
+	secret := newSecret(helpers.HubKubeConfig, namespace)
+	secret.Data["kubeconfig"] = kubeconfig
+	return secret
+}
+
+// kubeConfigWithCurrentContext builds a kubeconfig whose current-context names a context that the
+// file does not define.
+func kubeConfigWithCurrentContext(currentContext string) []byte {
+	kubeconfig, _ := runtime.Encode(clientcmdlatest.Codec, &clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{"hub-1": {
+			Server:                "https://hub-1.example.com",
+			InsecureSkipTLSVerify: true,
+		}},
+		Contexts:       map[string]*clientcmdapi.Context{"test-context": {Cluster: "hub-1"}},
+		CurrentContext: currentContext,
+	})
+	return kubeconfig
+}
+
+func findArgWithPrefix(args []string, prefix string) (string, bool) {
+	for _, arg := range args {
+		if strings.HasPrefix(arg, prefix) {
+			return arg, true
+		}
+	}
+	return "", false
+}
+
+// newKubeConfigWithClusterName builds a kubeconfig whose current context points at clusterName.
+// The hub cluster name the work agent logs is read out of exactly this shape, so tests that care
+// about that value name the cluster explicitly.
+func newKubeConfigWithClusterName(clusterName, host string) []byte {
 	configData, _ := runtime.Encode(clientcmdlatest.Codec, &clientcmdapi.Config{
-		Clusters: map[string]*clientcmdapi.Cluster{"test-cluster": {
+		Clusters: map[string]*clientcmdapi.Cluster{clusterName: {
 			Server:                host,
 			InsecureSkipTLSVerify: true,
 		}},
 		Contexts: map[string]*clientcmdapi.Context{"test-context": {
-			Cluster: "test-cluster",
+			Cluster: clusterName,
 		}},
 		CurrentContext: "test-context",
 	})
@@ -2035,7 +2083,7 @@ func TestReportHostingClusterDisabledByDefault(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
 	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
-	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubKubeConfigSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
 	namespace := newNamespace("testns")
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
@@ -2065,7 +2113,7 @@ func TestReportHostingClusterDefaultMode(t *testing.T) {
 	klusterlet.Spec.DeployOption.ReportHostingCluster = operatorapiv1.ReportHostingClusterModeEnable
 	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
 	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
-	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubKubeConfigSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
 	namespace := newNamespace("testns")
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
@@ -2101,7 +2149,7 @@ func TestReportHostingClusterHostedMode(t *testing.T) {
 	agentNamespace := helpers.AgentNamespace(klusterlet)
 	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, agentNamespace)
 	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, agentNamespace)
-	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubKubeConfigSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
 	namespace := newNamespace(agentNamespace)
 	pullSecret := newSecret(helpers.ImagePullSecret, "open-cluster-management")
 
@@ -2142,7 +2190,7 @@ func TestReportHostingClusterHostedModeWithoutManagementClusterName(t *testing.T
 	agentNamespace := helpers.AgentNamespace(klusterlet)
 	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, agentNamespace)
 	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, agentNamespace)
-	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubKubeConfigSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
 	namespace := newNamespace(agentNamespace)
 	pullSecret := newSecret(helpers.ImagePullSecret, "open-cluster-management")
 
@@ -2164,6 +2212,241 @@ func TestReportHostingClusterHostedModeWithoutManagementClusterName(t *testing.T
 	for _, arg := range args {
 		assert.NotEqual(t, "--hosting-cluster-name=cluster1", arg,
 			"must never self-report the target's own ClusterName as its hosting cluster")
+	}
+}
+
+// TestGetHubClusterNameFromSecret covers the lookup that turns the hub kubeconfig stored in
+// hub-kubeconfig-secret into the hub cluster name the work agent stamps on its apply logs.
+func TestGetHubClusterNameFromSecret(t *testing.T) {
+	cases := []struct {
+		name        string
+		secret      *corev1.Secret
+		want        string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:   "cluster of the current context",
+			secret: hubKubeConfigSecret("testns", newKubeConfigWithClusterName("hub-1", "https://hub-1.example.com")),
+			want:   "hub-1",
+		},
+		{
+			name:        "secret is missing",
+			secret:      nil,
+			wantErr:     true,
+			errContains: `secrets "hub-kubeconfig-secret" not found`,
+		},
+		{
+			name:        "secret carries no kubeconfig",
+			secret:      newSecret(helpers.HubKubeConfig, "testns"),
+			wantErr:     true,
+			errContains: "kubeconfig not found in hub-kubeconfig-secret",
+		},
+		{
+			name:        "kubeconfig is empty",
+			secret:      hubKubeConfigSecret("testns", []byte{}),
+			wantErr:     true,
+			errContains: "kubeconfig not found in hub-kubeconfig-secret",
+		},
+		{
+			name:        "kubeconfig does not parse",
+			secret:      hubKubeConfigSecret("testns", []byte("not-a-kubeconfig")),
+			wantErr:     true,
+			errContains: "cannot unmarshal",
+		},
+		{
+			// A kubeconfig whose current-context names a context that is not defined: the cluster
+			// cannot be resolved, so the lookup reports it rather than returning an empty name.
+			name:        "current context is not defined",
+			secret:      hubKubeConfigSecret("testns", kubeConfigWithCurrentContext("missing-context")),
+			wantErr:     true,
+			errContains: "current context not found in hub kubeconfig",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var objects []runtime.Object
+			if c.secret != nil {
+				objects = append(objects, c.secret)
+			}
+			r := &runtimeReconcile{kubeClient: fakekube.NewSimpleClientset(objects...)}
+
+			got, err := r.getHubClusterNameFromSecret(context.TODO(), "testns")
+
+			switch {
+			case c.wantErr && err == nil:
+				t.Fatalf("expected an error, got cluster name %q", got)
+			case c.wantErr && !strings.Contains(err.Error(), c.errContains):
+				t.Fatalf("error %q does not contain %q", err, c.errContains)
+			case !c.wantErr && err != nil:
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != c.want {
+				t.Errorf("hub cluster name = %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
+// TestGetHubClusterNameFromSecretReadsAgentNamespace pins which namespace the lookup reads: the
+// agent namespace it is given, not whichever namespace happens to hold a hub-kubeconfig-secret.
+func TestGetHubClusterNameFromSecretReadsAgentNamespace(t *testing.T) {
+	r := &runtimeReconcile{kubeClient: fakekube.NewSimpleClientset(
+		hubKubeConfigSecret("agentns", newKubeConfigWithClusterName("hub-agentns", "https://hub.example.com")),
+		hubKubeConfigSecret("otherns", newKubeConfigWithClusterName("hub-otherns", "https://hub.example.com")),
+	)}
+
+	got, err := r.getHubClusterNameFromSecret(context.TODO(), "agentns")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "hub-agentns" {
+		t.Errorf("hub cluster name = %q, want hub-agentns", got)
+	}
+}
+
+// TestSyncWorkDeploymentHubClusterName drives a full klusterlet sync and checks the hub cluster
+// name reaches the work agent as a flag. It is deliberately a different name from the one
+// newKubeConfig defaults to, so a hard-coded value cannot pass.
+func TestSyncWorkDeploymentHubClusterName(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	secret := hubKubeConfigSecret("testns", newKubeConfigWithClusterName("hub-east", "https://hub-east.example.com"))
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
+		newSecret(helpers.BootstrapHubKubeConfig, "testns"), secret, newNamespace("testns"))
+
+	if err := controller.controller.sync(context.TODO(), syncContext, "klusterlet"); err != nil {
+		t.Fatalf("Expected non error when sync, %v", err)
+	}
+
+	workDeployment := getDeployments(controller.kubeClient.Actions(), createVerb, "work-agent")
+	if workDeployment == nil {
+		t.Fatal("work deployment not found")
+	}
+	workArgs := workDeployment.Spec.Template.Spec.Containers[0].Args
+	if !slices.Contains(workArgs, hubClusterNameArgPrefix+"hub-east") {
+		t.Errorf("work agent args %v, want %shub-east", workArgs, hubClusterNameArgPrefix)
+	}
+
+	// The flag is only wired into the work agent; the registration agent does not take it.
+	registrationDeployment := getDeployments(controller.kubeClient.Actions(), createVerb, "registration-agent")
+	if registrationDeployment == nil {
+		t.Fatal("registration deployment not found")
+	}
+	if arg, found := findArgWithPrefix(
+		registrationDeployment.Spec.Template.Spec.Containers[0].Args, hubClusterNameArgPrefix); found {
+		t.Errorf("registration agent must not carry %s, got %q", hubClusterNameArgPrefix, arg)
+	}
+}
+
+// TestSyncSingletonAgentHubClusterName is the singleton counterpart: registration and work run in
+// one agent, so the name has to reach that deployment instead of a separate work agent.
+func TestSyncSingletonAgentHubClusterName(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	klusterlet.Spec.DeployOption.Mode = operatorapiv1.InstallModeSingleton
+	secret := hubKubeConfigSecret("testns", newKubeConfigWithClusterName("hub-east", "https://hub-east.example.com"))
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false,
+		newSecret(helpers.BootstrapHubKubeConfig, "testns"), secret, newNamespace("testns"))
+
+	if err := controller.controller.sync(context.TODO(), syncContext, "klusterlet"); err != nil {
+		t.Fatalf("Expected non error when sync, %v", err)
+	}
+
+	deployment := getDeployments(controller.kubeClient.Actions(), createVerb, "klusterlet-agent")
+	if deployment == nil {
+		t.Fatal("singleton agent deployment not found")
+	}
+	args := deployment.Spec.Template.Spec.Containers[0].Args
+	if !slices.Contains(args, hubClusterNameArgPrefix+"hub-east") {
+		t.Errorf("singleton agent args %v, want %shub-east", args, hubClusterNameArgPrefix)
+	}
+}
+
+// TestSyncSingletonAgentWithoutHubKubeConfig covers the bootstrap state the singleton agent has to
+// survive: it is itself the thing that writes hub-kubeconfig-secret, so a missing or unreadable
+// secret must leave it deployed without the flag rather than block its deployment.
+func TestSyncSingletonAgentWithoutHubKubeConfig(t *testing.T) {
+	cases := []struct {
+		name    string
+		objects []runtime.Object
+	}{
+		{
+			name: "hub-kubeconfig-secret is missing",
+			objects: []runtime.Object{
+				newSecret(helpers.BootstrapHubKubeConfig, "testns"), newNamespace("testns")},
+		},
+		{
+			name: "hub kubeconfig does not parse",
+			objects: []runtime.Object{
+				newSecret(helpers.BootstrapHubKubeConfig, "testns"), newNamespace("testns"),
+				hubKubeConfigSecret("testns", []byte("not-a-kubeconfig"))},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+			klusterlet.Spec.DeployOption.Mode = operatorapiv1.InstallModeSingleton
+			syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+			controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false, c.objects...)
+
+			if err := controller.controller.sync(context.TODO(), syncContext, "klusterlet"); err != nil {
+				t.Fatalf("Expected non error when sync, %v", err)
+			}
+
+			deployment := getDeployments(controller.kubeClient.Actions(), createVerb, "klusterlet-agent")
+			if deployment == nil {
+				t.Fatal("singleton agent must be deployed without a hub cluster name")
+			}
+			if arg, found := findArgWithPrefix(
+				deployment.Spec.Template.Spec.Containers[0].Args, hubClusterNameArgPrefix); found {
+				t.Errorf("expected no %s when the hub cluster name is unknown, got %q", hubClusterNameArgPrefix, arg)
+			}
+		})
+	}
+}
+
+// TestSyncDeploysWorkAgentWithoutHubClusterName: an unreadable hub cluster name omits the flag
+// instead of blocking the work agent, which is deployed before hub-kubeconfig-secret exists.
+func TestSyncDeploysWorkAgentWithoutHubClusterName(t *testing.T) {
+	cases := []struct {
+		name    string
+		objects []runtime.Object
+	}{
+		{
+			name: "hub-kubeconfig-secret is missing",
+			objects: []runtime.Object{
+				newSecret(helpers.BootstrapHubKubeConfig, "testns"), newNamespace("testns")},
+		},
+		{
+			name: "hub kubeconfig does not parse",
+			objects: []runtime.Object{
+				newSecret(helpers.BootstrapHubKubeConfig, "testns"), newNamespace("testns"),
+				hubKubeConfigSecret("testns", []byte("not-a-kubeconfig"))},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+			syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+			controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false, c.objects...)
+
+			if err := controller.controller.sync(context.TODO(), syncContext, "klusterlet"); err != nil {
+				t.Fatalf("expected no error when the hub cluster name cannot be read, got %v", err)
+			}
+			deployment := getDeployments(controller.kubeClient.Actions(), createVerb, "work-agent")
+			if deployment == nil {
+				t.Fatal("work deployment not found")
+			}
+			for _, arg := range deployment.Spec.Template.Spec.Containers[0].Args {
+				if strings.HasPrefix(arg, hubClusterNameArgPrefix) {
+					t.Errorf("expected no %s arg, got %v", hubClusterNameArgPrefix, arg)
+				}
+			}
+		})
 	}
 }
 

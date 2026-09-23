@@ -71,6 +71,9 @@ spec:
           - "--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig"
           {{end}}
           - "--agent-id={{ .AgentID }}"
+          {{if .HubClusterName}}
+          - "--hub-cluster-name={{ .HubClusterName }}"
+          {{end}}
           {{if eq .RegistrationDriver.AuthType "grpc"}}
           - "--workload-source-driver=grpc"
           - "--workload-source-config=/spoke/hub-kubeconfig/config.yaml"

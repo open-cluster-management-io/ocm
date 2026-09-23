@@ -26,6 +26,8 @@ type WorkloadAgentOptions struct {
 
 	WorkloadAgentWorkers int
 
+	HubClusterName string
+
 	ObjectReaderOption *objectreader.Options
 }
 
@@ -62,6 +64,9 @@ func (o *WorkloadAgentOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.IntVar(&o.WorkloadAgentWorkers, "workload-agent-workers",
 		o.WorkloadAgentWorkers, "The number of workers for the workload agent controllers")
+
+	fs.StringVar(&o.HubClusterName, "hub-cluster-name",
+		o.HubClusterName, "Name of the hub cluster, included in apply logs for correlation.")
 
 	o.ObjectReaderOption.AddFlags(fs)
 }

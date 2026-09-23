@@ -125,10 +125,11 @@ func TestPriorAppliedGeneration(t *testing.T) {
 
 func testWorkMeta() workMeta {
 	return workMeta{
-		name:       "demo-mw",
-		namespace:  "cluster1",
-		generation: 7,
-		labels:     map[string]string{"example.com/team": "platform"},
+		name:           "demo-mw",
+		namespace:      "cluster1",
+		generation:     7,
+		labels:         map[string]string{"example.com/team": "platform"},
+		hubClusterName: "hub-cluster1",
 	}
 }
 
@@ -192,6 +193,7 @@ func TestEmitResourceApply_FirstApplySuccess(t *testing.T) {
 	assertKV(t, kv, "flow", flowResourceSpokeApply)
 	assertKV(t, kv, "mw_name", "demo-mw")
 	assertKV(t, kv, "mw_namespace", "cluster1")
+	assertKV(t, kv, "hub_cluster_name", "hub-cluster1")
 	assertKV(t, kv, "generation", int64(7))
 	assertKV(t, kv, "applied_kind", "ConfigMap")
 	assertKV(t, kv, "applied_name", "cm1")
@@ -310,6 +312,70 @@ func TestEmitApplyRollup_End(t *testing.T) {
 	assertKV(t, kv, "failed_count", 1)
 	assertKV(t, kv, "read_only_count", 3)
 	assertKV(t, kv, "outcome", "partial")
+}
+
+// TestEmittedLinesCarryHubClusterName pins the hub cluster name on every apply-log line, so a
+// spoke attached to more than one hub stays correlatable: the per-resource line, the rollup start
+// line, and the rollup end line all carry it.
+func TestEmittedLinesCarryHubClusterName(t *testing.T) {
+	ctx, entries := captureContext()
+	emitResourceApply(ctx, true, true, testWorkMeta(), testManifest(),
+		workapiv1.UpdateStrategyTypeUpdate, applyResult{Result: &unstructured.Unstructured{}}, "")
+	emitApplyRollup(ctx, testWorkMeta(), flowSpokeApply, 1, nil)
+	emitApplyRollup(ctx, testWorkMeta(), flowSpokeApplyResult, 1, &applyCounts{applied: 1})
+
+	if len(*entries) != 3 {
+		t.Fatalf("expected 3 logs, got %d", len(*entries))
+	}
+	for _, e := range *entries {
+		assertKV(t, e.kv, "hub_cluster_name", "hub-cluster1")
+	}
+}
+
+// TestEmitLinesWithoutHubClusterName covers an agent started without --hub-cluster-name: the key
+// is still emitted, empty, rather than the line losing a field consumers index on.
+func TestEmitLinesWithoutHubClusterName(t *testing.T) {
+	ctx, entries := captureContext()
+	wm := testWorkMeta()
+	wm.hubClusterName = ""
+	emitResourceApply(ctx, true, true, wm, testManifest(),
+		workapiv1.UpdateStrategyTypeUpdate, applyResult{Result: &unstructured.Unstructured{}}, "")
+	emitApplyRollup(ctx, wm, flowSpokeApply, 1, nil)
+
+	if len(*entries) != 2 {
+		t.Fatalf("expected 2 logs, got %d", len(*entries))
+	}
+	for _, e := range *entries {
+		assertKV(t, e.kv, "hub_cluster_name", "")
+	}
+}
+
+// TestReconcileStampsHubClusterName drives a full reconcile and asserts the name the agent was
+// configured with reaches the emitted lines, covering the reconciler's hop into workMeta.
+func TestReconcileStampsHubClusterName(t *testing.T) {
+	setApplyLogsGate(t, true)
+	defer setApplyLogsGate(t, false)
+	resetRollupState(t)
+
+	work, workKey := newTestCase("hub-name").
+		withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test")).
+		newManifestWork()
+	controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
+		withKubeObject().withUnstructuredObject()
+	controller.mwReconciler.hubClusterName = "hub-east"
+	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
+
+	ctx, entries := captureContext()
+	if err := controller.toController().sync(ctx, syncContext, work.Name); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+
+	if len(*entries) == 0 {
+		t.Fatal("expected apply-log lines, got none")
+	}
+	for _, e := range *entries {
+		assertKV(t, e.kv, "hub_cluster_name", "hub-east")
+	}
 }
 
 func assertKV(t *testing.T, kv map[string]any, key string, want any) {

@@ -102,9 +102,10 @@ var resourceApplyOrder = map[string]int{
 }
 
 type manifestworkReconciler struct {
-	restMapper meta.RESTMapper
-	appliers   *apply.Appliers
-	validator  auth.ExecutorValidator
+	restMapper     meta.RESTMapper
+	appliers       *apply.Appliers
+	validator      auth.ExecutorValidator
+	hubClusterName string
 }
 
 func (m *manifestworkReconciler) reconcile(
@@ -121,10 +122,11 @@ func (m *manifestworkReconciler) reconcile(
 	// line is emitted deep in applyOneManifest; the two work-level rollup lines are emitted here, once
 	// per generation, gated on the persisted WorkApplied.ObservedGeneration (restart-safe).
 	wm := workMeta{
-		name:       manifestWork.Name,
-		namespace:  manifestWork.Namespace,
-		generation: manifestWork.Generation,
-		labels:     manifestWork.Labels,
+		name:           manifestWork.Name,
+		namespace:      manifestWork.Namespace,
+		generation:     manifestWork.Generation,
+		labels:         manifestWork.Labels,
+		hubClusterName: m.hubClusterName,
 	}
 	logApply := features.SpokeMutableFeatureGate.Enabled(ocmfeature.ManifestWorkApplyLogs)
 	// emittedRollups.admit records, so it stays last: the checks before it decide whether this

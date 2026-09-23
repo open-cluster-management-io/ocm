@@ -66,10 +66,11 @@ const (
 // workMeta carries the ManifestWork identity down to the per-resource apply emit, which runs
 // deep in applyOneManifest where the ManifestWork object itself is no longer in scope.
 type workMeta struct {
-	name       string
-	namespace  string
-	generation int64
-	labels     map[string]string
+	name           string
+	namespace      string
+	generation     int64
+	labels         map[string]string
+	hubClusterName string
 }
 
 // applyCounts is the per-generation apply tally carried by the rollup end line.
@@ -237,6 +238,7 @@ func emitResourceApply(ctx context.Context, logApply, firstApply bool, wm workMe
 		"flow", flow,
 		"mw_name", wm.name,
 		"mw_namespace", wm.namespace,
+		"hub_cluster_name", wm.hubClusterName,
 		"generation", wm.generation,
 		"applied_kind", om.resourceMeta.Kind,
 		"applied_name", om.resourceMeta.Name,
@@ -262,6 +264,7 @@ func emitApplyRollup(ctx context.Context, wm workMeta, flow string, resourceCoun
 		"flow", flow,
 		"mw_name", wm.name,
 		"mw_namespace", wm.namespace,
+		"hub_cluster_name", wm.hubClusterName,
 		"generation", wm.generation,
 		"resource_count", resourceCount,
 		"ts_utc", now.Format(applyLogTimeFormat),

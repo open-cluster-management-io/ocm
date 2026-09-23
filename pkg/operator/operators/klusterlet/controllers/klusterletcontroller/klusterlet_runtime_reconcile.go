@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
@@ -91,6 +92,9 @@ func (r *runtimeReconcile) installAgent(ctx context.Context, klusterlet *operato
 		}
 	}
 
+	// The secret is absent until registration completes; the agent picks the name up on a later reconcile.
+	workConfig.HubClusterName, _ = r.getHubClusterNameFromSecret(ctx, runtimeConfig.AgentNamespace)
+
 	// Deploy work agent.
 	// * work agent is scaled to 0 only when degrade is true with the reason is HubKubeConfigSecretMissing.
 	//   It is to ensure a fast startup of work agent when the klusterlet is bootstrapped at the first time.
@@ -155,6 +159,9 @@ func (r *runtimeReconcile) installSingletonAgent(ctx context.Context, klusterlet
 			return klusterlet, reconcileStop, err
 		}
 	}
+
+	config.HubClusterName, _ = r.getHubClusterNameFromSecret(ctx, config.AgentNamespace)
+
 	// Deploy singleton agent
 	_, generationStatus, err := helpers.ApplyDeployment(
 		ctx,
@@ -232,6 +239,26 @@ func (r *runtimeReconcile) getClusterNameFromHubKubeConfigSecret(ctx context.Con
 		return "", fmt.Errorf("the cluster name in the secret is empty")
 	}
 	return string(clusterName), nil
+}
+
+func (r *runtimeReconcile) getHubClusterNameFromSecret(ctx context.Context, namespace string) (string, error) {
+	hubSecret, err := r.kubeClient.CoreV1().Secrets(namespace).Get(ctx, helpers.HubKubeConfig, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	kubeconfigData := hubSecret.Data["kubeconfig"]
+	if len(kubeconfigData) == 0 {
+		return "", fmt.Errorf("kubeconfig not found in hub-kubeconfig-secret")
+	}
+	config, err := clientcmd.Load(kubeconfigData)
+	if err != nil {
+		return "", err
+	}
+	ctxObj, ok := config.Contexts[config.CurrentContext]
+	if !ok || ctxObj == nil {
+		return "", fmt.Errorf("current context not found in hub kubeconfig")
+	}
+	return ctxObj.Cluster, nil
 }
 
 func (r *runtimeReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
