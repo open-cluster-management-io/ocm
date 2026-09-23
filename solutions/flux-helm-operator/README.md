@@ -52,7 +52,22 @@ Check that the chart got reconciled and installed locally by the managed cluster
 controllers:
 
 ```shell
-kubectl --context <managed-cluster-context> -n flux-system get helmrepository,helmrelease,pods
+$ kubectl --context <managed-cluster-context> -n flux-system get helmrepository,helmrelease,pods
+NAME                                              URL                                      AGE   READY   STATUS
+helmrepository.source.toolkit.fluxcd.io/podinfo   https://stefanprodan.github.io/podinfo   16s   True    stored artifact: revision 'sha256:e7dc68a4...'
+
+NAME                                         AGE   READY   STATUS
+helmrelease.helm.toolkit.fluxcd.io/podinfo   16s   True    Helm install succeeded for release flux-system/podinfo.v1 with chart podinfo@6.15.0
+
+NAME                                          READY   STATUS      RESTARTS   AGE
+fluxcd-addon-flux-check-k694v                 0/1     Completed   0          105s
+helm-controller-5cd495db64-n2wvv              1/1     Running     0          105s
+image-automation-controller-996f6f87c-wlln8   1/1     Running     0          105s
+image-reflector-controller-5697d54567-bw498   1/1     Running     0          105s
+kustomize-controller-6c5cb76cd7-dblqg         1/1     Running     0          105s
+notification-controller-5dff57c596-s7gc4      1/1     Running     0          105s
+podinfo-6596c8f79c-nfjj8                      1/1     Running     0          14s
+source-controller-68bbb7669d-tm89f            1/1     Running     0          105s
 ```
 
 ## Or just run the script
