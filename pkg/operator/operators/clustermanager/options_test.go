@@ -3,6 +3,7 @@ package clustermanager
 import (
 	"context"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
@@ -56,10 +57,13 @@ var _ = ginkgo.AfterSuite(func() {
 var _ = ginkgo.Describe("start cluster manager", func() {
 	ginkgo.It("start hub manager", func() {
 		ctx, stopHub := context.WithCancel(context.Background())
+		var wg sync.WaitGroup
+		wg.Add(1)
 
 		// start hub controller
 		go func() {
 			defer ginkgo.GinkgoRecover()
+			defer wg.Done()
 			o := &Options{ImagePullSecretName: "my-registry-secret"}
 			err := o.RunClusterManagerOperator(ctx, &controllercmd.ControllerContext{
 				KubeConfig:        cfg,
@@ -69,5 +73,7 @@ var _ = ginkgo.Describe("start cluster manager", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		}()
 		stopHub()
+		// Wait so AfterSuite does not stop envtest while ServerVersion is still dialing.
+		wg.Wait()
 	})
 })
