@@ -2408,11 +2408,9 @@ func TestSyncSingletonAgentWithoutHubKubeConfig(t *testing.T) {
 	}
 }
 
-// TestSyncFailsWhenHubClusterNameUnavailable pins the non-singleton failure semantics: when the
-// hub cluster name cannot be read, the reconcile stops with the error instead of deploying a work
-// agent whose apply logs would be missing the hub it is attached to. The registration agent is
-// applied before this point, so it still goes out and eventually writes hub-kubeconfig-secret.
-func TestSyncFailsWhenHubClusterNameUnavailable(t *testing.T) {
+// TestSyncDeploysWorkAgentWithoutHubClusterName: an unreadable hub cluster name omits the flag
+// instead of blocking the work agent, which is deployed before hub-kubeconfig-secret exists.
+func TestSyncDeploysWorkAgentWithoutHubClusterName(t *testing.T) {
 	cases := []struct {
 		name    string
 		objects []runtime.Object
@@ -2436,12 +2434,17 @@ func TestSyncFailsWhenHubClusterNameUnavailable(t *testing.T) {
 			syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 			controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false, c.objects...)
 
-			err := controller.controller.sync(context.TODO(), syncContext, "klusterlet")
-			if err == nil {
-				t.Fatal("expected sync to fail when the hub cluster name cannot be read")
+			if err := controller.controller.sync(context.TODO(), syncContext, "klusterlet"); err != nil {
+				t.Fatalf("expected no error when the hub cluster name cannot be read, got %v", err)
 			}
-			if deployment := getDeployments(controller.kubeClient.Actions(), createVerb, "work-agent"); deployment != nil {
-				t.Error("work agent must not be deployed without a hub cluster name")
+			deployment := getDeployments(controller.kubeClient.Actions(), createVerb, "work-agent")
+			if deployment == nil {
+				t.Fatal("work deployment not found")
+			}
+			for _, arg := range deployment.Spec.Template.Spec.Containers[0].Args {
+				if strings.HasPrefix(arg, hubClusterNameArgPrefix) {
+					t.Errorf("expected no %s arg, got %v", hubClusterNameArgPrefix, arg)
+				}
 			}
 		})
 	}

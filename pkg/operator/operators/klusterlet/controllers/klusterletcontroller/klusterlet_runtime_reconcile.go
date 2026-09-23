@@ -92,11 +92,8 @@ func (r *runtimeReconcile) installAgent(ctx context.Context, klusterlet *operato
 		}
 	}
 
-	// Extract hub cluster name from the kubeconfig in the hub-kubeconfig-secret.
-	workConfig.HubClusterName, err = r.getHubClusterNameFromSecret(ctx, runtimeConfig.AgentNamespace)
-	if err != nil {
-		return klusterlet, reconcileStop, err
-	}
+	// The secret is absent until registration completes; the agent picks the name up on a later reconcile.
+	workConfig.HubClusterName, _ = r.getHubClusterNameFromSecret(ctx, runtimeConfig.AgentNamespace)
 
 	// Deploy work agent.
 	// * work agent is scaled to 0 only when degrade is true with the reason is HubKubeConfigSecretMissing.
@@ -163,11 +160,6 @@ func (r *runtimeReconcile) installSingletonAgent(ctx context.Context, klusterlet
 		}
 	}
 
-	// Extract hub cluster name from the kubeconfig in the hub-kubeconfig-secret. Unlike the
-	// non-singleton path, a failure here cannot stop the deployment: this agent is the one that
-	// creates hub-kubeconfig-secret, so waiting for the secret before deploying it would never
-	// resolve. The agent runs without the name until the secret exists, and picks it up on a
-	// later reconcile.
 	config.HubClusterName, _ = r.getHubClusterNameFromSecret(ctx, config.AgentNamespace)
 
 	// Deploy singleton agent
