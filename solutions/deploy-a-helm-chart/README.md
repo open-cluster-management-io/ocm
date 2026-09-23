@@ -10,7 +10,9 @@
 > For deploying Helm charts (or any application) across a fleet of clusters today, use one
 > of the Argo CD solutions instead: [`deploy-argocd-apps`](../deploy-argocd-apps) (push
 > model), [`deploy-argocd-apps-pull`](../deploy-argocd-apps-pull) (basic pull model), or
-> [`argocd-agent`](../argocd-agent) (advanced pull model).
+> [`argocd-agent`](../argocd-agent) (advanced pull model). If you want each managed cluster
+> to reconcile its own `HelmRelease` locally instead, see
+> [`flux-helm-operator`](../flux-helm-operator).
 
 ## Prerequisite
 

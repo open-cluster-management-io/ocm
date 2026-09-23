@@ -3,6 +3,7 @@ package klusterlet
 import (
 	"context"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
@@ -55,10 +56,13 @@ var _ = ginkgo.AfterSuite(func() {
 var _ = ginkgo.Describe("start klusterlet", func() {
 	ginkgo.It("start klusterlet", func() {
 		ctx, stopKlusterlet := context.WithCancel(context.Background())
+		var wg sync.WaitGroup
+		wg.Add(1)
 
 		// start hub controller
 		go func() {
 			defer ginkgo.GinkgoRecover()
+			defer wg.Done()
 			o := &Options{EnableSyncLabels: true}
 			err := o.RunKlusterletOperator(ctx, &controllercmd.ControllerContext{
 				KubeConfig:    cfg,
@@ -67,5 +71,7 @@ var _ = ginkgo.Describe("start klusterlet", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		}()
 		stopKlusterlet()
+		// Wait so AfterSuite does not stop envtest while ServerVersion is still dialing.
+		wg.Wait()
 	})
 })

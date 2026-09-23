@@ -575,7 +575,8 @@ func getIdentityCreatorRoleAndTags(cm operatorapiv1.ClusterManager) string {
 			if registrationDriver.AuthType == operatorapiv1.AwsIrsaAuthType && registrationDriver.AwsIrsa != nil {
 				hubClusterArn := registrationDriver.AwsIrsa.HubClusterArn
 				hubClusterAccountId, hubClusterName := commonhelper.GetAwsAccountIdAndClusterName(hubClusterArn)
-				return "arn:aws:iam::" + hubClusterAccountId + ":role/" + hubClusterName + "_managed-cluster-identity-creator"
+				return commonhelper.BuildIamRoleArn(commonhelper.GetAwsPartition(hubClusterArn), hubClusterAccountId,
+					hubClusterName+"_managed-cluster-identity-creator")
 			}
 		}
 	}

@@ -236,19 +236,29 @@ var _ = ginkgo.BeforeSuite(func() {
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	// start hub controller
-	var ctx context.Context
-
 	hubOption = hub.NewHubManagerOptions()
 	hubOption.EnabledRegistrationDrivers = []string{operatorv1.CSRAuthType}
 	hubOption.ClusterAutoApprovalUsers = []string{util.AutoApprovalBootstrapUser}
 
+	// Each hub owns its context, and stopHub waits for that hub's manager to return.
+	// A context shared between calls is read by the hub goroutine only once it is
+	// scheduled, so a hub started right before the next startHub call could pick up
+	// the next hub's context and survive the stopHub() meant for it. Two hubs then
+	// reconcile the same clusters, and a hub whose driver accepts every cluster
+	// approves clusters the test expects to stay unapproved.
 	startHub = func(m *hub.HubManagerOptions) {
-		ctx, stopHub = context.WithCancel(context.Background())
+		hubCtx, cancelHub := context.WithCancel(context.Background())
+		hubStopped := make(chan struct{})
+		stopHub = func() {
+			cancelHub()
+			<-hubStopped
+		}
 		go func() {
 			defer ginkgo.GinkgoRecover()
+			defer close(hubStopped)
 			m.ImportOption.APIServerURL = cfg.Host
 			m.ImportOption.ImporterRenderers = []string{importoptions.RenderFromConfigSecret}
-			err := m.RunControllerManager(ctx, &controllercmd.ControllerContext{
+			err := m.RunControllerManager(hubCtx, &controllercmd.ControllerContext{
 				KubeConfig:    cfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
 			})
@@ -269,8 +279,9 @@ var _ = ginkgo.BeforeSuite(func() {
 	proxyCertData, proxyKeyData, err := authn.SignServerCert("proxyserver", 24*time.Hour)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	proxyServer := util.NewProxyServer(proxyCertData, proxyKeyData)
-	ctx, stopProxy = context.WithCancel(context.Background())
-	err = proxyServer.Start(ctx, 5*time.Second)
+	var proxyCtx context.Context
+	proxyCtx, stopProxy = context.WithCancel(context.Background())
+	err = proxyServer.Start(proxyCtx, 5*time.Second)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	httpProxyURL = proxyServer.HTTPProxyURL

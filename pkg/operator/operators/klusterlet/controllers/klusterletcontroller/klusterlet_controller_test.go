@@ -2449,3 +2449,46 @@ func TestSyncDeploysWorkAgentWithoutHubClusterName(t *testing.T) {
 		})
 	}
 }
+
+func TestManagedClusterIamRoleArn(t *testing.T) {
+	cases := []struct {
+		name              string
+		hubClusterArn     string
+		managedClusterArn string
+		expectedPrefix    string
+	}{
+		{
+			name:              "commercial partition",
+			hubClusterArn:     "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1",
+			managedClusterArn: "arn:aws:eks:us-west-2:123456789013:cluster/managed-cluster1",
+			expectedPrefix:    "arn:aws:iam::123456789013:role/ocm-managed-cluster-",
+		},
+		{
+			name:              "govcloud partition",
+			hubClusterArn:     "arn:aws-us-gov:eks:us-gov-west-1:123456789012:cluster/hub-cluster1",
+			managedClusterArn: "arn:aws-us-gov:eks:us-gov-west-1:123456789013:cluster/managed-cluster1",
+			expectedPrefix:    "arn:aws-us-gov:iam::123456789013:role/ocm-managed-cluster-",
+		},
+		{
+			name:              "iso partition",
+			hubClusterArn:     "arn:aws-iso:eks:us-iso-east-1:123456789012:cluster/hub-cluster1",
+			managedClusterArn: "arn:aws-iso:eks:us-iso-east-1:123456789013:cluster/managed-cluster1",
+			expectedPrefix:    "arn:aws-iso:iam::123456789013:role/ocm-managed-cluster-",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			managedClusterIamRole := &ManagedClusterIamRole{
+				AwsIrsa: &AwsIrsa{
+					HubClusterArn:     c.hubClusterArn,
+					ManagedClusterArn: c.managedClusterArn,
+				},
+			}
+			roleArn := managedClusterIamRole.arn()
+			if !strings.HasPrefix(roleArn, c.expectedPrefix) {
+				t.Errorf("expected role arn to start with %q, but got %q", c.expectedPrefix, roleArn)
+			}
+		})
+	}
+}

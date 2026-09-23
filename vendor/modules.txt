@@ -1954,7 +1954,7 @@ open-cluster-management.io/addon-framework/pkg/agent/v1alpha1
 open-cluster-management.io/addon-framework/pkg/assets
 open-cluster-management.io/addon-framework/pkg/index
 open-cluster-management.io/addon-framework/pkg/utils
-# open-cluster-management.io/api v1.3.1-0.20260826151356-f3f2452d45ee
+# open-cluster-management.io/api v1.3.1-0.20260923113347-1f6022a6817f
 ## explicit; go 1.26.0
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/addon/v1beta1

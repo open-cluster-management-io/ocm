@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fluxcd-addon-manager
+  namespace: fluxcd-addon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fluxcd-addon-manager
+  template:
+    metadata:
+      labels:
+        app: fluxcd-addon-manager
+    spec:
+      serviceAccountName: fluxcd-addon-manager
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: manager
+          # Bump this alongside the CRD version referenced in deploy.sh/cleanup.sh.
+          # Already runs as USER 65534 (non-root) in its own Dockerfile, so
+          # runAsNonRoot above works without extra changes.
+          image: ghcr.io/kluster-manager/fluxcd-addon:v0.0.10
+          args:
+            - manager
+            - --enable-leader-election=true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL

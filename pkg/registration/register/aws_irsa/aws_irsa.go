@@ -72,6 +72,7 @@ func (c *AWSIRSADriver) Process(
 func (c *AWSIRSADriver) BuildKubeConfigFromTemplate(kubeConfig *clientcmdapi.Config) *clientcmdapi.Config {
 	hubClusterAccountId, hubClusterName := helpers.GetAwsAccountIdAndClusterName(c.hubClusterArn)
 	awsRegion := helpers.GetAwsRegion(c.hubClusterArn)
+	awsPartition := helpers.GetAwsPartition(c.hubClusterArn)
 	kubeConfig.AuthInfos = map[string]*clientcmdapi.AuthInfo{register.DefaultKubeConfigAuth: {
 		Exec: &clientcmdapi.ExecConfig{
 			APIVersion: "client.authentication.k8s.io/v1beta1",
@@ -86,7 +87,7 @@ func (c *AWSIRSADriver) BuildKubeConfigFromTemplate(kubeConfig *clientcmdapi.Con
 				"--output",
 				"json",
 				"--role",
-				fmt.Sprintf("arn:aws:iam::%s:role/ocm-hub-%s", hubClusterAccountId, c.managedClusterRoleSuffix),
+				helpers.BuildIamRoleArn(awsPartition, hubClusterAccountId, fmt.Sprintf("ocm-hub-%s", c.managedClusterRoleSuffix)),
 			},
 		},
 	}}
