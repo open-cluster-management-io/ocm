@@ -1,6 +1,7 @@
 package options
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -8,8 +9,12 @@ import (
 
 	"github.com/spf13/pflag"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -112,7 +117,7 @@ func (o *AgentOptions) Complete() error {
 //   1. Use cluster name from input arguments if 'spoke-cluster-name' is specified;
 //   2. Parse cluster name from the common name of the certification subject if the certification exists;
 //   3. Fallback to cluster name in the mounted secret if it exists;
-//   4. TODO: Read cluster name from openshift struct if the agent is running in an openshift cluster;
+//   4. ClusterName is populated from OpenShift cluster info during AgentOptions initialization;
 //   5. Generate a random cluster name then;
 
 // Rules for picking up agent id:
@@ -128,18 +133,23 @@ func (o *AgentOptions) getOrGenerateClusterAgentID() (string, string) {
 	clusterName := o.SpokeClusterName
 	// if cluster name is not specified with input argument, try to load it from file
 	if clusterName == "" {
-		// TODO, read cluster name from openshift struct if the spoke agent is running in an openshift cluster
+		// read cluster name from openshift struct if the spoke agent is running in an openshift cluster
+		if name := o.tryReadOpenShiftClusterName(); name != "" {
+			clusterName = name
+		}
 
-		// and then load the cluster name from the mounted secret
-		clusterNameFilePath := path.Join(o.HubKubeconfigDir, register.ClusterNameFile)
-		clusterNameBytes, err := os.ReadFile(path.Clean(clusterNameFilePath))
-		switch {
-		case err == nil:
-			// use cluster name load from the mounted secret
-			clusterName = string(clusterNameBytes)
-		default:
-			// generate random cluster name
-			clusterName = generateClusterName()
+		if clusterName == "" {
+			// and then load the cluster name from the mounted secret
+			clusterNameFilePath := path.Join(o.HubKubeconfigDir, register.ClusterNameFile)
+			clusterNameBytes, err := os.ReadFile(path.Clean(clusterNameFilePath))
+			switch {
+			case err == nil:
+				// use cluster name load from the mounted secret
+				clusterName = string(clusterNameBytes)
+			default:
+				// generate random cluster name
+				clusterName = generateClusterName()
+			}
 		}
 	}
 
@@ -169,4 +179,33 @@ func generateClusterName() string {
 // generateAgentName generates a random name for spoke cluster agent
 func generateAgentName() string {
 	return utilrand.String(spokeAgentNameLength)
+}
+
+func (o *AgentOptions) tryReadOpenShiftClusterName() string {
+	config, err := clientcmd.BuildConfigFromFlags("", o.SpokeKubeconfigFile)
+	if err != nil {
+		return ""
+	}
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return ""
+	}
+	return detectOpenShiftClusterName(dynamicClient)
+}
+
+func detectOpenShiftClusterName(client dynamic.Interface) string {
+	infra, err := client.Resource(schema.GroupVersionResource{
+		Group:    "config.openshift.io",
+		Version:  "v1",
+		Resource: "infrastructures",
+	}).Get(context.TODO(), "cluster", metav1.GetOptions{})
+	if err != nil {
+		return ""
+	}
+
+	infraName, found, err := unstructured.NestedString(infra.Object, "status", "infrastructureName")
+	if err != nil || !found {
+		return ""
+	}
+	return infraName
 }
