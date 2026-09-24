@@ -107,6 +107,21 @@ func (b *PlacementBuilder) WithDeletionTimestamp() *PlacementBuilder {
 	return b
 }
 
+func (b *PlacementBuilder) WithSortBy(sortBy clusterapiv1beta1.PlacementSortByType) *PlacementBuilder {
+	b.placement.Spec.SortBy = sortBy
+	return b
+}
+
+func (b *PlacementBuilder) WithScoreRateLimit(scoreRateLimit string) *PlacementBuilder {
+	b.placement.Spec.ScoreRateLimit = scoreRateLimit
+	return b
+}
+
+func (b *PlacementBuilder) WithLastSoreUpdateTime(lastScoreUpdateTime metav1.Time) *PlacementBuilder {
+	b.placement.Status.LastScoreUpdateTime = &lastScoreUpdateTime
+	return b
+}
+
 func (b *PlacementBuilder) AddPredicate(
 	labelSelector *metav1.LabelSelector,
 	claimSelector *clusterapiv1beta1.ClusterClaimSelector,
@@ -199,6 +214,7 @@ func NewClusterPredicate(
 
 type PlacementDecisionBuilder struct {
 	placementDecision *clusterapiv1beta1.PlacementDecision
+	scores            map[string]int64
 }
 
 func NewPlacementDecision(namespace, name string) *PlacementDecisionBuilder {
@@ -235,11 +251,25 @@ func (b *PlacementDecisionBuilder) WithDeletionTimestamp() *PlacementDecisionBui
 	return b
 }
 
+func (b *PlacementDecisionBuilder) WithScores(scores map[string]int64) *PlacementDecisionBuilder {
+	b.scores = scores
+
+	if b.placementDecision != nil {
+		for i, decision := range b.placementDecision.Status.Decisions {
+			if score, ok := b.scores[decision.ClusterName]; ok {
+				b.placementDecision.Status.Decisions[i].Score = score
+			}
+		}
+	}
+	return b
+}
+
 func (b *PlacementDecisionBuilder) WithDecisions(clusterNames ...string) *PlacementDecisionBuilder {
 	var decisions []clusterapiv1beta1.ClusterDecision
 	for _, clusterName := range clusterNames {
 		decisions = append(decisions, clusterapiv1beta1.ClusterDecision{
 			ClusterName: clusterName,
+			Score:       b.scores[clusterName],
 		})
 	}
 	b.placementDecision.Status.Decisions = decisions
