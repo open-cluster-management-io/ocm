@@ -111,6 +111,13 @@ spec:
                   - url
                   type: object
                 type: array
+              healthCheckPort:
+                description: |-
+                  healthCheckPort is the port on which the agent health check endpoint is served.
+                  When using hostNetwork, this port must be unique on the node. If not set or 0,
+                  the default port 8443 is used.
+                format: int32
+                type: integer
               hubApiServerHostAlias:
                 description: |-
                   HubApiServerHostAlias contains the host alias for hub api server.
