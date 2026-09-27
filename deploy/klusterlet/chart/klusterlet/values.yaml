@@ -163,6 +163,27 @@ klusterlet:
 #     - feature: ""
 #       mode: ""
 #    clientCertExpirationSeconds: 600
+#   registrationDriver:
+#     authType: azure
+#     azure:
+#       # One of: managed-identity-credential, environment-credential-secret,
+#       # environment-credential-certificate, workload-identity-credential.
+#       credential: workload-identity-credential
+#       # Required: the Azure AD object (principal) ID of the identity.
+#       managedClusterAzureID: 11111111-1111-1111-1111-111111111111
+#       # Optional for managed-identity-credential (omit for system-assigned), required otherwise.
+#       clientID: 22222222-2222-2222-2222-222222222222
+#       # Required for environment-credential-*; optional override for workload-identity-credential.
+#       # tenantID: 33333333-3333-3333-3333-333333333333
+#       # Optional override, workload-identity-credential only.
+#       # federatedTokenFile: /var/run/secrets/azure/tokens/azure-identity-token
+#       # Required for a self-managed hub apiserver (its --oidc-client-id); defaults to AKS's.
+#       # tokenAudience: <server-app-id>/.default
+#     # environment-credential-* read secret material only from a Secret named
+#     # "azure-registration-credential" in the agent namespace, never from this spec:
+#     #   environment-credential-secret:      key AZURE_CLIENT_SECRET
+#     #   environment-credential-certificate: key tls.crt (PEM or PKCS#12 incl. private key),
+#     #     optional keys AZURE_CLIENT_CERTIFICATE_PASSWORD and AZURE_CLIENT_SEND_CERTIFICATE_CHAIN
   workConfiguration: {}
 #   featureGates:
 #     - feature: ""

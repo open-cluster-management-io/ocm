@@ -503,11 +503,12 @@ spec:
                           default: csr
                           description: |-
                             authType is the type of the authentication used by hub to initialize the Hub cluster.
-                            Possible values are csr, awsirsa and grpc.
+                            Possible values are csr, awsirsa, grpc and azure.
                           enum:
                           - csr
                           - awsirsa
                           - grpc
+                          - azure
                           type: string
                         awsirsa:
                           description: awsirsa represents the configuration for awsirsa
@@ -533,6 +534,28 @@ spec:
                               items:
                                 type: string
                               type: array
+                          type: object
+                        azure:
+                          description: azure represents the configuration for azure
+                            driver.
+                          properties:
+                            autoApprovedIdentityPatterns:
+                              description: |-
+                                autoApprovedIdentityPatterns is a list of regex patterns matched against a joining
+                                managed cluster's Azure AD object ID. A cluster whose object ID fully matches any
+                                pattern is automatically accepted when the ManagedClusterAutoApproval feature gate
+                                is enabled.
+                              items:
+                                type: string
+                              type: array
+                            oidcIssuerURL:
+                              description: |-
+                                oidcIssuerURL is set only when the hub apiserver trusts Azure AD as a generic OIDC
+                                issuer rather than through AKS's native Azure AD integration. It must be
+                                byte-for-byte identical to the apiserver's --oidc-issuer-url, so that RBAC is bound
+                                to the same "<oidcIssuerURL>#<object-id>" username the apiserver derives. Leave it
+                                unset for AKS's native Azure AD integration, where the bare object ID is used.
+                              type: string
                           type: object
                         csr:
                           description: csr represents the configuration for csr driver.

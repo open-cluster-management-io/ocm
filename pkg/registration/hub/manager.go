@@ -48,21 +48,24 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/hub/taint"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	awsirsa "open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
+	azureauth "open-cluster-management.io/ocm/pkg/registration/register/azure_auth"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 	"open-cluster-management.io/ocm/pkg/registration/register/grpc"
 )
 
 // HubManagerOptions holds configuration for hub manager controller
 type HubManagerOptions struct {
-	ClusterAutoApprovalUsers   []string
-	EnabledRegistrationDrivers []string
-	GCResourceList             []string
-	ImportOption               *importeroptions.Options
-	HubClusterArn              string
-	AutoApprovedCSRUsers       []string
-	AutoApprovedARNPatterns    []string
-	AwsResourceTags            []string
-	Labels                     string
+	ClusterAutoApprovalUsers    []string
+	EnabledRegistrationDrivers  []string
+	GCResourceList              []string
+	ImportOption                *importeroptions.Options
+	HubClusterArn               string
+	AutoApprovedCSRUsers        []string
+	AutoApprovedARNPatterns     []string
+	AwsResourceTags             []string
+	AutoApprovedAzureIDPatterns []string
+	AzureOIDCIssuerURL          string
+	Labels                      string
 	// TODO (skeeey) introduce hub options for different drives to group these options
 	AutoApprovedGRPCUsers []string
 	GRPCCAFile            string
@@ -103,6 +106,11 @@ func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&m.AutoApprovedGRPCUsers, "auto-approved-grpc-users", m.AutoApprovedGRPCUsers,
 		"A bootstrap user list via gRPC whose cluster registration requests can be automatically approved.")
 	fs.StringSliceVar(&m.AwsResourceTags, "aws-resource-tags", m.AwsResourceTags, "A list of tags to apply to AWS resources created through the OCM controllers")
+	fs.StringSliceVar(&m.AutoApprovedAzureIDPatterns, "auto-approved-azure-identity-patterns", m.AutoApprovedAzureIDPatterns,
+		"A list of regexp patterns such that a managed cluster registering via azure-auth will be auto approved if its Azure AD object ID matches any of the patterns")
+	fs.StringVar(&m.AzureOIDCIssuerURL, "azure-oidc-issuer-url", m.AzureOIDCIssuerURL,
+		"Set only when the hub apiserver trusts Azure AD as a generic OIDC issuer: the apiserver's exact --oidc-issuer-url, "+
+			"so azure-auth binds RBAC to the \"<issuer>#<object-id>\" username the apiserver derives. Leave unset for AKS's native Azure AD integration.")
 	fs.StringVar(&m.Labels, "labels", m.Labels,
 		"Labels to be added to the resources created by registration controller. The format is key1=value1,key2=value2.")
 	fs.StringVar(&m.GRPCCAFile, "grpc-ca-file", m.GRPCCAFile, "ca file to sign client cert for grpc")
@@ -218,6 +226,12 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 				return err
 			}
 			drivers = append(drivers, awsIRSAHubDriver)
+		case operatorv1.AzureAuthType:
+			azureAuthHubDriver, err := azureauth.NewAzureAuthHubDriver(kubeClient, m.AutoApprovedAzureIDPatterns, m.AzureOIDCIssuerURL)
+			if err != nil {
+				return err
+			}
+			drivers = append(drivers, azureAuthHubDriver)
 		case operatorv1.GRPCAuthType:
 			grpcHubDriver, err := grpc.NewGRPCHubDriver(
 				kubeClient, kubeInformers,

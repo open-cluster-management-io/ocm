@@ -9,6 +9,7 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	awsirsa "open-cluster-management.io/ocm/pkg/registration/register/aws_irsa"
+	azureauth "open-cluster-management.io/ocm/pkg/registration/register/azure_auth"
 	"open-cluster-management.io/ocm/pkg/registration/register/csr"
 	"open-cluster-management.io/ocm/pkg/registration/register/grpc"
 	"open-cluster-management.io/ocm/pkg/registration/register/token"
@@ -18,6 +19,7 @@ type Options struct {
 	RegistrationAuth string
 	CSROption        *csr.Option
 	AWSIRSAOption    *awsirsa.AWSOption
+	AzureOption      *azureauth.AzureOption
 	GRPCOption       *grpc.Option
 	TokenOption      *token.Option
 
@@ -30,6 +32,7 @@ func NewOptions() *Options {
 	return &Options{
 		CSROption:                       csr.NewCSROption(),
 		AWSIRSAOption:                   awsirsa.NewAWSOption(),
+		AzureOption:                     azureauth.NewAzureOption(),
 		GRPCOption:                      grpc.NewOptions(),
 		TokenOption:                     token.NewTokenOption(),
 		AddonKubeClientRegistrationAuth: "csr", // default to csr
@@ -43,6 +46,7 @@ func (s *Options) AddFlags(fs *pflag.FlagSet) {
 		"The authentication method for addons with registration type KubeClient. Possible values are 'csr' (default) and 'token'.")
 	s.CSROption.AddFlags(fs)
 	s.AWSIRSAOption.AddFlags(fs)
+	s.AzureOption.AddFlags(fs)
 	s.GRPCOption.AddFlags(fs)
 	s.TokenOption.AddFlags(fs)
 }
@@ -58,6 +62,8 @@ func (s *Options) Validate() error {
 	switch s.RegistrationAuth {
 	case operatorv1.AwsIrsaAuthType:
 		return s.AWSIRSAOption.Validate()
+	case operatorv1.AzureAuthType:
+		return s.AzureOption.Validate()
 	case operatorv1.GRPCAuthType:
 		return s.GRPCOption.Validate()
 	default:
@@ -81,6 +87,8 @@ func (s *Options) Driver(secretOption register.SecretOption) (register.RegisterD
 	switch s.RegistrationAuth {
 	case operatorv1.AwsIrsaAuthType:
 		return awsirsa.NewAWSIRSADriver(s.AWSIRSAOption, secretOption), nil
+	case operatorv1.AzureAuthType:
+		return azureauth.NewAzureAuthDriver(s.AzureOption, secretOption), nil
 	case operatorv1.GRPCAuthType:
 		return grpc.NewGRPCDriver(s.GRPCOption, s.CSROption, secretOption)
 	default:

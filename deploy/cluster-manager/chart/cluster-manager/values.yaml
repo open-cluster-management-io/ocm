@@ -127,6 +127,14 @@ clusterManager:
 #   grpc:
 #     autoApprovedIdentities:
 #     - system:serviceaccount:open-cluster-management:agent-registration-bootstrap
+#   - authType: azure
+#     azure:
+#       # Optional: regex patterns matched against a joining cluster's Azure AD object ID.
+#       autoApprovedIdentityPatterns:
+#       - ^11111111-1111-1111-1111-111111111111$
+#       # Optional: set only when the hub apiserver trusts Azure AD as a generic OIDC issuer,
+#       # to its exact --oidc-issuer-url. Leave unset for AKS's native Azure AD integration.
+#       # oidcIssuerURL: https://login.microsoftonline.com/<tenant-id>/v2.0
   workConfiguration:
     workDriver: kube
   addOnManagerConfiguration: {}

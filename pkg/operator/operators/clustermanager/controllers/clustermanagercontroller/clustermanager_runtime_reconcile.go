@@ -113,6 +113,11 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 				if registrationDriver.CSR != nil {
 					config.AutoApprovedCSRUsers = strings.Join(registrationDriver.CSR.AutoApprovedIdentities, ",")
 				}
+			case operatorapiv1.AzureAuthType:
+				if registrationDriver.Azure != nil {
+					config.AutoApprovedAzureIDPatterns = strings.Join(registrationDriver.Azure.AutoApprovedIdentityPatterns, ",")
+					config.AzureOIDCIssuerURL = registrationDriver.Azure.OIDCIssuerURL
+				}
 			case operatorapiv1.GRPCAuthType:
 				if registrationDriver.GRPC != nil {
 					config.GRPCAutoApprovedUsers = strings.Join(registrationDriver.GRPC.AutoApprovedIdentities, ",")

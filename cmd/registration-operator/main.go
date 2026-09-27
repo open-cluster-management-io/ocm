@@ -12,6 +12,7 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/cmd/hub"
 	"open-cluster-management.io/ocm/pkg/cmd/spoke"
+	azureauth "open-cluster-management.io/ocm/pkg/registration/register/azure_auth"
 	"open-cluster-management.io/ocm/pkg/version"
 )
 
@@ -49,6 +50,7 @@ func newNucleusCommand() *cobra.Command {
 	cmd.AddCommand(hub.NewHubOperatorCmd())
 	cmd.AddCommand(spoke.NewKlusterletOperatorCmd())
 	cmd.AddCommand(spoke.NewKlusterletAgentCmd())
+	cmd.AddCommand(azureauth.NewGetTokenCommand())
 
 	return cmd
 }

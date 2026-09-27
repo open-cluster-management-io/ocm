@@ -96,6 +96,12 @@ spec:
           {{if .AwsResourceTags}}
           - "--aws-resource-tags={{ .AwsResourceTags }}"
           {{end}}
+          {{ if .AutoApprovedAzureIDPatterns }}
+          - "--auto-approved-azure-identity-patterns={{ .AutoApprovedAzureIDPatterns }}"
+          {{ end }}
+          {{ if .AzureOIDCIssuerURL }}
+          - "--azure-oidc-issuer-url={{ .AzureOIDCIssuerURL }}"
+          {{ end }}
           {{if .GRPCAuthEnabled}}
           - "--grpc-ca-file=/var/run/secrets/hub/grpc/certs/tls.crt"
           - "--grpc-key-file=/var/run/secrets/hub/grpc/certs/tls.key"

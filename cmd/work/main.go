@@ -17,6 +17,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/cmd/spoke"
 	"open-cluster-management.io/ocm/pkg/cmd/webhook"
 	"open-cluster-management.io/ocm/pkg/features"
+	azureauth "open-cluster-management.io/ocm/pkg/registration/register/azure_auth"
 	"open-cluster-management.io/ocm/pkg/version"
 )
 
@@ -57,6 +58,7 @@ func newWorkCommand() *cobra.Command {
 	cmd.AddCommand(spoke.NewWorkAgent())
 	cmd.AddCommand(webhook.NewWorkWebhook())
 	cmd.AddCommand(hub.NewWorkController())
+	cmd.AddCommand(azureauth.NewGetTokenCommand())
 
 	return cmd
 }

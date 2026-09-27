@@ -27,6 +27,16 @@ func (in AwsIrsaConfig) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in AzureAuth) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.operator.v1.AzureAuth"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in AzureConfig) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.operator.v1.AzureConfig"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in BindConfiguration) OpenAPIModelName() string {
 	return "io.open-cluster-management.api.operator.v1.BindConfiguration"
 }
