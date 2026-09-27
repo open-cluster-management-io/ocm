@@ -21,6 +21,9 @@ spec:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: klusterlet-manifestwork-agent
+        {{ if eq .RegistrationDriver.AzureCredential "workload-identity-credential" }}
+        azure.workload.identity/use: "true"
+        {{ end }}
         {{ if gt (len .Labels) 0 }}
         {{ range $key, $value := .Labels }}
         "{{ $key }}": "{{ $value }}"
@@ -115,6 +118,29 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
+          {{if eq .RegistrationDriver.AzureCredential "environment-credential-secret"}}
+          - name: AZURE_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: azure-registration-credential
+                key: AZURE_CLIENT_SECRET
+          {{end}}
+          {{if eq .RegistrationDriver.AzureCredential "environment-credential-certificate"}}
+          - name: AZURE_CLIENT_CERTIFICATE_PATH
+            value: /var/run/secrets/ocm/azure/tls.crt
+          - name: AZURE_CLIENT_CERTIFICATE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: azure-registration-credential
+                key: AZURE_CLIENT_CERTIFICATE_PASSWORD
+                optional: true
+          - name: AZURE_CLIENT_SEND_CERTIFICATE_CHAIN
+            valueFrom:
+              secretKeyRef:
+                name: azure-registration-credential
+                key: AZURE_CLIENT_SEND_CERTIFICATE_CHAIN
+                optional: true
+          {{end}}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -129,6 +155,11 @@ spec:
           readOnly: true
         - name: tmpdir
           mountPath: /tmp
+        {{if eq .RegistrationDriver.AzureCredential "environment-credential-certificate"}}
+        - name: azure-client-certificate
+          mountPath: /var/run/secrets/ocm/azure
+          readOnly: true
+        {{end}}
         {{if eq .RegistrationDriver.AuthType "awsirsa"}}
         - name: dot-aws
           mountPath: /.aws
@@ -188,6 +219,14 @@ spec:
           secretName: {{ .HubKubeConfigSecret }}
       - name: tmpdir
         emptyDir: { }
+      {{if eq .RegistrationDriver.AzureCredential "environment-credential-certificate"}}
+      - name: azure-client-certificate
+        secret:
+          secretName: azure-registration-credential
+          items:
+          - key: tls.crt
+            path: tls.crt
+      {{end}}
       {{if eq .RegistrationDriver.AuthType "awsirsa"}}
       - name: dot-aws
         emptyDir: { }

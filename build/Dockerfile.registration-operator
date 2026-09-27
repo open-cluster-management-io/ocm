@@ -13,6 +13,20 @@ RUN GOOS=${OS} \
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 ENV USER_UID=10001
 
+# ubi-micro ships no root CA trust store at all, so any outbound TLS call to a
+# public endpoint (e.g. the azure-auth driver's WorkloadIdentityCredential
+# exchanging a federated token with https://login.microsoftonline.com) fails
+# with "x509: certificate signed by unknown authority". Copy the builder
+# image's CA bundle over to fix that.
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+
 COPY --from=builder /go/src/open-cluster-management.io/ocm/registration-operator /
+
+# The azure-auth driver's kubeconfig exec-credential plugin is invoked at this
+# fixed path (see pkg/registration/register/azure_auth/azure_auth.go's
+# execCommand const) so that a hub-kubeconfig secret written by this container
+# stays usable by other containers that read the same persisted secret but
+# don't otherwise share this image's binary name.
+COPY --from=builder /go/src/open-cluster-management.io/ocm/registration-operator /ocm-agent
 
 USER ${USER_UID}

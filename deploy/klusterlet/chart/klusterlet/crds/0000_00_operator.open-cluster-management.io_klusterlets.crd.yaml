@@ -384,11 +384,12 @@ spec:
                         default: csr
                         description: Type of the authentication used by managedcluster
                           to register as well as pull work from hub. Possible values
-                          are csr and awsirsa.
+                          are csr, awsirsa, grpc and azure.
                         enum:
                         - csr
                         - awsirsa
                         - grpc
+                        - azure
                         type: string
                       awsIrsa:
                         description: |-
@@ -416,9 +417,75 @@ spec:
                         - hubClusterArn
                         - managedClusterArn
                         type: object
+                      azure:
+                        description: |-
+                          azure contains the details required for registering with the hub cluster using an Azure AD
+                          (Entra ID) identity instead of a client certificate. This is required only when authType is azure.
+                        properties:
+                          clientID:
+                            description: |-
+                              clientID is the client ID of the identity. Optional for managed-identity-credential
+                              (omit it to use the node's system-assigned identity); required for every other
+                              credential type.
+                            type: string
+                          credential:
+                            description: |-
+                              credential selects which Azure credential mechanism is used to obtain an Azure AD
+                              access token. There is no automatic fallback between mechanisms.
+                            enum:
+                            - managed-identity-credential
+                            - environment-credential-secret
+                            - environment-credential-certificate
+                            - workload-identity-credential
+                            type: string
+                          federatedTokenFile:
+                            description: |-
+                              federatedTokenFile overrides the projected ServiceAccount token path injected by the
+                              Azure Workload Identity webhook. Applies only to workload-identity-credential.
+                            type: string
+                          managedClusterAzureID:
+                            description: |-
+                              managedClusterAzureID is the Azure AD object ID (principal ID) of the identity used by
+                              this managed cluster. It is recorded as an annotation on the ManagedCluster, and used
+                              by the hub for auto-approval matching and RBAC binding.
+                            minLength: 1
+                            type: string
+                          tenantID:
+                            description: |-
+                              tenantID is the Entra ID tenant. Required for the environment-credential-* types;
+                              optional for workload-identity-credential, where it overrides the value injected by
+                              the Azure Workload Identity webhook.
+                            type: string
+                          tokenAudience:
+                            description: |-
+                              tokenAudience is the OAuth2 scope requested for the hub apiserver, e.g.
+                              "<server-app-id>/.default". Defaults to the well-known AKS AAD Server application,
+                              which is only correct for AKS's native Azure AD integration; for a self-managed
+                              apiserver it must match that apiserver's --oidc-client-id.
+                            type: string
+                        required:
+                        - credential
+                        - managedClusterAzureID
+                        type: object
+                        x-kubernetes-validations:
+                        - message: clientID is required for workload-identity-credential
+                          rule: self.credential != 'workload-identity-credential'
+                            || (has(self.clientID) && size(self.clientID) > 0)
+                        - message: clientID and tenantID are required for environment-credential-secret
+                            and environment-credential-certificate
+                          rule: '!(self.credential in [''environment-credential-secret'',
+                            ''environment-credential-certificate'']) || (has(self.clientID)
+                            && size(self.clientID) > 0 && has(self.tenantID) && size(self.tenantID)
+                            > 0)'
+                        - message: federatedTokenFile applies only to workload-identity-credential
+                          rule: self.credential == 'workload-identity-credential'
+                            || !has(self.federatedTokenFile)
                     required:
                     - authType
                     type: object
+                    x-kubernetes-validations:
+                    - message: azure is required when authType is azure
+                      rule: self.authType != 'azure' || has(self.azure)
                 type: object
               registrationImagePullSpec:
                 description: |-

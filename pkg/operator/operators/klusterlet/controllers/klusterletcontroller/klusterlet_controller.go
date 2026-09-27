@@ -145,9 +145,29 @@ type AwsIrsa struct {
 	ManagedClusterArn string
 }
 
+type Azure struct {
+	Credential            string
+	ManagedClusterAzureID string
+	ClientID              string
+	TenantID              string
+	FederatedTokenFile    string
+	TokenAudience         string
+}
+
 type RegistrationDriver struct {
 	AuthType string
 	AwsIrsa  *AwsIrsa
+	Azure    *Azure
+}
+
+// AzureCredential returns the selected Azure credential type, or "" when the azure
+// driver is not in use. Manifest templates use it to render only what the selected
+// credential type needs, without dereferencing a nil Azure.
+func (r RegistrationDriver) AzureCredential() string {
+	if r.AuthType != operatorapiv1.AzureAuthType || r.Azure == nil {
+		return ""
+	}
+	return r.Azure.Credential
 }
 
 type ManagedClusterIamRole struct {
@@ -433,6 +453,21 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			managedClusterAccountId, managedClusterName := commonhelpers.GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.ManagedClusterArn)
 			hubClusterAccountId, hubClusterName := commonhelpers.GetAwsAccountIdAndClusterName(managedClusterIamRole.AwsIrsa.HubClusterArn)
 			config.ManagedClusterRoleSuffix = commonhelpers.Md5HashSuffix(hubClusterAccountId, hubClusterName, managedClusterAccountId, managedClusterName)
+		} else if klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType == operatorapiv1.AzureAuthType &&
+			klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.Azure != nil {
+
+			azure := klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.Azure
+			config.RegistrationDriver = RegistrationDriver{
+				AuthType: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType,
+				Azure: &Azure{
+					Credential:            string(azure.Credential),
+					ManagedClusterAzureID: azure.ManagedClusterAzureID,
+					ClientID:              azure.ClientID,
+					TenantID:              azure.TenantID,
+					FederatedTokenFile:    azure.FederatedTokenFile,
+					TokenAudience:         azure.TokenAudience,
+				},
+			}
 		} else {
 			config.RegistrationDriver = RegistrationDriver{
 				AuthType: klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AuthType,

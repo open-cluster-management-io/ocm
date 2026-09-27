@@ -48,6 +48,8 @@ type HubConfig struct {
 	AutoApprovedCSRUsers              string
 	AutoApprovedARNPatterns           string
 	AwsResourceTags                   string
+	AutoApprovedAzureIDPatterns       string
+	AzureOIDCIssuerURL                string
 	Labels                            map[string]string
 	LabelsString                      string
 	GRPCAuthEnabled                   bool
