@@ -104,17 +104,17 @@ func (c *configChecker) Name() string {
 // If checksum not equal, it will return err and update cached checksum with current checksum
 // Note that: configChecker performs a instant update after it returns err, so DO NOT use one
 // configChecker for multible containers!!!
-func (c *configChecker) Check(_ *http.Request) error {
-	newChecksum, err := load(c.configfiles)
+func (cc *configChecker) Check(_ *http.Request) error {
+	newChecksum, err := load(cc.configfiles)
 	if err != nil {
 		return err
 	}
-	if newChecksum != c.checksum {
-		c.Lock()
-		if c.reload {
-			c.checksum = newChecksum // update checksum
+	if newChecksum != cc.checksum {
+		cc.Lock()
+		if cc.reload {
+			cc.checksum = newChecksum // update checksum
 		}
-		c.Unlock()
+		cc.Unlock()
 		return fmt.Errorf("checksum not equal")
 	}
 	return nil
