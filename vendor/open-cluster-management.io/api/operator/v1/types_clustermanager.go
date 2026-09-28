@@ -144,6 +144,8 @@ const (
 	CSRAuthType = "csr"
 	// GRPCAuthType represents the authentication type that uses gRPC.
 	GRPCAuthType = "grpc"
+	// AzureAuthType represents the authentication type that uses an Azure AD (Entra ID) identity.
+	AzureAuthType = "azure"
 )
 
 // GRPCAuthSigner is the signer name used when creating CSRs for gRPC authentication.
@@ -159,10 +161,10 @@ const (
 type RegistrationDriverHub struct {
 
 	// authType is the type of the authentication used by hub to initialize the Hub cluster.
-	// Possible values are csr, awsirsa and grpc.
+	// Possible values are csr, awsirsa, grpc and azure.
 	// +required
 	// +kubebuilder:default:=csr
-	// +kubebuilder:validation:Enum=csr;awsirsa;grpc
+	// +kubebuilder:validation:Enum=csr;awsirsa;grpc;azure
 	AuthType string `json:"authType,omitempty"`
 
 	// csr represents the configuration for csr driver.
@@ -176,6 +178,30 @@ type RegistrationDriverHub struct {
 	// grpc represents the configuration for gRPC driver.
 	// +optional
 	GRPC *GRPCRegistrationConfig `json:"grpc,omitempty"`
+
+	// azure represents the configuration for azure driver.
+	// +optional
+	Azure *AzureConfig `json:"azure,omitempty"`
+}
+
+// AzureConfig represents the hub-side configuration for the azure driver. It applies to
+// every managed cluster joining with the azure driver; a specific cluster's identity is
+// configured only on that cluster's Klusterlet.
+type AzureConfig struct {
+	// autoApprovedIdentityPatterns is a list of regex patterns matched against a joining
+	// managed cluster's Azure AD object ID. A cluster whose object ID fully matches any
+	// pattern is automatically accepted when the ManagedClusterAutoApproval feature gate
+	// is enabled.
+	// +optional
+	AutoApprovedIdentityPatterns []string `json:"autoApprovedIdentityPatterns,omitempty"`
+
+	// oidcIssuerURL is set only when the hub apiserver trusts Azure AD as a generic OIDC
+	// issuer rather than through AKS's native Azure AD integration. It must be
+	// byte-for-byte identical to the apiserver's --oidc-issuer-url, so that RBAC is bound
+	// to the same "<oidcIssuerURL>#<object-id>" username the apiserver derives. Leave it
+	// unset for AKS's native Azure AD integration, where the bare object ID is used.
+	// +optional
+	OIDCIssuerURL string `json:"oidcIssuerURL,omitempty"`
 }
 
 type ServerConfiguration struct {
