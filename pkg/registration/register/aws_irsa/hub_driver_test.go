@@ -2,7 +2,9 @@ package aws_irsa
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"reflect"
 	"regexp"
@@ -558,10 +560,13 @@ func TestCreateIAMRole(t *testing.T) {
 		withAPIOptionsFunc func(*middleware.Stack) error
 	}
 
+	var iamCalls []string
+
 	cases := []struct {
 		name                      string
 		args                      args
 		managedClusterAnnotations map[string]string
+		wantIAMCalls              []string
 		want                      error
 		wantErr                   bool
 	}{
@@ -632,19 +637,64 @@ func TestCreateIAMRole(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "test create IAM Role with EntityAlreadyExists in CreateRole",
+			name: "test existing IAM Role with matching trust policy is left untouched",
+			args: args{
+				ctx:                context.Background(),
+				withAPIOptionsFunc: existingRoleMock(expectedTrustPolicyEncoded(t), nil, &iamCalls),
+			},
+			managedClusterAnnotations: map[string]string{
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+			},
+			wantIAMCalls: []string{"CreateRole", "GetRole"},
+			want:         nil,
+			wantErr:      false,
+		},
+		{
+			// IAM rewrites the principal to the deleted role's unique ID once ocm-managed-cluster-<suffix>
+			// is deleted and recreated; the driver has to put the ARN back.
+			name: "test existing IAM Role with stale trust policy is updated",
+			args: args{
+				ctx:                context.Background(),
+				withAPIOptionsFunc: existingRoleMock(staleTrustPolicyEncoded, nil, &iamCalls),
+			},
+			managedClusterAnnotations: map[string]string{
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+			},
+			wantIAMCalls: []string{"CreateRole", "GetRole", "UpdateAssumeRolePolicy"},
+			want:         nil,
+			wantErr:      false,
+		},
+		{
+			name: "test existing IAM Role with stale trust policy reports failed update",
+			args: args{
+				ctx:                context.Background(),
+				withAPIOptionsFunc: existingRoleMock(staleTrustPolicyEncoded, fmt.Errorf("AccessDenied"), &iamCalls),
+			},
+			managedClusterAnnotations: map[string]string{
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
+			},
+			wantIAMCalls: []string{"CreateRole", "GetRole", "UpdateAssumeRolePolicy"},
+			want: fmt.Errorf("failed to update trust policy of IAM role ocm-hub-960c4e56c25ba0b571ddcdaa7edc943e for ManagedCluster spoke-cluster: " +
+				"operation error IAM: UpdateAssumeRolePolicy, AccessDenied"),
+			wantErr: true,
+		},
+		{
+			name: "test existing IAM Role reports failed GetRole",
 			args: args{
 				ctx: context.Background(),
 				withAPIOptionsFunc: func(stack *middleware.Stack) error {
 					return stack.Finalize.Add(
 						middleware.FinalizeMiddlewareFunc(
-							"CreateRoleEntityAlreadyExistsMock",
+							"GetRoleErrorMock",
 							func(ctx context.Context, input middleware.FinalizeInput, handler middleware.FinalizeHandler) (middleware.FinalizeOutput, middleware.Metadata, error) {
-								operationName := middleware.GetOperationName(ctx)
-								if operationName == "CreateRole" {
-									return middleware.FinalizeOutput{
-										Result: nil,
-									}, middleware.Metadata{}, fmt.Errorf("failed to create IAM role, EntityAlreadyExists")
+								switch middleware.GetOperationName(ctx) {
+								case "CreateRole":
+									return middleware.FinalizeOutput{}, middleware.Metadata{}, fmt.Errorf("failed to create IAM role, EntityAlreadyExists")
+								case "GetRole":
+									return middleware.FinalizeOutput{}, middleware.Metadata{}, fmt.Errorf("AccessDenied")
 								}
 								return middleware.FinalizeOutput{}, middleware.Metadata{}, nil
 							},
@@ -657,8 +707,9 @@ func TestCreateIAMRole(t *testing.T) {
 				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
 				operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterArn:           "arn:aws:eks:us-west-2:123456789012:cluster/spoke-cluster",
 			},
-			want:    nil,
-			wantErr: false,
+			want: fmt.Errorf("failed to get IAM role ocm-hub-960c4e56c25ba0b571ddcdaa7edc943e to verify its trust policy for ManagedCluster spoke-cluster: " +
+				"operation error IAM: GetRole, AccessDenied"),
+			wantErr: true,
 		},
 		{
 			name: "test create IAM Role with error in CreateRole",
@@ -710,6 +761,7 @@ func TestCreateIAMRole(t *testing.T) {
 			managedCluster := testinghelpers.NewManagedCluster()
 			managedCluster.Annotations = tt.managedClusterAnnotations
 			tags := []string{}
+			iamCalls = nil
 
 			_, _, err = createIAMRoleAndPolicy(tt.args.ctx, HubClusterArn, managedCluster, cfg, tags)
 			if (err != nil) != tt.wantErr {
@@ -718,6 +770,164 @@ func TestCreateIAMRole(t *testing.T) {
 			}
 			if tt.wantErr && err.Error() != tt.want.Error() {
 				t.Errorf("err = %#v, want %#v", err, tt.want)
+			}
+			if tt.wantIAMCalls != nil && !reflect.DeepEqual(iamCalls, tt.wantIAMCalls) {
+				t.Errorf("IAM calls = %v, want %v", iamCalls, tt.wantIAMCalls)
+			}
+		})
+	}
+}
+
+// staleTrustPolicyEncoded is what GetRole returns for ocm-hub-<suffix> after the managed cluster role
+// it trusted was deleted: the principal is the old role's unique ID instead of its ARN.
+var staleTrustPolicyEncoded = url.QueryEscape(`{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "AROAEXAMPLEDELETEDROLE"
+            },
+            "Action": "sts:AssumeRole",
+            "Condition": {
+                "StringEquals": {
+                    "aws:PrincipalTag/hub_cluster_account_id": "123456789012",
+                    "aws:PrincipalTag/hub_cluster_name": "hub-cluster",
+                    "aws:PrincipalTag/managed_cluster_account_id": "123456789012",
+                    "aws:PrincipalTag/managed_cluster_name": "spoke-cluster"
+                }
+            }
+        }
+    ]
+}`)
+
+// expectedTrustPolicyEncoded renders the trust policy the driver wants for the hub-cluster/spoke-cluster
+// fixtures and returns it the way GetRole would: URL-encoded, with IAM's own formatting rather than
+// the template's. Re-marshalling through encoding/json drops the whitespace and sorts the keys.
+func expectedTrustPolicyEncoded(t *testing.T) string {
+	rendered, err := renderTemplate(trustPolicyTemplatePath, map[string]interface{}{
+		"hubClusterArn":               "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
+		"managedClusterAccountId":     "123456789012",
+		"managedClusterIamRoleSuffix": "960c4e56c25ba0b571ddcdaa7edc943e",
+		"hubAccountId":                "123456789012",
+		"hubClusterName":              "hub-cluster",
+		"managedClusterName":          "spoke-cluster",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc interface{}
+	if err := json.Unmarshal([]byte(rendered), &doc); err != nil {
+		t.Fatal(err)
+	}
+	compact, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return url.QueryEscape(string(compact))
+}
+
+// existingRoleMock stands in for IAM when ocm-hub-<suffix> already exists: CreateRole fails with
+// EntityAlreadyExists, GetRole returns currentTrustPolicy, and UpdateAssumeRolePolicy returns
+// updateErr. Every IAM operation name is appended to calls so tests can assert what the driver did.
+func existingRoleMock(currentTrustPolicy string, updateErr error, calls *[]string) func(*middleware.Stack) error {
+	return func(stack *middleware.Stack) error {
+		return stack.Finalize.Add(
+			middleware.FinalizeMiddlewareFunc(
+				"ExistingRoleMock",
+				func(ctx context.Context, input middleware.FinalizeInput, handler middleware.FinalizeHandler) (middleware.FinalizeOutput, middleware.Metadata, error) {
+					operationName := middleware.GetOperationName(ctx)
+					*calls = append(*calls, operationName)
+					switch operationName {
+					case "CreateRole":
+						return middleware.FinalizeOutput{}, middleware.Metadata{}, fmt.Errorf("failed to create IAM role, EntityAlreadyExists")
+					case "GetRole":
+						return middleware.FinalizeOutput{
+							Result: &iam.GetRoleOutput{Role: &iamtypes.Role{
+								RoleName:                 aws.String("ocm-hub-960c4e56c25ba0b571ddcdaa7edc943e"),
+								Arn:                      aws.String("arn:aws:iam::123456789012:role/ocm-hub-960c4e56c25ba0b571ddcdaa7edc943e"),
+								AssumeRolePolicyDocument: aws.String(currentTrustPolicy),
+							}},
+						}, middleware.Metadata{}, nil
+					case "UpdateAssumeRolePolicy":
+						if updateErr != nil {
+							return middleware.FinalizeOutput{}, middleware.Metadata{}, updateErr
+						}
+						return middleware.FinalizeOutput{
+							Result: &iam.UpdateAssumeRolePolicyOutput{},
+						}, middleware.Metadata{}, nil
+					}
+					return middleware.FinalizeOutput{}, middleware.Metadata{}, nil
+				},
+			),
+			middleware.Before,
+		)
+	}
+}
+
+func TestTrustPolicyMatches(t *testing.T) {
+	desired := `{"Version": "2012-10-17", "Statement": [{"Effect": "Allow", "Principal": {"AWS": "arn:aws:iam::123456789012:role/ocm-managed-cluster-abc"}, "Action": "sts:AssumeRole"}]}`
+
+	cases := []struct {
+		name    string
+		current string
+		desired string
+		want    bool
+		wantErr bool
+	}{
+		{
+			name:    "identical document, URL-encoded",
+			current: url.QueryEscape(desired),
+			desired: desired,
+			want:    true,
+		},
+		{
+			name:    "same document with different whitespace and key order",
+			current: url.QueryEscape(`{"Statement":[{"Action":"sts:AssumeRole","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/ocm-managed-cluster-abc"}}],"Version":"2012-10-17"}`),
+			desired: desired,
+			want:    true,
+		},
+		{
+			name:    "principal replaced by the unique ID of a deleted role",
+			current: url.QueryEscape(`{"Version": "2012-10-17", "Statement": [{"Effect": "Allow", "Principal": {"AWS": "AROAEXAMPLEDELETEDROLE"}, "Action": "sts:AssumeRole"}]}`),
+			desired: desired,
+			want:    false,
+		},
+		{
+			name:    "empty current document counts as a mismatch",
+			current: "",
+			desired: desired,
+			want:    false,
+		},
+		{
+			name:    "undecodable current document counts as a mismatch",
+			current: "%zz",
+			desired: desired,
+			want:    false,
+		},
+		{
+			name:    "current document that is not JSON counts as a mismatch",
+			current: url.QueryEscape("not json"),
+			desired: desired,
+			want:    false,
+		},
+		{
+			name:    "desired document that is not JSON is an error",
+			current: url.QueryEscape(desired),
+			desired: "not json",
+			want:    false,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := trustPolicyMatches(tt.current, tt.desired)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("trustPolicyMatches() = %v, want %v", got, tt.want)
 			}
 		})
 	}
