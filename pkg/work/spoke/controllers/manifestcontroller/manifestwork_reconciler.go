@@ -28,6 +28,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/basic"
+	workmetrics "open-cluster-management.io/ocm/pkg/work/spoke/controllers/manifestcontroller/metrics"
 )
 
 type applyResult struct {
@@ -356,7 +357,16 @@ func (m *manifestworkReconciler) applyOneManifest(
 	result.strategy = strategy.Type
 	applier := m.appliers.GetApplier(strategy.Type)
 	result.Result, result.Error = applier.Apply(ctx, om.gvr, om.obj, requiredOwner, option, recorder)
+	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ManifestWorkApplyMetrics) {
+		outcome := outcomeApplied
+		if strategy.Type == workapiv1.UpdateStrategyTypeReadOnly {
+			outcome = outcomeReadOnly
+		} else if result.Error != nil {
+			outcome = outcomeFailed
+		}
 
+		workmetrics.ResourceApplyTotal.WithLabelValues(outcome).Inc()
+	}
 	// Per-resource apply-log line. On the first apply of a generation it emits the
 	// apply flow; on a later reconcile it emits the sync flow only when the outcome changed vs the
 	// last-persisted ManifestApplied condition. Noop when gated off or read-only.
