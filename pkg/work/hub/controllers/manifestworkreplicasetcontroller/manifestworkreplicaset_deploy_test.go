@@ -27,6 +27,7 @@ import (
 	workapplier "open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
+	workhelper "open-cluster-management.io/ocm/pkg/work/helper"
 	helpertest "open-cluster-management.io/ocm/pkg/work/hub/test"
 )
 
@@ -1402,8 +1403,8 @@ func listWorksByMWRS(
 ) ([]workapiv1.ManifestWork, error) {
 
 	selector := labels.Set{
-		workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey: fmt.Sprintf("%s.%s", mwrNamespace, mwrName),
-		workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey:  placement,
+		workhelper.ManifestWorkReplicaSetOwnerKeyHashLabelKey:       ownerKeyHash(mwrNamespace, mwrName),
+		workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey: placement,
 	}.AsSelector().String()
 
 	list, err := client.WorkV1().
@@ -1752,9 +1753,9 @@ func TestIsConditionReady(t *testing.T) {
 	}
 }
 
-func TestDeployReconcileOwnerLabelTooLong(t *testing.T) {
-	// "default." + longName exceeds the 63-char label-value limit, so the owner
-	// label value is invalid and the reconciler should report it on status.
+func TestDeployReconcileLongOwnerNameUsesHashLabel(t *testing.T) {
+	// "default." + longName exceeds the 63-char label-value limit, but the
+	// hash-based owner label always fits so reconcile should succeed.
 	longName := "mwrset-" + strings.Repeat("x", 60)
 	mwrSet := helpertest.CreateTestManifestWorkReplicaSet(longName, "default", "place-test")
 
@@ -1784,32 +1785,106 @@ func TestDeployReconcileOwnerLabelTooLong(t *testing.T) {
 
 	mwrSet, state, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
 	if err != nil {
-		t.Fatal("expected no error so the invalid name is reported via status, got ", err)
+		t.Fatal("expected no error, got ", err)
 	}
-	if state != reconcileStop {
-		t.Fatal("expected reconcileStop for a permanently invalid owner label, got ", state)
-	}
-
-	cond := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionManifestworkApplied)
-	if cond == nil {
-		t.Fatal("ManifestworkApplied condition not found ", mwrSet.Status.Conditions)
-	}
-	if cond.Status != metav1.ConditionFalse {
-		t.Fatal("expected ManifestworkApplied=False, got ", cond)
-	}
-	if cond.Reason != ReasonInvalidManifestWorkName {
-		t.Fatal("expected Reason ReasonInvalidManifestWorkName, got ", cond.Reason)
-	}
-	if !strings.Contains(cond.Message, "63") {
-		t.Fatal("expected message to reference the 63-char limit, got ", cond.Message)
+	if state == reconcileStop {
+		t.Fatal("expected reconcileContinue, long names should work with hash labels")
 	}
 
-	// No ManifestWork should have been applied for the invalid owner value.
+	// A ManifestWork should have been created.
 	works, err := fWorkClient.WorkV1().ManifestWorks("cls1").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(works.Items) != 0 {
-		t.Fatal("expected no ManifestWork to be applied, got ", len(works.Items))
+	if len(works.Items) != 1 {
+		t.Fatalf("expected 1 ManifestWork, got %d", len(works.Items))
+	}
+
+	mw := works.Items[0]
+	expectedHash := ownerKeyHash(mwrSet.Namespace, mwrSet.Name)
+	assert.Equal(t, expectedHash, mw.Labels[workhelper.ManifestWorkReplicaSetOwnerKeyHashLabelKey],
+		"hash label should be set")
+	assert.Equal(t, fmt.Sprintf("%s/%s", mwrSet.Namespace, mwrSet.Name),
+		mw.Annotations[workhelper.ManifestWorkReplicaSetOwnerAnnotationKey],
+		"owner annotation should be set")
+
+	// The deprecated label must NOT be set because namespace.name exceeds the label value limit.
+	_, hasOldLabel := mw.Labels[workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey]
+	assert.False(t, hasOldLabel,
+		"deprecated label should not be set when namespace.name exceeds 63 chars")
+}
+
+func TestOldLabelOnlyManifestWorkMigratesOnSpecChange(t *testing.T) {
+	mwrsName := "mwrSet-test"
+	mwrsNS := "default"
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet(mwrsName, mwrsNS, "place-test")
+
+	// Simulate a pre-upgrade ManifestWork: only the deprecated label, no hash label or annotation.
+	oldMW := helpertest.CreateTestManifestWork(mwrsName, mwrsNS, "place-test", "cls1")
+	delete(oldMW.Labels, workhelper.ManifestWorkReplicaSetOwnerKeyHashLabelKey)
+	oldMW.Annotations = nil
+
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet, oldMW)
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
+
+	assert.Nil(t, workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(oldMW))
+	assert.Nil(t, workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetStore().Add(mwrSet))
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	// Step 1: Verify the old-label-only MW is discovered by the deprecated-label fallback.
+	result, allMWs, err := getManifestWorkInReplicaSet(mwrSet, mwLister)
+	assert.Nil(t, err)
+	assert.Len(t, allMWs, 1, "old-label-only MW should be found by deprecated-label fallback")
+	assert.Contains(t, result.workByCluster, "cls1")
+
+	// Step 2: First reconcile — old MW has matching spec, so it is counted as existing.
+	placement, placementDecision := helpertest.CreateTestPlacement("place-test", "default", "cls1")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placement, placementDecision)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Second)
+	assert.Nil(t, clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement))
+	assert.Nil(t, clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision))
+
+	pmwDeployController := deployReconciler{
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
+		placementLister:     clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
+	}
+
+	mwrSet, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, mwrSet.Status.Summary.Total, "old MW should be counted in summary")
+
+	// Step 3: Change the MWRS spec to trigger a re-apply on the old MW.
+	newTemplate := helpertest.CreateTestManifestWorkSpecWithSecret("v2", "test", "ns-test", "name-test")
+	newTemplate.DeepCopyInto(&mwrSet.Spec.ManifestWorkTemplate)
+
+	mwrSet, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
+	assert.Nil(t, err)
+
+	// Step 4: Verify the MW in the fake client now has the new hash label and annotation,
+	// while keeping the deprecated label (namespace.name fits within label value limit).
+	works, err := fWorkClient.WorkV1().ManifestWorks("cls1").List(context.TODO(), metav1.ListOptions{})
+	assert.Nil(t, err)
+
+	var migrated *workapiv1.ManifestWork
+	for i := range works.Items {
+		if works.Items[i].Labels[workhelper.ManifestWorkReplicaSetOwnerKeyHashLabelKey] != "" {
+			migrated = &works.Items[i]
+			break
+		}
+	}
+	if assert.NotNil(t, migrated, "MW should have the new hash label after spec-change reconcile") {
+		assert.Equal(t, workhelper.OwnerKeyHash(mwrsNS, mwrsName),
+			migrated.Labels[workhelper.ManifestWorkReplicaSetOwnerKeyHashLabelKey],
+			"hash label should be set after migration")
+
+		assert.Equal(t, fmt.Sprintf("%s/%s", mwrsNS, mwrsName),
+			migrated.Annotations[workhelper.ManifestWorkReplicaSetOwnerAnnotationKey],
+			"owner annotation should be set after migration")
+
+		assert.Equal(t, fmt.Sprintf("%s.%s", mwrsNS, mwrsName),
+			migrated.Labels[workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey],
+			"deprecated label should be preserved for short names")
 	}
 }
