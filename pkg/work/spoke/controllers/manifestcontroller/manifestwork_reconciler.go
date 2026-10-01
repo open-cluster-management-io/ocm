@@ -199,6 +199,8 @@ func (m *manifestworkReconciler) reconcile(
 	// handle condition type Applied
 	// #1: Applied - work status condition (with type Applied) is applied if all manifest conditions (with type Applied) are applied
 	if inCondition, exists := allInCondition(workapiv1.ManifestApplied, newManifestConditions); exists {
+		recordApplyMetric := features.SpokeMutableFeatureGate.Enabled(ocmfeature.ManifestWorkApplyMetrics) &&
+			priorAppliedGeneration(manifestWork) < manifestWork.Generation
 		appliedCondition := metav1.Condition{
 			Type:               workapiv1.WorkApplied,
 			ObservedGeneration: manifestWork.Generation,
@@ -211,6 +213,14 @@ func (m *manifestworkReconciler) reconcile(
 			appliedCondition.Reason = "AppliedManifestWorkComplete"
 			appliedCondition.Message = "Apply manifest work complete"
 		}
+		if recordApplyMetric {
+			outcome := outcomeFailed
+			if inCondition {
+				outcome = outcomeApplied
+			}
+			workmetrics.ManifestWorkApplyTotal.WithLabelValues(outcome).Inc()
+		}
+
 		meta.SetStatusCondition(&manifestWork.Status.Conditions, appliedCondition)
 	}
 

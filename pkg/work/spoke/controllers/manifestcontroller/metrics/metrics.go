@@ -19,8 +19,21 @@ var (
 		},
 		[]string{"outcome"},
 	)
+
+	ManifestWorkApplyTotal = k8smetrics.NewCounterVec(
+		&k8smetrics.CounterOpts{
+			Subsystem:      WorkSubsystem,
+			Name:           "manifestwork_apply_total",
+			Help:           "Total number of ManifestWork apply results.",
+			StabilityLevel: k8smetrics.ALPHA,
+		},
+		[]string{"outcome"},
+	)
 )
 
 func init() {
-	legacyregistry.MustRegister(ResourceApplyTotal)
+	legacyregistry.MustRegister(
+		ResourceApplyTotal,
+		ManifestWorkApplyTotal,
+	)
 }

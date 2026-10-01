@@ -71,6 +71,31 @@ func resourceApplyMetricValue(t *testing.T, outcome string) float64 {
 	return 0
 }
 
+func manifestWorkApplyMetricValue(t *testing.T, outcome string) float64 {
+	t.Helper()
+
+	metricFamilies, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("failed to gather metrics: %v", err)
+	}
+
+	for _, mf := range metricFamilies {
+		if mf.GetName() != "work_manifestwork_apply_total" {
+			continue
+		}
+
+		for _, metric := range mf.GetMetric() {
+			for _, label := range metric.GetLabel() {
+				if label.GetName() == "outcome" && label.GetValue() == outcome {
+					return metric.GetCounter().GetValue()
+				}
+			}
+		}
+	}
+
+	return 0
+}
+
 func setApplyMetricsGate(t *testing.T, enabled bool) {
 	t.Helper()
 
@@ -402,6 +427,31 @@ func TestResourceApplyMetricFeatureGate(t *testing.T) {
 			t.Errorf("expected applied metric to increase by 1: before=%v after=%v", before, after)
 		}
 	})
+}
+
+func TestManifestWorkApplyMetric(t *testing.T) {
+	defer setApplyMetricsGate(t, false)
+	setApplyMetricsGate(t, true)
+
+	tc := newTestCase("manifestwork-metrics").
+		withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"))
+
+	work, workKey := tc.newManifestWork()
+	controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
+		withKubeObject(tc.spokeObject...).
+		withUnstructuredObject()
+
+	before := manifestWorkApplyMetricValue(t, "applied")
+
+	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
+	if err := controller.toController().sync(context.TODO(), syncContext, work.Name); err != nil {
+		t.Fatalf("sync failed: %v", err)
+	}
+
+	after := manifestWorkApplyMetricValue(t, "applied")
+	if after != before+1 {
+		t.Errorf("expected ManifestWork applied metric to increase by 1: before=%v after=%v", before, after)
+	}
 }
 
 // TestSync test cases when running sync
