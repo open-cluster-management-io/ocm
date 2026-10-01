@@ -300,6 +300,117 @@ func TestDeployReconcileMultiPlacementApplyFailuresAreAggregated(t *testing.T) {
 	}
 }
 
+// TestDeployReconcilePartialApplyFailureReportsNotAsExpected covers a placement that selects two
+// clusters where the apply succeeds on one and fails on the other. count > 0 in that case, but the
+// failure must still be reported instead of PlacementVerified=AsExpected.
+func TestDeployReconcilePartialApplyFailureReportsNotAsExpected(t *testing.T) {
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet)
+
+	fWorkClient.PrependReactor("create", "manifestworks", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		mw, _ := action.(clienttesting.CreateAction).GetObject().(*workapiv1.ManifestWork)
+		if mw.Namespace == "cls2" {
+			return true, nil, fmt.Errorf("namespaces %q not found", mw.Namespace)
+		}
+		return false, nil, nil
+	})
+
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Minute)
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	placement, placementDecision := helpertest.CreateTestPlacement("place-test", "default", "cls1", "cls2")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placement, placementDecision)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Minute)
+
+	if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision); err != nil {
+		t.Fatal(err)
+	}
+
+	pmwDeployController := deployReconciler{
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
+		placementLister:     clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
+	}
+
+	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	if err == nil {
+		t.Fatal("expected reconcile to return the apply error for cls2")
+	}
+
+	if mwrSet.Status.Summary.Total != 1 {
+		t.Fatal("expected Summary.Total to be 1 since only the cls1 apply succeeded ", mwrSet.Status.Summary)
+	}
+
+	placeCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified)
+	if placeCondition == nil {
+		t.Fatal("Placement condition not found ", mwrSet.Status.Conditions)
+	}
+	if placeCondition.Reason != workapiv1alpha1.ReasonNotAsExpected {
+		t.Fatal("Placement condition Reason should be NotAsExpected when any apply fails ", placeCondition)
+	}
+	if !strings.Contains(placeCondition.Message, `namespaces "cls2" not found`) {
+		t.Fatalf("expected the condition message to mention the cls2 failure, got %q", placeCondition.Message)
+	}
+}
+
+// TestDeployReconcileRolloutErrorNotOverwrittenByOtherPlacement covers two placements where one
+// fails to compute its rollout and the other rolls out fine. The NotAsExpected set for the failing
+// placement must not be overwritten with AsExpected because the other placement produced works.
+func TestDeployReconcileRolloutErrorNotOverwrittenByOtherPlacement(t *testing.T) {
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSetWithRollOutStrategy("mwrSet-test", "default",
+		map[string]clusterv1alpha1.RolloutStrategy{
+			"place-bad":  {Type: "BogusStrategyType"},
+			"place-good": {Type: clusterv1alpha1.All},
+		})
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet)
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Minute)
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	placementBad, placementDecisionBad := helpertest.CreateTestPlacement("place-bad", "default", "cls1")
+	placementGood, placementDecisionGood := helpertest.CreateTestPlacement("place-good", "default", "cls2")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placementBad, placementDecisionBad, placementGood, placementDecisionGood)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Minute)
+
+	for _, obj := range []runtime.Object{placementBad, placementGood} {
+		if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(obj); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, obj := range []runtime.Object{placementDecisionBad, placementDecisionGood} {
+		if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(obj); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	pmwDeployController := deployReconciler{
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
+		placementLister:     clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
+	}
+
+	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	if err == nil {
+		t.Fatal("expected reconcile to return the rollout strategy error")
+	}
+
+	if mwrSet.Status.Summary.Total != 1 {
+		t.Fatal("expected Summary.Total to be 1 from place-good ", mwrSet.Status.Summary)
+	}
+
+	placeCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified)
+	if placeCondition == nil {
+		t.Fatal("Placement condition not found ", mwrSet.Status.Conditions)
+	}
+	if placeCondition.Reason != workapiv1alpha1.ReasonNotAsExpected {
+		t.Fatal("Placement condition Reason should stay NotAsExpected, not be overwritten with AsExpected ", placeCondition)
+	}
+}
+
 // TestDeployReconcileInvalidRolloutStrategyReportsNotAsExpected covers a second, related way the
 // same count == 0 block used to misreport PlacementDecisionEmpty: rolloutHandler.GetRolloutCluster
 // failing (e.g. on an invalid rollout strategy type) already set PlacementVerified=NotAsExpected

@@ -213,13 +213,14 @@ func (d *deployReconciler) reconcile(
 		mwrSet.Status.Summary.Progressing = 0
 	}
 	switch {
-	case count > 0:
-		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(workapiv1alpha1.ReasonAsExpected, ""))
 	case len(errs) > 0:
-		// count == 0 with errors means clusters were selected but every apply, or the rollout
-		// computation itself, failed. Report the error instead of a misleading PlacementDecisionEmpty.
+		// Check errors first: an apply or rollout failure on some clusters must be reported even
+		// when others succeeded (count > 0), and when every apply failed (count == 0) it must not
+		// be reported as a misleading PlacementDecisionEmpty.
 		apimeta.SetStatusCondition(&mwrSet.Status.Conditions,
 			getPlacementDecisionVerified(workapiv1alpha1.ReasonNotAsExpected, aggregatedErrorMessage(errs)))
+	case count > 0:
+		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(workapiv1alpha1.ReasonAsExpected, ""))
 	default:
 		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(workapiv1alpha1.ReasonPlacementDecisionEmpty, ""))
 	}
