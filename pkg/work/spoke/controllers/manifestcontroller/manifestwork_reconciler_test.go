@@ -25,10 +25,9 @@ import (
 
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
+	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
-
-	ocmfeature "open-cluster-management.io/api/feature"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	features "open-cluster-management.io/ocm/pkg/features"
