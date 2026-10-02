@@ -5,7 +5,7 @@ metadata:
   namespace: istio-system
 spec:
   endpoints:
-  - address: ${REVIEW_V3_IP}
+  - address: ${REVIEW_V3_POD_IP}
     labels:
       app: reviews
       version: v3
