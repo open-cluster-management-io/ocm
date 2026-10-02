@@ -84,6 +84,10 @@ const (
 	// timestamp, and the manifestwork labels. Read-only applies emit an observation log instead.
 	ManifestWorkApplyLogs featuregate.Feature = "ManifestWorkApplyLogs"
 
+	// ManifestWorkApplyMetrics makes the work agent in the spoke cluster emit metrics
+	// for ManifestWork resource apply results.
+	ManifestWorkApplyMetrics featuregate.Feature = "ManifestWorkApplyMetrics"
+
 	// ResourceCleanup will start gc controller to clean up resources in cluster ns after cluster is deleted.
 	ResourceCleanup featuregate.Feature = "ResourceCleanup"
 
@@ -162,4 +166,5 @@ var DefaultSpokeWorkFeatureGates = map[featuregate.Feature]featuregate.FeatureSp
 	ExecutorValidatingCaches: {Default: false, PreRelease: featuregate.Alpha},
 	RawFeedbackJsonString:    {Default: false, PreRelease: featuregate.Alpha},
 	ManifestWorkApplyLogs:    {Default: false, PreRelease: featuregate.Alpha},
+	ManifestWorkApplyMetrics: {Default: false, PreRelease: featuregate.Alpha},
 }
