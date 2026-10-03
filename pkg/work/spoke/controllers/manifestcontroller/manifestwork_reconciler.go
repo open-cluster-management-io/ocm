@@ -350,6 +350,9 @@ func (m *manifestworkReconciler) applyOneManifest(
 	err := m.validator.Validate(ctx, workSpec.Executor, om.gvr, om.resourceMeta.Namespace, om.resourceMeta.Name, ownedByTheWork, om.obj)
 	if err != nil {
 		result.Error = err
+		if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ManifestWorkApplyMetrics) {
+			workmetrics.ResourceApplyTotal.WithLabelValues(outcomeFailed).Inc()
+		}
 		return result
 	}
 

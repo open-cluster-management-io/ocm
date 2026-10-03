@@ -112,7 +112,45 @@ type testController struct {
 	kubeClient    *fakekube.Clientset
 	mwReconciler  *manifestworkReconciler
 }
+type failingExecutorValidator struct{}
 
+func (*failingExecutorValidator) Validate(
+	ctx context.Context,
+	executor *workapiv1.ManifestWorkExecutor,
+	gvr schema.GroupVersionResource,
+	namespace, name string,
+	ownedByTheWork bool,
+	obj *unstructured.Unstructured,
+) error {
+	return fmt.Errorf("validation failed")
+}
+
+func TestResourceApplyMetricOnValidationFailure(t *testing.T) {
+	defer setApplyMetricsGate(t, false)
+	setApplyMetricsGate(t, true)
+
+	tc := newTestCase("metrics-validation-failure").
+		withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"))
+
+	work, workKey := tc.newManifestWork()
+	controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
+		withKubeObject().
+		withUnstructuredObject()
+
+	controller.mwReconciler.validator = &failingExecutorValidator{}
+
+	before := resourceApplyMetricValue(t, outcomeFailed)
+
+	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
+	if err := controller.toController().sync(context.TODO(), syncContext, work.Name); err == nil {
+		t.Fatal("expected validation error, got nil")
+	}
+
+	after := resourceApplyMetricValue(t, outcomeFailed)
+	if after != before+1 {
+		t.Errorf("expected failed resource apply metric to increase by 1: before=%v after=%v", before, after)
+	}
+}
 func newController(t *testing.T, work *workapiv1.ManifestWork, appliedWork *workapiv1.AppliedManifestWork, mapper meta.RESTMapper) *testController {
 	fakeWorkClient := fakeworkclient.NewSimpleClientset(work)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fakeWorkClient, 5*time.Minute, workinformers.WithNamespace("cluster1"))

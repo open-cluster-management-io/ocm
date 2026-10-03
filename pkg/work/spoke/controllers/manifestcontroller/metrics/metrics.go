@@ -24,7 +24,7 @@ var (
 		&k8smetrics.CounterOpts{
 			Subsystem:      WorkSubsystem,
 			Name:           "manifestwork_apply_total",
-			Help:           "Total number of ManifestWork apply results.",
+			Help:           "Total number of ManifestWork apply results recorded for generations not yet observed in persisted WorkApplied status; once a generation is persisted, later outcomes for the same generation are not counted, while status persistence failures may cause retries to be counted.",
 			StabilityLevel: k8smetrics.ALPHA,
 		},
 		[]string{"outcome"},
