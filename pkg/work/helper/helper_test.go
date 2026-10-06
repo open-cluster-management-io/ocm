@@ -388,6 +388,47 @@ func TestHubHash(t *testing.T) {
 	}
 }
 
+func TestOwnerKeyHash(t *testing.T) {
+	cases := []struct {
+		name  string
+		ns1   string
+		name1 string
+		ns2   string
+		name2 string
+		equal bool
+	}{
+		{
+			name: "same input",
+			ns1:  "default", name1: "mwrSet-test",
+			ns2: "default", name2: "mwrSet-test",
+			equal: true,
+		},
+		{
+			name: "different input",
+			ns1:  "default", name1: "mwrSet-test",
+			ns2: "default", name2: "other",
+			equal: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			hash1 := OwnerKeyHash(c.ns1, c.name1)
+			hash2 := OwnerKeyHash(c.ns2, c.name2)
+
+			if hash1 == hash2 && !c.equal {
+				t.Errorf("Expected not equal hash value, got %s, %s", hash1, hash2)
+			} else if hash1 != hash2 && c.equal {
+				t.Errorf("Expected equal hash value, got %s, %s", hash1, hash2)
+			}
+
+			if len(hash1) > LabelValueMaxLength {
+				t.Errorf("OwnerKeyHash output %q exceeds label value limit", hash1)
+			}
+		})
+	}
+}
+
 func TestFindManifestConfiguration(t *testing.T) {
 	cases := []struct {
 		name           string

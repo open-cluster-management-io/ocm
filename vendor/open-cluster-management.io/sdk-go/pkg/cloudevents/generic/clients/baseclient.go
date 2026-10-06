@@ -63,7 +63,13 @@ type baseClient struct {
 	subscribedChan         chan struct{}
 	subscribeChan          chan struct{}
 	connected              atomic.Bool
-	subscribed             atomic.Bool
+	// subscribed reflects whether the client is currently subscribed to the transport
+	// (i.e. the most recent transport.Subscribe call succeeded and the connection has not
+	// dropped since). It is exposed via IsSubscribed/IsReady.
+	subscribed atomic.Bool
+	// subscribeStarted guards against starting the subscription goroutines more than once
+	// per client; it is set exactly once and, unlike subscribed, is never reset to false.
+	subscribeStarted atomic.Bool
 }
 
 func newBaseClient(clientID string, transport options.CloudEventTransport, limit utils.EventRateLimit) *baseClient {
@@ -143,6 +149,10 @@ func (c *baseClient) connect(ctx context.Context) error {
 					klog.FromContext(ctx).V(2).Info("stopReceiverSignal not sent, receiver channel unavailable")
 				}
 				c.connected.Store(false)
+				// The transport connection dropped, so any prior subscription is no longer
+				// live; a fresh transport.Subscribe call is required after reconnection
+				// (triggered below via subscribeChan) before the client is ready again.
+				c.subscribed.Store(false)
 				if err := c.transport.Close(ctx); err != nil {
 					runtime.HandleErrorWithContext(ctx, err, "failed to close the cloudevents protocol")
 				}
@@ -193,8 +203,8 @@ func (c *baseClient) publish(ctx context.Context, evt cloudevents.Event) error {
 func (c *baseClient) subscribe(ctx context.Context, receive receiveFn) {
 	logger := klog.FromContext(ctx)
 	// make sure there is only one subscription go routine starting for one client.
-	// Swap returns the old value, so if it was already true, we've already subscribed
-	if c.subscribed.Swap(true) {
+	// Swap returns the old value, so if it was already true, we've already started subscribing.
+	if c.subscribeStarted.Swap(true) {
 		logger.V(2).Info("the subscription has already started")
 		return
 	}
@@ -228,6 +238,9 @@ func (c *baseClient) subscribe(ctx context.Context, receive receiveFn) {
 					// Subscribe succeeded, break out of retry loop
 					break
 				}
+
+				// The transport subscription is now live; reflect this in IsSubscribed/IsReady.
+				c.subscribed.Store(true)
 
 				// Send startReceiverSignal to start/restart the receiver after successful subscription.
 				// The receiver lifecycle goroutine will create a new context and spawn a goroutine
@@ -332,4 +345,22 @@ func (c *baseClient) subscribe(ctx context.Context, receive receiveFn) {
 		// Channel full or closed - should not happen during normal initialization
 		logger.V(2).Info("initial subscribe signal not sent, channel unavailable")
 	}
+}
+
+// IsConnected returns whether the client transport is currently connected.
+func (c *baseClient) IsConnected() bool {
+	return c.connected.Load()
+}
+
+// IsSubscribed returns whether the client currently has a live subscription to the
+// transport. It becomes true once the transport's Subscribe call succeeds, and is
+// reset to false if the transport connection drops (a fresh Subscribe call is
+// required, and will be attempted automatically, once reconnected).
+func (c *baseClient) IsSubscribed() bool {
+	return c.subscribed.Load()
+}
+
+// IsReady returns true if the client is connected and subscribed.
+func (c *baseClient) IsReady() bool {
+	return c.connected.Load() && c.subscribed.Load()
 }

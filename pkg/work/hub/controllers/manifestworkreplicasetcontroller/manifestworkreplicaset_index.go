@@ -12,6 +12,8 @@ import (
 
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
+
+	workhelper "open-cluster-management.io/ocm/pkg/work/helper"
 )
 
 const (
@@ -65,18 +67,27 @@ func (m *ManifestWorkReplicaSetController) placementDecisionQueueKeysFunc(obj ru
 	return keys
 }
 
-// we will generate manifestwork with a label
 func (m *ManifestWorkReplicaSetController) manifestWorkQueueKeyFunc(obj runtime.Object) string {
 	accessor, _ := meta.Accessor(obj)
+
+	// Prefer the annotation which stores the readable "namespace/name".
+	if annotations := accessor.GetAnnotations(); annotations != nil {
+		if ownerRef, ok := annotations[workhelper.ManifestWorkReplicaSetOwnerAnnotationKey]; ok {
+			return ownerRef
+		}
+	}
+
+	// Fall back to the deprecated label for ManifestWorks created before the
+	// hash-label migration.
 	key, ok := accessor.GetLabels()[workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey]
 	if !ok {
 		return ""
 	}
-	keys := strings.Split(key, ".")
-	if len(keys) != 2 {
+	parts := strings.SplitN(key, ".", 2)
+	if len(parts) != 2 {
 		return ""
 	}
-	return fmt.Sprintf("%s/%s", keys[0], keys[1])
+	return fmt.Sprintf("%s/%s", parts[0], parts[1])
 }
 
 func indexManifestWorkReplicaSetByPlacement(obj interface{}) ([]string, error) {
@@ -95,8 +106,18 @@ func indexManifestWorkReplicaSetByPlacement(obj interface{}) ([]string, error) {
 	return keys, nil
 }
 
-// manifestWorkReplicaSetKey return the value of the key of manifestworkreplicaset, and comply with
-// label value format.
+// manifestWorkReplicaSetKey returns "namespace.name" for the deprecated label.
 func manifestWorkReplicaSetKey(mwrs *workapiv1alpha1.ManifestWorkReplicaSet) string {
 	return fmt.Sprintf("%s.%s", mwrs.Namespace, mwrs.Name)
+}
+
+// ownerKeyHash delegates to the canonical implementation in the work/helper
+// package so the hash algorithm is defined in exactly one place.
+func ownerKeyHash(namespace, name string) string {
+	return workhelper.OwnerKeyHash(namespace, name)
+}
+
+// manifestWorkReplicaSetOwnerValue returns "namespace/name" for the owner annotation.
+func manifestWorkReplicaSetOwnerValue(mwrs *workapiv1alpha1.ManifestWorkReplicaSet) string {
+	return fmt.Sprintf("%s/%s", mwrs.Namespace, mwrs.Name)
 }

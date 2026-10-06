@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -25,7 +26,8 @@ type hostedHookSyncer struct {
 
 	deleteWork func(ctx context.Context, workNamespace, workName string) error
 
-	getWorkByAddon func(addonName, addonNamespace string) ([]*workapiv1.ManifestWork, error)
+	getWorkByAddon       func(addonName, addonNamespace string) ([]*workapiv1.ManifestWork, error)
+	getDeployWorkByAddon func(addonName, addonNamespace string) ([]*workapiv1.ManifestWork, error)
 
 	getCluster func(clusterName string) (*clusterv1.ManagedCluster, error)
 
@@ -47,6 +49,10 @@ func (s *hostedHookSyncer) sync(ctx context.Context,
 	}
 	installMode, hostingClusterName := s.agentAddon.GetAgentAddonOptions().HostedModeInfoFunc(addon, cluster)
 	if installMode != constants.InstallModeHosted {
+		if err := s.cleanupHookWork(ctx, addon); err != nil {
+			return addon, err
+		}
+		addonRemoveFinalizer(addon, addonapiv1beta1.AddonHostingPreDeleteHookFinalizer)
 		return addon, nil
 	}
 
@@ -71,6 +77,24 @@ func (s *hostedHookSyncer) sync(ctx context.Context,
 		}
 		addonRemoveFinalizer(addon, addonapiv1beta1.AddonHostingPreDeleteHookFinalizer)
 		return addon, nil
+	}
+
+	// A newly rejected deployment must not gain a pre-delete hook finalizer. Existing deployments
+	// retain their hook behavior so explicit deletion can still complete normally.
+	validity := meta.FindStatusCondition(addon.Status.Conditions,
+		addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity)
+	if validity != nil && validity.Reason == addonapiv1beta1.HostingClusterValidityReasonMismatch {
+		deployWorks, err := s.getDeployWorkByAddon(addon.Name, addon.Namespace)
+		if err != nil {
+			return addon, err
+		}
+		if len(deployWorksInHostingCluster(deployWorks, hostingClusterName, addon)) == 0 {
+			if err := s.cleanupHookWork(ctx, addon); err != nil {
+				return addon, err
+			}
+			addonRemoveFinalizer(addon, addonapiv1beta1.AddonHostingPreDeleteHookFinalizer)
+			return addon, nil
+		}
 	}
 	hookWork, err := s.buildWorks(ctx, hostingClusterName, cluster, addon)
 	if err != nil {

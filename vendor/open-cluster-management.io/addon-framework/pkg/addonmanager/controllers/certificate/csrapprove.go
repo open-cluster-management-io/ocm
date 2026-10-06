@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	certificateslisters "k8s.io/client-go/listers/certificates/v1"
 	"k8s.io/klog/v2"
+
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
 	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
@@ -199,9 +200,10 @@ func isCSRApproved(csr metav1.Object) bool {
 	approved := false
 	if v1CSR, ok := csr.(*certificatesv1.CertificateSigningRequest); ok {
 		for _, condition := range v1CSR.Status.Conditions {
-			if condition.Type == certificatesv1.CertificateDenied {
+			switch condition.Type {
+			case certificatesv1.CertificateDenied:
 				return false
-			} else if condition.Type == certificatesv1.CertificateApproved {
+			case certificatesv1.CertificateApproved:
 				approved = true
 			}
 		}

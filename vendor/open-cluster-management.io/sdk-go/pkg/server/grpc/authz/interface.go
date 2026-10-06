@@ -25,8 +25,10 @@ const (
 type UnaryAuthorizer interface {
 	// AuthorizeRequest validates whether the user in the context is authorized
 	// to perform the operation represented by the request. Returns a Decision
-	// indicating the authorization result and an error if the authorization process itself fails.
-	AuthorizeRequest(ctx context.Context, req any) (Decision, error)
+	// indicating the authorization result, a context that is passed to the handler
+	// when the request is allowed (it may carry data derived during authorization,
+	// see WithAuthorizedEvent), and an error if the authorization process itself fails.
+	AuthorizeRequest(ctx context.Context, req any) (Decision, context.Context, error)
 }
 
 // StreamAuthorizer defines the interface for authorizing streaming gRPC requests.

@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/dynamic/dynamiclister"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+
 	"open-cluster-management.io/addon-framework/pkg/index"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
@@ -80,7 +81,7 @@ func (c *addonConfigController) buildConfigInformers(
 	configInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	configGVRs map[schema.GroupVersionResource]bool,
 ) []factory.Informer {
-	configInformers := []factory.Informer{}
+	configInformers := make([]factory.Informer, 0, len(configGVRs))
 	for gvrRaw := range configGVRs {
 		gvr := gvrRaw // copy the value since it will be used in the closure
 		genericInformer := configInformerFactory.ForResource(gvr)
@@ -177,12 +178,12 @@ func (c *addonConfigController) updateConfigSpecHashAndGenerations(addon *addona
 		// do not update for unsupported configs
 		if !utils.ContainGR(
 			c.configGVRs,
-			configReference.ConfigGroupResource.Group,
-			configReference.ConfigGroupResource.Resource) {
+			configReference.Group,
+			configReference.Resource) {
 			continue
 		}
 
-		lister, ok := c.configListers[schema.GroupResource{Group: configReference.ConfigGroupResource.Group, Resource: configReference.ConfigGroupResource.Resource}]
+		lister, ok := c.configListers[schema.GroupResource{Group: configReference.Group, Resource: configReference.Resource}]
 		if !ok {
 			continue
 		}

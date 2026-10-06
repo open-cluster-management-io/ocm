@@ -74,4 +74,16 @@ type CloudEventsClient[T ResourceObject] interface {
 	// SubscribedChan returns a chan which indicates the source/agent client is subscribed.
 	// The source/agent client callers should consider sending a resync request when receiving this signal.
 	SubscribedChan() <-chan struct{}
+
+	// IsConnected returns whether the client transport is currently connected.
+	IsConnected() bool
+
+	// IsSubscribed returns whether the client currently has a live subscription to the
+	// transport. It becomes true once the transport's Subscribe call succeeds, and is
+	// reset to false if the transport connection drops (a fresh Subscribe call is
+	// required, and will be attempted automatically, once reconnected).
+	IsSubscribed() bool
+
+	// IsReady returns true if the client is connected and subscribed.
+	IsReady() bool
 }

@@ -15,6 +15,7 @@ import (
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	workhelper "open-cluster-management.io/ocm/pkg/work/helper"
 )
 
 func TestManifestWorkGarbageCollectionController(t *testing.T) {
@@ -77,6 +78,16 @@ func TestManifestWorkGarbageCollectionController(t *testing.T) {
 			works: []runtime.Object{
 				createCompletedManifestWorkWithLabel("test", "default", 300, time.Now().Add(-400*time.Second), map[string]string{
 					workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey: "test-replicaset",
+				}),
+			},
+			expectedDeleteActions:  0,
+			expectedRequeueActions: 0,
+		},
+		{
+			name: "ManifestWork with ownerkey-hash label - should skip GC",
+			works: []runtime.Object{
+				createCompletedManifestWorkWithLabel("test", "default", 300, time.Now().Add(-400*time.Second), map[string]string{
+					workhelper.ManifestWorkReplicaSetOwnerKeyHashLabelKey: "somehashvalue",
 				}),
 			},
 			expectedDeleteActions:  0,

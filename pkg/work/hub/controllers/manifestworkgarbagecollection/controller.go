@@ -20,6 +20,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
+	workhelper "open-cluster-management.io/ocm/pkg/work/helper"
 )
 
 // ManifestWorkGarbageCollectionController is to delete the manifestworks when it has the completed condition.
@@ -74,6 +75,9 @@ func (c *ManifestWorkGarbageCollectionController) sync(ctx context.Context, cont
 	// manifestworkreplicaset controller is responsible for managing it.
 	if len(manifestWork.Labels) > 0 {
 		if _, ok := manifestWork.Labels[workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey]; ok {
+			return nil
+		}
+		if _, ok := manifestWork.Labels[workhelper.ManifestWorkReplicaSetOwnerKeyHashLabelKey]; ok {
 			return nil
 		}
 	}

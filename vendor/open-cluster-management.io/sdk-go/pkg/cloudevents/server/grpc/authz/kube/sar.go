@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/cloudevents/sdk-go/v2/binding"
+	cloudeventstypes "github.com/cloudevents/sdk-go/v2/types"
 
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1beta1"
@@ -22,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
@@ -70,40 +72,81 @@ func NewSARAuthorizer(kubeClient kubernetes.Interface) *SARAuthorizer {
 	}
 }
 
-func (s *SARAuthorizer) AuthorizeRequest(ctx context.Context, req any) (authz.Decision, error) {
+func (s *SARAuthorizer) AuthorizeRequest(ctx context.Context, req any) (authz.Decision, context.Context, error) {
+	deny := func(err error) (authz.Decision, context.Context, error) {
+		return authz.DecisionDeny, ctx, err
+	}
+
 	pReq, ok := req.(*pbv1.PublishRequest)
 	if !ok {
-		return authz.DecisionDeny, fmt.Errorf("unsupported request type %T", req)
+		return deny(fmt.Errorf("unsupported request type %T", req))
 	}
-
-	eventsType, err := types.ParseCloudEventsType(pReq.Event.Type)
-	if err != nil {
-		return authz.DecisionDeny, err
+	if pReq == nil || pReq.Event == nil {
+		return deny(fmt.Errorf("missing event in request"))
 	}
-
-	// the event of grpc publish request is the original cloudevent data, we need a `ce-` prefix
-	// to get the event attribute
-	clusterAttr, ok := pReq.Event.Attributes[fmt.Sprintf("ce-%s", types.ExtensionClusterName)]
-	if !ok {
-		return authz.DecisionDeny, fmt.Errorf("missing ce-clustername in event attributes, %v", pReq.Event.Attributes)
-	}
-
-	if pReq.Event == nil {
-		return authz.DecisionDeny, fmt.Errorf("missing event in request")
-	}
-
-	var partial metav1.PartialObjectMetadata
 
 	evt, err := binding.ToEvent(ctx, grpcprotocol.NewMessage(pReq.Event))
 	if err != nil {
-		return authz.DecisionDeny, fmt.Errorf("failed to convert protobuf to cloudevent: %v", err)
-	}
-	if err := evt.DataAs(&partial); err != nil {
-		return authz.DecisionDeny, err
+		return deny(fmt.Errorf("failed to convert protobuf to cloudevent: %v", err))
 	}
 
-	decision, err := s.authorize(ctx, clusterAttr.GetCeString(), *eventsType, partial.ObjectMeta)
-	return decision, err
+	eventsType, err := types.ParseCloudEventsType(evt.Type())
+	if err != nil {
+		return deny(err)
+	}
+
+	clusterName, err := cloudeventstypes.ToString(evt.Extensions()[types.ExtensionClusterName])
+	if err != nil {
+		return deny(fmt.Errorf("invalid ce-clustername in event attributes: %v", err))
+	}
+	if clusterName == "" {
+		return deny(fmt.Errorf("missing ce-clustername in event attributes"))
+	}
+
+	var partial metav1.PartialObjectMetadata
+	if eventsType.Action != types.ResyncRequestAction && eventsType.CloudEventsDataType != payload.ManifestBundleEventDataType {
+		if err := evt.DataAs(&partial); err != nil {
+			return deny(err)
+		}
+		if err := validateEventClusterName(clusterName, *eventsType, partial.ObjectMeta); err != nil {
+			return deny(err)
+		}
+	}
+
+	ctx = authz.WithAuthorizedEvent(ctx, evt)
+
+	decision, err := s.authorize(ctx, clusterName, *eventsType, partial.ObjectMeta)
+	if err != nil {
+		return authz.DecisionDeny, ctx, err
+	}
+	return decision, ctx, nil
+}
+
+func validateEventClusterName(clusterName string, eventsType types.CloudEventsType, metaObj metav1.ObjectMeta) error {
+	switch eventsType.CloudEventsDataType {
+	case cluster.ManagedClusterEventDataType:
+		if metaObj.Name != clusterName {
+			return fmt.Errorf("managed cluster name %q does not match ce-clustername %q", metaObj.Name, clusterName)
+		}
+	case v1alpha1.ManagedClusterAddOnEventDataType,
+		v1beta1.ManagedClusterAddOnEventDataType,
+		event.EventEventDataType,
+		lease.LeaseEventDataType,
+		serviceaccount.TokenRequestDataType:
+		if metaObj.Namespace != clusterName {
+			return fmt.Errorf("resource namespace %q does not match ce-clustername %q", metaObj.Namespace, clusterName)
+		}
+	case csr.CSREventDataType:
+		csrClusterName, ok := metaObj.Labels[clusterv1.ClusterNameLabelKey]
+		if !ok {
+			return fmt.Errorf("CSR %q is missing the %q label", metaObj.Name, clusterv1.ClusterNameLabelKey)
+		}
+		if csrClusterName != clusterName {
+			return fmt.Errorf("CSR cluster name %q does not match ce-clustername %q", csrClusterName, clusterName)
+		}
+	}
+
+	return nil
 }
 
 func (s *SARAuthorizer) AuthorizeStream(ctx context.Context, ss grpc.ServerStream, info *grpc.StreamServerInfo) (authz.Decision, grpc.ServerStream, error) {
@@ -119,6 +162,9 @@ func (s *SARAuthorizer) AuthorizeStream(ctx context.Context, ss grpc.ServerStrea
 	var req pbv1.SubscriptionRequest
 	if err := ss.RecvMsg(&req); err != nil {
 		return authz.DecisionDeny, nil, err
+	}
+	if req.ClusterName == "" {
+		return authz.DecisionDeny, nil, fmt.Errorf("missing cluster name in subscription request")
 	}
 
 	eventDataType, err := types.ParseCloudEventsDataType(req.DataType)
@@ -143,6 +189,11 @@ func (s *SARAuthorizer) AuthorizeStream(ctx context.Context, ss grpc.ServerStrea
 }
 
 func (s *SARAuthorizer) authorize(ctx context.Context, cluster string, eventsType types.CloudEventsType, metaObj metav1.ObjectMeta) (authz.Decision, error) {
+	if eventsType.CloudEventsDataType == csr.CSREventDataType {
+		if err := authn.ValidateClusterIdentity(ctx, cluster); err != nil {
+			return authz.DecisionDeny, err
+		}
+	}
 	user, groups, err := userInfo(ctx)
 	if err != nil {
 		return authz.DecisionDeny, err

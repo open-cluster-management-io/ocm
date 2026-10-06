@@ -28,6 +28,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/utils"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server"
+	"open-cluster-management.io/sdk-go/pkg/server/grpc/authz"
 )
 
 type resourceHandler func(ctx context.Context, subID string, res *cloudevents.Event) error
@@ -84,10 +85,18 @@ func (bkr *GRPCBroker) Subscribers() sets.Set[string] {
 // Publish in stub implementation for agent publish resource status.
 func (bkr *GRPCBroker) Publish(ctx context.Context, pubReq *pbv1.PublishRequest) (*emptypb.Empty, error) {
 	logger := klog.FromContext(ctx)
+	if pubReq == nil || pubReq.Event == nil {
+		return nil, status.Error(codes.InvalidArgument, "event is required")
+	}
+
 	// WARNING: don't use "evt, err := pb.FromProto(pubReq.Event)" to convert protobuf to cloudevent
-	evt, err := binding.ToEvent(ctx, grpcprotocol.NewMessage(pubReq.Event))
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert protobuf to cloudevent: %v", err))
+	evt, authorized := authz.AuthorizedEventFrom(ctx)
+	if !authorized {
+		var err error
+		evt, err = binding.ToEvent(ctx, grpcprotocol.NewMessage(pubReq.Event))
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert protobuf to cloudevent: %v", err))
+		}
 	}
 
 	eventType, err := types.ParseCloudEventsType(evt.Type())

@@ -76,6 +76,16 @@ func (c *CSRService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.Ev
 	if err != nil {
 		return err
 	}
+	clusterName := csr.Labels[clusterv1.ClusterNameLabelKey]
+	if err := services.ValidateClusterName(evt, clusterName); err != nil {
+		return err
+	}
+	if err := services.ValidateClusterIdentity(ctx, clusterName); err != nil {
+		return err
+	}
+	if eventType.SubResource != types.SubResourceSpec {
+		return fmt.Errorf("unsupported subresource %s for csr %s", eventType.SubResource, csr.Name)
+	}
 
 	switch eventType.Action {
 	case types.CreateRequestAction:

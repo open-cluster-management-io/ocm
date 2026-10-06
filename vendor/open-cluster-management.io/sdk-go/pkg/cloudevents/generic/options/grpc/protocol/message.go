@@ -31,6 +31,7 @@ type Message struct {
 	internal *pbv1.CloudEvent
 	version  spec.Version
 	format   format.Format
+	attrErr  error
 }
 
 // Check if Message implements binding.Message
@@ -53,6 +54,7 @@ func NewMessage(msg *pbv1.CloudEvent) *Message {
 		internal: msg,
 		version:  v,
 		format:   f,
+		attrErr:  validateAttributeNames(msg.Attributes),
 	}
 }
 
@@ -68,6 +70,10 @@ func (m *Message) ReadEncoding() binding.Encoding {
 }
 
 func (m *Message) ReadStructured(ctx context.Context, encoder binding.StructuredWriter) error {
+	if m.attrErr != nil {
+		return m.attrErr
+	}
+
 	if m.format == nil {
 		return binding.ErrNotStructured
 	}
@@ -76,6 +82,10 @@ func (m *Message) ReadStructured(ctx context.Context, encoder binding.Structured
 }
 
 func (m *Message) ReadBinary(ctx context.Context, encoder binding.BinaryWriter) error {
+	if m.attrErr != nil {
+		return m.attrErr
+	}
+
 	if m.version == nil {
 		return binding.ErrNotBinary
 	}

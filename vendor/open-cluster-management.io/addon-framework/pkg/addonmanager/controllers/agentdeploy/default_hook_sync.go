@@ -6,6 +6,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -38,11 +40,13 @@ func (s *defaultHookSyncer) sync(ctx context.Context,
 		return addon, nil
 	}
 
-	if addonAddFinalizer(addon, addonapiv1beta1.AddonPreDeleteHookFinalizer) {
+	if addon.DeletionTimestamp.IsZero() {
+		addonAddFinalizer(addon, addonapiv1beta1.AddonPreDeleteHookFinalizer)
 		return addon, nil
 	}
 
-	if addon.DeletionTimestamp.IsZero() {
+	if !addonHasFinalizer(addon, addonapiv1beta1.AddonPreDeleteHookFinalizer) &&
+		!addonHasFinalizer(addon, addonapiv1alpha1.AddonDeprecatedPreDeleteHookFinalizer) {
 		return addon, nil
 	}
 

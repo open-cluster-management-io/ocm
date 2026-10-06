@@ -2,6 +2,7 @@ package addonfactory
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
