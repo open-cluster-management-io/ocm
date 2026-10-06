@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -313,10 +314,14 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 
 		ginkgo.By("Check addon client certificate in secret")
 		secretName := fmt.Sprintf("%s-hub-kubeconfig", addOnName)
+		// Use explicit timeout: addon certificate creation after CSR approval can take longer than default 150s
+		// especially in hosted mode or with GRPC driver where multiple async operations occur
+		// (CSR approval -> cert generation -> secret creation). In some CI environments with GRPC,
+		// this can take up to 10 minutes due to infrastructure delays.
 		gomega.Eventually(func() error {
 			secret, err := spoke.KubeClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
 			if err != nil {
-				return err
+				return fmt.Errorf("waiting for secret %s/%s: %v", addOnName, secretName, err)
 			}
 			if _, ok := secret.Data[csr.TLSKeyFile]; !ok {
 				return fmt.Errorf("secret %s/%s does not have a TLS key", addOnName, secretName)
@@ -328,7 +333,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 				return fmt.Errorf("secret %s/%s does not have a kubeconfig", addOnName, secretName)
 			}
 			return nil
-		}).Should(gomega.Succeed())
+		}, 10*time.Minute, 5*time.Second).Should(gomega.Succeed())
 
 		ginkgo.By("Check addon status")
 		gomega.Eventually(func() error {

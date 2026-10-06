@@ -200,6 +200,10 @@ func TestCacheController(t *testing.T) {
 	cacheController := newExecutorCacheController(t, ctx, clusterName, kubeClient, initialized, work)
 	<-initialized
 
+	// Wait for controller to finish initial event processing after informer sync
+	// to avoid race condition where events might be processed multiple times
+	time.Sleep(500 * time.Millisecond)
+
 	// the expected 5 comes from:
 	//   * 4(allowed sar check for Get, List, Update, Patch)
 	//   * 1(denied sar check for Get; after the first Get check fails, subsequent checks do not need to be checked)
@@ -384,6 +388,10 @@ func TestCacheControllerClusterRoleWithRoleBindingOnly(t *testing.T) {
 	initialized := make(chan struct{})
 	cacheController := newExecutorCacheController(t, ctx, clusterName, kubeClient, initialized, work)
 	<-initialized
+
+	// Wait for controller to finish initial event processing after informer sync
+	// to avoid race condition where events might be processed multiple times
+	time.Sleep(500 * time.Millisecond)
 
 	err := checkSARCount(kubeClient, 5)
 	if err != nil {

@@ -606,34 +606,34 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
-			gomega.Eventually(func() bool {
+			gomega.Eventually(func(g gomega.Gomega) {
 				actual, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
-				if err != nil {
-					return false
-				}
-				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
+				g.Expect(err).ToNot(gomega.HaveOccurred())
+
+				g.Expect(actual.Spec.Template.Spec.Containers).To(gomega.HaveLen(1))
+
 				// klusterlet has no condition, replica is 0
-				gomega.Expect(actual.Status.Replicas).Should(gomega.Equal(int32(0)))
+				g.Expect(actual.Status.Replicas).To(gomega.Equal(int32(0)))
 
-				// Print actual args for debugging
 				actualArgs := actual.Spec.Template.Spec.Containers[0].Args
-				if len(actualArgs) != 8 {
-					fmt.Fprintf(ginkgo.GinkgoWriter, "should get 8 args, actual got %v\n", actualArgs)
-				}
+				g.Expect(actualArgs).To(gomega.HaveLen(8))
 
-				gomega.Expect(len(actualArgs)).Should(gomega.Equal(8))
-				return actual.Spec.Template.Spec.Containers[0].Args[2] != "--spoke-cluster-name=cluster2"
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+				// Check that cluster name hasn't been updated yet
+				g.Expect(actual.Spec.Template.Spec.Containers[0].Args[2]).ToNot(gomega.Equal("--spoke-cluster-name=cluster2"))
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
-			gomega.Eventually(func() bool {
+			gomega.Eventually(func(g gomega.Gomega) {
 				actual, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
-				if err != nil {
-					return false
-				}
-				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
-				gomega.Expect(len(actual.Spec.Template.Spec.Containers[0].Args)).Should(gomega.Equal(7))
-				return actual.Spec.Template.Spec.Containers[0].Args[2] == "--spoke-cluster-name=cluster2"
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+				g.Expect(err).ToNot(gomega.HaveOccurred())
+
+				g.Expect(actual.Spec.Template.Spec.Containers).To(gomega.HaveLen(1))
+
+				actualArgs := actual.Spec.Template.Spec.Containers[0].Args
+				g.Expect(actualArgs).To(gomega.HaveLen(7))
+
+				// Check that cluster name has been updated
+				g.Expect(actual.Spec.Template.Spec.Containers[0].Args[2]).To(gomega.Equal("--spoke-cluster-name=cluster2"))
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 			// Check if generations are correct
 			gomega.Eventually(func() bool {
