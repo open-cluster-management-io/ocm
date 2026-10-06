@@ -54,7 +54,7 @@ func resourceApplyMetricValue(t *testing.T, outcome string) float64 {
 	}
 
 	for _, mf := range metricFamilies {
-		if mf.GetName() != "work_resource_apply_total" {
+		if mf.GetName() != "work_manifestwork_resource_apply_total" {
 			continue
 		}
 

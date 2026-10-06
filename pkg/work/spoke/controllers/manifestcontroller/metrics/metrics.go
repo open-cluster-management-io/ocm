@@ -13,7 +13,7 @@ var (
 	ResourceApplyTotal = k8smetrics.NewCounterVec(
 		&k8smetrics.CounterOpts{
 			Subsystem:      WorkSubsystem,
-			Name:           "resource_apply_total",
+			Name:           "manifestwork_resource_apply_total",
 			Help:           "Total number of ManifestWork resource apply results.",
 			StabilityLevel: k8smetrics.ALPHA,
 		},

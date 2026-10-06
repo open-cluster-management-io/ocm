@@ -23,7 +23,7 @@ func TestResourceApplyTotal(t *testing.T) {
 	}
 
 	for _, mf := range mfs {
-		if mf.GetName() != "work_resource_apply_total" {
+		if mf.GetName() != "work_manifestwork_resource_apply_total" {
 			continue
 		}
 
