@@ -39,10 +39,10 @@ var (
 	}
 
 	networkPolicyFiles = []string{
-		"klusterlet/management/klusterlet-default-deny-all-networkpolicy.yaml",
 		"klusterlet/management/klusterlet-allow-dns-networkpolicy.yaml",
 		"klusterlet/management/klusterlet-networkpolicy.yaml",
 		"klusterlet/management/klusterlet-agent-networkpolicy.yaml",
+		"klusterlet/management/klusterlet-default-deny-all-networkpolicy.yaml",
 	}
 )
 
