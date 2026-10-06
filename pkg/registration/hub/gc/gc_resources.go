@@ -33,6 +33,8 @@ const (
 	minCleanupPriority cleanupPriority = 0
 	// the max priority, the resources with this priority will be last deleted.
 	maxCleanupPriority cleanupPriority = 100
+
+	gcListPageSize int64 = 500
 )
 
 var requeueError = helpers.NewRequeueError("gc requeue", 5*time.Second)
@@ -50,34 +52,29 @@ func (r *gcResourcesController) reconcile(ctx context.Context,
 	var errs []error
 	// delete the resources in order. to delete the next resource after all resource instances are deleted.
 	for _, resourceGVR := range r.resourceGVRList {
-		resourceList, err := r.metadataClient.Resource(resourceGVR).
-			Namespace(clusterNamespace).List(ctx, metav1.ListOptions{})
+		result, err := r.collectGCTargets(ctx, resourceGVR, clusterNamespace)
 		if errors.IsNotFound(err) {
 			continue
 		}
 		if err != nil {
 			return fmt.Errorf("failed to list resource %v. err:%v", resourceGVR.Resource, err)
 		}
-		if len(resourceList.Items) == 0 {
+		if result.totalCount == 0 {
 			continue
 		}
 
 		if cluster != nil {
-			remainingCnt, finalizerPendingCnt := r.RemainingCnt(resourceList)
 			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 				Type:   clusterv1.ManagedClusterConditionDeleting,
 				Status: metav1.ConditionFalse,
 				Reason: clusterv1.ConditionDeletingReasonResourceRemaining,
 				Message: fmt.Sprintf("The resource %v is remaning, the remaining count is %v, "+
-					"the finalizer pending count is %v", resourceGVR.Resource, remainingCnt, finalizerPendingCnt),
+					"the finalizer pending count is %v", resourceGVR.Resource, result.totalCount, result.finalizerPendingCount),
 			})
 		}
 
-		// sort the resources by priority, and then find the lowest priority.
-		priorityResourceMap := mapPriorityResource(resourceList)
-		firstDeletePriority := getFirstDeletePriority(priorityResourceMap)
 		// delete the resource instances with the lowest priority in one reconciling.
-		for _, resourceName := range priorityResourceMap[firstDeletePriority] {
+		for _, resourceName := range result.lowestPriorityNames {
 			err = r.metadataClient.Resource(resourceGVR).Namespace(clusterNamespace).
 				Delete(ctx, resourceName, metav1.DeleteOptions{})
 			if err != nil && !errors.IsNotFound(err) {
@@ -101,48 +98,45 @@ func (r *gcResourcesController) reconcile(ctx context.Context,
 	return nil
 }
 
-func mapPriorityResource(resourceList *metav1.PartialObjectMetadataList) map[cleanupPriority][]string {
-	priorityResourceMap := map[cleanupPriority][]string{}
-	appendResourceFunc := func(priority cleanupPriority, name string) {
-		if len(priorityResourceMap[priority]) == 0 {
-			priorityResourceMap[priority] = []string{name}
-		} else {
-			priorityResourceMap[priority] = append(priorityResourceMap[priority], name)
-		}
-	}
-
-	// the resources which have invalid priority value(not in [0.100]) will be set
-	// into minCleanupPriority set and delete first.
-	for _, resource := range resourceList.Items {
-		priority := getCleanupPriority(resource)
-		appendResourceFunc(priority, resource.Name)
-	}
-
-	return priorityResourceMap
+type gcPageResult struct {
+	totalCount            int
+	finalizerPendingCount int
+	lowestPriority        cleanupPriority
+	lowestPriorityNames   []string
 }
 
-func getFirstDeletePriority(priorityResourceMap map[cleanupPriority][]string) cleanupPriority {
-	var firstDeletePriority cleanupPriority = -1
-	for priority := range priorityResourceMap {
-		if firstDeletePriority == -1 {
-			firstDeletePriority = priority
-			continue
+// collectGCTargets paginates through all resources, processing each page as it
+// arrives to avoid holding the full resource set in memory. Only resource names
+// for the lowest cleanup priority are retained.
+func (r *gcResourcesController) collectGCTargets(ctx context.Context,
+	gvr schema.GroupVersionResource, namespace string) (*gcPageResult, error) {
+	result := &gcPageResult{lowestPriority: -1}
+	listOpts := metav1.ListOptions{Limit: gcListPageSize}
+	for {
+		page, err := r.metadataClient.Resource(gvr).Namespace(namespace).List(ctx, listOpts)
+		if err != nil {
+			return nil, err
 		}
-		if priority < firstDeletePriority {
-			firstDeletePriority = priority
+		for _, item := range page.Items {
+			result.totalCount++
+			if len(item.Finalizers) != 0 {
+				result.finalizerPendingCount++
+			}
+			p := getCleanupPriority(item)
+			switch {
+			case result.lowestPriority == -1 || p < result.lowestPriority:
+				result.lowestPriority = p
+				result.lowestPriorityNames = []string{item.Name}
+			case p == result.lowestPriority:
+				result.lowestPriorityNames = append(result.lowestPriorityNames, item.Name)
+			}
 		}
+		if page.Continue == "" {
+			break
+		}
+		listOpts.Continue = page.Continue
 	}
-	return firstDeletePriority
-}
-
-func (r *gcResourcesController) RemainingCnt(
-	resourceList *metav1.PartialObjectMetadataList) (remainingCnt, finalizerPendingCnt int) {
-	for _, item := range resourceList.Items {
-		if len(item.Finalizers) != 0 {
-			finalizerPendingCnt++
-		}
-	}
-	return len(resourceList.Items), finalizerPendingCnt
+	return result, nil
 }
 
 // getCleanupPriority is to convert the value of cleanupPriority annotation to a cleanupPriority.
