@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -12,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 
-	corev1 "k8s.io/api/core/v1"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -627,15 +627,15 @@ func containsResourceIdentifier(mcs []workapiv1.ManifestConfigOption, ri workapi
 // is already in the existing rules, compare by the path name.
 func mergeFeedbackRule(rules []workapiv1.FeedbackRule, rule workapiv1.FeedbackRule) []workapiv1.FeedbackRule {
 	rrules := rules
-	var existJsonPaths []workapiv1.JsonPath
-	var existWellKnownStatus bool = false
+	var existJSONPaths []workapiv1.JsonPath
+	existWellKnownStatus := false
 	for _, rule := range rules {
 		if rule.Type == workapiv1.WellKnownStatusType {
 			existWellKnownStatus = true
 			continue
 		}
 		if rule.Type == workapiv1.JSONPathsType {
-			existJsonPaths = append(existJsonPaths, rule.JsonPaths...)
+			existJSONPaths = append(existJSONPaths, rule.JsonPaths...)
 		}
 	}
 
@@ -650,7 +650,7 @@ func mergeFeedbackRule(rules []workapiv1.FeedbackRule, rule workapiv1.FeedbackRu
 		var jsonPaths []workapiv1.JsonPath
 		for _, path := range rule.JsonPaths {
 			found := false
-			for _, rpath := range existJsonPaths {
+			for _, rpath := range existJSONPaths {
 				if path.Name == rpath.Name {
 					found = true
 					break

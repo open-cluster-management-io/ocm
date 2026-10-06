@@ -131,6 +131,11 @@ func NewCloudEventsMetricsUnaryInterceptor() grpc.UnaryServerInterceptor {
 			recordCloudEventsMetrics(cluster, dataType, method, err, startTime)
 			return nil, err
 		}
+		if pubReq == nil || pubReq.Event == nil {
+			err := fmt.Errorf("missing event in Publish request")
+			recordCloudEventsMetrics(cluster, dataType, method, err, startTime)
+			return nil, err
+		}
 		// convert the request to cloudevent and extract the source
 		evt, err := binding.ToEvent(ctx, protocol.NewMessage(pubReq.Event))
 		if err != nil {

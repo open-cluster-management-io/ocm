@@ -18,8 +18,8 @@ func NewMockAuthorizer() *MockAuthorizer {
 	return &MockAuthorizer{}
 }
 
-func (s *MockAuthorizer) AuthorizeRequest(ctx context.Context, req any) (authz.Decision, error) {
-	return authz.DecisionAllow, nil
+func (s *MockAuthorizer) AuthorizeRequest(ctx context.Context, req any) (authz.Decision, context.Context, error) {
+	return authz.DecisionAllow, ctx, nil
 }
 
 func (s *MockAuthorizer) AuthorizeStream(ctx context.Context, ss grpc.ServerStream, info *grpc.StreamServerInfo) (authz.Decision, grpc.ServerStream, error) {

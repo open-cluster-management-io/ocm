@@ -68,6 +68,12 @@ func (l *LeaseService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.
 	if err != nil {
 		return err
 	}
+	if err := services.ValidateClusterName(evt, lease.Namespace); err != nil {
+		return err
+	}
+	if eventType.SubResource != types.SubResourceSpec {
+		return fmt.Errorf("unsupported subresource %s for lease %s/%s", eventType.SubResource, lease.Namespace, lease.Name)
+	}
 
 	klog.V(4).Infof("lease %s/%s %s %s", lease.Namespace, lease.Name, eventType.SubResource, eventType.Action)
 

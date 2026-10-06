@@ -92,7 +92,11 @@ func (o *GRPCServerOptions) Run(ctx context.Context, controllerContext *controll
 		lease.NewLeaseService(clients.KubeClient, clients.KubeInformers.Coordination().V1().Leases()))
 	grpcEventServer.RegisterService(ctx, payload.ManifestBundleEventDataType,
 		work.NewWorkService(clients.WorkClient, clients.WorkInformers.Work().V1().ManifestWorks()))
-	grpcEventServer.RegisterService(ctx, sace.TokenRequestDataType, tokenrequest.NewTokenRequestService(clients.KubeClient))
+	grpcEventServer.RegisterService(ctx, sace.TokenRequestDataType,
+		tokenrequest.NewTokenRequestService(
+			clients.KubeClient,
+			clients.AddOnInformers.Addon().V1beta1().ManagedClusterAddOns().Lister(),
+		))
 
 	// start clients
 	go clients.Run(ctx)

@@ -15,6 +15,7 @@ import (
 	clusterinformerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	clusterce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/cluster"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server"
@@ -67,12 +68,19 @@ func (c *ClusterService) HandleStatusUpdate(ctx context.Context, evt *cloudevent
 	if err != nil {
 		return err
 	}
+	if err := services.ValidateClusterName(evt, cluster.Name); err != nil {
+		return err
+	}
 
 	logger.V(4).Info("handle cluster event",
 		"clusterName", cluster.Name, "subResource", eventType.SubResource, "action", eventType.Action)
 
 	switch eventType.Action {
 	case types.CreateRequestAction:
+		if eventType.SubResource != types.SubResourceSpec {
+			return fmt.Errorf("unsupported subresource %s for cluster %s", eventType.SubResource, cluster.Name)
+		}
+		delete(cluster.Labels, clusterv1beta2.ClusterSetLabel)
 		_, err := c.clusterClient.ClusterV1().ManagedClusters().Create(ctx, cluster, metav1.CreateOptions{})
 		return err
 	case types.UpdateRequestAction:
@@ -81,7 +89,21 @@ func (c *ClusterService) HandleStatusUpdate(ctx context.Context, evt *cloudevent
 			return err
 		}
 
-		_, err := c.clusterClient.ClusterV1().ManagedClusters().Update(ctx, cluster, metav1.UpdateOptions{})
+		current, err := c.clusterClient.ClusterV1().ManagedClusters().Get(ctx, cluster.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		clusterSet, hasClusterSet := current.Labels[clusterv1beta2.ClusterSetLabel]
+		if hasClusterSet {
+			if cluster.Labels == nil {
+				cluster.Labels = map[string]string{}
+			}
+			cluster.Labels[clusterv1beta2.ClusterSetLabel] = clusterSet
+		} else {
+			delete(cluster.Labels, clusterv1beta2.ClusterSetLabel)
+		}
+
+		_, err = c.clusterClient.ClusterV1().ManagedClusters().Update(ctx, cluster, metav1.UpdateOptions{})
 		return err
 	default:
 		return fmt.Errorf("unsupported action %s for cluster %s", eventType.Action, cluster.Name)

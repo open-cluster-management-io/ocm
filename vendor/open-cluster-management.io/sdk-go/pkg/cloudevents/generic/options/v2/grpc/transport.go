@@ -104,7 +104,7 @@ func (t *grpcTransport) Subscribe(ctx context.Context) error {
 	}
 
 	if t.subscribed {
-		return fmt.Errorf("transport has already subscribed")
+		return nil
 	}
 
 	subOption := t.getSubscriptionRequest()

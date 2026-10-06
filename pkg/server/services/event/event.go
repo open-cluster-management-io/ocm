@@ -14,6 +14,8 @@ import (
 	eventce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/event"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server"
+
+	"open-cluster-management.io/ocm/pkg/server/services"
 )
 
 type EventService struct {
@@ -42,6 +44,12 @@ func (e *EventService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.
 	event, err := e.codec.Decode(evt)
 	if err != nil {
 		return err
+	}
+	if err := services.ValidateClusterName(evt, event.Namespace); err != nil {
+		return err
+	}
+	if eventType.SubResource != types.SubResourceSpec {
+		return fmt.Errorf("unsupported subresource %s for event %s/%s", eventType.SubResource, event.Namespace, event.Name)
 	}
 
 	logger.V(4).Info("handle event",

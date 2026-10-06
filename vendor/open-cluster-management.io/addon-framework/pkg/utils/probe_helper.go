@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -21,7 +22,7 @@ type DeploymentProber struct {
 }
 
 func NewDeploymentProber(deployments ...types.NamespacedName) *agent.HealthProber {
-	probeFields := []agent.ProbeField{}
+	probeFields := make([]agent.ProbeField, 0, len(deployments))
 	for _, deploy := range deployments {
 		mc := DeploymentWellKnowManifestConfig(deploy.Namespace, deploy.Name)
 		probeFields = append(probeFields, agent.ProbeField{
@@ -65,7 +66,7 @@ func NewAllDeploymentsProber() *agent.HealthProber {
 }
 
 func (d *DeploymentProber) ProbeFields() []agent.ProbeField {
-	probeFields := []agent.ProbeField{}
+	probeFields := make([]agent.ProbeField, 0, len(d.deployments))
 	for _, deploy := range d.deployments {
 		probeFields = append(probeFields, agent.ProbeField{
 			ResourceIdentifier: workapiv1.ResourceIdentifier{
