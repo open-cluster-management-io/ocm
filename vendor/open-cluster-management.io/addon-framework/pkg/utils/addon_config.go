@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
+
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 )
@@ -119,18 +120,22 @@ func GetAddOnDeploymentConfigSpecHash(config *addonapiv1beta1.AddOnDeploymentCon
 	})
 }
 
-// GetAddOnConfigRef returns the first addon config ref for the given config type. It is fine since the status will only
-// have one config for each GK.
-// (TODO) this needs to be reconcidered if we support multiple same GK in the config referencese.
+// GetAddOnConfigRef returns the last addon config ref for the given config type.
+// When multiple config references share the same group+resource, the highest-index
+// entry takes precedence, consistent with the contract documented on
+// GetAddOnDeploymentConfigValues.
 func GetAddOnConfigRef(
 	configReferences []addonapiv1beta1.ConfigReference,
 	group, resource string) (bool, addonapiv1beta1.ConfigReference) {
 
+	found := false
+	var result addonapiv1beta1.ConfigReference
 	for _, config := range configReferences {
 		if config.Group == group && config.Resource == resource {
-			return true, config
+			found = true
+			result = config
 		}
 	}
 
-	return false, addonapiv1beta1.ConfigReference{}
+	return found, result
 }

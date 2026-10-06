@@ -5,16 +5,24 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 )
 
 const (
-	ManagedClusterAddonByNamespace = "managedClusterAddonByNamespace"
+	ManagedClusterAddonByNamespace              = "managedClusterAddonByNamespace"
+	ManagedClusterAddonByName                   = "managedClusterAddonByName"
+	ManagedClusterAddonByHostedMode             = "managedClusterAddonByHostedMode"
+	ManagedClusterAddonByDeclaredHostingCluster = "managedClusterAddonByDeclaredHostingCluster"
+	ManagedClusterByHostingCluster              = "managedClusterByHostingCluster"
+	HostedModeIndexKey                          = "Hosted"
 )
 
+//nolint:revive
 func IndexManagedClusterAddonByNamespace(obj interface{}) ([]string, error) {
 	mca, ok := obj.(*addonv1beta1.ManagedClusterAddOn)
 
@@ -25,12 +33,67 @@ func IndexManagedClusterAddonByNamespace(obj interface{}) ([]string, error) {
 	return []string{mca.Namespace}, nil
 }
 
+//nolint:revive
+func IndexManagedClusterAddonByName(obj interface{}) ([]string, error) {
+	mca, ok := obj.(*addonv1beta1.ManagedClusterAddOn)
+	if !ok {
+		return nil, fmt.Errorf("obj %T is not a ManagedClusterAddon", obj)
+	}
+
+	return []string{mca.Name}, nil
+}
+
+//nolint:revive
+func IndexManagedClusterAddonByHostedMode(obj interface{}) ([]string, error) {
+	mca, ok := obj.(*addonv1beta1.ManagedClusterAddOn)
+	if !ok {
+		return nil, fmt.Errorf("obj %T is not a ManagedClusterAddon", obj)
+	}
+
+	if mca.Annotations[addonv1beta1.InstallModeAnnotationKey] != constants.InstallModeHosted {
+		return nil, nil
+	}
+
+	return []string{HostedModeIndexKey}, nil
+}
+
+//nolint:revive
+func IndexManagedClusterAddonByDeclaredHostingCluster(obj interface{}) ([]string, error) {
+	mca, ok := obj.(*addonv1beta1.ManagedClusterAddOn)
+	if !ok {
+		return nil, fmt.Errorf("obj %T is not a ManagedClusterAddon", obj)
+	}
+
+	hostingClusterName := mca.Annotations[addonv1beta1.HostingClusterNameAnnotationKey]
+	if hostingClusterName == "" {
+		return nil, nil
+	}
+	return []string{hostingClusterName}, nil
+}
+
+//nolint:revive
+func IndexManagedClusterByHostingCluster(obj interface{}) ([]string, error) {
+	cluster, ok := obj.(*clusterv1.ManagedCluster)
+	if !ok {
+		return nil, fmt.Errorf("obj %T is not a ManagedCluster", obj)
+	}
+
+	for _, claim := range cluster.Status.ClusterClaims {
+		if claim.Name == constants.HostingClusterClaimName && claim.Value != "" {
+			return []string{claim.Value}, nil
+		}
+	}
+
+	return nil, nil
+}
+
 const (
 	ManifestWorkByAddon           = "manifestWorkByAddon"
 	ManifestWorkByHostedAddon     = "manifestWorkByHostedAddon"
 	ManifestWorkHookByHostedAddon = "manifestWorkHookByHostedAddon"
 )
 
+//nolint:revive
 func IndexManifestWorkByAddon(obj interface{}) ([]string, error) {
 	work, ok := obj.(*workapiv1.ManifestWork)
 	if !ok {
@@ -46,6 +109,7 @@ func IndexManifestWorkByAddon(obj interface{}) ([]string, error) {
 	return []string{fmt.Sprintf("%s/%s", work.Namespace, addonName)}, nil
 }
 
+//nolint:revive
 func IndexManifestWorkByHostedAddon(obj interface{}) ([]string, error) {
 	work, ok := obj.(*workapiv1.ManifestWork)
 	if !ok {
@@ -61,6 +125,7 @@ func IndexManifestWorkByHostedAddon(obj interface{}) ([]string, error) {
 	return []string{fmt.Sprintf("%s/%s", addonNamespace, addonName)}, nil
 }
 
+//nolint:revive
 func IndexManifestWorkHookByHostedAddon(obj interface{}) ([]string, error) {
 	work, ok := obj.(*workapiv1.ManifestWork)
 	if !ok {
@@ -88,10 +153,7 @@ func extractAddonFromWork(work *workapiv1.ManifestWork) (string, string, bool) {
 
 	addonNamespace := work.Labels[addonv1beta1.AddonNamespaceLabelKey]
 
-	isHook := false
-	if strings.HasPrefix(work.Name, constants.PreDeleteHookWorkName(addonName)) {
-		isHook = true
-	}
+	isHook := strings.HasPrefix(work.Name, constants.PreDeleteHookWorkName(addonName))
 
 	return addonName, addonNamespace, isHook
 }
@@ -100,6 +162,7 @@ const (
 	AddonByConfig = "addonByConfig"
 )
 
+//nolint:revive
 func IndexAddonByConfig(obj interface{}) ([]string, error) {
 	addon, ok := obj.(*addonv1beta1.ManagedClusterAddOn)
 	if !ok {
@@ -131,6 +194,7 @@ const (
 	ClusterManagementAddonByConfig = "clusterManagementAddonByConfig"
 )
 
+//nolint:revive
 func IndexClusterManagementAddonByConfig(obj interface{}) ([]string, error) {
 	cma, ok := obj.(*addonv1beta1.ClusterManagementAddOn)
 	if !ok {

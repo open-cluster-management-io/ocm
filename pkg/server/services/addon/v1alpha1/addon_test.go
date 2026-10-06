@@ -96,7 +96,41 @@ func TestHandleStatusUpdate(t *testing.T) {
 					CloudEventsDataType: addonce.ManagedClusterAddOnEventDataType,
 					SubResource:         types.SubResourceStatus,
 					Action:              types.CreateRequestAction,
-				}).NewEvent()
+				}).WithClusterName("test-namespace").NewEvent()
+				addon := &addonv1alpha1.ManagedClusterAddOn{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-namespace"},
+				}
+				evt.SetData(cloudevents.ApplicationJSON, addon)
+				return &evt
+			}(),
+			expectedError: true,
+		},
+		{
+			name:   "addon namespace does not match the event cluster name",
+			addons: []runtime.Object{},
+			addonEvt: func() *cloudevents.Event {
+				evt := types.NewEventBuilder("test", types.CloudEventsType{
+					CloudEventsDataType: addonce.ManagedClusterAddOnEventDataType,
+					SubResource:         types.SubResourceStatus,
+					Action:              types.UpdateRequestAction,
+				}).WithClusterName("other-namespace").NewEvent()
+				addon := &addonv1alpha1.ManagedClusterAddOn{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-namespace"},
+				}
+				evt.SetData(cloudevents.ApplicationJSON, addon)
+				return &evt
+			}(),
+			expectedError: true,
+		},
+		{
+			name:   "update addon spec",
+			addons: []runtime.Object{},
+			addonEvt: func() *cloudevents.Event {
+				evt := types.NewEventBuilder("test", types.CloudEventsType{
+					CloudEventsDataType: addonce.ManagedClusterAddOnEventDataType,
+					SubResource:         types.SubResourceSpec,
+					Action:              types.UpdateRequestAction,
+				}).WithClusterName("test-namespace").NewEvent()
 				addon := &addonv1alpha1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-namespace"},
 				}
@@ -117,7 +151,7 @@ func TestHandleStatusUpdate(t *testing.T) {
 					CloudEventsDataType: addonce.ManagedClusterAddOnEventDataType,
 					SubResource:         types.SubResourceStatus,
 					Action:              types.UpdateRequestAction,
-				}).NewEvent()
+				}).WithClusterName("test-namespace").NewEvent()
 				addon := &addonv1alpha1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-namespace"},
 				}

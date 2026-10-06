@@ -49,7 +49,41 @@ func TestHandleStatusUpdate(t *testing.T) {
 					CloudEventsDataType: eventce.EventEventDataType,
 					SubResource:         types.SubResourceSpec,
 					Action:              types.DeleteRequestAction,
-				}).NewEvent()
+				}).WithClusterName("test-namespace").NewEvent()
+				event := &eventsv1.Event{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-event", Namespace: "test-namespace"},
+				}
+				evt.SetData(cloudevents.ApplicationJSON, event)
+				return &evt
+			}(),
+			expectedError: true,
+		},
+		{
+			name:   "event namespace does not match the event cluster name",
+			events: []runtime.Object{},
+			eventEvt: func() *cloudevents.Event {
+				evt := types.NewEventBuilder("test", types.CloudEventsType{
+					CloudEventsDataType: eventce.EventEventDataType,
+					SubResource:         types.SubResourceSpec,
+					Action:              types.CreateRequestAction,
+				}).WithClusterName("other-namespace").NewEvent()
+				event := &eventsv1.Event{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-event", Namespace: "test-namespace"},
+				}
+				evt.SetData(cloudevents.ApplicationJSON, event)
+				return &evt
+			}(),
+			expectedError: true,
+		},
+		{
+			name:   "create event with status subresource",
+			events: []runtime.Object{},
+			eventEvt: func() *cloudevents.Event {
+				evt := types.NewEventBuilder("test", types.CloudEventsType{
+					CloudEventsDataType: eventce.EventEventDataType,
+					SubResource:         types.SubResourceStatus,
+					Action:              types.CreateRequestAction,
+				}).WithClusterName("test-namespace").NewEvent()
 				event := &eventsv1.Event{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-event", Namespace: "test-namespace"},
 				}
@@ -66,7 +100,7 @@ func TestHandleStatusUpdate(t *testing.T) {
 					CloudEventsDataType: eventce.EventEventDataType,
 					SubResource:         types.SubResourceSpec,
 					Action:              types.CreateRequestAction,
-				}).NewEvent()
+				}).WithClusterName("test-namespace").NewEvent()
 				event := &eventsv1.Event{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-event", Namespace: "test-namespace"},
 				}
@@ -89,7 +123,7 @@ func TestHandleStatusUpdate(t *testing.T) {
 					CloudEventsDataType: eventce.EventEventDataType,
 					SubResource:         types.SubResourceSpec,
 					Action:              types.UpdateRequestAction,
-				}).NewEvent()
+				}).WithClusterName("test-namespace").NewEvent()
 				event := &eventsv1.Event{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-event", Namespace: "test-namespace"},
 				}

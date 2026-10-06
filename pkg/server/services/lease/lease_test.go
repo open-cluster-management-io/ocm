@@ -102,7 +102,41 @@ func TestHandleStatusUpdate(t *testing.T) {
 					CloudEventsDataType: leasece.LeaseEventDataType,
 					SubResource:         types.SubResourceStatus,
 					Action:              types.DeleteRequestAction,
-				}).NewEvent()
+				}).WithClusterName("test-lease-namespace").NewEvent()
+				lease := &coordinationv1.Lease{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-lease", Namespace: "test-lease-namespace"},
+				}
+				evt.SetData(cloudevents.ApplicationJSON, lease)
+				return &evt
+			}(),
+			expectedError: true,
+		},
+		{
+			name:   "lease namespace does not match the event cluster name",
+			leases: []runtime.Object{},
+			leaseEvt: func() *cloudevents.Event {
+				evt := types.NewEventBuilder("test", types.CloudEventsType{
+					CloudEventsDataType: leasece.LeaseEventDataType,
+					SubResource:         types.SubResourceSpec,
+					Action:              types.UpdateRequestAction,
+				}).WithClusterName("other-namespace").NewEvent()
+				lease := &coordinationv1.Lease{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-lease", Namespace: "test-lease-namespace"},
+				}
+				evt.SetData(cloudevents.ApplicationJSON, lease)
+				return &evt
+			}(),
+			expectedError: true,
+		},
+		{
+			name:   "update lease with status subresource",
+			leases: []runtime.Object{},
+			leaseEvt: func() *cloudevents.Event {
+				evt := types.NewEventBuilder("test", types.CloudEventsType{
+					CloudEventsDataType: leasece.LeaseEventDataType,
+					SubResource:         types.SubResourceStatus,
+					Action:              types.UpdateRequestAction,
+				}).WithClusterName("test-lease-namespace").NewEvent()
 				lease := &coordinationv1.Lease{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-lease", Namespace: "test-lease-namespace"},
 				}
@@ -123,7 +157,7 @@ func TestHandleStatusUpdate(t *testing.T) {
 					CloudEventsDataType: leasece.LeaseEventDataType,
 					SubResource:         types.SubResourceSpec,
 					Action:              types.UpdateRequestAction,
-				}).NewEvent()
+				}).WithClusterName("test-lease-namespace").NewEvent()
 				lease := &coordinationv1.Lease{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-lease", Namespace: "test-lease-namespace"},
 				}

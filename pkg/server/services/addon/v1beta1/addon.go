@@ -67,6 +67,12 @@ func (s *AddonService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.
 	if err != nil {
 		return err
 	}
+	if err := services.ValidateClusterName(evt, addon.Namespace); err != nil {
+		return err
+	}
+	if eventType.SubResource != types.SubResourceStatus {
+		return fmt.Errorf("unsupported subresource %s for addon %s/%s", eventType.SubResource, addon.Namespace, addon.Name)
+	}
 
 	klog.V(4).Infof("addon %s/%s status update", addon.Namespace, addon.Name)
 

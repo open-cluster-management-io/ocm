@@ -14,8 +14,10 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	csrce "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/csr"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
+	"open-cluster-management.io/sdk-go/pkg/server/grpc/authn"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
@@ -79,13 +81,68 @@ func TestList(t *testing.T) {
 }
 
 func TestHandleStatusUpdate(t *testing.T) {
+	newCSREvent := func(subResource types.EventSubResource, clusterName string, csr *certificatesv1.CertificateSigningRequest) *cloudevents.Event {
+		evt := types.NewEventBuilder("test", types.CloudEventsType{
+			CloudEventsDataType: csrce.CSREventDataType,
+			SubResource:         subResource,
+			Action:              types.CreateRequestAction,
+		}).WithClusterName(clusterName).NewEvent()
+		if err := evt.SetData(cloudevents.ApplicationJSON, csr); err != nil {
+			t.Fatal(err)
+		}
+		return &evt
+	}
+	csrForCluster := func(clusterName string) *certificatesv1.CertificateSigningRequest {
+		return &certificatesv1.CertificateSigningRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "test-csr",
+				Labels: map[string]string{clusterv1.ClusterNameLabelKey: clusterName},
+			},
+		}
+	}
+
 	cases := []struct {
 		name            string
 		csrs            []runtime.Object
 		csrEvt          *cloudevents.Event
+		identity        string
 		validateActions func(t *testing.T, actions []clienttesting.Action)
 		expectedError   bool
 	}{
+		{
+			name:          "csr cluster label does not match the event cluster name",
+			csrs:          []runtime.Object{},
+			csrEvt:        newCSREvent(types.SubResourceSpec, "test-cluster", csrForCluster("other-cluster")),
+			expectedError: true,
+		},
+		{
+			name:          "csr without cluster label",
+			csrs:          []runtime.Object{},
+			csrEvt:        newCSREvent(types.SubResourceSpec, "test-cluster", &certificatesv1.CertificateSigningRequest{ObjectMeta: metav1.ObjectMeta{Name: "test-csr"}}),
+			expectedError: true,
+		},
+		{
+			name:          "csr created by another cluster's agent identity",
+			csrs:          []runtime.Object{},
+			csrEvt:        newCSREvent(types.SubResourceSpec, "test-cluster", csrForCluster("test-cluster")),
+			identity:      "system:open-cluster-management:other-cluster:test-agent",
+			expectedError: true,
+		},
+		{
+			name:          "create csr with status subresource",
+			csrs:          []runtime.Object{},
+			csrEvt:        newCSREvent(types.SubResourceStatus, "test-cluster", csrForCluster("test-cluster")),
+			expectedError: true,
+		},
+		{
+			name:     "create csr by a non cluster identity",
+			csrs:     []runtime.Object{},
+			csrEvt:   newCSREvent(types.SubResourceSpec, "test-cluster", csrForCluster("test-cluster")),
+			identity: "system:serviceaccount:open-cluster-management:agent-registration-bootstrap",
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "create")
+			},
+		},
 		{
 			name: "invalid event type",
 			csrs: []runtime.Object{},
@@ -118,11 +175,14 @@ func TestHandleStatusUpdate(t *testing.T) {
 			csrEvt: func() *cloudevents.Event {
 				evt := types.NewEventBuilder("test", types.CloudEventsType{
 					CloudEventsDataType: csrce.CSREventDataType,
-					SubResource:         types.SubResourceStatus,
+					SubResource:         types.SubResourceSpec,
 					Action:              types.CreateRequestAction,
-				}).NewEvent()
+				}).WithClusterName("test-cluster").NewEvent()
 				csr := &certificatesv1.CertificateSigningRequest{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-csr"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "test-csr",
+						Labels: map[string]string{clusterv1.ClusterNameLabelKey: "test-cluster"},
+					},
 				}
 				evt.SetData(cloudevents.ApplicationJSON, csr)
 				return &evt
@@ -140,7 +200,12 @@ func TestHandleStatusUpdate(t *testing.T) {
 			csrInformer := csrInformers.Certificates().V1().CertificateSigningRequests()
 
 			service := NewCSRService(csrClient, csrInformer)
-			err := service.HandleStatusUpdate(context.Background(), c.csrEvt)
+			identity := c.identity
+			if identity == "" {
+				identity = "system:open-cluster-management:test-cluster:test-agent"
+			}
+			ctx := context.WithValue(context.Background(), authn.ContextUserKey, identity)
+			err := service.HandleStatusUpdate(ctx, c.csrEvt)
 			if c.expectedError {
 				if err == nil {
 					t.Errorf("expected error, got nil")

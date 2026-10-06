@@ -133,6 +133,40 @@ func TestHandleStatusUpdate(t *testing.T) {
 			expectedError: true,
 		},
 		{
+			name: "update work spec",
+			works: []runtime.Object{
+				&workv1.ManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						UID:        "test-cluster/test-work",
+						Name:       "test-work",
+						Namespace:  "test-cluster",
+						Generation: 1,
+					},
+				},
+			},
+			workEvt: func() *cloudevents.Event {
+				evt := types.NewEventBuilder("test", types.CloudEventsType{
+					CloudEventsDataType: payload.ManifestBundleEventDataType,
+					SubResource:         types.SubResourceSpec,
+					Action:              types.UpdateRequestAction,
+				}).WithResourceVersion(1).
+					WithClusterName("test-cluster").
+					WithResourceID("test-cluster/test-work").
+					WithStatusUpdateSequenceID("1").NewEvent()
+				manifestBundleStatus := &payload.ManifestBundleStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   "Test",
+							Status: metav1.ConditionTrue,
+						},
+					},
+				}
+				evt.SetData(cloudevents.ApplicationJSON, manifestBundleStatus)
+				return &evt
+			}(),
+			expectedError: true,
+		},
+		{
 			name: "update work status",
 			works: []runtime.Object{
 				&workv1.ManifestWork{

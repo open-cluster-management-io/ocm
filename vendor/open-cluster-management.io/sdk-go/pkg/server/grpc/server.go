@@ -228,10 +228,13 @@ func newAuthzUnaryInterceptor(authorizers ...authz.UnaryAuthorizer) grpc.UnarySe
 	) (interface{}, error) {
 		var errs []error
 		for _, authorizer := range authorizers {
-			decision, err := authorizer.AuthorizeRequest(ctx, req)
+			decision, authorizedCtx, err := authorizer.AuthorizeRequest(ctx, req)
+			if authorizedCtx == nil {
+				authorizedCtx = ctx
+			}
 			switch decision {
 			case authz.DecisionAllow:
-				return handler(ctx, req)
+				return handler(authorizedCtx, req)
 			case authz.DecisionDeny:
 				return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("access denied: %v", err))
 			case authz.DecisionNoOpinion:

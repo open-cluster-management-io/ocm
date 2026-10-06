@@ -81,6 +81,9 @@ func (w *WorkService) HandleStatusUpdate(ctx context.Context, evt *cloudevents.E
 	if err != nil {
 		return fmt.Errorf("failed to parse cloud event type %s, %v", evt.Type(), err)
 	}
+	if eventType.SubResource != types.SubResourceStatus {
+		return fmt.Errorf("unsupported subresource %s for work status update", eventType.SubResource)
+	}
 
 	clusterName, err := cloudeventstypes.ToString(evt.Extensions()[types.ExtensionClusterName])
 	if err != nil {

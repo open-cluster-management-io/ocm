@@ -6,9 +6,11 @@ import (
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	sace "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/serviceaccount"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server"
@@ -17,16 +19,18 @@ import (
 )
 
 type TokenRequestService struct {
-	client  kubernetes.Interface
-	codec   *sace.TokenRequestCodec
-	handler server.EventHandler
+	client      kubernetes.Interface
+	addonLister addonlisterv1beta1.ManagedClusterAddOnLister
+	codec       *sace.TokenRequestCodec
+	handler     server.EventHandler
 }
 
 // NewTokenRequestService creates a new TokenRequestService
-func NewTokenRequestService(client kubernetes.Interface) server.Service {
+func NewTokenRequestService(client kubernetes.Interface, addonLister addonlisterv1beta1.ManagedClusterAddOnLister) server.Service {
 	return &TokenRequestService{
-		client: client,
-		codec:  sace.NewTokenRequestCodec(),
+		client:      client,
+		addonLister: addonLister,
+		codec:       sace.NewTokenRequestCodec(),
 	}
 }
 
@@ -45,6 +49,15 @@ func (t *TokenRequestService) HandleStatusUpdate(ctx context.Context, evt *cloud
 
 	tokenRequest, err := t.codec.Decode(evt)
 	if err != nil {
+		return err
+	}
+	if err := services.ValidateClusterName(evt, tokenRequest.Namespace); err != nil {
+		return err
+	}
+	if eventType.SubResource != types.SubResourceSpec {
+		return fmt.Errorf("unsupported subresource %s for tokenRequest %s/%s", eventType.SubResource, tokenRequest.Namespace, tokenRequest.Name)
+	}
+	if err := t.validateServiceAccount(tokenRequest.Namespace, tokenRequest.Name); err != nil {
 		return err
 	}
 
@@ -91,4 +104,26 @@ func (t *TokenRequestService) HandleStatusUpdate(ctx context.Context, evt *cloud
 
 func (t *TokenRequestService) RegisterHandler(ctx context.Context, handler server.EventHandler) {
 	t.handler = handler
+}
+
+const addonAgentServiceAccountSuffix = "-agent"
+
+func (t *TokenRequestService) validateServiceAccount(namespace, serviceAccountName string) error {
+	if t.addonLister == nil {
+		return nil
+	}
+
+	addons, err := t.addonLister.ManagedClusterAddOns(namespace).List(labels.Everything())
+	if err != nil {
+		return fmt.Errorf("failed to list addons in namespace %q: %v", namespace, err)
+	}
+
+	for _, addon := range addons {
+		if serviceAccountName == addon.Name ||
+			serviceAccountName == fmt.Sprintf("%s%s", addon.Name, addonAgentServiceAccountSuffix) {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("serviceaccount %s/%s is not an addon agent of cluster %q", namespace, serviceAccountName, namespace)
 }
