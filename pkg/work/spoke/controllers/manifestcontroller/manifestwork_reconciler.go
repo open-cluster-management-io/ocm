@@ -307,6 +307,9 @@ func (m *manifestworkReconciler) applyManifests(
 		}
 		if om.err != nil {
 			existingResults[om.specIndex] = applyResult{Error: om.err, resourceMeta: om.resourceMeta}
+			if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ManifestWorkApplyMetrics) {
+				workmetrics.ResourceApplyTotal.WithLabelValues(outcomeFailed).Inc()
+			}
 		} else {
 			existingResults[om.specIndex] = m.applyOneManifest(ctx, om, workSpec, workStatus, recorder, owner, wm, logApply, firstApply)
 		}
