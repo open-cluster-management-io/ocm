@@ -21,21 +21,89 @@ import (
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/metrics/legacyregistry"
 
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
+	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	features "open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/basic"
+	workmetrics "open-cluster-management.io/ocm/pkg/work/spoke/controllers/manifestcontroller/metrics"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 const defaultOwner = "testowner"
+
+func resourceApplyMetricValue(t *testing.T, outcome string) float64 {
+	t.Helper()
+
+	// Reference the exported metric so this test also verifies that the
+	// manifest controller uses the metric registered by this package.
+	_ = workmetrics.ResourceApplyTotal
+
+	metricFamilies, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("failed to gather metrics: %v", err)
+	}
+
+	for _, mf := range metricFamilies {
+		if mf.GetName() != "work_manifestwork_resource_apply_total" {
+			continue
+		}
+
+		for _, metric := range mf.GetMetric() {
+			for _, label := range metric.GetLabel() {
+				if label.GetName() == "outcome" && label.GetValue() == outcome {
+					return metric.GetCounter().GetValue()
+				}
+			}
+		}
+	}
+
+	return 0
+}
+
+func manifestWorkApplyMetricValue(t *testing.T, outcome string) float64 {
+	t.Helper()
+
+	metricFamilies, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("failed to gather metrics: %v", err)
+	}
+
+	for _, mf := range metricFamilies {
+		if mf.GetName() != "work_manifestwork_apply_total" {
+			continue
+		}
+
+		for _, metric := range mf.GetMetric() {
+			for _, label := range metric.GetLabel() {
+				if label.GetName() == "outcome" && label.GetValue() == outcome {
+					return metric.GetCounter().GetValue()
+				}
+			}
+		}
+	}
+
+	return 0
+}
+
+func setApplyMetricsGate(t *testing.T, enabled bool) {
+	t.Helper()
+
+	if err := features.SpokeMutableFeatureGate.Set(
+		fmt.Sprintf("%s=%t", ocmfeature.ManifestWorkApplyMetrics, enabled),
+	); err != nil {
+		t.Fatal(err)
+	}
+}
 
 type testController struct {
 	controller    *ManifestWorkController
@@ -44,7 +112,45 @@ type testController struct {
 	kubeClient    *fakekube.Clientset
 	mwReconciler  *manifestworkReconciler
 }
+type failingExecutorValidator struct{}
 
+func (*failingExecutorValidator) Validate(
+	ctx context.Context,
+	executor *workapiv1.ManifestWorkExecutor,
+	gvr schema.GroupVersionResource,
+	namespace, name string,
+	ownedByTheWork bool,
+	obj *unstructured.Unstructured,
+) error {
+	return fmt.Errorf("validation failed")
+}
+
+func TestResourceApplyMetricOnValidationFailure(t *testing.T) {
+	defer setApplyMetricsGate(t, false)
+	setApplyMetricsGate(t, true)
+
+	tc := newTestCase("metrics-validation-failure").
+		withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"))
+
+	work, workKey := tc.newManifestWork()
+	controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
+		withKubeObject().
+		withUnstructuredObject()
+
+	controller.mwReconciler.validator = &failingExecutorValidator{}
+
+	before := resourceApplyMetricValue(t, outcomeFailed)
+
+	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
+	if err := controller.toController().sync(context.TODO(), syncContext, work.Name); err == nil {
+		t.Fatal("expected validation error, got nil")
+	}
+
+	after := resourceApplyMetricValue(t, outcomeFailed)
+	if after != before+1 {
+		t.Errorf("expected failed resource apply metric to increase by 1: before=%v after=%v", before, after)
+	}
+}
 func newController(t *testing.T, work *workapiv1.ManifestWork, appliedWork *workapiv1.AppliedManifestWork, mapper meta.RESTMapper) *testController {
 	fakeWorkClient := fakeworkclient.NewSimpleClientset(work)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fakeWorkClient, 5*time.Minute, workinformers.WithNamespace("cluster1"))
@@ -306,6 +412,104 @@ func findManifestConditionByIndex(index int32, conds []workapiv1.ManifestConditi
 	}
 
 	return nil
+}
+
+func TestResourceApplyMetricFeatureGate(t *testing.T) {
+	defer setApplyMetricsGate(t, false)
+
+	t.Run("gate disabled does not increment metric", func(t *testing.T) {
+		setApplyMetricsGate(t, false)
+
+		tc := newTestCase("metrics-gate-off").
+			withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"))
+
+		work, workKey := tc.newManifestWork()
+		controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
+			withKubeObject(tc.spokeObject...).
+			withUnstructuredObject()
+
+		before := resourceApplyMetricValue(t, "applied")
+
+		syncContext := testingcommon.NewFakeSyncContext(t, workKey)
+		if err := controller.toController().sync(context.TODO(), syncContext, work.Name); err != nil {
+			t.Fatalf("sync failed: %v", err)
+		}
+
+		after := resourceApplyMetricValue(t, "applied")
+		if after != before {
+			t.Errorf("metric changed with feature gate disabled: before=%v after=%v", before, after)
+		}
+	})
+
+	t.Run("gate enabled increments metric", func(t *testing.T) {
+		setApplyMetricsGate(t, true)
+
+		tc := newTestCase("metrics-gate-on").
+			withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"))
+
+		work, workKey := tc.newManifestWork()
+		controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
+			withKubeObject(tc.spokeObject...).
+			withUnstructuredObject()
+
+		before := resourceApplyMetricValue(t, "applied")
+
+		syncContext := testingcommon.NewFakeSyncContext(t, workKey)
+		if err := controller.toController().sync(context.TODO(), syncContext, work.Name); err != nil {
+			t.Fatalf("sync failed: %v", err)
+		}
+
+		after := resourceApplyMetricValue(t, "applied")
+		if after != before+1 {
+			t.Errorf("expected applied metric to increase by 1: before=%v after=%v", before, after)
+		}
+	})
+}
+
+func TestManifestWorkApplyMetric(t *testing.T) {
+	defer setApplyMetricsGate(t, false)
+	setApplyMetricsGate(t, true)
+
+	tc := newTestCase("manifestwork-metrics").
+		withWorkManifest(testingcommon.NewUnstructured("v1", "Secret", "ns1", "test"))
+
+	work, workKey := tc.newManifestWork()
+	controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
+		withKubeObject(tc.spokeObject...).
+		withUnstructuredObject()
+
+	before := manifestWorkApplyMetricValue(t, "applied")
+
+	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
+	if err := controller.toController().sync(context.TODO(), syncContext, work.Name); err != nil {
+		t.Fatalf("sync failed: %v", err)
+	}
+
+	after := manifestWorkApplyMetricValue(t, "applied")
+	if after != before+1 {
+		t.Errorf("expected ManifestWork applied metric to increase by 1: before=%v after=%v", before, after)
+	}
+	persistedWork, err := controller.workClient.WorkV1().
+		ManifestWorks(work.Namespace).
+		Get(context.TODO(), work.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get persisted ManifestWork: %v", err)
+	}
+
+	secondController := newController(t, persistedWork, nil, spoketesting.NewFakeRestMapper()).
+		withKubeObject(tc.spokeObject...).
+		withUnstructuredObject()
+
+	secondSyncContext := testingcommon.NewFakeSyncContext(t, workKey)
+	if err := secondController.toController().sync(context.TODO(), secondSyncContext, persistedWork.Name); err != nil {
+		t.Fatalf("second sync failed: %v", err)
+	}
+
+	afterSecondSync := manifestWorkApplyMetricValue(t, "applied")
+	if afterSecondSync != after {
+		t.Errorf("expected ManifestWork applied metric not to increment again: after first sync=%v after second sync=%v",
+			after, afterSecondSync)
+	}
 }
 
 // TestSync test cases when running sync

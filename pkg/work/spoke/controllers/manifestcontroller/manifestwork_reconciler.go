@@ -28,6 +28,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/basic"
+	workmetrics "open-cluster-management.io/ocm/pkg/work/spoke/controllers/manifestcontroller/metrics"
 )
 
 type applyResult struct {
@@ -198,6 +199,8 @@ func (m *manifestworkReconciler) reconcile(
 	// handle condition type Applied
 	// #1: Applied - work status condition (with type Applied) is applied if all manifest conditions (with type Applied) are applied
 	if inCondition, exists := allInCondition(workapiv1.ManifestApplied, newManifestConditions); exists {
+		recordApplyMetric := features.SpokeMutableFeatureGate.Enabled(ocmfeature.ManifestWorkApplyMetrics) &&
+			priorAppliedGeneration(manifestWork) < manifestWork.Generation
 		appliedCondition := metav1.Condition{
 			Type:               workapiv1.WorkApplied,
 			ObservedGeneration: manifestWork.Generation,
@@ -210,6 +213,14 @@ func (m *manifestworkReconciler) reconcile(
 			appliedCondition.Reason = "AppliedManifestWorkComplete"
 			appliedCondition.Message = "Apply manifest work complete"
 		}
+		if recordApplyMetric {
+			outcome := outcomeFailed
+			if inCondition {
+				outcome = outcomeApplied
+			}
+			workmetrics.ManifestWorkApplyTotal.WithLabelValues(outcome).Inc()
+		}
+
 		meta.SetStatusCondition(&manifestWork.Status.Conditions, appliedCondition)
 	}
 
@@ -296,6 +307,9 @@ func (m *manifestworkReconciler) applyManifests(
 		}
 		if om.err != nil {
 			existingResults[om.specIndex] = applyResult{Error: om.err, resourceMeta: om.resourceMeta}
+			if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ManifestWorkApplyMetrics) {
+				workmetrics.ResourceApplyTotal.WithLabelValues(outcomeFailed).Inc()
+			}
 		} else {
 			existingResults[om.specIndex] = m.applyOneManifest(ctx, om, workSpec, workStatus, recorder, owner, wm, logApply, firstApply)
 		}
@@ -339,6 +353,9 @@ func (m *manifestworkReconciler) applyOneManifest(
 	err := m.validator.Validate(ctx, workSpec.Executor, om.gvr, om.resourceMeta.Namespace, om.resourceMeta.Name, ownedByTheWork, om.obj)
 	if err != nil {
 		result.Error = err
+		if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ManifestWorkApplyMetrics) {
+			workmetrics.ResourceApplyTotal.WithLabelValues(outcomeFailed).Inc()
+		}
 		return result
 	}
 
@@ -356,7 +373,16 @@ func (m *manifestworkReconciler) applyOneManifest(
 	result.strategy = strategy.Type
 	applier := m.appliers.GetApplier(strategy.Type)
 	result.Result, result.Error = applier.Apply(ctx, om.gvr, om.obj, requiredOwner, option, recorder)
+	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ManifestWorkApplyMetrics) {
+		outcome := outcomeApplied
+		if strategy.Type == workapiv1.UpdateStrategyTypeReadOnly {
+			outcome = outcomeReadOnly
+		} else if result.Error != nil {
+			outcome = outcomeFailed
+		}
 
+		workmetrics.ResourceApplyTotal.WithLabelValues(outcome).Inc()
+	}
 	// Per-resource apply-log line. On the first apply of a generation it emits the
 	// apply flow; on a later reconcile it emits the sync flow only when the outcome changed vs the
 	// last-persisted ManifestApplied condition. Noop when gated off or read-only.
