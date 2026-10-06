@@ -13,7 +13,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	clienttesting "k8s.io/client-go/testing"
 
 	fakeclusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
@@ -165,6 +167,377 @@ func TestDeployReconcileAsPlacementDecisionEmpty(t *testing.T) {
 	if placeCondition.Reason != workapiv1alpha1.ReasonPlacementDecisionEmpty {
 		t.Fatal("Placement condition Reason not match PlacementDecisionEmpty ", placeCondition)
 	}
+}
+
+// TestDeployReconcileApplyFailureReportsNotAsExpected reproduces
+// https://github.com/open-cluster-management-io/ocm/issues/1522: a Placement selects a real
+// cluster, but every ManifestWork Create for it is rejected by the apiserver. Before the fix,
+// count stayed 0 and the PlacementVerified condition was misreported as PlacementDecisionEmpty,
+// even though the placement decision was not empty at all.
+func TestDeployReconcileApplyFailureReportsNotAsExpected(t *testing.T) {
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet)
+
+	applyErr := errors.New("Deployment.apps \"test\" is invalid: spec.replicas: cannot unmarshal string into Go struct field")
+	fWorkClient.PrependReactor("create", "manifestworks", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, applyErr
+	})
+
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Minute)
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	// One real cluster is selected by the placement.
+	placement, placementDecision := helpertest.CreateTestPlacement("place-test", "default", "cls1")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placement, placementDecision)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Minute)
+
+	if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision); err != nil {
+		t.Fatal(err)
+	}
+
+	placementLister := clusterInformerFactory.Cluster().V1beta1().Placements().Lister()
+	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
+
+	pmwDeployController := deployReconciler{
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: placementDecisionLister,
+		placementLister:     placementLister,
+	}
+
+	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	if err == nil {
+		t.Fatal("expected reconcile to return the aggregated apply error")
+	}
+
+	if mwrSet.Status.Summary.Total != 0 {
+		t.Fatal("expected Summary.Total to be 0 since every apply failed ", mwrSet.Status.Summary)
+	}
+
+	placeCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified)
+	if placeCondition == nil {
+		t.Fatal("Placement condition not found ", mwrSet.Status.Conditions)
+	}
+
+	// This is the actual bug: an apply failure on a real, selected cluster must not be
+	// reported the same way as "the placement selected no clusters."
+	if placeCondition.Reason != workapiv1alpha1.ReasonNotAsExpected {
+		t.Fatal("Placement condition Reason should be NotAsExpected, not PlacementDecisionEmpty ", placeCondition)
+	}
+	if !strings.Contains(placeCondition.Message, applyErr.Error()) {
+		t.Fatalf("Placement condition message = %q, want it to contain the apply error %q", placeCondition.Message, applyErr.Error())
+	}
+}
+
+// TestDeployReconcileMultiPlacementApplyFailuresAreAggregated is the multi-placement variant of
+// TestDeployReconcileApplyFailureReportsNotAsExpected: reconcile processes every PlacementRef in
+// one pass and only makes the PlacementVerified decision once, at the end, so the errors from
+// every placement must reach the condition message, not just the last one processed.
+func TestDeployReconcileMultiPlacementApplyFailuresAreAggregated(t *testing.T) {
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-a", "place-b")
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet)
+
+	// Each cluster's apply error includes its own namespace so the two failures produce
+	// distinct messages: utilerrors.NewAggregate deduplicates identical error strings, and a
+	// single shared message would pass this test even if only the last placement's error
+	// made it into the condition.
+	fWorkClient.PrependReactor("create", "manifestworks", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		mw, _ := action.(clienttesting.CreateAction).GetObject().(*workapiv1.ManifestWork)
+		return true, nil, fmt.Errorf("apply rejected for %s", mw.Namespace)
+	})
+
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Minute)
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	placementA, placementDecisionA := helpertest.CreateTestPlacement("place-a", "default", "cls1")
+	placementB, placementDecisionB := helpertest.CreateTestPlacement("place-b", "default", "cls2")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placementA, placementDecisionA, placementB, placementDecisionB)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Minute)
+
+	for _, obj := range []runtime.Object{placementA, placementB} {
+		if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(obj); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, obj := range []runtime.Object{placementDecisionA, placementDecisionB} {
+		if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(obj); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	placementLister := clusterInformerFactory.Cluster().V1beta1().Placements().Lister()
+	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
+
+	pmwDeployController := deployReconciler{
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: placementDecisionLister,
+		placementLister:     placementLister,
+	}
+
+	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	if err == nil {
+		t.Fatal("expected reconcile to return the aggregated apply errors")
+	}
+
+	if mwrSet.Status.Summary.Total != 0 {
+		t.Fatal("expected Summary.Total to be 0 since every apply failed in both placements ", mwrSet.Status.Summary)
+	}
+
+	placeCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified)
+	if placeCondition == nil {
+		t.Fatal("Placement condition not found ", mwrSet.Status.Conditions)
+	}
+	if placeCondition.Reason != workapiv1alpha1.ReasonNotAsExpected {
+		t.Fatal("Placement condition Reason should be NotAsExpected, not PlacementDecisionEmpty ", placeCondition)
+	}
+	// Both placements' apply errors should have reached the condition, not just the last one.
+	if !strings.Contains(placeCondition.Message, "apply rejected for cls1") ||
+		!strings.Contains(placeCondition.Message, "apply rejected for cls2") {
+		t.Fatalf("expected the aggregated message to mention both failures, got %q", placeCondition.Message)
+	}
+}
+
+// TestDeployReconcilePartialApplyFailureReportsNotAsExpected covers a placement that selects two
+// clusters where the apply succeeds on one and fails on the other. count > 0 in that case, but the
+// failure must still be reported instead of PlacementVerified=AsExpected.
+func TestDeployReconcilePartialApplyFailureReportsNotAsExpected(t *testing.T) {
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet)
+
+	fWorkClient.PrependReactor("create", "manifestworks", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		mw, _ := action.(clienttesting.CreateAction).GetObject().(*workapiv1.ManifestWork)
+		if mw.Namespace == "cls2" {
+			return true, nil, fmt.Errorf("namespaces %q not found", mw.Namespace)
+		}
+		return false, nil, nil
+	})
+
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Minute)
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	placement, placementDecision := helpertest.CreateTestPlacement("place-test", "default", "cls1", "cls2")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placement, placementDecision)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Minute)
+
+	if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision); err != nil {
+		t.Fatal(err)
+	}
+
+	pmwDeployController := deployReconciler{
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
+		placementLister:     clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
+	}
+
+	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	if err == nil {
+		t.Fatal("expected reconcile to return the apply error for cls2")
+	}
+
+	if mwrSet.Status.Summary.Total != 1 {
+		t.Fatal("expected Summary.Total to be 1 since only the cls1 apply succeeded ", mwrSet.Status.Summary)
+	}
+
+	placeCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified)
+	if placeCondition == nil {
+		t.Fatal("Placement condition not found ", mwrSet.Status.Conditions)
+	}
+	if placeCondition.Reason != workapiv1alpha1.ReasonNotAsExpected {
+		t.Fatal("Placement condition Reason should be NotAsExpected when any apply fails ", placeCondition)
+	}
+	if !strings.Contains(placeCondition.Message, `namespaces "cls2" not found`) {
+		t.Fatalf("expected the condition message to mention the cls2 failure, got %q", placeCondition.Message)
+	}
+}
+
+// TestDeployReconcileRolloutErrorNotOverwrittenByOtherPlacement covers two placements where one
+// fails to compute its rollout and the other rolls out fine. The NotAsExpected set for the failing
+// placement must not be overwritten with AsExpected because the other placement produced works.
+func TestDeployReconcileRolloutErrorNotOverwrittenByOtherPlacement(t *testing.T) {
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSetWithRollOutStrategy("mwrSet-test", "default",
+		map[string]clusterv1alpha1.RolloutStrategy{
+			"place-bad":  {Type: "BogusStrategyType"},
+			"place-good": {Type: clusterv1alpha1.All},
+		})
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet)
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Minute)
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	placementBad, placementDecisionBad := helpertest.CreateTestPlacement("place-bad", "default", "cls1")
+	placementGood, placementDecisionGood := helpertest.CreateTestPlacement("place-good", "default", "cls2")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placementBad, placementDecisionBad, placementGood, placementDecisionGood)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Minute)
+
+	for _, obj := range []runtime.Object{placementBad, placementGood} {
+		if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(obj); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, obj := range []runtime.Object{placementDecisionBad, placementDecisionGood} {
+		if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(obj); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	pmwDeployController := deployReconciler{
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
+		placementLister:     clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
+	}
+
+	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	if err == nil {
+		t.Fatal("expected reconcile to return the rollout strategy error")
+	}
+
+	if mwrSet.Status.Summary.Total != 1 {
+		t.Fatal("expected Summary.Total to be 1 from place-good ", mwrSet.Status.Summary)
+	}
+
+	placeCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified)
+	if placeCondition == nil {
+		t.Fatal("Placement condition not found ", mwrSet.Status.Conditions)
+	}
+	if placeCondition.Reason != workapiv1alpha1.ReasonNotAsExpected {
+		t.Fatal("Placement condition Reason should stay NotAsExpected, not be overwritten with AsExpected ", placeCondition)
+	}
+}
+
+// TestDeployReconcileInvalidRolloutStrategyReportsNotAsExpected covers a second, related way the
+// same count == 0 block used to misreport PlacementDecisionEmpty: rolloutHandler.GetRolloutCluster
+// failing (e.g. on an invalid rollout strategy type) already set PlacementVerified=NotAsExpected
+// once, but the final count == 0 block at the end of reconcile unconditionally overwrote it with
+// PlacementDecisionEmpty.
+func TestDeployReconcileInvalidRolloutStrategyReportsNotAsExpected(t *testing.T) {
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSetWithRollOutStrategy("mwrSet-test", "default",
+		map[string]clusterv1alpha1.RolloutStrategy{
+			"place-test": {Type: "BogusStrategyType"},
+		})
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet)
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Minute)
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	placement, placementDecision := helpertest.CreateTestPlacement("place-test", "default", "cls1")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placement, placementDecision)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Minute)
+
+	if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision); err != nil {
+		t.Fatal(err)
+	}
+
+	placementLister := clusterInformerFactory.Cluster().V1beta1().Placements().Lister()
+	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
+
+	pmwDeployController := deployReconciler{
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: placementDecisionLister,
+		placementLister:     placementLister,
+	}
+
+	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	if err == nil {
+		t.Fatal("expected reconcile to return the rollout strategy error")
+	}
+
+	placeCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified)
+	if placeCondition == nil {
+		t.Fatal("Placement condition not found ", mwrSet.Status.Conditions)
+	}
+	if placeCondition.Reason != workapiv1alpha1.ReasonNotAsExpected {
+		t.Fatal("Placement condition Reason should stay NotAsExpected, not be overwritten with PlacementDecisionEmpty ", placeCondition)
+	}
+}
+
+// TestDeployReconcileSelectedClustersButEmptyDecision covers the case where the Placement status
+// already reports selected clusters but the PlacementDecision has no clusters yet (for example
+// informer lag). Nothing is attempted and nothing fails, so this is still a genuine
+// PlacementDecisionEmpty and must not be reported as NotAsExpected or panic on an empty error list.
+func TestDeployReconcileSelectedClustersButEmptyDecision(t *testing.T) {
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet)
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Minute)
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	placement, _ := helpertest.CreateTestPlacement("place-test", "default", "cls1")
+	_, emptyDecision := helpertest.CreateTestPlacement("place-test", "default")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placement, emptyDecision)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Minute)
+
+	if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(emptyDecision); err != nil {
+		t.Fatal(err)
+	}
+
+	placementLister := clusterInformerFactory.Cluster().V1beta1().Placements().Lister()
+	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
+
+	pmwDeployController := deployReconciler{
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: placementDecisionLister,
+		placementLister:     placementLister,
+	}
+
+	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	placeCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified)
+	if placeCondition == nil {
+		t.Fatal("Placement condition not found ", mwrSet.Status.Conditions)
+	}
+	if placeCondition.Reason != workapiv1alpha1.ReasonPlacementDecisionEmpty {
+		t.Fatal("Placement condition Reason should be PlacementDecisionEmpty when nothing was attempted and nothing failed ", placeCondition)
+	}
+}
+
+func TestAggregatedErrorMessage(t *testing.T) {
+	t.Run("no errors yields an empty message", func(t *testing.T) {
+		if msg := aggregatedErrorMessage(nil); msg != "" {
+			t.Fatalf("got %q, want empty", msg)
+		}
+	})
+
+	t.Run("short message is returned unchanged", func(t *testing.T) {
+		msg := aggregatedErrorMessage([]error{errors.New("boom")})
+		if msg != "boom" {
+			t.Fatalf("got %q, want %q", msg, "boom")
+		}
+	})
+
+	t.Run("long message is truncated with a count", func(t *testing.T) {
+		longErr := errors.New(strings.Repeat("x", maxAggregatedErrorMessageLen*2))
+		msg := aggregatedErrorMessage([]error{longErr, errors.New("second")})
+
+		if len(msg) > maxAggregatedErrorMessageLen {
+			t.Fatalf("expected message to be capped at %d, got length %d", maxAggregatedErrorMessageLen, len(msg))
+		}
+		// utilerrors.NewAggregate wraps multiple distinct messages as "[msg1, msg2]", so the
+		// retained prefix comes from that combined string, not from longErr alone.
+		untruncated := utilerrors.NewAggregate([]error{longErr, errors.New("second")}).Error()
+		if !strings.HasPrefix(untruncated, strings.TrimSuffix(msg, "... (truncated; 2 errors total)")) {
+			t.Fatal("expected message to start with a prefix of the aggregated error")
+		}
+		if !strings.Contains(msg, "2 errors total") {
+			t.Fatalf("expected message to note the total error count, got %q", msg)
+		}
+	})
 }
 
 func TestDeployReconcileAsPlacementNotExist(t *testing.T) {

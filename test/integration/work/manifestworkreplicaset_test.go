@@ -232,6 +232,69 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 				eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 		})
 
+		ginkgo.It("should report NotAsExpected when manifestwork apply fails", func() {
+			// Point the placement decision at a cluster whose namespace does not exist so the
+			// ManifestWork create is rejected by the apiserver.
+			missingCluster := "cluster-" + utilrand.String(5)
+			placementDecision.Status.Decisions = []clusterv1beta1.ClusterDecision{{ClusterName: missingCluster}}
+			manifestWorkReplicaSet := &workapiv1alpha1.ManifestWorkReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-work",
+					Namespace: namespaceName,
+				},
+				Spec: workapiv1alpha1.ManifestWorkReplicaSetSpec{
+					ManifestWorkTemplate: workapiv1.ManifestWorkSpec{
+						Workload: workapiv1.ManifestsTemplate{
+							Manifests: []workapiv1.Manifest{
+								util.ToManifest(util.NewConfigmap("defaut", cm1, map[string]string{"a": "b"}, nil)),
+							},
+						},
+					},
+					PlacementRefs: []workapiv1alpha1.LocalPlacementReference{{
+						Name:            placement.Name,
+						RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All},
+					}},
+				},
+			}
+			_, err := hubWorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespaceName).Create(context.TODO(), manifestWorkReplicaSet, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			createdPlacement, err := hubClusterClient.ClusterV1beta1().Placements(placement.Namespace).Create(context.TODO(), placement, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			decision, err := hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).Create(
+				context.TODO(), placementDecision, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			decision.Status.Decisions = placementDecision.Status.Decisions
+			_, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).UpdateStatus(context.TODO(), decision, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			createdPlacement.Status.NumberOfSelectedClusters = 1
+			_, err = hubClusterClient.ClusterV1beta1().Placements(placement.Namespace).UpdateStatus(context.TODO(), createdPlacement, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			ginkgo.By("PlacementVerified should report the apply error instead of PlacementDecisionEmpty")
+			gomega.Eventually(assertConditionReason(
+				workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified, metav1.ConditionFalse,
+				workapiv1alpha1.ReasonNotAsExpected, manifestWorkReplicaSet),
+				eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+			rs, err := hubWorkClient.WorkV1alpha1().ManifestWorkReplicaSets(manifestWorkReplicaSet.Namespace).Get(
+				context.TODO(), manifestWorkReplicaSet.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			cond := meta.FindStatusCondition(rs.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified)
+			gomega.Expect(cond.Message).To(gomega.ContainSubstring(missingCluster))
+			gomega.Expect(rs.Status.Summary.Total).To(gomega.Equal(0))
+
+			ginkgo.By("Creating the cluster namespace should let the apply succeed")
+			ns := &corev1.Namespace{}
+			ns.Name = missingCluster
+			_, err = spokeKubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			gomega.Eventually(assertWorksByReplicaSet(sets.New(missingCluster), manifestWorkReplicaSet, 1), eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+			gomega.Eventually(assertConditionReason(
+				workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified, metav1.ConditionTrue,
+				workapiv1alpha1.ReasonAsExpected, manifestWorkReplicaSet),
+				eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		})
+
 		ginkgo.It("should delete manifestworks from old placement when placementRef changes", func() {
 			// Create first placement and placementDecision
 			placement1 := &clusterv1beta1.Placement{
@@ -771,6 +834,23 @@ func assertCondition(condType string, status metav1.ConditionStatus, mwrs *worka
 			return fmt.Errorf("condition status is not correct, want %v got %v", status, cond.Status)
 		}
 
+		return nil
+	}
+}
+
+func assertConditionReason(condType string, status metav1.ConditionStatus, reason string, mwrs *workapiv1alpha1.ManifestWorkReplicaSet) func() error {
+	return func() error {
+		if err := assertCondition(condType, status, mwrs)(); err != nil {
+			return err
+		}
+		rs, err := hubWorkClient.WorkV1alpha1().ManifestWorkReplicaSets(mwrs.Namespace).Get(context.TODO(), mwrs.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		cond := meta.FindStatusCondition(rs.Status.Conditions, condType)
+		if cond.Reason != reason {
+			return fmt.Errorf("condition reason is not correct, want %v got %v", reason, cond.Reason)
+		}
 		return nil
 	}
 }
