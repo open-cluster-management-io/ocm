@@ -366,7 +366,7 @@ func (d *nodePlacementDecorator) decorate(_ string, pod *corev1.PodTemplateSpec)
 		pod.Spec.NodeSelector = np.NodeSelector
 	}
 
-	if np.NodeSelector != nil {
+	if np.Tolerations != nil {
 		pod.Spec.Tolerations = np.Tolerations
 	}
 
