@@ -489,6 +489,27 @@ func TestManifestWorkApplyMetric(t *testing.T) {
 	if after != before+1 {
 		t.Errorf("expected ManifestWork applied metric to increase by 1: before=%v after=%v", before, after)
 	}
+	persistedWork, err := controller.workClient.WorkV1().
+		ManifestWorks(work.Namespace).
+		Get(context.TODO(), work.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get persisted ManifestWork: %v", err)
+	}
+
+	secondController := newController(t, persistedWork, nil, spoketesting.NewFakeRestMapper()).
+		withKubeObject(tc.spokeObject...).
+		withUnstructuredObject()
+
+	secondSyncContext := testingcommon.NewFakeSyncContext(t, workKey)
+	if err := secondController.toController().sync(context.TODO(), secondSyncContext, persistedWork.Name); err != nil {
+		t.Fatalf("second sync failed: %v", err)
+	}
+
+	afterSecondSync := manifestWorkApplyMetricValue(t, "applied")
+	if afterSecondSync != after {
+		t.Errorf("expected ManifestWork applied metric not to increment again: after first sync=%v after second sync=%v",
+			after, afterSecondSync)
+	}
 }
 
 // TestSync test cases when running sync
