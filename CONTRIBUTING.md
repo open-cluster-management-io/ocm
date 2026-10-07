@@ -67,7 +67,7 @@ AI tools are welcome in this project. We use them ourselves. What matters is the
 
 *This section was drafted with the assistance of AI, in keeping with the very guidance it describes.*
 
-*This project follows the Linux Foundation's policy on generative AI contributions — see [AI_POLICY.md](AI_POLICY.md) for details.*
+*This project follows the Linux Foundation's policy on generative AI contributions — see [AI_POLICY.md](AI_POLICY.md) for details — and the Kubernetes community's [AI Guidance for pull requests](https://www.kubernetes.dev/docs/guide/pull-requests/#ai-guidance).*
 
 **We continue reviewing legal requirements and always have alignment with the CNCF rules and guidelines; this is an evolving space and may change without notice.**
 
