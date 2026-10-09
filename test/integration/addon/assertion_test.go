@@ -648,8 +648,23 @@ func assertClusterManagementAddOnConditionsBeta(name string, expect ...metav1.Co
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
+// earliestRolloutDeadline returns the earliest time at which the rollout may report a timeout
+// for a progression that started at start.
+//
+// The rollout counts the deadline from the LastTransitionTime of the addon Progressing
+// condition, which is serialized with second granularity. The stored timestamp is therefore up
+// to one second earlier than the moment the controller recorded it, and the timeout can fire
+// that much before start+duration without the controller being wrong. Truncating start to the
+// second gives the same lower bound the controller works with, so the assertions below can
+// check the whole interval leading up to it instead of leaving a blind spot at the end.
+func earliestRolloutDeadline(start metav1.Time, duration time.Duration) time.Time {
+	return start.Time.Truncate(time.Second).Add(duration)
+}
+
 func assertClusterManagementAddOnNoConditionsAlpha(name string, start metav1.Time, duration time.Duration, expect ...metav1.Condition) {
 	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s no conditions in duration %v (Alpha)", name, duration))
+
+	notBefore := earliestRolloutDeadline(start, duration)
 
 	gomega.Consistently(func() error {
 		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
@@ -657,23 +672,25 @@ func assertClusterManagementAddOnNoConditionsAlpha(name string, start metav1.Tim
 			return err
 		}
 
-		elapsedTime := metav1.Now().Sub(start.Time)
+		// Once the deadline is reached the condition is allowed to show up at any time
+		now := metav1.Now()
+		if !now.Time.Before(notBefore) {
+			return nil
+		}
 
-		// Only check if we haven't reached the expected timeout duration yet
-		if elapsedTime < duration {
-			for i, ec := range expect {
-				if i >= len(actual.Status.InstallProgressions) {
-					return fmt.Errorf("expected %d install progressions, actual: %d", i+1, len(actual.Status.InstallProgressions))
-				}
-				cond := meta.FindStatusCondition(actual.Status.InstallProgressions[i].Conditions, ec.Type)
+		for i, ec := range expect {
+			if i >= len(actual.Status.InstallProgressions) {
+				return fmt.Errorf("expected %d install progressions, actual: %d", i+1, len(actual.Status.InstallProgressions))
+			}
+			cond := meta.FindStatusCondition(actual.Status.InstallProgressions[i].Conditions, ec.Type)
 
-				// The expected timeout condition should NOT appear before the duration
-				if cond != nil &&
-					cond.Status == ec.Status &&
-					cond.Reason == ec.Reason &&
-					cond.Message == ec.Message {
-					return fmt.Errorf("unexpected condition matches before duration (elapsed: %v, expected: %v)", elapsedTime, duration)
-				}
+			// The expected timeout condition should NOT appear before the duration
+			if cond != nil &&
+				cond.Status == ec.Status &&
+				cond.Reason == ec.Reason &&
+				cond.Message == ec.Message {
+				return fmt.Errorf("unexpected condition matches %v before the %v deadline %v",
+					now.Time, duration, notBefore)
 			}
 		}
 
@@ -684,29 +701,33 @@ func assertClusterManagementAddOnNoConditionsAlpha(name string, start metav1.Tim
 func assertClusterManagementAddOnNoConditionsBeta(name string, start metav1.Time, duration time.Duration, expect ...metav1.Condition) {
 	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s no conditions in duration %v (Beta)", name, duration))
 
+	notBefore := earliestRolloutDeadline(start, duration)
+
 	gomega.Consistently(func() error {
 		actual, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 
-		elapsedTime := metav1.Now().Sub(start.Time)
+		// Once the deadline is reached the condition is allowed to show up at any time
+		now := metav1.Now()
+		if !now.Time.Before(notBefore) {
+			return nil
+		}
 
-		// Only check if we haven't reached the expected timeout duration yet
-		if elapsedTime < duration {
-			for i, ec := range expect {
-				if i >= len(actual.Status.InstallProgressions) {
-					return fmt.Errorf("expected %d install progressions, actual: %d", i+1, len(actual.Status.InstallProgressions))
-				}
-				cond := meta.FindStatusCondition(actual.Status.InstallProgressions[i].Conditions, ec.Type)
+		for i, ec := range expect {
+			if i >= len(actual.Status.InstallProgressions) {
+				return fmt.Errorf("expected %d install progressions, actual: %d", i+1, len(actual.Status.InstallProgressions))
+			}
+			cond := meta.FindStatusCondition(actual.Status.InstallProgressions[i].Conditions, ec.Type)
 
-				// The expected timeout condition should NOT appear before the duration
-				if cond != nil &&
-					cond.Status == ec.Status &&
-					cond.Reason == ec.Reason &&
-					cond.Message == ec.Message {
-					return fmt.Errorf("unexpected condition matches before duration (elapsed: %v, expected: %v)", elapsedTime, duration)
-				}
+			// The expected timeout condition should NOT appear before the duration
+			if cond != nil &&
+				cond.Status == ec.Status &&
+				cond.Reason == ec.Reason &&
+				cond.Message == ec.Message {
+				return fmt.Errorf("unexpected condition matches %v before the %v deadline %v",
+					now.Time, duration, notBefore)
 			}
 		}
 

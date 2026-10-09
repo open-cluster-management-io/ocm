@@ -7,9 +7,11 @@ import (
 
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
@@ -238,54 +240,142 @@ func (spoke *Spoke) CheckKlusterletStatus(klusterletName, condType, reason strin
 	return nil
 }
 
-func (spoke *Spoke) EnableRegistrationFeature(klusterletName, feature string) error {
-	kl, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(context.TODO(), klusterletName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	if kl.Spec.RegistrationConfiguration == nil {
-		kl.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationConfiguration{}
-	}
-
-	if len(kl.Spec.RegistrationConfiguration.FeatureGates) == 0 {
-		kl.Spec.RegistrationConfiguration.FeatureGates = make([]operatorapiv1.FeatureGate, 0)
-	}
-
-	for idx, f := range kl.Spec.RegistrationConfiguration.FeatureGates {
-		if f.Feature == feature {
-			if f.Mode == operatorapiv1.FeatureGateModeTypeEnable {
-				return nil
-			}
-			kl.Spec.RegistrationConfiguration.FeatureGates[idx].Mode = operatorapiv1.FeatureGateModeTypeEnable
-			_, err = spoke.OperatorClient.OperatorV1().Klusterlets().Update(context.TODO(), kl, metav1.UpdateOptions{})
-			return err
-		}
-	}
-
-	featureGate := operatorapiv1.FeatureGate{
-		Feature: feature,
-		Mode:    operatorapiv1.FeatureGateModeTypeEnable,
-	}
-
-	kl.Spec.RegistrationConfiguration.FeatureGates = append(kl.Spec.RegistrationConfiguration.FeatureGates, featureGate)
-	_, err = spoke.OperatorClient.OperatorV1().Klusterlets().Update(context.TODO(), kl, metav1.UpdateOptions{})
-	return err
+func EnableRegistrationFeature(hub *Hub, spoke *Spoke, klusterletName, feature string) {
+	UpdateKlusterlet(hub, spoke, klusterletName, func(klusterlet *operatorapiv1.Klusterlet) {
+		setRegistrationFeatureGate(klusterlet, feature, operatorapiv1.FeatureGateModeTypeEnable)
+	})
 }
 
-func (spoke *Spoke) RemoveRegistrationFeature(klusterletName string, feature string) error {
-	kl, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(context.TODO(), klusterletName, metav1.GetOptions{})
+func RemoveRegistrationFeature(hub *Hub, spoke *Spoke, klusterletName, feature string) {
+	UpdateKlusterlet(hub, spoke, klusterletName, func(klusterlet *operatorapiv1.Klusterlet) {
+		setRegistrationFeatureGate(klusterlet, feature, operatorapiv1.FeatureGateModeTypeDisable)
+	})
+}
+
+func setRegistrationFeatureGate(
+	klusterlet *operatorapiv1.Klusterlet, feature string, mode operatorapiv1.FeatureGateModeType) {
+	if klusterlet.Spec.RegistrationConfiguration == nil {
+		klusterlet.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationConfiguration{}
+	}
+
+	for idx, fg := range klusterlet.Spec.RegistrationConfiguration.FeatureGates {
+		if fg.Feature == feature {
+			klusterlet.Spec.RegistrationConfiguration.FeatureGates[idx].Mode = mode
+			return
+		}
+	}
+
+	klusterlet.Spec.RegistrationConfiguration.FeatureGates = append(
+		klusterlet.Spec.RegistrationConfiguration.FeatureGates,
+		operatorapiv1.FeatureGate{Feature: feature, Mode: mode})
+}
+
+// UpdateKlusterlet applies update to the klusterlet and, when that changes its spec, waits until
+// the operator has rolled the registration agent out with the new configuration. The tests share
+// the universal klusterlet, and returning before the new agent serves leaves the next test running
+// against an agent that is still restarting.
+func UpdateKlusterlet(hub *Hub, spoke *Spoke, klusterletName string,
+	update func(klusterlet *operatorapiv1.Klusterlet)) {
+	var agentClient kubernetes.Interface
+	var agentNamespace, deploymentName string
+	var generation int64
+	var changed bool
+
+	Eventually(func() error {
+		klusterlet, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(
+			context.TODO(), klusterletName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		agentClient = AgentClient(hub, spoke, klusterlet)
+		agentNamespace, deploymentName = registrationAgentDeployment(klusterlet)
+		deployment, err := agentClient.AppsV1().Deployments(agentNamespace).Get(
+			context.TODO(), deploymentName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		generation = deployment.Generation
+
+		updated := klusterlet.DeepCopy()
+		update(updated)
+		if equality.Semantic.DeepEqual(klusterlet.Spec, updated.Spec) {
+			changed = false
+			return nil
+		}
+
+		_, err = spoke.OperatorClient.OperatorV1().Klusterlets().Update(
+			context.TODO(), updated, metav1.UpdateOptions{})
+		changed = err == nil
+		return err
+	}).Should(Succeed())
+
+	if !changed {
+		return
+	}
+
+	klog.Infof("waiting for the registration agent deployment %s/%s to roll out past generation %d",
+		agentNamespace, deploymentName, generation)
+	Eventually(func() error {
+		return registrationAgentRolledOut(agentClient, agentNamespace, deploymentName, generation)
+	}, 2*time.Minute, 5*time.Second).Should(Succeed())
+}
+
+// AgentClient returns the client of the cluster the klusterlet agents run on, which is the
+// management cluster in the hosted modes and the managed cluster otherwise.
+func AgentClient(hub *Hub, spoke *Spoke, klusterlet *operatorapiv1.Klusterlet) kubernetes.Interface {
+	if helpers.IsHosted(klusterlet.Spec.DeployOption.Mode) {
+		return hub.KubeClient
+	}
+
+	return spoke.KubeClient
+}
+
+// registrationAgentDeployment returns the deployment running the registration agent of the
+// klusterlet. The singleton modes run all the agents in a single deployment.
+func registrationAgentDeployment(klusterlet *operatorapiv1.Klusterlet) (namespace, name string) {
+	if helpers.IsSingleton(klusterlet.Spec.DeployOption.Mode) {
+		return helpers.AgentNamespace(klusterlet), fmt.Sprintf("%s-agent", klusterlet.Name)
+	}
+
+	return helpers.AgentNamespace(klusterlet), fmt.Sprintf("%s-registration-agent", klusterlet.Name)
+}
+
+// registrationAgentRolledOut checks that the operator has applied a generation of the registration
+// agent deployment newer than previousGeneration and that all of its replicas are ready again.
+func registrationAgentRolledOut(
+	client kubernetes.Interface, namespace, name string, previousGeneration int64) error {
+	deployment, err := client.AppsV1().Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	for indx, fg := range kl.Spec.RegistrationConfiguration.FeatureGates {
-		if fg.Feature == feature {
-			kl.Spec.RegistrationConfiguration.FeatureGates[indx].Mode = operatorapiv1.FeatureGateModeTypeDisable
-			break
-		}
+
+	if deployment.Generation <= previousGeneration {
+		return fmt.Errorf("deployment %s/%s is still at generation %d, waiting for one newer than %d",
+			namespace, name, deployment.Generation, previousGeneration)
 	}
-	_, err = spoke.OperatorClient.OperatorV1().Klusterlets().Update(context.TODO(), kl, metav1.UpdateOptions{})
-	return err
+
+	if deployment.Status.ObservedGeneration != deployment.Generation {
+		return fmt.Errorf("deployment %s/%s has observed generation %d, waiting for %d",
+			namespace, name, deployment.Status.ObservedGeneration, deployment.Generation)
+	}
+
+	if deployment.Status.UpdatedReplicas != deployment.Status.Replicas {
+		return fmt.Errorf("deployment %s/%s has updated %d of %d replicas",
+			namespace, name, deployment.Status.UpdatedReplicas, deployment.Status.Replicas)
+	}
+
+	if deployment.Status.ReadyReplicas != deployment.Status.Replicas {
+		return fmt.Errorf("deployment %s/%s has %d of %d replicas ready",
+			namespace, name, deployment.Status.ReadyReplicas, deployment.Status.Replicas)
+	}
+
+	if deployment.Status.UnavailableReplicas > 0 {
+		return fmt.Errorf("deployment %s/%s has %d unavailable replicas",
+			namespace, name, deployment.Status.UnavailableReplicas)
+	}
+
+	return nil
 }
 
 // CleanKlusterletRelatedResources needs both hub side and spoke side operations.
