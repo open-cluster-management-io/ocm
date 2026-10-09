@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	cpv1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
 	cpclientset "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned"
@@ -156,6 +157,9 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 			if profile.Spec.DisplayName != clusterName {
 				return fmt.Errorf("unexpected display name: %s", profile.Spec.DisplayName)
 			}
+			if profile.Labels[clusterprofile.InventoryMemberIDLabelKey] != clusterName {
+				return fmt.Errorf("unexpected inventory member ID: %s", profile.Labels[clusterprofile.InventoryMemberIDLabelKey])
+			}
 
 			// Verify labels
 			if profile.Labels[cpv1alpha1.LabelClusterManagerKey] != clusterprofile.ClusterProfileManagerName {
@@ -264,9 +268,100 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 				if profile.Namespace != ns {
 					return fmt.Errorf("unexpected namespace: %s", profile.Namespace)
 				}
+				if profile.Labels[clusterprofile.InventoryMemberIDLabelKey] != clusterName {
+					return fmt.Errorf("unexpected inventory member ID: %s", profile.Labels[clusterprofile.InventoryMemberIDLabelKey])
+				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 		}
+	})
+
+	ginkgo.It("should synchronize inventory member IDs across namespaces", func() {
+		ctx := context.Background()
+		suffix := rand.String(6)
+		clusterName := "cluster-" + suffix
+		clusterSetName := "clusterset-" + suffix
+		namespaces := []string{"inventory1-" + suffix, "inventory2-" + suffix}
+		testNamespaces = append(testNamespaces, namespaces...)
+
+		_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(ctx, &clusterv1beta2.ManagedClusterSet{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterSetName},
+			Spec: clusterv1beta2.ManagedClusterSetSpec{
+				ClusterSelector: clusterv1beta2.ManagedClusterSelector{SelectorType: clusterv1beta2.ExclusiveClusterSetLabel},
+			},
+		}, metav1.CreateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		ginkgo.DeferCleanup(func() {
+			gomega.Expect(clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(ctx, clusterSetName, metav1.DeleteOptions{})).To(gomega.Succeed())
+		})
+		_, err = clusterClient.ClusterV1().ManagedClusters().Create(ctx, &clusterv1.ManagedCluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: clusterName,
+				Labels: map[string]string{
+					clusterv1beta2.ClusterSetLabel:           clusterSetName,
+					clusterprofile.InventoryMemberIDLabelKey: "Prod_JP.cluster-01",
+				},
+			},
+			Spec: clusterv1.ManagedClusterSpec{HubAcceptsClient: true},
+		}, metav1.CreateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		ginkgo.DeferCleanup(func() {
+			gomega.Expect(clusterClient.ClusterV1().ManagedClusters().Delete(ctx, clusterName, metav1.DeleteOptions{})).To(gomega.Succeed())
+		})
+		for _, namespace := range namespaces {
+			_, err = kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: namespace},
+			}, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			_, err = clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(ctx, &clusterv1beta2.ManagedClusterSetBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: clusterSetName, Namespace: namespace},
+				Spec:       clusterv1beta2.ManagedClusterSetBindingSpec{ClusterSet: clusterSetName},
+			}, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		}
+		expectMemberID := func(memberID string) {
+			gomega.Eventually(func() error {
+				for _, namespace := range namespaces {
+					profile, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(ctx, clusterName, metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+					if got := profile.Labels[clusterprofile.InventoryMemberIDLabelKey]; got != memberID {
+						return fmt.Errorf("profile %s/%s: expected inventory member ID %q, got %q", namespace, clusterName, memberID, got)
+					}
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		}
+		ginkgo.By("Copy the coordinated ID to both inventories")
+		expectMemberID("Prod_JP.cluster-01")
+
+		ginkgo.By("Restore a missing ID on an existing profile and preserve custom metadata")
+		_, err = clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespaces[0]).Patch(ctx, clusterName, types.MergePatchType,
+			[]byte(fmt.Sprintf(`{"metadata":{"labels":{%q:null,"custom-label":"keep-me"},"annotations":{"custom-annotation":"keep-me"}}}`,
+				clusterprofile.InventoryMemberIDLabelKey)), metav1.PatchOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		expectMemberID("Prod_JP.cluster-01")
+
+		for _, tc := range []struct {
+			name       string
+			labelJSON  string
+			expectedID string
+		}{
+			{name: "Change the coordinated ID", labelJSON: `"Prod_JP.cluster-02"`, expectedID: "Prod_JP.cluster-02"},
+			{name: "Fall back to the cluster name when the label is removed", labelJSON: `null`, expectedID: clusterName},
+			{name: "Restore the coordinated ID", labelJSON: `"Prod_JP.cluster-03"`, expectedID: "Prod_JP.cluster-03"},
+		} {
+			ginkgo.By(tc.name)
+			patch := fmt.Sprintf(`{"metadata":{"labels":{%q:%s}}}`, clusterprofile.InventoryMemberIDLabelKey, tc.labelJSON)
+			_, err = clusterClient.ClusterV1().ManagedClusters().Patch(ctx, clusterName, types.MergePatchType, []byte(patch), metav1.PatchOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			expectMemberID(tc.expectedID)
+		}
+		profile, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespaces[0]).Get(ctx, clusterName, metav1.GetOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(profile.Labels["custom-label"]).To(gomega.Equal("keep-me"))
+		gomega.Expect(profile.Annotations["custom-annotation"]).To(gomega.Equal("keep-me"))
 	})
 
 	ginkgo.It("should delete ClusterProfile when ManagedClusterSetBinding is deleted", func() {

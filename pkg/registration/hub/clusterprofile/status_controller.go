@@ -219,6 +219,7 @@ func syncLabelsFromCluster(profile *cpv1alpha1.ClusterProfile, cluster *v1.Manag
 	requiredLabels := map[string]string{
 		cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
 		cpv1alpha1.LabelClusterSetKey:     mclSetLabel,
+		InventoryMemberIDLabelKey:         inventoryMemberID(cluster),
 		// Keep the cluster-name label that lifecycle controller added
 		v1.ClusterNameLabelKey: cluster.Name,
 	}
