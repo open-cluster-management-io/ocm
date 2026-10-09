@@ -21,6 +21,7 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/addon/templateagent"
 	"open-cluster-management.io/ocm/test/e2e/manifests"
+	"open-cluster-management.io/ocm/test/framework"
 )
 
 var _ = ginkgo.Describe("Template addon with token-based authentication (v1alpha1)", ginkgo.Ordered, ginkgo.Label("addon-manager", "addon-token-auth"), func() {
@@ -30,7 +31,6 @@ var _ = ginkgo.Describe("Template addon with token-based authentication (v1alpha
 	var originalAddOnDriver *operatorapiv1.AddOnRegistrationDriver
 
 	var agentClient kubernetes.Interface
-	var agentNamespace string
 	s := runtime.NewScheme()
 	_ = scheme.AddToScheme(s)
 	_ = addonapiv1alpha1.Install(s)
@@ -54,113 +54,23 @@ var _ = ginkgo.Describe("Template addon with token-based authentication (v1alpha
 			originalAddOnDriver = klusterlet.Spec.RegistrationConfiguration.AddOnKubeClientRegistrationDriver
 		}
 
-		ginkgo.By("Get initial registration agent deployment generation before updating klusterlet")
-		var initialGeneration int64
-		var registrationDeploymentName string
-		registrationDeploymentName = fmt.Sprintf("%s-registration-agent", klusterlet.Name)
-		if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingleton ||
-			klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingletonHosted {
-			registrationDeploymentName = fmt.Sprintf("%s-agent", klusterlet.Name)
-		}
-
 		// In hosted mode, agents run on the hub cluster, otherwise on the spoke cluster
-		agentClient = spoke.KubeClient
-		agentNamespace = universalAgentNamespace
-		if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeHosted ||
-			klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingletonHosted {
-			agentClient = hub.KubeClient
-			agentNamespace = klusterlet.Name
-		}
-
-		deployment, err := agentClient.AppsV1().Deployments(agentNamespace).Get(
-			context.TODO(), registrationDeploymentName, metav1.GetOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		initialGeneration = deployment.Generation
+		agentClient = framework.AgentClient(hub, spoke, klusterlet)
 
 		ginkgo.By("Update klusterlet to use token-based authentication for addons")
-		gomega.Eventually(func() error {
-			klusterlet, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(
-				context.TODO(), universalKlusterletName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
+		framework.UpdateKlusterlet(hub, spoke, universalKlusterletName,
+			func(klusterlet *operatorapiv1.Klusterlet) {
+				if klusterlet.Spec.RegistrationConfiguration == nil {
+					klusterlet.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationConfiguration{}
+				}
 
-			if klusterlet.Spec.RegistrationConfiguration == nil {
-				klusterlet.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationConfiguration{}
-			}
-
-			klusterlet.Spec.RegistrationConfiguration.AddOnKubeClientRegistrationDriver = &operatorapiv1.AddOnRegistrationDriver{
-				AuthType: "token",
-				Token: &operatorapiv1.TokenConfig{
-					ExpirationSeconds: 3600, // 1 hour for testing
-				},
-			}
-
-			_, err = spoke.OperatorClient.OperatorV1().Klusterlets().Update(
-				context.TODO(), klusterlet, metav1.UpdateOptions{})
-			return err
-		}).Should(gomega.Succeed())
-
-		ginkgo.By("Verify klusterlet is updated with token auth configuration")
-		gomega.Eventually(func() error {
-			klusterlet, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(
-				context.TODO(), universalKlusterletName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-
-			if klusterlet.Spec.RegistrationConfiguration == nil ||
-				klusterlet.Spec.RegistrationConfiguration.AddOnKubeClientRegistrationDriver == nil {
-				return fmt.Errorf("token auth configuration not set")
-			}
-
-			if klusterlet.Spec.RegistrationConfiguration.AddOnKubeClientRegistrationDriver.AuthType != "token" {
-				return fmt.Errorf("auth type is not token: %s",
-					klusterlet.Spec.RegistrationConfiguration.AddOnKubeClientRegistrationDriver.AuthType)
-			}
-
-			return nil
-		}).Should(gomega.Succeed())
-
-		ginkgo.By("Wait for registration agent deployment to rollout with new token auth configuration")
-		gomega.Eventually(func() error {
-			deployment, err := agentClient.AppsV1().Deployments(agentNamespace).Get(
-				context.TODO(), registrationDeploymentName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-
-			// Wait for deployment generation to increment (indicates config change was applied)
-			if deployment.Generation <= initialGeneration {
-				return fmt.Errorf("deployment generation has not incremented yet: current=%d, initial=%d",
-					deployment.Generation, initialGeneration)
-			}
-
-			// Ensure the deployment controller has observed the latest spec
-			if deployment.Status.ObservedGeneration != deployment.Generation {
-				return fmt.Errorf("deployment has not observed latest generation: observed=%d, current=%d",
-					deployment.Status.ObservedGeneration, deployment.Generation)
-			}
-
-			// Ensure all replicas have been updated with the new configuration
-			if deployment.Status.UpdatedReplicas != deployment.Status.Replicas {
-				return fmt.Errorf("deployment has not updated all replicas: updated=%d, total=%d",
-					deployment.Status.UpdatedReplicas, deployment.Status.Replicas)
-			}
-
-			// Ensure all updated replicas are ready
-			if deployment.Status.ReadyReplicas != deployment.Status.Replicas {
-				return fmt.Errorf("deployment not fully ready: ready=%d, total=%d",
-					deployment.Status.ReadyReplicas, deployment.Status.Replicas)
-			}
-
-			// Ensure there are no unavailable replicas
-			if deployment.Status.UnavailableReplicas > 0 {
-				return fmt.Errorf("deployment has unavailable replicas: %d", deployment.Status.UnavailableReplicas)
-			}
-
-			return nil
-		}, "2m", "5s").Should(gomega.Succeed())
+				klusterlet.Spec.RegistrationConfiguration.AddOnKubeClientRegistrationDriver = &operatorapiv1.AddOnRegistrationDriver{
+					AuthType: "token",
+					Token: &operatorapiv1.TokenConfig{
+						ExpirationSeconds: 3600, // 1 hour for testing
+					},
+				}
+			})
 
 		signerSecretNamespace = "signer-secret-token-ns-" + rand.String(6)
 		ginkgo.By("Create addon custom sign secret namespace")
@@ -196,24 +106,14 @@ var _ = ginkgo.Describe("Template addon with token-based authentication (v1alpha
 		}
 
 		ginkgo.By("Restore original klusterlet AddOnKubeClientRegistrationDriver configuration")
-		gomega.Eventually(func() error {
-			klusterlet, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(
-				context.TODO(), universalKlusterletName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
+		framework.UpdateKlusterlet(hub, spoke, universalKlusterletName,
+			func(klusterlet *operatorapiv1.Klusterlet) {
+				if klusterlet.Spec.RegistrationConfiguration == nil {
+					klusterlet.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationConfiguration{}
+				}
 
-			if klusterlet.Spec.RegistrationConfiguration == nil {
-				klusterlet.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationConfiguration{}
-			}
-
-			klusterlet.Spec.RegistrationConfiguration.AddOnKubeClientRegistrationDriver = originalAddOnDriver
-
-			_, err = spoke.OperatorClient.OperatorV1().Klusterlets().Update(
-				context.TODO(), klusterlet, metav1.UpdateOptions{})
-			return err
-		}).Should(gomega.Succeed())
-
+				klusterlet.Spec.RegistrationConfiguration.AddOnKubeClientRegistrationDriver = originalAddOnDriver
+			})
 	})
 
 	ginkgo.It("Should work with token-based authentication flow", func() {

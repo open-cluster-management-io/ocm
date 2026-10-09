@@ -11,23 +11,21 @@ import (
 	aboutclient "sigs.k8s.io/about-api/pkg/generated/clientset/versioned"
 
 	ocmfeature "open-cluster-management.io/api/feature"
+
+	"open-cluster-management.io/ocm/test/framework"
 )
 
 var _ = ginkgo.Describe("ClusterProperty API test", func() {
 	var aboutClusterClient aboutclient.Interface
 	var err error
 	ginkgo.BeforeEach(func() {
-		gomega.Eventually(func() error {
-			return spoke.EnableRegistrationFeature(universalKlusterletName, string(ocmfeature.ClusterProperty))
-		}).Should(gomega.Succeed())
+		framework.EnableRegistrationFeature(hub, spoke, universalKlusterletName, string(ocmfeature.ClusterProperty))
 
 		aboutClusterClient, err = aboutclient.NewForConfig(spoke.RestConfig)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.DeferCleanup(func() {
-			gomega.Eventually(func() error {
-				return spoke.RemoveRegistrationFeature(universalKlusterletName, string(ocmfeature.ClusterProperty))
-			}).Should(gomega.Succeed())
+			framework.RemoveRegistrationFeature(hub, spoke, universalKlusterletName, string(ocmfeature.ClusterProperty))
 
 			err = aboutClusterClient.AboutV1alpha1().ClusterProperties().DeleteCollection(
 				context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{})
