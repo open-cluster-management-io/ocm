@@ -134,3 +134,8 @@ else
 	$(info Using existing helm from "$(HELM)")
 endif
 
+
+CONFORMANCE_ARGS ?=
+.PHONY: test-cluster-inventory-conformance
+test-cluster-inventory-conformance:
+	cd test/conformance && go test -count=1 -v ./... -args $(CONFORMANCE_ARGS)
