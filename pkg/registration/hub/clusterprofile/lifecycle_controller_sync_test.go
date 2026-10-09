@@ -1,6 +1,7 @@
 package clusterprofile
 
 import (
+	"cmp"
 	"context"
 	"testing"
 
@@ -551,6 +552,9 @@ func TestLifecycleControllerSync(t *testing.T) {
 		},
 	}
 
+	clusterWithMemberID := cluster1.DeepCopy()
+	clusterWithMemberID.Labels[InventoryMemberIDLabelKey] = "Prod_JP.cluster-01"
+
 	// ========== Test Cases ==========
 	cases := []struct {
 		name               string
@@ -562,6 +566,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 		existingProfiles   []runtime.Object
 		expectedCreates    []string // cluster names that should be created
 		expectedDeletes    []string // cluster names that should be deleted
+		expectedMemberID   string   // defaults to the cluster name
 		expectedNumActions int
 	}{
 		{
@@ -613,6 +618,17 @@ func TestLifecycleControllerSync(t *testing.T) {
 			bindings:           []runtime.Object{boundBindingDefault},
 			expectedCreates:    []string{"cluster1", "cluster2"},
 			expectedNumActions: 2, // 2 creates
+		},
+		{
+			name:               "create profile with administrator-coordinated member ID",
+			key:                "ns1",
+			namespace:          ns1,
+			clusters:           []runtime.Object{clusterWithMemberID},
+			clusterSets:        []runtime.Object{defaultClusterSet},
+			bindings:           []runtime.Object{boundBindingDefault},
+			expectedCreates:    []string{"cluster1"},
+			expectedMemberID:   "Prod_JP.cluster-01",
+			expectedNumActions: 1,
 		},
 		{
 			name:               "no action for unbound binding",
@@ -853,6 +869,10 @@ func TestLifecycleControllerSync(t *testing.T) {
 						}
 						if profile.Labels[v1.ClusterNameLabelKey] != expectedName {
 							t.Errorf("expected cluster-name label %s, got %s", expectedName, profile.Labels[v1.ClusterNameLabelKey])
+						}
+						expectedMemberID := cmp.Or(c.expectedMemberID, expectedName)
+						if profile.Labels[InventoryMemberIDLabelKey] != expectedMemberID {
+							t.Errorf("expected inventory member ID %s, got %s", expectedMemberID, profile.Labels[InventoryMemberIDLabelKey])
 						}
 						break
 					}

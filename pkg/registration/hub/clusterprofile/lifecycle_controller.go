@@ -305,7 +305,7 @@ func (c *clusterProfileLifecycleController) sync(ctx context.Context, syncCtx fa
 	logger.V(4).Info("Found bindings", "count", len(allBindings))
 
 	// 2. Build the desired state: which clusters should have profiles in this namespace
-	desiredClusters := sets.New[string]()
+	desiredClusters := map[string]*v1.ManagedCluster{}
 
 	for _, binding := range allBindings {
 		// Check if binding is bound
@@ -345,11 +345,11 @@ func (c *clusterProfileLifecycleController) sync(ctx context.Context, syncCtx fa
 			if !cluster.DeletionTimestamp.IsZero() {
 				continue
 			}
-			desiredClusters.Insert(cluster.Name)
+			desiredClusters[cluster.Name] = cluster
 		}
 	}
 
-	logger.V(4).Info("Calculated desired state", "desiredClusterCount", desiredClusters.Len())
+	logger.V(4).Info("Calculated desired state", "desiredClusterCount", len(desiredClusters))
 
 	// 3. Get all existing profiles in this namespace managed by us
 	existingProfiles, err := c.clusterProfileLister.ClusterProfiles(namespace).List(
@@ -370,15 +370,16 @@ func (c *clusterProfileLifecycleController) sync(ctx context.Context, syncCtx fa
 
 	// 4. Reconcile using set difference operations
 	// Clusters to create = desired - existing
-	clustersToCreate := desiredClusters.Difference(existingClusters)
+	desiredClusterNames := sets.KeySet(desiredClusters)
+	clustersToCreate := desiredClusterNames.Difference(existingClusters)
 	// Clusters to delete = existing - desired
-	clustersToDelete := existingClusters.Difference(desiredClusters)
+	clustersToDelete := existingClusters.Difference(desiredClusterNames)
 
 	var errs []error
 
 	// Create missing profiles
 	for clusterName := range clustersToCreate {
-		err := c.createClusterProfile(ctx, namespace, clusterName)
+		err := c.createClusterProfile(ctx, namespace, desiredClusters[clusterName])
 		if err != nil {
 			logger.Error(err, "Failed to create ClusterProfile", "cluster", clusterName)
 			errs = append(errs, fmt.Errorf("failed to create ClusterProfile %s/%s: %w", namespace, clusterName, err))
@@ -402,8 +403,9 @@ func (c *clusterProfileLifecycleController) sync(ctx context.Context, syncCtx fa
 }
 
 // createClusterProfile creates a new ClusterProfile in the specified namespace
-func (c *clusterProfileLifecycleController) createClusterProfile(ctx context.Context, namespace, clusterName string) error {
+func (c *clusterProfileLifecycleController) createClusterProfile(ctx context.Context, namespace string, cluster *v1.ManagedCluster) error {
 	logger := klog.FromContext(ctx)
+	clusterName := cluster.Name
 
 	clusterProfile := &cpv1alpha1.ClusterProfile{
 		ObjectMeta: metav1.ObjectMeta{
@@ -412,6 +414,7 @@ func (c *clusterProfileLifecycleController) createClusterProfile(ctx context.Con
 			Labels: map[string]string{
 				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
 				v1.ClusterNameLabelKey:            clusterName,
+				InventoryMemberIDLabelKey:         inventoryMemberID(cluster),
 			},
 		},
 		Spec: cpv1alpha1.ClusterProfileSpec{

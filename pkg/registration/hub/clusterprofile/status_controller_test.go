@@ -479,6 +479,46 @@ func TestStatusSyncLabelsFromCluster(t *testing.T) {
 				"custom-label":                    "keep-me", // Custom labels preserved
 			},
 		},
+		{
+			name: "cluster with coordinated inventory member ID",
+			cluster: &v1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "cluster-member-id",
+					Labels: map[string]string{InventoryMemberIDLabelKey: "Prod_JP.cluster-01"},
+				},
+			},
+			profile: &cpv1alpha1.ClusterProfile{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster-member-id", Namespace: "ns1", Labels: map[string]string{}},
+			},
+			expectedLabels: map[string]string{InventoryMemberIDLabelKey: "Prod_JP.cluster-01"},
+		},
+		{
+			name: "cluster with empty inventory member ID falls back to cluster name",
+			cluster: &v1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "cluster-empty-id",
+					Labels: map[string]string{InventoryMemberIDLabelKey: ""},
+				},
+			},
+			profile: &cpv1alpha1.ClusterProfile{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster-empty-id", Namespace: "ns1", Labels: map[string]string{}},
+			},
+			expectedLabels: map[string]string{InventoryMemberIDLabelKey: "cluster-empty-id"},
+		},
+		{
+			name: "cluster without inventory member ID falls back to cluster name",
+			cluster: &v1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster-no-id"},
+			},
+			profile: &cpv1alpha1.ClusterProfile{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cluster-no-id",
+					Namespace: "ns1",
+					Labels:    map[string]string{InventoryMemberIDLabelKey: "stale-id"},
+				},
+			},
+			expectedLabels: map[string]string{InventoryMemberIDLabelKey: "cluster-no-id"},
+		},
 	}
 
 	for _, c := range cases {
@@ -495,6 +535,88 @@ func TestStatusSyncLabelsFromCluster(t *testing.T) {
 				if actualValue != expectedValue {
 					t.Errorf("label %s: expected %s, got %s", key, expectedValue, actualValue)
 				}
+			}
+		})
+	}
+}
+
+func TestStatusControllerSyncInventoryMemberID(t *testing.T) {
+	cluster := &v1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster1"}}
+	clusterInformers := clusterinformers.NewSharedInformerFactory(clusterfake.NewSimpleClientset(), 0)
+	clusterStore := clusterInformers.Cluster().V1().ManagedClusters().Informer().GetStore()
+	namespaces := []string{"ns1", "ns2"}
+	profiles := []runtime.Object{}
+	for _, namespace := range namespaces {
+		profiles = append(profiles, &cpv1alpha1.ClusterProfile{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1", Namespace: namespace,
+				Labels: map[string]string{
+					cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+					v1.ClusterNameLabelKey:            "cluster1",
+					"custom-label":                    "keep-me",
+				},
+				Annotations: map[string]string{"custom-annotation": "keep-me"},
+			},
+			Spec: cpv1alpha1.ClusterProfileSpec{ClusterManager: cpv1alpha1.ClusterManager{Name: ClusterProfileManagerName}},
+		})
+	}
+	cpClient := cpfake.NewSimpleClientset(profiles...)
+	cpInformers := cpinformers.NewSharedInformerFactory(cpClient, 0)
+	cpInformer := cpInformers.Apis().V1alpha1().ClusterProfiles()
+	if err := cpInformer.Informer().AddIndexers(cache.Indexers{byClusterName: indexByClusterName}); err != nil {
+		t.Fatal(err)
+	}
+	for _, profile := range profiles {
+		if err := cpInformer.Informer().GetStore().Add(profile); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ctrl := &clusterProfileStatusController{
+		clusterLister:         clusterInformers.Cluster().V1().ManagedClusters().Lister(),
+		clusterProfileClient:  cpClient,
+		clusterProfileIndexer: cpInformer.Informer().GetIndexer(),
+	}
+
+	// Each case builds on the state left by the previous one.
+	for _, tc := range []struct {
+		name       string
+		labels     map[string]string
+		expectedID string
+	}{
+		{name: "backfill existing profiles", expectedID: "cluster1"},
+		{name: "change coordinated ID", labels: map[string]string{InventoryMemberIDLabelKey: "Prod_JP.cluster-02"}, expectedID: "Prod_JP.cluster-02"},
+		{name: "remove coordinated ID", expectedID: "cluster1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cluster = cluster.DeepCopy()
+			cluster.Labels = tc.labels
+			if err := clusterStore.Update(cluster); err != nil {
+				t.Fatal(err)
+			}
+			if err := ctrl.sync(context.Background(), testingcommon.NewFakeSyncContext(t, cluster.Name), cluster.Name); err != nil {
+				t.Fatal(err)
+			}
+			for _, namespace := range namespaces {
+				profile, err := cpClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), cluster.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if profile.Labels[InventoryMemberIDLabelKey] != tc.expectedID {
+					t.Errorf("profile %s/%s: expected member ID %q, got %q", namespace, cluster.Name, tc.expectedID, profile.Labels[InventoryMemberIDLabelKey])
+				}
+				if profile.Labels["custom-label"] != "keep-me" || profile.Annotations["custom-annotation"] != "keep-me" {
+					t.Error("overwrote custom metadata")
+				}
+				if err := cpInformer.Informer().GetStore().Update(profile); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cpClient.ClearActions()
+			if err := ctrl.sync(context.Background(), testingcommon.NewFakeSyncContext(t, cluster.Name), cluster.Name); err != nil {
+				t.Fatal(err)
+			}
+			if actions := cpClient.Actions(); len(actions) != 0 {
+				t.Errorf("unchanged profiles should not be patched, got %v", actions)
 			}
 		})
 	}
