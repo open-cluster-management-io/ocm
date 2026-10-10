@@ -9,7 +9,9 @@
         "iam:DeleteRole",
         "eks:DeleteAccessEntry",
         "iam:TagRole",
-        "eks:TagResource"
+        "eks:TagResource",
+        "iam:GetRole",
+        "iam:UpdateAssumeRolePolicy"
       ],
       "Resource": [
         "arn:aws:iam::HUB_ACCOUNT_ID:role/ocm-hub-*",
