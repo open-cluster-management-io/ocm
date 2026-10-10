@@ -6,6 +6,10 @@ import (
 	"testing"
 
 	"github.com/spf13/pflag"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 )
 
 func TestNewAgentOptions(t *testing.T) {
@@ -181,6 +185,13 @@ func TestAgentOptions_getOrGenerateClusterAgentID(t *testing.T) {
 				HubKubeconfigDir: "/non-exist-dir",
 			},
 		},
+		{
+			name: "invalid spoke kubeconfig",
+			options: &AgentOptions{
+				HubKubeconfigDir:    "/non-exist-dir",
+				SpokeKubeconfigFile: "/invalid/path/to/kubeconfig",
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -197,6 +208,89 @@ func TestAgentOptions_getOrGenerateClusterAgentID(t *testing.T) {
 			}
 			if len(c.expectedAgentName) == 0 && len(agentName) == 0 {
 				t.Error("agent name should be generated")
+			}
+		})
+	}
+}
+
+func Test_detectOpenShiftClusterName(t *testing.T) {
+	cases := []struct {
+		name         string
+		infraObject  *unstructured.Unstructured
+		expectedName string
+	}{
+		{
+			name: "successful lookup",
+			infraObject: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "config.openshift.io/v1",
+					"kind":       "Infrastructure",
+					"metadata": map[string]interface{}{
+						"name": "cluster",
+					},
+					"status": map[string]interface{}{
+						"infrastructureName": "my-openshift-cluster",
+					},
+				},
+			},
+			expectedName: "my-openshift-cluster",
+		},
+		{
+			name:         "missing infrastructure resource",
+			infraObject:  nil,
+			expectedName: "",
+		},
+		{
+			name: "empty infrastructure name",
+			infraObject: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "config.openshift.io/v1",
+					"kind":       "Infrastructure",
+					"metadata": map[string]interface{}{
+						"name": "cluster",
+					},
+					"status": map[string]interface{}{
+						"infrastructureName": "",
+					},
+				},
+			},
+			expectedName: "",
+		},
+		{
+			name: "no status field",
+			infraObject: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "config.openshift.io/v1",
+					"kind":       "Infrastructure",
+					"metadata": map[string]interface{}{
+						"name": "cluster",
+					},
+				},
+			},
+			expectedName: "",
+		},
+	}
+
+	scheme := runtime.NewScheme()
+	// Add the unstructured type so the fake client knows how to handle it
+	gvr := schema.GroupVersionResource{Group: "config.openshift.io", Version: "v1", Resource: "infrastructures"}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var client *dynamicfake.FakeDynamicClient
+			if c.infraObject != nil {
+				client = dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, map[schema.GroupVersionResource]string{
+					gvr: "InfrastructureList",
+				}, c.infraObject)
+			} else {
+				client = dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, map[schema.GroupVersionResource]string{
+					gvr: "InfrastructureList",
+				})
+			}
+
+			name := detectOpenShiftClusterName(client)
+			if name != c.expectedName {
+				t.Errorf("expected %q, got %q", c.expectedName, name)
 			}
 		})
 	}
