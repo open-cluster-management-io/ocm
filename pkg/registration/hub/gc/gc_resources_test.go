@@ -70,73 +70,84 @@ func TestGCResourcesController(t *testing.T) {
 	}
 }
 
-func TestGetFirstDeletePriority(t *testing.T) {
+func TestCollectGCTargets(t *testing.T) {
 	cases := []struct {
 		name                        string
-		objs                        []metav1.PartialObjectMetadata
+		objs                        []runtime.Object
 		expectedFirstDeletePriority cleanupPriority
 		expectedFirstDeletedCount   int
+		expectedTotalCount          int
 	}{
 		{
 			name: "no priority resource",
-			objs: []metav1.PartialObjectMetadata{
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test1", nil),
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test2", nil),
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test3", nil),
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test4", nil),
+			objs: []runtime.Object{
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test1", nil),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test2", nil),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test3", nil),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test4", nil),
 			},
 			expectedFirstDeletePriority: minCleanupPriority,
 			expectedFirstDeletedCount:   4,
+			expectedTotalCount:          4,
 		},
 		{
 			name: "invalid priority resource",
-			objs: []metav1.PartialObjectMetadata{
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test1", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "abc"}),
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test2", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "300"}),
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test3", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "-1"}),
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test4", nil),
+			objs: []runtime.Object{
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test1", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "abc"}),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test2", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "300"}),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test3", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "-1"}),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test4", nil),
 			},
 			expectedFirstDeletePriority: minCleanupPriority,
 			expectedFirstDeletedCount:   4,
+			expectedTotalCount:          4,
 		},
 		{
 			name: "multi priority resources",
-			objs: []metav1.PartialObjectMetadata{
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test1", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "100"}),
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test2", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "300"}),
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test3", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "10"}),
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test4", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "abc"}),
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test5", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "0"}),
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test6", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "-1"}),
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test7", nil),
+			objs: []runtime.Object{
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test1", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "100"}),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test2", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "300"}),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test3", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "10"}),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test4", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "abc"}),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test5", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "0"}),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test6", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "-1"}),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test7", nil),
 			},
 			expectedFirstDeletePriority: minCleanupPriority,
 			expectedFirstDeletedCount:   5,
+			expectedTotalCount:          7,
 		},
 		{
-			name: "valid priority resources ",
-			objs: []metav1.PartialObjectMetadata{
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test1", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "100"}),
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test2", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "10"}),
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test3", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "10"}),
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test4", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "40"}),
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test5", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "65"}),
-				*newWorkMetadata(testinghelpers.TestManagedClusterName, "test6", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "90"}),
+			name: "valid priority resources",
+			objs: []runtime.Object{
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test1", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "100"}),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test2", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "10"}),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test3", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "10"}),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test4", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "40"}),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test5", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "65"}),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test6", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "90"}),
 			},
 			expectedFirstDeletePriority: cleanupPriority(10),
 			expectedFirstDeletedCount:   2,
+			expectedTotalCount:          6,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			resourceList := &metav1.PartialObjectMetadataList{
-				Items: c.objs,
+			scheme := fakemetadataclient.NewTestScheme()
+			_ = workv1.Install(scheme)
+			_ = metav1.AddMetaToScheme(scheme)
+			metadataClient := fakemetadataclient.NewSimpleMetadataClient(scheme, c.objs...)
+
+			ctrl := &gcResourcesController{
+				metadataClient: metadataClient,
 			}
-			priorityResourceMap := mapPriorityResource(resourceList)
-			firstDeletePriority := getFirstDeletePriority(priorityResourceMap)
-			assert.Equal(t, c.expectedFirstDeletePriority, firstDeletePriority)
-			assert.Equal(t, c.expectedFirstDeletedCount, len(priorityResourceMap[firstDeletePriority]))
+			result, err := ctrl.collectGCTargets(context.TODO(), workGvr, testinghelpers.TestManagedClusterName)
+			assert.NoError(t, err)
+			assert.Equal(t, c.expectedTotalCount, result.totalCount)
+			assert.Equal(t, c.expectedFirstDeletePriority, result.lowestPriority)
+			assert.Equal(t, c.expectedFirstDeletedCount, len(result.lowestPriorityNames))
 		})
 	}
 }
