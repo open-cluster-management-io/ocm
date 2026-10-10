@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: headlamp
+  labels:
+    # Headlamp runs fine under the strictest Pod Security Standard; see the
+    # securityContext in headlamp-values.yaml.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+---
+# Selects the managed clusters Headlamp is allowed to see. An empty label
+# selector takes every managed cluster; narrow it to scope Headlamp to a subset.
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSet
+metadata:
+  name: headlamp
+spec:
+  clusterSelector:
+    selectorType: LabelSelector
+    labelSelector: {}
+---
+# The binding is what makes the registration controller create ClusterProfiles,
+# and it creates them in the binding's namespace. Headlamp has to run in that
+# same namespace -- see the README note on cp-creds namespace inference.
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: headlamp
+  namespace: headlamp
+spec:
+  clusterSet: headlamp
