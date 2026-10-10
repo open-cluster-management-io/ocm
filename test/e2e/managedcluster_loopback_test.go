@@ -316,7 +316,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		gomega.Eventually(func() error {
 			secret, err := spoke.KubeClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
 			if err != nil {
-				return err
+				return fmt.Errorf("waiting for secret %s/%s: %v", addOnName, secretName, err)
 			}
 			if _, ok := secret.Data[csr.TLSKeyFile]; !ok {
 				return fmt.Errorf("secret %s/%s does not have a TLS key", addOnName, secretName)
