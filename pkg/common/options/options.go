@@ -24,6 +24,7 @@ type Options struct {
 	QPS             float32
 	TLSMinVersion   string
 	TLSCipherSuites string
+	HealthCheckPort int32
 }
 
 // NewOptions returns the flags with default value set
@@ -57,6 +58,8 @@ func (o *Options) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.TLSCipherSuites, "tls-cipher-suites", "",
 		"Comma-separated list of TLS cipher suites for the serving endpoint. "+
 			"If omitted, the default Go cipher suites are used.")
+	flags.Int32Var(&o.HealthCheckPort, "health-port", 0,
+		"Port for the health check endpoint. If not set or 0, the default port 8443 is used.")
 	if o.CmdConfig != nil {
 		flags.BoolVar(&o.CmdConfig.DisableLeaderElection, "disable-leader-election", false, "Disable leader election.")
 		flags.DurationVar(&o.CmdConfig.LeaseDuration.Duration, "leader-election-lease-duration", 137*time.Second, ""+
@@ -82,8 +85,11 @@ func (o *Options) AddFlags(flags *pflag.FlagSet) {
 // Inside cmd.Run, StartController calls Config() which reads the file; the TLS
 // values survive SetRecommendedHTTPServingInfoDefaults because DefaultString
 // only sets fields that are empty.
-func writeTLSServingConfig(cmd *cobra.Command, minVersion, cipherSuites string) error {
+func writeTLSServingConfig(cmd *cobra.Command, minVersion, cipherSuites string, healthPort int32) error {
 	content := "apiVersion: operator.openshift.io/v1alpha1\nkind: GenericOperatorConfig\nservingInfo:\n"
+	if healthPort > 0 {
+		content += fmt.Sprintf("  bindAddress: \"0.0.0.0:%d\"\n", healthPort)
+	}
 	if minVersion != "" {
 		content += "  minTLSVersion: " + minVersion + "\n"
 	}
@@ -119,16 +125,21 @@ func (o *Options) ApplyTLSToCommand(cmd *cobra.Command) {
 				return err
 			}
 		}
-		// Only inject when at least one TLS flag is set and --config not already provided.
-		if (o.TLSMinVersion == "" && o.TLSCipherSuites == "") || cmd.Flags().Changed("config") {
+		// Only inject when at least one TLS or health-port flag is set and --config not already provided.
+		if (o.TLSMinVersion == "" && o.TLSCipherSuites == "" && o.HealthCheckPort == 0) || cmd.Flags().Changed("config") {
 			return nil
+		}
+		if o.HealthCheckPort != 0 && (o.HealthCheckPort < 1 || o.HealthCheckPort > 65535) {
+			return fmt.Errorf("invalid --health-port value %d: must be 0 or between 1 and 65535", o.HealthCheckPort)
 		}
 		// Validate TLS flags up-front so invalid values are caught early with a
 		// clear error rather than being deferred to library-go's YAML parsing.
-		if _, err := tlslib.ConfigFromFlags(o.TLSMinVersion, o.TLSCipherSuites); err != nil {
-			return fmt.Errorf("invalid TLS flags: %w", err)
+		if o.TLSMinVersion != "" || o.TLSCipherSuites != "" {
+			if _, err := tlslib.ConfigFromFlags(o.TLSMinVersion, o.TLSCipherSuites); err != nil {
+				return fmt.Errorf("invalid TLS flags: %w", err)
+			}
 		}
-		return writeTLSServingConfig(cmd, o.TLSMinVersion, o.TLSCipherSuites)
+		return writeTLSServingConfig(cmd, o.TLSMinVersion, o.TLSCipherSuites, o.HealthCheckPort)
 	}
 }
 
@@ -150,7 +161,7 @@ func operatorNamespace(cmd *cobra.Command) string {
 // kube client and namespace, and if found, writes the TLS serving config file.
 // Returns nil if the ConfigMap is not found (graceful no-op).
 // Extracted for testability.
-func applyTLSFromConfigMap(ctx context.Context, kubeClient kubernetes.Interface, namespace string, cmd *cobra.Command) error {
+func applyTLSFromConfigMap(ctx context.Context, kubeClient kubernetes.Interface, namespace string, cmd *cobra.Command, healthPort int32) error {
 	tlsCfg, err := tlslib.LoadTLSConfigFromConfigMap(ctx, kubeClient, namespace)
 	if err != nil {
 		return fmt.Errorf("failed to load TLS config from ConfigMap: %w", err)
@@ -164,7 +175,7 @@ func applyTLSFromConfigMap(ctx context.Context, kubeClient kubernetes.Interface,
 	if len(tlsCfg.CipherSuites) > 0 {
 		cipherSuites = tlslib.CipherSuitesToString(tlsCfg.CipherSuites)
 	}
-	return writeTLSServingConfig(cmd, minVersion, cipherSuites)
+	return writeTLSServingConfig(cmd, minVersion, cipherSuites, healthPort)
 }
 
 // ApplyTLSFromConfigMapToCommand installs a PersistentPreRunE hook that reads
@@ -207,6 +218,6 @@ func (o *Options) ApplyTLSFromConfigMapToCommand(cmd *cobra.Command) {
 		if err != nil {
 			return fmt.Errorf("failed to create kube client for TLS ConfigMap: %w", err)
 		}
-		return applyTLSFromConfigMap(context.Background(), kubeClient, namespace, cmd)
+		return applyTLSFromConfigMap(context.Background(), kubeClient, namespace, cmd, o.HealthCheckPort)
 	}
 }
