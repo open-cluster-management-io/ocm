@@ -71,8 +71,12 @@ else
 test-e2e: images-and-load-kind deploy-hub deploy-spoke-operator-helm run-e2e
 endif
 
+# Set SKIP_E2E_BUILD=true to run an existing ./e2e.test (e.g. one built by an earlier CI job)
+SKIP_E2E_BUILD?=false
 run-e2e:
+ifneq ($(SKIP_E2E_BUILD),true)
 	go test -c ./test/e2e
+endif
 	KUBECONFIG=$(KUBECONFIG) ./e2e.test -test.v -ginkgo.v -nil-executor-validating=true \
 	-registration-image=$(REGISTRATION_IMAGE) \
 	-work-image=$(WORK_IMAGE) \
