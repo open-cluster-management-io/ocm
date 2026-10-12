@@ -812,6 +812,7 @@ func expectedTrustPolicyEncoded(t *testing.T) string {
 		"hubAccountId":                "123456789012",
 		"hubClusterName":              "hub-cluster",
 		"managedClusterName":          "spoke-cluster",
+		"managedClusterPartition":     "aws",
 	})
 	if err != nil {
 		t.Fatal(err)
