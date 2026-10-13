@@ -218,13 +218,19 @@ var _ = ginkgo.BeforeSuite(func() {
 var _ = ginkgo.AfterSuite(func() {
 	ginkgo.By("tearing down the test environment")
 
-	envCancel()
+	if envCancel != nil {
+		envCancel()
+	}
 
-	err := testEnv.Stop()
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	if testEnv != nil {
+		err := testEnv.Stop()
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	}
 
-	err = hostedTestEnv.Stop()
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	if hostedTestEnv != nil {
+		err := hostedTestEnv.Stop()
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	}
 })
 
 // ServiceAccountCtl watch service accounts and create a corresponding secret for it.

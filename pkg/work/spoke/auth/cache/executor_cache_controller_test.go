@@ -10,12 +10,12 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	k8scache "k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/retry"
 
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
@@ -200,31 +200,25 @@ func TestCacheController(t *testing.T) {
 	cacheController := newExecutorCacheController(t, ctx, clusterName, kubeClient, initialized, work)
 	<-initialized
 
-	// the expected 5 comes from:
-	//   * 4(allowed sar check for Get, List, Update, Patch)
-	//   * 1(denied sar check for Get; after the first Get check fails, subsequent checks do not need to be checked)
-	err := checkSARCount(kubeClient, 5)
-	if err != nil {
-		t.Error(err)
-	}
+	// the RBAC resources that already exist when the informers start all enqueue the same
+	// executor key, and the queue only collapses the keys added before the worker dequeues
+	// them, so the initial state may be synced more than once. Wait for that to settle and
+	// take the result as the baseline of the deletions below.
+	baseline := waitForInitialSync(t, kubeClient, cacheController.bindingExecutorsMapper, 2)
 
 	// check if the map is initialized
 	executorKey := fmt.Sprintf("%s/%s", executor.Subject.ServiceAccount.Namespace, executor.Subject.ServiceAccount.Name)
-	actualMapCount := cacheController.bindingExecutorsMapper.count()
-	if actualMapCount != 2 {
-		t.Errorf("Expected 2 map item but got %d", actualMapCount)
-	}
 	checkBindingExecutorMapperInitialized(t, cacheController.bindingExecutorsMapper,
 		fmt.Sprintf("%s/%s", roleNamespace, roleName), executorKey)
 	checkBindingExecutorMapperInitialized(t, cacheController.bindingExecutorsMapper,
 		roleName, executorKey)
 
-	err = kubeClient.RbacV1().ClusterRoles().Delete(ctx, roleName, metav1.DeleteOptions{})
+	err := kubeClient.RbacV1().ClusterRoles().Delete(ctx, roleName, metav1.DeleteOptions{})
 	if err != nil {
 		t.Errorf("Exepected no error, but got %v", err)
 	}
 
-	err = checkSARCount(kubeClient, 2*5)
+	err = checkSARCount(kubeClient, baseline+1*sarChecksPerSync)
 	if err != nil {
 		t.Error(err)
 	}
@@ -234,7 +228,7 @@ func TestCacheController(t *testing.T) {
 		t.Errorf("Exepected no error, but got %v", err)
 	}
 
-	err = checkSARCount(kubeClient, 3*5)
+	err = checkSARCount(kubeClient, baseline+2*sarChecksPerSync)
 	if err != nil {
 		t.Error(err)
 	}
@@ -244,7 +238,7 @@ func TestCacheController(t *testing.T) {
 		t.Errorf("Exepected no error, but got %v", err)
 	}
 
-	err = checkSARCount(kubeClient, 4*5)
+	err = checkSARCount(kubeClient, baseline+3*sarChecksPerSync)
 	if err != nil {
 		t.Error(err)
 	}
@@ -254,27 +248,75 @@ func TestCacheController(t *testing.T) {
 		t.Errorf("Exepected no error, but got %v", err)
 	}
 
-	err = checkSARCount(kubeClient, 5*5)
+	err = checkSARCount(kubeClient, baseline+4*sarChecksPerSync)
 	if err != nil {
 		t.Error(err)
 	}
 }
 
-func checkSARCount(kubeClient *fakekube.Clientset, expected int) error {
-	return retry.OnError(
-		retry.DefaultBackoff,
-		func(err error) bool {
-			return err != nil
-		},
-		func() error {
-			acture := countSARRequests(kubeClient.Actions())
-			if acture != expected {
-				return fmt.Errorf("Expected kube client has %d subject access review action but got %#v",
-					expected, acture)
-			}
-			return nil
-		})
+const (
+	pollInterval = 50 * time.Millisecond
+	pollTimeout  = 30 * time.Second
+	// settledPollCount is how many consecutive polls must observe the same state before the
+	// initial sync is considered done
+	settledPollCount = 10
+)
 
+// sarChecksPerSync is the number of subject access review requests a single executor sync sends:
+//   - 4(allowed sar check for Get, List, Update, Patch)
+//   - 1(denied sar check for Get; after the first Get check fails, subsequent checks do not need to be checked)
+const sarChecksPerSync = 5
+
+// waitForInitialSync waits until the controller has reconciled the RBAC resources that exist
+// before the informers start: the binding executor mapper holds the expected bindings and the
+// subject access review requests stop coming in. It returns the number of requests sent so far,
+// which is the baseline the following assertions build on.
+func waitForInitialSync(t *testing.T, kubeClient *fakekube.Clientset, mapper *safeMap, expectedBindings int) int {
+	t.Helper()
+
+	var count, lastCount, settledPolls int
+	err := wait.PollUntilContextTimeout(context.TODO(), pollInterval, pollTimeout, true,
+		func(context.Context) (bool, error) {
+			count = countSARRequests(kubeClient.Actions())
+			if count > 0 && count == lastCount && mapper.count() == expectedBindings {
+				settledPolls++
+			} else {
+				settledPolls = 0
+			}
+			lastCount = count
+			return settledPolls >= settledPollCount, nil
+		})
+	if err != nil {
+		t.Fatalf("Initial sync did not settle, got %d subject access review actions and %d binding executor mapper items (expected %d items)",
+			count, mapper.count(), expectedBindings)
+	}
+
+	if count%sarChecksPerSync != 0 {
+		t.Fatalf("Expected a multiple of %d subject access review actions after the initial sync but got %d",
+			sarChecksPerSync, count)
+	}
+
+	t.Logf("The initial sync sent %d subject access review requests", count)
+	return count
+}
+
+func checkSARCount(kubeClient *fakekube.Clientset, expected int) error {
+	var actual int
+	err := wait.PollUntilContextTimeout(context.TODO(), pollInterval, pollTimeout, true,
+		func(context.Context) (bool, error) {
+			actual = countSARRequests(kubeClient.Actions())
+			if actual > expected {
+				// the count only grows, so it will never match again
+				return false, fmt.Errorf("Expected kube client has %d subject access review action but got %d",
+					expected, actual)
+			}
+			return actual == expected, nil
+		})
+	if err != nil {
+		return fmt.Errorf("Expected kube client has %d subject access review action but got %d", expected, actual)
+	}
+
+	return nil
 }
 
 func countSARRequests(kubeClientActions []clienttesting.Action) int {
@@ -385,26 +427,19 @@ func TestCacheControllerClusterRoleWithRoleBindingOnly(t *testing.T) {
 	cacheController := newExecutorCacheController(t, ctx, clusterName, kubeClient, initialized, work)
 	<-initialized
 
-	err := checkSARCount(kubeClient, 5)
-	if err != nil {
-		t.Error(err)
-	}
+	baseline := waitForInitialSync(t, kubeClient, cacheController.bindingExecutorsMapper, 1)
 
 	executorKey := fmt.Sprintf("%s/%s",
 		executor.Subject.ServiceAccount.Namespace, executor.Subject.ServiceAccount.Name)
-	actualMapCount := cacheController.bindingExecutorsMapper.count()
-	if actualMapCount != 1 {
-		t.Errorf("Expected 1 map item (RoleBinding only) but got %d", actualMapCount)
-	}
 	checkBindingExecutorMapperInitialized(t, cacheController.bindingExecutorsMapper,
 		fmt.Sprintf("%s/%s", rbNamespace, "rb-for-cluster-role"), executorKey)
 
-	err = kubeClient.RbacV1().ClusterRoles().Delete(ctx, clusterRoleName, metav1.DeleteOptions{})
+	err := kubeClient.RbacV1().ClusterRoles().Delete(ctx, clusterRoleName, metav1.DeleteOptions{})
 	if err != nil {
 		t.Errorf("Expected no error, but got %v", err)
 	}
 
-	err = checkSARCount(kubeClient, 2*5)
+	err = checkSARCount(kubeClient, baseline+sarChecksPerSync)
 	if err != nil {
 		t.Errorf("ClusterRole deletion did not trigger cache refresh through RoleBinding path: %v", err)
 	}
