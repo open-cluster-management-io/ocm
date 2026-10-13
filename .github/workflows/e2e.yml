@@ -26,6 +26,8 @@ env:
   KIND_VERSION: 'v0.33.0'
   KIND_SHA256: 'aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d'
   IMAGE_TAG: e2e
+  # How long e2e jobs can be re-run without re-running e2e-build.
+  BUILD_RETENTION_DAYS: 3
 
 permissions:
   contents: read
@@ -61,8 +63,7 @@ jobs:
           path: |
             images.tar
             e2e.test
-          # Long enough to re-run a flaky e2e job a few days later.
-          retention-days: 3
+          retention-days: ${{ env.BUILD_RETENTION_DAYS }}
           # "Re-run all jobs" uploads again into the same run.
           overwrite: true
 
@@ -121,10 +122,19 @@ jobs:
           mkdir -p /home/runner/.kube
           kind get kubeconfig > /home/runner/.kube/config
         if: ${{ env.USE_EXISTING_CLUSTER == 'true' }}
+      # "Re-run failed jobs" reuses the e2e-build output of the first attempt, which expires.
+      # If it's gone, fail in the next step with a message that says what to do.
       - name: Download build output
+        id: download
+        continue-on-error: true
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: e2e-build
+      - name: Check build output
+        if: ${{ steps.download.outcome == 'failure' }}
+        run: |
+          echo "::error::Could not download the e2e-build output (the download error is in the job annotations). If it expired (kept ${BUILD_RETENTION_DAYS} days), use \"Re-run all jobs\" or push a new commit so e2e-build runs again."
+          exit 1
       - name: Load images into kind
         run: |
           kind load image-archive images.tar
