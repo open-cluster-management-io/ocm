@@ -31,10 +31,12 @@ permissions:
   contents: read
 
 jobs:
-  # Compile everything and build the images once, so a compile error fails in minutes
+  # Compile the e2e tests and build the images once, so a compile error fails in minutes
   # and the e2e jobs below don't each rebuild the same five images.
-  build:
+  # Named e2e-build so it doesn't share the "build" check name with the Pre workflow.
+  e2e-build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -44,20 +46,13 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - name: Compile
-        run: |
-          go build ./...
-          go test -c ./test/e2e -o e2e.test
+      - name: Compile e2e tests
+        run: go test -c ./test/e2e -o e2e.test
       - name: Build images
         run: make images-kind
       - name: Save images
         run: |
-          docker save -o images.tar \
-            "quay.io/open-cluster-management/registration-operator:${IMAGE_TAG}" \
-            "quay.io/open-cluster-management/registration:${IMAGE_TAG}" \
-            "quay.io/open-cluster-management/work:${IMAGE_TAG}" \
-            "quay.io/open-cluster-management/placement:${IMAGE_TAG}" \
-            "quay.io/open-cluster-management/addon-manager:${IMAGE_TAG}"
+          make save-images-kind IMAGES_ARCHIVE=images.tar
           ls -lh images.tar e2e.test
       - name: Upload build output
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -66,11 +61,18 @@ jobs:
           path: |
             images.tar
             e2e.test
-          retention-days: 1
+          # Long enough to re-run a flaky e2e job a few days later.
+          retention-days: 3
+          # "Re-run all jobs" uploads again into the same run.
+          overwrite: true
 
   e2e:
-    needs: build
+    needs: e2e-build
+    # Run even if e2e-build fails, so the "Check build" step below turns these required
+    # checks red. A job skipped because of a failed need would count as passing.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     # The job names match the jobs this workflow had before, so required checks stay the same.
     name: ${{ matrix.name }}
     strategy:
@@ -78,14 +80,19 @@ jobs:
       matrix:
         include:
           - name: e2e
-            make_env: ''
+            make_vars: ''
           - name: e2e-hosted
-            make_env: KLUSTERLET_DEPLOY_MODE=SingletonHosted
+            make_vars: KLUSTERLET_DEPLOY_MODE=SingletonHosted
           - name: e2e-singleton
-            make_env: KLUSTERLET_DEPLOY_MODE=Singleton
+            make_vars: KLUSTERLET_DEPLOY_MODE=Singleton
           - name: e2e-grpc
-            make_env: REGISTRATION_DRIVER=grpc
+            make_vars: REGISTRATION_DRIVER=grpc
     steps:
+      - name: Check build
+        if: ${{ needs.e2e-build.result != 'success' }}
+        run: |
+          echo "::error::e2e-build ${{ needs.e2e-build.result }}, see that job for the error"
+          exit 1
       - name: add permisson to docker.sock
         run: sudo chown runner:docker /var/run/docker.sock
         if: ${{ env.ACT }} # this step only runs locally when using the https://github.com/nektos/act to debug the e2e
@@ -97,6 +104,8 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+          # These jobs run the prebuilt e2e.test and don't compile Go.
+          cache: false
       - name: Install kind
         if: ${{ env.USE_EXISTING_CLUSTER != 'true' }}
         run: |
@@ -122,6 +131,6 @@ jobs:
           rm images.tar
           chmod +x e2e.test
       - name: Test E2E
-        run: make test-e2e SKIP_IMAGE_BUILD=true SKIP_E2E_BUILD=true ${{ matrix.make_env }}
+        run: make test-e2e SKIP_IMAGE_BUILD=true SKIP_E2E_BUILD=true ${{ matrix.make_vars }}
         env:
           KUBECONFIG: /home/runner/.kube/config
