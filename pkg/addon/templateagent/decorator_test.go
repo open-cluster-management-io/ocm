@@ -6,6 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -428,4 +429,95 @@ func TestResourceRequirementsDecorator(t *testing.T) {
 		})
 	}
 
+}
+
+func TestNodePlacementDecorator(t *testing.T) {
+	nodeSelector := map[string]string{"node-role.kubernetes.io/infra": ""}
+	tolerations := []corev1.Toleration{
+		{
+			Key:      "node-role.kubernetes.io/infra",
+			Operator: corev1.TolerationOpExists,
+			Effect:   corev1.TaintEffectNoSchedule,
+		},
+	}
+
+	tests := []struct {
+		name                 string
+		config               addonapiv1beta1.AddOnDeploymentConfig
+		expectedNodeSelector map[string]string
+		expectedTolerations  []corev1.Toleration
+	}{
+		{
+			name: "no node placement set",
+		},
+		{
+			name: "node selector only",
+			config: addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					NodePlacement: &addonapiv1beta1.NodePlacement{
+						NodeSelector: nodeSelector,
+					},
+				},
+			},
+			expectedNodeSelector: nodeSelector,
+		},
+		{
+			// Tolerations must be applied on their own: tolerating a taint without pinning
+			// placement to a label is a valid configuration.
+			name: "tolerations only, no node selector",
+			config: addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					NodePlacement: &addonapiv1beta1.NodePlacement{
+						Tolerations: tolerations,
+					},
+				},
+			},
+			expectedTolerations: tolerations,
+		},
+		{
+			name: "node selector and tolerations",
+			config: addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					NodePlacement: &addonapiv1beta1.NodePlacement{
+						NodeSelector: nodeSelector,
+						Tolerations:  tolerations,
+					},
+				},
+			},
+			expectedNodeSelector: nodeSelector,
+			expectedTolerations:  tolerations,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			values, err := ToAddOnNodePlacementPrivateValues(tc.config)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			pod := &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "test",
+							Image: "test",
+						},
+					},
+				},
+			}
+
+			d := newNodePlacementDecorator(values)
+			if err := d.decorate("", pod); err != nil {
+				t.Fatal(err)
+			}
+
+			if !apiequality.Semantic.DeepEqual(pod.Spec.NodeSelector, tc.expectedNodeSelector) {
+				t.Errorf("expected node selector %v, got %v", tc.expectedNodeSelector, pod.Spec.NodeSelector)
+			}
+			if !apiequality.Semantic.DeepEqual(pod.Spec.Tolerations, tc.expectedTolerations) {
+				t.Errorf("expected tolerations %v, got %v", tc.expectedTolerations, pod.Spec.Tolerations)
+			}
+		})
+	}
 }
