@@ -14,6 +14,11 @@ do
     fi
 done
 
+for f in $CLUSTER_INVENTORY_CRD_FILES
+do
+    cp "$f" "./manifests/cluster-manager/hub/crds/0000_00_$(basename "$f" .yaml).crd.yaml"
+done
+
 for f in $SPOKE_CRD_FILES
 do
     cp $f ./manifests/klusterlet/managed/
