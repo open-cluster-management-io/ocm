@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	cpv1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
+	cpv1alpha2 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha2"
 	cpfake "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned/fake"
 	cpinformers "sigs.k8s.io/cluster-inventory-api/client/informers/externalversions"
 
@@ -502,33 +502,33 @@ func TestLifecycleControllerSync(t *testing.T) {
 	}
 
 	// ========== ClusterProfiles ==========
-	existingProfile := &cpv1alpha1.ClusterProfile{
+	existingProfile := &cpv1alpha2.ClusterProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cluster1",
 			Namespace: "ns1",
 			Labels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha2.LabelClusterManagerKey: ClusterProfileManagerName,
 			},
 		},
-		Spec: cpv1alpha1.ClusterProfileSpec{
+		Spec: cpv1alpha2.ClusterProfileSpec{
 			DisplayName: "cluster1",
-			ClusterManager: cpv1alpha1.ClusterManager{
+			ClusterManager: cpv1alpha2.ClusterManager{
 				Name: ClusterProfileManagerName,
 			},
 		},
 	}
 
-	staleProfile := &cpv1alpha1.ClusterProfile{
+	staleProfile := &cpv1alpha2.ClusterProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "stale-cluster",
 			Namespace: "ns1",
 			Labels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha2.LabelClusterManagerKey: ClusterProfileManagerName,
 			},
 		},
-		Spec: cpv1alpha1.ClusterProfileSpec{
+		Spec: cpv1alpha2.ClusterProfileSpec{
 			DisplayName: "stale-cluster",
-			ClusterManager: cpv1alpha1.ClusterManager{
+			ClusterManager: cpv1alpha2.ClusterManager{
 				Name: ClusterProfileManagerName,
 			},
 		},
@@ -553,7 +553,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 	}
 
 	clusterWithMemberID := cluster1.DeepCopy()
-	clusterWithMemberID.Labels[InventoryMemberIDLabelKey] = "Prod_JP.cluster-01"
+	clusterWithMemberID.Labels[cpv1alpha2.LabelInventoryMemberIDKey] = "Prod_JP.cluster-01"
 
 	// ========== Test Cases ==========
 	cases := []struct {
@@ -816,7 +816,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 				clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings().Informer().GetStore().Add(binding)
 			}
 			for _, profile := range c.existingProfiles {
-				cpInformers.Apis().V1alpha1().ClusterProfiles().Informer().GetStore().Add(profile)
+				cpInformers.Apis().V1alpha2().ClusterProfiles().Informer().GetStore().Add(profile)
 			}
 
 			ctrl := &clusterProfileLifecycleController{
@@ -826,7 +826,7 @@ func TestLifecycleControllerSync(t *testing.T) {
 				clusterSetBindingLister:  clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
 				clusterSetBindingIndexer: clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings().Informer().GetIndexer(),
 				clusterProfileClient:     cpClient,
-				clusterProfileLister:     cpInformers.Apis().V1alpha1().ClusterProfiles().Lister(),
+				clusterProfileLister:     cpInformers.Apis().V1alpha2().ClusterProfiles().Lister(),
 			}
 
 			syncCtx := testingcommon.NewFakeSyncContext(t, c.key)
@@ -860,19 +860,19 @@ func TestLifecycleControllerSync(t *testing.T) {
 			for _, expectedName := range c.expectedCreates {
 				found := false
 				for _, action := range createActions {
-					profile := action.GetObject().(*cpv1alpha1.ClusterProfile)
+					profile := action.GetObject().(*cpv1alpha2.ClusterProfile)
 					if profile.Name == expectedName {
 						found = true
 						// Verify labels
-						if profile.Labels[cpv1alpha1.LabelClusterManagerKey] != ClusterProfileManagerName {
-							t.Errorf("expected label %s, got %s", ClusterProfileManagerName, profile.Labels[cpv1alpha1.LabelClusterManagerKey])
+						if profile.Labels[cpv1alpha2.LabelClusterManagerKey] != ClusterProfileManagerName {
+							t.Errorf("expected label %s, got %s", ClusterProfileManagerName, profile.Labels[cpv1alpha2.LabelClusterManagerKey])
 						}
 						if profile.Labels[v1.ClusterNameLabelKey] != expectedName {
 							t.Errorf("expected cluster-name label %s, got %s", expectedName, profile.Labels[v1.ClusterNameLabelKey])
 						}
 						expectedMemberID := cmp.Or(c.expectedMemberID, expectedName)
-						if profile.Labels[InventoryMemberIDLabelKey] != expectedMemberID {
-							t.Errorf("expected inventory member ID %s, got %s", expectedMemberID, profile.Labels[InventoryMemberIDLabelKey])
+						if profile.Labels[cpv1alpha2.LabelInventoryMemberIDKey] != expectedMemberID {
+							t.Errorf("expected inventory member ID %s, got %s", expectedMemberID, profile.Labels[cpv1alpha2.LabelInventoryMemberIDKey])
 						}
 						break
 					}

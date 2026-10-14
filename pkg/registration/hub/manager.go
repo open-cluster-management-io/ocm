@@ -16,7 +16,7 @@ import (
 	"k8s.io/klog/v2"
 	generate "k8s.io/kubectl/pkg/generate"
 	cpclientset "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned"
-	cpinformerv1alpha1 "sigs.k8s.io/cluster-inventory-api/client/informers/externalversions"
+	cpinformerv1alpha2 "sigs.k8s.io/cluster-inventory-api/client/informers/externalversions"
 
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -156,7 +156,7 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 	}
 
 	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 30*time.Minute)
-	clusterProfileInformers := cpinformerv1alpha1.NewSharedInformerFactory(clusterProfileClient, 30*time.Minute)
+	clusterProfileInformers := cpinformerv1alpha2.NewSharedInformerFactory(clusterProfileClient, 30*time.Minute)
 	workInformers := workv1informers.NewSharedInformerFactory(workClient, 30*time.Minute)
 	kubeInfomers := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, 30*time.Minute, kubeinformers.WithTweakListOptions(
 		func(listOptions *metav1.ListOptions) {
@@ -195,7 +195,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	addOnClient addonclient.Interface,
 	kubeInformers kubeinformers.SharedInformerFactory,
 	clusterInformers clusterv1informers.SharedInformerFactory,
-	clusterProfileInformers cpinformerv1alpha1.SharedInformerFactory,
+	clusterProfileInformers cpinformerv1alpha2.SharedInformerFactory,
 	workInformers workv1informers.SharedInformerFactory,
 	addOnInformers addoninformers.SharedInformerFactory,
 ) error {
@@ -332,13 +332,13 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 			clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
 			clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings(),
 			clusterProfileClient,
-			clusterProfileInformers.Apis().V1alpha1().ClusterProfiles(),
+			clusterProfileInformers.Apis().V1alpha2().ClusterProfiles(),
 		)
 
 		clusterProfileStatusController = clusterprofile.NewClusterProfileStatusController(
 			clusterInformers.Cluster().V1().ManagedClusters(),
 			clusterProfileClient,
-			clusterProfileInformers.Apis().V1alpha1().ClusterProfiles(),
+			clusterProfileInformers.Apis().V1alpha2().ClusterProfiles(),
 		)
 	}
 

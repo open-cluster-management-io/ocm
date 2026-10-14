@@ -16,7 +16,7 @@ on:
 
 env:
   USE_EXISTING_CLUSTER: false # set to true to use an existing kind cluster for debugging with act
-  KUBERNETES_VERSION: 'v1.29.2'
+  KUBERNETES_VERSION: 'v1.37.0'
 
 permissions:
   contents: read

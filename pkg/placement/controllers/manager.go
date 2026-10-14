@@ -108,7 +108,7 @@ func RunControllerManagerWithInformers(
 		sigPDController := sigplacementdecision.NewSIGPlacementDecisionController(
 			clusterInformers.Cluster().V1beta1().PlacementDecisions(),
 			sigPDClient,
-			cpInformers.Apis().V1alpha1().PlacementDecisions(),
+			cpInformers.Apis().V1alpha2().PlacementDecisions(),
 		)
 
 		go cpInformers.Start(ctx.Done())

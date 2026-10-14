@@ -13,10 +13,10 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	cpv1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
+	cpv1alpha2 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha2"
 	cpclientset "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned"
-	cpinformerv1alpha1 "sigs.k8s.io/cluster-inventory-api/client/informers/externalversions/apis/v1alpha1"
-	cplisterv1alpha1 "sigs.k8s.io/cluster-inventory-api/client/listers/apis/v1alpha1"
+	cpinformerv1alpha2 "sigs.k8s.io/cluster-inventory-api/client/informers/externalversions/apis/v1alpha2"
+	cplisterv1alpha2 "sigs.k8s.io/cluster-inventory-api/client/listers/apis/v1alpha2"
 
 	informerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	listerv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
@@ -37,13 +37,13 @@ const (
 type clusterProfileStatusController struct {
 	clusterLister         listerv1.ManagedClusterLister
 	clusterProfileClient  cpclientset.Interface
-	clusterProfileLister  cplisterv1alpha1.ClusterProfileLister
+	clusterProfileLister  cplisterv1alpha2.ClusterProfileLister
 	clusterProfileIndexer cache.Indexer
 }
 
 // indexByClusterName is the indexer function for ClusterProfile by cluster name
 func indexByClusterName(obj interface{}) ([]string, error) {
-	profile, ok := obj.(*cpv1alpha1.ClusterProfile)
+	profile, ok := obj.(*cpv1alpha2.ClusterProfile)
 	if !ok {
 		return []string{}, fmt.Errorf("obj is supposed to be a ClusterProfile, but is %T", obj)
 	}
@@ -60,7 +60,7 @@ func indexByClusterName(obj interface{}) ([]string, error) {
 func NewClusterProfileStatusController(
 	clusterInformer informerv1.ManagedClusterInformer,
 	clusterProfileClient cpclientset.Interface,
-	clusterProfileInformer cpinformerv1alpha1.ClusterProfileInformer) factory.Controller {
+	clusterProfileInformer cpinformerv1alpha2.ClusterProfileInformer) factory.Controller {
 
 	// Add indexer for efficient lookup of profiles by cluster name
 	err := clusterProfileInformer.Informer().AddIndexers(cache.Indexers{
@@ -83,7 +83,7 @@ func NewClusterProfileStatusController(
 			c.profileToQueueKey,
 			queue.UnionFilter(
 				queue.FileterByLabel(v1.ClusterNameLabelKey),
-				queue.FileterByLabelKeyValue(cpv1alpha1.LabelClusterManagerKey, ClusterProfileManagerName),
+				queue.FileterByLabelKeyValue(cpv1alpha2.LabelClusterManagerKey, ClusterProfileManagerName),
 			),
 			clusterProfileInformer.Informer()).
 		WithSync(c.sync).
@@ -99,7 +99,7 @@ func (c *clusterProfileStatusController) clusterToQueueKey(obj runtime.Object) [
 }
 
 func (c *clusterProfileStatusController) profileToQueueKey(obj runtime.Object) []string {
-	profile, ok := obj.(*cpv1alpha1.ClusterProfile)
+	profile, ok := obj.(*cpv1alpha2.ClusterProfile)
 	if !ok {
 		return nil
 	}
@@ -163,15 +163,15 @@ func (c *clusterProfileStatusController) sync(ctx context.Context, syncCtx facto
 }
 
 // getProfilesByClusterName efficiently retrieves all profiles for a given cluster using the indexer
-func (c *clusterProfileStatusController) getProfilesByClusterName(clusterName string) ([]*cpv1alpha1.ClusterProfile, error) {
+func (c *clusterProfileStatusController) getProfilesByClusterName(clusterName string) ([]*cpv1alpha2.ClusterProfile, error) {
 	objs, err := c.clusterProfileIndexer.ByIndex(byClusterName, clusterName)
 	if err != nil {
 		return nil, err
 	}
 
-	profiles := make([]*cpv1alpha1.ClusterProfile, 0, len(objs))
+	profiles := make([]*cpv1alpha2.ClusterProfile, 0, len(objs))
 	for _, obj := range objs {
-		profile, ok := obj.(*cpv1alpha1.ClusterProfile)
+		profile, ok := obj.(*cpv1alpha2.ClusterProfile)
 		if !ok {
 			continue
 		}
@@ -183,13 +183,13 @@ func (c *clusterProfileStatusController) getProfilesByClusterName(clusterName st
 
 func (c *clusterProfileStatusController) updateClusterProfile(
 	ctx context.Context,
-	existing *cpv1alpha1.ClusterProfile,
+	existing *cpv1alpha2.ClusterProfile,
 	cluster *v1.ManagedCluster) error {
 
 	// Create a patcher for this specific namespace
 	profilePatcher := patcher.NewPatcher[
-		*cpv1alpha1.ClusterProfile, cpv1alpha1.ClusterProfileSpec, cpv1alpha1.ClusterProfileStatus](
-		c.clusterProfileClient.ApisV1alpha1().ClusterProfiles(existing.Namespace))
+		*cpv1alpha2.ClusterProfile, cpv1alpha2.ClusterProfileSpec, cpv1alpha2.ClusterProfileStatus](
+		c.clusterProfileClient.ApisV1alpha2().ClusterProfiles(existing.Namespace))
 
 	newProfile := existing.DeepCopy()
 
@@ -212,14 +212,14 @@ func (c *clusterProfileStatusController) updateClusterProfile(
 	return err
 }
 
-func syncLabelsFromCluster(profile *cpv1alpha1.ClusterProfile, cluster *v1.ManagedCluster) {
+func syncLabelsFromCluster(profile *cpv1alpha2.ClusterProfile, cluster *v1.ManagedCluster) {
 	mclLabels := cluster.GetLabels()
 	mclSetLabel := mclLabels[v1beta2.ClusterSetLabel]
 
 	requiredLabels := map[string]string{
-		cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
-		cpv1alpha1.LabelClusterSetKey:     mclSetLabel,
-		InventoryMemberIDLabelKey:         inventoryMemberID(cluster),
+		cpv1alpha2.LabelClusterManagerKey:    ClusterProfileManagerName,
+		cpv1alpha2.LabelClusterSetKey:        mclSetLabel,
+		cpv1alpha2.LabelInventoryMemberIDKey: inventoryMemberID(cluster),
 		// Keep the cluster-name label that lifecycle controller added
 		v1.ClusterNameLabelKey: cluster.Name,
 	}
@@ -228,21 +228,21 @@ func syncLabelsFromCluster(profile *cpv1alpha1.ClusterProfile, cluster *v1.Manag
 	resourcemerge.MergeMap(&modified, &profile.Labels, requiredLabels)
 }
 
-func syncStatusFromCluster(profile *cpv1alpha1.ClusterProfile, cluster *v1.ManagedCluster) {
+func syncStatusFromCluster(profile *cpv1alpha2.ClusterProfile, cluster *v1.ManagedCluster) {
 	// Sync version
 	profile.Status.Version.Kubernetes = cluster.Status.Version.Kubernetes
 
 	// Sync properties from cluster claims
-	cpProperties := []cpv1alpha1.Property{}
+	cpProperties := []cpv1alpha2.Property{}
 	for _, claim := range cluster.Status.ClusterClaims {
-		cpProperties = append(cpProperties, cpv1alpha1.Property{Name: claim.Name, Value: claim.Value})
+		cpProperties = append(cpProperties, cpv1alpha2.Property{Name: claim.Name, Value: claim.Value})
 	}
 	profile.Status.Properties = cpProperties
 
 	// Sync conditions
 	if availableCondition := meta.FindStatusCondition(cluster.Status.Conditions, v1.ManagedClusterConditionAvailable); availableCondition != nil {
 		meta.SetStatusCondition(&profile.Status.Conditions, metav1.Condition{
-			Type:    cpv1alpha1.ClusterConditionControlPlaneHealthy,
+			Type:    cpv1alpha2.ClusterConditionControlPlaneHealthy,
 			Status:  availableCondition.Status,
 			Reason:  availableCondition.Reason,
 			Message: availableCondition.Message,

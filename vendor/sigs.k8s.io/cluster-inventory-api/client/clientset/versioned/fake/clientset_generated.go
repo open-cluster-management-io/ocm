@@ -27,6 +27,8 @@ import (
 	clientset "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned"
 	apisv1alpha1 "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned/typed/apis/v1alpha1"
 	fakeapisv1alpha1 "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned/typed/apis/v1alpha1/fake"
+	apisv1alpha2 "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned/typed/apis/v1alpha2"
+	fakeapisv1alpha2 "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned/typed/apis/v1alpha2/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -97,4 +99,9 @@ var (
 // ApisV1alpha1 retrieves the ApisV1alpha1Client
 func (c *Clientset) ApisV1alpha1() apisv1alpha1.ApisV1alpha1Interface {
 	return &fakeapisv1alpha1.FakeApisV1alpha1{Fake: &c.Fake}
+}
+
+// ApisV1alpha2 retrieves the ApisV1alpha2Client
+func (c *Clientset) ApisV1alpha2() apisv1alpha2.ApisV1alpha2Interface {
+	return &fakeapisv1alpha2.FakeApisV1alpha2{Fake: &c.Fake}
 }
