@@ -49,6 +49,11 @@ jobs:
     steps:
       - name: checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        # The image version comes from `git describe`, which needs the tags and the history
+        # back to the last release. A treeless clone has both and stays small.
+        with:
+          fetch-depth: 0
+          filter: tree:0
       - name: install Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
