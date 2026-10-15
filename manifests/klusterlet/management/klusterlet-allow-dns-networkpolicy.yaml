@@ -23,3 +23,8 @@ spec:
       port: 443
     - protocol: TCP
       port: 6443
+  {{if eq .RegistrationDriver.AuthType "grpc"}}
+  - ports:
+    - protocol: TCP
+      port: 8090
+  {{end}}
