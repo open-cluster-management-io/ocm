@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -247,15 +248,18 @@ var _ = Describe("Create klusterlet CR", Label("klusterlet"), func() {
 			return err
 		}).Should(Succeed())
 
+		// After the namespace change the operator can roll out the agent twice in a few seconds.
+		// The second pod then waits for the first pod's leader lease to expire, which can take up
+		// to leaseDuration+retryPeriod (~163s), longer than the default Eventually timeout.
 		By(fmt.Sprintf("approve the managed cluster %v since it is registered in the new namespace", clusterName))
 		Eventually(func() error {
 			return hub.ApproveManagedClusterCSR(clusterName)
-		}).Should(Succeed())
+		}).WithTimeout(5 * time.Minute).Should(Succeed())
 
 		By("klusterlet status should be ok")
 		Eventually(func() error {
 			err := spoke.CheckKlusterletStatus(klusterletName, "HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
 			return err
-		}).Should(Succeed())
+		}).WithTimeout(5 * time.Minute).Should(Succeed())
 	})
 })
