@@ -11,7 +11,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	cpv1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
+	cpv1alpha2 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha2"
 	cpclientset "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned"
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
@@ -164,8 +164,8 @@ var _ = ginkgo.Describe("SIGPlacementDecision", func() {
 
 			ginkgo.By("Verify SIG MC PlacementDecision is created")
 			gomega.Eventually(func() bool {
-				sigPDList, err := cpClient.ApisV1alpha1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
-					LabelSelector: fmt.Sprintf("%s=%s", cpv1alpha1.LabelClusterManagerKey, sigplacementdecision.SchedulerName),
+				sigPDList, err := cpClient.ApisV1alpha2().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
+					LabelSelector: fmt.Sprintf("%s=%s", cpv1alpha2.LabelClusterManagerKey, sigplacementdecision.SchedulerName),
 				})
 				if err != nil || len(sigPDList.Items) == 0 {
 					return false
@@ -174,15 +174,15 @@ var _ = ginkgo.Describe("SIGPlacementDecision", func() {
 				if sigPD.SchedulerName != sigplacementdecision.SchedulerName {
 					return false
 				}
-				if sigPD.Labels[cpv1alpha1.PlacementKeyLabel] != placementName {
+				if sigPD.Labels[cpv1alpha2.PlacementKeyLabel] != placementName {
 					return false
 				}
 				return len(sigPD.Decisions) > 0
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			ginkgo.By("Verify SIG MC PlacementDecision has correct ClusterProfileRef")
-			sigPDList, err := cpClient.ApisV1alpha1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s", cpv1alpha1.LabelClusterManagerKey, sigplacementdecision.SchedulerName),
+			sigPDList, err := cpClient.ApisV1alpha2().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
+				LabelSelector: fmt.Sprintf("%s=%s", cpv1alpha2.LabelClusterManagerKey, sigplacementdecision.SchedulerName),
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(len(sigPDList.Items)).To(gomega.BeNumerically(">", 0))
@@ -190,6 +190,16 @@ var _ = ginkgo.Describe("SIGPlacementDecision", func() {
 			sigPD := sigPDList.Items[0]
 			for _, d := range sigPD.Decisions {
 				gomega.Expect(d.ClusterProfileRef.Name).ToNot(gomega.BeEmpty())
+			}
+
+			ginkgo.By("Keep the v1alpha2 decision readable through v1alpha1")
+			legacyPD, err := cpClient.ApisV1alpha1().PlacementDecisions(namespace).Get(context.Background(), sigPD.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(legacyPD.UID).To(gomega.Equal(sigPD.UID))
+			gomega.Expect(legacyPD.Decisions).To(gomega.HaveLen(len(sigPD.Decisions)))
+			for i, d := range legacyPD.Decisions {
+				gomega.Expect(d.ClusterProfileRef.Name).To(gomega.Equal(sigPD.Decisions[i].ClusterProfileRef.Name))
+				gomega.Expect(d.ClusterProfileRef.Namespace).To(gomega.Equal(namespace))
 			}
 
 			ginkgo.By("Verify SIG MC PlacementDecision has an OwnerReference to the OCM PlacementDecision")

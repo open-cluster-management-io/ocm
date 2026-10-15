@@ -8,7 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	cpv1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
+	cpv1alpha2 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha2"
 	cpfake "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned/fake"
 	cpinformers "sigs.k8s.io/cluster-inventory-api/client/informers/externalversions"
 
@@ -51,41 +51,41 @@ func TestStatusControllerSync(t *testing.T) {
 		},
 	}
 
-	profile1Ns1 := &cpv1alpha1.ClusterProfile{
+	profile1Ns1 := &cpv1alpha2.ClusterProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cluster1",
 			Namespace: "ns1",
 			Labels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha2.LabelClusterManagerKey: ClusterProfileManagerName,
 				v1.ClusterNameLabelKey:            "cluster1",
 			},
 		},
-		Spec: cpv1alpha1.ClusterProfileSpec{
+		Spec: cpv1alpha2.ClusterProfileSpec{
 			DisplayName: "cluster1",
-			ClusterManager: cpv1alpha1.ClusterManager{
+			ClusterManager: cpv1alpha2.ClusterManager{
 				Name: ClusterProfileManagerName,
 			},
 		},
 	}
 
-	profile1Ns2 := &cpv1alpha1.ClusterProfile{
+	profile1Ns2 := &cpv1alpha2.ClusterProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cluster1",
 			Namespace: "ns2",
 			Labels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha2.LabelClusterManagerKey: ClusterProfileManagerName,
 				v1.ClusterNameLabelKey:            "cluster1",
 			},
 		},
-		Spec: cpv1alpha1.ClusterProfileSpec{
+		Spec: cpv1alpha2.ClusterProfileSpec{
 			DisplayName: "cluster1",
-			ClusterManager: cpv1alpha1.ClusterManager{
+			ClusterManager: cpv1alpha2.ClusterManager{
 				Name: ClusterProfileManagerName,
 			},
 		},
 	}
 
-	profileNotManaged := &cpv1alpha1.ClusterProfile{
+	profileNotManaged := &cpv1alpha2.ClusterProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cluster1",
 			Namespace: "ns3",
@@ -93,9 +93,9 @@ func TestStatusControllerSync(t *testing.T) {
 				v1.ClusterNameLabelKey: "cluster1",
 			},
 		},
-		Spec: cpv1alpha1.ClusterProfileSpec{
+		Spec: cpv1alpha2.ClusterProfileSpec{
 			DisplayName: "cluster1",
-			ClusterManager: cpv1alpha1.ClusterManager{
+			ClusterManager: cpv1alpha2.ClusterManager{
 				Name: "other-manager",
 			},
 		},
@@ -127,35 +127,35 @@ func TestStatusControllerSync(t *testing.T) {
 		},
 	}
 
-	profileLabelSelectorNs1 := &cpv1alpha1.ClusterProfile{
+	profileLabelSelectorNs1 := &cpv1alpha2.ClusterProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cluster-label-selector",
 			Namespace: "prod-ns1",
 			Labels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha2.LabelClusterManagerKey: ClusterProfileManagerName,
 				v1.ClusterNameLabelKey:            "cluster-label-selector",
 			},
 		},
-		Spec: cpv1alpha1.ClusterProfileSpec{
+		Spec: cpv1alpha2.ClusterProfileSpec{
 			DisplayName: "cluster-label-selector",
-			ClusterManager: cpv1alpha1.ClusterManager{
+			ClusterManager: cpv1alpha2.ClusterManager{
 				Name: ClusterProfileManagerName,
 			},
 		},
 	}
 
-	profileLabelSelectorNs2 := &cpv1alpha1.ClusterProfile{
+	profileLabelSelectorNs2 := &cpv1alpha2.ClusterProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cluster-label-selector",
 			Namespace: "region-ns1",
 			Labels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha2.LabelClusterManagerKey: ClusterProfileManagerName,
 				v1.ClusterNameLabelKey:            "cluster-label-selector",
 			},
 		},
-		Spec: cpv1alpha1.ClusterProfileSpec{
+		Spec: cpv1alpha2.ClusterProfileSpec{
 			DisplayName: "cluster-label-selector",
-			ClusterManager: cpv1alpha1.ClusterManager{
+			ClusterManager: cpv1alpha2.ClusterManager{
 				Name: ClusterProfileManagerName,
 			},
 		},
@@ -184,35 +184,35 @@ func TestStatusControllerSync(t *testing.T) {
 		},
 	}
 
-	profileMixedExclusive := &cpv1alpha1.ClusterProfile{
+	profileMixedExclusive := &cpv1alpha2.ClusterProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cluster-mixed",
 			Namespace: "exclusive-ns",
 			Labels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha2.LabelClusterManagerKey: ClusterProfileManagerName,
 				v1.ClusterNameLabelKey:            "cluster-mixed",
 			},
 		},
-		Spec: cpv1alpha1.ClusterProfileSpec{
+		Spec: cpv1alpha2.ClusterProfileSpec{
 			DisplayName: "cluster-mixed",
-			ClusterManager: cpv1alpha1.ClusterManager{
+			ClusterManager: cpv1alpha2.ClusterManager{
 				Name: ClusterProfileManagerName,
 			},
 		},
 	}
 
-	profileMixedLabelSelector := &cpv1alpha1.ClusterProfile{
+	profileMixedLabelSelector := &cpv1alpha2.ClusterProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cluster-mixed",
 			Namespace: "labelselector-ns",
 			Labels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha2.LabelClusterManagerKey: ClusterProfileManagerName,
 				v1.ClusterNameLabelKey:            "cluster-mixed",
 			},
 		},
-		Spec: cpv1alpha1.ClusterProfileSpec{
+		Spec: cpv1alpha2.ClusterProfileSpec{
 			DisplayName: "cluster-mixed",
-			ClusterManager: cpv1alpha1.ClusterManager{
+			ClusterManager: cpv1alpha2.ClusterManager{
 				Name: ClusterProfileManagerName,
 			},
 		},
@@ -306,7 +306,7 @@ func TestStatusControllerSync(t *testing.T) {
 			}
 
 			// Add indexer for profiles
-			cpInformer := cpInformers.Apis().V1alpha1().ClusterProfiles()
+			cpInformer := cpInformers.Apis().V1alpha2().ClusterProfiles()
 			err := cpInformer.Informer().AddIndexers(cache.Indexers{
 				byClusterName: indexByClusterName,
 			})
@@ -360,7 +360,7 @@ func TestStatusSyncLabelsFromCluster(t *testing.T) {
 	cases := []struct {
 		name           string
 		cluster        *v1.ManagedCluster
-		profile        *cpv1alpha1.ClusterProfile
+		profile        *cpv1alpha2.ClusterProfile
 		expectedLabels map[string]string
 	}{
 		{
@@ -371,7 +371,7 @@ func TestStatusSyncLabelsFromCluster(t *testing.T) {
 					Labels: map[string]string{v1beta2.ClusterSetLabel: "set1"},
 				},
 			},
-			profile: &cpv1alpha1.ClusterProfile{
+			profile: &cpv1alpha2.ClusterProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "cluster1",
 					Namespace: "ns1",
@@ -379,8 +379,8 @@ func TestStatusSyncLabelsFromCluster(t *testing.T) {
 				},
 			},
 			expectedLabels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
-				cpv1alpha1.LabelClusterSetKey:     "set1",
+				cpv1alpha2.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha2.LabelClusterSetKey:     "set1",
 				v1.ClusterNameLabelKey:            "cluster1",
 			},
 		},
@@ -395,7 +395,7 @@ func TestStatusSyncLabelsFromCluster(t *testing.T) {
 					},
 				},
 			},
-			profile: &cpv1alpha1.ClusterProfile{
+			profile: &cpv1alpha2.ClusterProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "cluster-no-set",
 					Namespace: "prod-ns",
@@ -403,8 +403,8 @@ func TestStatusSyncLabelsFromCluster(t *testing.T) {
 				},
 			},
 			expectedLabels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
-				cpv1alpha1.LabelClusterSetKey:     "", // Empty when no ClusterSetLabel
+				cpv1alpha2.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha2.LabelClusterSetKey:     "", // Empty when no ClusterSetLabel
 				v1.ClusterNameLabelKey:            "cluster-no-set",
 			},
 		},
@@ -420,7 +420,7 @@ func TestStatusSyncLabelsFromCluster(t *testing.T) {
 					},
 				},
 			},
-			profile: &cpv1alpha1.ClusterProfile{
+			profile: &cpv1alpha2.ClusterProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "cluster-mixed",
 					Namespace: "ns1",
@@ -428,8 +428,8 @@ func TestStatusSyncLabelsFromCluster(t *testing.T) {
 				},
 			},
 			expectedLabels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
-				cpv1alpha1.LabelClusterSetKey:     "set1",
+				cpv1alpha2.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha2.LabelClusterSetKey:     "set1",
 				v1.ClusterNameLabelKey:            "cluster-mixed",
 			},
 		},
@@ -441,7 +441,7 @@ func TestStatusSyncLabelsFromCluster(t *testing.T) {
 					Labels: map[string]string{},
 				},
 			},
-			profile: &cpv1alpha1.ClusterProfile{
+			profile: &cpv1alpha2.ClusterProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "cluster-empty",
 					Namespace: "ns1",
@@ -449,8 +449,8 @@ func TestStatusSyncLabelsFromCluster(t *testing.T) {
 				},
 			},
 			expectedLabels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
-				cpv1alpha1.LabelClusterSetKey:     "", // Empty when no ClusterSetLabel
+				cpv1alpha2.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha2.LabelClusterSetKey:     "", // Empty when no ClusterSetLabel
 				v1.ClusterNameLabelKey:            "cluster-empty",
 			},
 		},
@@ -462,19 +462,19 @@ func TestStatusSyncLabelsFromCluster(t *testing.T) {
 					Labels: map[string]string{v1beta2.ClusterSetLabel: "new-set"},
 				},
 			},
-			profile: &cpv1alpha1.ClusterProfile{
+			profile: &cpv1alpha2.ClusterProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "cluster-update",
 					Namespace: "ns1",
 					Labels: map[string]string{
-						cpv1alpha1.LabelClusterSetKey: "old-set", // Should be updated
+						cpv1alpha2.LabelClusterSetKey: "old-set", // Should be updated
 						"custom-label":                "keep-me",
 					},
 				},
 			},
 			expectedLabels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
-				cpv1alpha1.LabelClusterSetKey:     "new-set",
+				cpv1alpha2.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha2.LabelClusterSetKey:     "new-set",
 				v1.ClusterNameLabelKey:            "cluster-update",
 				"custom-label":                    "keep-me", // Custom labels preserved
 			},
@@ -484,40 +484,40 @@ func TestStatusSyncLabelsFromCluster(t *testing.T) {
 			cluster: &v1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "cluster-member-id",
-					Labels: map[string]string{InventoryMemberIDLabelKey: "Prod_JP.cluster-01"},
+					Labels: map[string]string{cpv1alpha2.LabelInventoryMemberIDKey: "Prod_JP.cluster-01"},
 				},
 			},
-			profile: &cpv1alpha1.ClusterProfile{
+			profile: &cpv1alpha2.ClusterProfile{
 				ObjectMeta: metav1.ObjectMeta{Name: "cluster-member-id", Namespace: "ns1", Labels: map[string]string{}},
 			},
-			expectedLabels: map[string]string{InventoryMemberIDLabelKey: "Prod_JP.cluster-01"},
+			expectedLabels: map[string]string{cpv1alpha2.LabelInventoryMemberIDKey: "Prod_JP.cluster-01"},
 		},
 		{
 			name: "cluster with empty inventory member ID falls back to cluster name",
 			cluster: &v1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "cluster-empty-id",
-					Labels: map[string]string{InventoryMemberIDLabelKey: ""},
+					Labels: map[string]string{cpv1alpha2.LabelInventoryMemberIDKey: ""},
 				},
 			},
-			profile: &cpv1alpha1.ClusterProfile{
+			profile: &cpv1alpha2.ClusterProfile{
 				ObjectMeta: metav1.ObjectMeta{Name: "cluster-empty-id", Namespace: "ns1", Labels: map[string]string{}},
 			},
-			expectedLabels: map[string]string{InventoryMemberIDLabelKey: "cluster-empty-id"},
+			expectedLabels: map[string]string{cpv1alpha2.LabelInventoryMemberIDKey: "cluster-empty-id"},
 		},
 		{
 			name: "cluster without inventory member ID falls back to cluster name",
 			cluster: &v1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{Name: "cluster-no-id"},
 			},
-			profile: &cpv1alpha1.ClusterProfile{
+			profile: &cpv1alpha2.ClusterProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "cluster-no-id",
 					Namespace: "ns1",
-					Labels:    map[string]string{InventoryMemberIDLabelKey: "stale-id"},
+					Labels:    map[string]string{cpv1alpha2.LabelInventoryMemberIDKey: "stale-id"},
 				},
 			},
-			expectedLabels: map[string]string{InventoryMemberIDLabelKey: "cluster-no-id"},
+			expectedLabels: map[string]string{cpv1alpha2.LabelInventoryMemberIDKey: "cluster-no-id"},
 		},
 	}
 
@@ -547,22 +547,22 @@ func TestStatusControllerSyncInventoryMemberID(t *testing.T) {
 	namespaces := []string{"ns1", "ns2"}
 	profiles := []runtime.Object{}
 	for _, namespace := range namespaces {
-		profiles = append(profiles, &cpv1alpha1.ClusterProfile{
+		profiles = append(profiles, &cpv1alpha2.ClusterProfile{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "cluster1", Namespace: namespace,
 				Labels: map[string]string{
-					cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+					cpv1alpha2.LabelClusterManagerKey: ClusterProfileManagerName,
 					v1.ClusterNameLabelKey:            "cluster1",
 					"custom-label":                    "keep-me",
 				},
 				Annotations: map[string]string{"custom-annotation": "keep-me"},
 			},
-			Spec: cpv1alpha1.ClusterProfileSpec{ClusterManager: cpv1alpha1.ClusterManager{Name: ClusterProfileManagerName}},
+			Spec: cpv1alpha2.ClusterProfileSpec{ClusterManager: cpv1alpha2.ClusterManager{Name: ClusterProfileManagerName}},
 		})
 	}
 	cpClient := cpfake.NewSimpleClientset(profiles...)
 	cpInformers := cpinformers.NewSharedInformerFactory(cpClient, 0)
-	cpInformer := cpInformers.Apis().V1alpha1().ClusterProfiles()
+	cpInformer := cpInformers.Apis().V1alpha2().ClusterProfiles()
 	if err := cpInformer.Informer().AddIndexers(cache.Indexers{byClusterName: indexByClusterName}); err != nil {
 		t.Fatal(err)
 	}
@@ -584,7 +584,7 @@ func TestStatusControllerSyncInventoryMemberID(t *testing.T) {
 		expectedID string
 	}{
 		{name: "backfill existing profiles", expectedID: "cluster1"},
-		{name: "change coordinated ID", labels: map[string]string{InventoryMemberIDLabelKey: "Prod_JP.cluster-02"}, expectedID: "Prod_JP.cluster-02"},
+		{name: "change coordinated ID", labels: map[string]string{cpv1alpha2.LabelInventoryMemberIDKey: "Prod_JP.cluster-02"}, expectedID: "Prod_JP.cluster-02"},
 		{name: "remove coordinated ID", expectedID: "cluster1"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -597,12 +597,12 @@ func TestStatusControllerSyncInventoryMemberID(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, namespace := range namespaces {
-				profile, err := cpClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), cluster.Name, metav1.GetOptions{})
+				profile, err := cpClient.ApisV1alpha2().ClusterProfiles(namespace).Get(context.Background(), cluster.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
-				if profile.Labels[InventoryMemberIDLabelKey] != tc.expectedID {
-					t.Errorf("profile %s/%s: expected member ID %q, got %q", namespace, cluster.Name, tc.expectedID, profile.Labels[InventoryMemberIDLabelKey])
+				if profile.Labels[cpv1alpha2.LabelInventoryMemberIDKey] != tc.expectedID {
+					t.Errorf("profile %s/%s: expected member ID %q, got %q", namespace, cluster.Name, tc.expectedID, profile.Labels[cpv1alpha2.LabelInventoryMemberIDKey])
 				}
 				if profile.Labels["custom-label"] != "keep-me" || profile.Annotations["custom-annotation"] != "keep-me" {
 					t.Error("overwrote custom metadata")
@@ -652,7 +652,7 @@ func TestStatusSyncStatusFromCluster(t *testing.T) {
 		},
 	}
 
-	profile := &cpv1alpha1.ClusterProfile{
+	profile := &cpv1alpha2.ClusterProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cluster1",
 			Namespace: "ns1",
@@ -672,7 +672,7 @@ func TestStatusSyncStatusFromCluster(t *testing.T) {
 	}
 
 	// Verify conditions
-	availableCondition := meta.FindStatusCondition(profile.Status.Conditions, cpv1alpha1.ClusterConditionControlPlaneHealthy)
+	availableCondition := meta.FindStatusCondition(profile.Status.Conditions, cpv1alpha2.ClusterConditionControlPlaneHealthy)
 	if availableCondition == nil {
 		t.Errorf("expected ControlPlaneHealthy condition")
 	} else if availableCondition.Status != metav1.ConditionTrue {
@@ -694,24 +694,24 @@ func TestStatusControllerQueueKeyMapping(t *testing.T) {
 		},
 	}
 
-	profile1 := &cpv1alpha1.ClusterProfile{
+	profile1 := &cpv1alpha2.ClusterProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cluster1",
 			Namespace: "ns1",
 			Labels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha2.LabelClusterManagerKey: ClusterProfileManagerName,
 				v1.ClusterNameLabelKey:            "cluster1",
 			},
 		},
 	}
 
 	// Profile without cluster-name label to test fallback
-	profileNoLabel := &cpv1alpha1.ClusterProfile{
+	profileNoLabel := &cpv1alpha2.ClusterProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "profile-no-label",
 			Namespace: "ns1",
 			Labels: map[string]string{
-				cpv1alpha1.LabelClusterManagerKey: ClusterProfileManagerName,
+				cpv1alpha2.LabelClusterManagerKey: ClusterProfileManagerName,
 				// v1.ClusterNameLabelKey is intentionally missing to test fallback
 			},
 		},

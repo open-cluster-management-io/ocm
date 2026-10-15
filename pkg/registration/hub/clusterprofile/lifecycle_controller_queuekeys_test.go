@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	cpv1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
+	cpv1alpha2 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha2"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
@@ -1060,7 +1060,7 @@ func TestProfileToQueueKey(t *testing.T) {
 	ctrl := &clusterProfileLifecycleController{}
 
 	// Test with profile
-	profile := &cpv1alpha1.ClusterProfile{
+	profile := &cpv1alpha2.ClusterProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cluster1",
 			Namespace: "ns1",

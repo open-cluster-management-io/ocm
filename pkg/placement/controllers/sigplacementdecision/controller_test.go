@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
-	cpv1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
+	cpv1alpha2 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha2"
 	cpfake "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned/fake"
 	cpinformers "sigs.k8s.io/cluster-inventory-api/client/informers/externalversions"
 
@@ -39,13 +39,13 @@ func newOCMPlacementDecision(namespace, name, placementName string, groupIndex s
 	}
 }
 
-func newSIGPlacementDecision(namespace, name string, labels map[string]string, decisions []cpv1alpha1.ClusterDecision, schedulerName string) *cpv1alpha1.PlacementDecision {
+func newSIGPlacementDecision(namespace, name string, labels map[string]string, decisions []cpv1alpha2.ClusterDecision, schedulerName string) *cpv1alpha2.PlacementDecision {
 	return newSIGPlacementDecisionWithOwnerRefs(namespace, name, labels, nil, decisions, schedulerName)
 }
 
 func newSIGPlacementDecisionWithOwnerRefs(namespace, name string, labels map[string]string,
-	ownerRefs []metav1.OwnerReference, decisions []cpv1alpha1.ClusterDecision, schedulerName string) *cpv1alpha1.PlacementDecision {
-	return &cpv1alpha1.PlacementDecision{
+	ownerRefs []metav1.OwnerReference, decisions []cpv1alpha2.ClusterDecision, schedulerName string) *cpv1alpha2.PlacementDecision {
+	return &cpv1alpha2.PlacementDecision{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
 			Namespace:       namespace,
@@ -84,7 +84,7 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 			existingSIGPDs:  nil,
 			expectedCreates: 1,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				created := actions[0].(clienttesting.CreateAction).GetObject().(*cpv1alpha1.PlacementDecision)
+				created := actions[0].(clienttesting.CreateAction).GetObject().(*cpv1alpha2.PlacementDecision)
 				if created.Name != "pd-1" {
 					t.Errorf("expected name pd-1, got %s", created.Name)
 				}
@@ -106,17 +106,17 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 				if created.Decisions[1].ClusterProfileRef.Name != "cluster2" {
 					t.Errorf("expected cluster2, got %s", created.Decisions[1].ClusterProfileRef.Name)
 				}
-				if created.Labels[cpv1alpha1.LabelClusterManagerKey] != SchedulerName {
-					t.Errorf("expected cluster-manager label %s, got %s", SchedulerName, created.Labels[cpv1alpha1.LabelClusterManagerKey])
+				if created.Labels[cpv1alpha2.LabelClusterManagerKey] != SchedulerName {
+					t.Errorf("expected cluster-manager label %s, got %s", SchedulerName, created.Labels[cpv1alpha2.LabelClusterManagerKey])
 				}
-				if created.Labels[cpv1alpha1.PlacementKeyLabel] != "my-placement" {
-					t.Errorf("expected placement-key label 'my-placement', got %s", created.Labels[cpv1alpha1.PlacementKeyLabel])
+				if created.Labels[cpv1alpha2.PlacementKeyLabel] != "my-placement" {
+					t.Errorf("expected placement-key label 'my-placement', got %s", created.Labels[cpv1alpha2.PlacementKeyLabel])
 				}
-				if created.Labels[cpv1alpha1.DecisionKeyLabel] != "my-placement" {
-					t.Errorf("expected decision-key label 'my-placement', got %s", created.Labels[cpv1alpha1.DecisionKeyLabel])
+				if created.Labels[cpv1alpha2.DecisionKeyLabel] != "my-placement" {
+					t.Errorf("expected decision-key label 'my-placement', got %s", created.Labels[cpv1alpha2.DecisionKeyLabel])
 				}
-				if created.Labels[cpv1alpha1.DecisionIndexLabel] != "0" {
-					t.Errorf("expected decision-index label '0', got %s", created.Labels[cpv1alpha1.DecisionIndexLabel])
+				if created.Labels[cpv1alpha2.DecisionIndexLabel] != "0" {
+					t.Errorf("expected decision-index label '0', got %s", created.Labels[cpv1alpha2.DecisionIndexLabel])
 				}
 				if len(created.OwnerReferences) != 1 {
 					t.Fatalf("expected 1 owner reference, got %d", len(created.OwnerReferences))
@@ -139,7 +139,7 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 			existingSIGPDs:  nil,
 			expectedCreates: 1,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				created := actions[0].(clienttesting.CreateAction).GetObject().(*cpv1alpha1.PlacementDecision)
+				created := actions[0].(clienttesting.CreateAction).GetObject().(*cpv1alpha2.PlacementDecision)
 				if len(created.Decisions) != 0 {
 					t.Errorf("expected 0 decisions, got %d", len(created.Decisions))
 				}
@@ -151,9 +151,9 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 			ocmPDs: nil,
 			existingSIGPDs: []runtime.Object{
 				newSIGPlacementDecision("ns1", "pd-deleted", map[string]string{
-					cpv1alpha1.LabelClusterManagerKey: SchedulerName,
-				}, []cpv1alpha1.ClusterDecision{
-					{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "cluster1"}},
+					cpv1alpha2.LabelClusterManagerKey: SchedulerName,
+				}, []cpv1alpha2.ClusterDecision{
+					{ClusterProfileRef: cpv1alpha2.ClusterProfileReference{Name: "cluster1"}},
 				}, SchedulerName),
 			},
 			expectedDeletes: 0,
@@ -171,19 +171,19 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 			},
 			existingSIGPDs: []runtime.Object{
 				newSIGPlacementDecisionWithOwnerRefs("ns1", "pd-update", map[string]string{
-					cpv1alpha1.LabelClusterManagerKey: SchedulerName,
-					cpv1alpha1.PlacementKeyLabel:      "my-placement",
-					cpv1alpha1.DecisionKeyLabel:       "my-placement",
-					cpv1alpha1.DecisionIndexLabel:     "0",
+					cpv1alpha2.LabelClusterManagerKey: SchedulerName,
+					cpv1alpha2.PlacementKeyLabel:      "my-placement",
+					cpv1alpha2.DecisionKeyLabel:       "my-placement",
+					cpv1alpha2.DecisionIndexLabel:     "0",
 				}, []metav1.OwnerReference{ownerRefFor(newOCMPlacementDecision("ns1", "pd-update", "my-placement", "0", nil))},
-					[]cpv1alpha1.ClusterDecision{
-						{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "cluster1", Namespace: "ns1"}, Reason: "score"},
-						{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "cluster2", Namespace: "ns1"}, Reason: "old"},
+					[]cpv1alpha2.ClusterDecision{
+						{ClusterProfileRef: cpv1alpha2.ClusterProfileReference{Name: "cluster1", Namespace: "ns1"}, Reason: "score"},
+						{ClusterProfileRef: cpv1alpha2.ClusterProfileReference{Name: "cluster2", Namespace: "ns1"}, Reason: "old"},
 					}, SchedulerName),
 			},
 			expectedUpdates: 1,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				updated := actions[0].(clienttesting.UpdateAction).GetObject().(*cpv1alpha1.PlacementDecision)
+				updated := actions[0].(clienttesting.UpdateAction).GetObject().(*cpv1alpha2.PlacementDecision)
 				if len(updated.Decisions) != 2 {
 					t.Fatalf("expected 2 decisions, got %d", len(updated.Decisions))
 				}
@@ -205,13 +205,13 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 			},
 			existingSIGPDs: []runtime.Object{
 				newSIGPlacementDecisionWithOwnerRefs("ns1", "pd-noop", map[string]string{
-					cpv1alpha1.LabelClusterManagerKey: SchedulerName,
-					cpv1alpha1.PlacementKeyLabel:      "my-placement",
-					cpv1alpha1.DecisionKeyLabel:       "my-placement",
-					cpv1alpha1.DecisionIndexLabel:     "0",
+					cpv1alpha2.LabelClusterManagerKey: SchedulerName,
+					cpv1alpha2.PlacementKeyLabel:      "my-placement",
+					cpv1alpha2.DecisionKeyLabel:       "my-placement",
+					cpv1alpha2.DecisionIndexLabel:     "0",
 				}, []metav1.OwnerReference{ownerRefFor(newOCMPlacementDecision("ns1", "pd-noop", "my-placement", "0", nil))},
-					[]cpv1alpha1.ClusterDecision{
-						{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "cluster1", Namespace: "ns1"}, Reason: "score"},
+					[]cpv1alpha2.ClusterDecision{
+						{ClusterProfileRef: cpv1alpha2.ClusterProfileReference{Name: "cluster1", Namespace: "ns1"}, Reason: "score"},
 					}, SchedulerName),
 			},
 			expectedUpdates: 0,
@@ -233,14 +233,14 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 			},
 			existingSIGPDs: []runtime.Object{
 				newSIGPlacementDecisionWithOwnerRefs("ns1", "pd-extra-label", map[string]string{
-					cpv1alpha1.LabelClusterManagerKey: SchedulerName,
+					cpv1alpha2.LabelClusterManagerKey: SchedulerName,
 					"extra-label":                     "value",
 				}, []metav1.OwnerReference{ownerRefFor(newOCMPlacementDecision("ns1", "pd-extra-label", "", "", nil))},
-					[]cpv1alpha1.ClusterDecision{}, SchedulerName),
+					[]cpv1alpha2.ClusterDecision{}, SchedulerName),
 			},
 			expectedUpdates: 1,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				updated := actions[0].(clienttesting.UpdateAction).GetObject().(*cpv1alpha1.PlacementDecision)
+				updated := actions[0].(clienttesting.UpdateAction).GetObject().(*cpv1alpha2.PlacementDecision)
 				if _, ok := updated.Labels["extra-label"]; ok {
 					t.Errorf("expected extra-label to be dropped from updated labels")
 				}
@@ -254,12 +254,12 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 			},
 			existingSIGPDs: []runtime.Object{
 				newSIGPlacementDecision("ns1", "pd-missing-ownerref", map[string]string{
-					cpv1alpha1.LabelClusterManagerKey: SchedulerName,
-				}, []cpv1alpha1.ClusterDecision{}, SchedulerName),
+					cpv1alpha2.LabelClusterManagerKey: SchedulerName,
+				}, []cpv1alpha2.ClusterDecision{}, SchedulerName),
 			},
 			expectedUpdates: 1,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				updated := actions[0].(clienttesting.UpdateAction).GetObject().(*cpv1alpha1.PlacementDecision)
+				updated := actions[0].(clienttesting.UpdateAction).GetObject().(*cpv1alpha2.PlacementDecision)
 				if len(updated.OwnerReferences) != 1 {
 					t.Fatalf("expected the update to backfill 1 owner reference, got %d", len(updated.OwnerReferences))
 				}
@@ -275,9 +275,9 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 			},
 			existingSIGPDs: []runtime.Object{
 				newSIGPlacementDecision("ns1", "pd-foreign-update", map[string]string{
-					cpv1alpha1.LabelClusterManagerKey: "other-scheduler",
-				}, []cpv1alpha1.ClusterDecision{
-					{ClusterProfileRef: cpv1alpha1.ClusterProfileReference{Name: "different-cluster"}},
+					cpv1alpha2.LabelClusterManagerKey: "other-scheduler",
+				}, []cpv1alpha2.ClusterDecision{
+					{ClusterProfileRef: cpv1alpha2.ClusterProfileReference{Name: "different-cluster"}},
 				}, "other-scheduler"),
 			},
 			expectedUpdates: 0,
@@ -298,13 +298,13 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 				clusterInformers.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(pd)
 			}
 			for _, pd := range c.existingSIGPDs {
-				sigPDInformers.Apis().V1alpha1().PlacementDecisions().Informer().GetStore().Add(pd)
+				sigPDInformers.Apis().V1alpha2().PlacementDecisions().Informer().GetStore().Add(pd)
 			}
 
 			ctrl := &sigPlacementDecisionController{
 				ocmPDLister: clusterInformers.Cluster().V1beta1().PlacementDecisions().Lister(),
 				sigPDClient: cpClient,
-				sigPDLister: sigPDInformers.Apis().V1alpha1().PlacementDecisions().Lister(),
+				sigPDLister: sigPDInformers.Apis().V1alpha2().PlacementDecisions().Lister(),
 			}
 
 			syncCtx := testingcommon.NewFakeSyncContext(t, c.key)
@@ -367,17 +367,17 @@ func TestBuildSIGPlacementDecision(t *testing.T) {
 	if result.SchedulerName != SchedulerName {
 		t.Errorf("expected scheduler %s, got %s", SchedulerName, result.SchedulerName)
 	}
-	if result.Labels[cpv1alpha1.LabelClusterManagerKey] != SchedulerName {
+	if result.Labels[cpv1alpha2.LabelClusterManagerKey] != SchedulerName {
 		t.Errorf("expected cluster-manager label")
 	}
-	if result.Labels[cpv1alpha1.PlacementKeyLabel] != "my-placement" {
+	if result.Labels[cpv1alpha2.PlacementKeyLabel] != "my-placement" {
 		t.Errorf("expected placement-key label")
 	}
-	if result.Labels[cpv1alpha1.DecisionKeyLabel] != "my-placement" {
+	if result.Labels[cpv1alpha2.DecisionKeyLabel] != "my-placement" {
 		t.Errorf("expected decision-key label")
 	}
-	if result.Labels[cpv1alpha1.DecisionIndexLabel] != "2" {
-		t.Errorf("expected decision-index label '2', got %s", result.Labels[cpv1alpha1.DecisionIndexLabel])
+	if result.Labels[cpv1alpha2.DecisionIndexLabel] != "2" {
+		t.Errorf("expected decision-index label '2', got %s", result.Labels[cpv1alpha2.DecisionIndexLabel])
 	}
 	if len(result.Decisions) != 2 {
 		t.Fatalf("expected 2 decisions, got %d", len(result.Decisions))

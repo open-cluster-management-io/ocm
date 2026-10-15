@@ -21,3 +21,9 @@ SPOKE_CRD_FILES="./vendor/open-cluster-management.io/api/work/v1/0000_01_work.op
 
 CLUSTER_MANAGER_CRD_FILE="./vendor/open-cluster-management.io/api/operator/v1/0000_01_operator.open-cluster-management.io_clustermanagers.crd.yaml"
 KLUSTERLET_CRD_FILE="./vendor/open-cluster-management.io/api/operator/v1/0000_00_operator.open-cluster-management.io_klusterlets.crd.yaml"
+
+# go mod vendor does not include the upstream CRD directory.
+go mod download sigs.k8s.io/cluster-inventory-api
+CLUSTER_INVENTORY_API_DIR=$(go list -m -mod=mod -f '{{.Dir}}' sigs.k8s.io/cluster-inventory-api)
+CLUSTER_INVENTORY_CRD_FILES="$CLUSTER_INVENTORY_API_DIR/config/crd/bases/multicluster.x-k8s.io_clusterprofiles.yaml
+$CLUSTER_INVENTORY_API_DIR/config/crd/bases/multicluster.x-k8s.io_placementdecisions.yaml"

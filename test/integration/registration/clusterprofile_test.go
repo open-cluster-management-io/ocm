@@ -12,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
-	cpv1alpha1 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha1"
+	cpv1alpha2 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha2"
 	cpclientset "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -145,7 +145,7 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 
 		ginkgo.By("Verify ClusterProfile is created")
 		gomega.Eventually(func() error {
-			profile, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
+			profile, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -157,20 +157,57 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 			if profile.Spec.DisplayName != clusterName {
 				return fmt.Errorf("unexpected display name: %s", profile.Spec.DisplayName)
 			}
-			if profile.Labels[clusterprofile.InventoryMemberIDLabelKey] != clusterName {
-				return fmt.Errorf("unexpected inventory member ID: %s", profile.Labels[clusterprofile.InventoryMemberIDLabelKey])
+			if profile.Labels[cpv1alpha2.LabelInventoryMemberIDKey] != clusterName {
+				return fmt.Errorf("unexpected inventory member ID: %s", profile.Labels[cpv1alpha2.LabelInventoryMemberIDKey])
 			}
 
 			// Verify labels
-			if profile.Labels[cpv1alpha1.LabelClusterManagerKey] != clusterprofile.ClusterProfileManagerName {
+			if profile.Labels[cpv1alpha2.LabelClusterManagerKey] != clusterprofile.ClusterProfileManagerName {
 				return fmt.Errorf("missing or incorrect cluster manager label")
 			}
-			if profile.Labels[cpv1alpha1.LabelClusterSetKey] != clusterSetName {
+			if profile.Labels[cpv1alpha2.LabelClusterSetKey] != clusterSetName {
 				return fmt.Errorf("missing or incorrect clusterset label")
 			}
 
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+		ginkgo.By("Preserve access providers written through v1alpha1 during v1alpha2 status synchronization")
+		legacyProfile, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Patch(
+			context.Background(), clusterName, types.MergePatchType,
+			[]byte(`{"status":{"accessProviders":[{"name":"kubeconfig","cluster":{"server":"https://api.example.com:6443","tls-server-name":"kubernetes","disable-compression":true}}]}}`),
+			metav1.PatchOptions{}, "status")
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		_, err = clusterClient.ClusterV1().ManagedClusters().Patch(context.Background(), clusterName, types.MergePatchType,
+			[]byte(`{"status":{"version":{"kubernetes":"v1.26.0"}}}`), metav1.PatchOptions{}, "status")
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Eventually(func() error {
+			profile, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if profile.UID != legacyProfile.UID {
+				return fmt.Errorf("ClusterProfile was recreated")
+			}
+			if profile.Status.Version.Kubernetes != "v1.26.0" {
+				return fmt.Errorf("ClusterProfile version has not been synchronized")
+			}
+			if len(profile.Status.AccessProviders) != 1 {
+				return fmt.Errorf("access providers were not preserved: %v", profile.Status.AccessProviders)
+			}
+			provider := profile.Status.AccessProviders[0]
+			if provider.Name != "kubeconfig" || provider.Cluster.Server != "https://api.example.com:6443" ||
+				provider.Cluster.TLSServerName != "kubernetes" || !provider.Cluster.DisableCompression {
+				return fmt.Errorf("access provider was modified: %v", provider)
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+		ginkgo.By("Keep the synchronized profile readable through v1alpha1")
+		legacyProfile, err = clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(legacyProfile.Status.Version.Kubernetes).To(gomega.Equal("v1.26.0"))
+		gomega.Expect(legacyProfile.Status.AccessProviders).To(gomega.HaveLen(1))
 	})
 
 	ginkgo.It("should create ClusterProfiles in multiple namespaces", func() {
@@ -261,15 +298,15 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 		ginkgo.By("Verify ClusterProfile is created in both namespaces")
 		for _, ns := range []string{namespace1, namespace2} {
 			gomega.Eventually(func() error {
-				profile, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(ns).Get(context.Background(), clusterName, metav1.GetOptions{})
+				profile, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(ns).Get(context.Background(), clusterName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 				if profile.Namespace != ns {
 					return fmt.Errorf("unexpected namespace: %s", profile.Namespace)
 				}
-				if profile.Labels[clusterprofile.InventoryMemberIDLabelKey] != clusterName {
-					return fmt.Errorf("unexpected inventory member ID: %s", profile.Labels[clusterprofile.InventoryMemberIDLabelKey])
+				if profile.Labels[cpv1alpha2.LabelInventoryMemberIDKey] != clusterName {
+					return fmt.Errorf("unexpected inventory member ID: %s", profile.Labels[cpv1alpha2.LabelInventoryMemberIDKey])
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
@@ -298,8 +335,8 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: clusterName,
 				Labels: map[string]string{
-					clusterv1beta2.ClusterSetLabel:           clusterSetName,
-					clusterprofile.InventoryMemberIDLabelKey: "Prod_JP.cluster-01",
+					clusterv1beta2.ClusterSetLabel:       clusterSetName,
+					cpv1alpha2.LabelInventoryMemberIDKey: "Prod_JP.cluster-01",
 				},
 			},
 			Spec: clusterv1.ManagedClusterSpec{HubAcceptsClient: true},
@@ -322,11 +359,11 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 		expectMemberID := func(memberID string) {
 			gomega.Eventually(func() error {
 				for _, namespace := range namespaces {
-					profile, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(ctx, clusterName, metav1.GetOptions{})
+					profile, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace).Get(ctx, clusterName, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}
-					if got := profile.Labels[clusterprofile.InventoryMemberIDLabelKey]; got != memberID {
+					if got := profile.Labels[cpv1alpha2.LabelInventoryMemberIDKey]; got != memberID {
 						return fmt.Errorf("profile %s/%s: expected inventory member ID %q, got %q", namespace, clusterName, memberID, got)
 					}
 				}
@@ -337,9 +374,9 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 		expectMemberID("Prod_JP.cluster-01")
 
 		ginkgo.By("Restore a missing ID on an existing profile and preserve custom metadata")
-		_, err = clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespaces[0]).Patch(ctx, clusterName, types.MergePatchType,
+		_, err = clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespaces[0]).Patch(ctx, clusterName, types.MergePatchType,
 			[]byte(fmt.Sprintf(`{"metadata":{"labels":{%q:null,"custom-label":"keep-me"},"annotations":{"custom-annotation":"keep-me"}}}`,
-				clusterprofile.InventoryMemberIDLabelKey)), metav1.PatchOptions{})
+				cpv1alpha2.LabelInventoryMemberIDKey)), metav1.PatchOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		expectMemberID("Prod_JP.cluster-01")
 
@@ -353,12 +390,12 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 			{name: "Restore the coordinated ID", labelJSON: `"Prod_JP.cluster-03"`, expectedID: "Prod_JP.cluster-03"},
 		} {
 			ginkgo.By(tc.name)
-			patch := fmt.Sprintf(`{"metadata":{"labels":{%q:%s}}}`, clusterprofile.InventoryMemberIDLabelKey, tc.labelJSON)
+			patch := fmt.Sprintf(`{"metadata":{"labels":{%q:%s}}}`, cpv1alpha2.LabelInventoryMemberIDKey, tc.labelJSON)
 			_, err = clusterClient.ClusterV1().ManagedClusters().Patch(ctx, clusterName, types.MergePatchType, []byte(patch), metav1.PatchOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			expectMemberID(tc.expectedID)
 		}
-		profile, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespaces[0]).Get(ctx, clusterName, metav1.GetOptions{})
+		profile, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespaces[0]).Get(ctx, clusterName, metav1.GetOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(profile.Labels["custom-label"]).To(gomega.Equal("keep-me"))
 		gomega.Expect(profile.Annotations["custom-annotation"]).To(gomega.Equal("keep-me"))
@@ -433,7 +470,7 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 
 		ginkgo.By("Verify ClusterProfile is created")
 		gomega.Eventually(func() error {
-			_, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
+			_, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
@@ -443,7 +480,7 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 
 		ginkgo.By("Verify ClusterProfile is deleted")
 		gomega.Eventually(func() bool {
-			_, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
+			_, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
 			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	})
@@ -517,7 +554,7 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 
 		ginkgo.By("Verify ClusterProfile is created")
 		gomega.Eventually(func() error {
-			_, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
+			_, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
@@ -527,7 +564,7 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 
 		ginkgo.By("Verify ClusterProfile is deleted")
 		gomega.Eventually(func() bool {
-			_, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
+			_, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
 			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	})
@@ -637,7 +674,7 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 
 		ginkgo.By("Verify only ONE ClusterProfile is created (deduplication)")
 		gomega.Eventually(func() error {
-			profile, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
+			profile, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -651,7 +688,7 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		ginkgo.By("Verify there is exactly one ClusterProfile for the cluster in the namespace")
-		profiles, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).List(context.Background(), metav1.ListOptions{})
+		profiles, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace).List(context.Background(), metav1.ListOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		clusterProfileCount := 0
@@ -767,7 +804,7 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 
 		ginkgo.By("Verify ClusterProfile status is synced from ManagedCluster")
 		gomega.Eventually(func() error {
-			profile, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
+			profile, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -797,7 +834,7 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 			}
 
 			// Verify conditions
-			availableCond := meta.FindStatusCondition(profile.Status.Conditions, cpv1alpha1.ClusterConditionControlPlaneHealthy)
+			availableCond := meta.FindStatusCondition(profile.Status.Conditions, cpv1alpha2.ClusterConditionControlPlaneHealthy)
 			if availableCond == nil || availableCond.Status != metav1.ConditionTrue {
 				return fmt.Errorf("expected ControlPlaneHealthy condition to be True")
 			}
@@ -897,7 +934,7 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 		ginkgo.By("Verify ClusterProfile is created for both clusters (global selector matches all)")
 		for _, clusterName := range []string{cluster1Name, cluster2Name} {
 			gomega.Eventually(func() error {
-				profile, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
+				profile, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -1020,14 +1057,14 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 		ginkgo.By("Verify ClusterProfiles are created for matching clusters only")
 		for _, clusterName := range []string{prodClusterName, devClusterName} {
 			gomega.Eventually(func() error {
-				_, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
+				_, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 		}
 
 		ginkgo.By("Verify ClusterProfile is NOT created for test cluster")
 		gomega.Consistently(func() bool {
-			_, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), testClusterName, metav1.GetOptions{})
+			_, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace).Get(context.Background(), testClusterName, metav1.GetOptions{})
 			return errors.IsNotFound(err)
 		}, "10s", "1s").Should(gomega.BeTrue())
 	})
@@ -1142,12 +1179,12 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 
 		ginkgo.By("Verify only ONE ClusterProfile is created (deduplication across LabelSelectors)")
 		gomega.Eventually(func() error {
-			_, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
+			_, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		ginkgo.By("Verify there is exactly one ClusterProfile")
-		profiles, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).List(context.Background(), metav1.ListOptions{})
+		profiles, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace).List(context.Background(), metav1.ListOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		clusterProfileCount := 0
@@ -1228,14 +1265,14 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 
 		ginkgo.By("Verify ClusterProfile has correct clusterset label")
 		gomega.Eventually(func() error {
-			profile, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
+			profile, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 
 			// Verify clusterset label is synced
-			if profile.Labels[cpv1alpha1.LabelClusterSetKey] != clusterSetName {
-				return fmt.Errorf("expected clusterset label %s, got %s", clusterSetName, profile.Labels[cpv1alpha1.LabelClusterSetKey])
+			if profile.Labels[cpv1alpha2.LabelClusterSetKey] != clusterSetName {
+				return fmt.Errorf("expected clusterset label %s, got %s", clusterSetName, profile.Labels[cpv1alpha2.LabelClusterSetKey])
 			}
 
 			return nil
@@ -1325,7 +1362,7 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 
 		ginkgo.By("Verify ClusterProfile is NOT created for cluster in deletion")
 		gomega.Consistently(func() bool {
-			_, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
+			_, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
 			return errors.IsNotFound(err)
 		}, "15s", "2s").Should(gomega.BeTrue())
 
@@ -1404,7 +1441,7 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 
 		ginkgo.By("Verify ClusterProfile is NOT created while the binding is not bound")
 		gomega.Consistently(func(g gomega.Gomega) {
-			_, err := clusterProfileClient.ApisV1alpha1().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
+			_, err := clusterProfileClient.ApisV1alpha2().ClusterProfiles(namespace).Get(context.Background(), clusterName, metav1.GetOptions{})
 			g.Expect(errors.IsNotFound(err)).To(gomega.BeTrue(), "ClusterProfile should not be created while the binding is not bound")
 		}, "10s", "2s").Should(gomega.Succeed())
 	})

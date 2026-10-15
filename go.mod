@@ -45,7 +45,7 @@ require (
 	open-cluster-management.io/api v1.4.0
 	open-cluster-management.io/sdk-go v1.4.0
 	sigs.k8s.io/about-api v0.0.0-20250131010323-518069c31c03
-	sigs.k8s.io/cluster-inventory-api v0.1.3
+	sigs.k8s.io/cluster-inventory-api v0.2.0
 	sigs.k8s.io/controller-runtime v0.24.1
 	sigs.k8s.io/kube-storage-version-migrator v0.0.6-0.20230721195810-5c8923c5ff96
 	sigs.k8s.io/yaml v1.6.0

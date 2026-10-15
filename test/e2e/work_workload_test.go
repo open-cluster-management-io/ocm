@@ -1140,7 +1140,7 @@ func newSleepJob(name string, sleepSeconds int) *batchv1.Job {
 					Containers: []corev1.Container{
 						{
 							Name:    "sleeper",
-							Image:   "quay.io/asmacdo/busybox",
+							Image:   "registry.k8s.io/e2e-test-images/busybox:1.36.1-1",
 							Command: []string{"/bin/sh"},
 							Args:    []string{"-c", fmt.Sprintf("echo 'Starting sleep job'; sleep %d; echo 'Sleep job completed'", sleepSeconds)},
 						},
@@ -1182,7 +1182,7 @@ func newDeployment(name string) *appsv1.Deployment {
 					Containers: []corev1.Container{
 						{
 							Name:  "busybox",
-							Image: "quay.io/asmacdo/busybox",
+							Image: "registry.k8s.io/e2e-test-images/busybox:1.36.1-1",
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 80,
