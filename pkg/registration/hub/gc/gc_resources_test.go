@@ -2,6 +2,7 @@ package gc
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -72,11 +73,12 @@ func TestGCResourcesController(t *testing.T) {
 
 func TestCollectGCTargets(t *testing.T) {
 	cases := []struct {
-		name                        string
-		objs                        []runtime.Object
-		expectedFirstDeletePriority cleanupPriority
-		expectedFirstDeletedCount   int
-		expectedTotalCount          int
+		name                          string
+		objs                          []runtime.Object
+		expectedFirstDeletePriority   cleanupPriority
+		expectedFirstDeletedNames     []string
+		expectedTotalCount            int
+		expectedFinalizerPendingCount int
 	}{
 		{
 			name: "no priority resource",
@@ -87,8 +89,21 @@ func TestCollectGCTargets(t *testing.T) {
 				newWorkMetadata(testinghelpers.TestManagedClusterName, "test4", nil),
 			},
 			expectedFirstDeletePriority: minCleanupPriority,
-			expectedFirstDeletedCount:   4,
+			expectedFirstDeletedNames:   []string{"test1", "test2", "test3", "test4"},
 			expectedTotalCount:          4,
+		},
+		{
+			name: "resources pending finalizers",
+			objs: []runtime.Object{
+				newWorkMetadataWithFinalizers(testinghelpers.TestManagedClusterName, "test1", nil, "work.open-cluster-management.io/hold"),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test2", nil),
+				newWorkMetadataWithFinalizers(testinghelpers.TestManagedClusterName, "test3", nil, "work.open-cluster-management.io/hold"),
+				newWorkMetadata(testinghelpers.TestManagedClusterName, "test4", nil),
+			},
+			expectedFirstDeletePriority:   minCleanupPriority,
+			expectedFirstDeletedNames:     []string{"test1", "test2", "test3", "test4"},
+			expectedTotalCount:            4,
+			expectedFinalizerPendingCount: 2,
 		},
 		{
 			name: "invalid priority resource",
@@ -99,7 +114,7 @@ func TestCollectGCTargets(t *testing.T) {
 				newWorkMetadata(testinghelpers.TestManagedClusterName, "test4", nil),
 			},
 			expectedFirstDeletePriority: minCleanupPriority,
-			expectedFirstDeletedCount:   4,
+			expectedFirstDeletedNames:   []string{"test1", "test2", "test3", "test4"},
 			expectedTotalCount:          4,
 		},
 		{
@@ -114,7 +129,7 @@ func TestCollectGCTargets(t *testing.T) {
 				newWorkMetadata(testinghelpers.TestManagedClusterName, "test7", nil),
 			},
 			expectedFirstDeletePriority: minCleanupPriority,
-			expectedFirstDeletedCount:   5,
+			expectedFirstDeletedNames:   []string{"test2", "test4", "test5", "test6", "test7"},
 			expectedTotalCount:          7,
 		},
 		{
@@ -128,7 +143,7 @@ func TestCollectGCTargets(t *testing.T) {
 				newWorkMetadata(testinghelpers.TestManagedClusterName, "test6", map[string]string{clusterv1.CleanupPriorityAnnotationKey: "90"}),
 			},
 			expectedFirstDeletePriority: cleanupPriority(10),
-			expectedFirstDeletedCount:   2,
+			expectedFirstDeletedNames:   []string{"test2", "test3"},
 			expectedTotalCount:          6,
 		},
 	}
@@ -146,10 +161,86 @@ func TestCollectGCTargets(t *testing.T) {
 			result, err := ctrl.collectGCTargets(context.TODO(), workGvr, testinghelpers.TestManagedClusterName)
 			assert.NoError(t, err)
 			assert.Equal(t, c.expectedTotalCount, result.totalCount)
+			assert.Equal(t, c.expectedFinalizerPendingCount, result.finalizerPendingCount)
 			assert.Equal(t, c.expectedFirstDeletePriority, result.lowestPriority)
-			assert.Equal(t, c.expectedFirstDeletedCount, len(result.lowestPriorityNames))
+			assert.ElementsMatch(t, c.expectedFirstDeletedNames, result.lowestPriorityNames)
 		})
 	}
+}
+
+// TestCollectGCTargetsPagination drives collectGCTargets across several pages. The
+// object tracker behind NewSimpleMetadataClient ignores ListOptions.Limit/Continue,
+// so pages are served by a stateful list reactor instead: each call returns the next
+// chunk and a non-empty Continue token until the last one.
+func TestCollectGCTargetsPagination(t *testing.T) {
+	// 1200 works: the lowest priority (10) only appears on the last page, so the
+	// names collected from the earlier pages must be discarded.
+	var objs []metav1.PartialObjectMetadata
+	for i := 0; i < 1200; i++ {
+		priority := "50"
+		switch {
+		case i >= 1150:
+			priority = "10"
+		case i%2 == 0:
+			priority = "90"
+		}
+		objs = append(objs, *newWorkMetadata(testinghelpers.TestManagedClusterName,
+			fmt.Sprintf("test-%04d", i),
+			map[string]string{clusterv1.CleanupPriorityAnnotationKey: priority}))
+	}
+	// every 100th work is pending a finalizer
+	for i := range objs {
+		if i%100 == 0 {
+			objs[i].Finalizers = []string{"work.open-cluster-management.io/hold"}
+		}
+	}
+
+	const pageSize = 500
+	scheme := fakemetadataclient.NewTestScheme()
+	_ = workv1.Install(scheme)
+	_ = metav1.AddMetaToScheme(scheme)
+	metadataClient := fakemetadataclient.NewSimpleMetadataClient(scheme)
+
+	served := 0
+	metadataClient.PrependReactor("list", workGvr.Resource,
+		func(action clienttesting.Action) (bool, runtime.Object, error) {
+			if served >= len(objs) {
+				return true, &metav1.List{}, nil
+			}
+			end := min(served+pageSize, len(objs))
+			page := &metav1.List{}
+			for i := served; i < end; i++ {
+				page.Items = append(page.Items, runtime.RawExtension{Object: &objs[i]})
+			}
+			served = end
+			if served < len(objs) {
+				page.Continue = fmt.Sprintf("continue-%d", served)
+			}
+			return true, page, nil
+		})
+
+	ctrl := &gcResourcesController{metadataClient: metadataClient}
+	result, err := ctrl.collectGCTargets(context.TODO(), workGvr, testinghelpers.TestManagedClusterName)
+	assert.NoError(t, err)
+
+	// 1200 objects at 500 per page is 3 list calls, the last one with an empty Continue.
+	assert.Len(t, metadataClient.Actions(), 3)
+	assert.Equal(t, 1200, result.totalCount)
+	assert.Equal(t, 12, result.finalizerPendingCount)
+	assert.Equal(t, cleanupPriority(10), result.lowestPriority)
+
+	var expectedNames []string
+	for i := 1150; i < 1200; i++ {
+		expectedNames = append(expectedNames, fmt.Sprintf("test-%04d", i))
+	}
+	assert.ElementsMatch(t, expectedNames, result.lowestPriorityNames)
+}
+
+func newWorkMetadataWithFinalizers(namespace, name string,
+	annotations map[string]string, finalizers ...string) *metav1.PartialObjectMetadata {
+	work := newWorkMetadata(namespace, name, annotations)
+	work.Finalizers = finalizers
+	return work
 }
 
 func newAddonMetadata(namespace, name string, annotations map[string]string) *metav1.PartialObjectMetadata {
