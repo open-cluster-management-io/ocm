@@ -57,6 +57,21 @@ load-images-kind:
 	@echo "All images loaded into kind cluster successfully!"
 .PHONY: load-images-kind
 
+# Save all images to one archive, e.g. to load them into kind on another machine
+# with `kind load image-archive`. podman needs -m to put more than one image in an archive.
+IMAGES_ARCHIVE ?= images.tar
+save-images-kind:
+ifeq ($(CONTAINER_CLI),)
+	$(error Neither docker nor podman found. Please install one of them.)
+endif
+	$(CONTAINER_CLI) save $(if $(filter podman,$(CONTAINER_RUNTIME)),-m) -o $(IMAGES_ARCHIVE) \
+		$(OPERATOR_IMAGE_NAME) \
+		$(REGISTRATION_IMAGE) \
+		$(WORK_IMAGE) \
+		$(PLACEMENT_IMAGE) \
+		$(ADDON_MANAGER_IMAGE)
+.PHONY: save-images-kind
+
 # Build and load images in one step
 images-and-load-kind: images-kind load-images-kind
 .PHONY: images-and-load-kind
