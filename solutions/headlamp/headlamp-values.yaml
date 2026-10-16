@@ -1,0 +1,68 @@
+# Helm values for the Headlamp chart (kubernetes-sigs/headlamp).
+#
+# Headlamp discovers the managed clusters from ClusterProfile objects and calls
+# the OCM cp-creds plugin to mint a token for each one. The only OCM-specific
+# parts are the provider name -- which must be `open-cluster-management`, the
+# name OCM writes into ClusterProfile.status.accessProviders -- and the
+# --managed-serviceaccount argument, which must match the ManagedServiceAccount
+# name used on the hub.
+config:
+  inCluster: true
+  # The hub itself, served straight from the pod's service account rather than
+  # through the proxy. Renaming it keeps it distinct from the managed clusters.
+  inClusterContextName: hub
+
+  clusterInventory:
+    enabled: true
+
+    # The chart rejects an exec command that is not under one of these mount
+    # paths, so the plugin has to arrive as an image volume -- an initContainer
+    # copying the binary into an emptyDir fails template validation. Pin a tag,
+    # not a digest: digest references need the ImageVolumeWithDigest gate.
+    plugins:
+      - name: cp-creds
+        image: quay.io/open-cluster-management/cp-creds:v0.11.0
+        mountPath: /plugins
+
+    accessProvidersConfig:
+      providers:
+        - name: open-cluster-management
+          execConfig:
+            apiVersion: client.authentication.k8s.io/v1
+            command: /plugins/cp-creds
+            args:
+              - --managed-serviceaccount=headlamp
+            provideClusterInfo: true
+            interactiveMode: Never
+
+    # Left empty on purpose: Headlamp then watches its own namespace, which is
+    # where the ManagedClusterSetBinding puts the ClusterProfiles. Setting ["*"]
+    # needs cluster-wide RBAC on clusterprofiles.
+    namespaces: []
+
+    # Label a ClusterProfile with headlamp.dev/ignore to hide that cluster.
+    labelSelector: "!headlamp.dev/ignore"
+
+# Spelled out to satisfy the restricted Pod Security Standard. The chart only
+# fills in allowPrivilegeEscalation, seccompProfile and the capability drop when
+# securityContext is left empty, and its own defaults set runAsUser/runAsGroup,
+# so without this the pod is rejected by a namespace enforcing restricted.
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 100
+  runAsGroup: 101
+  privileged: false
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+  # readOnlyRootFilesystem is deliberately left off: Headlamp writes the
+  # kubeconfig for dynamically added clusters under /home/headlamp/.config, which
+  # the chart's automatic /tmp emptyDir does not cover.
