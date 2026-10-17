@@ -2,7 +2,7 @@ module open-cluster-management.io/ocm/test/conformance
 
 go 1.26.0
 
-require sigs.k8s.io/cluster-inventory-api/conformance v0.0.0-20261009084903-a220be3e1c74
+require sigs.k8s.io/cluster-inventory-api/conformance v0.0.0-20261017160138-b354017eed03
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
