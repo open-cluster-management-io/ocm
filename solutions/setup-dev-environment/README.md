@@ -16,6 +16,23 @@ sudo chmod +x /usr/local/bin/clusteradm
 
 For other platforms (macOS, arm64), download the appropriate binary from the [clusteradm releases page](https://github.com/open-cluster-management-io/clusteradm/releases).
 
+## Configuration
+
+| Environment variable | Default | Purpose |
+| --- | --- | --- |
+| `HUB`, `CLUSTER1`, `CLUSTER2` | `hub`, `cluster1`, `cluster2` | Names of the three kind clusters. The hub is also registered as `local-cluster`. Existing names cause an error. |
+| `BUILD_IMAGES` | `false` | `true` builds all five OCM images from this checkout and loads them into all three clusters. Otherwise, clusteradm selects its default released images. |
+| `IMAGE_REGISTRY` | `quay.io/open-cluster-management` | Image name prefix in local build mode. No registry push is needed. |
+| `IMAGE_TAG` | `local` in local build mode | Tag shared by the locally built images. `latest` is rejected so Pods use the loaded images. |
+| `CONTAINER_CLI` | Docker, falling back to Podman | Container runtime for local builds and kind. An explicit `KIND_EXPERIMENTAL_PROVIDER` is honored when `CONTAINER_CLI` is unset. |
+| `HUB_FEATURE_GATES` | clusteradm defaults | Comma-separated feature gates for the hub, for example `ClusterProfile=true`. |
+| `SPOKE_FEATURE_GATES` | clusteradm defaults | Comma-separated feature gates for every managed cluster, including the hub's agent, for example `ClusterClaim=false`. |
+
+Local build mode additionally requires Go and make. It uses the kind nodes'
+architecture for both the container images and Go binaries, and applies this
+checkout's operator RBAC to match the locally built operators. All clusters remain
+available after the script finishes or fails.
+
 ## Setup the clusters
 
 Run `./local-up.sh`, you will see three clusters registered on the hub cluster.
