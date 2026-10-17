@@ -17,6 +17,7 @@ include ./test/integration-test.mk
 include ./test/e2e-test.mk
 include ./test/olm-test.mk
 include ./test/kind-images.mk
+include ./test/conformance-test.mk
 
 OPERATOR_SDK?=$(PERMANENT_TMP_GOPATH)/bin/operator-sdk
 OPERATOR_SDK_VERSION?=v1.32.0
@@ -133,4 +134,3 @@ ifeq "" "$(wildcard $(HELM))"
 else
 	$(info Using existing helm from "$(HELM)")
 endif
-
