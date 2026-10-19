@@ -17,6 +17,10 @@ spec:
       app: clustermanager-registration-controller
   template:
     metadata:
+      {{ if eq .AwsCredentialSource "PodIdentity" }}
+      annotations:
+        open-cluster-management.io/aws-credential-source: PodIdentity
+      {{ end }}
       labels:
         app: clustermanager-registration-controller
         {{ if gt (len .Labels) 0 }}

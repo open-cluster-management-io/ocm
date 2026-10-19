@@ -93,3 +93,71 @@ The hub and spoke can be joined using AWS IAM based authentication by running fo
    ```
 
 7. Create a sample manifestwork in hub. Confirm that resources are pushed to spoke.
+
+# Using EKS Pod Identity instead of IRSA
+
+The `awsirsa` registration driver can also get its AWS credentials from [EKS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html). With Pod Identity, neither cluster needs an IAM OIDC provider. Configure both the hub and the spoke to use it.
+
+Set `credentialSource: PodIdentity` on both CRs. The operators then stop annotating the OCM service accounts with `eks.amazonaws.com/role-arn`. That annotation makes EKS inject web identity credentials, which take precedence over Pod Identity in the AWS default credential chain. If the annotation is already there, for example on an existing IRSA setup, the operators remove it and restart the affected pods.
+
+The default is `IRSA`, so existing setups keep working unchanged.
+
+1. Install the [EKS Pod Identity Agent](https://docs.aws.amazon.com/eks/latest/userguide/pod-id-agent-setup.html) add-on on the hub and spoke clusters.
+
+2. On the spoke, create `$SPOKE_ROLE_NAME` as in step 2 above, but use the Pod Identity trust policy. The permission policy and the four role tags are still required, because the hub role's trust policy checks the tags through `aws:PrincipalTag` conditions:
+   ```bash
+   aws iam create-role --role-name $SPOKE_ROLE_NAME --assume-role-policy-document file://templates/Template-Pod-Identity-Trust-Policy.json
+   # then run the put-role-policy and tag-role commands from step 2
+   ```
+   Associate the role with the agent service accounts. In `Default` mode these are `klusterlet-registration-sa` and `klusterlet-work-sa`. In `Singleton` mode only `klusterlet-work-sa` is used.
+   ```bash
+   for sa in klusterlet-registration-sa klusterlet-work-sa; do
+     aws eks create-pod-identity-association --cluster-name $SPOKE_CLUSTER_NAME --region $SPOKE_REGION \
+       --namespace open-cluster-management-agent --service-account $sa \
+       --role-arn arn:aws:iam::$SPOKE_ACCOUNT_ID:role/$SPOKE_ROLE_NAME
+   done
+   ```
+
+3. On the hub, create `$IDENTITY_CREATOR_ROLE_NAME` as in step 3 above, but use the Pod Identity trust policy, then associate it with `registration-controller-sa`:
+   ```bash
+   aws iam create-role --role-name $IDENTITY_CREATOR_ROLE_NAME --assume-role-policy-document file://templates/Template-Pod-Identity-Trust-Policy.json
+   # then run the put-role-policy command from step 3
+   aws eks create-pod-identity-association --cluster-name $HUB_CLUSTER_NAME --region $HUB_REGION \
+     --namespace open-cluster-management-hub --service-account registration-controller-sa \
+     --role-arn arn:aws:iam::$HUB_ACCOUNT_ID:role/$IDENTITY_CREATOR_ROLE_NAME
+   ```
+
+4. Initialize the hub and join the spoke as in steps 4 and 5, then set `credentialSource` on both CRs:
+   ```shell
+   # hub
+   kubectl patch clustermanager cluster-manager --type json -p \
+     '[{"op":"add","path":"/spec/registrationConfiguration/registrationDrivers/0/awsirsa/credentialSource","value":"PodIdentity"}]'
+
+   # spoke
+   kubectl patch klusterlet klusterlet --type merge -p \
+     '{"spec":{"registrationConfiguration":{"registrationDriver":{"awsIrsa":{"credentialSource":"PodIdentity"}}}}}'
+   ```
+   The resulting configuration looks like this:
+   ```yaml
+   # ClusterManager
+   spec:
+     registrationConfiguration:
+       registrationDrivers:
+       - authType: awsirsa
+         awsirsa:
+           hubClusterArn: arn:aws:eks:us-west-2:123456789012:cluster/hub
+           credentialSource: PodIdentity
+   ---
+   # Klusterlet
+   spec:
+     registrationConfiguration:
+       registrationDriver:
+         authType: awsirsa
+         awsIrsa:
+           hubClusterArn: arn:aws:eks:us-west-2:123456789012:cluster/hub
+           managedClusterArn: arn:aws:eks:us-west-2:567890123456:cluster/spoke
+           credentialSource: PodIdentity
+   ```
+   Adjust the `registrationDrivers` index if `awsirsa` is not the first driver.
+
+5. Continue with steps 6 and 7.
