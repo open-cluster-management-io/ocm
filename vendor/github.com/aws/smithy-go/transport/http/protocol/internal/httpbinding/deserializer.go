@@ -380,6 +380,9 @@ func (d *ShapeDeserializer) ReadMapKey(s *smithy.Schema) (string, bool, error) {
 
 // ReadNil implements [smithy.ShapeDeserializer].
 func (d *ShapeDeserializer) ReadNil(s *smithy.Schema) (bool, error) {
+	if d.inPrefixMap || d.inHeaderList {
+		return false, nil
+	}
 	return d.body.ReadNil(s)
 }
 

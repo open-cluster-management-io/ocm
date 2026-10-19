@@ -606,7 +606,7 @@ func memberFromToken(s *smithy.Schema, tok []byte, escaped bool) (*smithy.Schema
 	// if the string had no escapes, the raw bytes ARE the unquoted form --
 	// no point re-trying the lookup
 	if !escaped {
-		return nil, nil
+		return errorMessageMember(s, inner), nil
 	}
 
 	unq, err := unquote(tok)
@@ -614,7 +614,29 @@ func memberFromToken(s *smithy.Schema, tok []byte, escaped bool) (*smithy.Schema
 		return nil, err
 	}
 
-	return s.Member(unq), nil
+	if m := s.Member(unq); m != nil {
+		return m, nil
+	}
+	return errorMessageMember(s, []byte(unq)), nil
+}
+
+// Services do not consistently use the casing that is modeled for the message
+// part of errors, handle that here.
+func errorMessageMember(s *smithy.Schema, name []byte) *smithy.Schema {
+	var alt string
+	switch string(name) {
+	case "message":
+		alt = "Message"
+	case "Message":
+		alt = "message"
+	default:
+		return nil
+	}
+
+	if _, ok := smithy.SchemaTrait[*traits.Error](s); !ok {
+		return nil
+	}
+	return s.Members()[alt]
 }
 
 func isN(tok []byte) bool   { return tok[0] == 'n' }
