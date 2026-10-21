@@ -68,7 +68,7 @@ func (d *deployReconciler) reconcile(
 		placement, err := d.placementLister.Placements(mwrSet.Namespace).Get(placementRef.Name)
 
 		if errors.IsNotFound(err) {
-			apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(workapiv1alpha1.ReasonPlacementDecisionNotFound, ""))
+			apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(mwrSet.Generation, workapiv1alpha1.ReasonPlacementDecisionNotFound, ""))
 			return mwrSet, reconcileStop, nil
 		}
 
@@ -106,7 +106,7 @@ func (d *deployReconciler) reconcile(
 		placeTracker := helper.GetPlacementTracker(d.placeDecisionLister, placement, existingClusterNames)
 		rolloutHandler, err := clustersdkv1alpha1.NewRolloutHandler(placeTracker, d.clusterRolloutStatusFunc)
 		if err != nil {
-			apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(workapiv1alpha1.ReasonNotAsExpected, ""))
+			apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(mwrSet.Generation, workapiv1alpha1.ReasonNotAsExpected, ""))
 
 			return mwrSet, reconcileContinue, utilerrors.NewAggregate(errs)
 		}
@@ -121,7 +121,7 @@ func (d *deployReconciler) reconcile(
 
 		if err != nil {
 			errs = append(errs, err)
-			apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(workapiv1alpha1.ReasonNotAsExpected, ""))
+			apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(mwrSet.Generation, workapiv1alpha1.ReasonNotAsExpected, ""))
 
 			continue
 		}
@@ -201,17 +201,17 @@ func (d *deployReconciler) reconcile(
 		// when others succeeded (count > 0), and when every apply failed (count == 0) it must not
 		// be reported as a misleading PlacementDecisionEmpty.
 		apimeta.SetStatusCondition(&mwrSet.Status.Conditions,
-			getPlacementDecisionVerified(workapiv1alpha1.ReasonNotAsExpected, aggregatedErrorMessage(errs)))
+			getPlacementDecisionVerified(mwrSet.Generation, workapiv1alpha1.ReasonNotAsExpected, aggregatedErrorMessage(errs)))
 	case count > 0:
-		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(workapiv1alpha1.ReasonAsExpected, ""))
+		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(mwrSet.Generation, workapiv1alpha1.ReasonAsExpected, ""))
 	default:
-		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(workapiv1alpha1.ReasonPlacementDecisionEmpty, ""))
+		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementDecisionVerified(mwrSet.Generation, workapiv1alpha1.ReasonPlacementDecisionEmpty, ""))
 	}
 
 	if total == succeededCount {
-		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementRollOut(workapiv1alpha1.ReasonComplete, ""))
+		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementRollOut(mwrSet.Generation, workapiv1alpha1.ReasonComplete, ""))
 	} else {
-		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementRollOut(workapiv1alpha1.ReasonProgressing, ""))
+		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, getPlacementRollOut(mwrSet.Generation, workapiv1alpha1.ReasonProgressing, ""))
 	}
 
 	if len(errs) > 0 {
@@ -329,31 +329,31 @@ func isConditionReady(cond *metav1.Condition, generation int64, requireTrue bool
 }
 
 // getManifestworkApplied return only True status if there all clusters have manifests applied as expected
-func getManifestworkApplied(reason string, message string) metav1.Condition {
+func getManifestworkApplied(generation int64, reason string, message string) metav1.Condition {
 	if reason == workapiv1alpha1.ReasonAsExpected {
-		return getCondition(workapiv1alpha1.ManifestWorkReplicaSetConditionManifestworkApplied, reason, message, metav1.ConditionTrue)
+		return getCondition(workapiv1alpha1.ManifestWorkReplicaSetConditionManifestworkApplied, reason, message, metav1.ConditionTrue, generation)
 	}
 
-	return getCondition(workapiv1alpha1.ManifestWorkReplicaSetConditionManifestworkApplied, reason, message, metav1.ConditionFalse)
+	return getCondition(workapiv1alpha1.ManifestWorkReplicaSetConditionManifestworkApplied, reason, message, metav1.ConditionFalse, generation)
 
 }
 
 // getPlacementDecisionVerified return only True status if there are clusters selected
-func getPlacementDecisionVerified(reason string, message string) metav1.Condition {
+func getPlacementDecisionVerified(generation int64, reason string, message string) metav1.Condition {
 	if reason == workapiv1alpha1.ReasonAsExpected {
-		return getCondition(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified, reason, message, metav1.ConditionTrue)
+		return getCondition(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified, reason, message, metav1.ConditionTrue, generation)
 	}
 
-	return getCondition(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified, reason, message, metav1.ConditionFalse)
+	return getCondition(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified, reason, message, metav1.ConditionFalse, generation)
 }
 
 // getPlacementRollOut return only True status if all the clusters selected by the placement have succeeded
-func getPlacementRollOut(reason string, message string) metav1.Condition {
+func getPlacementRollOut(generation int64, reason string, message string) metav1.Condition {
 	if reason == workapiv1alpha1.ReasonComplete {
-		return getCondition(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementRolledOut, reason, message, metav1.ConditionTrue)
+		return getCondition(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementRolledOut, reason, message, metav1.ConditionTrue, generation)
 	}
 
-	return getCondition(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementRolledOut, reason, message, metav1.ConditionFalse)
+	return getCondition(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementRolledOut, reason, message, metav1.ConditionFalse, generation)
 }
 
 // maxAggregatedErrorMessageLen caps how much of the aggregated apply/rollout error text is
@@ -376,12 +376,13 @@ func aggregatedErrorMessage(errs []error) string {
 	return msg[:maxAggregatedErrorMessageLen-len(suffix)] + suffix
 }
 
-func getCondition(conditionType string, reason string, message string, status metav1.ConditionStatus) metav1.Condition {
+func getCondition(conditionType string, reason string, message string, status metav1.ConditionStatus, generation int64) metav1.Condition {
 	return metav1.Condition{
 		Type:               conditionType,
 		Reason:             reason,
 		Message:            message,
 		Status:             status,
+		ObservedGeneration: generation,
 		LastTransitionTime: metav1.Now(),
 	}
 }
