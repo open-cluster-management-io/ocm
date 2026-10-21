@@ -21,6 +21,7 @@ func TestStatusReconcileAsExpected(t *testing.T) {
 	plcName := "place-test"
 	clusters := []string{"cls1", "cls2", "cls3", "cls4"}
 	mwrSetTest := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", plcName)
+	mwrSetTest.Generation = 3
 	mwrSetTest.Status.Summary.Total = len(clusters)
 	mwrSetTest.Status.PlacementsSummary = []workapiv1alpha1.PlacementSummary{
 		{
@@ -41,10 +42,10 @@ func TestStatusReconcileAsExpected(t *testing.T) {
 
 	for _, cls := range clusters {
 		mw := buildManifestWork(mwrSetTest, mwrSetTest.Name, cls, plcName)
-		cond := getCondition(workv1.WorkApplied, "", "", metav1.ConditionTrue)
+		cond := getCondition(workv1.WorkApplied, "", "", metav1.ConditionTrue, 0)
 		apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 
-		cond = getCondition(workv1.WorkAvailable, "", "", metav1.ConditionTrue)
+		cond = getCondition(workv1.WorkAvailable, "", "", metav1.ConditionTrue, 0)
 		apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 		if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw); err != nil {
 			t.Fatal(err)
@@ -90,6 +91,10 @@ func TestStatusReconcileAsExpected(t *testing.T) {
 	if appliedCondition.Reason != workapiv1alpha1.ReasonAsExpected {
 		t.Fatal("Applied condition Reason not match AsExpected ", appliedCondition)
 	}
+
+	if appliedCondition.ObservedGeneration != mwrSetTest.Generation {
+		t.Fatal("Applied condition ObservedGeneration not match Generation ", appliedCondition, mwrSetTest.Generation)
+	}
 }
 
 func TestStatusReconcileAsProcessing(t *testing.T) {
@@ -116,14 +121,14 @@ func TestStatusReconcileAsProcessing(t *testing.T) {
 
 	for id, cls := range clusters {
 		mw := buildManifestWork(mwrSetTest, mwrSetTest.Name, cls, plcName)
-		cond := getCondition(workv1.WorkApplied, "", "", metav1.ConditionTrue)
+		cond := getCondition(workv1.WorkApplied, "", "", metav1.ConditionTrue, 0)
 		apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 
 		if id%2 == 0 {
-			cond = getCondition(workv1.WorkAvailable, "", "", metav1.ConditionTrue)
+			cond = getCondition(workv1.WorkAvailable, "", "", metav1.ConditionTrue, 0)
 			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 		} else {
-			cond = getCondition(workv1.WorkProgressing, "", "", metav1.ConditionTrue)
+			cond = getCondition(workv1.WorkProgressing, "", "", metav1.ConditionTrue, 0)
 			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 		}
 
@@ -198,19 +203,19 @@ func TestStatusReconcileNotAsExpected(t *testing.T) {
 	avaCount, processingCount, degradCount := 0, 0, 0
 	for id, cls := range clusters {
 		mw := buildManifestWork(mwrSetTest, mwrSetTest.Name, cls, plcName)
-		cond := getCondition(workv1.WorkApplied, "", "", metav1.ConditionTrue)
+		cond := getCondition(workv1.WorkApplied, "", "", metav1.ConditionTrue, 0)
 		apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 
 		if id%2 == 0 { //nolint:gocritic
-			cond = getCondition(workv1.WorkAvailable, "", "", metav1.ConditionTrue)
+			cond = getCondition(workv1.WorkAvailable, "", "", metav1.ConditionTrue, 0)
 			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 			avaCount++
 		} else if id%3 == 0 {
-			cond = getCondition(workv1.WorkDegraded, "", "", metav1.ConditionTrue)
+			cond = getCondition(workv1.WorkDegraded, "", "", metav1.ConditionTrue, 0)
 			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 			processingCount++
 		} else {
-			cond = getCondition(workv1.WorkProgressing, "", "", metav1.ConditionTrue)
+			cond = getCondition(workv1.WorkProgressing, "", "", metav1.ConditionTrue, 0)
 			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 			degradCount++
 		}
