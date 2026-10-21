@@ -4,6 +4,50 @@
 becomes a fleet UI: one page with a cluster chooser listing every managed cluster, no
 per-cluster kubeconfig to build or rotate.
 
+## What you get
+
+- **One UI for the whole fleet.** Every managed cluster in the `ManagedClusterSet` shows up
+  in Headlamp's cluster chooser, next to the hub.
+- **Browse inside each cluster.** Pick a cluster and see its workloads, nodes, events,
+  storage and network resources, the same as if Headlamp were installed on that cluster.
+- **No kubeconfigs to manage.** Headlamp reaches each cluster through `cluster-proxy`, using a
+  token that `managed-serviceaccount` creates and rotates. Nothing is copied by hand.
+- **Read-only by default.** The spoke RBAC grants only `get`, `list` and `watch`, and leaves out
+  secrets, so the UI cannot change a cluster or read its secrets.
+- **New clusters appear on their own.** No Headlamp restart or config change when the fleet
+  grows.
+
+The cluster chooser lists the hub and every managed cluster:
+
+![Headlamp cluster chooser listing cluster1, cluster2 and local-cluster from Cluster Inventory](./assets/cluster-chooser.png)
+
+Picking `cluster1` shows that cluster's own pods, fetched through `cluster-proxy`:
+
+![Pods running on cluster1, shown in Headlamp](./assets/cluster1-pods.png)
+
+Read-only access is enforced on the spoke; opening Secrets is refused:
+
+![Headlamp Secrets page on cluster1 showing "Error: No permissions"](./assets/cluster1-secrets-denied.png)
+
+Headlamp names each cluster `cluster-inventory-in-cluster--<namespace>--<cluster>--<hash>`;
+the chooser cuts long names off.
+
+### How this relates to the OCM Headlamp plugin
+
+The [`headlamp-plugin`](https://github.com/open-cluster-management-io/lab/tree/main/headlamp-plugin)
+in the `lab` repo and this solution do different jobs, and complement each other:
+
+| | `lab/headlamp-plugin` | This solution |
+|---|---|---|
+| What it is | A Headlamp plugin (TypeScript) | Configuration only: Headlamp's built-in Cluster Inventory support plus OCM addons |
+| What it shows | OCM objects on the **hub**, such as `ManagedCluster` status and capacity | The resources **inside** each managed cluster |
+| How it connects | Reads the hub's API | Reaches each managed cluster through `cluster-proxy` |
+
+The plugin answers "what is the state of my fleet?"; this solution answers "what is running
+on that cluster?".
+
+## How it works
+
 Nothing here is Headlamp-specific glue. Headlamp reads
 [Cluster Inventory](https://multicluster.sigs.k8s.io/concepts/cluster-profile-api/)
 `ClusterProfile` objects, and OCM produces them. The hub publishes a `ClusterProfile` per
@@ -53,6 +97,7 @@ hub cluster                                        managed cluster
 ## Layout
 
 ```
+assets/                       # screenshots used in this README
 manifests/
   clusterset.yaml             # namespace, ManagedClusterSet, ManagedClusterSetBinding
   managedserviceaccount.yaml  # ManagedServiceAccount per cluster (deploy.sh generates these)
