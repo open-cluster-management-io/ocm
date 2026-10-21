@@ -16,6 +16,10 @@ KIND_CLUSTER_NAME ?= $(shell $(KUBECTL) config current-context 2>/dev/null | sed
 
 # Set platform for builds to match kind cluster
 BUILD_PLATFORM ?= linux/$(KIND_CLUSTER_ARCH)
+# The Dockerfiles default OS/ARCH to linux/amd64, so --platform alone would
+# put amd64 binaries into an arm64 image.
+BUILD_OS = $(word 1,$(subst /, ,$(BUILD_PLATFORM)))
+BUILD_ARCH = $(word 2,$(subst /, ,$(BUILD_PLATFORM)))
 
 # Docker/podman build settings
 # These are only used by kind-specific targets below
@@ -44,7 +48,7 @@ endif
 	@echo "  Build platform: $(BUILD_PLATFORM)"
 	@$(MAKE) images \
 		IMAGE_BUILD_BUILDER="$(CONTAINER_RUNTIME) build" \
-		IMAGE_BUILD_DEFAULT_FLAGS="--platform=$(BUILD_PLATFORM)"
+		IMAGE_BUILD_DEFAULT_FLAGS="--platform=$(BUILD_PLATFORM) --build-arg OS=$(BUILD_OS) --build-arg ARCH=$(BUILD_ARCH)"
 .PHONY: images-kind
 
 # Load all images into kind cluster
