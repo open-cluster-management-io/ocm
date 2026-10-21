@@ -14,17 +14,86 @@ on:
       - main
       - release-*
 
+# A new push to a PR cancels its previous run. Manual runs are never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 env:
   USE_EXISTING_CLUSTER: false # set to true to use an existing kind cluster for debugging with act
   KUBERNETES_VERSION: 'v1.37.0'
+  # Pinned so runner image updates can't change the cluster under the tests.
+  KIND_VERSION: 'v0.33.0'
+  KIND_SHA256: 'aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d'
+  IMAGE_TAG: e2e
+  # How long e2e jobs can be re-run without re-running e2e-build.
+  BUILD_RETENTION_DAYS: 3
 
 permissions:
   contents: read
 
 jobs:
+  # Compile the e2e tests and build the images once, so a compile error fails in minutes
+  # and the e2e jobs below don't each rebuild the same five images.
+  # Named e2e-build so it doesn't share the "build" check name with the Pre workflow.
+  e2e-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Free disk space
+        run: bash .github/scripts/free-disk-space.sh
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Compile e2e tests
+        run: go test -c ./test/e2e -o e2e.test
+      - name: Build images
+        run: make images-kind
+      - name: Save images
+        run: |
+          make save-images-kind IMAGES_ARCHIVE=images.tar
+          ls -lh images.tar e2e.test
+      - name: Upload build output
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-build
+          path: |
+            images.tar
+            e2e.test
+          retention-days: ${{ env.BUILD_RETENTION_DAYS }}
+          # "Re-run all jobs" uploads again into the same run.
+          overwrite: true
+
   e2e:
+    needs: e2e-build
+    # Run even if e2e-build fails, so the "Check build" step below turns these required
+    # checks red. A job skipped because of a failed need would count as passing.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # The job names match the jobs this workflow had before, so required checks stay the same.
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: e2e
+            make_vars: ''
+          - name: e2e-hosted
+            make_vars: KLUSTERLET_DEPLOY_MODE=SingletonHosted
+          - name: e2e-singleton
+            make_vars: KLUSTERLET_DEPLOY_MODE=Singleton
+          - name: e2e-grpc
+            make_vars: REGISTRATION_DRIVER=grpc
     steps:
+      - name: Check build
+        if: ${{ needs.e2e-build.result != 'success' }}
+        run: |
+          echo "::error::e2e-build ${{ needs.e2e-build.result }}, see that job for the error"
+          exit 1
       - name: add permisson to docker.sock
         run: sudo chown runner:docker /var/run/docker.sock
         if: ${{ env.ACT }} # this step only runs locally when using the https://github.com/nektos/act to debug the e2e
@@ -36,6 +105,15 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+          # These jobs run the prebuilt e2e.test and don't compile Go.
+          cache: false
+      - name: Install kind
+        if: ${{ env.USE_EXISTING_CLUSTER != 'true' }}
+        run: |
+          curl -fsSLo kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
+          echo "${KIND_SHA256}  kind" | sha256sum -c -
+          chmod +x kind && sudo mv kind /usr/local/bin/kind
+          kind version
       - name: Setup kind
         if: ${{ env.USE_EXISTING_CLUSTER != 'true' }}
         run: kind create cluster --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
@@ -44,89 +122,25 @@ jobs:
           mkdir -p /home/runner/.kube
           kind get kubeconfig > /home/runner/.kube/config
         if: ${{ env.USE_EXISTING_CLUSTER == 'true' }}
-      - name: Test E2E
-        run: |
-          IMAGE_TAG=e2e make test-e2e
-        env:
-          KUBECONFIG: /home/runner/.kube/config
-  e2e-hosted:
-    runs-on: ubuntu-latest
-    steps:
-      - name: add permisson to docker.sock
-        run: sudo chown runner:docker /var/run/docker.sock
-        if: ${{ env.ACT }} # this step only runs locally when using the https://github.com/nektos/act to debug the e2e
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Free disk space
-        run: bash .github/scripts/free-disk-space.sh
-      - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      # "Re-run failed jobs" reuses the e2e-build output of the first attempt, which expires.
+      # If it's gone, fail in the next step with a message that says what to do.
+      - name: Download build output
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
-          go-version-file: go.mod
-      - name: Setup kind
-        if: ${{ env.USE_EXISTING_CLUSTER != 'true' }}
-        run: kind create cluster --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
-      - name: Set KUBECONFIG
+          name: e2e-build
+      - name: Check build output
+        if: ${{ steps.download.outcome == 'failure' }}
         run: |
-          mkdir -p /home/runner/.kube
-          kind get kubeconfig > /home/runner/.kube/config
-        if: ${{ env.USE_EXISTING_CLUSTER == 'true' }}
+          echo "::error::Could not download the e2e-build output (the download error is in the job annotations). If it expired (kept ${BUILD_RETENTION_DAYS} days), use \"Re-run all jobs\" or push a new commit so e2e-build runs again."
+          exit 1
+      - name: Load images into kind
+        run: |
+          kind load image-archive images.tar
+          rm images.tar
+          chmod +x e2e.test
       - name: Test E2E
-        run: |
-          IMAGE_TAG=e2e KLUSTERLET_DEPLOY_MODE=SingletonHosted make test-e2e
-        env:
-          KUBECONFIG: /home/runner/.kube/config
-  e2e-singleton:
-    runs-on: ubuntu-latest
-    steps:
-      - name: add permisson to docker.sock
-        run: sudo chown runner:docker /var/run/docker.sock
-        if: ${{ env.ACT }} # this step only runs locally when using the https://github.com/nektos/act to debug the e2e
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Free disk space
-        run: bash .github/scripts/free-disk-space.sh
-      - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-      - name: Setup kind
-        if: ${{ env.USE_EXISTING_CLUSTER != 'true' }}
-        run: kind create cluster --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
-      - name: Set KUBECONFIG
-        run: |
-          mkdir -p /home/runner/.kube
-          kind get kubeconfig > /home/runner/.kube/config
-        if: ${{ env.USE_EXISTING_CLUSTER == 'true' }}
-      - name: Test E2E
-        run: |
-          IMAGE_TAG=e2e KLUSTERLET_DEPLOY_MODE=Singleton make test-e2e
-        env:
-          KUBECONFIG: /home/runner/.kube/config
-  e2e-grpc:
-    runs-on: ubuntu-latest
-    steps:
-      - name: add permisson to docker.sock
-        run: sudo chown runner:docker /var/run/docker.sock
-        if: ${{ env.ACT }} # this step only runs locally when using the https://github.com/nektos/act to debug the e2e
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Free disk space
-        run: bash .github/scripts/free-disk-space.sh
-      - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-      - name: Setup kind
-        if: ${{ env.USE_EXISTING_CLUSTER != 'true' }}
-        run: kind create cluster --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
-      - name: Set KUBECONFIG
-        run: |
-          mkdir -p /home/runner/.kube
-          kind get kubeconfig > /home/runner/.kube/config
-        if: ${{ env.USE_EXISTING_CLUSTER == 'true' }}
-      - name: Test E2E
-        run: |
-          IMAGE_TAG=e2e REGISTRATION_DRIVER=grpc make test-e2e
+        run: make test-e2e SKIP_IMAGE_BUILD=true SKIP_E2E_BUILD=true ${{ matrix.make_vars }}
         env:
           KUBECONFIG: /home/runner/.kube/config
