@@ -228,6 +228,8 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
+	// Cleanup below removes the universal klusterlet; save its agents' state first in case cleanup fails.
+	saveDiagnosticsIfEnabled("aftersuite-before-cleanup")
 	By(fmt.Sprintf("clean klusterlet %v resources after the test case", universalKlusterletName))
 	framework.CleanKlusterletRelatedResources(hub, spoke, universalKlusterletName, universalClusterName)
 })
