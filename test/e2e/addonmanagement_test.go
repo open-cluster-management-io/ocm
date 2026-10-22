@@ -49,7 +49,21 @@ const (
 var (
 	nodeSelector = map[string]string{"kubernetes.io/os": "linux"}
 	tolerations  = []corev1.Toleration{{Key: "foo", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoExecute}}
-	registries   = []addonapiv1beta1.ImageMirror{
+	affinity     = &corev1.Affinity{
+		NodeAffinity: &corev1.NodeAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
+				{
+					Weight: 80,
+					Preference: corev1.NodeSelectorTerm{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{Key: "node-role.kubernetes.io/infra", Operator: corev1.NodeSelectorOpExists},
+						},
+					},
+				},
+			},
+		},
+	}
+	registries = []addonapiv1beta1.ImageMirror{
 		{
 			Source: "quay.io/open-cluster-management/addon-examples",
 			Mirror: "quay.io/ocm/addon-examples",
@@ -545,6 +559,10 @@ var _ = ginkgo.Describe("Addon management (v1beta1)", ginkgo.Ordered, ginkgo.Lab
 				return fmt.Errorf("unexpected tolerations %v", agentDeploy.Spec.Template.Spec.Tolerations)
 			}
 
+			if !equality.Semantic.DeepEqual(agentDeploy.Spec.Template.Spec.Affinity, affinity) {
+				return fmt.Errorf("unexpected affinity %v", agentDeploy.Spec.Template.Spec.Affinity)
+			}
+
 			return nil
 		}).ShouldNot(gomega.HaveOccurred())
 
@@ -993,6 +1011,7 @@ func prepareNodePlacementAddOnDeploymentConfig(namespace, installNamespace strin
 					NodePlacement: &addonapiv1beta1.NodePlacement{
 						NodeSelector: nodeSelector,
 						Tolerations:  tolerations,
+						Affinity:     affinity,
 					},
 					AgentInstallNamespace: installNamespace,
 				},
