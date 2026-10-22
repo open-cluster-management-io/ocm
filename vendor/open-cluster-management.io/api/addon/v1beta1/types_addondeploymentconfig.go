@@ -119,6 +119,17 @@ type NodePlacement struct {
 	// The default is an empty list.
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// affinity expresses scheduling constraints that nodeSelector cannot, such as a
+	// preference for a node role rather than a hard requirement.
+	// affinity is applied in parallel with nodeSelector: the scheduler requires both to be
+	// satisfied, so "prefer infrastructure nodes, fall back to workers" is expressed with
+	// nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution and nodeSelector left unset.
+	// Note that requiredDuringSchedulingIgnoredDuringExecution leaves the agent Pending on
+	// managed clusters where no node matches, for example single-node or compact clusters.
+	// If the affinity is nil, the agent pod is scheduled as its template defines.
+	// +optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 }
 
 // ImageMirror describes how to mirror images from a source

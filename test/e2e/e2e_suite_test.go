@@ -160,10 +160,7 @@ var _ = BeforeSuite(func() {
 		}).Should(Succeed())
 	}
 
-	By("Enable ManifestWorkReplicaSet Feature")
-	Eventually(func() error {
-		return hub.EnableHubWorkFeature("ManifestWorkReplicaSet")
-	}).Should(Succeed())
+	// ManifestWorkReplicaSet is enabled by default; not enabling it here verifies that default.
 
 	By("Enable ClusterImporter Feature")
 	Eventually(func() error {
