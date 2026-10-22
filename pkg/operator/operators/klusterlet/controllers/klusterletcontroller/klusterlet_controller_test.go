@@ -1163,6 +1163,113 @@ func TestAWSIrsaAuthInNonSingletonMode(t *testing.T) {
 	assertRegistrationDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1", 1, true)
 }
 
+func TestAWSIrsaCredentialSource(t *testing.T) {
+	const (
+		roleArnAnnotation          = "eks.amazonaws.com/role-arn"
+		credentialSourceAnnotation = "open-cluster-management.io/aws-credential-source"
+	)
+	cases := []struct {
+		name             string
+		mode             operatorapiv1.InstallMode
+		credentialSource operatorapiv1.AwsCredentialSource
+		existingRoleArn  bool
+		expectRoleArn    bool
+		deployments      []string
+	}{
+		{
+			name:          "default credential source annotates service accounts",
+			mode:          operatorapiv1.InstallModeDefault,
+			expectRoleArn: true,
+			deployments:   []string{"registration-agent", "work-agent"},
+		},
+		{
+			name:             "IRSA annotates service accounts",
+			mode:             operatorapiv1.InstallModeDefault,
+			credentialSource: operatorapiv1.AwsCredentialSourceIRSA,
+			expectRoleArn:    true,
+			deployments:      []string{"registration-agent", "work-agent"},
+		},
+		{
+			name:             "PodIdentity removes a previously applied annotation",
+			mode:             operatorapiv1.InstallModeDefault,
+			credentialSource: operatorapiv1.AwsCredentialSourcePodIdentity,
+			existingRoleArn:  true,
+			deployments:      []string{"registration-agent", "work-agent"},
+		},
+		{
+			name:             "PodIdentity in singleton mode",
+			mode:             operatorapiv1.InstallModeSingleton,
+			credentialSource: operatorapiv1.AwsCredentialSourcePodIdentity,
+			existingRoleArn:  true,
+			deployments:      []string{"agent"},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+			klusterlet.Spec.DeployOption.Mode = c.mode
+			klusterlet.Spec.RegistrationConfiguration.RegistrationDriver = operatorapiv1.RegistrationDriver{
+				AuthType: operatorapiv1.AwsIrsaAuthType,
+				AwsIrsa: &operatorapiv1.AwsIrsa{
+					HubClusterArn:     "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster1",
+					ManagedClusterArn: "arn:aws:eks:us-west-2:123456789012:cluster/managed-cluster1",
+					CredentialSource:  c.credentialSource,
+				},
+			}
+			hubSecret := newSecret(helpers.HubKubeConfig, "testns")
+			hubSecret.Data["kubeconfig"] = newKubeConfig("https://localhost")
+			hubSecret.Data["cluster-name"] = []byte("cluster1")
+			objects := []runtime.Object{
+				newNamespace("testns"),
+				newSecret(helpers.BootstrapHubKubeConfig, "testns"),
+				hubSecret,
+			}
+			saNames := sets.New(serviceAccountName("registration-sa", klusterlet), serviceAccountName("work-sa", klusterlet))
+			if c.existingRoleArn {
+				for _, name := range saNames.UnsortedList() {
+					sa := newServiceAccount(name, "testns", "")
+					sa.Secrets = nil
+					sa.Annotations = map[string]string{roleArnAnnotation: "arn:aws:iam::123456789012:role/stale"}
+					objects = append(objects, sa)
+				}
+			}
+
+			syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+			controller := newTestController(t, klusterlet, syncContext.Recorder(), nil, false, objects...)
+			if err := controller.controller.sync(context.TODO(), syncContext, "klusterlet"); err != nil {
+				t.Fatalf("Expected no error when sync, %v", err)
+			}
+
+			for _, name := range saNames.UnsortedList() {
+				sa, err := controller.kubeClient.CoreV1().ServiceAccounts("testns").Get(context.TODO(), name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("failed to get service account %s: %v", name, err)
+				}
+				roleArn, ok := sa.Annotations[roleArnAnnotation]
+				if ok != c.expectRoleArn {
+					t.Errorf("service account %s: expected role-arn annotation present=%v, got annotations %v",
+						name, c.expectRoleArn, sa.Annotations)
+				}
+				if c.expectRoleArn && !strings.HasPrefix(roleArn, "arn:aws:iam::123456789012:role/ocm-managed-cluster-") {
+					t.Errorf("service account %s: unexpected role-arn %q", name, roleArn)
+				}
+			}
+
+			for _, suffix := range c.deployments {
+				deployment := getDeployments(controller.kubeClient.Actions(), createVerb, suffix)
+				if deployment == nil {
+					t.Fatalf("deployment with suffix %s not created", suffix)
+				}
+				_, ok := deployment.Spec.Template.Annotations[credentialSourceAnnotation]
+				if ok == c.expectRoleArn {
+					t.Errorf("deployment %s: unexpected pod template annotations %v", deployment.Name, deployment.Spec.Template.Annotations)
+				}
+			}
+		})
+	}
+}
+
 func TestReplica(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	hubSecret := newSecret(helpers.HubKubeConfig, "testns")

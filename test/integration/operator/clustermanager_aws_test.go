@@ -98,6 +98,50 @@ var _ = ginkgo.Describe("ClusterManager Default Mode with aws registration", fun
 				return annotation == "arn:aws:iam::123456789012:role/hub-cluster_managed-cluster-identity-creator"
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 		})
+		ginkgo.It("should remove IAM role annotation and roll the registration-controller when switched to PodIdentity", func() {
+			gomega.Eventually(func() bool {
+				registrationControllerSA, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(
+					context.Background(), hubRegistrationSA, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				_, ok := registrationControllerSA.Annotations["eks.amazonaws.com/role-arn"]
+				return ok
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			gomega.Eventually(func() error {
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(),
+					clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				clusterManager.Spec.RegistrationConfiguration.RegistrationDrivers[0].AwsIrsa.CredentialSource =
+					operatorapiv1.AwsCredentialSourcePodIdentity
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(),
+					clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			gomega.Eventually(func() bool {
+				registrationControllerSA, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(
+					context.Background(), hubRegistrationSA, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				_, ok := registrationControllerSA.Annotations["eks.amazonaws.com/role-arn"]
+				return !ok
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			gomega.Eventually(func() bool {
+				registrationControllerDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).
+					Get(context.Background(), fmt.Sprintf("%s-registration-controller", clusterManagerName), metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				return registrationControllerDeployment.Spec.Template.Annotations["open-cluster-management.io/aws-credential-source"] ==
+					string(operatorapiv1.AwsCredentialSourcePodIdentity)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		})
 		ginkgo.It("registration-controller should have command line option hub cluster arn when initialized with awsirsa", func() {
 			gomega.Eventually(func() bool {
 

@@ -236,6 +236,13 @@ type AwsIrsa struct {
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Pattern=`^arn:aws(?:-[a-z0-9]+)*:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$`
 	ManagedClusterArn string `json:"managedClusterArn"`
+
+	// credentialSource selects how AWS credentials are obtained. IRSA annotates the service
+	// accounts with eks.amazonaws.com/role-arn; PodIdentity leaves them unannotated so an
+	// EKS Pod Identity association is used instead.
+	// +optional
+	// +kubebuilder:default:=IRSA
+	CredentialSource AwsCredentialSource `json:"credentialSource,omitempty"`
 }
 
 type AddOnRegistrationDriver struct {

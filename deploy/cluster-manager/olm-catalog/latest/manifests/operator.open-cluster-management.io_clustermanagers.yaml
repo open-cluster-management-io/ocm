@@ -519,11 +519,32 @@ spec:
                               items:
                                 type: string
                               type: array
+                            credentialSource:
+                              default: IRSA
+                              description: |-
+                                credentialSource selects how AWS credentials are obtained. IRSA annotates the service
+                                accounts with eks.amazonaws.com/role-arn; PodIdentity leaves them unannotated so an
+                                EKS Pod Identity association is used instead.
+                              enum:
+                              - IRSA
+                              - PodIdentity
+                              type: string
                             hubClusterArn:
                               description: |-
                                 This represents the hub cluster ARN
-                                Example - arn:eks:us-west-2:12345678910:cluster/hub-cluster1
-                              pattern: ^arn:aws:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$
+                                Example - arn:aws:eks:us-west-2:123456789010:cluster/hub-cluster1
+                                Non-commercial partitions are supported too, e.g. arn:aws-us-gov:eks:us-gov-west-1:123456789010:cluster/hub-cluster1
+                              pattern: ^arn:aws(?:-[a-z0-9]+)*:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$
+                              type: string
+                            resourceManagement:
+                              default: Managed
+                              description: |-
+                                resourceManagement controls whether the hub creates and deletes the per-cluster
+                                ocm-hub-<suffix> IAM roles and their EKS access entries. With UseExisting both must be
+                                provisioned ahead of time, the hub only verifies that the access entry exists, and Tags is ignored.
+                              enum:
+                              - Managed
+                              - UseExisting
                               type: string
                             tags:
                               description: |-

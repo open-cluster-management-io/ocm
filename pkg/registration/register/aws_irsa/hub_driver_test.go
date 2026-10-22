@@ -408,6 +408,47 @@ func mockSuccessfulDeletionBehaviour(stack *middleware.Stack) error {
 	return nil
 }
 
+func TestGetRoleNameAndArnAccountID(t *testing.T) {
+	hubClusterArn := "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster"
+	managedCluster := testinghelpers.NewManagedCluster()
+	managedCluster.Annotations = map[string]string{
+		operatorv1.ClusterAnnotationsKeyPrefix + "/" + ManagedClusterIAMRoleSuffix: "960c4e56c25ba0b571ddcdaa7edc943e",
+	}
+
+	cases := []struct {
+		name      string
+		accountID string
+		expected  string
+	}{
+		{
+			name:      "account ID from credentials",
+			accountID: "210987654321",
+			expected:  "arn:aws:iam::210987654321:role/ocm-hub-960c4e56c25ba0b571ddcdaa7edc943e",
+		},
+		{
+			name:     "falls back to hub cluster account when credentials have no account ID",
+			expected: "arn:aws:iam::123456789012:role/ocm-hub-960c4e56c25ba0b571ddcdaa7edc943e",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cfg := aws.Config{
+				Credentials: aws.CredentialsProviderFunc(func(context.Context) (aws.Credentials, error) {
+					return aws.Credentials{AccessKeyID: "test", SecretAccessKey: "test", AccountID: c.accountID}, nil
+				}),
+			}
+			_, roleArn, err := getRoleNameAndArn(context.Background(), managedCluster, cfg, hubClusterArn)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if roleArn != c.expected {
+				t.Errorf("expected role arn %q, got %q", c.expected, roleArn)
+			}
+		})
+	}
+}
+
 func TestDeleteAccessEntry(t *testing.T) {
 	type args struct {
 		ctx                context.Context

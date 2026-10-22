@@ -1786,9 +1786,10 @@ func TestNetworkPolicyFeatureGate(t *testing.T) {
 
 func TestGetIdentityCreatorRoleAndTags(t *testing.T) {
 	cases := []struct {
-		name          string
-		hubClusterArn string
-		expected      string
+		name             string
+		hubClusterArn    string
+		credentialSource operatorapiv1.AwsCredentialSource
+		expected         string
 	}{
 		{
 			name:          "commercial partition",
@@ -1805,6 +1806,18 @@ func TestGetIdentityCreatorRoleAndTags(t *testing.T) {
 			hubClusterArn: "arn:aws-iso:eks:us-iso-east-1:123456789012:cluster/hub-cluster",
 			expected:      "arn:aws-iso:iam::123456789012:role/hub-cluster_managed-cluster-identity-creator",
 		},
+		{
+			name:             "explicit IRSA credential source",
+			hubClusterArn:    "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
+			credentialSource: operatorapiv1.AwsCredentialSourceIRSA,
+			expected:         "arn:aws:iam::123456789012:role/hub-cluster_managed-cluster-identity-creator",
+		},
+		{
+			name:             "PodIdentity credential source skips the annotation",
+			hubClusterArn:    "arn:aws:eks:us-west-2:123456789012:cluster/hub-cluster",
+			credentialSource: operatorapiv1.AwsCredentialSourcePodIdentity,
+			expected:         "",
+		},
 	}
 
 	for _, c := range cases {
@@ -1816,7 +1829,8 @@ func TestGetIdentityCreatorRoleAndTags(t *testing.T) {
 							{
 								AuthType: operatorapiv1.AwsIrsaAuthType,
 								AwsIrsa: &operatorapiv1.AwsIrsaConfig{
-									HubClusterArn: c.hubClusterArn,
+									HubClusterArn:    c.hubClusterArn,
+									CredentialSource: c.credentialSource,
 								},
 							},
 						},
