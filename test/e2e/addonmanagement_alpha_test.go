@@ -522,6 +522,10 @@ var _ = ginkgo.Describe("Addon management (v1alpha1)", ginkgo.Ordered, ginkgo.La
 				return fmt.Errorf("unexpected tolerations %v", agentDeploy.Spec.Template.Spec.Tolerations)
 			}
 
+			if !equality.Semantic.DeepEqual(agentDeploy.Spec.Template.Spec.Affinity, affinity) {
+				return fmt.Errorf("unexpected affinity %v", agentDeploy.Spec.Template.Spec.Affinity)
+			}
+
 			return nil
 		}).ShouldNot(gomega.HaveOccurred())
 
@@ -970,6 +974,7 @@ func prepareNodePlacementAddOnDeploymentConfigAlpha(namespace, installNamespace 
 					NodePlacement: &addonapiv1alpha1.NodePlacement{
 						NodeSelector: nodeSelector,
 						Tolerations:  tolerations,
+						Affinity:     affinity,
 					},
 					AgentInstallNamespace: installNamespace,
 				},
