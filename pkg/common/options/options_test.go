@@ -430,7 +430,7 @@ func TestApplyTLSFromConfigMap(t *testing.T) {
 			var configFile string
 			cmd.Flags().StringVar(&configFile, "config", "", "")
 
-			err := applyTLSFromConfigMap(context.Background(), kubeClient, "test-ns", cmd)
+			err := applyTLSFromConfigMap(context.Background(), kubeClient, "test-ns", cmd, 0)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -506,5 +506,79 @@ func TestApplyTLSFromConfigMapSkipsWhenConfigAlreadySet(t *testing.T) {
 	// --config must remain unchanged.
 	if configFile != "/existing/config.yaml" {
 		t.Errorf("expected --config to remain %q, got %q", "/existing/config.yaml", configFile)
+	}
+}
+
+func TestApplyTLSToCommandHealthPortValidation(t *testing.T) {
+	cases := []struct {
+		name      string
+		port      int32
+		wantError bool
+	}{
+		{name: "valid port 9443", port: 9443},
+		{name: "valid port 1", port: 1},
+		{name: "valid port 65535", port: 65535},
+		{name: "negative port", port: -1, wantError: true},
+		{name: "port exceeds 65535", port: 70000, wantError: true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			opts := NewOptions()
+			opts.HealthCheckPort = c.port
+
+			cmd := &cobra.Command{Use: "test"}
+			var configFile string
+			cmd.Flags().StringVar(&configFile, "config", "", "")
+
+			opts.ApplyTLSToCommand(cmd)
+			err := cmd.PersistentPreRunE(cmd, nil)
+			if c.wantError {
+				if err == nil {
+					t.Fatal("expected an error but got none")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if configFile != "" {
+				defer os.Remove(configFile)
+			}
+		})
+	}
+}
+
+func TestApplyTLSFromConfigMapWithHealthPort(t *testing.T) {
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      tlslib.ConfigMapName,
+			Namespace: "test-ns",
+		},
+		Data: map[string]string{
+			tlslib.ConfigMapKeyMinVersion: "VersionTLS13",
+		},
+	}
+	kubeClient := kubefake.NewSimpleClientset(configMap)
+
+	cmd := &cobra.Command{Use: "test"}
+	var configFile string
+	cmd.Flags().StringVar(&configFile, "config", "", "")
+
+	err := applyTLSFromConfigMap(context.Background(), kubeClient, "test-ns", cmd, 9443)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if configFile == "" {
+		t.Fatal("expected --config to be set")
+	}
+	defer os.Remove(configFile)
+
+	content, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("failed to read generated config file: %v", err)
+	}
+	s := string(content)
+	if !strings.Contains(s, "bindAddress: \"0.0.0.0:9443\"") {
+		t.Errorf("expected bindAddress with port 9443, got:\n%s", s)
 	}
 }
