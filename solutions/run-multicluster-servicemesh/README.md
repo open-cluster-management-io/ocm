@@ -1,10 +1,71 @@
 # Set up a Multicluster Service Mesh on OCM
 
-This script sets up a multicluster service mesh on top of OCM. The guide will bootstrap 3 Kind clusters (hub, cluster1, and cluster2) on your local machine and then deploy the [multicluster mesh addon](https://github.com/open-cluster-management-io/multicluster-mesh). After that, it creates service meshes from the hub to the managed clusters and finally federates the service meshes so that microservices deployed into different managed clusters can access each other.
+This solution sets up a multicluster service mesh on top of OCM. The guide bootstraps 3 Kind clusters (hub, cluster1, and cluster2) on your local machine and then deploys the [multicluster mesh addon](https://github.com/open-cluster-management-io/multicluster-mesh). After that, it creates service meshes from the hub to the managed clusters and finally federates the service meshes so that microservices deployed into different managed clusters can access each other.
+
+Optional automation scripts (`setup-mesh-addon.sh`, `verify-bookinfo-traffic.sh`, `cleanup.sh`) mirror the manual steps below.
+
+## Architecture
+
+OCM manages cluster registration and work distribution. The multicluster-mesh addon translates high-level mesh CRs on the hub into Istio resources on managed clusters.
+
+```mermaid
+flowchart TB
+  subgraph hub["Hub cluster (kind-hub)"]
+    OCM["OCM control plane"]
+    Addon["multicluster-mesh addon"]
+    MD["MeshDeployment"]
+    MF["MeshFederation"]
+    OCM --> Addon
+    Addon --> MD
+    Addon --> MF
+  end
+
+  subgraph c1["Managed cluster 1 (cluster1)"]
+    M1["Istio control plane"]
+    EW1["istio-eastwestgateway"]
+    B1["Bookinfo: productpage, reviews-v1/v2"]
+    M1 --> EW1
+    B1 --> M1
+  end
+
+  subgraph c2["Managed cluster 2 (cluster2)"]
+    M2["Istio control plane"]
+    EW2["istio-eastwestgateway"]
+    B2["Bookinfo: reviews-v3"]
+    M2 --> EW2
+    B2 --> M2
+  end
+
+  MD -->|"deploy Istio"| M1
+  MD -->|"deploy Istio"| M2
+  MF -->|"federate trust + east-west GW"| EW1
+  MF -->|"federate trust + east-west GW"| EW2
+  B1 -->|"75% traffic via ServiceEntry"| EW2
+  EW2 --> B2
+```
+
+### Key resources
+
+| Resource | Purpose |
+|---|---|
+| `MeshDeployment` | Deploy Istio control planes to selected managed clusters from the hub |
+| `MeshFederation` | Establish trust and east-west gateways between mesh peers |
+| `ServiceEntry` | Export/import remote services across federated meshes |
+| `VirtualService` | Split traffic between local and remote review services |
 
 ## Prerequisite
 
-Set up the dev environment in your local machine following [setup dev environment](../setup-dev-environment).
+Clone remote repo and cd to service mesh dir
+```bash
+git clone https://github.com/open-cluster-management-io/ocm.git
+cd ./ocm/solutions/run-multicluster-servicemesh
+```
+
+Set up the dev environment in your local machine following [setup dev environment](https://github.com/open-cluster-management-io/ocm/tree/main/solutions/setup-dev-environment).
+
+```bash
+../setup-dev-environment/local-up.sh
+```
 
 ## Install Multicluster Service Mesh Addon on OCM
 
@@ -111,8 +172,8 @@ reviews-v3-58cb55c99-dc594    2/2     Running       0          15s
 
 ```bash
 kubectl config use-context kind-cluster2
-export REVIEW_V3_IP=$(kubectl -n bookinfo get pod -l app=reviews -o jsonpath='{.items[0].status.podIP}')
-cat ./manifests/serviceentry-export-cluster2.yaml | REVIEW_V3_IP=${REVIEW_V3_IP} envsubst | kubectl apply -f -
+export REVIEW_V3_POD_IP=$(kubectl -n bookinfo get pod -l app=reviews,version=v3 --field-selector=status.phase=Running -o jsonpath='{.items[0].status.podIP}')
+cat ./manifests/serviceentry-export-cluster2.yaml | REVIEW_V3_POD_IP=${REVIEW_V3_POD_IP} envsubst | kubectl apply -f -
 ```
 
 5. Create the serviceentry in cluster1 to 'import' the remote service(reviews-v3):
@@ -141,4 +202,16 @@ kubectl config use-context kind-cluster1
 kubectl -n bookinfo port-forward svc/productpage --address 0.0.0.0 9080:9080
 ```
 
-Then access the bookinfo application with your browser via `http://localhost:9080/productpage/`. The expected result is that by refreshing the productpage several times, you should occasionally see traffic being routed to the `reviews-v3` service, which will produce red-colored stars on the product page, which means traffic from cluster1 is routed to cluster2.
+Then access the bookinfo application with your browser via `http://localhost:9080/productpage`. The expected result is that by refreshing the productpage several times, you should occasionally see traffic being routed to the `reviews-v3` service, which will produce red-colored stars on the product page, which means traffic from cluster1 is routed to cluster2. Also observe ```"Reviews served by"``` on product page, it will display the source pod.
+
+## Optional: automated scripts
+
+```bash
+chmod +x setup-mesh-addon.sh verify-bookinfo-traffic.sh cleanup.sh scripts/common.sh
+./setup-mesh-addon.sh
+./verify-bookinfo-traffic.sh
+
+# Cleanup (optional: also delete KinD clusters)
+./cleanup.sh
+# DELETE_KIND_CLUSTERS=true ./cleanup.sh
+```
