@@ -35,7 +35,6 @@ type AppliedManifestWorkFinalizeController struct {
 	spokeDynamicClient        dynamic.Interface
 	objectReader              objectreader.ObjectReader
 	rateLimiter               workqueue.TypedRateLimiter[string]
-	deferRBACDeletion         bool
 }
 
 func NewAppliedManifestWorkFinalizeController(
@@ -44,7 +43,6 @@ func NewAppliedManifestWorkFinalizeController(
 	appliedManifestWorkInformer workinformer.AppliedManifestWorkInformer,
 	objectReader objectreader.ObjectReader,
 	agentID string,
-	deferRBACDeletion bool,
 ) factory.Controller {
 
 	controller := &AppliedManifestWorkFinalizeController{
@@ -54,7 +52,6 @@ func NewAppliedManifestWorkFinalizeController(
 		appliedManifestWorkLister: appliedManifestWorkInformer.Lister(),
 		spokeDynamicClient:        spokeDynamicClient,
 		objectReader:              objectReader,
-		deferRBACDeletion:         deferRBACDeletion,
 		// After 11 retries (approximately 1 mins), the delay reaches the maximum of 60 seconds.
 		rateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[string](50*time.Millisecond, 60*time.Second),
 	}
@@ -112,10 +109,8 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 	resources := appliedManifestWork.Status.AppliedResources
 	var deferred []workapiv1.AppliedManifestResourceMeta
 	// Delete RBAC last, it may grant the agent access to the other resources.
-	if m.deferRBACDeletion {
-		if others, rbac := splitRBACResources(resources); len(others) != 0 {
-			resources, deferred = others, rbac
-		}
+	if others, rbac := splitRBACResources(resources); len(others) != 0 {
+		resources, deferred = others, rbac
 	}
 	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(
 		ctx, resources, reason, m.spokeDynamicClient, *owner)
