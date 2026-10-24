@@ -32,6 +32,23 @@ func TestFinalize(t *testing.T) {
 	appliedWork := spoketesting.NewAppliedManifestWork("test", 0, uid)
 	owner := helper.NewAppliedManifestWorkOwner(appliedWork)
 
+	clusterRole := workapiv1.AppliedManifestResourceMeta{Version: "v1", UID: "cr1", ResourceIdentifier: workapiv1.ResourceIdentifier{
+		Group: "rbac.authorization.k8s.io", Resource: "clusterroles", Name: "cr1"}}
+	secret := workapiv1.AppliedManifestResourceMeta{Version: "v1", UID: "ns1-n1", ResourceIdentifier: workapiv1.ResourceIdentifier{
+		Resource: "secrets", Namespace: "ns1", Name: "n1"}}
+	assertPatch := func(t *testing.T, actions []clienttesting.Action) { testingcommon.AssertActions(t, actions, "patch") }
+	assertGets := func(resources ...string) func(t *testing.T, actions []clienttesting.Action) {
+		return func(t *testing.T, actions []clienttesting.Action) {
+			var got []string
+			for _, action := range actions {
+				got = append(got, action.GetResource().Resource)
+			}
+			if !reflect.DeepEqual(got, resources) {
+				t.Fatal(spew.Sdump(actions))
+			}
+		}
+	}
+
 	cases := []struct {
 		name                               string
 		existingFinalizers                 []string
@@ -173,6 +190,32 @@ func TestFinalize(t *testing.T) {
 					t.Fatal(spew.Sdump(actions[0]))
 				}
 			},
+		},
+		{
+			name:               "defer rbac deletion while other resources are pending",
+			terminated:         true,
+			existingFinalizers: []string{workapiv1.AppliedManifestWorkFinalizer},
+			existingResources:  []runtime.Object{testingcommon.NewUnstructuredSecret("ns1", "n1", true, "ns1-n1", *owner)},
+			resourcesToRemove:  []workapiv1.AppliedManifestResourceMeta{clusterRole, secret},
+			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				work := &workapiv1.AppliedManifestWork{}
+				if err := json.Unmarshal(actions[0].(clienttesting.PatchActionImpl).Patch, work); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(work.Status.AppliedResources, []workapiv1.AppliedManifestResourceMeta{secret, clusterRole}) {
+					t.Fatal(spew.Sdump(work.Status.AppliedResources))
+				}
+			},
+			validateDynamicActions: assertGets("secrets"),
+		},
+		{
+			name:                               "delete rbac once only rbac resources are left",
+			terminated:                         true,
+			existingFinalizers:                 []string{workapiv1.AppliedManifestWorkFinalizer},
+			resourcesToRemove:                  []workapiv1.AppliedManifestResourceMeta{clusterRole},
+			validateAppliedManifestWorkActions: assertPatch,
+			validateDynamicActions:             assertGets("clusterroles"),
 		},
 	}
 
