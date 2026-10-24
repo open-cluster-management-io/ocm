@@ -23,7 +23,6 @@ import (
 	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/agent/codec"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/store"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/constants"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/builder"
 
 	"open-cluster-management.io/ocm/pkg/common/options"
@@ -161,7 +160,6 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		spokeWorkInformerFactory.Work().V1().AppliedManifestWorks(),
 		objectReader,
 		agentID,
-		o.workOptions.WorkloadSourceDriver == constants.ConfigTypeGRPC,
 	)
 	manifestWorkFinalizeController := finalizercontroller.NewManifestWorkFinalizeController(
 		hubWorkClient,

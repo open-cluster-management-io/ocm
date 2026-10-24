@@ -55,7 +55,6 @@ func TestFinalize(t *testing.T) {
 		existingResources                  []runtime.Object
 		resourcesToRemove                  []workapiv1.AppliedManifestResourceMeta
 		terminated                         bool
-		deferRBACDeletion                  bool
 		validateAppliedManifestWorkActions func(t *testing.T, actions []clienttesting.Action)
 		validateDynamicActions             func(t *testing.T, actions []clienttesting.Action)
 		expectedQueueLen                   int
@@ -195,7 +194,6 @@ func TestFinalize(t *testing.T) {
 		{
 			name:               "defer rbac deletion while other resources are pending",
 			terminated:         true,
-			deferRBACDeletion:  true,
 			existingFinalizers: []string{workapiv1.AppliedManifestWorkFinalizer},
 			existingResources:  []runtime.Object{testingcommon.NewUnstructuredSecret("ns1", "n1", true, "ns1-n1", *owner)},
 			resourcesToRemove:  []workapiv1.AppliedManifestResourceMeta{clusterRole, secret},
@@ -214,20 +212,10 @@ func TestFinalize(t *testing.T) {
 		{
 			name:                               "delete rbac once only rbac resources are left",
 			terminated:                         true,
-			deferRBACDeletion:                  true,
 			existingFinalizers:                 []string{workapiv1.AppliedManifestWorkFinalizer},
 			resourcesToRemove:                  []workapiv1.AppliedManifestResourceMeta{clusterRole},
 			validateAppliedManifestWorkActions: assertPatch,
 			validateDynamicActions:             assertGets("clusterroles"),
-		},
-		{
-			name:                               "delete rbac in order when deferral is disabled",
-			terminated:                         true,
-			existingFinalizers:                 []string{workapiv1.AppliedManifestWorkFinalizer},
-			existingResources:                  []runtime.Object{testingcommon.NewUnstructuredSecret("ns1", "n1", true, "ns1-n1", *owner)},
-			resourcesToRemove:                  []workapiv1.AppliedManifestResourceMeta{clusterRole, secret},
-			validateAppliedManifestWorkActions: assertPatch,
-			validateDynamicActions:             assertGets("clusterroles", "secrets"),
 		},
 	}
 
@@ -257,7 +245,6 @@ func TestFinalize(t *testing.T) {
 				spokeDynamicClient: fakeDynamicClient,
 				objectReader:       r,
 				rateLimiter:        workqueue.NewTypedItemExponentialFailureRateLimiter[string](0, 1*time.Second),
-				deferRBACDeletion:  c.deferRBACDeletion,
 			}
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, testingWork.Name)
