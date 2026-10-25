@@ -114,6 +114,9 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 	}
 	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(
 		ctx, resources, reason, m.spokeDynamicClient, *owner)
+	if len(errs) != 0 {
+		return utilerrors.NewAggregate(errs)
+	}
 	resourcesPendingFinalization = append(resourcesPendingFinalization, deferred...)
 	appliedManifestWork.Status.AppliedResources = resourcesPendingFinalization
 	updatedAppliedManifestWork, err := m.patcher.PatchStatus(ctx, appliedManifestWork, appliedManifestWork.Status, originalManifestWork.Status)

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -55,6 +56,8 @@ func TestFinalize(t *testing.T) {
 		existingResources                  []runtime.Object
 		resourcesToRemove                  []workapiv1.AppliedManifestResourceMeta
 		terminated                         bool
+		dynamicReactor                     clienttesting.ReactionFunc
+		expectErr                          bool
 		validateAppliedManifestWorkActions func(t *testing.T, actions []clienttesting.Action)
 		validateDynamicActions             func(t *testing.T, actions []clienttesting.Action)
 		expectedQueueLen                   int
@@ -217,6 +220,18 @@ func TestFinalize(t *testing.T) {
 			validateAppliedManifestWorkActions: assertPatch,
 			validateDynamicActions:             assertGets("clusterroles"),
 		},
+		{
+			name:               "keep rbac when deleting other resources fails",
+			terminated:         true,
+			existingFinalizers: []string{workapiv1.AppliedManifestWorkFinalizer},
+			resourcesToRemove:  []workapiv1.AppliedManifestResourceMeta{clusterRole, secret},
+			dynamicReactor: func(action clienttesting.Action) (bool, runtime.Object, error) {
+				return true, nil, errors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "n1", nil)
+			},
+			expectErr:                          true,
+			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
+			validateDynamicActions:             assertGets("secrets"),
+		},
 	}
 
 	for _, c := range cases {
@@ -230,6 +245,9 @@ func TestFinalize(t *testing.T) {
 			testingWork.Status.AppliedResources = append(testingWork.Status.AppliedResources, c.resourcesToRemove...)
 
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), c.existingResources...)
+			if c.dynamicReactor != nil {
+				fakeDynamicClient.PrependReactor("get", "*", c.dynamicReactor)
+			}
 			fakeClient := fakeworkclient.NewSimpleClientset(testingWork)
 			informerFactory := workinformers.NewSharedInformerFactory(fakeClient, 0)
 
@@ -249,8 +267,8 @@ func TestFinalize(t *testing.T) {
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, testingWork.Name)
 			err = controller.syncAppliedManifestWork(context.TODO(), controllerContext, testingWork)
-			if err != nil {
-				t.Fatal(err)
+			if (err != nil) != c.expectErr {
+				t.Fatalf("expected error %v, got %v", c.expectErr, err)
 			}
 			c.validateAppliedManifestWorkActions(t, fakeClient.Actions())
 			c.validateDynamicActions(t, fakeDynamicClient.Actions())
