@@ -138,7 +138,8 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 			gomega.Eventually(assertWorksByReplicaSet(clusterNames, manifestWorkReplicaSet, 3), eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 			gomega.Eventually(assertWorksSameLabelAsReplicaSet(manifestWorkReplicaSet), eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 			gomega.Eventually(assertSummary(workapiv1alpha1.ManifestWorkReplicaSetSummary{
-				Total: 3,
+				Total:       3,
+				Progressing: 3,
 			}, manifestWorkReplicaSet), eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 			ginkgo.By("Update decision so manifestworks should be updated")
@@ -152,7 +153,8 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 			clusterNames.Delete(removedCluster)
 			gomega.Eventually(assertWorksByReplicaSet(clusterNames, manifestWorkReplicaSet, 2), eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 			gomega.Eventually(assertSummary(workapiv1alpha1.ManifestWorkReplicaSetSummary{
-				Total: 2,
+				Total:       2,
+				Progressing: 2,
 			}, manifestWorkReplicaSet), eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 			ginkgo.By("Delete manifestworkreplicaset")
@@ -167,7 +169,8 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 
 			gomega.Eventually(assertWorksByReplicaSet(clusterNames, manifestWorkReplicaSet, 1), eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 			gomega.Eventually(assertSummary(workapiv1alpha1.ManifestWorkReplicaSetSummary{
-				Total: 1,
+				Total:       1,
+				Progressing: 1,
 			}, manifestWorkReplicaSet), eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 			key := fmt.Sprintf("%s.%s", manifestWorkReplicaSet.Namespace, manifestWorkReplicaSet.Name)
@@ -185,7 +188,7 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 			for _, work := range works.Items {
 				workCopy := work.DeepCopy()
 				meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "ApplyTest", ObservedGeneration: workCopy.Generation})
-				meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "ApplyTest"})
+				meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "ApplyTest", ObservedGeneration: workCopy.Generation})
 				meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{Type: workapiv1.WorkProgressing, Status: metav1.ConditionFalse, Reason: "AppliedManifestWorkComplete", ObservedGeneration: workCopy.Generation})
 				_, err := hubWorkClient.WorkV1().ManifestWorks(workCopy.Namespace).UpdateStatus(context.TODO(), workCopy, metav1.UpdateOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -210,7 +213,7 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 
 			for _, work := range works.Items {
 				workCopy := work.DeepCopy()
-				meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionFalse, Reason: "ResourceNotAvailable"})
+				meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionFalse, Reason: "ResourceNotAvailable", ObservedGeneration: workCopy.Generation})
 				meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{Type: workapiv1.WorkProgressing, Status: metav1.ConditionTrue, Reason: "Applying", ObservedGeneration: workCopy.Generation})
 				meta.SetStatusCondition(&workCopy.Status.Conditions, metav1.Condition{Type: workapiv1.WorkDegraded, Status: metav1.ConditionTrue, Reason: "ResourceDegraded", ObservedGeneration: workCopy.Generation})
 				_, err := hubWorkClient.WorkV1().ManifestWorks(workCopy.Namespace).UpdateStatus(context.TODO(), workCopy, metav1.UpdateOptions{})

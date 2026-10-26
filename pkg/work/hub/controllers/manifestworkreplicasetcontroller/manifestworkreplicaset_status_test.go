@@ -2,6 +2,7 @@ package manifestworkreplicasetcontroller
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -97,6 +98,258 @@ func TestStatusReconcileAsExpected(t *testing.T) {
 	}
 }
 
+func TestStatusReconcileNewGeneration(t *testing.T) {
+	const placementName = "place-test"
+	cases := []struct {
+		name                  string
+		observedGeneration    int64
+		availableGeneration   int64
+		progressingGeneration int64
+		degradedGeneration    int64
+		oldTemplate           bool
+		oldWorkCount          int
+		total                 int
+		noConditions          bool
+		omitAvailable         bool
+		omitProgressing       bool
+		missingWorks          int
+		deleting              bool
+		failed                bool
+		applyFailedAvailable  bool
+		wantSummary           workapiv1alpha1.ManifestWorkReplicaSetSummary
+		wantReason            string
+		wantStatus            metav1.ConditionStatus
+	}{
+		{
+			name:         "new work without conditions",
+			noConditions: true,
+			wantSummary:  workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: 2, Progressing: 2},
+			wantReason:   workapiv1alpha1.ReasonProcessing,
+			wantStatus:   metav1.ConditionFalse,
+		},
+		{
+			name:               "conditions from previous work generation",
+			observedGeneration: 1,
+			wantSummary:        workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: 2, Progressing: 2},
+			wantReason:         workapiv1alpha1.ReasonProcessing,
+			wantStatus:         metav1.ConditionFalse,
+		},
+		{
+			name:               "work spec still uses previous template",
+			observedGeneration: 2,
+			oldTemplate:        true,
+			wantSummary:        workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: 2, Progressing: 2},
+			wantReason:         workapiv1alpha1.ReasonProcessing,
+			wantStatus:         metav1.ConditionFalse,
+		},
+		{
+			name:               "applied current but available not reported yet",
+			observedGeneration: 2,
+			omitAvailable:      true,
+			wantSummary:        workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: 2, Progressing: 2},
+			wantReason:         workapiv1alpha1.ReasonProcessing,
+			wantStatus:         metav1.ConditionFalse,
+		},
+		{
+			name:                "available condition from previous work generation",
+			observedGeneration:  2,
+			availableGeneration: 1,
+			wantSummary:         workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: 2, Progressing: 2},
+			wantReason:          workapiv1alpha1.ReasonProcessing,
+			wantStatus:          metav1.ConditionFalse,
+		},
+		{
+			name:                  "progressing condition from previous work generation",
+			observedGeneration:    2,
+			progressingGeneration: 1,
+			wantSummary:           workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: 2, Progressing: 2},
+			wantReason:            workapiv1alpha1.ReasonProcessing,
+			wantStatus:            metav1.ConditionFalse,
+		},
+		{
+			name:               "degraded condition from previous work generation",
+			observedGeneration: 2,
+			degradedGeneration: 1,
+			wantSummary:        workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: 2, Progressing: 2},
+			wantReason:         workapiv1alpha1.ReasonProcessing,
+			wantStatus:         metav1.ConditionFalse,
+		},
+		{
+			name:               "new works not yet in the informer cache",
+			observedGeneration: 2,
+			missingWorks:       2,
+			wantSummary:        workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: 2, Progressing: 2},
+			wantReason:         workapiv1alpha1.ReasonProcessing,
+			wantStatus:         metav1.ConditionFalse,
+		},
+		{
+			name:               "one new work not yet in the informer cache",
+			observedGeneration: 2,
+			missingWorks:       1,
+			wantSummary:        workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: 2, Applied: 1, Available: 1, Progressing: 1},
+			wantReason:         workapiv1alpha1.ReasonProcessing,
+			wantStatus:         metav1.ConditionFalse,
+		},
+		{
+			name:               "old works do not hide a missing work from the cache",
+			observedGeneration: 2,
+			missingWorks:       1,
+			oldWorkCount:       4,
+			wantSummary:        workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: 2, Applied: 1, Available: 1, Progressing: 1},
+			wantReason:         workapiv1alpha1.ReasonProcessing,
+			wantStatus:         metav1.ConditionFalse,
+		},
+		{
+			name:         "progressive rollout excludes old works from total",
+			missingWorks: 2,
+			oldWorkCount: 4,
+			total:        1,
+			wantSummary:  workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: 1, Progressing: 1},
+			wantReason:   workapiv1alpha1.ReasonProcessing,
+			wantStatus:   metav1.ConditionFalse,
+		},
+		{
+			name:               "deleting old works do not hide missing current works",
+			observedGeneration: 2,
+			oldTemplate:        true,
+			deleting:           true,
+			wantSummary:        workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: 2, Progressing: 2},
+			wantReason:         workapiv1alpha1.ReasonProcessing,
+			wantStatus:         metav1.ConditionFalse,
+		},
+		{
+			name:               "deleting works are skipped",
+			observedGeneration: 2,
+			deleting:           true,
+			wantSummary:        workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: 2},
+			wantReason:         workapiv1alpha1.ReasonNotAsExpected,
+			wantStatus:         metav1.ConditionFalse,
+		},
+		{
+			name:               "current generation succeeded",
+			observedGeneration: 2,
+			wantSummary:        workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: 2, Applied: 2, Available: 2},
+			wantReason:         workapiv1alpha1.ReasonAsExpected,
+			wantStatus:         metav1.ConditionTrue,
+		},
+		{
+			name:               "current generation without optional progressing condition",
+			observedGeneration: 2,
+			omitProgressing:    true,
+			wantSummary:        workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: 2, Applied: 2, Available: 2},
+			wantReason:         workapiv1alpha1.ReasonAsExpected,
+			wantStatus:         metav1.ConditionTrue,
+		},
+		{
+			name:                 "current apply failed while resource remains available",
+			observedGeneration:   2,
+			omitProgressing:      true,
+			applyFailedAvailable: true,
+			wantSummary:          workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: 2, Available: 2},
+			wantReason:           workapiv1alpha1.ReasonNotAsExpected,
+			wantStatus:           metav1.ConditionFalse,
+		},
+		{
+			name:               "current generation failed",
+			observedGeneration: 2,
+			failed:             true,
+			wantSummary:        workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: 2, Progressing: 2, Degraded: 2},
+			wantReason:         workapiv1alpha1.ReasonNotAsExpected,
+			wantStatus:         metav1.ConditionFalse,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", placementName)
+			mwrSet.Generation = 2
+			total := 2
+			if tt.total != 0 {
+				total = tt.total
+			}
+			mwrSet.Status.Summary.Total = total
+			mwrSet.Status.PlacementsSummary = []workapiv1alpha1.PlacementSummary{{
+				Name:    placementName,
+				Summary: workapiv1alpha1.ManifestWorkReplicaSetSummary{Total: total},
+			}}
+
+			workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fakeworkclient.NewSimpleClientset(), time.Second)
+			clusters := []string{"cls1", "cls2"}
+			for _, cluster := range clusters[:len(clusters)-tt.missingWorks] {
+				mw := buildManifestWork(mwrSet, mwrSet.Name, cluster, placementName)
+				mw.Generation = 2
+				if tt.deleting {
+					deletionTime := metav1.Now()
+					mw.DeletionTimestamp = &deletionTime
+				}
+				if tt.oldTemplate {
+					mw.Spec = helpertest.CreateTestManifestWorkSpecWithSecret("v2", "kindtest", "ns-test", "name-test")
+				}
+				if !tt.noConditions {
+					appliedStatus, availableStatus, progressingStatus := metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionFalse
+					if tt.failed {
+						appliedStatus, availableStatus, progressingStatus = metav1.ConditionFalse, metav1.ConditionFalse, metav1.ConditionTrue
+					}
+					if tt.applyFailedAvailable {
+						appliedStatus = metav1.ConditionFalse
+					}
+					if tt.failed || tt.degradedGeneration != 0 {
+						degradedGeneration := tt.observedGeneration
+						if tt.degradedGeneration != 0 {
+							degradedGeneration = tt.degradedGeneration
+						}
+						apimeta.SetStatusCondition(&mw.Status.Conditions,
+							getCondition(workv1.WorkDegraded, "", "", metav1.ConditionTrue, degradedGeneration))
+					}
+					apimeta.SetStatusCondition(&mw.Status.Conditions,
+						getCondition(workv1.WorkApplied, "", "", appliedStatus, tt.observedGeneration))
+					availableGeneration := tt.observedGeneration
+					if tt.availableGeneration != 0 {
+						availableGeneration = tt.availableGeneration
+					}
+					if !tt.omitAvailable {
+						apimeta.SetStatusCondition(&mw.Status.Conditions,
+							getCondition(workv1.WorkAvailable, "", "", availableStatus, availableGeneration))
+					}
+					if !tt.omitProgressing {
+						progressingGeneration := tt.observedGeneration
+						if tt.progressingGeneration != 0 {
+							progressingGeneration = tt.progressingGeneration
+						}
+						apimeta.SetStatusCondition(&mw.Status.Conditions,
+							getCondition(workv1.WorkProgressing, "", "", progressingStatus, progressingGeneration))
+					}
+				}
+				if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for i := 0; i < tt.oldWorkCount; i++ {
+				mw := buildManifestWork(mwrSet, mwrSet.Name, fmt.Sprintf("old-cls-%d", i), placementName)
+				mw.Spec = helpertest.CreateTestManifestWorkSpecWithSecret("v2", "kindtest", "ns-test", "name-test")
+				if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			reconciler := statusReconciler{manifestWorkLister: workInformerFactory.Work().V1().ManifestWorks().Lister()}
+			_, _, err := reconciler.reconcile(context.Background(), mwrSet)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, tt.wantSummary, mwrSet.Status.Summary)
+			assert.Equal(t, tt.wantSummary, mwrSet.Status.PlacementsSummary[0].Summary)
+			condition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionManifestworkApplied)
+			if assert.NotNil(t, condition) {
+				assert.Equal(t, tt.wantReason, condition.Reason)
+				assert.Equal(t, tt.wantStatus, condition.Status)
+				assert.Equal(t, mwrSet.Generation, condition.ObservedGeneration)
+			}
+		})
+	}
+}
+
 func TestStatusReconcileAsProcessing(t *testing.T) {
 	plcName := "place-test"
 	clusters := []string{"cls1", "cls2", "cls3", "cls4"}
@@ -128,6 +381,8 @@ func TestStatusReconcileAsProcessing(t *testing.T) {
 			cond = getCondition(workv1.WorkAvailable, "", "", metav1.ConditionTrue, 0)
 			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 		} else {
+			cond = getCondition(workv1.WorkAvailable, "", "", metav1.ConditionFalse, 0)
+			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 			cond = getCondition(workv1.WorkProgressing, "", "", metav1.ConditionTrue, 0)
 			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 		}
@@ -211,10 +466,14 @@ func TestStatusReconcileNotAsExpected(t *testing.T) {
 			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 			avaCount++
 		} else if id%3 == 0 {
+			cond = getCondition(workv1.WorkAvailable, "", "", metav1.ConditionFalse, 0)
+			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 			cond = getCondition(workv1.WorkDegraded, "", "", metav1.ConditionTrue, 0)
 			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 			processingCount++
 		} else {
+			cond = getCondition(workv1.WorkAvailable, "", "", metav1.ConditionFalse, 0)
+			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 			cond = getCondition(workv1.WorkProgressing, "", "", metav1.ConditionTrue, 0)
 			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 			degradCount++
@@ -377,7 +636,7 @@ func TestStatusWithMWRSetSpecChangesReconcile(t *testing.T) {
 		Applied:     0,
 		Available:   0,
 		Degraded:    0,
-		Progressing: 0,
+		Progressing: len(clusters),
 	}
 	assert.Equal(t, mwrSetTest.Status.Summary, mwrSetSummary)
 
@@ -385,5 +644,5 @@ func TestStatusWithMWRSetSpecChangesReconcile(t *testing.T) {
 	appliedCondition = apimeta.FindStatusCondition(mwrSetTest.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionManifestworkApplied)
 	assert.NotNil(t, appliedCondition)
 	assert.Equal(t, appliedCondition.Status, metav1.ConditionFalse)
-	assert.Equal(t, appliedCondition.Reason, workapiv1alpha1.ReasonNotAsExpected)
+	assert.Equal(t, appliedCondition.Reason, workapiv1alpha1.ReasonProcessing)
 }
