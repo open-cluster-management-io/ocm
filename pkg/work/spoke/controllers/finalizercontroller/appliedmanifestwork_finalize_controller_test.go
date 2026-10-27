@@ -213,6 +213,23 @@ func TestFinalize(t *testing.T) {
 			validateDynamicActions: assertGets("secrets"),
 		},
 		{
+			name:               "keep rbac in status once other resources are gone",
+			terminated:         true,
+			existingFinalizers: []string{workapiv1.AppliedManifestWorkFinalizer},
+			resourcesToRemove:  []workapiv1.AppliedManifestResourceMeta{clusterRole, secret},
+			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				work := &workapiv1.AppliedManifestWork{}
+				if err := json.Unmarshal(actions[0].(clienttesting.PatchActionImpl).Patch, work); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(work.Status.AppliedResources, []workapiv1.AppliedManifestResourceMeta{clusterRole}) {
+					t.Fatal(spew.Sdump(work.Status.AppliedResources))
+				}
+			},
+			validateDynamicActions: assertGets("secrets"),
+		},
+		{
 			name:                               "delete rbac once only rbac resources are left",
 			terminated:                         true,
 			existingFinalizers:                 []string{workapiv1.AppliedManifestWorkFinalizer},

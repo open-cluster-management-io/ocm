@@ -1012,6 +1012,44 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		})
 	})
 
+	ginkgo.Context("RBAC deletion order", func() {
+		var finalizer = "cluster.open-cluster-management.io/testing"
+		var clusterRoleName = "work-rbac-deletion-order"
+		ginkgo.BeforeEach(func() {
+			clusterRole, _ := util.NewClusterRole(clusterName, clusterRoleName)
+			manifests = []workapiv1.Manifest{
+				util.ToManifest(util.NewConfigmap(clusterName, cm1, map[string]string{"a": "b"}, []string{finalizer})),
+				util.ToManifest(clusterRole),
+			}
+		})
+
+		ginkgo.AfterEach(func() {
+			err = util.RemoveConfigmapFinalizers(spokeKubeClient, clusterName, cm1)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should delete rbac resources after other resources are gone", func() {
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			gomega.Consistently(func() error {
+				_, err := spokeKubeClient.RbacV1().ClusterRoles().Get(context.Background(), clusterRoleName, metav1.GetOptions{})
+				return err
+			}, 5, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			err = util.RemoveConfigmapFinalizers(spokeKubeClient, clusterName, cm1)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			gomega.Eventually(func() bool {
+				_, err := spokeKubeClient.RbacV1().ClusterRoles().Get(context.Background(), clusterRoleName, metav1.GetOptions{})
+				return errors.IsNotFound(err)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		})
+	})
+
 	ginkgo.Context("Foreground deletion", func() {
 		var finalizer = "cluster.open-cluster-management.io/testing"
 		ginkgo.BeforeEach(func() {
