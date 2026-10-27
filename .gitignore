@@ -36,3 +36,9 @@ _output/
 
 # VSCode workspace files
 .vscode/
+
+# MacOS
+# Though commonly globally ignored,
+# above explicitly includes everything in deploy/ and vendor/,
+# which overrides global settings.
+.DS_Store
