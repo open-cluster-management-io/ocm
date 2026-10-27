@@ -93,6 +93,7 @@ verify-crds: ensure-yaml-patch
 .PHONY: lint
 lint:
 	@bash -o pipefail -c 'curl -fsSL https://raw.githubusercontent.com/open-cluster-management-io/sdk-go/main/ci/lint/run-lint.sh | bash'
+	go test -count=1 -tags lintconfig ./hack/lintconfig
 
 install-golang-gci:
 	go install github.com/daixiang0/gci@v0.13.7

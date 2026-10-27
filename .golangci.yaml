@@ -106,6 +106,401 @@ linters:
     #       - staticcheck
     #       - revive
     #       - lll
+    # Remove these rules as the corresponding existing findings are fixed.
+    # Identical source and diagnostics in the same file are also excluded.
+    rules:
+      - path: '^pkg/addon/webhook/v1alpha1/webhook\.go$'
+        linters: [staticcheck]
+        text: '^ST1016: methods on the same type should have the same receiver name \(seen 2x "r", 3x "in"\)$'
+        source: '^[[:space:]]*func \(in \*ClusterManagementAddOn\) DeepCopy\(\) \*ClusterManagementAddOn \{[[:space:]]*$'
+      - path: '^pkg/addon/webhook/v1alpha1/webhook\.go$'
+        linters: [staticcheck]
+        text: '^ST1016: methods on the same type should have the same receiver name \(seen 2x "r", 3x "in"\)$'
+        source: '^[[:space:]]*func \(in \*ManagedClusterAddOn\) DeepCopy\(\) \*ManagedClusterAddOn \{[[:space:]]*$'
+      - path: '^pkg/addon/webhook/v1beta1/clustermanagementaddon_conversion\.go$'
+        linters: [staticcheck]
+        text: '^ST1016: methods on the same type should have the same receiver name \(seen 1x "dst", 2x "src", 3x "in"\)$'
+        source: '^[[:space:]]*func \(dst \*ClusterManagementAddOn\) ConvertFrom\(srcRaw conversion\.Hub\) error \{[[:space:]]*$'
+      - path: '^pkg/addon/webhook/v1beta1/managedclusteraddon_conversion\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: src\.Spec\.InstallNamespace is deprecated'
+        source: '^[[:space:]]*dst\.ManagedClusterAddOn\.Annotations\[InstallNamespaceAnnotation\] = src\.Spec\.InstallNamespace[[:space:]]*$'
+      - path: '^pkg/addon/webhook/v1beta1/managedclusteraddon_conversion\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: src\.Spec\.InstallNamespace is deprecated'
+        source: '^[[:space:]]*if src\.Spec\.InstallNamespace != "" \{[[:space:]]*$'
+      - path: '^pkg/addon/webhook/v1beta1/managedclusteraddon_conversion\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: v1alpha1Obj\.Spec\.InstallNamespace is deprecated'
+        source: '^[[:space:]]*v1alpha1Obj\.Spec\.InstallNamespace = installNs[[:space:]]*$'
+      - path: '^pkg/addon/webhook/v1beta1/managedclusteraddon_conversion\.go$'
+        linters: [staticcheck]
+        text: '^ST1016: methods on the same type should have the same receiver name \(seen 1x "dst", 2x "src", 3x "in"\)$'
+        source: '^[[:space:]]*func \(dst \*ManagedClusterAddOn\) ConvertFrom\(srcRaw conversion\.Hub\) error \{[[:space:]]*$'
+      - path: '^pkg/common/apply/rbac\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: resourcemerge\.BoolPtr is deprecated'
+        source: '^[[:space:]]*modified := resourcemerge\.BoolPtr\(false\)[[:space:]]*$'
+      - path: '^pkg/common/helpers/aws\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: func GetAwsAccountIdAndClusterName should be GetAwsAccountIDAndClusterName$'
+        source: '^[[:space:]]*func GetAwsAccountIdAndClusterName\(clusterArn string\) \(string, string\) \{[[:space:]]*$'
+      - path: '^pkg/common/helpers/aws\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: func parameter awsAccountId should be awsAccountID$'
+        source: '^[[:space:]]*func BuildIamRoleArn\(partition string, awsAccountId string, roleName string\) string \{[[:space:]]*$'
+      - path: '^pkg/common/helpers/aws\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: func parameter hubClusterAccountId should be hubClusterAccountID$'
+        source: '^[[:space:]]*func Md5HashSuffix\(hubClusterAccountId string, hubClusterName string, managedClusterAccountId string, managedClusterName string\) string \{[[:space:]]*$'
+      - path: '^pkg/common/helpers/aws\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: func parameter managedClusterAccountId should be managedClusterAccountID$'
+        source: '^[[:space:]]*func Md5HashSuffix\(hubClusterAccountId string, hubClusterName string, managedClusterAccountId string, managedClusterName string\) string \{[[:space:]]*$'
+      - path: '^pkg/common/helpers/aws\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: var awsAccountId should be awsAccountID$'
+        source: '^[[:space:]]*awsAccountId := clusterStringParts\[4\][[:space:]]*$'
+      - path: '^pkg/common/options/agent\.go$'
+        linters: [staticcheck]
+        text: '^QF1002: could use tagged switch on err$'
+        source: '^[[:space:]]*switch \{[[:space:]]*$'
+      - path: '^pkg/operator/helpers/chart/config\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: struct field DockerConfigJson should be DockerConfigJSON$'
+        source: '^[[:space:]]*DockerConfigJson       string `json:"dockerConfigJson,omitempty"`[[:space:]]*$'
+      - path: '^pkg/operator/helpers/chart/render\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: func JsonStructToValues should be JSONStructToValues$'
+        source: '^[[:space:]]*func JsonStructToValues\(a interface\{\}\) \(chartutil\.Values, error\) \{[[:space:]]*$'
+      - path: '^pkg/operator/helpers/helpers\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: corev1\.Endpoints is deprecated'
+        source: '^[[:space:]]*case \*corev1\.Endpoints:[[:space:]]*$'
+      - path: '^pkg/operator/helpers/helpers\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: corev1\.Endpoints is deprecated'
+        source: '^[[:space:]]*func ApplyEndpoints\(ctx context\.Context, client coreclientv1\.EndpointsGetter, required \*corev1\.Endpoints\) \(\*corev1\.Endpoints, bool, error\) \{[[:space:]]*$'
+      - path: '^pkg/operator/helpers/helpers\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: resourcemerge\.BoolPtr is deprecated'
+        source: '^[[:space:]]*modified := resourcemerge\.BoolPtr\(false\)[[:space:]]*$'
+      - path: '^pkg/operator/helpers/queuekey\.go$'
+        linters: [staticcheck]
+        text: '^QF1007: could merge conditional assignment into variable declaration$'
+        source: '^[[:space:]]*interestedObjectFound := false[[:space:]]*$'
+      - path: '^pkg/operator/helpers/sa_syncer\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: "k8s\.io/utils/pointer" is deprecated'
+        source: '^[[:space:]]*"k8s\.io/utils/pointer"[[:space:]]*$'
+      - path: '^pkg/operator/operators/clustermanager/controllers/certrotationcontroller/certrotation_controller\.go$'
+        linters: [staticcheck]
+        text: '^QF1002: could use tagged switch on key$'
+        source: '^[[:space:]]*switch \{[[:space:]]*$'
+      - path: '^pkg/operator/operators/clustermanager/controllers/certrotationcontroller/certrotation_controller\.go$'
+        linters: [staticcheck]
+        text: '^ST1019\(related information\): other import of "github\.com/openshift/library-go/pkg/operator/v1helpers"$'
+        source: '^[[:space:]]*operatorhelpers "github\.com/openshift/library-go/pkg/operator/v1helpers"[[:space:]]*$'
+      - path: '^pkg/operator/operators/clustermanager/controllers/certrotationcontroller/certrotation_controller\.go$'
+        linters: [staticcheck]
+        text: '^ST1019: package "github\.com/openshift/library-go/pkg/operator/v1helpers" is being imported more than once$'
+        source: '^[[:space:]]*errorhelpers "github\.com/openshift/library-go/pkg/operator/v1helpers"[[:space:]]*$'
+      - path: '^pkg/operator/operators/clustermanager/controllers/clustermanagercontroller/clustermanager_controller\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: var hubApiExtensionClient should be hubAPIExtensionClient$'
+        source: '^[[:space:]]*hubApiExtensionClient, err := apiextensionsclient\.NewForConfig\(hubKubeConfig\)[[:space:]]*$'
+      - path: '^pkg/operator/operators/clustermanager/controllers/clustermanagercontroller/clustermanager_controller\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: var hubApiExtensionClient should be hubAPIExtensionClient$'
+        source: '^[[:space:]]*hubClient, hubApiExtensionClient, hubMigrationClient, err := n\.generateHubClusterClients\(hubKubeConfig\)[[:space:]]*$'
+      - path: '^pkg/operator/operators/clustermanager/controllers/clustermanagercontroller/clustermanager_controller\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: var hubClusterAccountId should be hubClusterAccountID$'
+        source: '^[[:space:]]*hubClusterAccountId, hubClusterName := commonhelper\.GetAwsAccountIdAndClusterName\(hubClusterArn\)[[:space:]]*$'
+      - path: '^pkg/operator/operators/clustermanager/controllers/crdstatuccontroller/crd_status_controller\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: var hubApiExtensionClient should be hubAPIExtensionClient$'
+        source: '^[[:space:]]*hubApiExtensionClient, err := apiextensionsclient\.NewForConfig\(hubKubeConfig\)[[:space:]]*$'
+      - path: '^pkg/operator/operators/clustermanager/controllers/migrationcontroller/migration_controller\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: resourcemerge\.BoolPtr is deprecated'
+        source: '^[[:space:]]*modified := resourcemerge\.BoolPtr\(false\)[[:space:]]*$'
+      - path: '^pkg/operator/operators/clustermanager/controllers/migrationcontroller/migration_controller\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: var hubApiExtensionClient should be hubAPIExtensionClient$'
+        source: '^[[:space:]]*hubApiExtensionClient, err := apiextensionsclient\.NewForConfig\(hubKubeConfig\)[[:space:]]*$'
+      - path: '^pkg/operator/operators/crdmanager/manager\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: "k8s\.io/utils/pointer" is deprecated'
+        source: '^[[:space:]]*"k8s\.io/utils/pointer"[[:space:]]*$'
+      - path: '^pkg/operator/operators/klusterlet/controllers/klusterletcontroller/klusterlet_controller\.go$'
+        linters: [staticcheck]
+        text: '^SA4022: the address of a variable cannot be nil$'
+        source: '^[[:space:]]*if &klusterlet\.Spec\.RegistrationConfiguration\.RegistrationDriver != nil &&[[:space:]]*$'
+      - path: '^pkg/operator/operators/klusterlet/controllers/klusterletcontroller/klusterlet_controller\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: struct field HubApiServerHostAlias should be HubAPIServerHostAlias$'
+        source: '^[[:space:]]*HubApiServerHostAlias \*operatorapiv1\.HubApiServerHostAlias[[:space:]]*$'
+      - path: '^pkg/operator/operators/klusterlet/controllers/klusterletcontroller/klusterlet_controller\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: var hubClusterAccountId should be hubClusterAccountID$'
+        source: '^[[:space:]]*hubClusterAccountId, hubClusterName := commonhelpers\.GetAwsAccountIdAndClusterName\(managedClusterIamRole\.AwsIrsa\.HubClusterArn\)[[:space:]]*$'
+      - path: '^pkg/operator/operators/klusterlet/controllers/klusterletcontroller/klusterlet_controller\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: var managedClusterAccountId should be managedClusterAccountID$'
+        source: '^[[:space:]]*managedClusterAccountId, managedClusterName := commonhelpers\.GetAwsAccountIdAndClusterName\(managedClusterIamRole\.AwsIrsa\.ManagedClusterArn\)[[:space:]]*$'
+      - path: '^pkg/placement/controllers/scheduling/schedule\.go$'
+        linters: [staticcheck]
+        text: '^QF1002: could use tagged switch on k\.BuiltIn$'
+        source: '^[[:space:]]*switch \{[[:space:]]*$'
+      - path: '^pkg/placement/controllers/scheduling/schedule\.go$'
+        linters: [staticcheck]
+        text: '^QF1002: could use tagged switch on mode$'
+        source: '^[[:space:]]*switch \{[[:space:]]*$'
+      - path: '^pkg/placement/controllers/scheduling/scheduling_controller\.go$'
+        linters: [staticcheck]
+        text: '^SA4010: this result of append is never used, except maybe in other appends$'
+        source: '^[[:space:]]*errs = append\(errs, err\)[[:space:]]*$'
+      - path: '^pkg/placement/controllers/sigplacementdecision/controller\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: v1beta1\.SchemeGroupVersion is deprecated'
+        source: '^[[:space:]]*\*metav1\.NewControllerRef\(ocmPD, v1beta1\.SchemeGroupVersion\.WithKind\("PlacementDecision"\)\),[[:space:]]*$'
+      - path: '^pkg/placement/helpers/cel\.go$'
+        linters: [staticcheck]
+        text: '^SA1029: should not use built-in type string as key for value; define your own type to avoid collisions$'
+        source: '^[[:space:]]*ctx = context\.WithValue\(ctx, "cluster", cluster\.GetName\(\)\)[[:space:]]*$'
+      - path: '^pkg/placement/helpers/testing/builders\.go$'
+        linters: [staticcheck]
+        text: '^QF1002: could use tagged switch on numbOfUnscheduledDecisions$'
+        source: '^[[:space:]]*switch \{[[:space:]]*$'
+      - path: '^pkg/placement/plugins/steady/steady\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: sets\.String is deprecated'
+        source: '^[[:space:]]*existingDecisions := sets\.String\{\}[[:space:]]*$'
+      - path: '^pkg/placement/plugins/tainttoleration/taint_toleration\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: sets\.String is deprecated'
+        source: '^[[:space:]]*existingDecisions := sets\.String\{\}[[:space:]]*$'
+      - path: '^pkg/placement/plugins/tainttoleration/taint_toleration\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: sets\.String is deprecated'
+        source: '^[[:space:]]*func getDecisionClusterNames\(handle plugins\.Handle, placement \*clusterapiv1beta1\.Placement\) sets\.String \{[[:space:]]*$'
+      - path: '^pkg/placement/plugins/tainttoleration/taint_toleration\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: sets\.String is deprecated'
+        source: '^[[:space:]]*func getDecisionClusters\(logger klog\.Logger, handle plugins\.Handle, placement \*clusterapiv1beta1\.Placement\) \(sets\.String, \[\]\*clusterapiv1\.ManagedCluster\) \{[[:space:]]*$'
+      - path: '^pkg/placement/plugins/tainttoleration/taint_toleration\.go$'
+        linters: [staticcheck]
+        text: '^ST1016: methods on the same type should have the same receiver name \(seen 1x "p", 3x "pl"\)$'
+        source: '^[[:space:]]*func \(pl \*TaintToleration\) Description\(\) string \{[[:space:]]*$'
+      - path: '^pkg/registration/hub/addon/discovery_controller\.go$'
+        linters: [staticcheck]
+        text: '^QF1002: could use tagged switch on queueKey$'
+        source: '^[[:space:]]*switch \{[[:space:]]*$'
+      - path: '^pkg/registration/hub/importer/importer\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: "k8s\.io/utils/pointer" is deprecated'
+        source: '^[[:space:]]*"k8s\.io/utils/pointer"[[:space:]]*$'
+      - path: '^pkg/registration/hub/importer/providers/interface\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: var hubApiExtensionClient should be hubAPIExtensionClient$'
+        source: '^[[:space:]]*hubApiExtensionClient, err := apiextensionsclient\.NewForConfig\(config\)[[:space:]]*$'
+      - path: '^pkg/registration/hub/lease/controller\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: "k8s\.io/utils/pointer" is deprecated'
+        source: '^[[:space:]]*"k8s\.io/utils/pointer"[[:space:]]*$'
+      - path: '^pkg/registration/register/aws_irsa/aws\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: should not use underscores in package names$'
+        source: '^[[:space:]]*package aws_irsa[[:space:]]*$'
+      - path: '^pkg/registration/register/aws_irsa/aws_irsa\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: should not use underscores in package names$'
+        source: '^[[:space:]]*package aws_irsa[[:space:]]*$'
+      - path: '^pkg/registration/register/aws_irsa/aws_irsa\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: var hubClusterAccountId should be hubClusterAccountID$'
+        source: '^[[:space:]]*hubClusterAccountId, hubClusterName := helpers\.GetAwsAccountIdAndClusterName\(c\.hubClusterArn\)[[:space:]]*$'
+      - path: '^pkg/registration/register/aws_irsa/hub_driver\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: should not use underscores in package names$'
+        source: '^[[:space:]]*package aws_irsa[[:space:]]*$'
+      - path: '^pkg/registration/register/aws_irsa/hub_driver\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: var awsAccountId should be awsAccountID$'
+        source: '^[[:space:]]*awsAccountId := creds\.AccountID[[:space:]]*$'
+      - path: '^pkg/registration/register/aws_irsa/hub_driver\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: var hubAccountId should be hubAccountID$'
+        source: '^[[:space:]]*var hubAccountId string[[:space:]]*$'
+      - path: '^pkg/registration/register/aws_irsa/hub_driver\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: var managedClusterAccountId should be managedClusterAccountID$'
+        source: '^[[:space:]]*var managedClusterAccountId string[[:space:]]*$'
+      - path: '^pkg/registration/register/aws_irsa/hub_driver\.go$'
+        linters: [staticcheck]
+        text: '^ST1005: error strings should not be capitalized$'
+        source: '^[[:space:]]*return nil, fmt\.Errorf\("Failed to process auto approval ARN pattern: %w", err\)[[:space:]]*$'
+      - path: '^pkg/registration/register/aws_irsa/hub_driver\.go$'
+        linters: [staticcheck]
+        text: '^ST1016: methods on the same type should have the same receiver name \(seen 2x "c", 3x "a"\)$'
+        source: '^[[:space:]]*func \(a \*AWSIRSAHubDriver\) Accept\(cluster \*clusterv1\.ManagedCluster\) bool \{[[:space:]]*$'
+      - path: '^pkg/registration/register/aws_irsa/hub_driver\.go$'
+        linters: [staticcheck]
+        text: '^ST1019\(related information\): other import of "open-cluster-management\.io/api/cluster/v1"$'
+        source: '^[[:space:]]*v1 "open-cluster-management\.io/api/cluster/v1"[[:space:]]*$'
+      - path: '^pkg/registration/register/aws_irsa/hub_driver\.go$'
+        linters: [staticcheck]
+        text: '^ST1019: package "open-cluster-management\.io/api/cluster/v1" is being imported more than once$'
+        source: '^[[:space:]]*clusterv1 "open-cluster-management\.io/api/cluster/v1"[[:space:]]*$'
+      - path: '^pkg/registration/register/aws_irsa/options\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: should not use underscores in package names$'
+        source: '^[[:space:]]*package aws_irsa[[:space:]]*$'
+      - path: '^pkg/registration/register/common\.go$'
+        linters: [staticcheck]
+        text: '^ST1016: methods on the same type should have the same receiver name \(seen 1x "n", 3x "a"\)$'
+        source: '^[[:space:]]*func \(n \*NoopHubDriver\) Accept\(cluster \*clusterv1\.ManagedCluster\) bool \{[[:space:]]*$'
+      - path: '^pkg/registration/register/common\.go$'
+        linters: [staticcheck]
+        text: '^ST1019\(related information\): other import of "open-cluster-management\.io/api/client/cluster/clientset/versioned"$'
+        source: '^[[:space:]]*hubclusterclientset "open-cluster-management\.io/api/client/cluster/clientset/versioned"[[:space:]]*$'
+      - path: '^pkg/registration/register/common\.go$'
+        linters: [staticcheck]
+        text: '^ST1019: package "open-cluster-management\.io/api/client/cluster/clientset/versioned" is being imported more than once$'
+        source: '^[[:space:]]*clusterv1client "open-cluster-management\.io/api/client/cluster/clientset/versioned"[[:space:]]*$'
+      - path: '^pkg/registration/register/csr/certficate_beta\.go$'
+        linters: [staticcheck]
+        text: '^QF1003: could use tagged switch on condition\.Type$'
+        source: '^[[:space:]]*if condition\.Type == certificates\.CertificateDenied \{[[:space:]]*$'
+      - path: '^pkg/registration/register/csr/certificate\.go$'
+        linters: [staticcheck]
+        text: '^QF1003: could use tagged switch on condition\.Type$'
+        source: '^[[:space:]]*if condition\.Type == certificates\.CertificateDenied \{[[:space:]]*$'
+      - path: '^pkg/registration/register/csr/csr\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: "k8s\.io/utils/pointer" is deprecated'
+        source: '^[[:space:]]*"k8s\.io/utils/pointer"[[:space:]]*$'
+      - path: '^pkg/registration/register/csr/hub_driver\.go$'
+        linters: [staticcheck]
+        text: '^ST1016: methods on the same type should have the same receiver name \(seen 1x "a", 3x "c"\)$'
+        source: '^[[:space:]]*func \(c \*CSRHubDriver\) Accept\(_ \*clusterv1\.ManagedCluster\) bool \{[[:space:]]*$'
+      - path: '^pkg/registration/register/grpc/hub_driver\.go$'
+        linters: [staticcheck]
+        text: '^ST1016: methods on the same type should have the same receiver name \(seen 1x "a", 3x "c"\)$'
+        source: '^[[:space:]]*func \(c \*GRPCHubDriver\) Accept\(_ \*clusterv1\.ManagedCluster\) bool \{[[:space:]]*$'
+      - path: '^pkg/registration/webhook/v1/managedcluster_mutating\.go$'
+        linters: [staticcheck]
+        text: '^ST1016: methods on the same type should have the same receiver name \(seen 13x "r", 1x "a"\)$'
+        source: '^[[:space:]]*func \(r \*ManagedClusterWebhook\) Default\(ctx context\.Context, managedCluster \*clusterv1\.ManagedCluster\) error \{[[:space:]]*$'
+      - path: '^pkg/singleton/spoke/agent\.go$'
+        linters: [staticcheck]
+        text: '^ST1016: methods on the same type should have the same receiver name \(seen 1x "a", 1x "o"\)$'
+        source: '^[[:space:]]*func \(o \*AgentConfig\) HealthCheckers\(\) \[\]healthz\.HealthChecker \{[[:space:]]*$'
+      - path: '^pkg/work/hub/controllers/manifestworkreplicasetcontroller/manifestworkreplicaset_deploy_reconcile\.go$'
+        linters: [staticcheck]
+        text: '^S1005: unnecessary assignment to the blank identifier$'
+        source: '^[[:space:]]*clusterWorks, _ := allManifestWorks\.workByPlacement\[placementRef\.Name\][[:space:]]*$'
+      - path: '^pkg/work/hub/test/helper\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: func parameter mApiVersion should be mAPIVersion$'
+        source: '^[[:space:]]*func CreateTestManifestWorkSpecWithSecret\(mApiVersion string, mKind string, mNS string, mName string\) workapiv1\.ManifestWorkSpec \{[[:space:]]*$'
+      - path: '^pkg/work/spoke/apply/update_apply\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: "k8s\.io/utils/pointer" is deprecated'
+        source: '^[[:space:]]*"k8s\.io/utils/pointer"[[:space:]]*$'
+      - path: '^pkg/work/spoke/auth/cache/auth\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: "k8s\.io/utils/pointer" is deprecated'
+        source: '^[[:space:]]*"k8s\.io/utils/pointer"[[:space:]]*$'
+      - path: '^pkg/work/spoke/controllers/finalizercontroller/manifestwork_finalize_controller\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: workqueue\.NewItemExponentialFailureRateLimiter is deprecated'
+        source: '^[[:space:]]*rateLimiter:               workqueue\.NewItemExponentialFailureRateLimiter\(5\*time\.Millisecond, 1000\*time\.Second\),[[:space:]]*$'
+      - path: '^pkg/work/spoke/controllers/finalizercontroller/manifestwork_finalize_controller\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: workqueue\.RateLimiter is deprecated'
+        source: '^[[:space:]]*rateLimiter               workqueue\.RateLimiter[[:space:]]*$'
+      - path: '^pkg/work/spoke/statusfeedback/reader\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: "k8s\.io/utils/pointer" is deprecated'
+        source: '^[[:space:]]*"k8s\.io/utils/pointer"[[:space:]]*$'
+      - path: '^pkg/work/spoke/statusfeedback/reader\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: method WithMaxJsonRawLength should be WithMaxJSONRawLength$'
+        source: '^[[:space:]]*func \(s \*StatusReader\) WithMaxJsonRawLength\(length int32\) \*StatusReader \{[[:space:]]*$'
+      - path: '^pkg/work/spoke/statusfeedback/reader\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: method getValueByJsonPath should be getValueByJSONPath$'
+        source: '^[[:space:]]*func \(s \*StatusReader\) getValueByJsonPath\(name, path string, obj \*unstructured\.Unstructured\) \(\*workapiv1\.FeedbackValue, error\) \{[[:space:]]*$'
+      - path: '^test/framework/clusterclient\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: "k8s\.io/utils/pointer" is deprecated'
+        source: '^[[:space:]]*"k8s\.io/utils/pointer"[[:space:]]*$'
+      - path: '^test/framework/klusterlet\.go$'
+        linters: [staticcheck]
+        text: '^ST1001: should not use dot imports$'
+        source: '^[[:space:]]*\. "github\.com/onsi/gomega"[[:space:]]*$'
+      - path: '^test/framework/managedcluster\.go$'
+        linters: [staticcheck]
+        text: '^ST1001: should not use dot imports$'
+        source: '^[[:space:]]*\. "github\.com/onsi/gomega"[[:space:]]*$'
+      - path: '^test/framework/managedclusteraddon\.go$'
+        linters: [staticcheck]
+        text: '^ST1001: should not use dot imports$'
+        source: '^[[:space:]]*\. "github\.com/onsi/gomega"[[:space:]]*$'
+      - path: '^test/framework/manifestwork\.go$'
+        linters: [staticcheck]
+        text: '^ST1001: should not use dot imports$'
+        source: '^[[:space:]]*\. "github\.com/onsi/gomega"[[:space:]]*$'
+      - path: '^test/integration/util/addon\.go$'
+        linters: [staticcheck]
+        text: '^SA1019: "k8s\.io/utils/pointer" is deprecated'
+        source: '^[[:space:]]*"k8s\.io/utils/pointer"[[:space:]]*$'
+      - path: '^test/integration/util/assertion\.go$'
+        linters: [staticcheck]
+        text: '^ST1005: error strings should not be capitalized$'
+        source: '^[[:space:]]*return fmt\.Errorf\([[:space:]]*$'
+      - path: '^test/integration/util/assertion\.go$'
+        linters: [staticcheck]
+        text: '^ST1005: error strings should not be capitalized$'
+        source: '^[[:space:]]*return fmt\.Errorf\("Cannot find expected condition %s", expectedType\)[[:space:]]*$'
+      - path: '^test/integration/util/proxy\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: should not use underscores in Go names; var client_conn should be clientConn$'
+        source: '^[[:space:]]*client_conn, _, err := hijacker\.Hijack\(\)[[:space:]]*$'
+      - path: '^test/integration/util/proxy\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: should not use underscores in Go names; var dest_conn should be destConn$'
+        source: '^[[:space:]]*dest_conn, err := net\.DialTimeout\("tcp", r\.Host, 10\*time\.Second\)[[:space:]]*$'
+      - path: '^test/integration/util/recorder\.go$'
+        linters: [staticcheck]
+        text: '^ST1005: error strings should not be capitalized$'
+        source: '^[[:space:]]*errs = append\(errs, fmt\.Errorf\("Expected not to find condition %s, got %\+v", expected\.Type, condition\)\)[[:space:]]*$'
+      - path: '^test/integration/util/recorder\.go$'
+        linters: [staticcheck]
+        text: '^ST1005: error strings should not be capitalized$'
+        source: '^[[:space:]]*errs = append\(errs, fmt\.Errorf\("Expected to find condition %\+v, got %\+v", expected, condition\)\)[[:space:]]*$'
+      - path: '^test/integration/util/unstructured\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: const daemonsetJson should be daemonsetJSON$'
+        source: '^[[:space:]]*daemonsetJson = `\{[[:space:]]*$'
+      - path: '^test/integration/util/unstructured\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: const deploymentJson should be deploymentJSON$'
+        source: '^[[:space:]]*deploymentJson = `\{[[:space:]]*$'
+      - path: '^test/integration/util/unstructured\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: const guestbookCrJson should be guestbookCrJSON$'
+        source: '^[[:space:]]*guestbookCrJson = `\{[[:space:]]*$'
+      - path: '^test/integration/util/unstructured\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: const guestbookCrdJson should be guestbookCrdJSON$'
+        source: '^[[:space:]]*guestbookCrdJson = `\{[[:space:]]*$'
+      - path: '^test/integration/util/unstructured\.go$'
+        linters: [staticcheck]
+        text: '^ST1003: const jobJson should be jobJSON$'
+        source: '^[[:space:]]*jobJson = `\{[[:space:]]*$'
   settings:
     errcheck:
       # report about not checking of errors in type assetions: `a := b.(MyStruct)`;
@@ -224,6 +619,7 @@ linters:
         # - wrapperFunc
     staticcheck:
       checks:
+        - all
         # Omit embedded fields from selector expression.
         # https://staticcheck.dev/docs/checks/#QF1008
         - "-QF1008" # Disable
