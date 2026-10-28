@@ -97,11 +97,11 @@ func CheckExpectedConditions(conditions []metav1.Condition, expectedConditions .
 		switch expected.Status {
 		case ConditionNotFound:
 			if condition != nil {
-				errs = append(errs, fmt.Errorf("Expected not to find condition %s, got %+v", expected.Type, condition))
+				errs = append(errs, fmt.Errorf("expected not to find condition %s, got %+v", expected.Type, condition))
 			}
 		default:
 			if condition == nil || !MatchCondition(*condition, expected) {
-				errs = append(errs, fmt.Errorf("Expected to find condition %+v, got %+v", expected, condition))
+				errs = append(errs, fmt.Errorf("expected to find condition %+v, got %+v", expected, condition))
 			}
 		}
 	}

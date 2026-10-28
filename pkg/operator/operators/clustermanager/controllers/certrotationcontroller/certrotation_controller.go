@@ -6,7 +6,6 @@ import (
 	"slices"
 	"time"
 
-	errorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -342,5 +341,5 @@ func (c certRotationController) syncOne(ctx context.Context, clustermanager *ope
 		}
 	}
 
-	return errorhelpers.NewMultiLineAggregate(errs)
+	return operatorhelpers.NewMultiLineAggregate(errs)
 }

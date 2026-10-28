@@ -22,7 +22,6 @@ import (
 	"k8s.io/klog/v2"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	v1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/manifests"
@@ -131,7 +130,7 @@ func (a *AWSIRSAHubDriver) CreatePermissions(ctx context.Context, cluster *clust
 // This function creates:
 // 1. IAM Role and Trust Policy in the hub cluster IAM
 // 2. Returns the hubClusterName and the roleArn to be used for Access Entry creation
-func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCluster *v1.ManagedCluster, cfg aws.Config,
+func createIAMRoleAndPolicy(ctx context.Context, hubClusterArn string, managedCluster *clusterv1.ManagedCluster, cfg aws.Config,
 	awsResourceTags []string) (string, string, error) {
 	logger := klog.FromContext(ctx)
 	var managedClusterIamRoleSuffix string
@@ -355,7 +354,7 @@ func deleteIAMRole(ctx context.Context, cfg aws.Config, roleName string) error {
 
 // The IAM role lives in the hub cluster's account, so its ARN has to be built in the
 // same partition as hubClusterArn.
-func getRoleNameAndArn(ctx context.Context, managedCluster *v1.ManagedCluster, cfg aws.Config,
+func getRoleNameAndArn(ctx context.Context, managedCluster *clusterv1.ManagedCluster, cfg aws.Config,
 	hubClusterArn string) (string, string, error) {
 	logger := klog.FromContext(ctx)
 
@@ -442,7 +441,7 @@ func NewAWSIRSAHubDriver(ctx context.Context, hubClusterArn string, autoApproved
 	for i, s := range autoApprovedIdentityPatterns {
 		p, err := regexp.Compile(s)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to process auto approval ARN pattern: %w", err)
+			return nil, fmt.Errorf("failed to process auto approval ARN pattern: %w", err)
 		}
 		compiledPatterns[i] = p
 	}
