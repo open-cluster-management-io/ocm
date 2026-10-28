@@ -370,6 +370,10 @@ func getRoleNameAndArn(ctx context.Context, managedCluster *v1.ManagedCluster, c
 		return "", "", err
 	}
 	awsAccountId := creds.AccountID
+	// Container credentials (e.g. EKS Pod Identity) only carry the account ID if the endpoint returns it.
+	if awsAccountId == "" {
+		awsAccountId, _ = commonhelpers.GetAwsAccountIdAndClusterName(hubClusterArn)
+	}
 	roleArn := commonhelpers.BuildIamRoleArn(commonhelpers.GetAwsPartition(hubClusterArn), awsAccountId, roleName)
 	return roleName, roleArn, err
 }

@@ -174,6 +174,51 @@ var _ = ginkgo.Describe("Klusterlet using aws auth", func() {
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "Applied", "KlusterletApplied", metav1.ConditionTrue)
 		})
 
+		ginkgo.It("should remove IRSA annotation and roll the agents when switched to PodIdentity", func() {
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			saAnnotated := func(name string) bool {
+				sa, err := kubeClient.CoreV1().ServiceAccounts(klusterletNamespace).Get(context.Background(), name, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				_, ok := sa.Annotations[util.IrsaAnnotationKey]
+				return ok
+			}
+			gomega.Eventually(func() bool {
+				return saAnnotated(registrationSAName) && saAnnotated(workSAName)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			gomega.Eventually(func() error {
+				current, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				current.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.CredentialSource = operatorapiv1.AwsCredentialSourcePodIdentity
+				_, err = operatorClient.OperatorV1().Klusterlets().Update(context.Background(), current, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			gomega.Eventually(func() bool {
+				return !saAnnotated(registrationSAName) && !saAnnotated(workSAName)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			gomega.Eventually(func() bool {
+				for _, name := range []string{registrationDeploymentName, workDeploymentName} {
+					deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), name, metav1.GetOptions{})
+					if err != nil {
+						return false
+					}
+					if deployment.Spec.Template.Annotations["open-cluster-management.io/aws-credential-source"] !=
+						string(operatorapiv1.AwsCredentialSourcePodIdentity) {
+						return false
+					}
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		})
+
 	})
 
 })

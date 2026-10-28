@@ -30,7 +30,7 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode with aws auth", func() {
 				Name: fmt.Sprintf("klusterlet-%s", rand.String(6)),
 			},
 			Spec: operatorapiv1.KlusterletSpec{
-				Namespace:     fmt.Sprintf("%s-singleton-aws", helpers.KlusterletDefaultNamespace),
+				Namespace:     fmt.Sprintf("%s-singleton-aws-%s", helpers.KlusterletDefaultNamespace, rand.String(6)),
 				ImagePullSpec: "quay.io/open-cluster-management/registration-operator",
 				ExternalServerURLs: []operatorapiv1.ServerURL{
 					{
@@ -113,6 +113,26 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode with aws auth", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "Applied", "KlusterletApplied", metav1.ConditionTrue)
+		})
+
+		ginkgo.It("should not annotate the service account when using PodIdentity", func() {
+			klusterlet.Spec.RegistrationConfiguration.RegistrationDriver.AwsIrsa.CredentialSource = operatorapiv1.AwsCredentialSourcePodIdentity
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			gomega.Eventually(func() bool {
+				deployment, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				return util.AllCommandLineOptionsPresent(*deployment) &&
+					deployment.Spec.Template.Annotations["open-cluster-management.io/aws-credential-source"] ==
+						string(operatorapiv1.AwsCredentialSourcePodIdentity)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			sa, err := kubeClient.CoreV1().ServiceAccounts(agentNamespace).Get(context.Background(), saName, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(sa.Annotations).NotTo(gomega.HaveKey(util.IrsaAnnotationKey))
 		})
 	})
 })
