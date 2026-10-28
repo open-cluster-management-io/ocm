@@ -258,6 +258,7 @@ type klusterletConfig struct {
 	NetworkPoliciesEnabled bool
 	TLSMinVersion          string
 	TLSCipherSuites        string
+	HealthCheckPort        int32
 }
 
 // If multiplehubs feature gate is enabled, using the bootstrapkubeconfigs from klusterlet CR.
@@ -333,6 +334,16 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		ResourceRequirementResourceType: helpers.ResourceType(klusterlet),
 		ResourceRequirements:            resourceRequirements,
 		DisableAddonNamespace:           n.disableAddonNamespace,
+	}
+
+	switch {
+	case klusterlet.Spec.HealthCheckPort == 0:
+		config.HealthCheckPort = 8443
+	case klusterlet.Spec.HealthCheckPort >= 1024 && klusterlet.Spec.HealthCheckPort <= 65535:
+		config.HealthCheckPort = klusterlet.Spec.HealthCheckPort
+	default:
+		return fmt.Errorf("invalid healthCheckPort %d: must be 0 (default 8443) or between 1024 and 65535",
+			klusterlet.Spec.HealthCheckPort)
 	}
 
 	if klusterlet.Spec.DeployOption.ReportHostingCluster == operatorapiv1.ReportHostingClusterModeEnable {

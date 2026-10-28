@@ -100,6 +100,12 @@ type KlusterletSpec struct {
 	// is not available on the managed cluster.
 	// +optional
 	PriorityClassName string `json:"priorityClassName,omitempty"`
+
+	// HealthCheckPort is the port on which the agent health check endpoint is served.
+	// When using hostNetwork, this port must be unique on the node. If not set or 0,
+	// the default port 8443 is used.
+	// +optional
+	HealthCheckPort int32 `json:"healthCheckPort,omitempty"`
 }
 
 // ServerURL represents the apiserver url and ca bundle that is accessible externally
