@@ -249,7 +249,7 @@ func ApplyDeployment(
 	}
 
 	if updated {
-		generationStatus.LastGeneration = updatedDeployment.ObjectMeta.Generation
+		generationStatus.LastGeneration = updatedDeployment.Generation
 	}
 
 	return updatedDeployment, generationStatus, nil

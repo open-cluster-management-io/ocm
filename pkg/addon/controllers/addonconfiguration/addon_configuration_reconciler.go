@@ -100,8 +100,8 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 		}
 		key := configKey{
 			gr:      configRef.ConfigGroupResource,
-			refName: configRef.DesiredConfig.ConfigReferent.Name,
-			refNs:   configRef.DesiredConfig.ConfigReferent.Namespace,
+			refName: configRef.DesiredConfig.Name,
+			refNs:   configRef.DesiredConfig.Namespace,
 		}
 		oldStatusByKey[key] = configRef
 	}
@@ -113,8 +113,8 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 		for _, configRef := range desiredConfigMap[gr] {
 			key := configKey{
 				gr:      gr,
-				refName: configRef.DesiredConfig.ConfigReferent.Name,
-				refNs:   configRef.DesiredConfig.ConfigReferent.Namespace,
+				refName: configRef.DesiredConfig.Name,
+				refNs:   configRef.DesiredConfig.Namespace,
 			}
 			if old, ok := oldStatusByKey[key]; ok {
 				// Preserve rollout tracking fields, update desired config

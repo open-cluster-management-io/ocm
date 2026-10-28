@@ -97,10 +97,10 @@ func (dst *ManagedClusterAddOn) ConvertFrom(srcRaw conversion.Hub) error {
 	// Save installNamespace to annotation (removed in v1beta1)
 	// This field exists in v1alpha1 but not in v1beta1, so we preserve it in annotations
 	if src.Spec.InstallNamespace != "" {
-		if dst.ManagedClusterAddOn.Annotations == nil {
-			dst.ManagedClusterAddOn.Annotations = make(map[string]string)
+		if dst.Annotations == nil {
+			dst.Annotations = make(map[string]string)
 		}
-		dst.ManagedClusterAddOn.Annotations[InstallNamespaceAnnotation] = src.Spec.InstallNamespace
+		dst.Annotations[InstallNamespaceAnnotation] = src.Spec.InstallNamespace
 	}
 
 	return nil

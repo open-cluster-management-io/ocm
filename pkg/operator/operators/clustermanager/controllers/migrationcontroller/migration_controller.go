@@ -393,7 +393,7 @@ func createStorageVersionMigration(
 	}
 	existing, err := client.StorageVersionMigrations().Get(ctx, migration.Name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		migration.ObjectMeta.OwnerReferences = append(migration.ObjectMeta.OwnerReferences, ownerRefs)
+		migration.OwnerReferences = append(migration.OwnerReferences, ownerRefs)
 		actual, err := client.StorageVersionMigrations().Create(context.TODO(), migration, metav1.CreateOptions{})
 		if err != nil {
 			recorder.Warningf(ctx, "StorageVersionMigrationCreateFailed", "Failed to create %s: %v", resourcehelper.FormatResourceForCLIWithNamespace(migration), err)
