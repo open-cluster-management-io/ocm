@@ -106,7 +106,10 @@ func getManifestWorkInReplicaSet(mwrs *workapiv1alpha1.ManifestWorkReplicaSet,
 			work:       mw,
 			placements: sets.New[string](),
 		}
-		result.workByCluster[mw.Namespace] = recordedWork
+		// A work being deleted must not hide a live one, which is the one to update.
+		if existing, ok := result.workByCluster[mw.Namespace]; !ok || !existing.work.DeletionTimestamp.IsZero() {
+			result.workByCluster[mw.Namespace] = recordedWork
+		}
 
 		if !hasPlacement {
 			continue
