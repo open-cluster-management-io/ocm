@@ -15,9 +15,10 @@ import (
 
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
+
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/basic"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/store"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 // SubjectAccessReviewCheckFn is a function to checks if the executor has permission to operate

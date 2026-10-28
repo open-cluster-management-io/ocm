@@ -28,11 +28,12 @@ import (
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
+
 	"open-cluster-management.io/ocm/pkg/registration/hub/user"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	"open-cluster-management.io/ocm/pkg/registration/register/token"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 const (

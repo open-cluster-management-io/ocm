@@ -28,12 +28,13 @@ import (
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
-	"open-cluster-management.io/ocm/manifests"
-	"open-cluster-management.io/ocm/pkg/common/queue"
-	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
+
+	"open-cluster-management.io/ocm/manifests"
+	"open-cluster-management.io/ocm/pkg/common/queue"
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
 var (

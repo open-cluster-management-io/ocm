@@ -19,8 +19,9 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
 
-	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 )
 
 type TokenGetterFunc func() (token []byte, expiration []byte, additionalData map[string][]byte, err error)

@@ -19,8 +19,9 @@ import (
 	"k8s.io/klog/v2"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
-	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+
+	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 )
 
 type UpdateApply struct {

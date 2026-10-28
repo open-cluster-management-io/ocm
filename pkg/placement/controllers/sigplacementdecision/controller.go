@@ -18,8 +18,9 @@ import (
 	informerv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
 	listerv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	v1beta1 "open-cluster-management.io/api/cluster/v1beta1"
-	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
+
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 const (

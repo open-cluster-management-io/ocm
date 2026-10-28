@@ -15,8 +15,9 @@ import (
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
+
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 func TestSyncManifestWorkController(t *testing.T) {
