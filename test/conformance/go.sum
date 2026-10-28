@@ -132,8 +132,8 @@ k8s.io/kube-openapi v0.0.0-20260319004828-5883c5ee87b9 h1:Sztf7ESG9tAXRW/ACJZjrj
 k8s.io/kube-openapi v0.0.0-20260319004828-5883c5ee87b9/go.mod h1:uGBT7iTA6c6MvqUvSXIaYZo9ukscABYi2btjhvgKGZ0=
 k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2 h1:AZYQSJemyQB5eRxqcPky+/7EdBj0xi3g0ZcxxJ7vbWU=
 k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2/go.mod h1:xDxuJ0whA3d0I4mf/C4ppKHxXynQ+fxnkmQH0vTHnuk=
-sigs.k8s.io/cluster-inventory-api v0.1.4-0.20260914135521-dc460e8ca90d h1:kY6FEQWAkbdD+X0AL0g0qrlRZJXRKHSS7GZZAdKUWUw=
-sigs.k8s.io/cluster-inventory-api v0.1.4-0.20260914135521-dc460e8ca90d/go.mod h1:7J3M6srZ1I4snZR+p5zxgEBdXnia3tlHo5ODMHJpEUk=
+sigs.k8s.io/cluster-inventory-api v0.2.0 h1:gGbfhTLP+RWo2wZSNJNItrhsUrgVhxRlZCDizir/kF4=
+sigs.k8s.io/cluster-inventory-api v0.2.0/go.mod h1:7J3M6srZ1I4snZR+p5zxgEBdXnia3tlHo5ODMHJpEUk=
 sigs.k8s.io/cluster-inventory-api/conformance v0.0.0-20261017160138-b354017eed03 h1:3zYg+eAV5ze/7XDPCnf6ky5ncSV4u3rjzkw5fGjUVqU=
 sigs.k8s.io/cluster-inventory-api/conformance v0.0.0-20261017160138-b354017eed03/go.mod h1:rqR5qWBfuZKhKEn7YVi85KS+/OT6AUB7hooG3BQTLAc=
 sigs.k8s.io/controller-runtime v0.23.3 h1:VjB/vhoPoA9l1kEKZHBMnQF33tdCLQKJtydy4iqwZ80=
