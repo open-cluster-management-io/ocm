@@ -222,11 +222,6 @@ linters:
         # - unlabelStmt
         # - unnamedResult
         # - wrapperFunc
-    staticcheck:
-      checks:
-        # Omit embedded fields from selector expression.
-        # https://staticcheck.dev/docs/checks/#QF1008
-        - "-QF1008" # Disable
 
 issues:
   # We want to make sure we get a full report every time. Setting these
