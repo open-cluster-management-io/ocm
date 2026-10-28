@@ -49,7 +49,7 @@ func (d *deployReconciler) reconcile(
 	}
 
 	// Get all ManifestWorks belonging to this ManifestWorkReplicaSet
-	allManifestWorks, _, err := getManifestWorkInReplicaSet(mwrSet, d.manifestWorkLister)
+	allManifestWorks, works, err := getManifestWorkInReplicaSet(mwrSet, d.manifestWorkLister)
 	if err != nil {
 		return mwrSet, reconcileContinue, fmt.Errorf("failed to list manifestworks: %w", err)
 	}
@@ -64,13 +64,14 @@ func (d *deployReconciler) reconcile(
 		}
 	}
 
-	// Delete ManifestWorks that belong to placements no longer in the spec
-	for _, mwRecord := range allManifestWorks.workByCluster {
-		if mwRecord.placements.Len() == 0 || mwRecord.placements.Difference(currentPlacementNames).Len() > 0 {
-			// This ManifestWork belongs to a placement that's no longer in the spec, delete it
-			err := d.workApplier.Delete(ctx, mwRecord.work.Namespace, mwRecord.work.Name)
+	// Delete ManifestWorks that belong to placements no longer in the spec. All works are checked:
+	// workByCluster holds one work per cluster, which can be the one of another placement.
+	for _, mw := range works {
+		placementName, ok := mw.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey]
+		if !ok || !currentPlacementNames.Has(placementName) {
+			err := d.workApplier.Delete(ctx, mw.Namespace, mw.Name)
 			if err != nil && !errors.IsNotFound(err) {
-				errs = append(errs, fmt.Errorf("failed to delete manifestwork %s/%s for removed placement: %w", mwRecord.work.Namespace, mwRecord.work.Name, err))
+				errs = append(errs, fmt.Errorf("failed to delete manifestwork %s/%s for removed placement: %w", mw.Namespace, mw.Name, err))
 			}
 		}
 	}
