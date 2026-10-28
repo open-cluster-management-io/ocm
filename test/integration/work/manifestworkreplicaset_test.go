@@ -298,6 +298,51 @@ var _ = Describe("ManifestWorkReplicaSet", func() {
 				eventuallyTimeout, eventuallyInterval).Should(Succeed())
 		})
 
+		It("should delete a duplicate manifestwork and roll out to a new cluster", func(ctx SpecContext) {
+			manifestWorkReplicaSet, clusterNames, err := generateTestFixture(ctx, 1)
+			Expect(err).ToNot(HaveOccurred())
+			Eventually(assertWorksByReplicaSet(ctx, clusterNames, manifestWorkReplicaSet, 1), eventuallyTimeout, eventuallyInterval).Should(Succeed())
+
+			By("Create a duplicate manifestwork in the cluster, as a sync with a stale lister would")
+			firstCluster := clusterNames.UnsortedList()[0]
+			works, err := hubWorkClient.WorkV1().ManifestWorks(firstCluster).List(ctx, metav1.ListOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(works.Items).To(HaveLen(1))
+			duplicate := &workapiv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: manifestWorkReplicaSet.Name,
+					Namespace:    firstCluster,
+					Labels:       works.Items[0].Labels,
+					Annotations:  works.Items[0].Annotations,
+				},
+				Spec: works.Items[0].Spec,
+			}
+			_, err = hubWorkClient.WorkV1().ManifestWorks(firstCluster).Create(ctx, duplicate, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+
+			By("Add a second cluster to the placement")
+			secondCluster := "cluster-" + utilrand.String(5)
+			ns := &corev1.Namespace{}
+			ns.Name = secondCluster
+			_, err = spokeKubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			decision, err := hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).Get(
+				ctx, placementDecision.Name, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			decision.Status.Decisions = append(decision.Status.Decisions, clusterv1beta1.ClusterDecision{ClusterName: secondCluster})
+			_, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).UpdateStatus(ctx, decision, metav1.UpdateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			createdPlacement, err := hubClusterClient.ClusterV1beta1().Placements(placement.Namespace).Get(ctx, placement.Name, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			createdPlacement.Status.NumberOfSelectedClusters = 2
+			_, err = hubClusterClient.ClusterV1beta1().Placements(placement.Namespace).UpdateStatus(ctx, createdPlacement, metav1.UpdateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			clusterNames.Insert(secondCluster)
+
+			By("Each cluster ends with one manifestwork")
+			Eventually(assertOneWorkPerCluster(ctx, clusterNames, manifestWorkReplicaSet), eventuallyTimeout, eventuallyInterval).Should(Succeed())
+		})
+
 		It("should delete manifestworks from old placement when placementRef changes", func(ctx SpecContext) {
 			// Create first placement and placementDecision
 			placement1 := &clusterv1beta1.Placement{
@@ -881,6 +926,24 @@ func assertWorksByReplicaSet(ctx context.Context, clusterNames sets.Set[string],
 			}
 		}
 
+		return nil
+	}
+}
+
+func assertOneWorkPerCluster(ctx context.Context, clusterNames sets.Set[string], mwrs *workapiv1alpha1.ManifestWorkReplicaSet) func() error {
+	return func() error {
+		key := fmt.Sprintf("%s.%s", mwrs.Namespace, mwrs.Name)
+		for _, cluster := range sets.List(clusterNames) {
+			works, err := hubWorkClient.WorkV1().ManifestWorks(cluster).List(ctx, metav1.ListOptions{
+				LabelSelector: fmt.Sprintf("work.open-cluster-management.io/manifestworkreplicaset=%s", key),
+			})
+			if err != nil {
+				return err
+			}
+			if len(works.Items) != 1 {
+				return fmt.Errorf("cluster %s should have 1 work, but got %d", cluster, len(works.Items))
+			}
+		}
 		return nil
 	}
 }

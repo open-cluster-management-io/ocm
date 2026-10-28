@@ -1,8 +1,10 @@
 package manifestworkreplicasetcontroller
 
 import (
+	"cmp"
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -50,6 +52,10 @@ type manifestWorkInReplicaSet struct {
 	workByCluster map[string]*manifestWorkWithPlacements
 
 	workByPlacement map[string][]*workapiv1.ManifestWork
+
+	// duplicates holds the extra works of a placement in a cluster (all but the oldest one).
+	// They are not in workByCluster or workByPlacement.
+	duplicates []*workapiv1.ManifestWork
 }
 
 type manifestWorkWithPlacements struct {
@@ -71,23 +77,38 @@ func getManifestWorkInReplicaSet(mwrs *workapiv1alpha1.ManifestWorkReplicaSet,
 	}
 
 	mws = appendLegacyManifestWorks(mws, mwrs, manifestWorkLister)
+	// Sort oldest first, so the oldest work of each placement and cluster is the one kept.
+	slices.SortFunc(mws, compareWorksByAge)
 
 	result := &manifestWorkInReplicaSet{
 		workByCluster:   make(map[string]*manifestWorkWithPlacements),
 		workByPlacement: make(map[string][]*workapiv1.ManifestWork),
 	}
 
+	keptWorks := sets.New[string]()
 	for _, mw := range mws {
+		// TODO(qiujian) actually a work could be related to multiple placements, we should not
+		// use label, but annotation to record all placements in the mw
+		placementName, hasPlacement := mw.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey]
+
+		// The lister can be behind the works created by a previous sync, which may have led to
+		// several works for the same placement in a cluster. Only keep the oldest one.
+		if hasPlacement && mw.DeletionTimestamp.IsZero() {
+			key := mw.Namespace + "/" + placementName
+			if keptWorks.Has(key) {
+				result.duplicates = append(result.duplicates, mw)
+				continue
+			}
+			keptWorks.Insert(key)
+		}
+
 		recordedWork := &manifestWorkWithPlacements{
 			work:       mw,
 			placements: sets.New[string](),
 		}
 		result.workByCluster[mw.Namespace] = recordedWork
 
-		// TODO(qiujian) actually a work could be related to multiple placements, we should not
-		// use label, but annotation to record all placements in the mw
-		placementName, ok := mw.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey]
-		if !ok {
+		if !hasPlacement {
 			continue
 		}
 		recordedWork.placements.Insert(placementName)
@@ -98,6 +119,11 @@ func getManifestWorkInReplicaSet(mwrs *workapiv1alpha1.ManifestWorkReplicaSet,
 		}
 	}
 	return result, mws, nil
+}
+
+// compareWorksByAge orders works by creation time, then by name.
+func compareWorksByAge(a, b *workapiv1.ManifestWork) int {
+	return cmp.Or(a.CreationTimestamp.Time.Compare(b.CreationTimestamp.Time), cmp.Compare(a.Name, b.Name))
 }
 
 // ManifestWorkReplicaSetReconcile is a interface for reconcile logic. It returns an updated manifestWorkReplicaSet and whether further
@@ -235,6 +261,7 @@ func newController(
 				workClient: workClient,
 			},
 			&deployReconciler{
+				workClient:          workClient,
 				workApplier:         workApplier,
 				manifestWorkLister:  manifestWorkInformer.Lister(),
 				placementLister:     placementInformer.Lister(),
