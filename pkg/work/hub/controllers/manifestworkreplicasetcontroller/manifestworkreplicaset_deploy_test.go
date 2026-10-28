@@ -2496,3 +2496,116 @@ func TestGetManifestWorkInReplicaSetKeepsTheOldestWorkPerPlacementAndCluster(t *
 		})
 	}
 }
+
+func TestDeployReconcileDeletesTheWorkOfARemovedPlacementBesideANewerWork(t *testing.T) {
+	// cls1 was selected by place-old and place-test, then place-old was removed from the spec.
+	// The work of place-old is older than the one of place-test.
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	now := time.Now()
+	oldPlacementWork := buildManifestWork(mwrSet, "mwrSet-test-old", "cls1", "place-old")
+	oldPlacementWork.CreationTimestamp = metav1.NewTime(now.Add(-time.Minute))
+	currentWork := buildManifestWork(mwrSet, "mwrSet-test-current", "cls1", "place-test")
+	currentWork.CreationTimestamp = metav1.NewTime(now)
+
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet, oldPlacementWork, currentWork)
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
+	for _, mw := range []*workapiv1.ManifestWork{oldPlacementWork, currentWork} {
+		if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	placement, placementDecision := helpertest.CreateTestPlacement("place-test", "default", "cls1")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placement, placementDecision)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Second)
+	if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision); err != nil {
+		t.Fatal(err)
+	}
+
+	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
+		placementLister:     clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
+	}
+
+	if _, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet); err != nil {
+		t.Fatal(err)
+	}
+
+	works, err := listWorksByMWRS(context.TODO(), fWorkClient, "cls1", mwrSet.Namespace, mwrSet.Name, "place-old")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(works) != 0 {
+		t.Fatalf("expected the work of the removed placement to be deleted, got %d works", len(works))
+	}
+	works, err = listWorksByMWRS(context.TODO(), fWorkClient, "cls1", mwrSet.Namespace, mwrSet.Name, "place-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(works) != 1 {
+		t.Fatalf("expected the work of place-test to be kept, got %d works", len(works))
+	}
+}
+
+func TestDeployReconcileUpdatesTheLiveWorkBesideADeletingOne(t *testing.T) {
+	// cls1 has its work and a newer duplicate that is being deleted, both with the previous
+	// template. The template changes: the live work must be the one updated.
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	now := time.Now()
+	live := buildManifestWork(mwrSet, "mwrSet-test-live", "cls1", "place-test")
+	live.CreationTimestamp = metav1.NewTime(now.Add(-time.Minute))
+	deleting := buildManifestWork(mwrSet, "mwrSet-test-deleting", "cls1", "place-test")
+	deleting.CreationTimestamp = metav1.NewTime(now)
+	deleting.DeletionTimestamp = &metav1.Time{Time: now}
+	deleting.Finalizers = []string{"cluster.open-cluster-management.io/manifest-work-cleanup"}
+
+	newTemplate := helpertest.CreateTestManifestWorkSpecWithSecret("v2", "test", "ns-test", "name-test")
+	newTemplate.DeepCopyInto(&mwrSet.Spec.ManifestWorkTemplate)
+
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet, live, deleting)
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
+	for _, mw := range []*workapiv1.ManifestWork{live, deleting} {
+		if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	placement, placementDecision := helpertest.CreateTestPlacement("place-test", "default", "cls1")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placement, placementDecision)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Second)
+	if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision); err != nil {
+		t.Fatal(err)
+	}
+
+	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
+		placementLister:     clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
+	}
+
+	if _, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet); err != nil {
+		t.Fatal(err)
+	}
+
+	updated, err := fWorkClient.WorkV1().ManifestWorks("cls1").Get(context.TODO(), live.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if assert.Len(t, updated.Spec.Workload.Manifests, 1) {
+		assert.JSONEq(t, string(newTemplate.Workload.Manifests[0].Raw), string(updated.Spec.Workload.Manifests[0].Raw),
+			"the live work gets the new template")
+	}
+}
