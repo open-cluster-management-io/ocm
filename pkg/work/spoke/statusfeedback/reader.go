@@ -8,11 +8,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/util/jsonpath"
-	"k8s.io/utils/pointer"
 
 	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
-
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/spoke/statusfeedback/rules"
 )
@@ -158,7 +156,7 @@ func (s *StatusReader) getValueByJsonPath(name, path string, obj *unstructured.U
 			}
 			fieldValue = workapiv1.FieldValue{
 				Type:    workapiv1.JsonRaw,
-				JsonRaw: pointer.String(string(jsonRaw)),
+				JsonRaw: new(string(jsonRaw)),
 			}
 			return &workapiv1.FeedbackValue{
 				Name:  name,

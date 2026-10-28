@@ -15,12 +15,11 @@ import (
 	workinformer "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/ocm/pkg/common/queue"
+	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/logging"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
-
-	"open-cluster-management.io/ocm/pkg/common/queue"
-	"open-cluster-management.io/ocm/pkg/work/helper"
 )
 
 const manifestWorkFinalizer = "ManifestWorkFinalizer"
@@ -32,7 +31,7 @@ type ManifestWorkFinalizeController struct {
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
 	appliedManifestWorkLister worklister.AppliedManifestWorkLister
 	hubHash                   string
-	rateLimiter               workqueue.RateLimiter
+	rateLimiter               workqueue.TypedRateLimiter[string]
 }
 
 func NewManifestWorkFinalizeController(
@@ -52,7 +51,7 @@ func NewManifestWorkFinalizeController(
 		appliedManifestWorkClient: appliedManifestWorkClient,
 		appliedManifestWorkLister: appliedManifestWorkInformer.Lister(),
 		hubHash:                   hubHash,
-		rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
+		rateLimiter:               workqueue.NewTypedItemExponentialFailureRateLimiter[string](5*time.Millisecond, 1000*time.Second),
 	}
 
 	return factory.New().

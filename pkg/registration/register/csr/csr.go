@@ -24,17 +24,15 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
-
 	"open-cluster-management.io/ocm/pkg/registration/hub/user"
 	"open-cluster-management.io/ocm/pkg/registration/register"
 	"open-cluster-management.io/ocm/pkg/registration/register/token"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 const (
@@ -221,7 +219,7 @@ func (c *CSRDriver) Process(
 		}
 
 		// do not set expiration second if it is 0
-		expirationSeconds := pointer.Int32(c.opt.GetExpirationSeconds())
+		expirationSeconds := new(c.opt.GetExpirationSeconds())
 		if *expirationSeconds == 0 {
 			expirationSeconds = nil
 		}

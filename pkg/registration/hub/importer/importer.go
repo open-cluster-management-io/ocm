@@ -20,7 +20,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
 
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterinformerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
@@ -28,15 +27,14 @@ import (
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	v1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
-	"open-cluster-management.io/sdk-go/pkg/patcher"
-
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
 	cloudproviders "open-cluster-management.io/ocm/pkg/registration/hub/importer/providers"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
+	"open-cluster-management.io/sdk-go/pkg/patcher"
 )
 
 const (
@@ -290,7 +288,7 @@ func ApplyKlusterlet(
 		return nil, false, err
 	}
 
-	modified := pointer.Bool(false)
+	modified := new(false)
 	existingCopy := existing.DeepCopy()
 	resourcemerge.EnsureObjectMeta(modified, &existingCopy.ObjectMeta, required.ObjectMeta)
 

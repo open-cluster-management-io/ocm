@@ -46,6 +46,7 @@ func (src *ManagedClusterAddOn) ConvertTo(dstRaw conversion.Hub) error {
 
 	// Restore installNamespace from annotation
 	// This field was removed in v1beta1, so we store it in annotation
+	//nolint:staticcheck // SA1019: v1alpha1 conversion still writes installNamespace.
 	if installNs, ok := src.Annotations[InstallNamespaceAnnotation]; ok {
 		v1alpha1Obj.Spec.InstallNamespace = installNs
 		// Remove the internal annotation from v1alpha1 object
@@ -96,6 +97,7 @@ func (dst *ManagedClusterAddOn) ConvertFrom(srcRaw conversion.Hub) error {
 
 	// Save installNamespace to annotation (removed in v1beta1)
 	// This field exists in v1alpha1 but not in v1beta1, so we preserve it in annotations
+	//nolint:staticcheck // SA1019: v1alpha1 conversion still reads installNamespace.
 	if src.Spec.InstallNamespace != "" {
 		if dst.Annotations == nil {
 			dst.Annotations = make(map[string]string)

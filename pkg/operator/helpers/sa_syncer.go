@@ -18,11 +18,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
-
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 
 	commonrecorder "open-cluster-management.io/ocm/pkg/common/recorder"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/events"
 )
 
 type TokenGetterFunc func() (token []byte, expiration []byte, additionalData map[string][]byte, err error)
@@ -68,7 +66,7 @@ func SATokenGetter(ctx context.Context, saName, saNamespace string, saClient kub
 		tr, err := saClient.CoreV1().ServiceAccounts(saNamespace).
 			CreateToken(ctx, saName, &authv1.TokenRequest{
 				Spec: authv1.TokenRequestSpec{
-					ExpirationSeconds: pointer.Int64(8640 * 3600),
+					ExpirationSeconds: new(int64(8640 * 3600)),
 				},
 			}, metav1.CreateOptions{})
 		if err != nil {

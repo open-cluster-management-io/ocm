@@ -12,14 +12,12 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
 
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
-	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
-
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/basic"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/store"
+	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
 // SubjectAccessReviewCheckFn is a function to checks if the executor has permission to operate
@@ -144,12 +142,12 @@ func (v *sarCacheValidator) Validate(ctx context.Context, executor *workapiv1.Ma
 func updateSARCheckResultToCache(executorCaches *store.ExecutorCaches, executorKey string,
 	dimension store.Dimension, result error) {
 	if result == nil {
-		executorCaches.Upsert(executorKey, dimension, pointer.Bool(true))
+		executorCaches.Upsert(executorKey, dimension, new(true))
 		return
 	}
 
 	var authError *basic.NotAllowedError
 	if errors.As(result, &authError) {
-		executorCaches.Upsert(executorKey, dimension, pointer.Bool(false))
+		executorCaches.Upsert(executorKey, dimension, new(false))
 	}
 }

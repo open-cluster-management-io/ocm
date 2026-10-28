@@ -11,7 +11,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/utils/ptr"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
@@ -106,7 +105,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				}
 
 				job.Status.Active = 1
-				job.Status.Ready = ptr.To(int32(1))
+				job.Status.Ready = new(int32(1))
 				job.Status.StartTime = &now
 
 				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
@@ -140,7 +139,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				}
 
 				job.Status.Active = 0
-				job.Status.Ready = ptr.To(int32(0))
+				job.Status.Ready = new(int32(0))
 				job.Status.Succeeded = 1
 				job.Status.StartTime = &now
 				job.Status.CompletionTime = &completionTime
@@ -317,7 +316,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				}
 
 				job.Status.Active = 1
-				job.Status.Ready = ptr.To(int32(1))
+				job.Status.Ready = new(int32(1))
 				job.Status.Conditions = []batchv1.JobCondition{}
 
 				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
@@ -403,7 +402,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				}
 
 				job.Status.Active = 1
-				job.Status.Ready = ptr.To(int32(1))
+				job.Status.Ready = new(int32(1))
 				job.Status.StartTime = &now
 
 				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
@@ -418,7 +417,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				}
 
 				job.Status.Active = 0
-				job.Status.Ready = ptr.To(int32(0))
+				job.Status.Ready = new(int32(0))
 				job.Status.Succeeded = 1
 				job.Status.StartTime = &now
 				job.Status.CompletionTime = &completionTime
@@ -531,7 +530,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				}
 
 				job.Status.Active = 1
-				job.Status.Ready = ptr.To(int32(1))
+				job.Status.Ready = new(int32(1))
 				job.Status.StartTime = &now
 
 				_, err = spokeKubeClient.BatchV1().Jobs(clusterName).UpdateStatus(context.Background(), job, metav1.UpdateOptions{})
@@ -546,7 +545,7 @@ var _ = ginkgo.Describe("ManifestWork Condition Rules", func() {
 				}
 
 				job.Status.Active = 0
-				job.Status.Ready = ptr.To(int32(0))
+				job.Status.Ready = new(int32(0))
 				job.Status.Succeeded = 1
 				job.Status.StartTime = &now
 				job.Status.CompletionTime = &completionTime

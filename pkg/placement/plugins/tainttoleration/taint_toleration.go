@@ -14,7 +14,6 @@ import (
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
-
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
 	"open-cluster-management.io/ocm/pkg/placement/plugins"
 )
@@ -202,8 +201,8 @@ func isTolerationTimeExpired(taint clusterapiv1.Taint, toleration clusterapiv1be
 	return false, nil, ""
 }
 
-func getDecisionClusterNames(handle plugins.Handle, placement *clusterapiv1beta1.Placement) sets.String {
-	existingDecisions := sets.String{}
+func getDecisionClusterNames(handle plugins.Handle, placement *clusterapiv1beta1.Placement) sets.Set[string] {
+	existingDecisions := sets.Set[string]{}
 
 	// query placementdecisions with label selector
 	requirement, err := labels.NewRequirement(placementLabel, selection.Equals, []string{placement.Name})
@@ -226,7 +225,7 @@ func getDecisionClusterNames(handle plugins.Handle, placement *clusterapiv1beta1
 	return existingDecisions
 }
 
-func getDecisionClusters(logger klog.Logger, handle plugins.Handle, placement *clusterapiv1beta1.Placement) (sets.String, []*clusterapiv1.ManagedCluster) {
+func getDecisionClusters(logger klog.Logger, handle plugins.Handle, placement *clusterapiv1beta1.Placement) (sets.Set[string], []*clusterapiv1.ManagedCluster) {
 	// get existing decision cluster name
 	decisionClusterNames := getDecisionClusterNames(handle, placement)
 

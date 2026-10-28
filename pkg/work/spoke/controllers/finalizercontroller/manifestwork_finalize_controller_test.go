@@ -15,9 +15,8 @@ import (
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
-	"open-cluster-management.io/sdk-go/pkg/patcher"
-
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	"open-cluster-management.io/sdk-go/pkg/patcher"
 )
 
 func TestSyncManifestWorkController(t *testing.T) {
@@ -201,7 +200,7 @@ func TestSyncManifestWorkController(t *testing.T) {
 				appliedManifestWorkClient: fakeClient.WorkV1().AppliedManifestWorks(),
 				appliedManifestWorkLister: informerFactory.Work().V1().AppliedManifestWorks().Lister(),
 				hubHash:                   hubHash,
-				rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(0, 1*time.Second),
+				rateLimiter:               workqueue.NewTypedItemExponentialFailureRateLimiter[string](0, 1*time.Second),
 			}
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, c.workName)
