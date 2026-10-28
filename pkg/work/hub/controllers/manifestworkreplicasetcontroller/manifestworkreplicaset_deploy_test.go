@@ -63,6 +63,7 @@ func TestDeployReconcileAsExpected(t *testing.T) {
 	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
 
 	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
 		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 		manifestWorkLister:  mwLister,
 		placeDecisionLister: placementDecisionLister,
@@ -127,6 +128,7 @@ func TestDeployReconcileAsPlacementDecisionEmpty(t *testing.T) {
 	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
 
 	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
 		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 		manifestWorkLister:  mwLister,
 		placeDecisionLister: placementDecisionLister,
@@ -202,6 +204,7 @@ func TestDeployReconcileApplyFailureReportsNotAsExpected(t *testing.T) {
 	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
 
 	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
 		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 		manifestWorkLister:  mwLister,
 		placeDecisionLister: placementDecisionLister,
@@ -272,6 +275,7 @@ func TestDeployReconcileMultiPlacementApplyFailuresAreAggregated(t *testing.T) {
 	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
 
 	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
 		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 		manifestWorkLister:  mwLister,
 		placeDecisionLister: placementDecisionLister,
@@ -331,6 +335,7 @@ func TestDeployReconcilePartialApplyFailureReportsNotAsExpected(t *testing.T) {
 	}
 
 	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
 		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 		manifestWorkLister:  mwLister,
 		placeDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
@@ -388,6 +393,7 @@ func TestDeployReconcileRolloutErrorNotOverwrittenByOtherPlacement(t *testing.T)
 	}
 
 	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
 		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 		manifestWorkLister:  mwLister,
 		placeDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
@@ -441,6 +447,7 @@ func TestDeployReconcileInvalidRolloutStrategyReportsNotAsExpected(t *testing.T)
 	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
 
 	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
 		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 		manifestWorkLister:  mwLister,
 		placeDecisionLister: placementDecisionLister,
@@ -487,6 +494,7 @@ func TestDeployReconcileSelectedClustersButEmptyDecision(t *testing.T) {
 	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
 
 	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
 		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 		manifestWorkLister:  mwLister,
 		placeDecisionLister: placementDecisionLister,
@@ -558,6 +566,7 @@ func TestDeployReconcileAsPlacementNotExist(t *testing.T) {
 	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
 
 	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
 		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 		manifestWorkLister:  mwLister,
 		placeDecisionLister: placementDecisionLister,
@@ -618,6 +627,7 @@ func TestDeployWithRolloutStrategyReconcileAsExpected(t *testing.T) {
 
 	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
 	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
 		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 		manifestWorkLister:  mwLister,
 		placeDecisionLister: placementDecisionLister,
@@ -781,6 +791,7 @@ func TestDeployWithMultiPlacementsReconcileAsExpected(t *testing.T) {
 
 	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
 	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
 		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 		manifestWorkLister:  mwLister,
 		placeDecisionLister: placementDecisionLister,
@@ -898,6 +909,7 @@ func TestDeployMWRSetSpecChangesReconcile(t *testing.T) {
 
 	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
 	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
 		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 		manifestWorkLister:  mwLister,
 		placeDecisionLister: placementDecisionLister,
@@ -1080,6 +1092,7 @@ func TestRequeueWithProgressDeadline(t *testing.T) {
 	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
 
 	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
 		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 		manifestWorkLister:  mwLister,
 		placeDecisionLister: placementDecisionLister,
@@ -1131,6 +1144,7 @@ func TestDeployReconcileDeletesOrphanedManifestWorks(t *testing.T) {
 	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
 
 	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
 		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 		manifestWorkLister:  mwLister,
 		placeDecisionLister: placementDecisionLister,
@@ -1218,6 +1232,7 @@ func TestDeployReconcileWithMultiplePlacementChanges(t *testing.T) {
 	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
 
 	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
 		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 		manifestWorkLister:  mwLister,
 		placeDecisionLister: placementDecisionLister,
@@ -1346,6 +1361,7 @@ func TestDeployRolloutProgressingWhenNotAllSucceeded(t *testing.T) {
 	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
 
 	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
 		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 		manifestWorkLister:  mwLister,
 		placeDecisionLister: placementDecisionLister,
@@ -1757,6 +1773,7 @@ func TestClusterRolloutStatusFunc(t *testing.T) {
 			placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
 
 			reconciler := deployReconciler{
+				workClient:          fWorkClient,
 				workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 				manifestWorkLister:  mwLister,
 				placeDecisionLister: placementDecisionLister,
@@ -2155,6 +2172,7 @@ func TestDeployReconcileLongOwnerNameUsesHashLabel(t *testing.T) {
 	}
 
 	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
 		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 		manifestWorkLister:  mwLister,
 		placeDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
@@ -2223,6 +2241,7 @@ func TestOldLabelOnlyManifestWorkMigratesOnSpecChange(t *testing.T) {
 	assert.Nil(t, clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision))
 
 	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
 		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 		manifestWorkLister:  mwLister,
 		placeDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
@@ -2264,5 +2283,216 @@ func TestOldLabelOnlyManifestWorkMigratesOnSpecChange(t *testing.T) {
 		assert.Equal(t, fmt.Sprintf("%s.%s", mwrsNS, mwrsName),
 			migrated.Labels[workapiv1alpha1.ManifestWorkReplicaSetControllerNameLabelKey],
 			"deprecated label should be preserved for short names")
+	}
+}
+
+// progressingWork sets the creation time of mw and makes it Applied and Progressing, so its
+// rollout status is Progressing.
+func progressingWork(mw *workapiv1.ManifestWork, created time.Time) *workapiv1.ManifestWork {
+	mw.CreationTimestamp = metav1.NewTime(created)
+	apimeta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
+		Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "Applied", ObservedGeneration: mw.Generation,
+	})
+	apimeta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
+		Type: workapiv1.WorkProgressing, Status: metav1.ConditionTrue, Reason: "Applying", ObservedGeneration: mw.Generation,
+	})
+	return mw
+}
+
+func TestDeployReconcileDeletesDuplicateManifestWorks(t *testing.T) {
+	// Two works of the replica set on cls1, as created by two syncs with a stale lister. Both
+	// are Progressing, so with the All strategy they used to fill the rollout of the 2-cluster
+	// placement and cls2 never got a work.
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	now := time.Now()
+	older := progressingWork(buildManifestWork(mwrSet, "mwrSet-test-older", "cls1", "place-test"), now.Add(-time.Minute))
+	newer := progressingWork(buildManifestWork(mwrSet, "mwrSet-test-newer", "cls1", "place-test"), now)
+
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet, older, newer)
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
+	for _, mw := range []*workapiv1.ManifestWork{older, newer} {
+		if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	placement, placementDecision := helpertest.CreateTestPlacement("place-test", "default", "cls1", "cls2")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placement, placementDecision)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Second)
+	if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision); err != nil {
+		t.Fatal(err)
+	}
+
+	pmwDeployController := deployReconciler{
+		workClient:          fWorkClient,
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
+		placementLister:     clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
+	}
+
+	if _, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet); err != nil {
+		t.Fatal(err)
+	}
+
+	works, err := listWorksByMWRS(context.TODO(), fWorkClient, "cls2", mwrSet.Namespace, mwrSet.Name, "place-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(works) != 1 {
+		t.Fatalf("expected cls2 to get its work, got %d works", len(works))
+	}
+	works, err = listWorksByMWRS(context.TODO(), fWorkClient, "cls1", mwrSet.Namespace, mwrSet.Name, "place-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, mw := range works {
+		names = append(names, mw.Name)
+	}
+	assert.Equal(t, []string{older.Name}, names, "only the oldest work is kept on cls1")
+}
+
+func TestDeployReconcileDoesNotCreateAWorkTheListerHasNotSeen(t *testing.T) {
+	// A previous sync created the work of cls1 for place-test; the lister has not seen it yet.
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	created := buildManifestWork(mwrSet, "mwrSet-test-abcde", "cls1", "place-test")
+
+	cases := []struct {
+		name   string
+		listed []*workapiv1.ManifestWork
+	}{
+		{
+			name: "a cluster joining the placement",
+		},
+		{
+			// The lister only has the work of the previous placement.
+			name:   "after the placementRef changed",
+			listed: []*workapiv1.ManifestWork{buildManifestWork(mwrSet, "mwrSet-test-fghij", "cls1", "place-old")},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			objects := []runtime.Object{mwrSet, created}
+			for _, mw := range c.listed {
+				objects = append(objects, mw)
+			}
+			fWorkClient := fakeworkclient.NewSimpleClientset(objects...)
+			workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
+			for _, mw := range c.listed {
+				if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw); err != nil {
+					t.Fatal(err)
+				}
+			}
+			mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+			placement, placementDecision := helpertest.CreateTestPlacement("place-test", "default", "cls1")
+			fClusterClient := fakeclusterclient.NewSimpleClientset(placement, placementDecision)
+			clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Second)
+			if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement); err != nil {
+				t.Fatal(err)
+			}
+			if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision); err != nil {
+				t.Fatal(err)
+			}
+
+			pmwDeployController := deployReconciler{
+				workClient:          fWorkClient,
+				workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+				manifestWorkLister:  mwLister,
+				placeDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
+				placementLister:     clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
+			}
+
+			if _, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet); err != nil {
+				t.Fatal(err)
+			}
+
+			works, err := listWorksByMWRS(context.TODO(), fWorkClient, "cls1", mwrSet.Namespace, mwrSet.Name, "place-test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(works) != 1 {
+				t.Fatalf("expected the one work of cls1, got %d works", len(works))
+			}
+		})
+	}
+}
+
+func TestGetManifestWorkInReplicaSetKeepsTheOldestWorkPerPlacementAndCluster(t *testing.T) {
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-a", "place-b")
+	now := time.Now()
+	work := func(name, cluster, placement string, created time.Time) *workapiv1.ManifestWork {
+		mw := buildManifestWork(mwrSet, name, cluster, placement)
+		mw.CreationTimestamp = metav1.NewTime(created)
+		return mw
+	}
+	deleting := func(mw *workapiv1.ManifestWork) *workapiv1.ManifestWork {
+		ts := metav1.NewTime(now)
+		mw.DeletionTimestamp = &ts
+		return mw
+	}
+
+	cases := []struct {
+		name       string
+		works      []*workapiv1.ManifestWork
+		duplicates []string
+	}{
+		{
+			name: "one work per placement and cluster",
+			works: []*workapiv1.ManifestWork{
+				work("a-cls1", "cls1", "place-a", now), work("b-cls1", "cls1", "place-b", now), work("a-cls2", "cls2", "place-a", now),
+			},
+		},
+		{
+			name: "the newer of two works is the duplicate",
+			works: []*workapiv1.ManifestWork{
+				work("newer", "cls1", "place-a", now), work("older", "cls1", "place-a", now.Add(-time.Minute)),
+			},
+			duplicates: []string{"newer"},
+		},
+		{
+			name: "same creation time, the first name is kept",
+			works: []*workapiv1.ManifestWork{
+				work("mwrSet-testbbbbb", "cls1", "place-a", now), work("mwrSet-testaaaaa", "cls1", "place-a", now),
+			},
+			duplicates: []string{"mwrSet-testbbbbb"},
+		},
+		{
+			name: "a work being deleted is not a duplicate",
+			works: []*workapiv1.ManifestWork{
+				work("current", "cls1", "place-a", now), deleting(work("leaving", "cls1", "place-a", now.Add(-time.Minute))),
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fakeworkclient.NewSimpleClientset(), 1*time.Second)
+			for _, mw := range c.works {
+				if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			result, all, err := getManifestWorkInReplicaSet(mwrSet, workInformerFactory.Work().V1().ManifestWorks().Lister())
+			if err != nil {
+				t.Fatal(err)
+			}
+			var duplicates []string
+			for _, mw := range result.duplicates {
+				duplicates = append(duplicates, mw.Name)
+			}
+			assert.Equal(t, c.duplicates, duplicates)
+			assert.Len(t, all, len(c.works), "every work is still returned, the duplicates included")
+			for _, mws := range result.workByPlacement {
+				for _, mw := range mws {
+					assert.NotContains(t, c.duplicates, mw.Name, "a duplicate is not counted in its placement")
+				}
+			}
+		})
 	}
 }
