@@ -89,10 +89,10 @@ func NewCertRotationController(
 
 func (c certRotationController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
 	logger := klog.FromContext(ctx).WithValues("key", key)
-	switch {
-	case key == "":
+	switch key {
+	case "":
 		return nil
-	case key == factory.DefaultQueueKey:
+	case factory.DefaultQueueKey:
 		// ensure every clustermanager's certificates
 		clustermanagers, err := c.clusterManagerLister.List(labels.Everything())
 		if err != nil {
