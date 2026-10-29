@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,17 +18,17 @@ import (
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
-var _ = ginkgo.Describe("Addon install with install strategy (v1alpha1)", ginkgo.Ordered, ginkgo.Label("addon-install"), func() {
+var _ = Describe("Addon install with install strategy (v1alpha1)", Ordered, Label("addon-install"), func() {
 	var addOnName string
 	var clusterNames []string
 	const globalSetNamespace = "open-cluster-management-global-set"
 
-	ginkgo.BeforeAll(func() {
+	BeforeAll(func() {
 		suffix := rand.String(6)
 		addOnName = fmt.Sprintf("addon-%s", suffix)
 		clusterNames = nil
 
-		ginkgo.By("create namespace " + globalSetNamespace)
+		By("create namespace " + globalSetNamespace)
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: globalSetNamespace,
@@ -36,10 +36,10 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1alpha1)", ginkgo
 		}
 		_, err := hub.KubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 		if err != nil && !errors.IsAlreadyExists(err) {
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		}
 
-		ginkgo.By("create Placement global in " + globalSetNamespace)
+		By("create Placement global in " + globalSetNamespace)
 		placement := &clusterv1beta1.Placement{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "global",
@@ -68,10 +68,10 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1alpha1)", ginkgo
 		_, err = hub.ClusterClient.ClusterV1beta1().Placements(globalSetNamespace).Create(
 			context.TODO(), placement, metav1.CreateOptions{})
 		if err != nil && !errors.IsAlreadyExists(err) {
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		}
 
-		ginkgo.By("create ManagedClusterSetBinding global in " + globalSetNamespace)
+		By("create ManagedClusterSetBinding global in " + globalSetNamespace)
 		binding := &clusterv1beta2.ManagedClusterSetBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "global",
@@ -84,10 +84,10 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1alpha1)", ginkgo
 		_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSetBindings(globalSetNamespace).Create(
 			context.TODO(), binding, metav1.CreateOptions{})
 		if err != nil && !errors.IsAlreadyExists(err) {
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		}
 
-		ginkgo.By(fmt.Sprintf("create ClusterManagementAddOn %s with install strategy", addOnName))
+		By(fmt.Sprintf("create ClusterManagementAddOn %s with install strategy", addOnName))
 		cma := &addonapiv1alpha1.ClusterManagementAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: addOnName,
@@ -111,34 +111,34 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1alpha1)", ginkgo
 		}
 		_, err = hub.AddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(
 			context.TODO(), cma, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
-	ginkgo.AfterAll(func() {
-		ginkgo.By(fmt.Sprintf("delete ClusterManagementAddOn %s", addOnName))
+	AfterAll(func() {
+		By(fmt.Sprintf("delete ClusterManagementAddOn %s", addOnName))
 		err := hub.AddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(
 			context.TODO(), addOnName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		}
 
 		for _, clusterName := range clusterNames {
-			ginkgo.By(fmt.Sprintf("delete ManagedCluster %s", clusterName))
+			By(fmt.Sprintf("delete ManagedCluster %s", clusterName))
 			err := hub.ClusterClient.ClusterV1().ManagedClusters().Delete(
 				context.TODO(), clusterName, metav1.DeleteOptions{})
 			if err != nil && !errors.IsNotFound(err) {
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 			}
 		}
 
-		ginkgo.By("delete namespace " + globalSetNamespace)
+		By("delete namespace " + globalSetNamespace)
 		err = hub.KubeClient.CoreV1().Namespaces().Delete(
 			context.TODO(), globalSetNamespace, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		}
 
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			_, err := hub.KubeClient.CoreV1().Namespaces().Get(
 				context.TODO(), globalSetNamespace, metav1.GetOptions{})
 			if errors.IsNotFound(err) {
@@ -148,14 +148,14 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1alpha1)", ginkgo
 				return err
 			}
 			return fmt.Errorf("namespace " + globalSetNamespace + " still exists")
-		}).Should(gomega.Succeed())
+		}).Should(Succeed())
 	})
 
-	ginkgo.It("Should create addon without addon annotations when managed cluster has no addon annotations", func() {
+	It("Should create addon without addon annotations when managed cluster has no addon annotations", func() {
 		clusterName := fmt.Sprintf("e2e-addon-install-%s", rand.String(6))
 		clusterNames = append(clusterNames, clusterName)
 
-		ginkgo.By(fmt.Sprintf("create ManagedCluster %s with non-addon annotations", clusterName))
+		By(fmt.Sprintf("create ManagedCluster %s with non-addon annotations", clusterName))
 		managedCluster := &clusterv1.ManagedCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: clusterName,
@@ -170,10 +170,10 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1alpha1)", ginkgo
 		}
 		_, err := hub.ClusterClient.ClusterV1().ManagedClusters().Create(
 			context.TODO(), managedCluster, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		ginkgo.By(fmt.Sprintf("check ManagedClusterAddOn %s is created in cluster namespace %s", addOnName, clusterName))
-		gomega.Eventually(func() error {
+		By(fmt.Sprintf("check ManagedClusterAddOn %s is created in cluster namespace %s", addOnName, clusterName))
+		Eventually(func() error {
 			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
@@ -184,10 +184,10 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1alpha1)", ginkgo
 				return fmt.Errorf("expected no annotations on ManagedClusterAddOn, got %v", addon.Annotations)
 			}
 			return nil
-		}).Should(gomega.Succeed())
+		}).Should(Succeed())
 	})
 
-	ginkgo.It("Should sync addon annotations from managed cluster to addon", func() {
+	It("Should sync addon annotations from managed cluster to addon", func() {
 		clusterName := fmt.Sprintf("e2e-addon-install-%s", rand.String(6))
 		clusterNames = append(clusterNames, clusterName)
 
@@ -196,7 +196,7 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1alpha1)", ginkgo
 			"addon.open-cluster-management.io/test-annotation":      "test-value",
 		}
 
-		ginkgo.By(fmt.Sprintf("create ManagedCluster %s with addon annotations", clusterName))
+		By(fmt.Sprintf("create ManagedCluster %s with addon annotations", clusterName))
 		managedCluster := &clusterv1.ManagedCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        clusterName,
@@ -208,10 +208,10 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1alpha1)", ginkgo
 		}
 		_, err := hub.ClusterClient.ClusterV1().ManagedClusters().Create(
 			context.TODO(), managedCluster, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		ginkgo.By(fmt.Sprintf("check ManagedClusterAddOn %s is created with synced annotations", addOnName))
-		gomega.Eventually(func() error {
+		By(fmt.Sprintf("check ManagedClusterAddOn %s is created with synced annotations", addOnName))
+		Eventually(func() error {
 			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
@@ -228,10 +228,10 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1alpha1)", ginkgo
 				}
 			}
 			return nil
-		}).Should(gomega.Succeed())
+		}).Should(Succeed())
 
-		ginkgo.By(fmt.Sprintf("update annotation on ManagedCluster %s", clusterName))
-		gomega.Eventually(func() error {
+		By(fmt.Sprintf("update annotation on ManagedCluster %s", clusterName))
+		Eventually(func() error {
 			cluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
 				context.TODO(), clusterName, metav1.GetOptions{})
 			if err != nil {
@@ -241,10 +241,10 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1alpha1)", ginkgo
 			_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Update(
 				context.TODO(), cluster, metav1.UpdateOptions{})
 			return err
-		}).Should(gomega.Succeed())
+		}).Should(Succeed())
 
-		ginkgo.By(fmt.Sprintf("check updated annotation is synced to ManagedClusterAddOn %s", addOnName))
-		gomega.Eventually(func() error {
+		By(fmt.Sprintf("check updated annotation is synced to ManagedClusterAddOn %s", addOnName))
+		Eventually(func() error {
 			addon, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(
 				context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
@@ -259,6 +259,6 @@ var _ = ginkgo.Describe("Addon install with install strategy (v1alpha1)", ginkgo
 				return fmt.Errorf("annotation addon.open-cluster-management.io/test-annotation: expected %q, got %q", "updated-value", actualValue)
 			}
 			return nil
-		}).Should(gomega.Succeed())
+		}).Should(Succeed())
 	})
 })

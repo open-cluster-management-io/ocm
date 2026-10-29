@@ -8,9 +8,9 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/dsl/decorators"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	certificates "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -38,7 +38,7 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("Rebootstrap", func() {
+var _ = Describe("Rebootstrap", func() {
 	var managedClusterName, bootstrapFile, hubKubeconfigSecret, addOnName, suffix string
 	var stopSpoke context.CancelFunc
 	var createBootstrapKubeconfig func(bootstrapFile, serverCertFile, securePort string, certAge time.Duration)
@@ -64,40 +64,40 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 		}
 
 		cfg, err := env.Start()
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		gomega.Expect(cfg).ToNot(gomega.BeNil())
+		Expect(err).ToNot(HaveOccurred())
+		Expect(cfg).ToNot(BeNil())
 
 		err = clusterv1.Install(scheme.Scheme)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		// patch addon for conversion webhook and connect to started webhook server
 		apiExtensionClient, err := apiextensionsclient.NewForConfig(cfg)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		err = util.AddConversionForAddonAPI(ctx, apiExtensionClient, testEnv, "managedclusteraddons.addon.open-cluster-management.io")
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		// prepare configs
 		newSecurePort := env.ControlPlane.APIServer.Port
-		gomega.Expect(len(newSecurePort)).ToNot(gomega.BeZero())
+		Expect(len(newSecurePort)).ToNot(BeZero())
 
 		anotherServerCertFile := fmt.Sprintf("%s/apiserver.crt", env.ControlPlane.APIServer.CertDir)
 
 		bootstrapKubeConfigFile := path.Join(util.TestDir, "recovery-test", "kubeconfig-hub-b")
 		err = newAuthn.CreateBootstrapKubeConfigWithCertAge(bootstrapKubeConfigFile, anotherServerCertFile, newSecurePort, 24*time.Hour)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		// prepare clients
 		kubeClient, err := kubernetes.NewForConfig(cfg)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		gomega.Expect(kubeClient).ToNot(gomega.BeNil())
+		Expect(err).ToNot(HaveOccurred())
+		Expect(kubeClient).ToNot(BeNil())
 
 		clusterClient, err := clusterclientset.NewForConfig(cfg)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		gomega.Expect(clusterClient).ToNot(gomega.BeNil())
+		Expect(err).ToNot(HaveOccurred())
+		Expect(clusterClient).ToNot(BeNil())
 
 		addOnClient, err := addonclientset.NewForConfig(cfg)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		gomega.Expect(clusterClient).ToNot(gomega.BeNil())
+		Expect(err).ToNot(HaveOccurred())
+		Expect(clusterClient).ToNot(BeNil())
 
 		// start hub controller
 		go func() {
@@ -105,7 +105,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 				KubeConfig:    cfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		}()
 
 		return bootstrapKubeConfigFile, kubeClient, clusterClient, addOnClient, env, newAuthn
@@ -115,23 +115,23 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 		hubKubeClient, spokeKubeClient kubernetes.Interface, hubClusterClient clusterclientset.Interface,
 		auth *util.TestAuthn, certAget time.Duration) {
 		// the spoke cluster and csr should be created after bootstrap
-		ginkgo.By("Check existence of ManagedCluster & CSR")
-		gomega.Eventually(func() bool {
+		By("Check existence of ManagedCluster & CSR")
+		Eventually(func() bool {
 			if _, err := util.GetManagedCluster(hubClusterClient, managedClusterName); err != nil {
 				return false
 			}
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			if _, err := util.FindUnapprovedSpokeCSR(hubKubeClient, managedClusterName); err != nil {
 				return err
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 		// the spoke cluster should has finalizer that is added by hub controller
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			spokeCluster, err := util.GetManagedCluster(hubClusterClient, managedClusterName)
 			if err != nil {
 				return false
@@ -142,18 +142,18 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 			}
 
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
-		ginkgo.By("Accept and approve the ManagedCluster")
+		By("Accept and approve the ManagedCluster")
 		// simulate hub cluster admin to accept the managedcluster and approve the csr
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			return util.AcceptManagedCluster(hubClusterClient, managedClusterName)
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 		err := auth.ApproveSpokeClusterCSR(hubKubeClient, managedClusterName, certAget)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		// the managed cluster should have accepted condition after it is accepted
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			spokeCluster, err := util.GetManagedCluster(hubClusterClient, managedClusterName)
 			if err != nil {
 				return err
@@ -162,19 +162,19 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 				return fmt.Errorf("cluster should be accepted")
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 		// the hub kubeconfig secret should be filled after the csr is approved
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			if _, err := util.GetFilledHubKubeConfigSecret(spokeKubeClient, testNamespace, hubKubeconfigSecret); err != nil {
 				return err
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-		ginkgo.By("ManagedCluster joins the hub")
+		By("ManagedCluster joins the hub")
 		// the spoke cluster should have joined condition finally
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			spokeCluster, err := util.GetManagedCluster(hubClusterClient, managedClusterName)
 			if err != nil {
 				return err
@@ -184,38 +184,38 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 				return fmt.Errorf("cluster should be joined")
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 		// ensure cluster namespace is in place
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			_, err := hubKubeClient.CoreV1().Namespaces().Get(context.TODO(), managedClusterName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	}
 
 	assertSuccessCSRApproval := func(managedClusterName, addOnName string, hubKubeClient kubernetes.Interface) {
-		ginkgo.By("Approve bootstrap csr")
+		By("Approve bootstrap csr")
 		var csr *certificates.CertificateSigningRequest
 		var err error
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			csr, err = util.FindUnapprovedAddOnCSR(hubKubeClient, managedClusterName, addOnName)
 			if err != nil {
 				return err
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 		now := time.Now()
 		err = authn.ApproveCSR(hubKubeClient, csr, now.UTC(), now.Add(300*time.Second).UTC())
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 	}
 
 	assertValidClientCertificate := func(registrationType addonv1beta1.RegistrationType, secretNamespace, secretName string, spokeKubeClient kubernetes.Interface) {
-		ginkgo.By("Check client certificate in secret")
-		gomega.Eventually(func() bool {
+		By("Check client certificate in secret")
+		Eventually(func() bool {
 			secret, err := spokeKubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 			if err != nil {
 				return false
@@ -234,12 +234,12 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 				return false
 			}
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 	}
 
 	assertAddonLabel := func(managedClusterName, addonName, status string, hubClusterClient clusterclientset.Interface) {
-		ginkgo.By("Check addon status label on managed cluster")
-		gomega.Eventually(func() bool {
+		By("Check addon status label on managed cluster")
+		Eventually(func() bool {
 			cluster, err := util.GetManagedCluster(hubClusterClient, managedClusterName)
 			if err != nil {
 				return false
@@ -249,14 +249,14 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 			}
 			key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addonName)
 			return cluster.Labels[key] == status
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 	}
 
 	assertSuccessAddOnBootstrap := func(
 		managedClusterName, addOnName string,
 		hubKubeClient, spokeKubeClient kubernetes.Interface,
 		hubClusterClient clusterclientset.Interface, hubAddOnClient addonclientset.Interface) {
-		ginkgo.By("Create ManagedClusterAddOn cr with required annotations")
+		By("Create ManagedClusterAddOn cr with required annotations")
 		// create addon namespace
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
@@ -264,7 +264,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 			},
 		}
 		_, err := hubKubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		// create addon
 		addOn := &addonv1beta1.ManagedClusterAddOn{
@@ -275,9 +275,9 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 			Spec: addonv1beta1.ManagedClusterAddOnSpec{},
 		}
 		_, err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			created, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -298,7 +298,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 			created.Status.Namespace = addOnName
 			_, err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.TODO(), created, metav1.UpdateOptions{})
 			return err
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 		assertSuccessCSRApproval(managedClusterName, addOnName, hubKubeClient)
 		assertValidClientCertificate(addonv1beta1.KubeClient, addOnName, getSecretName(addonv1beta1.KubeClient, addOnName, ""), spokeKubeClient)
@@ -307,7 +307,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 
 	startAgent := func(ctx context.Context, managedClusterName, hubKubeconfigDir string,
 		agentOptions *spoke.SpokeAgentOptions) (context.Context, context.CancelFunc, *spoke.SpokeAgentConfig) {
-		ginkgo.By("run registration agent")
+		By("run registration agent")
 		commOptions := commonoptions.NewAgentOptions()
 		commOptions.HubKubeconfigDir = hubKubeconfigDir
 		commOptions.SpokeClusterName = managedClusterName
@@ -319,7 +319,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 		return agentCtx, stopAgent, agentConfig
 	}
 
-	ginkgo.JustBeforeEach(func() {
+	JustBeforeEach(func() {
 		var spokeCtx, agentCtx context.Context
 		var agentConfig *spoke.SpokeAgentConfig
 		var stopAgent context.CancelFunc
@@ -327,7 +327,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 		// ensure there is no remaining bootstrap-hub-kubeconfig secret
 		err := kubeClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), "bootstrap-hub-kubeconfig", metav1.DeleteOptions{})
 		if err != nil {
-			gomega.Expect(apierrors.IsNotFound(err)).To(gomega.BeTrue())
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
 		}
 
 		// start agent
@@ -453,7 +453,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 		}()
 	})
 
-	ginkgo.AfterEach(func() {
+	AfterEach(func() {
 		if stopSpoke != nil {
 			stopSpoke()
 		}
@@ -463,75 +463,75 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 		}
 	})
 
-	ginkgo.Context("bootstrapping", func() {
-		ginkgo.BeforeEach(func() {
+	Context("bootstrapping", func() {
+		BeforeEach(func() {
 			createBootstrapKubeconfig = func(bootstrapFile, serverCertFile, securePort string, certAge time.Duration) {
-				ginkgo.By("Create a bootstrap kubeconfig with an invalid port")
+				By("Create a bootstrap kubeconfig with an invalid port")
 				err := authn.CreateBootstrapKubeConfigWithCertAge(bootstrapFile, serverCertFile, "700000", 10*time.Minute)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 
-		ginkgo.It("should join the hub once the bootstrap kubeconfig becomes valid", func() {
+		It("should join the hub once the bootstrap kubeconfig becomes valid", func() {
 			// the spoke cluster should not be created
-			gomega.Consistently(func() error {
+			Consistently(func() error {
 				if _, err := util.GetManagedCluster(clusterClient, managedClusterName); apierrors.IsNotFound(err) {
 					return nil
 				}
 				return fmt.Errorf("managed cluster should not be created")
-			}, 15, 3).Should(gomega.Succeed())
+			}, 15, 3).Should(Succeed())
 
-			ginkgo.By("Replace the bootstrap kubeconfig with a valid one")
+			By("Replace the bootstrap kubeconfig with a valid one")
 			err := authn.CreateBootstrapKubeConfigWithCertAge(bootstrapFile, serverCertFile, securePort, 10*time.Minute)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			assertSuccessClusterBootstrap(testNamespace, managedClusterName, hubKubeconfigSecret, kubeClient, kubeClient, clusterClient, authn, time.Hour*24)
 			assertSuccessAddOnBootstrap(managedClusterName, addOnName, kubeClient, kubeClient, clusterClient, addOnClient)
 		})
 	})
 
-	ginkgo.Context("bootstrapped", func() {
-		ginkgo.BeforeEach(func() {
+	Context("bootstrapped", func() {
+		BeforeEach(func() {
 			createBootstrapKubeconfig = func(bootstrapFile, serverCertFile, securePort string, certAge time.Duration) {
-				ginkgo.By("Create a bootstrap kubeconfig")
+				By("Create a bootstrap kubeconfig")
 				err := authn.CreateBootstrapKubeConfigWithCertAge(bootstrapFile, serverCertFile, securePort, 10*time.Minute)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 
-		ginkgo.It("should switch to the new hub successfully", decorators.Label("disaster recovery"), func() {
+		It("should switch to the new hub successfully", decorators.Label("disaster recovery"), func() {
 			assertSuccessClusterBootstrap(testNamespace, managedClusterName, hubKubeconfigSecret, kubeClient, kubeClient, clusterClient, authn, time.Hour*24)
 			assertSuccessAddOnBootstrap(managedClusterName, addOnName, kubeClient, kubeClient, clusterClient, addOnClient)
 
-			ginkgo.By("start a new hub")
+			By("start a new hub")
 			ctx, stopHub := context.WithCancel(context.Background())
 			hubBootstrapKubeConfigFile, hubKubeClient, hubClusterClient, hubAddOnClient, testHubEnv, testAuthn := startNewHub(ctx)
 
 			stopNewHub = func() {
-				ginkgo.By("Stop the new hub")
+				By("Stop the new hub")
 				stopHub()
 				err := testHubEnv.Stop()
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			}
 
-			ginkgo.By("Update the bootstrap kubeconfig to connect to the new hub ")
+			By("Update the bootstrap kubeconfig to connect to the new hub ")
 			input, err := os.ReadFile(hubBootstrapKubeConfigFile)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 			err = os.WriteFile(bootstrapFile, input, 0600)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			assertSuccessClusterBootstrap(testNamespace, managedClusterName, hubKubeconfigSecret, hubKubeClient, kubeClient, hubClusterClient, testAuthn, time.Hour*24)
 			assertSuccessAddOnBootstrap(managedClusterName, addOnName, hubKubeClient, kubeClient, hubClusterClient, hubAddOnClient)
 		})
 
-		ginkgo.It("should rebootstrap once the client certificate expires", func() {
+		It("should rebootstrap once the client certificate expires", func() {
 			assertSuccessClusterBootstrap(testNamespace, managedClusterName, hubKubeconfigSecret, kubeClient, kubeClient, clusterClient, authn, 10*time.Second)
 
-			ginkgo.By("stop the hub")
+			By("stop the hub")
 			stopHub()
 
-			ginkgo.By("wait until the client cert expires")
-			gomega.Eventually(func() bool {
+			By("wait until the client cert expires")
+			Eventually(func() bool {
 				secret, err := kubeClient.CoreV1().Secrets(testNamespace).Get(context.Background(), hubKubeconfigSecret, metav1.GetOptions{})
 				if err != nil {
 					return false
@@ -551,9 +551,9 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 					}
 				}
 				return false
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
-			ginkgo.By("start the hub again")
+			By("start the hub again")
 			startHub(hubOption)
 
 			assertSuccessClusterBootstrap(testNamespace, managedClusterName, hubKubeconfigSecret, kubeClient, kubeClient, clusterClient, authn, time.Hour*24)

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/openshift/api"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	corev1 "k8s.io/api/core/v1"
@@ -47,51 +47,51 @@ func init() {
 	utilruntime.Must(operatorv1.Install(genericScheme))
 }
 
-var _ = ginkgo.Describe("Cluster Auto Importer", func() {
+var _ = Describe("Cluster Auto Importer", func() {
 	var managedClusterName string
 	var dynamicClient dynamic.Interface
 	var operatorClient operatorclient.Interface
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		suffix := rand.String(5)
 		managedClusterName = fmt.Sprintf("managedcluster-%s", suffix)
 
-		ginkgo.By("Create bootstrap token")
+		By("Create bootstrap token")
 		clusterManagerConfig := chart.NewDefaultClusterManagerChartConfig()
 		clusterManagerConfig.CreateBootstrapSA = true
 		clusterManagerConfig.CreateNamespace = true
 		crdObjs, rawObjs, err := chart.RenderClusterManagerChart(context.Background(), clusterManagerConfig, "open-cluster-management")
 		manifests := append(crdObjs, rawObjs...)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 		recorder := commonrecorder.NewEventsRecorderWrapper(context.TODO(),
 			events.NewContextualLoggingEventRecorder("importer-test"))
 		for _, manifest := range manifests {
 			requiredObj, _, err := genericCodec.Decode(manifest, nil, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 			switch t := requiredObj.(type) {
 			case *corev1.Namespace:
 				_, _, err = resourceapply.ApplyNamespace(context.TODO(), kubeClient.CoreV1(), recorder, t)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			case *corev1.ServiceAccount:
 				_, _, err = resourceapply.ApplyServiceAccount(context.TODO(), kubeClient.CoreV1(), recorder, t)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			case *rbacv1.ClusterRole:
 				_, _, err = resourceapply.ApplyClusterRole(context.TODO(), kubeClient.RbacV1(), recorder, t)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			case *rbacv1.ClusterRoleBinding:
 				_, _, err = resourceapply.ApplyClusterRoleBinding(context.TODO(), kubeClient.RbacV1(), recorder, t)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			}
 		}
 
 		dynamicClient, err = dynamic.NewForConfig(spokeCfg)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		operatorClient, err = operatorclient.NewForConfig(spokeCfg)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 	})
 
-	ginkgo.Context("Cluster API importer", func() {
-		ginkgo.JustBeforeEach(func() {
+	Context("Cluster API importer", func() {
+		JustBeforeEach(func() {
 			cluster := &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: managedClusterName,
@@ -101,37 +101,37 @@ var _ = ginkgo.Describe("Cluster Auto Importer", func() {
 				},
 			}
 			_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.TODO(), cluster, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			// Wait for managed cluster namespace to be created
 			namespaceGVR := schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				_, err := dynamicClient.Resource(namespaceGVR).Get(context.TODO(), managedClusterName, metav1.GetOptions{})
 				return err
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 
-		ginkgo.JustAfterEach(func() {
+		JustAfterEach(func() {
 			err := clusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(), managedClusterName, metav1.DeleteOptions{})
 			if !errors.IsNotFound(err) {
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 
-		ginkgo.It("Should import CAPI cluster", func() {
-			ginkgo.By("create cluster import config secret")
+		It("Should import CAPI cluster", func() {
+			By("create cluster import config secret")
 			configSecret := util.GetClusterImportConfigSecret(managedClusterName)
 			_, err := kubeClient.CoreV1().Secrets(managedClusterName).Create(context.TODO(), configSecret, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
-			ginkgo.By("Create CAPI cluster")
+			By("Create CAPI cluster")
 			capiCluster := testingcommon.NewUnstructured(
 				"cluster.x-k8s.io/v1beta1", "Cluster", managedClusterName, managedClusterName)
 			_, err = dynamicClient.Resource(capi.ClusterAPIGVR).Namespace(managedClusterName).Create(
 				context.TODO(), capiCluster, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return err
@@ -141,9 +141,9 @@ var _ = ginkgo.Describe("Cluster Auto Importer", func() {
 					return fmt.Errorf("cluster should have error when imported")
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-			ginkgo.By("Create secret")
+			By("Create secret")
 			capiSecret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      managedClusterName + "-kubeconfig",
@@ -154,10 +154,10 @@ var _ = ginkgo.Describe("Cluster Auto Importer", func() {
 				},
 			}
 			_, err = kubeClient.CoreV1().Secrets(managedClusterName).Create(context.TODO(), capiSecret, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			// trigger the capi cluster resource to reconcile again
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				capiCluster, err := dynamicClient.Resource(capi.ClusterAPIGVR).Namespace(managedClusterName).Get(
 					context.TODO(), managedClusterName, metav1.GetOptions{})
 				if err != nil {
@@ -174,16 +174,16 @@ var _ = ginkgo.Describe("Cluster Auto Importer", func() {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return err
 				}
 				if !meta.IsStatusConditionTrue(
 					spokeCluster.Status.Conditions, importer.ManagedClusterConditionImported) {
-					ginkgo.By(fmt.Sprintf("condition is %v", spokeCluster.Status.Conditions))
+					By(fmt.Sprintf("condition is %v", spokeCluster.Status.Conditions))
 					return fmt.Errorf("cluster should have imported")
 				}
 				_, err = operatorClient.OperatorV1().Klusterlets().Get(
@@ -192,14 +192,14 @@ var _ = ginkgo.Describe("Cluster Auto Importer", func() {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			err = dynamicClient.Resource(capi.ClusterAPIGVR).Namespace(managedClusterName).Delete(
 				context.TODO(), managedClusterName, metav1.DeleteOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 			err = kubeClient.CoreV1().Secrets(managedClusterName).Delete(
 				context.TODO(), managedClusterName+"-kubeconfig", metav1.DeleteOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 })

@@ -5,8 +5,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/clientcmd"
@@ -20,14 +20,14 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("Joining Process", func() {
+var _ = Describe("Joining Process", func() {
 	var bootstrapKubeconfig string
 	var managedClusterName string
 	var hubKubeconfigSecret string
 	var hubKubeconfigDir string
 	var expectedProxyURL string
 
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		postfix := rand.String(5)
 		managedClusterName = fmt.Sprintf("joiningtest-managedcluster-%s", postfix)
 		hubKubeconfigSecret = fmt.Sprintf("joiningtest-hub-kubeconfig-secret-%s", postfix)
@@ -35,7 +35,7 @@ var _ = ginkgo.Describe("Joining Process", func() {
 	})
 
 	assertJoiningSucceed := func() {
-		ginkgo.It("managedcluster should join successfully", func() {
+		It("managedcluster should join successfully", func() {
 			var err error
 
 			// run registration agent
@@ -53,22 +53,22 @@ var _ = ginkgo.Describe("Joining Process", func() {
 			defer cancel()
 
 			// the spoke cluster and csr should be created after bootstrap
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := util.GetManagedCluster(clusterClient, managedClusterName); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				if _, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName); err != nil {
 					return err
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// the spoke cluster should has finalizer that is added by hub controller
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return err
@@ -79,17 +79,17 @@ var _ = ginkgo.Describe("Joining Process", func() {
 				}
 
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// simulate hub cluster admin to accept the managedcluster and approve the csr
 			err = util.AcceptManagedCluster(clusterClient, managedClusterName)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			err = authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			// the managed cluster should have accepted condition after it is accepted
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return err
@@ -98,10 +98,10 @@ var _ = ginkgo.Describe("Joining Process", func() {
 					return fmt.Errorf("cluster should be accepted")
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// the hub kubeconfig secret should be filled after the csr is approved
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				secret, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret)
 				if err != nil {
 					return err
@@ -116,10 +116,10 @@ var _ = ginkgo.Describe("Joining Process", func() {
 					return fmt.Errorf("expected proxy url %q, but got %q", expectedProxyURL, proxyURL)
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			// the spoke cluster should have joined condition finally
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 				if err != nil {
 					return err
@@ -128,28 +128,28 @@ var _ = ginkgo.Describe("Joining Process", func() {
 					return fmt.Errorf("cluster should be joined")
 				}
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 	}
 
-	ginkgo.Context("without proxy", func() {
-		ginkgo.BeforeEach(func() {
+	Context("without proxy", func() {
+		BeforeEach(func() {
 			bootstrapKubeconfig = bootstrapKubeConfigFile
 			expectedProxyURL = ""
 		})
 		assertJoiningSucceed()
 	})
 
-	ginkgo.Context("with http proxy", func() {
-		ginkgo.BeforeEach(func() {
+	Context("with http proxy", func() {
+		BeforeEach(func() {
 			bootstrapKubeconfig = bootstrapKubeConfigHTTPProxyFile
 			expectedProxyURL = httpProxyURL
 		})
 		assertJoiningSucceed()
 	})
 
-	ginkgo.Context("with https proxy", func() {
-		ginkgo.BeforeEach(func() {
+	Context("with https proxy", func() {
+		BeforeEach(func() {
 			bootstrapKubeconfig = bootstrapKubeConfigHTTPSProxyFile
 			expectedProxyURL = httpsProxyURL
 		})

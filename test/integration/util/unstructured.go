@@ -3,7 +3,7 @@ package util
 import (
 	"context"
 
-	"github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -317,7 +317,7 @@ func NewJob(namespace, name, sa string) (u *unstructured.Unstructured, gvr schem
 
 func toUnstructured(obj runtime.Object, gvk schema.GroupVersionKind, scheme *runtime.Scheme) *unstructured.Unstructured {
 	u := &unstructured.Unstructured{}
-	gomega.Expect(scheme.Convert(obj, u, nil)).To(gomega.Succeed())
+	Expect(scheme.Convert(obj, u, nil)).To(Succeed())
 	u.SetGroupVersionKind(gvk)
 	return u
 }

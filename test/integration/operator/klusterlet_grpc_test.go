@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,7 +15,7 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
 
-var _ = ginkgo.Describe("Klusterlet using grpc auth", func() {
+var _ = Describe("Klusterlet using grpc auth", func() {
 	var cancel context.CancelFunc
 	var klusterlet *operatorapiv1.Klusterlet
 	var klusterletNamespace string
@@ -23,8 +23,8 @@ var _ = ginkgo.Describe("Klusterlet using grpc auth", func() {
 	var workDeploymentName string
 	var deploymentName string
 
-	ginkgo.Context("Default mode", func() {
-		ginkgo.BeforeEach(func() {
+	Context("Default mode", func() {
+		BeforeEach(func() {
 			var ctx context.Context
 
 			klusterletNamespace = fmt.Sprintf("open-cluster-management-%s", rand.String(6))
@@ -34,7 +34,7 @@ var _ = ginkgo.Describe("Klusterlet using grpc auth", func() {
 				},
 			}
 			_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			klusterlet = &operatorapiv1.Klusterlet{
 				ObjectMeta: metav1.ObjectMeta{
@@ -66,23 +66,23 @@ var _ = ginkgo.Describe("Klusterlet using grpc auth", func() {
 			go startKlusterletOperator(ctx)
 		})
 
-		ginkgo.AfterEach(func() {
+		AfterEach(func() {
 			err := operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			err = kubeClient.CoreV1().Namespaces().Delete(context.Background(), klusterletNamespace, metav1.DeleteOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			if cancel != nil {
 				cancel()
 			}
 		})
 
-		ginkgo.It("should have expected resource created successfully", func() {
+		It("should have expected resource created successfully", func() {
 			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				deploy, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -93,9 +93,9 @@ var _ = ginkgo.Describe("Klusterlet using grpc auth", func() {
 				}
 
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				deploy, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -106,12 +106,12 @@ var _ = ginkgo.Describe("Klusterlet using grpc auth", func() {
 				}
 
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 	})
 
-	ginkgo.Context("Singleton mode", func() {
-		ginkgo.BeforeEach(func() {
+	Context("Singleton mode", func() {
+		BeforeEach(func() {
 			var ctx context.Context
 
 			klusterletNamespace = fmt.Sprintf("open-cluster-management-%s", rand.String(6))
@@ -121,7 +121,7 @@ var _ = ginkgo.Describe("Klusterlet using grpc auth", func() {
 				},
 			}
 			_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			klusterlet = &operatorapiv1.Klusterlet{
 				ObjectMeta: metav1.ObjectMeta{
@@ -154,23 +154,23 @@ var _ = ginkgo.Describe("Klusterlet using grpc auth", func() {
 			go startKlusterletOperator(ctx)
 		})
 
-		ginkgo.AfterEach(func() {
+		AfterEach(func() {
 			err := operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			err = kubeClient.CoreV1().Namespaces().Delete(context.Background(), klusterletNamespace, metav1.DeleteOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			if cancel != nil {
 				cancel()
 			}
 		})
 
-		ginkgo.It("should have expected resource created successfully", func() {
+		It("should have expected resource created successfully", func() {
 			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				deploy, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -181,7 +181,7 @@ var _ = ginkgo.Describe("Klusterlet using grpc auth", func() {
 				}
 
 				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 		})
 	})
 })

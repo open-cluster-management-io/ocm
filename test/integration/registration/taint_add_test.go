@@ -6,8 +6,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,18 +23,18 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("ManagedCluster Taints Update", func() {
+var _ = Describe("ManagedCluster Taints Update", func() {
 	var managedClusterName string
 	var hubKubeconfigSecret string
 	var hubKubeconfigDir string
 
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		managedClusterName = fmt.Sprintf("managedcluster-%s", rand.String(6))
 		hubKubeconfigSecret = fmt.Sprintf("%s-secret", managedClusterName)
 		hubKubeconfigDir = path.Join(util.TestDir, "leasetest", fmt.Sprintf("%s-config", managedClusterName))
 	})
 
-	ginkgo.It("ManagedCluster taint should be updated automatically", func() {
+	It("ManagedCluster taint should be updated automatically", func() {
 		ctx, stop := context.WithCancel(context.Background())
 		// run registration agent
 		go func() {
@@ -53,10 +53,10 @@ var _ = ginkgo.Describe("ManagedCluster Taints Update", func() {
 				KubeConfig:    spokeCfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("cluster-tainttest"),
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		}()
 
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return err
@@ -64,9 +64,9 @@ var _ = ginkgo.Describe("ManagedCluster Taints Update", func() {
 			spokeCluster.Spec.HubAcceptsClient = true
 			_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), spokeCluster, metav1.UpdateOptions{})
 			return err
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return err
@@ -78,17 +78,17 @@ var _ = ginkgo.Describe("ManagedCluster Taints Update", func() {
 				return fmt.Errorf("the %+v is not equal to UnreachableTaint", managedCluster.Spec.Taints[0])
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			if err := authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24); err != nil {
 				return err
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
 		// The managed cluster is available, so taint is expected to be empty
-		gomega.Eventually(func() bool {
+		Eventually(func() bool {
 			managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return false
@@ -97,11 +97,11 @@ var _ = ginkgo.Describe("ManagedCluster Taints Update", func() {
 				return false
 			}
 			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 		stop()
 
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return err
@@ -114,9 +114,9 @@ var _ = ginkgo.Describe("ManagedCluster Taints Update", func() {
 			meta.SetStatusCondition(&(managedCluster.Status.Conditions), condition)
 			_, err = clusterClient.ClusterV1().ManagedClusters().UpdateStatus(context.Background(), managedCluster, metav1.UpdateOptions{})
 			return err
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return err
@@ -128,9 +128,9 @@ var _ = ginkgo.Describe("ManagedCluster Taints Update", func() {
 				return fmt.Errorf("the %+v is not equal to UnavailableTaint", managedCluster.Spec.Taints[0])
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return err
@@ -138,9 +138,9 @@ var _ = ginkgo.Describe("ManagedCluster Taints Update", func() {
 			spokeCluster.Spec.LeaseDurationSeconds = 1
 			_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), spokeCluster, metav1.UpdateOptions{})
 			return err
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return err
@@ -152,6 +152,6 @@ var _ = ginkgo.Describe("ManagedCluster Taints Update", func() {
 				return fmt.Errorf("the %+v is not equal to UnreachableTaint", managedCluster.Spec.Taints[0])
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+		}, eventuallyTimeout, eventuallyInterval).Should(BeNil())
 	})
 })

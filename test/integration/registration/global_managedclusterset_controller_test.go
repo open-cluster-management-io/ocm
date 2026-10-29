@@ -5,18 +5,18 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	setcontroller "open-cluster-management.io/ocm/pkg/registration/hub/managedclusterset"
 )
 
-var _ = ginkgo.Describe("GlobalManagedClusterSet", func() {
-	ginkgo.It("should create GlobalManagedClusterSet successfully", func() {
-		ginkgo.By("check whether GlobalManagedClusterSet is created")
-		gomega.Eventually(func() error {
+var _ = Describe("GlobalManagedClusterSet", func() {
+	It("should create GlobalManagedClusterSet successfully", func() {
+		By("check whether GlobalManagedClusterSet is created")
+		Eventually(func() error {
 			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -27,13 +27,13 @@ var _ = ginkgo.Describe("GlobalManagedClusterSet", func() {
 			}
 			return fmt.Errorf("check not pass")
 
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	})
 
-	ginkgo.It("should reconcile GlobalManagedClusterSet successfully if it changed", func() {
-		ginkgo.By("check whether GlobalManagedClusterSet is reconciled after changed")
+	It("should reconcile GlobalManagedClusterSet successfully if it changed", func() {
+		By("check whether GlobalManagedClusterSet is reconciled after changed")
 		mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		updateMcs := mcs.DeepCopy()
 		updateMcs.Spec.ClusterSelector.LabelSelector = &metav1.LabelSelector{
@@ -42,9 +42,9 @@ var _ = ginkgo.Describe("GlobalManagedClusterSet", func() {
 			},
 		}
 		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Update(context.TODO(), updateMcs, metav1.UpdateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -53,13 +53,13 @@ var _ = ginkgo.Describe("GlobalManagedClusterSet", func() {
 				return nil
 			}
 			return fmt.Errorf("check not pass")
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	})
 
-	ginkgo.It("should not change users labels/annotations in GlobalManagedClusterSet", func() {
-		ginkgo.By("check whether GlobalManagedClusterSet labels/annotations reconciled after changed")
+	It("should not change users labels/annotations in GlobalManagedClusterSet", func() {
+		By("check whether GlobalManagedClusterSet labels/annotations reconciled after changed")
 		mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		updateMcs := mcs.DeepCopy()
 		updateMcs.Annotations = map[string]string{
@@ -74,9 +74,9 @@ var _ = ginkgo.Describe("GlobalManagedClusterSet", func() {
 			},
 		}
 		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Update(context.TODO(), updateMcs, metav1.UpdateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -87,16 +87,16 @@ var _ = ginkgo.Describe("GlobalManagedClusterSet", func() {
 				return nil
 			}
 			return fmt.Errorf("check not pass")
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	})
 
-	ginkgo.It("should recreate GlobalManagedClusterSet successfully after deleted", func() {
-		ginkgo.By("delete GlobalManagedClusterSet")
+	It("should recreate GlobalManagedClusterSet successfully after deleted", func() {
+		By("delete GlobalManagedClusterSet")
 		err := clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.DeleteOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "try to delete GlobalManagedClusterSet error")
+		Expect(err).NotTo(HaveOccurred(), "try to delete GlobalManagedClusterSet error")
 
-		ginkgo.By("check whether GlobalManagedClusterSet is recreated")
-		gomega.Eventually(func() error {
+		By("check whether GlobalManagedClusterSet is recreated")
+		Eventually(func() error {
 			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -107,7 +107,7 @@ var _ = ginkgo.Describe("GlobalManagedClusterSet", func() {
 			}
 			return fmt.Errorf("check not pass")
 
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	})
 
 })

@@ -6,8 +6,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -22,13 +22,13 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("Addon Alpha Lease Resync", func() {
+var _ = Describe("Addon Alpha Lease Resync", func() {
 	var managedClusterName, hubKubeconfigSecret, hubKubeconfigDir, addOnName string
 	var err error
 	var cancel context.CancelFunc
 
 	assertAddOn := func() {
-		ginkgo.By(fmt.Sprintf("Create addon %q on managed cluster namespace %q", addOnName, managedClusterName))
+		By(fmt.Sprintf("Create addon %q on managed cluster namespace %q", addOnName, managedClusterName))
 		// create addon on managed cluster namespace
 		addOn := &addonv1alpha1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
@@ -40,7 +40,7 @@ var _ = ginkgo.Describe("Addon Alpha Lease Resync", func() {
 			},
 		}
 		_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 		assertAddonLabel(managedClusterName, addOnName, "unreachable")
 
 		// create addon namespace
@@ -50,7 +50,7 @@ var _ = ginkgo.Describe("Addon Alpha Lease Resync", func() {
 			},
 		}
 		_, err = kubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 
 		// create addon lease on addon namespace
 		addOnLease := &coordv1.Lease{
@@ -63,10 +63,10 @@ var _ = ginkgo.Describe("Addon Alpha Lease Resync", func() {
 			},
 		}
 		_, err = kubeClient.CoordinationV1().Leases(addOnName).Create(context.TODO(), addOnLease, metav1.CreateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 	}
 
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		suffix := rand.String(5)
 		managedClusterName = fmt.Sprintf("managedcluster-%s", suffix)
 		hubKubeconfigSecret = fmt.Sprintf("hub-kubeconfig-secret-%s", suffix)
@@ -87,14 +87,14 @@ var _ = ginkgo.Describe("Addon Alpha Lease Resync", func() {
 		cancel = runAgent("addontest", agentOptions, commOptions, spokeCfg)
 	})
 
-	ginkgo.AfterEach(func() {
+	AfterEach(func() {
 		cancel()
 	})
 
-	ginkgo.It("should update addon status to unavailable after addon lease controller resync", func() {
+	It("should update addon status to unavailable after addon lease controller resync", func() {
 		assertSuccessClusterBootstrap(managedClusterName, hubKubeconfigSecret)
 		assertAddOn()
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -104,12 +104,12 @@ var _ = ginkgo.Describe("Addon Alpha Lease Resync", func() {
 				return fmt.Errorf("addon status should be available")
 			}
 			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 		assertAddonLabel(managedClusterName, addOnName, "available")
 
 		// do not update addon lease, wait resync once, the addon status should be unavailable
-		gomega.Eventually(func() error {
+		Eventually(func() error {
 			addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -120,7 +120,7 @@ var _ = ginkgo.Describe("Addon Alpha Lease Resync", func() {
 			}
 
 			return nil
-		}, 2*eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		}, 2*eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 		assertAddonLabel(managedClusterName, addOnName, "unhealthy")
 	})

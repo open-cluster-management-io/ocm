@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -26,17 +26,17 @@ const (
 	mwrSetLabel = "work.open-cluster-management.io/manifestworkreplicaset"
 )
 
-var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestworkreplicaset"), func() {
+var _ = Describe("Test ManifestWorkReplicaSet", Label("manifestworkreplicaset"), func() {
 	var err error
 	var nameSuffix string
 
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		nameSuffix = rand.String(6)
 	})
 
-	ginkgo.Context("Creating a ManifestWorkReplicaSet and check created resources", func() {
-		ginkgo.It("Should create ManifestWorkReplicaSet successfully", func() {
-			ginkgo.By("create manifestworkreplicaset")
+	Context("Creating a ManifestWorkReplicaSet and check created resources", func() {
+		It("Should create ManifestWorkReplicaSet successfully", func() {
+			By("create manifestworkreplicaset")
 			ns1 := fmt.Sprintf("ns1-%s", nameSuffix)
 			work := newManifestWork("", "",
 				util.NewConfigmap(ns1, "cm1", nil, nil),
@@ -65,7 +65,7 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 			}
 			manifestWorkReplicaSet, err = hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(metav1.NamespaceDefault).Create(
 				context.TODO(), manifestWorkReplicaSet, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			csb := &clusterapiv1beta2.ManagedClusterSetBinding{
 				ObjectMeta: metav1.ObjectMeta{
@@ -78,7 +78,7 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 			}
 			_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSetBindings(metav1.NamespaceDefault).Create(
 				context.Background(), csb, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			placement := &clusterv1beta1.Placement{
 				ObjectMeta: metav1.ObjectMeta{
@@ -91,10 +91,10 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 			}
 
 			placement, err = hub.ClusterClient.ClusterV1beta1().Placements(placement.Namespace).Create(context.TODO(), placement, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
-			ginkgo.By("check if resources are applied for manifests")
-			gomega.Eventually(func() error {
+			By("check if resources are applied for manifests")
+			Eventually(func() error {
 				_, err := spoke.KubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm1", metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -107,10 +107,10 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 
 				_, err = spoke.KubeClient.CoreV1().Namespaces().Get(context.Background(), ns1, metav1.GetOptions{})
 				return err
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
-			ginkgo.By("check if manifestworkreplicaset status")
-			gomega.Eventually(func() error {
+			By("check if manifestworkreplicaset status")
+			Eventually(func() error {
 				mwrs, err := hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(metav1.NamespaceDefault).Get(
 					context.TODO(), manifestWorkReplicaSet.Name, metav1.GetOptions{})
 				if err != nil {
@@ -132,20 +132,20 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 				}
 
 				return nil
-			}).ShouldNot(gomega.HaveOccurred())
+			}).ShouldNot(HaveOccurred())
 
 			// TODO we should also update manifestwork replicaset and test
 
 			err = hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(metav1.NamespaceDefault).Delete(
 				context.TODO(), manifestWorkReplicaSet.Name, metav1.DeleteOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			err = hub.ClusterClient.ClusterV1beta1().Placements(placement.Namespace).Delete(context.TODO(), placement.Name, metav1.DeleteOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
-	ginkgo.Context("Creating a ManifestWorkReplicaSet across multiple clusters", func() {
+	Context("Creating a ManifestWorkReplicaSet across multiple clusters", func() {
 		var suffix string
 		var clusterNamePrefix string
 		var namespace string
@@ -154,7 +154,7 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 		var mwReplicaSetName string
 		var numOfClusters = 3
 
-		ginkgo.JustBeforeEach(func() {
+		JustBeforeEach(func() {
 			suffix = rand.String(6)
 			clusterNamePrefix = fmt.Sprintf("cls-%s", suffix)
 			clusterSetName = fmt.Sprintf("clusterset-%s", suffix)
@@ -162,23 +162,23 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 			placementName = fmt.Sprintf("placement-%s", suffix)
 			mwReplicaSetName = fmt.Sprintf("mwrset-%s", suffix)
 
-			ginkgo.By(fmt.Sprintf("Create namespace %s", namespace))
+			By(fmt.Sprintf("Create namespace %s", namespace))
 			ns := &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: namespace,
 				},
 			}
 			_, err := hub.KubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			ginkgo.By(fmt.Sprintf("Create clusterset %s and clustersetbinding %s", clusterSetName, clusterSetName))
+			By(fmt.Sprintf("Create clusterset %s and clustersetbinding %s", clusterSetName, clusterSetName))
 			clusterset := &clusterapiv1beta2.ManagedClusterSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: clusterSetName,
 				},
 			}
 			_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			csb := &clusterapiv1beta2.ManagedClusterSetBinding{
 				ObjectMeta: metav1.ObjectMeta{
@@ -190,9 +190,9 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 				},
 			}
 			_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			ginkgo.By(fmt.Sprintf("Create %d clusters", numOfClusters))
+			By(fmt.Sprintf("Create %d clusters", numOfClusters))
 			for i := 0; i < numOfClusters; i++ {
 				clsName := fmt.Sprintf("%s-%d", clusterNamePrefix, i)
 				cluster := &clusterapiv1.ManagedCluster{
@@ -204,7 +204,7 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 					},
 				}
 				_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				ns := &corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
@@ -212,10 +212,10 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 					},
 				}
 				_, err = hub.KubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 			}
 
-			ginkgo.By(fmt.Sprintf("Create placement %s", placementName))
+			By(fmt.Sprintf("Create placement %s", placementName))
 			placement := &clusterv1beta1.Placement{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: namespace,
@@ -232,35 +232,35 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 			}
 
 			_, err = hub.ClusterClient.ClusterV1beta1().Placements(namespace).Create(context.TODO(), placement, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		})
 
-		ginkgo.JustAfterEach(func() {
+		JustAfterEach(func() {
 			// delete namespace
 			err := hub.KubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// delete clusters created
 			clusterList, err := hub.ClusterClient.ClusterV1().ManagedClusters().List(context.Background(), metav1.ListOptions{
 				LabelSelector: fmt.Sprintf("%s=%s", clusterapiv1beta2.ClusterSetLabel, clusterSetName),
 			})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			for _, cluster := range clusterList.Items {
 				err = hub.ClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), cluster.Name, metav1.DeleteOptions{})
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 			}
 
 			// delete created clusterset
 			err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.Background(), clusterSetName, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// delete placement
 			err = hub.ClusterClient.ClusterV1beta1().Placements(namespace).Delete(context.TODO(), placementName, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		})
 
-		ginkgo.It("Create ManifestWorkReplicaSet and check the created manifestWorks", func() {
-			ginkgo.By(fmt.Sprintf("Create manifestWorkReplicaSet %s", mwReplicaSetName))
+		It("Create ManifestWorkReplicaSet and check the created manifestWorks", func() {
+			By(fmt.Sprintf("Create manifestWorkReplicaSet %s", mwReplicaSetName))
 			manifest := workapiv1.Manifest{}
 			manifest.Object = util.NewConfigmap("default", "cm", map[string]string{"a": "b"}, nil)
 			placementRef := workapiv1alpha1.LocalPlacementReference{
@@ -291,10 +291,10 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 				},
 			}
 			_, err = hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Create(context.TODO(), mwReplicaSet, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			ginkgo.By("Check manifestWork replicaSet status is updated")
-			gomega.Eventually(func() error {
+			By("Check manifestWork replicaSet status is updated")
+			Eventually(func() error {
 				mwrSet, err := hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Get(context.TODO(), mwReplicaSetName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -308,10 +308,10 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 					return fmt.Errorf("total number of clusters is not correct, expect %d, got %d", numOfClusters, mwrSet.Status.Summary.Total)
 				}
 				return nil
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 
-			ginkgo.By("Check manifestWorks are created")
-			gomega.Eventually(func() error {
+			By("Check manifestWorks are created")
+			Eventually(func() error {
 				manifestWorkList, err := hub.WorkClient.WorkV1().ManifestWorks("").List(context.TODO(), metav1.ListOptions{
 					LabelSelector: fmt.Sprintf("%s=%s.%s", mwrSetLabel, namespace, mwReplicaSetName),
 				})
@@ -323,14 +323,14 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 					return fmt.Errorf("manifestworks are not created, expect %d, got %d", numOfClusters, len(manifestWorkList.Items))
 				}
 				return nil
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 
-			ginkgo.By("Delete manifestWorkReplicaSet")
+			By("Delete manifestWorkReplicaSet")
 			err = hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Delete(context.TODO(), mwReplicaSetName, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			ginkgo.By("Check manifestworks are deleted")
-			gomega.Eventually(func() error {
+			By("Check manifestworks are deleted")
+			Eventually(func() error {
 				manifestWorkList, err := hub.WorkClient.WorkV1().ManifestWorks("").List(context.TODO(), metav1.ListOptions{
 					LabelSelector: fmt.Sprintf("%s=%s.%s", mwrSetLabel, namespace, mwReplicaSetName),
 				})
@@ -342,11 +342,11 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 					return fmt.Errorf("manifestworks are not deleted, expect %d, got %d", 0, len(manifestWorkList.Items))
 				}
 				return nil
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 		})
 
-		ginkgo.It("delete ManifestWorkReplicaSet Foreground", func() {
-			ginkgo.By(fmt.Sprintf("Create manifestWorkReplicaSet %s with Foreground", mwReplicaSetName))
+		It("delete ManifestWorkReplicaSet Foreground", func() {
+			By(fmt.Sprintf("Create manifestWorkReplicaSet %s with Foreground", mwReplicaSetName))
 			manifest := workapiv1.Manifest{}
 			manifest.Object = util.NewConfigmap("default", "cm", map[string]string{"a": "b"}, nil)
 			placementRef := workapiv1alpha1.LocalPlacementReference{
@@ -378,10 +378,10 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 				},
 			}
 			_, err = hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Create(context.TODO(), mwReplicaSet, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			ginkgo.By("Check manifestWork replicaSet status is updated")
-			gomega.Eventually(func() error {
+			By("Check manifestWork replicaSet status is updated")
+			Eventually(func() error {
 				mwrSet, err := hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Get(context.TODO(), mwReplicaSetName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -395,11 +395,11 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 					return fmt.Errorf("total number of clusters is not correct, expect %d, got %d", numOfClusters, mwrSet.Status.Summary.Total)
 				}
 				return nil
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 
-			ginkgo.By("Check manifestWorks are created")
+			By("Check manifestWorks are created")
 			manifestWorkList := &workapiv1.ManifestWorkList{}
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				manifestWorkList, err = hub.WorkClient.WorkV1().ManifestWorks("").List(context.TODO(), metav1.ListOptions{
 					LabelSelector: fmt.Sprintf("%s=%s.%s", mwrSetLabel, namespace, mwReplicaSetName),
 				})
@@ -411,25 +411,25 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 					return fmt.Errorf("manifestworks are not created, expect %d, got %d", numOfClusters, len(manifestWorkList.Items))
 				}
 				return nil
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 
-			ginkgo.By("Update manifestWorks with a finalizer to stop deleting")
+			By("Update manifestWorks with a finalizer to stop deleting")
 			leftWork := manifestWorkList.Items[0].DeepCopy()
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				leftWork.Finalizers = append(leftWork.Finalizers, "test")
 				_, err = hub.WorkClient.WorkV1().ManifestWorks(leftWork.Namespace).Update(context.TODO(), leftWork, metav1.UpdateOptions{})
 				if err != nil {
 					return fmt.Errorf("failed to update work %v, %v", leftWork.Name, err)
 				}
 				return nil
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 
-			ginkgo.By("Delete manifestWorkReplicaSet")
+			By("Delete manifestWorkReplicaSet")
 			err = hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Delete(context.TODO(), mwReplicaSetName, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			ginkgo.By("Check manifestworks are deleted")
-			gomega.Eventually(func() error {
+			By("Check manifestworks are deleted")
+			Eventually(func() error {
 				manifestWorkList, err := hub.WorkClient.WorkV1().ManifestWorks("").List(context.TODO(), metav1.ListOptions{
 					LabelSelector: fmt.Sprintf("%s=%s.%s", mwrSetLabel, namespace, mwReplicaSetName),
 				})
@@ -445,10 +445,10 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 					return fmt.Errorf("expect the leftWork %s is deleting", manifestWorkList.Items[0].Name)
 				}
 				return nil
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 
-			ginkgo.By("Check manifestWorkReplicaSet is deleting")
-			gomega.Eventually(func() error {
+			By("Check manifestWorkReplicaSet is deleting")
+			Eventually(func() error {
 				workset, err := hub.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).
 					Get(context.TODO(), mwReplicaSetName, metav1.GetOptions{})
 				if err != nil {
@@ -461,22 +461,22 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 					return fmt.Errorf("expect the workset %s has finalizer", workset.Name)
 				}
 				return nil
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 
-			ginkgo.By("Remove finalizer from the manifestwork")
+			By("Remove finalizer from the manifestwork")
 			copyLeftWork, err := hub.WorkClient.WorkV1().ManifestWorks(leftWork.Namespace).
 				Get(context.TODO(), leftWork.Name, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				copyLeftWork.Finalizers = []string{}
 				_, err = hub.WorkClient.WorkV1().ManifestWorks(copyLeftWork.Namespace).
 					Update(context.TODO(), copyLeftWork, metav1.UpdateOptions{})
 				return err
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 
-			ginkgo.By("The manifestworks and ManifestWorkReplicaSet should be deleted")
-			gomega.Eventually(func() error {
+			By("The manifestworks and ManifestWorkReplicaSet should be deleted")
+			Eventually(func() error {
 				manifestWorkList, err = hub.WorkClient.WorkV1().ManifestWorks("").List(context.TODO(), metav1.ListOptions{
 					LabelSelector: fmt.Sprintf("%s=%s.%s", mwrSetLabel, namespace, mwReplicaSetName),
 				})
@@ -494,7 +494,7 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", ginkgo.Label("manifestwor
 					return nil
 				}
 				return fmt.Errorf("ManifestWorkReplicaSets should be deleted")
-			}).Should(gomega.Succeed())
+			}).Should(Succeed())
 		})
 	})
 })

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,14 +20,14 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("TaintToleration", func() {
+var _ = Describe("TaintToleration", func() {
 	var cancel context.CancelFunc
 	var namespace string
 	var placementName string
 	var clusterSet1Name string
 	var suffix string
 
-	ginkgo.BeforeEach(func() {
+	BeforeEach(func() {
 		suffix = rand.String(5)
 		namespace = fmt.Sprintf("ns-%s", suffix)
 		placementName = fmt.Sprintf("placement-%s", suffix)
@@ -40,31 +40,31 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 			},
 		}
 		_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		// start controller manager
 		var ctx context.Context
 		ctx, cancel = context.WithCancel(context.Background())
 		go func() {
-			defer ginkgo.GinkgoRecover()
+			defer GinkgoRecover()
 			err := controllers.RunControllerManager(ctx, &controllercmd.ControllerContext{
 				KubeConfig:    restConfig,
 				EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		}()
 	})
 
-	ginkgo.AfterEach(func() {
+	AfterEach(func() {
 		if cancel != nil {
 			cancel()
 		}
 		err := kubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
-	ginkgo.Context("TaintToleration", func() {
-		ginkgo.It("Should schedule successfully when taint/toleration matches", func() {
+	Context("TaintToleration", func() {
+		It("Should schedule successfully when taint/toleration matches", func() {
 			// Cluster settings
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			clusterNames := assertCreatingClusters(clusterSet1Name, 3)
@@ -98,7 +98,7 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[0], clusterNames[1]})
 		})
 
-		ginkgo.It("Should schedule when taint/toleration effect matches", func() {
+		It("Should schedule when taint/toleration effect matches", func() {
 			// Cluster settings
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			clusterNames := assertCreatingClusters(clusterSet1Name, 4)
@@ -150,7 +150,7 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[2], clusterNames[3]})
 		})
 
-		ginkgo.It("Should reschedule when expire TolerationSeconds", func() {
+		It("Should reschedule when expire TolerationSeconds", func() {
 			addedTime := metav1.Now()
 			addedTime_60 := addedTime.Add(-60 * time.Second)
 			tolerationSeconds_10 := int64(10)
