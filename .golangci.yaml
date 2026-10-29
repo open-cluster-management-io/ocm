@@ -30,13 +30,17 @@ linters:
       - std-error-handling
       - common-false-positives
       - legacy
-    paths:
-      - ".*_test\\.go"
     rules:
       - linters:
           - staticcheck
         path: _test\.go$|^test/
         source: \. "github\.com/onsi/(gomega|ginkgo)(/v[0-9])?"
+      # Remove this once the API module ships NewClientset and 
+      # tests move to the field-managed tracker.
+      - linters:
+          - staticcheck
+        path: _test\.go$|^test/
+        text: NewSimpleClientset is deprecated
   settings:
     errcheck:
       verbose: true
