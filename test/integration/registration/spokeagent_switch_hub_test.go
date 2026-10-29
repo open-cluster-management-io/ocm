@@ -154,7 +154,7 @@ func startNewHub(ctx context.Context, hubName string) *mockHub {
 	apiserver := &envtest.APIServer{}
 	newAuthn := util.NewTestAuthn(path.Join(util.CertDir, fmt.Sprintf("%s-another-ca.crt", hubName)),
 		path.Join(util.CertDir, fmt.Sprintf("%s-another-ca.key", hubName)))
-	apiserver.SecureServing.Authn = newAuthn
+	apiserver.Authn = newAuthn
 
 	env := &envtest.Environment{
 		ControlPlane: envtest.ControlPlane{
@@ -172,7 +172,7 @@ func startNewHub(ctx context.Context, hubName string) *mockHub {
 	Expect(err).NotTo(HaveOccurred())
 
 	// prepare configs
-	newSecurePort := env.ControlPlane.APIServer.SecureServing.Port
+	newSecurePort := env.ControlPlane.APIServer.Port
 	Expect(len(newSecurePort)).ToNot(BeZero())
 
 	anotherServerCertFile := fmt.Sprintf("%s/apiserver.crt", env.ControlPlane.APIServer.CertDir)

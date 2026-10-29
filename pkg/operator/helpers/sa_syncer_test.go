@@ -96,7 +96,7 @@ func TestSyncKubeConfigSecret_tlsServerNameDrift(t *testing.T) {
 		Clusters: map[string]*clientcmdapi.Cluster{
 			"cluster": {
 				Server:                   tkc.Host,
-				CertificateAuthorityData: tkc.TLSClientConfig.CAData,
+				CertificateAuthorityData: tkc.CAData,
 			},
 		},
 		Contexts: map[string]*clientcmdapi.Context{

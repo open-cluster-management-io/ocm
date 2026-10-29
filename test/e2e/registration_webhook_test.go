@@ -150,7 +150,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				updatedTaint := findTaint(managedCluster.Spec.Taints, "a", "b", clusterv1.TaintEffectNoSelectIfNew)
 				gomega.Expect(updatedTaint).ShouldNot(gomega.BeNil())
 				gomega.Expect(taint.TimeAdded.Equal(&updatedTaint.TimeAdded)).To(gomega.BeFalse(),
-					"timeAdded of taint should be updated (before=%s, after=%s)", taint.TimeAdded.Time.String(), updatedTaint.TimeAdded.Time.String())
+					"timeAdded of taint should be updated (before=%s, after=%s)", taint.TimeAdded.String(), updatedTaint.TimeAdded.String())
 			})
 
 			ginkgo.It("Should respond bad request when creating a managed cluster with invalid external server URLs", func() {

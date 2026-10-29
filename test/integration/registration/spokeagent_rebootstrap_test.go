@@ -52,7 +52,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 		*envtest.Environment, *util.TestAuthn) {
 		apiserver := &envtest.APIServer{}
 		newAuthn := util.NewTestAuthn(path.Join(util.CertDir, "another-ca.crt"), path.Join(util.CertDir, "another-ca.key"))
-		apiserver.SecureServing.Authn = newAuthn
+		apiserver.Authn = newAuthn
 
 		env := &envtest.Environment{
 			ControlPlane: envtest.ControlPlane{
@@ -77,7 +77,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		// prepare configs
-		newSecurePort := env.ControlPlane.APIServer.SecureServing.Port
+		newSecurePort := env.ControlPlane.APIServer.Port
 		gomega.Expect(len(newSecurePort)).ToNot(gomega.BeZero())
 
 		anotherServerCertFile := fmt.Sprintf("%s/apiserver.crt", env.ControlPlane.APIServer.CertDir)

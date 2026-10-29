@@ -105,7 +105,7 @@ var _ = ginkgo.Describe("Template deploy Beta", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		// The fixture YAML has its own metadata.name; force our unique, per-test name
 		// since AddOnTemplate is cluster-scoped and must not collide with the alpha test.
-		addonTemplate.ObjectMeta.Name = addonTemplateName
+		addonTemplate.Name = addonTemplateName
 
 		_, err = hubAddonClient.AddonV1beta1().AddOnTemplates().Create(context.Background(), addonTemplate, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())

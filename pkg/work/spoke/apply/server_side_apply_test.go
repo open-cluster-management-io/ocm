@@ -74,7 +74,7 @@ func TestServerSideApply(t *testing.T) {
 			// see issue: https://github.com/kubernetes/kubernetes/issues/103816
 			reactor := &reactor{}
 			reactors := []clienttesting.Reactor{reactor}
-			dynamicClient.Fake.ReactionChain = append(reactors, dynamicClient.Fake.ReactionChain...)
+			dynamicClient.ReactionChain = append(reactors, dynamicClient.ReactionChain...)
 
 			applier := NewServerSideApply(dynamicClient)
 
@@ -1083,7 +1083,7 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 			// see issue: https://github.com/kubernetes/kubernetes/issues/103816
 			reactor := &reactor{}
 			reactors := []clienttesting.Reactor{reactor}
-			dynamicClient.Fake.ReactionChain = append(reactors, dynamicClient.Fake.ReactionChain...)
+			dynamicClient.ReactionChain = append(reactors, dynamicClient.ReactionChain...)
 
 			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			option := &workapiv1.ManifestConfigOption{
@@ -1209,7 +1209,7 @@ func TestServerSideApplyWithIgnoreFieldErrors(t *testing.T) {
 
 			reactor := &reactor{}
 			reactors := []clienttesting.Reactor{reactor}
-			dynamicClient.Fake.ReactionChain = append(reactors, dynamicClient.Fake.ReactionChain...)
+			dynamicClient.ReactionChain = append(reactors, dynamicClient.ReactionChain...)
 
 			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			option := &workapiv1.ManifestConfigOption{

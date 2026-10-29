@@ -143,7 +143,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	authn = util.DefaultTestAuthn
 	apiserver := &envtest.APIServer{}
-	apiserver.SecureServing.Authn = authn
+	apiserver.Authn = authn
 
 	testEnv = &envtest.Environment{
 		ControlPlane: envtest.ControlPlane{
@@ -169,7 +169,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	// prepare configs
-	securePort = testEnv.ControlPlane.APIServer.SecureServing.Port
+	securePort = testEnv.ControlPlane.APIServer.Port
 	gomega.Expect(len(securePort)).ToNot(gomega.BeZero())
 
 	serverCertFile = fmt.Sprintf("%s/apiserver.crt", testEnv.ControlPlane.APIServer.CertDir)

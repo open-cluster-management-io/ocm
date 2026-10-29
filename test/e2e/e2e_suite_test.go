@@ -133,8 +133,8 @@ var _ = BeforeSuite(func() {
 		Get(context.TODO(), helpers.BootstrapHubKubeConfig, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
 	// The secret will used via copy and create another secret in other ns, so we need to clean the resourceVersion and namespace
-	bootstrapHubKubeConfigSecret.ObjectMeta.ResourceVersion = ""
-	bootstrapHubKubeConfigSecret.ObjectMeta.Namespace = ""
+	bootstrapHubKubeConfigSecret.ResourceVersion = ""
+	bootstrapHubKubeConfigSecret.Namespace = ""
 
 	By("Calculate Hub Hash")
 	kubeconfigData, err := clientcmd.Load(bootstrapHubKubeConfigSecret.Data["kubeconfig"])

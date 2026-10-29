@@ -105,9 +105,10 @@ var _ = ginkgo.Describe("Unmanaged ApplieManifestWork", func() {
 			gomega.Expect(sourceDriver).Should(gomega.Or(gomega.Equal("grpc"), gomega.Equal("kube")))
 
 			grpcCtx, grpcCancel = context.WithCancel(context.Background())
-			if sourceDriver == "grpc" {
+			switch sourceDriver {
+			case "grpc":
 				newSourceConfigFile, _ = startGRPCServer(grpcCtx, newHubTempDir, newCfg)
-			} else if sourceDriver == "kube" {
+			case "kube":
 				newSourceConfigFile = path.Join(newHubTempDir, "kubeconfig")
 				err = util.CreateKubeconfigFile(newCfg, newSourceConfigFile)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
