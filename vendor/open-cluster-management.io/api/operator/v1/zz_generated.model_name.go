@@ -17,6 +17,16 @@ func (in AddOnRegistrationDriver) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in AgentBindConfiguration) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.operator.v1.AgentBindConfiguration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in AgentConfiguration) OpenAPIModelName() string {
+	return "io.open-cluster-management.api.operator.v1.AgentConfiguration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in AwsIrsa) OpenAPIModelName() string {
 	return "io.open-cluster-management.api.operator.v1.AwsIrsa"
 }

@@ -1547,6 +1547,17 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 
 				// Check addon manager enabled mode
 				clusterManager.Spec.RegistrationConfiguration = nil
+				// Earlier cases enable ManifestWorkReplicaSet explicitly. Keep only NilExecutorValidating
+				// so ManifestWorkReplicaSet falls back to its default.
+				clusterManager.Spec.WorkConfiguration = &operatorapiv1.WorkConfiguration{
+					WorkDriver: operatorapiv1.WorkDriverTypeKube,
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{
+							Feature: string(feature.NilExecutorValidating),
+							Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+						},
+					},
+				}
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
@@ -1575,7 +1586,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", ginkgo.Ordered, func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(workDeployment.Spec.Template.Spec.Containers[0].Args).Should(
 				gomega.ContainElement("--feature-gates=NilExecutorValidating=true"))
-			gomega.Expect(workDeployment.Spec.Template.Spec.Containers[0].Args).Should(
+			// ManifestWorkReplicaSet is enabled by default, so enabling it adds no flag.
+			gomega.Expect(workDeployment.Spec.Template.Spec.Containers[0].Args).ShouldNot(
 				gomega.ContainElement("--feature-gates=ManifestWorkReplicaSet=true"))
 
 			workHubControllerDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(),
