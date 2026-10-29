@@ -71,8 +71,8 @@ func TestAgentConfigWithNilInputs(t *testing.T) {
 }
 
 func TestRunSpokeAgentSignature(t *testing.T) {
-	// Test that RunSpokeAgent has the correct signature and can be called
-	// This is a compile-time assertion that validates the method signature
+	// Compile-time assertion: (*AgentConfig).RunSpokeAgent must keep this signature.
+	//nolint:staticcheck // QF1011: the explicit type is the assertion.
 	var _ func(*AgentConfig, context.Context, *controllercmd.ControllerContext) error = (*AgentConfig).RunSpokeAgent
 
 	// Test that the config struct is properly set up for RunSpokeAgent

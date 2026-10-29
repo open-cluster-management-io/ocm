@@ -32,7 +32,7 @@ var chartScheme = runtime.NewScheme()
 func init() {
 	_ = scheme.AddToScheme(chartScheme)
 	_ = apiextensionsv1.AddToScheme(chartScheme)
-	_ = operatorv1.AddToScheme(chartScheme)
+	_ = operatorv1.Install(chartScheme)
 
 	decoder = serializer.NewCodecFactory(chartScheme).UniversalDeserializer()
 }

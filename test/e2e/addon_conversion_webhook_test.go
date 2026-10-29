@@ -538,6 +538,7 @@ var _ = ginkgo.Describe("Create v1alpha1 ClusterManagementAddOn", ginkgo.Label("
 			if err != nil {
 				return err
 			}
+			//nolint:staticcheck // SA1019: v1alpha1 conversion still reads supportedConfigs.
 			if len(addon.Spec.SupportedConfigs) != 2 {
 				return fmt.Errorf("expected 2 supported config but got %v", len(addon.Spec.SupportedConfigs))
 			}
@@ -698,9 +699,11 @@ var _ = ginkgo.Describe("Create v1beta1 ClusterManagementAddOn", ginkgo.Label("a
 				return err
 			}
 			// Verify spec.defaultConfigs → spec.supportedConfigs conversion
+			//nolint:staticcheck // SA1019: v1alpha1 conversion still reads supportedConfigs.
 			if len(v1alpha1Addon.Spec.SupportedConfigs) != 1 {
 				return fmt.Errorf("expected 1 supported config, got %d", len(v1alpha1Addon.Spec.SupportedConfigs))
 			}
+			//nolint:staticcheck // SA1019: v1alpha1 conversion still reads supportedConfigs.
 			if v1alpha1Addon.Spec.SupportedConfigs[0].DefaultConfig.Name != "beta-config" {
 				return fmt.Errorf("expected default config, got %s", v1alpha1Addon.Spec.SupportedConfigs[0].DefaultConfig.Name)
 			}
@@ -724,7 +727,9 @@ var _ = ginkgo.Describe("Create v1beta1 ClusterManagementAddOn", ginkgo.Label("a
 				return err
 			}
 			// Only append if not already present
+			//nolint:staticcheck // SA1019: v1alpha1 conversion still reads supportedConfigs.
 			if len(v1alpha1Addon.Spec.SupportedConfigs) < 2 {
+				//nolint:staticcheck // SA1019: v1alpha1 conversion still reads supportedConfigs.
 				v1alpha1Addon.Spec.SupportedConfigs = append(v1alpha1Addon.Spec.SupportedConfigs,
 					addonv1alpha1.ConfigMeta{
 						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{

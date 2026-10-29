@@ -361,6 +361,7 @@ var _ = ginkgo.Describe("Addon Alpha Registration", func() {
 					}
 					addOn.Status.Registrations = []addonv1alpha1.RegistrationConfig{
 						{
+							//nolint:staticcheck // SA1019: v1alpha1 registration still uses signerName.
 							SignerName: addOn.Status.Registrations[0].SignerName,
 							Subject: addonv1alpha1.Subject{
 								User: fmt.Sprintf("test-%d", currentIndex),

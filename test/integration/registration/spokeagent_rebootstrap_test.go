@@ -3,7 +3,6 @@ package registration_test
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
@@ -384,7 +383,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 		// update the bootstrap kubeconfig secret once the bootstrap kubeconfig file changes
 		syncBootstrapKubeconfig := func() error {
 			bootstrapKubeconfigDir := path.Dir(bootstrapFile)
-			files, err := ioutil.ReadDir(bootstrapKubeconfigDir)
+			files, err := os.ReadDir(bootstrapKubeconfigDir)
 			if err != nil {
 				return err
 			}
@@ -396,7 +395,7 @@ var _ = ginkgo.Describe("Rebootstrap", func() {
 				}
 
 				key := file.Name()
-				value, err := ioutil.ReadFile(path.Join(bootstrapKubeconfigDir, key))
+				value, err := os.ReadFile(path.Join(bootstrapKubeconfigDir, key))
 				if err != nil {
 					return err
 				}
