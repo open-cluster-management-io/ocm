@@ -3,6 +3,7 @@ ENSURE_ENVTEST_SCRIPT := https://raw.githubusercontent.com/open-cluster-manageme
 .PHONY: envtest-setup
 envtest-setup:
 	$(eval export KUBEBUILDER_ASSETS=$(shell curl -fsSL $(ENSURE_ENVTEST_SCRIPT) | bash))
+	@: $${KUBEBUILDER_ASSETS:?failed to fetch kubebuilder assets}
 	@echo "KUBEBUILDER_ASSETS=$(KUBEBUILDER_ASSETS)"
 
 clean-integration-test:
