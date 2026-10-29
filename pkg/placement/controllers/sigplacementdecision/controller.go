@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	cpv1alpha2 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha2"
@@ -159,7 +160,10 @@ func buildSIGPlacementDecision(ocmPD *v1beta1.PlacementDecision) *cpv1alpha2.Pla
 			Namespace: ocmPD.Namespace,
 			Labels:    labels,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(ocmPD, v1beta1.SchemeGroupVersion.WithKind("PlacementDecision")),
+				*metav1.NewControllerRef(ocmPD, schema.GroupVersion{
+					Group:   v1beta1.GroupVersion.Group,
+					Version: v1beta1.GroupVersion.Version,
+				}.WithKind("PlacementDecision")),
 			},
 		},
 		Decisions:     decisions,

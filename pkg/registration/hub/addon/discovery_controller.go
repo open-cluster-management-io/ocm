@@ -65,8 +65,8 @@ func NewAddOnFeatureDiscoveryController(
 }
 
 func (c *addOnFeatureDiscoveryController) sync(ctx context.Context, syncCtx factory.SyncContext, queueKey string) error {
-	switch {
-	case queueKey == factory.DefaultQueueKey:
+	switch queueKey {
+	case factory.DefaultQueueKey:
 		// no need to resync
 		return nil
 	default:

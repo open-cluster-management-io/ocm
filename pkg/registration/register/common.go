@@ -25,7 +25,6 @@ import (
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	addonv1beta1informers "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
-	hubclusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
@@ -174,7 +173,7 @@ func GenerateBootstrapStatusUpdater() StatusUpdateFunc {
 }
 
 // GenerateStatusUpdater generates status update func after the bootstrap
-func GenerateStatusUpdater(hubClusterClient hubclusterclientset.Interface,
+func GenerateStatusUpdater(hubClusterClient clusterv1client.Interface,
 	hubClusterLister clusterv1listers.ManagedClusterLister, clusterName string) StatusUpdateFunc {
 	return func(ctx context.Context, cond metav1.Condition) error {
 		cluster, err := hubClusterLister.Get(clusterName)

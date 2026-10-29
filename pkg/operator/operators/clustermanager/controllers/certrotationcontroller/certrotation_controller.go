@@ -6,7 +6,6 @@ import (
 	"slices"
 	"time"
 
-	errorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,10 +88,10 @@ func NewCertRotationController(
 
 func (c certRotationController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
 	logger := klog.FromContext(ctx).WithValues("key", key)
-	switch {
-	case key == "":
+	switch key {
+	case "":
 		return nil
-	case key == factory.DefaultQueueKey:
+	case factory.DefaultQueueKey:
 		// ensure every clustermanager's certificates
 		clustermanagers, err := c.clusterManagerLister.List(labels.Everything())
 		if err != nil {
@@ -342,5 +341,5 @@ func (c certRotationController) syncOne(ctx context.Context, clustermanager *ope
 		}
 	}
 
-	return errorhelpers.NewMultiLineAggregate(errs)
+	return operatorhelpers.NewMultiLineAggregate(errs)
 }

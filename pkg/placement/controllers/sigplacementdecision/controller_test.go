@@ -6,6 +6,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clienttesting "k8s.io/client-go/testing"
 	cpv1alpha2 "sigs.k8s.io/cluster-inventory-api/apis/v1alpha2"
 	cpfake "sigs.k8s.io/cluster-inventory-api/client/clientset/versioned/fake"
@@ -58,7 +59,10 @@ func newSIGPlacementDecisionWithOwnerRefs(namespace, name string, labels map[str
 }
 
 func ownerRefFor(ocmPD *v1beta1.PlacementDecision) metav1.OwnerReference {
-	return *metav1.NewControllerRef(ocmPD, v1beta1.SchemeGroupVersion.WithKind("PlacementDecision"))
+	return *metav1.NewControllerRef(ocmPD, schema.GroupVersion{
+		Group:   v1beta1.GroupVersion.Group,
+		Version: v1beta1.GroupVersion.Version,
+	}.WithKind("PlacementDecision"))
 }
 
 func TestSIGPlacementDecisionControllerSync(t *testing.T) {

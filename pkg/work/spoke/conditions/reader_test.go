@@ -8,7 +8,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/utils/ptr"
 
 	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -344,7 +343,7 @@ func TestConditionReader(t *testing.T) {
 				Reason:  workapiv1.ConditionRuleExpressionError,
 				Message: "CEL evaluation budget exceeded",
 			},
-			budget: ptr.To(int64(1)),
+			budget: new(int64(1)),
 		},
 	}
 

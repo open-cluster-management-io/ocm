@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	applyappsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
-	"k8s.io/utils/pointer"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
@@ -580,28 +579,28 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 						Name: "ReadyReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(1),
+							Integer: new(int64(1)),
 						},
 					},
 					{
 						Name: "Replicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(1),
+							Integer: new(int64(1)),
 						},
 					},
 					{
 						Name: "AvailableReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(1),
+							Integer: new(int64(1)),
 						},
 					},
 					{
 						Name: "AvailableCondition",
 						Value: workapiv1.FieldValue{
 							Type:   workapiv1.String,
-							String: pointer.String("True"),
+							String: new("True"),
 						},
 					},
 				}
@@ -874,7 +873,7 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 	ginkgo.Context("ManifestWork server side apply", func() {
 		ginkgo.It("should ignore fields with certain field", func() {
 			deployment := newDeployment("busybox-ssa")
-			deployment.Spec.Replicas = pointer.Int32(2)
+			deployment.Spec.Replicas = new(int32(2))
 			objects := []runtime.Object{deployment}
 			work := newManifestWork(universalClusterName, workName, objects...)
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
@@ -922,7 +921,7 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				if err != nil {
 					return err
 				}
-				deployment.Spec.Replicas = pointer.Int32(3)
+				deployment.Spec.Replicas = new(int32(3))
 				objects := []runtime.Object{deployment}
 				newWork := newManifestWork(universalClusterName, workName, objects...)
 				actualWork.Spec.Workload = newWork.Spec.Workload
@@ -957,7 +956,7 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				if err != nil {
 					return err
 				}
-				deployment.Spec.Replicas = pointer.Int32(4)
+				deployment.Spec.Replicas = new(int32(4))
 				objects := []runtime.Object{deployment}
 				newWork := newManifestWork(universalClusterName, workName, objects...)
 				actualWork.Spec.Workload = newWork.Spec.Workload

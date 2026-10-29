@@ -3,90 +3,28 @@
 version: "2"
 
 run:
-  # default concurrency is an available CPU number
   concurrency: 10
-  # timeout for analysis, e.g. 30s, 5m, default is 1m
   timeout: 5m
-  # The mode used to evaluate relative paths.
-  # It's used by exclusions, Go plugins, and some linters.
-  relative-path-mode: cfg
-  # # Include test files or not.
-  # tests: false
 
 formatters:
   enable:
     - gci
     - gofmt
-    # - gofumpt
     - goimports
-    # - golines
-    # - swaggo
   settings:
-    gofmt:
-      # simplify code: gofmt with `-s` option, true by default
-      simplify: true
     goimports:
-      # put imports beginning with prefix after 3rd-party packages;
-      # it's a comma-separated list of prefixes
       local-prefixes:
         - open-cluster-management.io/ocm/
     gci:
-      # Section configuration to compare against.
-      # Section names are case-insensitive and may contain parameters in ().
-      # The default order of sections is `standard > default > custom > blank > dot`,
-      # If `custom-order` is `true`, it follows the order of `sections` option.
-      # Default: ["standard", "default"]
       sections:
-        - standard # Standard section: captures all standard packages.
-        - default # Default section: contains all imports that could not be matched to another section type.
-        - prefix(open-cluster-management.io) # Custom section: groups all imports with the specified Prefix.
-        # - prefix(open-cluster-management.io/ocm)
-        # - blank # Blank section: contains all blank imports. This section is not present unless explicitly enabled.
-        # - dot # Dot section: contains all dot imports. This section is not present unless explicitly enabled.
-        # - alias # Alias section: contains all alias imports. This section is not present unless explicitly enabled.
-        - localmodule # Local module section: contains all local packages. This section is not present unless explicitly enabled.
-      # Enable custom order of sections.
-      # If `true`, make the section order the same as the order of `sections`.
-      # Default: false
-      custom-order: true
+        - standard
+        - default
+        - prefix(open-cluster-management.io)
+        - localmodule
 
 linters:
-  # Explicitly disable all default linters
-  default: standard # standard | all | none | fast
-  # Enable specific linters
-  # enable:
-  #   - unused
-  #   - errcheck
-  #   - goconst
-  #   - gocritic
-  #   - gosec
-  #   - staticcheck
-  #   - govet
-  #   - ineffassign
-  #   - lll
-  #   - misspell
-  #   - unconvert
-  #   - revive
-  # disable:
-  #   - gocyclo
-  #   - bodyclose
-  #   - depguard
-  #   - dogsled
-  #   - dupl
-  #   - funlen
-  #   - gochecknoglobals
-  #   - gochecknoinits
-  #   - gocognit
-  #   - godox
-  #   - nakedret
-  #   - prealloc
-  #   - whitespace
   exclusions:
-    # Mode of the generated files analysis.
-    generated: strict # strict | lax | disable
-    # Log a warning if an exclusion rule is unused.
     warn-unused: true
-    # Predefined exclusion rules
     presets:
       - comments
       - std-error-handling
@@ -94,146 +32,45 @@ linters:
       - legacy
     paths:
       - ".*_test\\.go"
-    # # Excluding configuration per-path, per-linter, per-text and per-source.
-    # rules:
-    #   # Exclude some linters from running on tests files.
-    #   - path: ".*_test\\.go"
-    #     linters:
-    #       - gocyclo
-    #       - errcheck
-    #       - dupl
-    #       - gosec
-    #       - staticcheck
-    #       - revive
-    #       - lll
+    rules:
+      - linters:
+          - staticcheck
+        path: _test\.go$|^test/
+        source: \. "github\.com/onsi/(gomega|ginkgo)(/v[0-9])?"
   settings:
     errcheck:
-      # report about not checking of errors in type assetions: `a := b.(MyStruct)`;
-      # default is false: such cases aren't reported by default.
-      check-type-assertions: false
-      # report about assignment of errors to blank identifier: `num, _ := strconv.Atoi(numStr)`;
-      # default is false: such cases aren't reported by default.
-      check-blank: false
-      # Display function signature instead of selector.
       verbose: true
-    # govet:
-    #   settings:
-    #     shadow:
-    #       # Whether to be strict about shadowing; can be noisy.
-    #       strict: true
     revive:
-      # Sets the default failure confidence.
-      # This means that linting errors with less than 0.8 confidence will be ignored.
-      # Default: 0.8
       confidence: 0.1
     misspell:
-      # Correct spellings using locale preferences for US or UK.
-      # Default is to use a neutral variety of English.
-      # Setting locale to US will correct the British spelling of 'colour' to 'color'.
       locale: US
       ignore-rules:
         - cancelled
         - cancelling
-      # Mode of the analysis:
-      # - default: checks all the file content.
-      # - restricted: checks only comments.
-      mode: default
     lll:
-      # max line length, lines longer will be reported. Default is 120.
-      # '\t' is counted as 1 character by default, and can be changed with the tab-width option
       line-length: 160
-      # tab width in spaces. Default to 1.
-      tab-width: 1
-    unused:
-      # Treat IncDec statement (e.g. `i++` or `i--`) as both read and write operation instead of just write.
-      # Default: false
-      post-statements-are-reads: true
-      # Mark all function parameters as used.
-      # default: true
-      parameters-are-used: true
-      # Mark all local variables as used.
-      # default: true
-      local-variables-are-used: false
-      # Mark all identifiers inside generated files as used.
-      # Default: true
-      generated-is-used: true
     gocritic:
+      # Additions to the stable checks, which are already enabled.
       enabled-checks:
         - appendCombine
-        - argOrder
-        # - assignOp
-        - badCond
         - boolExprSimplify
-        # - builtinShadow
-        - captLocal
-        - caseOrder
-        - codegenComment
-        # - commentedOutCode
         - commentedOutImport
-        - defaultCaseOrder
-        - deprecatedComment
         - docStub
-        - dupArg
-        - dupBranchBody
-        - dupCase
-        - dupSubExpr
-        - elseif
         - emptyFallthrough
         - equalFold
-        - flagDeref
-        - flagName
         - hexLiteral
         - indexAlloc
         - initClause
         - methodExprCall
         - nilValReturn
-        # - octalLiteral
-        - offBy1
         - rangeExprCopy
-        - regexpMust
-        - sloppyLen
         - stringXbytes
-        - switchTrue
         - typeAssertChain
-        - typeSwitchVar
         - typeUnparen
-        - underef
-        - unlambda
         - unnecessaryBlock
-        - unslice
-        - valSwap
         - weakCond
-  
-        # Unused
-        # - yodaStyleExpr
-        # - appendAssign
-        # - commentFormatting
-        # - emptyStringTest
-        # - exitAfterDefer
-        # - ifElseChain
-        # - hugeParam
-        # - importShadow
-        # - nestingReduce
-        # - paramTypeCombine
-        # - ptrToRefParam
-        # - rangeValCopy
-        # - singleCaseSwitch
-        # - sloppyReassign
-        # - unlabelStmt
-        # - unnamedResult
-        # - wrapperFunc
-    staticcheck:
-      checks:
-        # Omit embedded fields from selector expression.
-        # https://staticcheck.dev/docs/checks/#QF1008
-        - "-QF1008" # Disable
 
 issues:
-  # We want to make sure we get a full report every time. Setting these
-  # to zero disables the limit.
+  # Report every finding. Zero disables the limit.
   max-issues-per-linter: 0
-  # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
   max-same-issues: 0
-  # # Fix found issues (if it's supported by the linter).
-  # # Default: false
-  # fix: true

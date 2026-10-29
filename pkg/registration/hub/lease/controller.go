@@ -13,7 +13,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	coordlisters "k8s.io/client-go/listers/coordination/v1"
 	kevents "k8s.io/client-go/tools/events"
-	"k8s.io/utils/pointer"
 
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
@@ -102,7 +101,7 @@ func (c *leaseController) sync(ctx context.Context, syncCtx factory.SyncContext,
 				Labels:    map[string]string{clusterv1.ClusterNameLabelKey: cluster.Name},
 			},
 			Spec: coordv1.LeaseSpec{
-				HolderIdentity: pointer.String(leaseName),
+				HolderIdentity: new(leaseName),
 				RenewTime:      &metav1.MicroTime{Time: time.Now()},
 			},
 		}

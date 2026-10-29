@@ -14,7 +14,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/utils/pointer"
 
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
@@ -307,21 +306,21 @@ func TestStatusFeedback(t *testing.T) {
 						Name: "ReadyReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(2),
+							Integer: new(int64(2)),
 						},
 					},
 					{
 						Name: "Replicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(3),
+							Integer: new(int64(3)),
 						},
 					},
 					{
 						Name: "AvailableReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(2),
+							Integer: new(int64(2)),
 						},
 					},
 				}
@@ -382,7 +381,7 @@ func TestStatusFeedback(t *testing.T) {
 						Name: "Replicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(3),
+							Integer: new(int64(3)),
 						},
 					},
 				}
@@ -423,7 +422,7 @@ func TestStatusFeedback(t *testing.T) {
 								Name: "ReadyReplicas",
 								Value: workapiv1.FieldValue{
 									Type:    workapiv1.Integer,
-									Integer: pointer.Int64(2), // Different from current state (3)
+									Integer: new(int64(2)), // Different from current state (3)
 								},
 							},
 						},
@@ -507,21 +506,21 @@ func TestStatusFeedback(t *testing.T) {
 						Name: "ReadyReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(2),
+							Integer: new(int64(2)),
 						},
 					},
 					{
 						Name: "Replicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(3),
+							Integer: new(int64(3)),
 						},
 					},
 					{
 						Name: "AvailableReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(2),
+							Integer: new(int64(2)),
 						},
 					},
 				}

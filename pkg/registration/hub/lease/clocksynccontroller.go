@@ -114,7 +114,7 @@ func (c *clockSyncController) sync(ctx context.Context, syncCtx factory.SyncCont
 	// the clock is considered synced when the hub's "now" and the agent's lease RenewTime are
 	// within the lease duration of each other.
 	clockSynced := now.Sub(observedLease.Spec.RenewTime.Time) < leaseDuration &&
-		observedLease.Spec.RenewTime.Time.Sub(now) < leaseDuration
+		observedLease.Spec.RenewTime.Sub(now) < leaseDuration
 
 	// allow opting out of the clock sync check per cluster: if the cluster is annotated to skip
 	// the check, always treat its clock as synced so the agent is not blocked from updating status.
