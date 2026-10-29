@@ -107,7 +107,7 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 				},
 			},
 		}
-		cluster, err = clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// Update cluster status - get latest version first to avoid conflicts with other controllers
@@ -742,7 +742,7 @@ var _ = ginkgo.Describe("ClusterProfile", func() {
 				HubAcceptsClient: true,
 			},
 		}
-		cluster, err = clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// Update cluster status - get latest version first to avoid conflicts with other controllers

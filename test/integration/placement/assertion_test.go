@@ -160,7 +160,7 @@ func assertCreatingPlacementDecision(name, namespace string, clusterNames []stri
 	}
 
 	placementDecision.Status.Decisions = clusterDecisions
-	placementDecision, err = clusterClient.ClusterV1beta1().PlacementDecisions(namespace).UpdateStatus(
+	_, err = clusterClient.ClusterV1beta1().PlacementDecisions(namespace).UpdateStatus(
 		context.Background(), placementDecision, metav1.UpdateOptions{})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 }

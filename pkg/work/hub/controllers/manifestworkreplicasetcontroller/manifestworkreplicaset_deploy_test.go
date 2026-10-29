@@ -2237,7 +2237,7 @@ func TestOldLabelOnlyManifestWorkMigratesOnSpecChange(t *testing.T) {
 	newTemplate := helpertest.CreateTestManifestWorkSpecWithSecret("v2", "test", "ns-test", "name-test")
 	newTemplate.DeepCopyInto(&mwrSet.Spec.ManifestWorkTemplate)
 
-	mwrSet, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
+	_, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
 	assert.Nil(t, err)
 
 	// Step 4: Verify the MW in the fake client now has the new hash label and annotation,

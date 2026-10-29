@@ -13,7 +13,6 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
-	clusterlisterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
@@ -25,7 +24,7 @@ func TestSchedule(t *testing.T) {
 
 	cases := []struct {
 		name                 string
-		placement            *clusterlisterv1beta1.Placement
+		placement            *clusterapiv1beta1.Placement
 		initObjs             []runtime.Object
 		clusters             []*clusterapiv1.ManagedCluster
 		expectedFilterResult []FilterResult

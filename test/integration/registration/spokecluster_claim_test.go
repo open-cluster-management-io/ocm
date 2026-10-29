@@ -493,7 +493,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 					Value: "value1",
 				},
 			}
-			newClaim, err = clusterClient.ClusterV1alpha1().ClusterClaims().Create(context.TODO(), newClaim, metav1.CreateOptions{})
+			_, err = clusterClient.ClusterV1alpha1().ClusterClaims().Create(context.TODO(), newClaim, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			updatedClusterClaims[1].Value = "newValue"
 

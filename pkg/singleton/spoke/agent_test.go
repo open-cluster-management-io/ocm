@@ -54,15 +54,8 @@ func TestAgentConfigHealthCheckers(t *testing.T) {
 
 	config := NewAgentConfig(agentOption, registrationOption, workOption, cancel)
 
-	// Test that HealthCheckers method exists and can be called
-	healthCheckers := config.HealthCheckers()
-
-	// The result might be nil or empty, but the method should not panic
-	if healthCheckers == nil {
-		// This is acceptable - health checkers might not be set up
-	} else if len(healthCheckers) < 0 {
-		t.Error("Length should not be negative")
-	}
+	// HealthCheckers may return nil when none are configured. The call must not panic.
+	config.HealthCheckers()
 }
 
 func TestAgentConfigWithNilInputs(t *testing.T) {

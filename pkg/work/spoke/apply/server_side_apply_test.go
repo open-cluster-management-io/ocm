@@ -1013,7 +1013,7 @@ func TestServerSideApplyWithIgnoreFields(t *testing.T) {
 					}
 				}
 				// Verify init containers are filtered out by JQ (should be 0, down from 1)
-				initContainers, exist, err := unstructured.NestedSlice(actual.Object, "spec", "initContainers")
+				initContainers, _, err := unstructured.NestedSlice(actual.Object, "spec", "initContainers")
 				if err != nil {
 					t.Fatal(err)
 				}
