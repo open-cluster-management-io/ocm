@@ -45,10 +45,14 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 		// start controller manager
 		var ctx context.Context
 		ctx, cancel = context.WithCancel(context.Background())
-		go controllers.RunControllerManager(ctx, &controllercmd.ControllerContext{
-			KubeConfig:    restConfig,
-			EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
-		})
+		go func() {
+			defer ginkgo.GinkgoRecover()
+			err := controllers.RunControllerManager(ctx, &controllercmd.ControllerContext{
+				KubeConfig:    restConfig,
+				EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		}()
 	})
 
 	ginkgo.AfterEach(func() {

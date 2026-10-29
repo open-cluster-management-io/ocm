@@ -35,14 +35,15 @@ import (
 // 1. the spoke first connects to hub1, we set the hub1 to not accept the spoke, then the spoke should switch to hub2.
 // 2. the spoke first connects to hub1, we stop hub1, then the spoke should switch to hub2.
 var _ = Describe("switch-hub", Ordered, func() {
+	var hub1Ctx, hub2Ctx context.Context
 	var managedClusterName, hubKubeconfigSecret, suffix string
 	var hub1, hub2 *mockHub
-	var spokeCancel context.CancelFunc
+	var spokeCancel, hub1CtxCancel, hub2CtxCancel context.CancelFunc
 
-	BeforeEach(func() {
-		features.SpokeMutableFeatureGate.SetFromMap(map[string]bool{
+	BeforeEach(func(ctx SpecContext) {
+		Expect(features.SpokeMutableFeatureGate.SetFromMap(map[string]bool{
 			string(ocmfeature.MultipleHubs): true,
-		})
+		})).NotTo(HaveOccurred())
 
 		var err error
 		suffix = rand.String(5)
@@ -51,16 +52,18 @@ var _ = Describe("switch-hub", Ordered, func() {
 		hubKubeconfigDir := path.Join(util.TestDir, fmt.Sprintf("switch-hub-%s", suffix), "hub-kubeconfig")
 
 		// Ensure there is no remaining bootstrap-hub-kubeconfig secret
-		err = kubeClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), "bootstrap-hub-kubeconfig", metav1.DeleteOptions{})
+		err = kubeClient.CoreV1().Secrets(testNamespace).Delete(ctx, "bootstrap-hub-kubeconfig", metav1.DeleteOptions{})
 		if err != nil {
 			Expect(apierrors.IsNotFound(err)).To(BeTrue())
 		}
 
 		// Start 2 hubs
-		hub1 = startNewHub(context.Background(), fmt.Sprintf("hub1-%s", suffix))
+		hub1Ctx, hub1CtxCancel = context.WithCancel(context.Background())
+		hub1 = startNewHub(hub1Ctx, fmt.Sprintf("hub1-%s", suffix))
 		fmt.Println("hub1 bootstrap file path: ", hub1.bootstrapFilePath)
 
-		hub2 = startNewHub(context.Background(), fmt.Sprintf("hub2-%s", suffix))
+		hub2Ctx, hub2CtxCancel = context.WithCancel(context.Background())
+		hub2 = startNewHub(hub2Ctx, fmt.Sprintf("hub2-%s", suffix))
 		fmt.Println("hub2 bootstrap file path: ", hub2.bootstrapFilePath)
 
 		// start a auto restart agent
@@ -88,16 +91,25 @@ var _ = Describe("switch-hub", Ordered, func() {
 	})
 
 	AfterEach(func() {
-		// stop hubs
-		hub1.env.Stop()
-		hub2.env.Stop()
-
-		// stop spoke
+		By("Cancelling spoke and mock hub contexts")
+		// cancel cluster contexts
 		spokeCancel()
-
-		features.SpokeMutableFeatureGate.SetFromMap(map[string]bool{
+		hub1CtxCancel()
+		hub2CtxCancel()
+		By("Stopping mock hubs")
+		// stop hubs
+		// errors are only logged here because the api server takes too long
+		// to stop in a reasonable time and returns a timeout error
+		for i, hub := range []*mockHub{hub1, hub2} {
+			if !hub.stopped {
+				if err := hub.Stop(); err != nil {
+					GinkgoLogr.Error(err, fmt.Sprintf("Error stopping hub%d", i+1))
+				}
+			}
+		}
+		Expect(features.SpokeMutableFeatureGate.SetFromMap(map[string]bool{
 			string(ocmfeature.MultipleHubs): false,
-		})
+		})).NotTo(HaveOccurred())
 	})
 
 	Context("Hub1 doesn't accept client", func() {
@@ -125,8 +137,12 @@ var _ = Describe("switch-hub", Ordered, func() {
 
 	Context("Hub1 is down and timeout", func() {
 		It("Should switch to hub2", func() {
-			// Stop hub1
-			hub1.env.Stop()
+			By("Stop hub1")
+			// errors are only logged here because the api server takes too long
+			// to stop in a reasonable time and returns a timeout error
+			if err := hub1.Stop(); err != nil {
+				GinkgoLogr.Error(err, "Error stopping hub1")
+			}
 
 			// The timeoutSeconds is 10s, so we need to wait for 30s to make sure the agent is restarted
 			time.Sleep(30 * time.Second)
@@ -141,8 +157,14 @@ var _ = Describe("switch-hub", Ordered, func() {
 	})
 })
 
+func (h *mockHub) Stop() error {
+	h.stopped = true
+	return h.env.Stop()
+}
+
 type mockHub struct {
 	bootstrapFilePath string
+	stopped           bool
 	kubeClient        kubernetes.Interface
 	clusterClient     clusterclientset.Interface
 	addonClient       addonclientset.Interface

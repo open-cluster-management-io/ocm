@@ -299,10 +299,14 @@ func TestSIGPlacementDecisionControllerSync(t *testing.T) {
 			sigPDInformers := cpinformers.NewSharedInformerFactory(cpClient, 0)
 
 			for _, pd := range c.ocmPDs {
-				clusterInformers.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(pd)
+				if err := clusterInformers.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(pd); err != nil {
+					t.Fatal(err)
+				}
 			}
 			for _, pd := range c.existingSIGPDs {
-				sigPDInformers.Apis().V1alpha2().PlacementDecisions().Informer().GetStore().Add(pd)
+				if err := sigPDInformers.Apis().V1alpha2().PlacementDecisions().Informer().GetStore().Add(pd); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			ctrl := &sigPlacementDecisionController{

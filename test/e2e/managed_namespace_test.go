@@ -318,14 +318,17 @@ var _ = ginkgo.Describe("ManagedNamespace", func() {
 			}, 30*time.Second, 2*time.Second).Should(gomega.Succeed())
 
 			// Clean up additional cluster set
-			hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Delete(
+			err := hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Delete(
 				context.TODO(), additionalClusterSetName, metav1.DeleteOptions{})
+			if !errors.IsNotFound(err) {
+				Expect(err).ToNot(HaveOccurred())
+			}
 
 			// Clean up test namespaces
-			spoke.KubeClient.CoreV1().Namespaces().Delete(
-				context.TODO(), namespace1, metav1.DeleteOptions{})
-			spoke.KubeClient.CoreV1().Namespaces().Delete(
-				context.TODO(), namespace2, metav1.DeleteOptions{})
+			gomega.Expect(spoke.KubeClient.CoreV1().Namespaces().Delete(
+				context.TODO(), namespace1, metav1.DeleteOptions{})).ToNot(gomega.HaveOccurred())
+			gomega.Expect(spoke.KubeClient.CoreV1().Namespaces().Delete(
+				context.TODO(), namespace2, metav1.DeleteOptions{})).ToNot(gomega.HaveOccurred())
 		})
 
 		ginkgo.It("should manage namespaces from multiple cluster sets", func() {

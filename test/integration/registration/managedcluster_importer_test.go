@@ -163,9 +163,11 @@ var _ = ginkgo.Describe("Cluster Auto Importer", func() {
 				if err != nil {
 					return err
 				}
-				unstructured.SetNestedField(capiCluster.Object, map[string]interface{}{
+				if err := unstructured.SetNestedField(capiCluster.Object, map[string]interface{}{
 					"phase": "Provisioned",
-				}, "status")
+				}, "status"); err != nil {
+					return err
+				}
 				_, err = dynamicClient.Resource(capi.ClusterAPIGVR).Namespace(managedClusterName).UpdateStatus(
 					context.TODO(), capiCluster, metav1.UpdateOptions{})
 				if err != nil {

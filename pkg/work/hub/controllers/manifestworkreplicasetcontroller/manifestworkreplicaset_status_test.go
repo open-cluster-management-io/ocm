@@ -595,7 +595,7 @@ func TestStatusWithMWRSetSpecChangesReconcile(t *testing.T) {
 
 	for _, cls := range clusters {
 		mw := helpertest.CreateTestManifestWork(mwrSetTest.Name, mwrSetTest.Namespace, plcName, cls)
-		workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw)
+		err = workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw)
 		assert.Nil(t, err)
 	}
 

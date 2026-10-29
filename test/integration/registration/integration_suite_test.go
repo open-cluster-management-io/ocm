@@ -158,8 +158,8 @@ var _ = ginkgo.BeforeSuite(func() {
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(cfg).ToNot(gomega.BeNil())
 
-	features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeRegistrationFeatureGates)
-	features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates)
+	gomega.Expect(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeRegistrationFeatureGates)).ToNot(gomega.HaveOccurred())
+	gomega.Expect(features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates)).ToNot(gomega.HaveOccurred())
 
 	// install scheme
 	scheme := runtime.NewScheme()
