@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -32,12 +33,31 @@ func TestFinalize(t *testing.T) {
 	appliedWork := spoketesting.NewAppliedManifestWork("test", 0, uid)
 	owner := helper.NewAppliedManifestWorkOwner(appliedWork)
 
+	clusterRole := workapiv1.AppliedManifestResourceMeta{Version: "v1", UID: "cr1", ResourceIdentifier: workapiv1.ResourceIdentifier{
+		Group: "rbac.authorization.k8s.io", Resource: "clusterroles", Name: "cr1"}}
+	secret := workapiv1.AppliedManifestResourceMeta{Version: "v1", UID: "ns1-n1", ResourceIdentifier: workapiv1.ResourceIdentifier{
+		Resource: "secrets", Namespace: "ns1", Name: "n1"}}
+	assertPatch := func(t *testing.T, actions []clienttesting.Action) { testingcommon.AssertActions(t, actions, "patch") }
+	assertGets := func(resources ...string) func(t *testing.T, actions []clienttesting.Action) {
+		return func(t *testing.T, actions []clienttesting.Action) {
+			var got []string
+			for _, action := range actions {
+				got = append(got, action.GetResource().Resource)
+			}
+			if !reflect.DeepEqual(got, resources) {
+				t.Fatal(spew.Sdump(actions))
+			}
+		}
+	}
+
 	cases := []struct {
 		name                               string
 		existingFinalizers                 []string
 		existingResources                  []runtime.Object
 		resourcesToRemove                  []workapiv1.AppliedManifestResourceMeta
 		terminated                         bool
+		dynamicReactor                     clienttesting.ReactionFunc
+		expectErr                          bool
 		validateAppliedManifestWorkActions func(t *testing.T, actions []clienttesting.Action)
 		validateDynamicActions             func(t *testing.T, actions []clienttesting.Action)
 		expectedQueueLen                   int
@@ -174,6 +194,61 @@ func TestFinalize(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:               "defer rbac deletion while other resources are pending",
+			terminated:         true,
+			existingFinalizers: []string{workapiv1.AppliedManifestWorkFinalizer},
+			existingResources:  []runtime.Object{testingcommon.NewUnstructuredSecret("ns1", "n1", true, "ns1-n1", *owner)},
+			resourcesToRemove:  []workapiv1.AppliedManifestResourceMeta{clusterRole, secret},
+			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				work := &workapiv1.AppliedManifestWork{}
+				if err := json.Unmarshal(actions[0].(clienttesting.PatchActionImpl).Patch, work); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(work.Status.AppliedResources, []workapiv1.AppliedManifestResourceMeta{secret, clusterRole}) {
+					t.Fatal(spew.Sdump(work.Status.AppliedResources))
+				}
+			},
+			validateDynamicActions: assertGets("secrets"),
+		},
+		{
+			name:               "keep rbac in status once other resources are gone",
+			terminated:         true,
+			existingFinalizers: []string{workapiv1.AppliedManifestWorkFinalizer},
+			resourcesToRemove:  []workapiv1.AppliedManifestResourceMeta{clusterRole, secret},
+			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				work := &workapiv1.AppliedManifestWork{}
+				if err := json.Unmarshal(actions[0].(clienttesting.PatchActionImpl).Patch, work); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(work.Status.AppliedResources, []workapiv1.AppliedManifestResourceMeta{clusterRole}) {
+					t.Fatal(spew.Sdump(work.Status.AppliedResources))
+				}
+			},
+			validateDynamicActions: assertGets("secrets"),
+		},
+		{
+			name:                               "delete rbac once only rbac resources are left",
+			terminated:                         true,
+			existingFinalizers:                 []string{workapiv1.AppliedManifestWorkFinalizer},
+			resourcesToRemove:                  []workapiv1.AppliedManifestResourceMeta{clusterRole},
+			validateAppliedManifestWorkActions: assertPatch,
+			validateDynamicActions:             assertGets("clusterroles"),
+		},
+		{
+			name:               "keep rbac when deleting other resources fails",
+			terminated:         true,
+			existingFinalizers: []string{workapiv1.AppliedManifestWorkFinalizer},
+			resourcesToRemove:  []workapiv1.AppliedManifestResourceMeta{clusterRole, secret},
+			dynamicReactor: func(action clienttesting.Action) (bool, runtime.Object, error) {
+				return true, nil, errors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "n1", nil)
+			},
+			expectErr:                          true,
+			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
+			validateDynamicActions:             assertGets("secrets"),
+		},
 	}
 
 	for _, c := range cases {
@@ -187,6 +262,9 @@ func TestFinalize(t *testing.T) {
 			testingWork.Status.AppliedResources = append(testingWork.Status.AppliedResources, c.resourcesToRemove...)
 
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), c.existingResources...)
+			if c.dynamicReactor != nil {
+				fakeDynamicClient.PrependReactor("get", "*", c.dynamicReactor)
+			}
 			fakeClient := fakeworkclient.NewSimpleClientset(testingWork)
 			informerFactory := workinformers.NewSharedInformerFactory(fakeClient, 0)
 
@@ -206,8 +284,8 @@ func TestFinalize(t *testing.T) {
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, testingWork.Name)
 			err = controller.syncAppliedManifestWork(context.TODO(), controllerContext, testingWork)
-			if err != nil {
-				t.Fatal(err)
+			if (err != nil) != c.expectErr {
+				t.Fatalf("expected error %v, got %v", c.expectErr, err)
 			}
 			c.validateAppliedManifestWorkActions(t, fakeClient.Actions())
 			c.validateDynamicActions(t, fakeDynamicClient.Actions())
