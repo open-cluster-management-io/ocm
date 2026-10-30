@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
@@ -33,13 +34,14 @@ const (
 )
 
 type unmanagedAppliedWorkController struct {
-	manifestWorkLister        worklister.ManifestWorkNamespaceLister
-	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
-	patcher                   patcher.Patcher[*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus]
-	appliedManifestWorkLister worklister.AppliedManifestWorkLister
-	hubHash                   string
-	agentID                   string
-	evictionGracePeriod       time.Duration
+	manifestWorkLister         worklister.ManifestWorkNamespaceLister
+	appliedManifestWorkClient  workv1client.AppliedManifestWorkInterface
+	patcher                    patcher.Patcher[*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus]
+	appliedManifestWorkLister  worklister.AppliedManifestWorkLister
+	manifestWorkInformerSynced cache.InformerSynced
+	hubHash                    string
+	agentID                    string
+	evictionGracePeriod        time.Duration
 }
 
 // NewUnManagedAppliedWorkController returns a controller to evict the unmanaged appliedmanifestworks.
@@ -51,6 +53,11 @@ type unmanagedAppliedWorkController struct {
 // One unmanaged appliedmanifestwork will be evicted from the managed cluster after a grace period (by
 // default, 60 minutes), after one appliedmanifestwork is evicted from the managed cluster, its owned
 // resources will also be evicted from the managed cluster with Kubernetes garbage collection.
+//
+// Eviction based on a ManifestWork NotFound is gated on the ManifestWork informer having
+// synced at least once. With the kube driver that matches the usual controller start barrier;
+// with the cloudevents driver it avoids treating an empty/partial local store during
+// (re)subscribe replay as "hub deleted the work" (see issue #1786).
 func NewUnManagedAppliedWorkController(
 	manifestWorkInformer workinformer.ManifestWorkInformer,
 	manifestWorkLister worklister.ManifestWorkNamespaceLister,
@@ -65,10 +72,11 @@ func NewUnManagedAppliedWorkController(
 		patcher: patcher.NewPatcher[
 			*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus](
 			appliedManifestWorkClient),
-		appliedManifestWorkLister: appliedManifestWorkInformer.Lister(),
-		hubHash:                   hubHash,
-		agentID:                   agentID,
-		evictionGracePeriod:       evictionGracePeriod,
+		appliedManifestWorkLister:  appliedManifestWorkInformer.Lister(),
+		manifestWorkInformerSynced: manifestWorkInformer.Informer().HasSynced,
+		hubHash:                    hubHash,
+		agentID:                    agentID,
+		evictionGracePeriod:        evictionGracePeriod,
 	}
 
 	return factory.New().
@@ -107,6 +115,16 @@ func (m *unmanagedAppliedWorkController) sync(ctx context.Context, controllerCon
 	// EvictionGracePeriodBound indicating the eviction is disabled for all the appliedmanifestworks.
 	if m.evictionGracePeriod >= EvictionGracePeriodBound {
 		return m.stopToEvictAppliedManifestWork(ctx, appliedManifestWork)
+	}
+
+	// Do not treat ManifestWork NotFound as hub deletion until the work informer has
+	// completed its initial sync. An unsynced/partial local store (common during
+	// cloudevents resubscribe replay) would otherwise stamp evictionStartTime on
+	// every AppliedManifestWork whose ManifestWork has not been replayed yet.
+	if m.manifestWorkInformerSynced != nil && !m.manifestWorkInformerSynced() {
+		logger.V(4).Info("Skipping AppliedManifestWork eviction until ManifestWork informer has synced")
+		controllerContext.Queue().AddAfter(appliedManifestWorkName, time.Second)
+		return nil
 	}
 
 	_, err = m.manifestWorkLister.Get(appliedManifestWork.Spec.ManifestWorkName)

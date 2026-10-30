@@ -24,6 +24,7 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 		hubHash                            string
 		agentID                            string
 		evictionGracePeriod                time.Duration
+		manifestWorkInformerSynced         func() bool
 		works                              []runtime.Object
 		appliedWorks                       []runtime.Object
 		expectedQueueLen                   int
@@ -80,6 +81,28 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
 			},
+		},
+		{
+			name:                       "do not start eviction while ManifestWork informer has not synced",
+			appliedManifestWorkName:    "hubhash-test",
+			hubHash:                    "hubhash",
+			agentID:                    "test-agent",
+			manifestWorkInformerSynced: func() bool { return false },
+			works:                      []runtime.Object{},
+			appliedWorks: []runtime.Object{
+				&workapiv1.AppliedManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "hubhash-test",
+					},
+					Spec: workapiv1.AppliedManifestWorkSpec{
+						ManifestWorkName: "test",
+						HubHash:          "hubhash",
+						AgentID:          "test-agent",
+					},
+				},
+			},
+			expectedQueueLen:                   0, // requeued via AddAfter, not the main queue
+			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
 		},
 		{
 			name:                    "evict appliedmanifestwork after the hub switched",
@@ -272,16 +295,21 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 				}
 			}
 
+			synced := c.manifestWorkInformerSynced
+			if synced == nil {
+				synced = func() bool { return true }
+			}
 			controller := &unmanagedAppliedWorkController{
 				manifestWorkLister:        informerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks("test"),
 				appliedManifestWorkClient: fakeClient.WorkV1().AppliedManifestWorks(),
 				patcher: patcher.NewPatcher[
 					*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus](
 					fakeClient.WorkV1().AppliedManifestWorks()),
-				appliedManifestWorkLister: informerFactory.Work().V1().AppliedManifestWorks().Lister(),
-				hubHash:                   c.hubHash,
-				agentID:                   c.agentID,
-				evictionGracePeriod:       c.evictionGracePeriod,
+				appliedManifestWorkLister:  informerFactory.Work().V1().AppliedManifestWorks().Lister(),
+				manifestWorkInformerSynced: synced,
+				hubHash:                    c.hubHash,
+				agentID:                    c.agentID,
+				evictionGracePeriod:        c.evictionGracePeriod,
 			}
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, c.appliedManifestWorkName)
