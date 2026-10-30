@@ -1,7 +1,6 @@
 package clusterprofile
 
 import (
-	"context"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -330,7 +329,7 @@ func TestStatusControllerSync(t *testing.T) {
 			}
 
 			syncCtx := testingcommon.NewFakeSyncContext(t, c.key)
-			err = ctrl.sync(context.TODO(), syncCtx, c.key)
+			err = ctrl.sync(t.Context(), syncCtx, c.key)
 
 			if c.expectError && err == nil {
 				t.Errorf("expected error but got none")
@@ -597,11 +596,11 @@ func TestStatusControllerSyncInventoryMemberID(t *testing.T) {
 			if err := clusterStore.Update(cluster); err != nil {
 				t.Fatal(err)
 			}
-			if err := ctrl.sync(context.Background(), testingcommon.NewFakeSyncContext(t, cluster.Name), cluster.Name); err != nil {
+			if err := ctrl.sync(t.Context(), testingcommon.NewFakeSyncContext(t, cluster.Name), cluster.Name); err != nil {
 				t.Fatal(err)
 			}
 			for _, namespace := range namespaces {
-				profile, err := cpClient.ApisV1alpha2().ClusterProfiles(namespace).Get(context.Background(), cluster.Name, metav1.GetOptions{})
+				profile, err := cpClient.ApisV1alpha2().ClusterProfiles(namespace).Get(t.Context(), cluster.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -616,7 +615,7 @@ func TestStatusControllerSyncInventoryMemberID(t *testing.T) {
 				}
 			}
 			cpClient.ClearActions()
-			if err := ctrl.sync(context.Background(), testingcommon.NewFakeSyncContext(t, cluster.Name), cluster.Name); err != nil {
+			if err := ctrl.sync(t.Context(), testingcommon.NewFakeSyncContext(t, cluster.Name), cluster.Name); err != nil {
 				t.Fatal(err)
 			}
 			if actions := cpClient.Actions(); len(actions) != 0 {

@@ -1,7 +1,6 @@
 package manifestworkreplicasetcontroller
 
 import (
-	"context"
 	"encoding/json"
 	"reflect"
 	"testing"
@@ -246,7 +245,7 @@ func TestManifestWorkReplicaSetControllerPatchStatus(t *testing.T) {
 			)
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, c.mwrSet.Namespace+"/"+c.mwrSet.Name)
-			err = ctrl.sync(context.TODO(), controllerContext, c.mwrSet.Namespace+"/"+c.mwrSet.Name)
+			err = ctrl.sync(t.Context(), controllerContext, c.mwrSet.Namespace+"/"+c.mwrSet.Name)
 			if err != nil {
 				t.Error(err)
 			}

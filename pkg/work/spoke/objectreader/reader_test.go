@@ -1,7 +1,6 @@
 package objectreader
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -40,7 +39,7 @@ func TestNewObjectReader(t *testing.T) {
 	}
 
 	// Verify ObjectReader is functional by calling Get
-	_, _, err = reader.Get(context.TODO(), workapiv1.ManifestResourceMeta{
+	_, _, err = reader.Get(t.Context(), workapiv1.ManifestResourceMeta{
 		Group:     "",
 		Version:   "v1",
 		Resource:  "secrets",
@@ -98,7 +97,7 @@ func TestGet_IncompleteResourceMeta(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			obj, condition, err := reader.Get(context.TODO(), c.resourceMeta)
+			obj, condition, err := reader.Get(t.Context(), c.resourceMeta)
 
 			if obj != nil {
 				t.Errorf("Expected nil object, got %v", obj)
@@ -148,7 +147,7 @@ func TestGet_ResourceNotFound(t *testing.T) {
 		Name:      "test-secret",
 	}
 
-	obj, condition, err := reader.Get(context.TODO(), resourceMeta)
+	obj, condition, err := reader.Get(t.Context(), resourceMeta)
 
 	if obj != nil {
 		t.Errorf("Expected nil object, got %v", obj)
@@ -211,7 +210,7 @@ func TestGet_ResourceFound(t *testing.T) {
 		Name:      "test-secret",
 	}
 
-	obj, condition, err := reader.Get(context.TODO(), resourceMeta)
+	obj, condition, err := reader.Get(t.Context(), resourceMeta)
 
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -657,7 +656,7 @@ func TestUnRegisterInformerFromAppliedManifestWork(t *testing.T) {
 	}
 
 	// Unregister using the helper function
-	UnRegisterInformerFromAppliedManifestWork(context.TODO(), reader, "test-work", appliedResources)
+	UnRegisterInformerFromAppliedManifestWork(t.Context(), reader, "test-work", appliedResources)
 
 	// Verify that 2 informers were removed
 	concreteReader.RLock()
@@ -684,7 +683,7 @@ func TestUnRegisterInformerFromAppliedManifestWork_NilObjectReader(t *testing.T)
 	}
 
 	// Should not panic when objectReader is nil
-	UnRegisterInformerFromAppliedManifestWork(context.TODO(), nil, "test-work", appliedResources)
+	UnRegisterInformerFromAppliedManifestWork(t.Context(), nil, "test-work", appliedResources)
 }
 
 func TestGet_InformerFallbackToClient(t *testing.T) {

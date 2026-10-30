@@ -1,7 +1,6 @@
 package registration_test
 
 import (
-	"context"
 	"fmt"
 	"path"
 	"reflect"
@@ -23,7 +22,7 @@ import (
 
 var _ = Describe("Agent Restart", func() {
 
-	It("restart agent", func() {
+	It("restart agent", func(ctx SpecContext) {
 		var err error
 		managedClusterName := "restart-test-cluster1"
 
@@ -114,7 +113,7 @@ var _ = Describe("Agent Restart", func() {
 				conditions = append(conditions, condition)
 			}
 			spokeCluster.Status.Conditions = conditions
-			_, err = clusterClient.ClusterV1().ManagedClusters().UpdateStatus(context.TODO(), spokeCluster, metav1.UpdateOptions{})
+			_, err = clusterClient.ClusterV1().ManagedClusters().UpdateStatus(ctx, spokeCluster, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
@@ -159,7 +158,7 @@ var _ = Describe("Agent Restart", func() {
 	// This case happens when registration agent is restarted with a new cluster name by specifying
 	// argument 'cluster-name' and the agent has already had a hub kubecofig with a different
 	// cluster name. A bootstrap process is expected.
-	It("restart agent with a different cluster name", func() {
+	It("restart agent with a different cluster name", func(ctx SpecContext) {
 		var err error
 		managedClusterName := "restart-test-cluster2"
 
@@ -283,7 +282,7 @@ var _ = Describe("Agent Restart", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	})
 
-	It("agent rebootstrap when kubeconfig current context cluster name changes", func() {
+	It("agent rebootstrap when kubeconfig current context cluster name changes", func(ctx SpecContext) {
 		var err error
 		spokeClusterName := "contextclusternamechanges-spokecluster"
 

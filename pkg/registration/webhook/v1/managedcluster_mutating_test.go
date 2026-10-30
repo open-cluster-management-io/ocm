@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"context"
 	"encoding/json"
 	"reflect"
 	"testing"
@@ -543,7 +542,7 @@ func TestDefault(t *testing.T) {
 					},
 				},
 			}
-			ctx := admission.NewContextWithRequest(context.Background(), req)
+			ctx := admission.NewContextWithRequest(t.Context(), req)
 
 			cluster := &clusterv1.ManagedCluster{}
 			if err := json.Unmarshal(clusterBytes, cluster); err != nil {

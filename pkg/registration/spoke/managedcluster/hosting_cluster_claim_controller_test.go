@@ -1,7 +1,6 @@
 package managedcluster
 
 import (
-	"context"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -22,11 +21,11 @@ func TestHostingClusterClaimControllerCreate(t *testing.T) {
 	}
 
 	syncContext := testingcommon.NewFakeSyncContext(t, "hosting-cluster-claim")
-	if err := c.sync(context.TODO(), syncContext, factory.DefaultQueueKey); err != nil {
+	if err := c.sync(t.Context(), syncContext, factory.DefaultQueueKey); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	claim, err := clusterClient.ClusterV1alpha1().ClusterClaims().Get(context.TODO(), HostingClusterClaimName, metav1.GetOptions{})
+	claim, err := clusterClient.ClusterV1alpha1().ClusterClaims().Get(t.Context(), HostingClusterClaimName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("expected claim to be created: %v", err)
 	}
@@ -47,11 +46,11 @@ func TestHostingClusterClaimControllerUpdate(t *testing.T) {
 	}
 
 	syncContext := testingcommon.NewFakeSyncContext(t, "hosting-cluster-claim")
-	if err := c.sync(context.TODO(), syncContext, factory.DefaultQueueKey); err != nil {
+	if err := c.sync(t.Context(), syncContext, factory.DefaultQueueKey); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	claim, err := clusterClient.ClusterV1alpha1().ClusterClaims().Get(context.TODO(), HostingClusterClaimName, metav1.GetOptions{})
+	claim, err := clusterClient.ClusterV1alpha1().ClusterClaims().Get(t.Context(), HostingClusterClaimName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("expected claim to still exist: %v", err)
 	}
@@ -72,7 +71,7 @@ func TestHostingClusterClaimControllerNoopWhenUnchanged(t *testing.T) {
 	}
 
 	syncContext := testingcommon.NewFakeSyncContext(t, "hosting-cluster-claim")
-	if err := c.sync(context.TODO(), syncContext, factory.DefaultQueueKey); err != nil {
+	if err := c.sync(t.Context(), syncContext, factory.DefaultQueueKey); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -95,11 +94,11 @@ func TestHostingClusterClaimControllerDeletesWhenEmpty(t *testing.T) {
 	}
 
 	syncContext := testingcommon.NewFakeSyncContext(t, "hosting-cluster-claim")
-	if err := c.sync(context.TODO(), syncContext, factory.DefaultQueueKey); err != nil {
+	if err := c.sync(t.Context(), syncContext, factory.DefaultQueueKey); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, err := clusterClient.ClusterV1alpha1().ClusterClaims().Get(context.TODO(), HostingClusterClaimName, metav1.GetOptions{})
+	_, err := clusterClient.ClusterV1alpha1().ClusterClaims().Get(t.Context(), HostingClusterClaimName, metav1.GetOptions{})
 	if !errors.IsNotFound(err) {
 		t.Errorf("expected claim to be deleted, got err=%v", err)
 	}
@@ -114,7 +113,7 @@ func TestHostingClusterClaimControllerDeleteNoopWhenAlreadyGone(t *testing.T) {
 
 	// Deleting an already-absent claim must not surface as an error.
 	syncContext := testingcommon.NewFakeSyncContext(t, "hosting-cluster-claim")
-	if err := c.sync(context.TODO(), syncContext, factory.DefaultQueueKey); err != nil {
+	if err := c.sync(t.Context(), syncContext, factory.DefaultQueueKey); err != nil {
 		t.Fatalf("unexpected error when the claim never existed: %v", err)
 	}
 }

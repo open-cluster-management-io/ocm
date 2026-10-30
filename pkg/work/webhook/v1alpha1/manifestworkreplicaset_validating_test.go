@@ -1,7 +1,6 @@
 package v1alpha1
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -32,7 +31,7 @@ func TestWebHookValidateRequest(t *testing.T) {
 			Operation: admissionv1.Connect,
 		},
 	}
-	ctx := admission.NewContextWithRequest(context.Background(), request)
+	ctx := admission.NewContextWithRequest(t.Context(), request)
 	webHook := ManifestWorkReplicaSetWebhook{}
 	placementRef := workv1alpha1.LocalPlacementReference{Name: "place"}
 	mwrSet := &workv1alpha1.ManifestWorkReplicaSet{
@@ -65,7 +64,7 @@ func TestWebHookCreateRequest(t *testing.T) {
 
 	webHook := ManifestWorkReplicaSetWebhook{}
 	mwrSet := &workv1alpha1.ManifestWorkReplicaSet{}
-	_, err := webHook.ValidateCreate(context.Background(), mwrSet)
+	_, err := webHook.ValidateCreate(t.Context(), mwrSet)
 	if err == nil {
 		t.Fatal("Expecting error for empty mwrSet")
 	}
@@ -78,7 +77,7 @@ func TestWebHookCreateRequest(t *testing.T) {
 			Operation: admissionv1.Create,
 		},
 	}
-	ctx := admission.NewContextWithRequest(context.Background(), request)
+	ctx := admission.NewContextWithRequest(t.Context(), request)
 	mwrSet = helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
 	_, err = webHook.ValidateCreate(ctx, mwrSet)
 	if err != nil {
@@ -91,7 +90,7 @@ func TestWebHookUpdateRequest(t *testing.T) {
 
 	webHook := ManifestWorkReplicaSetWebhook{}
 	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
-	_, err := webHook.ValidateUpdate(context.Background(), nil, mwrSet)
+	_, err := webHook.ValidateUpdate(t.Context(), nil, mwrSet)
 	if err == nil {
 		t.Fatal("Expecting error for nil oldPlaceMW")
 	}
@@ -99,7 +98,7 @@ func TestWebHookUpdateRequest(t *testing.T) {
 		t.Fatal("Expecting bad request error type")
 	}
 
-	_, err = webHook.ValidateUpdate(context.Background(), mwrSet, nil)
+	_, err = webHook.ValidateUpdate(t.Context(), mwrSet, nil)
 	if err == nil {
 		t.Fatal("Expecting error for nil newPlaceMW")
 	}
@@ -110,7 +109,7 @@ func TestWebHookUpdateRequest(t *testing.T) {
 			Operation: admissionv1.Update,
 		},
 	}
-	ctx := admission.NewContextWithRequest(context.Background(), request)
+	ctx := admission.NewContextWithRequest(t.Context(), request)
 	_, err = webHook.ValidateUpdate(ctx, mwrSet, mwrSet)
 	if err != nil {
 		t.Fatal(err)

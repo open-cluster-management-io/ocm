@@ -18,7 +18,7 @@ import (
 )
 
 var _ = Describe("Cluster Annotations", func() {
-	It("Cluster Annotations should be created on the managed cluster", func() {
+	It("Cluster Annotations should be created on the managed cluster", func(ctx SpecContext) {
 		managedClusterName := "clusterannotations-spokecluster"
 		//#nosec G101
 		hubKubeconfigSecret := "clusterannotations-hub-kubeconfig-secret"

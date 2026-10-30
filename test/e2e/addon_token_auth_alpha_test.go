@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -44,10 +43,10 @@ var _ = Describe("Template addon with token-based authentication (v1alpha1)", Or
 		"addon/signca_secret_rolebinding.yaml",
 	}
 
-	BeforeAll(func() {
+	BeforeAll(func(ctx SpecContext) {
 		By("Save original klusterlet configuration")
 		klusterlet, err := spoke.OperatorClient.OperatorV1().Klusterlets().Get(
-			context.TODO(), universalKlusterletName, metav1.GetOptions{})
+			ctx, universalKlusterletName, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		if klusterlet.Spec.RegistrationConfiguration != nil {
@@ -74,7 +73,7 @@ var _ = Describe("Template addon with token-based authentication (v1alpha1)", Or
 
 		signerSecretNamespace = "signer-secret-token-ns-" + rand.String(6)
 		By("Create addon custom sign secret namespace")
-		_, err = hub.KubeClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+		_, err = hub.KubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: signerSecretNamespace,
 			},
@@ -84,15 +83,15 @@ var _ = Describe("Template addon with token-based authentication (v1alpha1)", Or
 		}
 
 		By("Create addon custom sign secret")
-		err = copySignerSecret(context.TODO(), hub.KubeClient, "open-cluster-management-hub",
+		err = copySignerSecret(ctx, hub.KubeClient, "open-cluster-management-hub",
 			"signer-secret", signerSecretNamespace, customSignerSecretName)
 		Expect(err).ToNot(HaveOccurred())
 
 	})
 
-	AfterAll(func() {
+	AfterAll(func(ctx SpecContext) {
 		By("Delete addon custom sign secret")
-		err := hub.KubeClient.CoreV1().Secrets(signerSecretNamespace).Delete(context.TODO(),
+		err := hub.KubeClient.CoreV1().Secrets(signerSecretNamespace).Delete(ctx,
 			customSignerSecretName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			Fail(fmt.Sprintf("failed to delete custom signer secret %v/%v: %v",
@@ -100,7 +99,7 @@ var _ = Describe("Template addon with token-based authentication (v1alpha1)", Or
 		}
 
 		By("Delete addon custom sign secret namespace")
-		err = hub.KubeClient.CoreV1().Namespaces().Delete(context.TODO(), signerSecretNamespace, metav1.DeleteOptions{})
+		err = hub.KubeClient.CoreV1().Namespaces().Delete(ctx, signerSecretNamespace, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			Fail(fmt.Sprintf("failed to delete custom signer secret namespace %v: %v", signerSecretNamespace, err))
 		}
@@ -116,11 +115,11 @@ var _ = Describe("Template addon with token-based authentication (v1alpha1)", Or
 			})
 	})
 
-	It("Should work with token-based authentication flow", func() {
+	It("Should work with token-based authentication flow", func(ctx SpecContext) {
 		var err error
 
 		By("Step 1: Create addon template resources")
-		err = createResourcesFromYamlFiles(context.Background(), hub.DynamicClient, hub.RestMapper, s,
+		err = createResourcesFromYamlFiles(ctx, hub.DynamicClient, hub.RestMapper, s,
 			defaultAddonTemplateReaderManifestsFunc(manifests.AddonManifestFiles, map[string]interface{}{
 				"Namespace":                   universalClusterName,
 				"AddonInstallNamespace":       addonInstallNamespace,
@@ -146,7 +145,7 @@ var _ = Describe("Template addon with token-based authentication (v1alpha1)", Or
 
 		By("Step 4: Verify hub kubeconfig secret is created with token authentication")
 		Eventually(func() error {
-			secret, err := agentClient.CoreV1().Secrets(addonInstallNamespace).Get(context.TODO(),
+			secret, err := agentClient.CoreV1().Secrets(addonInstallNamespace).Get(ctx,
 				templateagent.HubKubeconfigSecretName(addOnName), metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -168,7 +167,7 @@ var _ = Describe("Template addon with token-based authentication (v1alpha1)", Or
 
 		By("Step 5: Verify custom client cert secret is created")
 		Eventually(func() error {
-			_, err := agentClient.CoreV1().Secrets(addonInstallNamespace).Get(context.TODO(),
+			_, err := agentClient.CoreV1().Secrets(addonInstallNamespace).Get(ctx,
 				templateagent.CustomSignedSecretName(addOnName, customSignerName), metav1.GetOptions{})
 			return err
 		}).Should(Succeed())
@@ -186,13 +185,13 @@ var _ = Describe("Template addon with token-based authentication (v1alpha1)", Or
 		}
 
 		_, err = hub.KubeClient.CoreV1().ConfigMaps(universalClusterName).Create(
-			context.Background(), configmap, metav1.CreateOptions{})
+			ctx, configmap, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Step 7: Verify addon copies configmap to spoke using token auth")
 		Eventually(func() error {
 			copiedConfig, err := spoke.KubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(
-				context.Background(), configmap.Name, metav1.GetOptions{})
+				ctx, configmap.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -205,12 +204,12 @@ var _ = Describe("Template addon with token-based authentication (v1alpha1)", Or
 
 		By("Step 8: Cleanup - Delete the addon")
 		err = hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Delete(
-			context.TODO(), addOnName, metav1.DeleteOptions{})
+			ctx, addOnName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		Eventually(func() error {
 			_, err := hub.AddonClient.AddonV1alpha1().ManagedClusterAddOns(universalClusterName).Get(
-				context.TODO(), addOnName, metav1.GetOptions{})
+				ctx, addOnName, metav1.GetOptions{})
 			if err == nil {
 				return fmt.Errorf("the managedClusterAddon %s should be deleted", addOnName)
 			}
@@ -221,7 +220,7 @@ var _ = Describe("Template addon with token-based authentication (v1alpha1)", Or
 		}).ShouldNot(HaveOccurred())
 
 		By("Step 9: Delete addon template resources")
-		err = deleteResourcesFromYamlFiles(context.Background(), hub.DynamicClient, hub.RestMapper, s,
+		err = deleteResourcesFromYamlFiles(ctx, hub.DynamicClient, hub.RestMapper, s,
 			defaultAddonTemplateReaderManifestsFunc(manifests.AddonManifestFiles, map[string]interface{}{
 				"Namespace":                   universalClusterName,
 				"AddonInstallNamespace":       addonInstallNamespace,
@@ -236,7 +235,7 @@ var _ = Describe("Template addon with token-based authentication (v1alpha1)", Or
 
 		By("Step 10: Cleanup CSRs")
 		Eventually(func() error {
-			csrs, err := hub.KubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(),
+			csrs, err := hub.KubeClient.CertificatesV1().CertificateSigningRequests().List(ctx,
 				metav1.ListOptions{
 					LabelSelector: fmt.Sprintf("%s=%s,%s=%s", addonapiv1alpha1.AddonLabelKey, addOnName,
 						clusterv1.ClusterNameLabelKey, universalClusterName),
@@ -246,7 +245,7 @@ var _ = Describe("Template addon with token-based authentication (v1alpha1)", Or
 			}
 
 			for _, csr := range csrs.Items {
-				err = hub.KubeClient.CertificatesV1().CertificateSigningRequests().Delete(context.TODO(),
+				err = hub.KubeClient.CertificatesV1().CertificateSigningRequests().Delete(ctx,
 					csr.Name, metav1.DeleteOptions{})
 				if err != nil {
 					return err

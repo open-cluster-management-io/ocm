@@ -1,7 +1,6 @@
 package registration_test
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 
@@ -14,10 +13,10 @@ import (
 )
 
 var _ = Describe("GlobalManagedClusterSet", func() {
-	It("should create GlobalManagedClusterSet successfully", func() {
+	It("should create GlobalManagedClusterSet successfully", func(ctx SpecContext) {
 		By("check whether GlobalManagedClusterSet is created")
 		Eventually(func() error {
-			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
+			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -30,9 +29,9 @@ var _ = Describe("GlobalManagedClusterSet", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	})
 
-	It("should reconcile GlobalManagedClusterSet successfully if it changed", func() {
+	It("should reconcile GlobalManagedClusterSet successfully if it changed", func(ctx SpecContext) {
 		By("check whether GlobalManagedClusterSet is reconciled after changed")
-		mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
+		mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		updateMcs := mcs.DeepCopy()
@@ -41,11 +40,11 @@ var _ = Describe("GlobalManagedClusterSet", func() {
 				"vendor": "openshift",
 			},
 		}
-		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Update(context.TODO(), updateMcs, metav1.UpdateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Update(ctx, updateMcs, metav1.UpdateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func() error {
-			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
+			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -56,9 +55,9 @@ var _ = Describe("GlobalManagedClusterSet", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	})
 
-	It("should not change users labels/annotations in GlobalManagedClusterSet", func() {
+	It("should not change users labels/annotations in GlobalManagedClusterSet", func(ctx SpecContext) {
 		By("check whether GlobalManagedClusterSet labels/annotations reconciled after changed")
-		mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
+		mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		updateMcs := mcs.DeepCopy()
@@ -73,11 +72,11 @@ var _ = Describe("GlobalManagedClusterSet", func() {
 				"vendor": "openshift",
 			},
 		}
-		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Update(context.TODO(), updateMcs, metav1.UpdateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Update(ctx, updateMcs, metav1.UpdateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func() error {
-			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
+			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -90,14 +89,14 @@ var _ = Describe("GlobalManagedClusterSet", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	})
 
-	It("should recreate GlobalManagedClusterSet successfully after deleted", func() {
+	It("should recreate GlobalManagedClusterSet successfully after deleted", func(ctx SpecContext) {
 		By("delete GlobalManagedClusterSet")
-		err := clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.DeleteOptions{})
+		err := clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(ctx, setcontroller.GlobalManagedClusterSetName, metav1.DeleteOptions{})
 		Expect(err).NotTo(HaveOccurred(), "try to delete GlobalManagedClusterSet error")
 
 		By("check whether GlobalManagedClusterSet is recreated")
 		Eventually(func() error {
-			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
+			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(ctx, setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}

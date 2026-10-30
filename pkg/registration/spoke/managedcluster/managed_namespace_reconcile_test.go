@@ -1,7 +1,6 @@
 package managedcluster
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -250,7 +249,7 @@ func TestManagedNamespaceReconcile_reconcile(t *testing.T) {
 			}
 
 			// Run reconcile
-			ctx := context.TODO()
+			ctx := t.Context()
 			syncCtx := testingcommon.NewFakeSyncContext(t, "")
 			updatedCluster, state, err := reconciler.reconcile(ctx, syncCtx, c.cluster)
 
@@ -355,7 +354,7 @@ func TestManagedNamespaceReconcile_createOrUpdateNamespace(t *testing.T) {
 			}
 
 			// Run createOrUpdateNamespace
-			ctx := context.TODO()
+			ctx := t.Context()
 			syncCtx := testingcommon.NewFakeSyncContext(t, "")
 			err := reconciler.createOrUpdateNamespace(ctx, syncCtx, c.nsName, c.clusterSetName)
 
@@ -494,7 +493,7 @@ func TestManagedNamespaceReconcile_cleanupPreviouslyManagedNamespaces(t *testing
 			}
 
 			// Run cleanupPreviouslyManagedNamespaces
-			ctx := context.TODO()
+			ctx := t.Context()
 			syncCtx := testingcommon.NewFakeSyncContext(t, "")
 			err := reconciler.cleanupPreviouslyManagedNamespaces(ctx, syncCtx, c.currentManagedNS)
 

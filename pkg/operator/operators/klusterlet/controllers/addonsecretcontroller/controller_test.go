@@ -1,7 +1,6 @@
 package addonsecretcontroller
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -71,7 +70,7 @@ func TestSync(t *testing.T) {
 				},
 			},
 			verify: func(t *testing.T, client *kubefake.Clientset) {
-				secret, err := client.CoreV1().Secrets("ns1").Get(context.TODO(), helpers.ImagePullSecret, metav1.GetOptions{})
+				secret, err := client.CoreV1().Secrets("ns1").Get(t.Context(), helpers.ImagePullSecret, metav1.GetOptions{})
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
@@ -97,7 +96,7 @@ func TestSync(t *testing.T) {
 			namespaceInformer: kubeInformer.Core().V1().Namespaces(),
 		}
 
-		err := controller.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, tc.queueKey), tc.queueKey)
+		err := controller.sync(t.Context(), testingcommon.NewFakeSyncContext(t, tc.queueKey), tc.queueKey)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 		}

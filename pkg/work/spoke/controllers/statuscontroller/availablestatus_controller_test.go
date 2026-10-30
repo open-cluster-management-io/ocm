@@ -1,7 +1,6 @@
 package statuscontroller
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -222,7 +221,7 @@ func TestSyncManifestWork(t *testing.T) {
 				objectReader: r,
 			}
 
-			err = controller.syncManifestWork(context.TODO(), syncCtx, testingWork)
+			err = controller.syncManifestWork(t.Context(), syncCtx, testingWork)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -568,7 +567,7 @@ func TestStatusFeedback(t *testing.T) {
 				objectReader: r,
 			}
 
-			err = controller.syncManifestWork(context.TODO(), syncCtx, testingWork)
+			err = controller.syncManifestWork(t.Context(), syncCtx, testingWork)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -898,7 +897,7 @@ func TestConditionRules(t *testing.T) {
 			}
 
 			syncCtx := testingcommon.NewFakeSyncContext(t, testingWork.Namespace)
-			err = controller.syncManifestWork(context.TODO(), syncCtx, testingWork)
+			err = controller.syncManifestWork(t.Context(), syncCtx, testingWork)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1113,7 +1112,7 @@ func TestRegisterUnregisterInformersBasedOnFeedbackType(t *testing.T) {
 				statusReader:    statusfeedback.NewStatusReader(),
 			}
 
-			err = controller.syncManifestWork(context.TODO(), syncCtx, testingWork)
+			err = controller.syncManifestWork(t.Context(), syncCtx, testingWork)
 			if err != nil {
 				t.Fatal(err)
 			}

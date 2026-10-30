@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -68,7 +67,7 @@ var _ = Describe("Agent deploy Alpha", func() {
 	var managedClusterName string
 	var err error
 	var manifestWorkName string
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		suffix := rand.String(5)
 		managedClusterName = fmt.Sprintf("managedcluster-%s", suffix)
 		manifestWorkName = fmt.Sprintf("%s-0", constants.DeployWorkNamePrefix(testAddonImpl.name))
@@ -81,32 +80,32 @@ var _ = Describe("Agent deploy Alpha", func() {
 				HubAcceptsClient: true,
 			},
 		}
-		_, err = hubClusterClient.ClusterV1().ManagedClusters().Create(context.Background(), managedCluster, metav1.CreateOptions{})
+		_, err = hubClusterClient.ClusterV1().ManagedClusters().Create(ctx, managedCluster, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: managedClusterName}}
-		_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err = hubKubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		cma := newClusterManagementAddonAlpha(testAddonImpl.name)
-		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(),
+		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(ctx,
 			cma, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		assertClusterManagementAddOnAnnotationsAlpha(testAddonImpl.name)
+		assertClusterManagementAddOnAnnotationsAlpha(ctx, testAddonImpl.name)
 	})
 
-	AfterEach(func() {
-		err = hubKubeClient.CoreV1().Namespaces().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
+	AfterEach(func(ctx SpecContext) {
+		err = hubKubeClient.CoreV1().Namespaces().Delete(ctx, managedClusterName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
-		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
+		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(ctx, managedClusterName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
-		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(),
+		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(ctx,
 			testAddonImpl.name, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	It("Should deploy agent when cma is managed by addon-manager successfully", func() {
+	It("Should deploy agent when cma is managed by addon-manager successfully", func(ctx SpecContext) {
 		obj := &unstructured.Unstructured{}
 		err := obj.UnmarshalJSON([]byte(deploymentJson))
 		Expect(err).ToNot(HaveOccurred())
@@ -124,11 +123,11 @@ var _ = Describe("Agent deploy Alpha", func() {
 				InstallNamespace: "default",
 			},
 		}
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
+		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(ctx, addon, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		Eventually(func() error {
-			work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
+			work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(ctx, manifestWorkName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -152,16 +151,16 @@ var _ = Describe("Agent deploy Alpha", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 		// Update work status to trigger addon status
-		work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
+		work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(ctx, manifestWorkName, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		meta.SetStatusCondition(
 			&work.Status.Conditions,
 			metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "WorkApplied", ObservedGeneration: work.Generation})
-		_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
+		_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).UpdateStatus(ctx, work, metav1.UpdateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		Eventually(func() error {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
+			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(ctx, testAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -176,16 +175,16 @@ var _ = Describe("Agent deploy Alpha", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 		// update work to available so addon becomes available
-		work, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
+		work, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(ctx, manifestWorkName, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		meta.SetStatusCondition(
 			&work.Status.Conditions,
 			metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "WorkAvailable", ObservedGeneration: work.Generation})
-		_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
+		_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).UpdateStatus(ctx, work, metav1.UpdateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		Eventually(func() error {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
+			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(ctx, testAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -200,17 +199,17 @@ var _ = Describe("Agent deploy Alpha", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 		// do nothing if cluster is deleting and addon is not deleted
-		cluster, err := hubClusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedClusterName, metav1.GetOptions{})
+		cluster, err := hubClusterClient.ClusterV1().ManagedClusters().Get(ctx, managedClusterName, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		cluster.SetFinalizers([]string{clusterv1.ManagedClusterFinalizer})
-		_, err = hubClusterClient.ClusterV1().ManagedClusters().Update(context.Background(), cluster, metav1.UpdateOptions{})
+		_, err = hubClusterClient.ClusterV1().ManagedClusters().Update(ctx, cluster, metav1.UpdateOptions{})
 		Expect(err).ToNot(HaveOccurred())
-		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
+		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(ctx, managedClusterName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		time.Sleep(5 * time.Second) // wait 5 seconds to sync
 		Eventually(func() error {
-			_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
+			_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(ctx, manifestWorkName, metav1.GetOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	})

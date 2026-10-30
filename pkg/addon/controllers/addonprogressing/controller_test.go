@@ -1,7 +1,6 @@
 package addonprogressing
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -742,7 +741,7 @@ func TestReconcile(t *testing.T) {
 				workInformers.Work().V1().ManifestWorks(),
 			)
 
-			err := controller.Sync(context.TODO(), syncContext, c.syncKey)
+			err := controller.Sync(t.Context(), syncContext, c.syncKey)
 			if err != nil {
 				t.Errorf("expected no error when sync: %v", err)
 			}
@@ -1467,7 +1466,7 @@ func TestReconcileHostedAddons(t *testing.T) {
 				workInformers.Work().V1().ManifestWorks(),
 			)
 
-			err := controller.Sync(context.TODO(), syncContext, c.syncKey)
+			err := controller.Sync(t.Context(), syncContext, c.syncKey)
 			if err != nil {
 				t.Errorf("expected no error when sync: %v", err)
 			}

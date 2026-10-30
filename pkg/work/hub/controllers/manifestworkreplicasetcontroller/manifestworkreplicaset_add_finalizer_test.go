@@ -1,7 +1,6 @@
 package manifestworkreplicasetcontroller
 
 import (
-	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,12 +21,12 @@ func TestAddFinalizerReconcile(t *testing.T) {
 		workClient: fakeClient,
 	}
 
-	_, _, err := addFinalizerController.reconcile(context.TODO(), mwrSetTest)
+	_, _, err := addFinalizerController.reconcile(t.Context(), mwrSetTest)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	updatetSet, err := fakeClient.WorkV1alpha1().ManifestWorkReplicaSets(mwrSetTest.Namespace).Get(context.TODO(), mwrSetTest.Name, metav1.GetOptions{})
+	updatetSet, err := fakeClient.WorkV1alpha1().ManifestWorkReplicaSets(mwrSetTest.Namespace).Get(t.Context(), mwrSetTest.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +41,7 @@ func TestAddFinalizerReconcile(t *testing.T) {
 	mwrSetTest.Finalizers = []string{}
 
 	// Run reconcile
-	mwrSetTest, _, err = addFinalizerController.reconcile(context.TODO(), mwrSetTest)
+	mwrSetTest, _, err = addFinalizerController.reconcile(t.Context(), mwrSetTest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +61,7 @@ func TestAddFinalizerTwiceReconcile(t *testing.T) {
 		workClient: fakeClient,
 	}
 
-	_, _, err := addFinalizerController.reconcile(context.TODO(), mwrSetTest)
+	_, _, err := addFinalizerController.reconcile(t.Context(), mwrSetTest)
 	if err != nil {
 		t.Fatal(err)
 	}

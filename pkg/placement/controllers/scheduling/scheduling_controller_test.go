@@ -572,7 +572,7 @@ func TestSchedulingController_sync(t *testing.T) {
 
 			key := c.placement.Namespace + "/" + c.placement.Name
 			sysCtx := testingcommon.NewFakeSyncContext(t, key)
-			syncErr := ctrl.sync(context.TODO(), sysCtx, key)
+			syncErr := ctrl.sync(t.Context(), sysCtx, key)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}
@@ -1404,7 +1404,7 @@ func TestBind(t *testing.T) {
 
 			decisions, _, _ := ctrl.generatePlacementDecisionsAndStatus(c.placement, c.clusters)
 			err := ctrl.bind(
-				context.TODO(),
+				t.Context(),
 				c.placement,
 				decisions,
 				nil,

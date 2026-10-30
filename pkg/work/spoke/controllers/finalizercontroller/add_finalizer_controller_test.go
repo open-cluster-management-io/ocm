@@ -1,7 +1,6 @@
 package finalizercontroller
 
 import (
-	"context"
 	"encoding/json"
 	"reflect"
 	"testing"
@@ -83,7 +82,7 @@ func TestAddFinalizer(t *testing.T) {
 					fakeClient.WorkV1().ManifestWorks(testingWork.Namespace)),
 			}
 
-			err := controller.syncManifestWork(context.TODO(), testingWork)
+			err := controller.syncManifestWork(t.Context(), testingWork)
 			if err != nil {
 				t.Fatal(err)
 			}

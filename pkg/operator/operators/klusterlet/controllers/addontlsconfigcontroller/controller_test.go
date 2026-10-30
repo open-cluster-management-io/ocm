@@ -1,7 +1,6 @@
 package addontlsconfigcontroller
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -74,7 +73,7 @@ func TestSync(t *testing.T) {
 			},
 			verify: func(t *testing.T, client *kubefake.Clientset) {
 				cm, err := client.CoreV1().ConfigMaps("ns1").Get(
-					context.TODO(), tlslib.ConfigMapName, metav1.GetOptions{})
+					t.Context(), tlslib.ConfigMapName, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("expected ConfigMap to be copied, got error: %v", err)
 				}
@@ -108,7 +107,7 @@ func TestSync(t *testing.T) {
 			},
 			verify: func(t *testing.T, client *kubefake.Clientset) {
 				_, err := client.CoreV1().ConfigMaps("ns1").Get(
-					context.TODO(), tlslib.ConfigMapName, metav1.GetOptions{})
+					t.Context(), tlslib.ConfigMapName, metav1.GetOptions{})
 				if err == nil {
 					t.Error("expected target ConfigMap to be deleted, but it still exists")
 				}
@@ -147,7 +146,7 @@ func TestSync(t *testing.T) {
 			},
 			verify: func(t *testing.T, client *kubefake.Clientset) {
 				cm, err := client.CoreV1().ConfigMaps("ns1").Get(
-					context.TODO(), tlslib.ConfigMapName, metav1.GetOptions{})
+					t.Context(), tlslib.ConfigMapName, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("expected ConfigMap to exist, got error: %v", err)
 				}
@@ -214,7 +213,7 @@ func TestSync(t *testing.T) {
 				kubeClient:        kubeClient,
 			}
 
-			err := controller.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, tc.queueKey), tc.queueKey)
+			err := controller.sync(t.Context(), testingcommon.NewFakeSyncContext(t, tc.queueKey), tc.queueKey)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

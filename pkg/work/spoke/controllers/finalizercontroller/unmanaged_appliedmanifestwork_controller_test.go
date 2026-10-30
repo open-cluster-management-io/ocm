@@ -1,7 +1,6 @@
 package finalizercontroller
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -285,7 +284,7 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 			}
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, c.appliedManifestWorkName)
-			if err := controller.sync(context.TODO(), controllerContext, c.appliedManifestWorkName); err != nil {
+			if err := controller.sync(t.Context(), controllerContext, c.appliedManifestWorkName); err != nil {
 				t.Errorf("Expect no sync error, but got %v", err)
 			}
 

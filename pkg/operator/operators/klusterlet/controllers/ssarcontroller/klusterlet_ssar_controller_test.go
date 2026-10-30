@@ -1,7 +1,6 @@
 package ssarcontroller
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -286,7 +285,7 @@ func TestSync(t *testing.T) {
 			response.allowToOperateManagedClusterStatus = c.allowToOperateManagedClusterStatus
 			response.allowToOperateManifestWorks = c.allowToOperateManifestWorks
 
-			err := controller.controller.sync(context.TODO(), syncContext, c.klusterlet.Name)
+			err := controller.controller.sync(t.Context(), syncContext, c.klusterlet.Name)
 			if err != nil {
 				t.Errorf("Expected no error when update status: %v", err)
 			}

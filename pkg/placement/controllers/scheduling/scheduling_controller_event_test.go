@@ -1,7 +1,6 @@
 package scheduling
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -135,7 +134,7 @@ func TestCreateOrUpdatePlacementDecision_EventRecording(t *testing.T) {
 				},
 			}
 
-			err := ctrl.createOrUpdatePlacementDecision(context.TODO(), placement, placementDecision, c.clusterScores, c.status)
+			err := ctrl.createOrUpdatePlacementDecision(t.Context(), placement, placementDecision, c.clusterScores, c.status)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

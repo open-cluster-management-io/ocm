@@ -49,7 +49,7 @@ var _ = Describe("PlacementDebugger", Label("placement-debugger", "sanity-check"
 	var suffix string
 	var token string
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		suffix = rand.String(5)
 		namespace = fmt.Sprintf("debugger-test-%s", suffix)
 		placementName = fmt.Sprintf("test-placement-%s", suffix)
@@ -66,7 +66,7 @@ var _ = Describe("PlacementDebugger", Label("placement-debugger", "sanity-check"
 				},
 			},
 		}
-		_, err := hub.KubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err := hub.KubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("Creating ManagedClusterSet: %s", clusterSetName))
@@ -78,7 +78,7 @@ var _ = Describe("PlacementDebugger", Label("placement-debugger", "sanity-check"
 				},
 			},
 		}
-		_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterSet, metav1.CreateOptions{})
+		_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Create(ctx, clusterSet, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("Creating ManagedClusterSetBinding in namespace: %s", namespace))
@@ -91,7 +91,7 @@ var _ = Describe("PlacementDebugger", Label("placement-debugger", "sanity-check"
 				ClusterSet: clusterSetName,
 			},
 		}
-		_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.Background(), binding, metav1.CreateOptions{})
+		_, err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(ctx, binding, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("Creating ManagedCluster: %s", clusterName))
@@ -108,7 +108,7 @@ var _ = Describe("PlacementDebugger", Label("placement-debugger", "sanity-check"
 				HubAcceptsClient: true,
 			},
 		}
-		_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
+		_, err = hub.ClusterClient.ClusterV1().ManagedClusters().Create(ctx, cluster, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("Creating Placement: %s", placementName))
@@ -131,7 +131,7 @@ var _ = Describe("PlacementDebugger", Label("placement-debugger", "sanity-check"
 				},
 			},
 		}
-		_, err = hub.ClusterClient.ClusterV1beta1().Placements(namespace).Create(context.Background(), placement, metav1.CreateOptions{})
+		_, err = hub.ClusterClient.ClusterV1beta1().Placements(namespace).Create(ctx, placement, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("Creating ServiceAccount: %s", serviceAccountName))
@@ -141,7 +141,7 @@ var _ = Describe("PlacementDebugger", Label("placement-debugger", "sanity-check"
 				Namespace: namespace,
 			},
 		}
-		_, err = hub.KubeClient.CoreV1().ServiceAccounts(namespace).Create(context.Background(), sa, metav1.CreateOptions{})
+		_, err = hub.KubeClient.CoreV1().ServiceAccounts(namespace).Create(ctx, sa, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Creating Role with placement permissions")
@@ -158,7 +158,7 @@ var _ = Describe("PlacementDebugger", Label("placement-debugger", "sanity-check"
 				},
 			},
 		}
-		_, err = hub.KubeClient.RbacV1().Roles(namespace).Create(context.Background(), role, metav1.CreateOptions{})
+		_, err = hub.KubeClient.RbacV1().Roles(namespace).Create(ctx, role, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Creating RoleBinding")
@@ -180,7 +180,7 @@ var _ = Describe("PlacementDebugger", Label("placement-debugger", "sanity-check"
 				},
 			},
 		}
-		_, err = hub.KubeClient.RbacV1().RoleBindings(namespace).Create(context.Background(), roleBinding, metav1.CreateOptions{})
+		_, err = hub.KubeClient.RbacV1().RoleBindings(namespace).Create(ctx, roleBinding, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Creating ClusterRole for debug path access")
@@ -199,7 +199,7 @@ var _ = Describe("PlacementDebugger", Label("placement-debugger", "sanity-check"
 				},
 			},
 		}
-		_, err = hub.KubeClient.RbacV1().ClusterRoles().Create(context.Background(), clusterRole, metav1.CreateOptions{})
+		_, err = hub.KubeClient.RbacV1().ClusterRoles().Create(ctx, clusterRole, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Creating ClusterRoleBinding")
@@ -223,7 +223,7 @@ var _ = Describe("PlacementDebugger", Label("placement-debugger", "sanity-check"
 				},
 			},
 		}
-		_, err = hub.KubeClient.RbacV1().ClusterRoleBindings().Create(context.Background(), clusterRoleBinding, metav1.CreateOptions{})
+		_, err = hub.KubeClient.RbacV1().ClusterRoleBindings().Create(ctx, clusterRoleBinding, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Creating ServiceAccount token")
@@ -233,7 +233,7 @@ var _ = Describe("PlacementDebugger", Label("placement-debugger", "sanity-check"
 			},
 		}
 		tokenResp, err := hub.KubeClient.CoreV1().ServiceAccounts(namespace).CreateToken(
-			context.Background(),
+			ctx,
 			serviceAccountName,
 			tokenRequest,
 			metav1.CreateOptions{},
@@ -246,46 +246,46 @@ var _ = Describe("PlacementDebugger", Label("placement-debugger", "sanity-check"
 		time.Sleep(5 * time.Second)
 	})
 
-	AfterEach(func() {
+	AfterEach(func(ctx SpecContext) {
 		By("Cleaning up test resources")
 
 		// Delete namespace
-		err := hub.KubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
+		err := hub.KubeClient.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			GinkgoLogr.Error(err, "Failed to delete namespace", "namespace", namespace)
 		}
 
 		// Delete ManagedCluster
-		err = hub.ClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), clusterName, metav1.DeleteOptions{})
+		err = hub.ClusterClient.ClusterV1().ManagedClusters().Delete(ctx, clusterName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			GinkgoLogr.Error(err, "Failed to delete ManagedCluster", "cluster", clusterName)
 		}
 
 		// Delete ManagedClusterSet
-		err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.Background(), clusterSetName, metav1.DeleteOptions{})
+		err = hub.ClusterClient.ClusterV1beta2().ManagedClusterSets().Delete(ctx, clusterSetName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			GinkgoLogr.Error(err, "Failed to delete ManagedClusterSet", "clusterSet", clusterSetName)
 		}
 
 		// Delete ClusterRole and ClusterRoleBinding
 		clusterRoleName := fmt.Sprintf("debug-access-%s", namespace)
-		err = hub.KubeClient.RbacV1().ClusterRoles().Delete(context.Background(), clusterRoleName, metav1.DeleteOptions{})
+		err = hub.KubeClient.RbacV1().ClusterRoles().Delete(ctx, clusterRoleName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			GinkgoLogr.Error(err, "Failed to delete ClusterRole", "clusterRole", clusterRoleName)
 		}
 
 		clusterRoleBindingName := fmt.Sprintf("debug-access-%s-binding", namespace)
-		err = hub.KubeClient.RbacV1().ClusterRoleBindings().Delete(context.Background(), clusterRoleBindingName, metav1.DeleteOptions{})
+		err = hub.KubeClient.RbacV1().ClusterRoleBindings().Delete(ctx, clusterRoleBindingName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			GinkgoLogr.Error(err, "Failed to delete ClusterRoleBinding", "clusterRoleBinding", clusterRoleBindingName)
 		}
 	})
 
-	It("Should debug placement with GET method using curl pod", func() {
+	It("Should debug placement with GET method using curl pod", func(ctx SpecContext) {
 		By("Creating a curl pod to test the debugger service")
 
 		debugPath := fmt.Sprintf("/debug/placements/%s/%s", namespace, placementName)
-		response := callDebugServiceWithPod(hub, namespace, "GET", debugPath, token, nil)
+		response := callDebugServiceWithPod(ctx, hub, namespace, "GET", debugPath, token, nil)
 
 		By("Validating GET response")
 		Expect(response.Placement).ToNot(BeNil())
@@ -295,7 +295,7 @@ var _ = Describe("PlacementDebugger", Label("placement-debugger", "sanity-check"
 		Expect(response.Error).To(BeEmpty())
 	})
 
-	It("Should debug placement with POST method using curl pod", func() {
+	It("Should debug placement with POST method using curl pod", func(ctx SpecContext) {
 		By("Creating a curl pod to test the debugger service")
 
 		placementPayload := &clusterapiv1beta1.Placement{
@@ -323,7 +323,7 @@ var _ = Describe("PlacementDebugger", Label("placement-debugger", "sanity-check"
 		}
 
 		debugPath := "/debug/placements/"
-		response := callDebugServiceWithPod(hub, namespace, "POST", debugPath, token, placementPayload)
+		response := callDebugServiceWithPod(ctx, hub, namespace, "POST", debugPath, token, placementPayload)
 
 		By("Validating POST response")
 		Expect(response.Placement).ToNot(BeNil())
@@ -335,7 +335,7 @@ var _ = Describe("PlacementDebugger", Label("placement-debugger", "sanity-check"
 })
 
 // callDebugServiceWithPod calls the placement debugger service using a curl pod
-func callDebugServiceWithPod(hub *framework.Hub, namespace, method, path, token string, payload interface{}) *DebugResponse {
+func callDebugServiceWithPod(ctx context.Context, hub *framework.Hub, namespace, method, path, token string, payload interface{}) *DebugResponse {
 	serviceURL := fmt.Sprintf("https://%s.%s.svc.cluster.local:%d%s",
 		placementDebuggerServiceName,
 		placementDebuggerHubNamespace,
@@ -382,13 +382,13 @@ func callDebugServiceWithPod(hub *framework.Hub, namespace, method, path, token 
 	}
 
 	By(fmt.Sprintf("Creating curl pod %s in namespace %s", podName, namespace))
-	_, err := hub.KubeClient.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{})
+	_, err := hub.KubeClient.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
 	// Wait for pod to complete
 	By("Waiting for curl pod to complete")
 	Eventually(func() corev1.PodPhase {
-		p, err := hub.KubeClient.CoreV1().Pods(namespace).Get(context.Background(), podName, metav1.GetOptions{})
+		p, err := hub.KubeClient.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 		if err != nil {
 			return corev1.PodUnknown
 		}
@@ -401,7 +401,7 @@ func callDebugServiceWithPod(hub *framework.Hub, namespace, method, path, token 
 	// Get pod logs
 	By("Retrieving curl pod logs")
 	req := hub.KubeClient.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{})
-	logs, err := req.Stream(context.Background())
+	logs, err := req.Stream(ctx)
 	Expect(err).ToNot(HaveOccurred())
 	defer logs.Close()
 
@@ -411,7 +411,7 @@ func callDebugServiceWithPod(hub *framework.Hub, namespace, method, path, token 
 	GinkgoLogr.Info("Received response from debugger", "response", string(respBody))
 
 	// Clean up the pod
-	err = hub.KubeClient.CoreV1().Pods(namespace).Delete(context.Background(), podName, metav1.DeleteOptions{})
+	err = hub.KubeClient.CoreV1().Pods(namespace).Delete(ctx, podName, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		GinkgoLogr.Error(err, "Failed to delete curl pod", "pod", podName)
 	}

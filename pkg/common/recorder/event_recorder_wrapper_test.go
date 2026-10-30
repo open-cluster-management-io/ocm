@@ -44,7 +44,7 @@ func (f *fakeRecorder) Shutdown() {}
 
 func TestEventsRecorderWrapperDelegation(t *testing.T) {
 	f := &fakeRecorder{component: "test"}
-	w := NewEventsRecorderWrapper(context.Background(), f)
+	w := NewEventsRecorderWrapper(t.Context(), f)
 
 	w.Event("Created", "created a thing")
 	w.Eventf("Updated", "updated %d things", 3)
@@ -69,7 +69,7 @@ func TestEventsRecorderWrapperDelegation(t *testing.T) {
 
 func TestEventsRecorderWrapperComponentName(t *testing.T) {
 	f := &fakeRecorder{component: "hub-controller"}
-	w := NewEventsRecorderWrapper(context.Background(), f)
+	w := NewEventsRecorderWrapper(t.Context(), f)
 
 	if got := w.ComponentName(); got != "hub-controller" {
 		t.Errorf("expected component name %q, got %q", "hub-controller", got)
@@ -78,7 +78,7 @@ func TestEventsRecorderWrapperComponentName(t *testing.T) {
 
 func TestEventsRecorderWrapperForComponentDoesNotMutateOriginal(t *testing.T) {
 	f := &fakeRecorder{component: "hub-controller"}
-	w := NewEventsRecorderWrapper(context.Background(), f)
+	w := NewEventsRecorderWrapper(t.Context(), f)
 
 	sub := w.ForComponent("sub-reconciler")
 
@@ -102,7 +102,7 @@ func TestEventsRecorderWrapperForComponentDoesNotMutateOriginal(t *testing.T) {
 
 func TestEventsRecorderWrapperWithComponentSuffix(t *testing.T) {
 	f := &fakeRecorder{component: "hub-controller"}
-	w := NewEventsRecorderWrapper(context.Background(), f)
+	w := NewEventsRecorderWrapper(t.Context(), f)
 
 	sub := w.WithComponentSuffix("retry")
 
@@ -116,10 +116,10 @@ func TestEventsRecorderWrapperWithComponentSuffix(t *testing.T) {
 
 func TestEventsRecorderWrapperWithContextDoesNotMutateOriginal(t *testing.T) {
 	f := &fakeRecorder{component: "test"}
-	original := NewEventsRecorderWrapper(context.Background(), f)
+	original := NewEventsRecorderWrapper(t.Context(), f)
 
 	type ctxKey struct{}
-	newCtx := context.WithValue(context.Background(), ctxKey{}, "child")
+	newCtx := context.WithValue(t.Context(), ctxKey{}, "child")
 	withNewCtx := original.WithContext(newCtx)
 
 	withNewCtx.Event("Created", "via new context")

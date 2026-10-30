@@ -1,7 +1,6 @@
 package managedcluster
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -156,7 +155,7 @@ func TestSyncManagedNamespacesForCluster(t *testing.T) {
 
 			syncCtx := testingcommon.NewFakeSyncContext(t, c.name)
 
-			err := controller.syncManagedNamespacesForCluster(context.TODO(), syncCtx, c.cluster)
+			err := controller.syncManagedNamespacesForCluster(t.Context(), syncCtx, c.cluster)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -461,7 +460,7 @@ func TestSync(t *testing.T) {
 
 			// Create a fake sync context
 			syncCtx := testingcommon.NewFakeSyncContext(t, c.queueKey)
-			err := controller.sync(context.TODO(), syncCtx, c.queueKey)
+			err := controller.sync(t.Context(), syncCtx, c.queueKey)
 
 			if c.expectError && err == nil {
 				t.Errorf("expected error but got none")

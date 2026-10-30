@@ -305,7 +305,7 @@ func TestSyncManifestWork(t *testing.T) {
 			}
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, testingWork.Name)
-			err = controller.sync(context.TODO(), controllerContext, testingWork.Name)
+			err = controller.sync(t.Context(), controllerContext, testingWork.Name)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -69,7 +69,7 @@ func TestDeployReconcileAsExpected(t *testing.T) {
 		placementLister:     placementLister,
 	}
 
-	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, _, err := pmwDeployController.reconcile(t.Context(), mwrSet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +133,7 @@ func TestDeployReconcileAsPlacementDecisionEmpty(t *testing.T) {
 		placementLister:     placementLister,
 	}
 
-	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, _, err := pmwDeployController.reconcile(t.Context(), mwrSet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +208,7 @@ func TestDeployReconcileApplyFailureReportsNotAsExpected(t *testing.T) {
 		placementLister:     placementLister,
 	}
 
-	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, _, err := pmwDeployController.reconcile(t.Context(), mwrSet)
 	if err == nil {
 		t.Fatal("expected reconcile to return the aggregated apply error")
 	}
@@ -278,7 +278,7 @@ func TestDeployReconcileMultiPlacementApplyFailuresAreAggregated(t *testing.T) {
 		placementLister:     placementLister,
 	}
 
-	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, _, err := pmwDeployController.reconcile(t.Context(), mwrSet)
 	if err == nil {
 		t.Fatal("expected reconcile to return the aggregated apply errors")
 	}
@@ -337,7 +337,7 @@ func TestDeployReconcilePartialApplyFailureReportsNotAsExpected(t *testing.T) {
 		placementLister:     clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
 	}
 
-	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, _, err := pmwDeployController.reconcile(t.Context(), mwrSet)
 	if err == nil {
 		t.Fatal("expected reconcile to return the apply error for cls2")
 	}
@@ -394,7 +394,7 @@ func TestDeployReconcileRolloutErrorNotOverwrittenByOtherPlacement(t *testing.T)
 		placementLister:     clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
 	}
 
-	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, _, err := pmwDeployController.reconcile(t.Context(), mwrSet)
 	if err == nil {
 		t.Fatal("expected reconcile to return the rollout strategy error")
 	}
@@ -447,7 +447,7 @@ func TestDeployReconcileInvalidRolloutStrategyReportsNotAsExpected(t *testing.T)
 		placementLister:     placementLister,
 	}
 
-	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, _, err := pmwDeployController.reconcile(t.Context(), mwrSet)
 	if err == nil {
 		t.Fatal("expected reconcile to return the rollout strategy error")
 	}
@@ -493,7 +493,7 @@ func TestDeployReconcileSelectedClustersButEmptyDecision(t *testing.T) {
 		placementLister:     placementLister,
 	}
 
-	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, _, err := pmwDeployController.reconcile(t.Context(), mwrSet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -564,7 +564,7 @@ func TestDeployReconcileAsPlacementNotExist(t *testing.T) {
 		placementLister:     placementLister,
 	}
 
-	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, _, err := pmwDeployController.reconcile(t.Context(), mwrSet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -624,7 +624,7 @@ func TestDeployWithRolloutStrategyReconcileAsExpected(t *testing.T) {
 		placementLister:     placementLister,
 	}
 
-	mwrSet, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, _, err = pmwDeployController.reconcile(t.Context(), mwrSet)
 	assert.Nil(t, err)
 	assert.Equal(t, len(mwrSet.Status.PlacementsSummary), len(mwrSet.Spec.PlacementRefs))
 
@@ -674,7 +674,7 @@ func TestDeployWithRolloutStrategyReconcileAsExpected(t *testing.T) {
 	err = workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw)
 	assert.Nil(t, err)
 
-	mwrSet, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, _, err = pmwDeployController.reconcile(t.Context(), mwrSet)
 	assert.Nil(t, err)
 	assert.Equal(t, len(mwrSet.Status.PlacementsSummary), len(mwrSet.Spec.PlacementRefs))
 
@@ -729,7 +729,7 @@ func TestDeployWithRolloutStrategyReconcileAsExpected(t *testing.T) {
 		assert.Nil(t, err)
 	}
 
-	mwrSet, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, _, err = pmwDeployController.reconcile(t.Context(), mwrSet)
 	assert.Nil(t, err)
 
 	// Now RollOut should be Complete since all clusters have Succeeded status
@@ -787,7 +787,7 @@ func TestDeployWithMultiPlacementsReconcileAsExpected(t *testing.T) {
 		placementLister:     placementLister,
 	}
 
-	mwrSet, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, _, err = pmwDeployController.reconcile(t.Context(), mwrSet)
 	assert.Nil(t, err)
 	assert.Equal(t, len(mwrSet.Status.PlacementsSummary), len(mwrSet.Spec.PlacementRefs))
 
@@ -905,7 +905,7 @@ func TestDeployMWRSetSpecChangesReconcile(t *testing.T) {
 		placementLister:     placementLister,
 	}
 
-	mwrSet, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, _, err = pmwDeployController.reconcile(t.Context(), mwrSet)
 	assert.Nil(t, err)
 	assert.Equal(t, len(mwrSet.Status.PlacementsSummary), len(mwrSet.Spec.PlacementRefs))
 
@@ -967,7 +967,7 @@ func TestDeployMWRSetSpecChangesReconcile(t *testing.T) {
 		assert.Nil(t, err)
 	}
 
-	mwrSet, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, _, err = pmwDeployController.reconcile(t.Context(), mwrSet)
 	assert.Nil(t, err)
 
 	// Now RollOut should be Complete
@@ -982,7 +982,7 @@ func TestDeployMWRSetSpecChangesReconcile(t *testing.T) {
 	mwTemplate.DeepCopyInto(&mwrSet.Spec.ManifestWorkTemplate)
 	mwrSet.Generation = 2
 
-	mwrSet, _, _ = pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, _, _ = pmwDeployController.reconcile(t.Context(), mwrSet)
 	assert.Equal(t, len(mwrSet.Status.PlacementsSummary), len(mwrSet.Spec.PlacementRefs))
 
 	// As the mwrSet.Spec changed we expect to rollOut again with the num of clsPerGroup
@@ -1087,7 +1087,7 @@ func TestRequeueWithProgressDeadline(t *testing.T) {
 		placementLister:     placementLister,
 	}
 
-	_, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	_, _, err := pmwDeployController.reconcile(t.Context(), mwrSet)
 	var rqe helpers.RequeueError
 	if !errors.As(err, &rqe) {
 		t.Errorf("expect to get err %t", err)
@@ -1139,13 +1139,13 @@ func TestDeployReconcileDeletesOrphanedManifestWorks(t *testing.T) {
 	}
 
 	// Run reconcile
-	_, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	_, _, err := pmwDeployController.reconcile(t.Context(), mwrSet)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Verify that the ManifestWork from the old placement (place-test1) was deleted
-	works, err := listWorksByMWRS(context.TODO(), fWorkClient, "cls1", mwrSet.Namespace, mwrSet.Name, "place-test1")
+	works, err := listWorksByMWRS(t.Context(), fWorkClient, "cls1", mwrSet.Namespace, mwrSet.Name, "place-test1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1153,7 +1153,7 @@ func TestDeployReconcileDeletesOrphanedManifestWorks(t *testing.T) {
 		t.Fatalf("Expected ManifestWork for old placement to be deleted, but it still exists")
 	}
 	// Verify that the ManifestWork from the current placement (place-test2) still exists
-	works, err = listWorksByMWRS(context.TODO(), fWorkClient, "cls2", mwrSet.Namespace, mwrSet.Name, "place-test2")
+	works, err = listWorksByMWRS(t.Context(), fWorkClient, "cls2", mwrSet.Namespace, mwrSet.Name, "place-test2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1226,13 +1226,13 @@ func TestDeployReconcileWithMultiplePlacementChanges(t *testing.T) {
 	}
 
 	// Run reconcile
-	_, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	_, _, err := pmwDeployController.reconcile(t.Context(), mwrSet)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Verify that the ManifestWork from the old placement (place-test1) was deleted
-	works, err := listWorksByMWRS(context.TODO(), fWorkClient, "cls1", mwrSet.Namespace, mwrSet.Name, "place-test1")
+	works, err := listWorksByMWRS(t.Context(), fWorkClient, "cls1", mwrSet.Namespace, mwrSet.Name, "place-test1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1241,7 +1241,7 @@ func TestDeployReconcileWithMultiplePlacementChanges(t *testing.T) {
 	}
 
 	// Verify that ManifestWorks from current placements (place-test2 and place-test3) still exist
-	works, err = listWorksByMWRS(context.TODO(), fWorkClient, "cls2", mwrSet.Namespace, mwrSet.Name, "place-test2")
+	works, err = listWorksByMWRS(t.Context(), fWorkClient, "cls2", mwrSet.Namespace, mwrSet.Name, "place-test2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1251,7 +1251,7 @@ func TestDeployReconcileWithMultiplePlacementChanges(t *testing.T) {
 	currentMW2 := works[0]
 	assert.Equal(t, currentMW2.Labels[workapiv1alpha1.ManifestWorkReplicaSetPlacementNameLabelKey], "place-test2")
 
-	works, err = listWorksByMWRS(context.TODO(), fWorkClient, "cls3", mwrSet.Namespace, mwrSet.Name, "place-test3")
+	works, err = listWorksByMWRS(t.Context(), fWorkClient, "cls3", mwrSet.Namespace, mwrSet.Name, "place-test3")
 	if err != nil {
 		t.Fatalf("Expected ManifestWork for placement3 to exist, but got error: %v", err)
 	}
@@ -1353,7 +1353,7 @@ func TestDeployRolloutProgressingWhenNotAllSucceeded(t *testing.T) {
 		placementLister:     placementLister,
 	}
 
-	mwrSet, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, _, err = pmwDeployController.reconcile(t.Context(), mwrSet)
 	assert.Nil(t, err)
 
 	// Verify that Summary.Total equals the number of clusters
@@ -2162,7 +2162,7 @@ func TestDeployReconcileLongOwnerNameUsesHashLabel(t *testing.T) {
 		placementLister:     clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
 	}
 
-	mwrSet, state, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, state, err := pmwDeployController.reconcile(t.Context(), mwrSet)
 	if err != nil {
 		t.Fatal("expected no error, got ", err)
 	}
@@ -2171,7 +2171,7 @@ func TestDeployReconcileLongOwnerNameUsesHashLabel(t *testing.T) {
 	}
 
 	// A ManifestWork should have been created.
-	works, err := fWorkClient.WorkV1().ManifestWorks("cls1").List(context.TODO(), metav1.ListOptions{})
+	works, err := fWorkClient.WorkV1().ManifestWorks("cls1").List(t.Context(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2230,7 +2230,7 @@ func TestOldLabelOnlyManifestWorkMigratesOnSpecChange(t *testing.T) {
 		placementLister:     clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
 	}
 
-	mwrSet, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
+	mwrSet, _, err = pmwDeployController.reconcile(t.Context(), mwrSet)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, mwrSet.Status.Summary.Total, "old MW should be counted in summary")
 
@@ -2238,12 +2238,12 @@ func TestOldLabelOnlyManifestWorkMigratesOnSpecChange(t *testing.T) {
 	newTemplate := helpertest.CreateTestManifestWorkSpecWithSecret("v2", "test", "ns-test", "name-test")
 	newTemplate.DeepCopyInto(&mwrSet.Spec.ManifestWorkTemplate)
 
-	_, _, err = pmwDeployController.reconcile(context.TODO(), mwrSet)
+	_, _, err = pmwDeployController.reconcile(t.Context(), mwrSet)
 	assert.Nil(t, err)
 
 	// Step 4: Verify the MW in the fake client now has the new hash label and annotation,
 	// while keeping the deprecated label (namespace.name fits within label value limit).
-	works, err := fWorkClient.WorkV1().ManifestWorks("cls1").List(context.TODO(), metav1.ListOptions{})
+	works, err := fWorkClient.WorkV1().ManifestWorks("cls1").List(t.Context(), metav1.ListOptions{})
 	assert.Nil(t, err)
 
 	var migrated *workapiv1.ManifestWork

@@ -1,7 +1,6 @@
 package apply
 
 import (
-	"context"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -73,7 +72,7 @@ func TestCreateOnlyApply(t *testing.T) {
 
 			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			obj, err := applier.Apply(
-				context.TODO(), c.gvr, c.required, c.owner, nil, syncContext.Recorder())
+				t.Context(), c.gvr, c.required, c.owner, nil, syncContext.Recorder())
 
 			if err != nil {
 				t.Errorf("expect no error, but got %v", obj)

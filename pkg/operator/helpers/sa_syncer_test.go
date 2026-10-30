@@ -1,7 +1,6 @@
 package helpers
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -124,7 +123,7 @@ func TestSyncKubeConfigSecret_tlsServerNameDrift(t *testing.T) {
 		return []byte("aaa"), nil, nil, nil
 	}
 	err = SyncKubeConfigSecret(
-		context.TODO(), secretName, secretNamespace,
+		t.Context(), secretName, secretNamespace,
 		"/tmp/kubeconfig", tkc, client.CoreV1(), tokenGetter,
 		events.NewContextualLoggingEventRecorder(t.Name()), nil)
 	if err != nil {
@@ -219,7 +218,7 @@ func TestTokenGetter(t *testing.T) {
 			client.PrependReactor("create", "serviceaccounts/token", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 				return true, &authv1.TokenRequest{Status: authv1.TokenRequestStatus{Token: "aaa", ExpirationTimestamp: tt.expirationTime}}, nil
 			})
-			tokenGetter := SATokenGetter(context.TODO(), saName, saNamespace, client)
+			tokenGetter := SATokenGetter(t.Context(), saName, saNamespace, client)
 			token, _, additionalData, err := tokenGetter()
 			if err != nil && !tt.wantErr {
 				t.Error(err)
@@ -419,7 +418,7 @@ func TestApplyKubeconfigSecret(t *testing.T) {
 			}
 			client := testclient.NewSimpleClientset(tt.secrets...)
 			err := SyncKubeConfigSecret(
-				context.TODO(), secretName, secretNamespace,
+				t.Context(), secretName, secretNamespace,
 				"/tmp/kubeconfig", tkc, client.CoreV1(), tokenGetter,
 				events.NewContextualLoggingEventRecorder(t.Name()), nil)
 			if err != nil && !tt.wantErr {

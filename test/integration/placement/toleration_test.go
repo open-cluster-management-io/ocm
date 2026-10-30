@@ -27,7 +27,7 @@ var _ = Describe("TaintToleration", func() {
 	var clusterSet1Name string
 	var suffix string
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		suffix = rand.String(5)
 		namespace = fmt.Sprintf("ns-%s", suffix)
 		placementName = fmt.Sprintf("placement-%s", suffix)
@@ -39,15 +39,15 @@ var _ = Describe("TaintToleration", func() {
 				Name: namespace,
 			},
 		}
-		_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err := kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// start controller manager
-		var ctx context.Context
-		ctx, cancel = context.WithCancel(context.Background())
+		var runCtx context.Context
+		runCtx, cancel = context.WithCancel(context.Background())
 		go func() {
 			defer GinkgoRecover()
-			err := controllers.RunControllerManager(ctx, &controllercmd.ControllerContext{
+			err := controllers.RunControllerManager(runCtx, &controllercmd.ControllerContext{
 				KubeConfig:    restConfig,
 				EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
 			})
@@ -55,31 +55,31 @@ var _ = Describe("TaintToleration", func() {
 		}()
 	})
 
-	AfterEach(func() {
+	AfterEach(func(ctx SpecContext) {
 		if cancel != nil {
 			cancel()
 		}
-		err := kubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
+		err := kubeClient.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	Context("TaintToleration", func() {
-		It("Should schedule successfully when taint/toleration matches", func() {
+		It("Should schedule successfully when taint/toleration matches", func(ctx SpecContext) {
 			// Cluster settings
-			assertBindingClusterSet(clusterSet1Name, namespace)
-			clusterNames := assertCreatingClusters(clusterSet1Name, 3)
+			assertBindingClusterSet(ctx, clusterSet1Name, namespace)
+			clusterNames := assertCreatingClusters(ctx, clusterSet1Name, 3)
 
-			assertPatchingClusterSpecWithTaint(clusterNames[0], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(ctx, clusterNames[0], &clusterapiv1.Taint{
 				Key:    "key1",
 				Value:  "value1",
 				Effect: clusterapiv1.TaintEffectNoSelect,
 			})
-			assertPatchingClusterSpecWithTaint(clusterNames[1], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(ctx, clusterNames[1], &clusterapiv1.Taint{
 				Key:    "key2",
 				Value:  "value2",
 				Effect: clusterapiv1.TaintEffectNoSelect,
 			})
-			assertPatchingClusterSpecWithTaint(clusterNames[2], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(ctx, clusterNames[2], &clusterapiv1.Taint{
 				Key:    "key2",
 				Value:  "value3",
 				Effect: clusterapiv1.TaintEffectNoSelect,
@@ -94,26 +94,26 @@ var _ = Describe("TaintToleration", func() {
 				Operator: clusterapiv1beta1.TolerationOpEqual,
 				Value:    "value2",
 			}).Build()
-			assertCreatingPlacementWithDecision(placement, 2, 1)
-			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[0], clusterNames[1]})
+			assertCreatingPlacementWithDecision(ctx, placement, 2, 1)
+			assertPlacementDecisionClusterNames(ctx, placementName, namespace, []string{clusterNames[0], clusterNames[1]})
 		})
 
-		It("Should schedule when taint/toleration effect matches", func() {
+		It("Should schedule when taint/toleration effect matches", func(ctx SpecContext) {
 			// Cluster settings
-			assertBindingClusterSet(clusterSet1Name, namespace)
-			clusterNames := assertCreatingClusters(clusterSet1Name, 4)
+			assertBindingClusterSet(ctx, clusterSet1Name, namespace)
+			clusterNames := assertCreatingClusters(ctx, clusterSet1Name, 4)
 
-			assertPatchingClusterSpecWithTaint(clusterNames[0], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(ctx, clusterNames[0], &clusterapiv1.Taint{
 				Key:    "key1",
 				Value:  "value1",
 				Effect: clusterapiv1.TaintEffectNoSelect,
 			})
-			assertPatchingClusterSpecWithTaint(clusterNames[1], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(ctx, clusterNames[1], &clusterapiv1.Taint{
 				Key:    "key2",
 				Value:  "value2",
 				Effect: clusterapiv1.TaintEffectNoSelectIfNew,
 			})
-			assertPatchingClusterSpecWithTaint(clusterNames[2], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(ctx, clusterNames[2], &clusterapiv1.Taint{
 				Key:    "key3",
 				Value:  "value3",
 				Effect: clusterapiv1.TaintEffectPreferNoSelect,
@@ -137,42 +137,42 @@ var _ = Describe("TaintToleration", func() {
 				Operator: clusterapiv1beta1.TolerationOpExists,
 				Effect:   clusterapiv1.TaintEffectNoSelect,
 			}).Build()
-			assertCreatingPlacementWithDecision(placement, 2, 1)
+			assertCreatingPlacementWithDecision(ctx, placement, 2, 1)
 			// Checking the result of the placement
-			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[2], clusterNames[3]})
+			assertPlacementDecisionClusterNames(ctx, placementName, namespace, []string{clusterNames[2], clusterNames[3]})
 
 			// Taint effect is NoSelectIfNew, tolerations doesn't match, cluster is in decision
-			assertPatchingClusterSpecWithTaint(clusterNames[3], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(ctx, clusterNames[3], &clusterapiv1.Taint{
 				Key:    "key4",
 				Value:  "value4",
 				Effect: clusterapiv1.TaintEffectNoSelectIfNew,
 			})
-			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[2], clusterNames[3]})
+			assertPlacementDecisionClusterNames(ctx, placementName, namespace, []string{clusterNames[2], clusterNames[3]})
 		})
 
-		It("Should reschedule when expire TolerationSeconds", func() {
+		It("Should reschedule when expire TolerationSeconds", func(ctx SpecContext) {
 			addedTime := metav1.Now()
 			addedTime_60 := addedTime.Add(-60 * time.Second)
 			tolerationSeconds_10 := int64(10)
 			tolerationSeconds_20 := int64(20)
 
 			// Cluster settings
-			assertBindingClusterSet(clusterSet1Name, namespace)
-			clusterNames := assertCreatingClusters(clusterSet1Name, 4)
+			assertBindingClusterSet(ctx, clusterSet1Name, namespace)
+			clusterNames := assertCreatingClusters(ctx, clusterSet1Name, 4)
 
-			assertPatchingClusterSpecWithTaint(clusterNames[0], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(ctx, clusterNames[0], &clusterapiv1.Taint{
 				Key:       "key1",
 				Value:     "value1",
 				Effect:    clusterapiv1.TaintEffectNoSelect,
 				TimeAdded: addedTime,
 			})
-			assertPatchingClusterSpecWithTaint(clusterNames[1], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(ctx, clusterNames[1], &clusterapiv1.Taint{
 				Key:       "key2",
 				Value:     "value2",
 				Effect:    clusterapiv1.TaintEffectNoSelect,
 				TimeAdded: addedTime,
 			})
-			assertPatchingClusterSpecWithTaint(clusterNames[2], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(ctx, clusterNames[2], &clusterapiv1.Taint{
 				Key:       "key2",
 				Value:     "value2",
 				Effect:    clusterapiv1.TaintEffectNoSelect,
@@ -189,21 +189,21 @@ var _ = Describe("TaintToleration", func() {
 				Operator:          clusterapiv1beta1.TolerationOpExists,
 				TolerationSeconds: &tolerationSeconds_20,
 			}).Build()
-			assertCreatingPlacementWithDecision(placement, 3, 1)
-			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[0], clusterNames[1], clusterNames[3]})
+			assertCreatingPlacementWithDecision(ctx, placement, 3, 1)
+			assertPlacementDecisionClusterNames(ctx, placementName, namespace, []string{clusterNames[0], clusterNames[1], clusterNames[3]})
 
 			// Check placement requeue, clusterNames[0] should be removed when TolerationSeconds expired.
-			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[1], clusterNames[3]})
+			assertPlacementDecisionClusterNames(ctx, placementName, namespace, []string{clusterNames[1], clusterNames[3]})
 			// Check placement requeue, clusterNames[1] should be removed when TolerationSeconds expired.
-			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[3]})
+			assertPlacementDecisionClusterNames(ctx, placementName, namespace, []string{clusterNames[3]})
 			// Check placement update, clusterNames[3] should be removed when new taint added.
-			assertPatchingClusterSpecWithTaint(clusterNames[3], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(ctx, clusterNames[3], &clusterapiv1.Taint{
 				Key:       "key3",
 				Value:     "value3",
 				Effect:    clusterapiv1.TaintEffectNoSelect,
 				TimeAdded: metav1.NewTime(addedTime_60),
 			})
-			assertPlacementDecisionClusterNames(placementName, namespace, []string{})
+			assertPlacementDecisionClusterNames(ctx, placementName, namespace, []string{})
 		})
 	})
 })

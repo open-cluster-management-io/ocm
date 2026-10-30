@@ -1,7 +1,6 @@
 package csr
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -158,7 +157,7 @@ func Test_v1beta1CSRApprovingController_sync(t *testing.T) {
 					},
 				},
 			}
-			if err := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, validV1beta1CSR.Name), validV1beta1CSR.Name); (err != nil) != tt.wantErr {
+			if err := ctrl.sync(t.Context(), testingcommon.NewFakeSyncContext(t, validV1beta1CSR.Name), validV1beta1CSR.Name); (err != nil) != tt.wantErr {
 				t.Errorf("v1beta1CSRApprovingController.sync() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			tt.validateActions(t, kubeClient.Actions())

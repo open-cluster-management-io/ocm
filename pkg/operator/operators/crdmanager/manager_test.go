@@ -5,7 +5,6 @@
 package crdmanager
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -91,7 +90,7 @@ func TestApplyV1CRD(t *testing.T) {
 			for i := range c.requiredCRDs {
 				indices = append(indices, fmt.Sprintf("%d", i))
 			}
-			err := manager.Apply(context.TODO(), func(index string) ([]byte, error) {
+			err := manager.Apply(t.Context(), func(index string) ([]byte, error) {
 				i, _ := strconv.Atoi(index)
 				return json.Marshal(c.requiredCRDs[i])
 			}, indices...)
@@ -171,7 +170,7 @@ func TestClean(t *testing.T) {
 			for i := range c.requiredCRDs {
 				indices = append(indices, fmt.Sprintf("%d", i))
 			}
-			err := manager.Clean(context.TODO(), c.skip, func(index string) ([]byte, error) {
+			err := manager.Clean(t.Context(), c.skip, func(index string) ([]byte, error) {
 				i, _ := strconv.Atoi(index)
 				return json.Marshal(c.requiredCRDs[i])
 			}, indices...)

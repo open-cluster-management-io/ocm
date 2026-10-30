@@ -116,14 +116,14 @@ var _ = Describe("Registration using GRPC", Ordered, Label("grpc-test"), func() 
 		}()
 	})
 
-	AfterAll(func() {
+	AfterAll(func(ctx SpecContext) {
 		stopGRPCServer()
 		// restart hub with default option
 		startHub(hubOption)
 	})
 
 	Context("ManagedCluster registration", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			postfix = rand.String(5)
 			hubOptionWithGRPC = hub.NewHubManagerOptions()
 			hubOptionWithGRPC.EnabledRegistrationDrivers = []string{operatorv1.CSRAuthType, operatorv1.GRPCAuthType}
@@ -217,7 +217,7 @@ var _ = Describe("Registration using GRPC", Ordered, Label("grpc-test"), func() 
 	})
 
 	Context("Certificate rotation", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			postfix = rand.String(5)
 			hubOptionWithGRPC = hub.NewHubManagerOptions()
 			hubOptionWithGRPC.EnabledRegistrationDrivers = []string{operatorv1.GRPCAuthType}
@@ -294,7 +294,7 @@ var _ = Describe("Registration using GRPC", Ordered, Label("grpc-test"), func() 
 	})
 
 	Context("Auto approval", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			postfix = rand.String(5)
 			hubOptionWithGRPC = hub.NewHubManagerOptions()
 			hubOptionWithGRPC.EnabledRegistrationDrivers = []string{operatorv1.GRPCAuthType}

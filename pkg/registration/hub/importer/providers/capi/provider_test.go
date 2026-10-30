@@ -1,7 +1,6 @@
 package capi
 
 import (
-	"context"
 	"testing"
 
 	"github.com/ghodss/yaml"
@@ -220,7 +219,7 @@ func TestClients(t *testing.T) {
 				informer:   dynamicInformers,
 				lister:     dynamicInformers.ForResource(ClusterAPIGVR).Lister(),
 			}
-			_, err := provider.Clients(context.TODO(), c.cluster)
+			_, err := provider.Clients(t.Context(), c.cluster)
 			if c.expectErr && err == nil {
 				t.Errorf("expected error but got nil")
 			}

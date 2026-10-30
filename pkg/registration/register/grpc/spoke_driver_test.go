@@ -1,7 +1,6 @@
 package grpc
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -88,7 +87,7 @@ func TestIsHubKubeConfigValid(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			valid, err := driver.IsHubKubeConfigValid(context.Background(), secretOption)
+			valid, err := driver.IsHubKubeConfigValid(t.Context(), secretOption)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -424,7 +423,7 @@ func TestGRPCTokenControl_CreateToken(t *testing.T) {
 				// We can't easily test the actual CreateToken call without a real gRPC server,
 				// so we just verify the nil check works
 				if ctrl.saClient == nil && tt.saClient == nil {
-					_, err := ctrl.CreateToken(context.Background(), "test-sa", "test-ns", 3600)
+					_, err := ctrl.CreateToken(t.Context(), "test-sa", "test-ns", 3600)
 					if !tt.expectErr {
 						t.Errorf("expected no error, got: %v", err)
 					}
@@ -433,7 +432,7 @@ func TestGRPCTokenControl_CreateToken(t *testing.T) {
 					}
 				}
 			} else {
-				_, err := ctrl.CreateToken(context.Background(), "test-sa", "test-ns", 3600)
+				_, err := ctrl.CreateToken(t.Context(), "test-sa", "test-ns", 3600)
 				if !tt.expectErr {
 					t.Errorf("expected no error, got: %v", err)
 				}

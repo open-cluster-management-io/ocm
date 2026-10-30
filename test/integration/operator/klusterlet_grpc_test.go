@@ -24,8 +24,8 @@ var _ = Describe("Klusterlet using grpc auth", func() {
 	var deploymentName string
 
 	Context("Default mode", func() {
-		BeforeEach(func() {
-			var ctx context.Context
+		BeforeEach(func(ctx SpecContext) {
+			var runCtx context.Context
 
 			klusterletNamespace = fmt.Sprintf("open-cluster-management-%s", rand.String(6))
 			ns := &corev1.Namespace{
@@ -33,7 +33,7 @@ var _ = Describe("Klusterlet using grpc auth", func() {
 					Name: klusterletNamespace,
 				},
 			}
-			_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+			_, err := kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			klusterlet = &operatorapiv1.Klusterlet{
@@ -62,15 +62,15 @@ var _ = Describe("Klusterlet using grpc auth", func() {
 			registrationDeploymentName = fmt.Sprintf("%s-registration-agent", klusterlet.Name)
 			workDeploymentName = fmt.Sprintf("%s-work-agent", klusterlet.Name)
 
-			ctx, cancel = context.WithCancel(context.Background())
-			go startKlusterletOperator(ctx)
+			runCtx, cancel = context.WithCancel(context.Background())
+			go startKlusterletOperator(runCtx)
 		})
 
-		AfterEach(func() {
-			err := operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})
+		AfterEach(func(ctx SpecContext) {
+			err := operatorClient.OperatorV1().Klusterlets().Delete(ctx, klusterlet.Name, metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
-			err = kubeClient.CoreV1().Namespaces().Delete(context.Background(), klusterletNamespace, metav1.DeleteOptions{})
+			err = kubeClient.CoreV1().Namespaces().Delete(ctx, klusterletNamespace, metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			if cancel != nil {
@@ -78,12 +78,12 @@ var _ = Describe("Klusterlet using grpc auth", func() {
 			}
 		})
 
-		It("should have expected resource created successfully", func() {
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+		It("should have expected resource created successfully", func(ctx SpecContext) {
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() error {
-				deploy, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				deploy, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, registrationDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -96,7 +96,7 @@ var _ = Describe("Klusterlet using grpc auth", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 
 			Eventually(func() error {
-				deploy, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
+				deploy, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -111,8 +111,8 @@ var _ = Describe("Klusterlet using grpc auth", func() {
 	})
 
 	Context("Singleton mode", func() {
-		BeforeEach(func() {
-			var ctx context.Context
+		BeforeEach(func(ctx SpecContext) {
+			var runCtx context.Context
 
 			klusterletNamespace = fmt.Sprintf("open-cluster-management-%s", rand.String(6))
 			ns := &corev1.Namespace{
@@ -120,7 +120,7 @@ var _ = Describe("Klusterlet using grpc auth", func() {
 					Name: klusterletNamespace,
 				},
 			}
-			_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+			_, err := kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			klusterlet = &operatorapiv1.Klusterlet{
@@ -150,15 +150,15 @@ var _ = Describe("Klusterlet using grpc auth", func() {
 
 			deploymentName = fmt.Sprintf("%s-agent", klusterlet.Name)
 
-			ctx, cancel = context.WithCancel(context.Background())
-			go startKlusterletOperator(ctx)
+			runCtx, cancel = context.WithCancel(context.Background())
+			go startKlusterletOperator(runCtx)
 		})
 
-		AfterEach(func() {
-			err := operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})
+		AfterEach(func(ctx SpecContext) {
+			err := operatorClient.OperatorV1().Klusterlets().Delete(ctx, klusterlet.Name, metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
-			err = kubeClient.CoreV1().Namespaces().Delete(context.Background(), klusterletNamespace, metav1.DeleteOptions{})
+			err = kubeClient.CoreV1().Namespaces().Delete(ctx, klusterletNamespace, metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			if cancel != nil {
@@ -166,12 +166,12 @@ var _ = Describe("Klusterlet using grpc auth", func() {
 			}
 		})
 
-		It("should have expected resource created successfully", func() {
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+		It("should have expected resource created successfully", func(ctx SpecContext) {
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(ctx, klusterlet, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() error {
-				deploy, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
+				deploy, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(ctx, deploymentName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}

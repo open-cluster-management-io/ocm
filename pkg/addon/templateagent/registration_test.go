@@ -2,7 +2,6 @@ package templateagent
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"net"
 	"os"
@@ -557,7 +556,7 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 			addon:       NewFakeTemplateManagedClusterAddon("addon1", "cluster1", "template1", "fakehash"),
 			expectedErr: nil,
 			validatePermissionFunc: func(t *testing.T, kubeClient kubernetes.Interface) {
-				rb, err := kubeClient.RbacV1().RoleBindings("cluster1").Get(context.TODO(),
+				rb, err := kubeClient.RbacV1().RoleBindings("cluster1").Get(t.Context(),
 					fmt.Sprintf("open-cluster-management:%s:%s:agent", "addon1", strings.ToLower("ClusterRole")),
 					metav1.GetOptions{},
 				)
@@ -621,7 +620,7 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 				}),
 			expectedErr: nil,
 			validatePermissionFunc: func(t *testing.T, kubeClient kubernetes.Interface) {
-				rb, err := kubeClient.RbacV1().RoleBindings("cluster1").Get(context.TODO(),
+				rb, err := kubeClient.RbacV1().RoleBindings("cluster1").Get(t.Context(),
 					fmt.Sprintf("open-cluster-management:%s:%s:agent", "addon1", strings.ToLower("ClusterRole")),
 					metav1.GetOptions{},
 				)
@@ -674,7 +673,7 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 			addon:       NewFakeTemplateManagedClusterAddon("addon1", "cluster1", "template1", "fakehash"),
 			expectedErr: nil,
 			validatePermissionFunc: func(t *testing.T, kubeClient kubernetes.Interface) {
-				rb, err := kubeClient.RbacV1().RoleBindings("test").Get(context.TODO(),
+				rb, err := kubeClient.RbacV1().RoleBindings("test").Get(t.Context(),
 					fmt.Sprintf("open-cluster-management:%s:%s:agent", "addon1", strings.ToLower("ClusterRole")),
 					metav1.GetOptions{},
 				)

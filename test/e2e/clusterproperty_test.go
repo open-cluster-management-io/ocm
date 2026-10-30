@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -24,17 +23,17 @@ var _ = Describe("ClusterProperty API test", func() {
 		aboutClusterClient, err = aboutclient.NewForConfig(spoke.RestConfig)
 		Expect(err).ToNot(HaveOccurred())
 
-		DeferCleanup(func() {
+		DeferCleanup(func(ctx SpecContext) {
 			framework.RemoveRegistrationFeature(hub, spoke, universalKlusterletName, string(ocmfeature.ClusterProperty))
 
 			err = aboutClusterClient.AboutV1alpha1().ClusterProperties().DeleteCollection(
-				context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{})
+				ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 
 	Context("create/update/delete clusterproperty", func() {
-		It("managed cluster should have clusterproperty synced", func() {
+		It("managed cluster should have clusterproperty synced", func(ctx SpecContext) {
 			prop1 := &aboutv1alpha1.ClusterProperty{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "prop1",
@@ -46,14 +45,14 @@ var _ = Describe("ClusterProperty API test", func() {
 
 			Eventually(func() error {
 				_, err = aboutClusterClient.AboutV1alpha1().ClusterProperties().Create(
-					context.Background(), prop1, metav1.CreateOptions{})
+					ctx, prop1, metav1.CreateOptions{})
 				return err
 			}).Should(Succeed())
 
 			By("create a cluster property")
 			Eventually(func() error {
 				managedCluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
-					context.Background(), universalClusterName, metav1.GetOptions{})
+					ctx, universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -70,19 +69,19 @@ var _ = Describe("ClusterProperty API test", func() {
 			By("update a cluster property")
 			Eventually(func() error {
 				p, err := aboutClusterClient.AboutV1alpha1().ClusterProperties().Get(
-					context.Background(), "prop1", metav1.GetOptions{})
+					ctx, "prop1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 				p.Spec.Value = "value2"
 				_, err = aboutClusterClient.AboutV1alpha1().ClusterProperties().Update(
-					context.Background(), p, metav1.UpdateOptions{})
+					ctx, p, metav1.UpdateOptions{})
 				return err
 			}).Should(Succeed())
 
 			Eventually(func() error {
 				managedCluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
-					context.Background(), universalClusterName, metav1.GetOptions{})
+					ctx, universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -98,12 +97,12 @@ var _ = Describe("ClusterProperty API test", func() {
 
 			By("delete a cluster property")
 			err = aboutClusterClient.AboutV1alpha1().ClusterProperties().Delete(
-				context.Background(), "prop1", metav1.DeleteOptions{})
+				ctx, "prop1", metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() error {
 				managedCluster, err := hub.ClusterClient.ClusterV1().ManagedClusters().Get(
-					context.Background(), universalClusterName, metav1.GetOptions{})
+					ctx, universalClusterName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}

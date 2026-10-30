@@ -64,7 +64,7 @@ var _ = AfterSuite(func() {
 
 var _ = Describe("start hub manager", func() {
 	It("start hub manager", func() {
-		ctx, stopHub := context.WithCancel(context.Background())
+		runCtx, stopHub := context.WithCancel(context.Background())
 		opts := NewWorkHubManagerOptions()
 		opts.WorkDriver = "kube"
 		opts.WorkDriverConfig = sourceConfigFileName
@@ -75,7 +75,7 @@ var _ = Describe("start hub manager", func() {
 
 		// start hub controller
 		go func() {
-			err := hubConfig.RunWorkHubManager(ctx, &controllercmd.ControllerContext{
+			err := hubConfig.RunWorkHubManager(runCtx, &controllercmd.ControllerContext{
 				KubeConfig:    cfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
 			})

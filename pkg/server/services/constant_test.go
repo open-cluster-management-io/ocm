@@ -109,7 +109,7 @@ func TestValidateClusterIdentity(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 			if c.identity != "" {
 				ctx = context.WithValue(ctx, authn.ContextUserKey, c.identity)
 			}

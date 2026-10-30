@@ -44,7 +44,7 @@ var _ = Describe("Cluster Claim", func() {
 		hostingClusterName = ""
 	})
 
-	JustBeforeEach(func() {
+	JustBeforeEach(func(ctx SpecContext) {
 		suffix := rand.String(5)
 		managedClusterName = fmt.Sprintf("managedcluster-%s", suffix)
 		hubKubeconfigSecret = fmt.Sprintf("hub-kubeconfig-secret-%s", suffix)
@@ -52,7 +52,7 @@ var _ = Describe("Cluster Claim", func() {
 
 		// create claims
 		for _, claim := range claims {
-			_, err = clusterClient.ClusterV1alpha1().ClusterClaims().Create(context.TODO(), claim, metav1.CreateOptions{})
+			_, err = clusterClient.ClusterV1alpha1().ClusterClaims().Create(ctx, claim, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 		}
 
@@ -72,9 +72,9 @@ var _ = Describe("Cluster Claim", func() {
 		commOptions.SpokeClusterName = managedClusterName
 		cancel = runAgent("claimtest", agentOptions, commOptions, spokeCfg)
 
-		DeferCleanup(func() {
+		DeferCleanup(func(ctx SpecContext) {
 			err = clusterClient.ClusterV1alpha1().ClusterClaims().DeleteCollection(
-				context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+				ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			cancel()
 		})
@@ -172,7 +172,7 @@ var _ = Describe("Cluster Claim", func() {
 			}
 		})
 
-		It("should sync all cluster claims on spoke to status of ManagedCluster", func() {
+		It("should sync all cluster claims on spoke to status of ManagedCluster", func(ctx SpecContext) {
 			assertSuccessBootstrap()
 
 			By("Sync existing claims")
@@ -201,7 +201,7 @@ var _ = Describe("Cluster Claim", func() {
 					Value: "z",
 				},
 			}
-			newClaim, err = clusterClient.ClusterV1alpha1().ClusterClaims().Create(context.TODO(), newClaim, metav1.CreateOptions{})
+			newClaim, err = clusterClient.ClusterV1alpha1().ClusterClaims().Create(ctx, newClaim, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			var newClusterClaims []clusterv1.ManagedClusterClaim
@@ -221,7 +221,7 @@ var _ = Describe("Cluster Claim", func() {
 
 			By("Update the claim")
 			newClaim.Spec.Value = "Z"
-			_, err := clusterClient.ClusterV1alpha1().ClusterClaims().Update(context.TODO(), newClaim, metav1.UpdateOptions{})
+			_, err := clusterClient.ClusterV1alpha1().ClusterClaims().Update(ctx, newClaim, metav1.UpdateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			var updatedClusterClaims []clusterv1.ManagedClusterClaim
@@ -240,7 +240,7 @@ var _ = Describe("Cluster Claim", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(BeTrue())
 
 			By("Delete the claim")
-			err = clusterClient.ClusterV1alpha1().ClusterClaims().Delete(context.TODO(), newClaim.Name, metav1.DeleteOptions{})
+			err = clusterClient.ClusterV1alpha1().ClusterClaims().Delete(ctx, newClaim.Name, metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(func() bool {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
@@ -258,13 +258,13 @@ var _ = Describe("Cluster Claim", func() {
 			hostingClusterName = "hub-cluster-b"
 		})
 
-		It("should create, update and delete the reserved hosting-cluster claim", func() {
+		It("should create, update and delete the reserved hosting-cluster claim", func(ctx SpecContext) {
 			assertSuccessBootstrap()
 
 			By("Claim is created with the reported value")
 			Eventually(func() (string, error) {
 				claim, err := clusterClient.ClusterV1alpha1().ClusterClaims().Get(
-					context.TODO(), managedcluster.HostingClusterClaimName, metav1.GetOptions{})
+					ctx, managedcluster.HostingClusterClaimName, metav1.GetOptions{})
 				if err != nil {
 					return "", err
 				}
@@ -273,14 +273,14 @@ var _ = Describe("Cluster Claim", func() {
 
 			By("Claim is corrected if something else changes its value")
 			claim, err := clusterClient.ClusterV1alpha1().ClusterClaims().Get(
-				context.TODO(), managedcluster.HostingClusterClaimName, metav1.GetOptions{})
+				ctx, managedcluster.HostingClusterClaimName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			claim.Spec.Value = "someone-else-changed-this"
-			_, err = clusterClient.ClusterV1alpha1().ClusterClaims().Update(context.TODO(), claim, metav1.UpdateOptions{})
+			_, err = clusterClient.ClusterV1alpha1().ClusterClaims().Update(ctx, claim, metav1.UpdateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(func() (string, error) {
 				claim, err := clusterClient.ClusterV1alpha1().ClusterClaims().Get(
-					context.TODO(), managedcluster.HostingClusterClaimName, metav1.GetOptions{})
+					ctx, managedcluster.HostingClusterClaimName, metav1.GetOptions{})
 				if err != nil {
 					return "", err
 				}
@@ -290,12 +290,12 @@ var _ = Describe("Cluster Claim", func() {
 	})
 
 	Context("Self-report disabled (default)", func() {
-		It("should never create the reserved hosting-cluster claim", func() {
+		It("should never create the reserved hosting-cluster claim", func(ctx SpecContext) {
 			assertSuccessBootstrap()
 
 			Consistently(func() bool {
 				_, err := clusterClient.ClusterV1alpha1().ClusterClaims().Get(
-					context.TODO(), managedcluster.HostingClusterClaimName, metav1.GetOptions{})
+					ctx, managedcluster.HostingClusterClaimName, metav1.GetOptions{})
 				return errors.IsNotFound(err)
 			}, 5*time.Second, eventuallyInterval).Should(BeTrue())
 		})
@@ -305,7 +305,7 @@ var _ = Describe("Cluster Claim", func() {
 		var aboutClient aboutclient.Interface
 		var err error
 		var properties []*aboutv1alpha1.ClusterProperty
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			maxCustomClusterClaims = 20
 			claims = []*clusterv1alpha1.ClusterClaim{}
 			properties = []*aboutv1alpha1.ClusterProperty{
@@ -330,22 +330,22 @@ var _ = Describe("Cluster Claim", func() {
 			Expect(err).NotTo(HaveOccurred())
 			for _, prop := range properties {
 				_, err = aboutClient.AboutV1alpha1().ClusterProperties().Create(
-					context.Background(), prop, metav1.CreateOptions{})
+					ctx, prop, metav1.CreateOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}
 			err = features.SpokeMutableFeatureGate.Set("ClusterProperty=true")
 			Expect(err).NotTo(HaveOccurred())
 
-			DeferCleanup(func() {
+			DeferCleanup(func(ctx SpecContext) {
 				err := aboutClient.AboutV1alpha1().ClusterProperties().DeleteCollection(
-					context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{})
+					ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
 				Expect(err).NotTo(HaveOccurred())
 				err = features.SpokeMutableFeatureGate.Set("ClusterProperty=false")
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 
-		It("should sync all cluster properties on spoke to status of ManagedCluster", func() {
+		It("should sync all cluster properties on spoke to status of ManagedCluster", func(ctx SpecContext) {
 			assertSuccessBootstrap()
 
 			By("Sync existing clusterproperty")
@@ -378,7 +378,7 @@ var _ = Describe("Cluster Claim", func() {
 					Value: "value3",
 				},
 			}
-			newProperty, err = aboutClient.AboutV1alpha1().ClusterProperties().Create(context.TODO(), newProperty, metav1.CreateOptions{})
+			newProperty, err = aboutClient.AboutV1alpha1().ClusterProperties().Create(ctx, newProperty, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			var newClusterClaims []clusterv1.ManagedClusterClaim
@@ -401,7 +401,7 @@ var _ = Describe("Cluster Claim", func() {
 
 			By("Update the property")
 			newProperty.Spec.Value = "Z"
-			_, err := aboutClient.AboutV1alpha1().ClusterProperties().Update(context.TODO(), newProperty, metav1.UpdateOptions{})
+			_, err := aboutClient.AboutV1alpha1().ClusterProperties().Update(ctx, newProperty, metav1.UpdateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			var updatedClusterClaims []clusterv1.ManagedClusterClaim
@@ -423,7 +423,7 @@ var _ = Describe("Cluster Claim", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 
 			By("Delete the property")
-			err = aboutClient.AboutV1alpha1().ClusterProperties().Delete(context.TODO(), newProperty.Name, metav1.DeleteOptions{})
+			err = aboutClient.AboutV1alpha1().ClusterProperties().Delete(ctx, newProperty.Name, metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(func() error {
 				spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
@@ -437,7 +437,7 @@ var _ = Describe("Cluster Claim", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 		})
 
-		It("should sync all both properties and claims", func() {
+		It("should sync all both properties and claims", func(ctx SpecContext) {
 			assertSuccessBootstrap()
 
 			var clusterClaims []clusterv1.ManagedClusterClaim
@@ -457,7 +457,7 @@ var _ = Describe("Cluster Claim", func() {
 					Value: "z",
 				},
 			}
-			newClaim, err = clusterClient.ClusterV1alpha1().ClusterClaims().Create(context.TODO(), newClaim, metav1.CreateOptions{})
+			newClaim, err = clusterClient.ClusterV1alpha1().ClusterClaims().Create(ctx, newClaim, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			var updatedClusterClaims []clusterv1.ManagedClusterClaim
@@ -480,10 +480,10 @@ var _ = Describe("Cluster Claim", func() {
 
 			By("create a claim with the same key")
 			updateProperty, err := aboutClient.AboutV1alpha1().ClusterProperties().Get(
-				context.TODO(), "property1", metav1.GetOptions{})
+				ctx, "property1", metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			updateProperty.Spec.Value = "newValue"
-			_, err = aboutClient.AboutV1alpha1().ClusterProperties().Update(context.TODO(), updateProperty, metav1.UpdateOptions{})
+			_, err = aboutClient.AboutV1alpha1().ClusterProperties().Update(ctx, updateProperty, metav1.UpdateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			newClaim = &clusterv1alpha1.ClusterClaim{
 				ObjectMeta: metav1.ObjectMeta{
@@ -493,7 +493,7 @@ var _ = Describe("Cluster Claim", func() {
 					Value: "value1",
 				},
 			}
-			_, err = clusterClient.ClusterV1alpha1().ClusterClaims().Create(context.TODO(), newClaim, metav1.CreateOptions{})
+			_, err = clusterClient.ClusterV1alpha1().ClusterClaims().Create(ctx, newClaim, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			updatedClusterClaims[1].Value = "newValue"
 

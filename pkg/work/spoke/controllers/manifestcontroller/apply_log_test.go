@@ -61,10 +61,10 @@ func (s *captureSink) Info(_ int, msg string, kv ...any) {
 // context plus the slice the emitted entries land in. The sink is package-level rather than
 // context-carried because these lines are emitted as JSON independently of the process-wide
 // klog format, so tests assert against the sink instead of a context logger.
-func captureContext() (context.Context, *[]logEntry) {
+func captureContext(ctx context.Context) (context.Context, *[]logEntry) {
 	entries := &[]logEntry{}
 	applyLogSink = logr.New(&captureSink{entries: entries})
-	return context.Background(), entries
+	return ctx, entries
 }
 
 func TestApplyOutcome(t *testing.T) {
@@ -144,7 +144,7 @@ func testManifest() orderedManifest {
 }
 
 func TestEmitResourceApply_GateOff(t *testing.T) {
-	ctx, entries := captureContext()
+	ctx, entries := captureContext(t.Context())
 	// logApply=false: never emits, even on a first apply.
 	emitResourceApply(ctx, false, true, testWorkMeta(), testManifest(),
 		workapiv1.UpdateStrategyTypeUpdate, applyResult{}, "")
@@ -154,7 +154,7 @@ func TestEmitResourceApply_GateOff(t *testing.T) {
 }
 
 func TestEmitResourceApply_ReadOnlyFirstApply(t *testing.T) {
-	ctx, entries := captureContext()
+	ctx, entries := captureContext(t.Context())
 	emitResourceApply(ctx, true, true, testWorkMeta(), testManifest(),
 		workapiv1.UpdateStrategyTypeReadOnly, applyResult{Result: &unstructured.Unstructured{}}, "")
 	if len(*entries) != 1 {
@@ -169,7 +169,7 @@ func TestEmitResourceApply_ReadOnlyFirstApply(t *testing.T) {
 }
 
 func TestEmitResourceApply_ReadOnlyNoSyncOnResync(t *testing.T) {
-	ctx, entries := captureContext()
+	ctx, entries := captureContext(t.Context())
 	// firstApply=false with a differing prevOutcome: a read-only manifest must NOT emit a sync line
 	// (its outcome cannot change).
 	emitResourceApply(ctx, true, false, testWorkMeta(), testManifest(),
@@ -180,7 +180,7 @@ func TestEmitResourceApply_ReadOnlyNoSyncOnResync(t *testing.T) {
 }
 
 func TestEmitResourceApply_FirstApplySuccess(t *testing.T) {
-	ctx, entries := captureContext()
+	ctx, entries := captureContext(t.Context())
 	obj := &unstructured.Unstructured{}
 	obj.SetResourceVersion("123")
 	emitResourceApply(ctx, true, true, testWorkMeta(), testManifest(),
@@ -209,7 +209,7 @@ func TestEmitResourceApply_FirstApplySuccess(t *testing.T) {
 }
 
 func TestEmitResourceApply_FirstApplyFailure(t *testing.T) {
-	ctx, entries := captureContext()
+	ctx, entries := captureContext(t.Context())
 	emitResourceApply(ctx, true, true, testWorkMeta(), testManifest(),
 		workapiv1.UpdateStrategyTypeServerSideApply, applyResult{Error: errors.New("denied")}, "")
 
@@ -224,7 +224,7 @@ func TestEmitResourceApply_FirstApplyFailure(t *testing.T) {
 
 // Resync (firstApply=false) where the resource's outcome changed emits the sync flow.
 func TestEmitResourceApply_SyncOutcomeChanged(t *testing.T) {
-	ctx, entries := captureContext()
+	ctx, entries := captureContext(t.Context())
 	obj := &unstructured.Unstructured{}
 	obj.SetResourceVersion("456")
 	emitResourceApply(ctx, true, false, testWorkMeta(), testManifest(),
@@ -241,7 +241,7 @@ func TestEmitResourceApply_SyncOutcomeChanged(t *testing.T) {
 
 // Resync where the outcome is unchanged emits nothing.
 func TestEmitResourceApply_SyncNoChange(t *testing.T) {
-	ctx, entries := captureContext()
+	ctx, entries := captureContext(t.Context())
 	obj := &unstructured.Unstructured{}
 	emitResourceApply(ctx, true, false, testWorkMeta(), testManifest(),
 		workapiv1.UpdateStrategyTypeUpdate, applyResult{Result: obj}, "applied")
@@ -252,7 +252,7 @@ func TestEmitResourceApply_SyncNoChange(t *testing.T) {
 
 // Resync with no known prior outcome emits nothing (cannot determine a change).
 func TestEmitResourceApply_SyncUnknownPrev(t *testing.T) {
-	ctx, entries := captureContext()
+	ctx, entries := captureContext(t.Context())
 	emitResourceApply(ctx, true, false, testWorkMeta(), testManifest(),
 		workapiv1.UpdateStrategyTypeUpdate, applyResult{}, "")
 	if len(*entries) != 0 {
@@ -279,7 +279,7 @@ func TestPriorManifestOutcome(t *testing.T) {
 }
 
 func TestEmitApplyRollup_Start(t *testing.T) {
-	ctx, entries := captureContext()
+	ctx, entries := captureContext(t.Context())
 	emitApplyRollup(ctx, testWorkMeta(), flowSpokeApply, 3, nil)
 
 	if len(*entries) != 1 {
@@ -298,7 +298,7 @@ func TestEmitApplyRollup_Start(t *testing.T) {
 }
 
 func TestEmitApplyRollup_End(t *testing.T) {
-	ctx, entries := captureContext()
+	ctx, entries := captureContext(t.Context())
 	emitApplyRollup(ctx, testWorkMeta(), flowSpokeApplyResult, 6,
 		&applyCounts{applied: 2, failed: 1, readOnly: 3})
 
@@ -318,7 +318,7 @@ func TestEmitApplyRollup_End(t *testing.T) {
 // spoke attached to more than one hub stays correlatable: the per-resource line, the rollup start
 // line, and the rollup end line all carry it.
 func TestEmittedLinesCarryHubClusterName(t *testing.T) {
-	ctx, entries := captureContext()
+	ctx, entries := captureContext(t.Context())
 	emitResourceApply(ctx, true, true, testWorkMeta(), testManifest(),
 		workapiv1.UpdateStrategyTypeUpdate, applyResult{Result: &unstructured.Unstructured{}}, "")
 	emitApplyRollup(ctx, testWorkMeta(), flowSpokeApply, 1, nil)
@@ -335,7 +335,7 @@ func TestEmittedLinesCarryHubClusterName(t *testing.T) {
 // TestEmitLinesWithoutHubClusterName covers an agent started without --hub-cluster-name: the key
 // is still emitted, empty, rather than the line losing a field consumers index on.
 func TestEmitLinesWithoutHubClusterName(t *testing.T) {
-	ctx, entries := captureContext()
+	ctx, entries := captureContext(t.Context())
 	wm := testWorkMeta()
 	wm.hubClusterName = ""
 	emitResourceApply(ctx, true, true, wm, testManifest(),
@@ -365,7 +365,7 @@ func TestReconcileStampsHubClusterName(t *testing.T) {
 	controller.mwReconciler.hubClusterName = "hub-east"
 	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
 
-	ctx, entries := captureContext()
+	ctx, entries := captureContext(t.Context())
 	if err := controller.toController().sync(ctx, syncContext, work.Name); err != nil {
 		t.Fatalf("sync: %v", err)
 	}
@@ -430,7 +430,7 @@ func TestReconcileEmitsApplyLogLines(t *testing.T) {
 		withKubeObject().withUnstructuredObject()
 	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
 
-	ctx, entries := captureContext()
+	ctx, entries := captureContext(t.Context())
 	if err := controller.toController().sync(ctx, syncContext, work.Name); err != nil {
 		t.Fatalf("sync: %v", err)
 	}
@@ -457,7 +457,7 @@ func TestReconcileDedupsRollupBySameGeneration(t *testing.T) {
 		withKubeObject().withUnstructuredObject()
 	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
 
-	ctx, entries := captureContext()
+	ctx, entries := captureContext(t.Context())
 	if err := controller.toController().sync(ctx, syncContext, work.Name); err != nil {
 		t.Fatalf("sync: %v", err)
 	}
@@ -495,7 +495,7 @@ func TestReconcileRollupSurvivesUnpersistedStatus(t *testing.T) {
 		withKubeObject().withUnstructuredObject()
 	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
 
-	ctx, entries := captureContext()
+	ctx, entries := captureContext(t.Context())
 	for i := range 2 {
 		if err := controller.toController().sync(ctx, syncContext, work.Name); err != nil {
 			t.Fatalf("sync %d: %v", i+1, err)
@@ -521,7 +521,7 @@ func TestReconcileNoEmitWhenGateOff(t *testing.T) {
 		withKubeObject().withUnstructuredObject()
 	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
 
-	ctx, entries := captureContext()
+	ctx, entries := captureContext(t.Context())
 	if err := controller.toController().sync(ctx, syncContext, work.Name); err != nil {
 		t.Fatalf("sync: %v", err)
 	}

@@ -85,11 +85,11 @@ var _ = AfterSuite(func() {
 
 var _ = Describe("start hub manager", func() {
 	It("start hub manager", func() {
-		ctx, stopHub := context.WithCancel(context.Background())
+		runCtx, stopHub := context.WithCancel(context.Background())
 		m := NewHubManagerOptions()
 		m.ClusterAutoApprovalUsers = []string{util.AutoApprovalBootstrapUser}
 		go func() {
-			err := m.RunControllerManager(ctx, &controllercmd.ControllerContext{
+			err := m.RunControllerManager(runCtx, &controllercmd.ControllerContext{
 				KubeConfig:    cfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
 			})

@@ -1,7 +1,6 @@
 package registration_test
 
 import (
-	"context"
 	"fmt"
 	"path"
 	"time"
@@ -23,7 +22,7 @@ import (
 const expectedAnnotation = "open-cluster-management.io/automatically-accepted-on"
 
 var _ = Describe("Cluster Auto Approval", func() {
-	It("Cluster should be automatically approved", func() {
+	It("Cluster should be automatically approved", func(ctx SpecContext) {
 		var err error
 
 		managedClusterName := "autoapprovaltest-spokecluster"
@@ -99,9 +98,9 @@ var _ = Describe("Cluster Auto Approval", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(HaveOccurred())
 	})
 
-	It("Cluster can be denied by manually after automatically approved", func() {
+	It("Cluster can be denied by manually after automatically approved", func(ctx SpecContext) {
 		clusterName := "autoapprovaltest-spoke-cluster1"
-		_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), &clusterv1.ManagedCluster{
+		_, err := clusterClient.ClusterV1().ManagedClusters().Create(ctx, &clusterv1.ManagedCluster{
 			ObjectMeta: v1.ObjectMeta{
 				Name: clusterName,
 			},
@@ -132,7 +131,7 @@ var _ = Describe("Cluster Auto Approval", func() {
 
 			updatedCluster := cluster.DeepCopy()
 			updatedCluster.Spec.HubAcceptsClient = false
-			_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), updatedCluster, v1.UpdateOptions{})
+			_, err = clusterClient.ClusterV1().ManagedClusters().Update(ctx, updatedCluster, v1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).Should(Succeed())
 

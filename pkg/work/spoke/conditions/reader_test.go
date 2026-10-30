@@ -1,7 +1,6 @@
 package conditions
 
 import (
-	"context"
 	"testing"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -361,7 +360,7 @@ func TestConditionReader(t *testing.T) {
 				budget = int64(1000)
 			}
 
-			condition, remainingBudget, err := reader.GetConditionByRule(context.TODO(), c.object, c.rule, budget)
+			condition, remainingBudget, err := reader.GetConditionByRule(t.Context(), c.object, c.rule, budget)
 			if err == nil && c.expectError {
 				t.Errorf("%s: Expect error but got no error", c.name)
 			}

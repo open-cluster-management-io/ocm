@@ -1,7 +1,6 @@
 package predicate
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -226,7 +225,7 @@ func TestMatchWithClusterPredicates(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			p := &Predicate{handle: testinghelpers.NewFakePluginHandle(t, nil, c.existingAddOnScores...)}
-			result, status := p.Filter(context.TODO(), c.placement, c.clusters)
+			result, status := p.Filter(t.Context(), c.placement, c.clusters)
 			clusters := result.Filtered
 			err := status.AsError()
 			if err != nil && status.Code() != framework.Misconfigured {

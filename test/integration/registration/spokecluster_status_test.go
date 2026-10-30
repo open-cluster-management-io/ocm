@@ -19,7 +19,7 @@ import (
 )
 
 var _ = Describe("Collecting Node Resource", func() {
-	It("managed cluster node resource should be collected successfully", func() {
+	It("managed cluster node resource should be collected successfully", func(ctx SpecContext) {
 		var err error
 
 		// create one node
