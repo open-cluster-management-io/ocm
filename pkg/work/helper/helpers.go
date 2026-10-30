@@ -387,7 +387,9 @@ func NewAppliedManifestWorkOwner(appliedWork *workapiv1.AppliedManifestWork) *me
 	}
 }
 
-func resourceMatch(resourceMeta workapiv1.ManifestResourceMeta, resource workapiv1.ResourceIdentifier) bool {
+// ResourceMatch reports whether the resource identified by resourceMeta matches the given
+// ResourceIdentifier. Group and resource must be equal; name and namespace support "*" wildcards.
+func ResourceMatch(resourceMeta workapiv1.ManifestResourceMeta, resource workapiv1.ResourceIdentifier) bool {
 	return resourceMeta.Group == resource.Group &&
 		resourceMeta.Resource == resource.Resource &&
 		wildcardMatch(resourceMeta.Namespace, resource.Namespace) &&
@@ -408,7 +410,7 @@ func FindManifestConfiguration(resourceMeta workapiv1.ManifestResourceMeta,
 
 	for i := 0; i < len(manifestOptions); i++ {
 		option := manifestOptions[i]
-		if !resourceMatch(resourceMeta, option.ResourceIdentifier) {
+		if !ResourceMatch(resourceMeta, option.ResourceIdentifier) {
 			continue
 		}
 
