@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -31,6 +33,15 @@ const (
 	EvictionGracePeriodBound = 100 * 365 * 24 * time.Hour
 
 	unManagedAppliedManifestWork = "UnManagedAppliedManifestWork"
+
+	// massEvictionWarnMinCount is the minimum number of this agent's AppliedManifestWorks that must
+	// already carry EvictionStartTime before we emit the mass-eviction warning.
+	massEvictionWarnMinCount = 10
+	// massEvictionWarnRatio is the fraction of this agent's AppliedManifestWorks with
+	// EvictionStartTime set that triggers the warning (together with massEvictionWarnMinCount).
+	massEvictionWarnRatio = 0.5
+	// massEvictionWarnCooldown limits how often the warning is emitted.
+	massEvictionWarnCooldown = 5 * time.Minute
 )
 
 type unmanagedAppliedWorkController struct {
@@ -42,6 +53,9 @@ type unmanagedAppliedWorkController struct {
 	hubHash                    string
 	agentID                    string
 	evictionGracePeriod        time.Duration
+
+	massEvictionWarnMu     sync.Mutex
+	lastMassEvictionWarnAt time.Time
 }
 
 // NewUnManagedAppliedWorkController returns a controller to evict the unmanaged appliedmanifestworks.
@@ -155,7 +169,13 @@ func (m *unmanagedAppliedWorkController) evictAppliedManifestWork(ctx context.Co
 
 	evictionStartTime := appliedManifestWork.Status.EvictionStartTime
 	if evictionStartTime == nil {
-		return m.patchEvictionStartTime(ctx, appliedManifestWork, &metav1.Time{Time: now})
+		if err := m.patchEvictionStartTime(ctx, appliedManifestWork, &metav1.Time{Time: now}); err != nil {
+			return err
+		}
+		// Mass simultaneous stamps usually mean the local ManifestWork store is empty/partial
+		// (cloudevents replay), not that the hub deleted most of the estate (#1786).
+		m.warnIfMassEviction(ctx, controllerContext)
+		return nil
 	}
 
 	evictionTime := evictionStartTime.Add(m.evictionGracePeriod)
@@ -174,6 +194,68 @@ func (m *unmanagedAppliedWorkController) evictAppliedManifestWork(ctx context.Co
 	}
 	logger.Info("AppliedManifestWork evicted after eviction grace period", "agentID", m.agentID)
 	return nil
+}
+
+// warnIfMassEviction logs and records a warning when a large share of this agent's
+// AppliedManifestWorks already have EvictionStartTime set. With the cloudevents driver the
+// ManifestWork informer can report HasSynced before resync replay fills the local store, so
+// NotFound-based eviction can stamp many works at once; a true "store reconciled" signal must
+// come from sdk-go (#1786).
+func (m *unmanagedAppliedWorkController) warnIfMassEviction(ctx context.Context, controllerContext factory.SyncContext) {
+	stamped, total := countAgentEvictionStamps(m.appliedManifestWorkLister, m.agentID)
+	// The lister may not yet reflect the EvictionStartTime we just patched on the current object.
+	stamped++
+	if total < stamped {
+		total = stamped
+	}
+	if !shouldWarnMassEviction(stamped, total) {
+		return
+	}
+
+	m.massEvictionWarnMu.Lock()
+	defer m.massEvictionWarnMu.Unlock()
+	now := time.Now()
+	if !m.lastMassEvictionWarnAt.IsZero() && now.Sub(m.lastMassEvictionWarnAt) < massEvictionWarnCooldown {
+		return
+	}
+	m.lastMassEvictionWarnAt = now
+
+	msg := fmt.Sprintf(
+		"EvictionStartTime is set on %d/%d AppliedManifestWorks for agent %q; "+
+			"this often means the ManifestWork store is empty or still replaying rather than hub deletion. "+
+			"Consider increasing appliedManifestWorkEvictionGracePeriod or verifying work-driver sync health.",
+		stamped, total, m.agentID)
+	klog.FromContext(ctx).Info(msg)
+	if recorder := controllerContext.Recorder(); recorder != nil {
+		recorder.Warning(ctx, "MassAppliedManifestWorkEviction", msg)
+	}
+}
+
+func shouldWarnMassEviction(stamped, total int) bool {
+	if total == 0 || stamped < massEvictionWarnMinCount {
+		return false
+	}
+	return float64(stamped)/float64(total) >= massEvictionWarnRatio
+}
+
+func countAgentEvictionStamps(lister worklister.AppliedManifestWorkLister, agentID string) (stamped, total int) {
+	if lister == nil {
+		return 0, 0
+	}
+	appliedWorks, err := lister.List(labels.Everything())
+	if err != nil {
+		return 0, 0
+	}
+	for _, aw := range appliedWorks {
+		if aw.Spec.AgentID != agentID {
+			continue
+		}
+		total++
+		if aw.Status.EvictionStartTime != nil {
+			stamped++
+		}
+	}
+	return stamped, total
 }
 
 func (m *unmanagedAppliedWorkController) stopToEvictAppliedManifestWork(
